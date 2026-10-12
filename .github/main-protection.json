@@ -3,8 +3,9 @@
     "strict": true,
     "contexts": [],
     "checks": [
-      {"context": "CI (Python 3.11)"},
-      {"context": "CI (Python 3.13)"}
+      {"context": "CI (Python 3.13)"},
+      {"context": "CI (Python 3.14)"},
+      {"context": "CI (Python 3.15)"}
     ]
   },
   "enforce_admins": true,

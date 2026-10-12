@@ -4,6 +4,8 @@ IHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+- Raise the minimum supported Python version to 3.13; older versions are no longer supported. Align packaging, Ruff, and setup instructions, and test Python 3.13, 3.14, and 3.15 in CI.
+
 ## 1.0.0 — 2026-10-12
 
 First versioned release of the local Python and SQLite app.
