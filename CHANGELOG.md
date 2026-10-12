@@ -4,7 +4,11 @@ IHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.0.1 — 2026-10-12
+
 - Raise the minimum supported Python version to 3.13; older versions are no longer supported. Align packaging, Ruff, and setup instructions, and test Python 3.13, 3.14, and 3.15 in CI.
+- Show the release version in About using the same version source as packaging, the CLI, and FastAPI.
+- Require a version bump and changelog entry for each material change, including runtime support changes.
 
 ## 1.0.0 — 2026-10-12
 

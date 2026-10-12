@@ -2,13 +2,13 @@
 
 A local budgeting app built with **Python, FastAPI, Jinja, and SQLite**. It has monthly category allocations and rollover, transaction categorization and review, spending analytics, manual accounts, CSV export, and a server-side Plaid Transactions connection. Pages and budgeting logic run in Python; a small browser script handles forms and Plaid Link. No Node.js build is required.
 
-Current version: **1.0.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes. This version establishes the compatibility baseline for the local app; the limitations below still apply.
+Current version: **1.0.1**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
 
 ## Versioning and contributions
 
 IHAB follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html): patch releases fix compatible behavior, minor releases add compatible features, and major releases introduce breaking changes. The compatibility contract covers documented HTTP/CSV interfaces and the ability to open existing ledgers and encrypted connections through supported migrations. A schema change with a supported automatic migration can be compatible; dropping or changing documented fields, requiring manual data conversion, or invalidating existing tokens requires a major release. Internal refactoring and visual changes do not by themselves break this contract.
 
-`ihab/__init__.py` contains the single version value used by packaging, the CLI, and FastAPI. Check it with `.venv/bin/python -m ihab --version`. For a release, update that value and the changelog in a PR, then tag the merged `main` commit as `vX.Y.Z` and publish matching GitHub release notes. Never move an existing release tag. Documentation and tooling PRs can remain unreleased until the next app release.
+`ihab/__init__.py` contains the single version value used by packaging, the CLI, FastAPI, and the About dialog. Check it with `.venv/bin/python -m ihab --version`. Every material change, including runtime or dependency support changes, must include the appropriate SemVer bump and a dated changelog entry in the same PR. Verify the package and runtime versions match before merging, then tag the merged `main` commit as `vX.Y.Z` and publish matching GitHub release notes. Never move an existing release tag. Small documentation-only changes can remain unreleased until the next app release.
 
 All changes use a feature branch and a pull request targeting `main`. CI runs pytest and Ruff on Python 3.13, 3.14, and 3.15 without Plaid credentials or private data. Review the final diff, fix failures, and squash merge after the checks pass. The sole maintainer has authorized routine PR review and merging without another confirmation. There is no second-person approval requirement because [GitHub cannot approve a PR through its author's account](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews).
 
