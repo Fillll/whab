@@ -5,11 +5,13 @@ import os
 
 import uvicorn
 
+from . import __version__
 from .config import Settings
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run IHAB on this computer.")
+    parser.add_argument("--version", action="version", version=f"IHAB {__version__}")
     parser.add_argument("--port", type=int, help="Local HTTP port (default: PORT or 5173)")
     parser.add_argument(
         "--reload", action="store_true", help="Reload Python files during development"

@@ -24,6 +24,7 @@ from pydantic import (
     field_validator,
 )
 
+from . import __version__
 from .config import ROOT, Settings
 from .plaid_service import PlaidError, PlaidService
 from .store import UNSET, Store, StoreError, current_month
@@ -166,7 +167,14 @@ def create_app(store=None, plaid=None, settings=None):
         if owned_store:
             store.close()
 
-    app = FastAPI(title="IHAB", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    app = FastAPI(
+        title="IHAB",
+        version=__version__,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+    )
     templates = Jinja2Templates(directory=ROOT / "templates")
     app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
     origins = {f"http://{host}:{settings.port}" for host in ("localhost", "127.0.0.1")}
