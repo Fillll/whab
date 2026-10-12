@@ -10,7 +10,7 @@ IHAB follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html): p
 
 `ihab/__init__.py` contains the single version value used by packaging, the CLI, and FastAPI. Check it with `.venv/bin/python -m ihab --version`. For a release, update that value and the changelog in a PR, then tag the merged `main` commit as `vX.Y.Z` and publish matching GitHub release notes. Never move an existing release tag. Documentation and tooling PRs can remain unreleased until the next app release.
 
-All changes use a feature branch and a pull request targeting `main`. CI runs pytest and Ruff on Python 3.11 and 3.13 without Plaid credentials or private data. Review the final diff, fix failures, and squash merge after the checks pass. The sole maintainer has authorized routine PR review and merging without another confirmation. There is no second-person approval requirement because [GitHub cannot approve a PR through its author's account](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews).
+All changes use a feature branch and a pull request targeting `main`. CI runs pytest and Ruff on Python 3.13, 3.14, and 3.15 without Plaid credentials or private data. Review the final diff, fix failures, and squash merge after the checks pass. The sole maintainer has authorized routine PR review and merging without another confirmation. There is no second-person approval requirement because [GitHub cannot approve a PR through its author's account](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews).
 
 **Branch protection is pending.** GitHub rejected protection for this private repository on the current account plan; the maintainer chose to leave enforcement pending. [Private repository protection requires Pro or an eligible organization plan](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches). The PR workflow is a project convention until Pro is enabled. `.github/main-protection.json` records the intended rule: require PRs and passing CI, apply it to administrators, prevent force pushes/deletion, and require resolved conversations and linear history. After enabling Pro, apply it with:
 
@@ -21,10 +21,10 @@ gh api --method PUT repos/Fillll/ihab/branches/main/protection \
 
 ## Run locally
 
-Requires Python 3.11 or newer. Run from a source checkout; templates and static assets live alongside the Python package.
+Requires **Python 3.13 or newer**. Older Python versions are unsupported and rejected by package installation. Run from a source checkout; templates and static assets live alongside the Python package.
 
 ```sh
-python3 -m venv .venv
+python3.13 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python scripts/setup.py
 .venv/bin/python -m ihab
