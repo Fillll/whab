@@ -1,0 +1,88 @@
+<div class="page-title-row">
+  <div>
+    <div class="eyebrow">A CLEARER PICTURE</div>
+    <h1>Spending insights</h1>
+    <p>See where your money went and how it changes.</p>
+  </div>
+  <input type="month"
+         aria-label="Insights month"
+         data-navigation="month"
+         value="{{ month }}">
+</div>
+<div class="insights-summary">
+  <div>
+    <span class="summary-label">SPENT IN {{ month_label(month,true)|upper }}</span><strong>{{ money(data.summary.spent) }}</strong><span class="comparison">
+      {% if change is not none %}{{ icon('insights', 14) }}{{ '%.1f'|format(change|abs) }}% {{ 'more' if change>0 else 'less' }} than last month
+      {% else %}No prior month to compare yet
+      {% endif %}
+    </span>
+  </div>
+  <div class="insight-income">
+    <span class="summary-label">INCOME</span><strong>{{ money(data.summary.income) }}</strong><span class="summary-foot">Posted inflows this month</span>
+  </div>
+  <div class="insight-income">
+    <span class="summary-label">TRANSACTIONS</span><strong>{{ purchases }}</strong><span class="summary-foot">Posted purchases</span>
+  </div>
+</div>
+<section class="trend-section">
+  <div class="section-title">
+    <h2>Spending over time</h2>
+    <span class="chart-legend"><span></span>Monthly spending · USD</span>
+  </div>
+  <svg class="spend-chart"
+       viewBox="0 0 880 230"
+       role="img"
+       aria-label="Monthly spending over six months">
+    <defs><linearGradient id="spend-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#42715a" stop-opacity=".13" /><stop offset="100%" stop-color="#42715a" stop-opacity="0" /></linearGradient></defs>
+    {% for fraction in [0,0.25,0.5,0.75,1] %}<line x1="64" x2="864" y1="{{ 192-fraction*170 }}" y2="{{ 192-fraction*170 }}" stroke="#e6e9e1" stroke-dasharray="4 5" /><text x="52" y="{{ 196-fraction*170 }}" text-anchor="end">{{ money(chart_max*fraction,0) }}</text>
+    {% endfor %}
+    {% if points %}
+      <path d="{{ chart_path }} L{{ points[-1].x }},192 L64,192 Z" fill="url(#spend-fill)" />
+      <path d="{{ chart_path }}" fill="none" stroke="#3b6a52" stroke-width="2.5" stroke-linejoin="round" />
+      {% for point in points %}<circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" fill="#f9faf6" stroke="#3b6a52" stroke-width="2"><title>{{ month_label(point.month) }}: {{ money(point.spent) }}</title></circle><text x="{{ point.x }}" y="219" text-anchor="middle">{{ month_label(point.month,true).split(' ')[0] }}</text>
+      {% endfor %}
+    {% endif %}
+  </svg>
+</section>
+<div class="insights-columns">
+  <section>
+    <div class="section-title">
+      <h2>By category</h2>
+      <span class="subtle-label">{{ month_label(month,true) }}</span>
+    </div>
+    {% for row in spending %}
+      <div class="spending-row">
+        <div>
+          <span>{{ row.category.name }}</span><strong>{{ money(row.spent) }}</strong>
+        </div>
+        <div class="spend-bar">
+          <span style="width:{{ [100,row.spent/data.summary.spent*100 if data.summary.spent>0 else 0]|min }}%"></span>
+        </div>
+      </div>
+    {% else %}<p class="empty-inline">Categorize your spending to see the breakdown.</p>
+    {% endfor %}
+    {% if uncategorized %}
+      <div class="spending-row">
+        <div>
+          <span>Uncategorized</span><strong>{{ money(uncategorized) }}</strong>
+        </div>
+      </div>
+    {% endif %}
+  </section>
+  <section>
+    <div class="section-title">
+      <h2>Top payees</h2>
+      <span class="subtle-label">After categorized refunds</span>
+    </div>
+    {% for name,amount in payees %}
+      <div class="payee-row">
+        <span class="payee-index">{{ '%02d'|format(loop.index) }}</span><strong>{{ name }}</strong><span>{{ money(amount) }}</span>
+      </div>
+    {% else %}<p class="empty-inline">Your top payees will appear after importing transactions.</p>
+    {% endfor %}
+    <div class="insight-note">
+      {{ icon('shield', 17) }}
+      <p>Transfers and pending transactions are excluded. Uncategorized spending is included in the total.</p>
+    </div>
+  </section>
+</div>

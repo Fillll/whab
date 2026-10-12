@@ -1,0 +1,108 @@
+<div class="page-title-row">
+  <div>
+    <div class="eyebrow">CONNECTED ACCOUNTS</div>
+    <h1>Your financial accounts</h1>
+    <p>Bring your balances and transactions together.</p>
+  </div><button class="button primary"
+        data-connect
+        {% if not status.plaidConfigured %}disabled {% endif %}>{{ icon('link', 16) }}Connect account</button>
+</div>
+<div class="connection-notice">
+  {{ icon('shield', 20) }}
+  <div>
+    <strong>{{ 'Live connections' if status.environment=='production' else 'Sandbox connections' }}</strong>
+    <p>{{ 'Real bank data. Connect each account once to preserve your Trial connection allowance.' if status.environment=='production' else 'Plaid Sandbox imports test accounts. Connecting here will not connect your real bank.' }}</p>
+  </div>
+  <span class="mode-badge">{{ status.environment }}</span>
+</div>
+{% if not status.plaidConfigured %}
+  <section class="setup-panel">
+    <div class="section-title">
+      <h2>Finish Plaid setup</h2>
+      {{ icon('settings', 19) }}
+    </div>
+    <p>Save your Plaid keys in the local <code>.env</code> file, then restart IHAB.</p>
+    <div class="setup-checks">
+      {% for key,label in [('PLAID_CLIENT_ID','Client ID'),('PLAID_SECRET','Sandbox secret'),('TOKEN_ENCRYPTION_KEY','Token encryption key')] %}
+        <div><span class="setup-dot {% if key not in status.missingConfig %}complete {% endif %}"></span><span>{{ label }}</span><small>{{ 'Needed' if key in status.missingConfig else 'Configured' }}</small>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="setup-footer">
+      <span>Your keys stay on this computer.</span><a class="text-link"
+   href="https://dashboard.plaid.com/team/keys"
+   target="_blank"
+   rel="noreferrer">Open Plaid Dashboard {{ icon('arrow-up', 14) }}</a>
+    </div>
+  {% if status.environment=="production" and not status.liveEnabled %}<p class="field-error">Live access is disabled. Enable it in the server configuration when you’re ready.</p>
+{% endif %}
+</section>
+{% endif %}
+<div class="section-title accounts-heading">
+  <h2>{{ 'Sample accounts' if workspace=='demo' else 'Accounts' }} <span>{{ data.accounts|length }}</span></h2>
+  <button class="text-link"
+          data-dialog="account-dialog">{{ icon('plus', 14) }}Add manual account</button>
+</div>
+{% if data.accounts %}
+  <div class="account-list">
+    {% for account in data.accounts %}
+      <div class="account-row">
+        <span class="bank-mark">{{ account.institution[:1] }}</span>
+        <div class="account-description">
+          <strong>{{ account.name }}</strong><span>{{ account.institution }}
+            {% if account.mask %} · ••{{ account.mask }}
+            {% endif %} · {{ 'Credit card' if account.type=='credit' else 'Loan' if account.type=='loan' else 'Cash account' if account.type=='depository' else account.type }}
+            {% if account.stale %} · Stale snapshot
+            {% endif %}
+          </span>
+        </div>
+        <span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' else 'Plaid' }}</span>
+        <div class="account-balance">
+          <strong>{{ 'Unavailable' if account.balanceUnknown else money(account.balance) }}</strong><small>{{ 'Owed' if account.type in ['credit','loan'] else 'Balance' }}</small>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="accounts-total">
+    <span>Cash account balances</span><strong>{{ money(cash_balance) }}</strong>
+  </div>
+{% else %}
+  <div class="empty-state">
+    <span>{{ icon('accounts', 28) }}</span>
+    <h2>Start with one account</h2>
+    <p>Connect a bank through Plaid to start importing balances and transactions.</p>
+  </div>
+{% endif %}
+{% if workspace=="demo" %}
+  <div class="sample-account-note">
+    <span>These accounts only contain sample data.</span><a class="text-link" href="{{ url('accounts',workspace='personal') }}">Open my budget {{ icon('arrow-right', 15) }}</a>
+  </div>
+{% endif %}
+{% if items %}
+  <section class="connected-items">
+    <div class="section-title">
+      <h2>Plaid connections</h2>
+      <button class="button secondary compact" data-sync>{{ icon('refresh', 14) }}Sync now</button>
+    </div>
+    {% for item in items %}
+      <div class="connection-row">
+        <div>
+          <strong>{{ item.institutionName }}</strong>
+          <p>
+          {% if item.lastSynced %}Last sync <time data-local-time
+       datetime="{{ item.lastSynced }}">{{ item.lastSynced }}</time>
+    {% else %}Initial import pending
+    {% endif %}
+    {% if item.error %} · {{ item.error }}
+    {% endif %}
+  </p>
+  </div>
+  <div class="connection-actions">
+    <button class="text-link" data-connect="{{ item.id }}">{{ 'Reconnect' if item.status=='reconnect' else 'Manage' }}</button><button class="disconnect-button"
+        data-disconnect="{{ item.id }}"
+        data-institution="{{ item.institutionName }}">Disconnect</button>
+  </div>
+  </div>
+{% endfor %}
+</section>
+{% endif %}

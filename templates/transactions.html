@@ -1,0 +1,104 @@
+<div class="page-title-row">
+  <div>
+    <div class="eyebrow">YOUR MONEY, IN DETAIL</div>
+    <h1>Transactions</h1>
+    <p>Review spending and put it in the right category.</p>
+  </div>
+  <div class="button-group"><a class="button secondary"
+   href="/api/export?workspace={{ workspace }}"
+   download>{{ icon('download', 16) }}Export</a><button class="button primary"
+        data-dialog="transaction-dialog"
+        {% if not manual_accounts %}disabled title="Add a manual account in Accounts first" {% endif %}>{{ icon('plus', 16) }}Add transaction</button>
+  </div>
+</div>
+<div class="transaction-filters">
+  <label class="search-input">
+    {{ icon('search', 17) }}<input aria-label="Search transactions"
+       id="transaction-search"
+       placeholder="Search transactions…">
+  </label>
+  <select aria-label="Filter by account" id="account-filter">
+    <option value="all">All accounts</option>
+  {% for account in data.accounts %}<option value="{{ account.id }}">{{ account.name }}</option>
+{% endfor %}</select><input type="month"
+       aria-label="Transaction month"
+       data-navigation="month"
+       value="{{ month }}"><button class="filter-button" id="review-filter" aria-pressed="false">{{ icon('check-circle', 15) }}Needs review</button>
+</div>
+<div class="table-scroll">
+  <table class="transactions-table">
+    <thead>
+      <tr>
+        <th>Reviewed</th>
+        <th>Date</th>
+        <th>Payee</th>
+        <th>Category</th>
+        <th>Account</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for transaction in transactions %}
+        <tr class="transaction-row"
+            data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}"
+            data-account="{{ transaction.accountId }}"
+            data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}">
+          <td>
+            <form data-api="/transactions/{{ transaction.id|urlencode }}"
+                  data-method="PATCH"
+                  data-auto>
+              <input type="hidden" name="workspace" value="{{ workspace }}"><input type="checkbox"
+       name="reviewed"
+       data-boolean
+       aria-label="Mark {{ transaction.merchant }} reviewed"
+       {% if transaction.reviewed %}checked {% endif %}
+       {% if transaction.pending %}disabled {% endif %}>
+            </form>
+          </td>
+          <td class="date-cell">{{ date_label(transaction.date) }}</td>
+          <td>
+            <strong>{{ transaction.merchant }}</strong>
+            <div class="transaction-meta">
+              {% if transaction.pending %}<span>Pending</span>
+              {% endif %}
+              {% if transaction.isTransfer %}<span>Transfer</span>
+              {% endif %}
+              {% if transaction.source=="manual" %}<span>Manual</span>
+              {% endif %}
+              {% if transaction.note %}<span>{{ transaction.note }}</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <form data-api="/transactions/{{ transaction.id|urlencode }}"
+                  data-method="PATCH"
+                  data-auto><input type="hidden" name="workspace" value="{{ workspace }}"><select name="categoryId"
+        data-null
+        aria-label="Category for {{ transaction.merchant }}"
+        class="{% if not transaction.categoryId and not transaction.isTransfer %}uncategorized {% endif %}"><option value="">{{ 'Transfer (excluded)' if transaction.inferredTransfer else 'Income / uncategorized' if transaction.amount<0 else 'Uncategorized' }}</option>
+              {% for category in data.categories %}<option value="{{ category.id }}"
+        {% if transaction.categoryId==category.id %}selected {% endif %}>{{ category.name }}</option>
+      {% endfor %}
+      </select>
+    </form>
+  </td>
+  <td class="account-cell">
+    {{ accounts_by_id[transaction.accountId].name if transaction.accountId in accounts_by_id else 'Disconnected account' }}
+  </td>
+  <td class="amount-cell {% if transaction.amount<0 %}inflow {% endif %}">{{ '+' if transaction.amount<0 else '−' }}{{ money(transaction.amount|abs) }}
+  </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% if not transactions %}
+  <div class="empty-state">
+    <span>{{ icon('transactions', 28) }}</span>
+    <h2>No transactions here yet</h2>
+    <p>{{ 'Try another month.' if data.accounts else 'Connect a bank account to import transactions.' }}</p>
+  </div>
+{% endif %}
+<div class="table-footer">
+  <span id="transaction-count">{{ transactions|length }} transactions · {{ month_label(month) }}</span><span>Pending transactions are excluded from spending totals.</span>
+</div>

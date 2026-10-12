@@ -1,0 +1,134 @@
+{% macro heading(title, subtitle) %}
+  <div class="modal-heading">
+    <div>
+      <h2>{{ title }}</h2>
+      <p>{{ subtitle }}</p>
+    </div>
+    <button class="icon-button"
+            data-close-dialog
+            aria-label="Close dialog">{{ icon('close', 20) }}</button>
+  </div>
+{% endmacro %}
+<dialog class="modal"
+        id="category-dialog">{{ heading('New category', 'Make space for something you want to budget for.') }}
+  <form class="modal-form" data-api="/categories">
+    <input type="hidden" name="workspace" value="{{ workspace }}">
+    <label>
+      Category name<input name="name"
+       required
+       maxlength="80"
+       placeholder="e.g. School supplies"
+       autofocus>
+    </label>
+    <label>
+      Group<input name="group"
+       required
+       maxlength="80"
+       list="category-groups"
+       value="Everyday">
+      <datalist id="category-groups">
+        {% for group in groups %}
+          <option value="{{ group.name }}">
+        {% endfor %}
+      </datalist>
+    </label>
+    <label>
+      Monthly target ($)<input name="target" data-cents inputmode="decimal" value="0" required>
+    </label>
+    <p class="field-error" role="alert" hidden></p>
+    <button class="button primary full-width">Create category</button>
+  </form>
+</dialog>
+<dialog class="modal"
+        id="account-dialog">{{ heading('Add manual account', 'Track an account without a bank connection.') }}
+  <form class="modal-form" data-api="/accounts">
+    <input type="hidden" name="workspace" value="{{ workspace }}">
+    <label>
+      Account name<input name="name"
+       required
+       maxlength="100"
+       placeholder="e.g. Cash wallet"
+       autofocus>
+    </label>
+    <label>
+      Account type<select name="type">
+      <option value="depository">Cash / checking / savings</option>
+      <option value="credit">Credit card</option>
+      </select>
+    </label>
+    <label>
+      Current balance / amount owed ($)<input name="balance"
+       data-cents
+       inputmode="decimal"
+       value="0"
+       required>
+    </label>
+    <p class="field-error" role="alert" hidden></p>
+    <button class="button primary full-width">Add account</button>
+  </form>
+</dialog>
+<dialog class="modal"
+        id="transaction-dialog">{{ heading('Add transaction', 'Record spending or income in a manual account.') }}
+  <form class="modal-form" data-api="/transactions">
+    <input type="hidden" name="workspace" value="{{ workspace }}">
+    <label>
+      Payee<input name="merchant"
+       required
+       maxlength="120"
+       placeholder="Who was it with?"
+       autofocus>
+    </label>
+    <div class="form-columns">
+      <label>
+        Amount ($)<input name="amount" data-cents required inputmode="decimal">
+      </label>
+      <label>
+        Type<select name="_kind">
+        <option value="expense">Expense</option>
+        <option value="income">Inflow / refund</option>
+        </select>
+      </label>
+    </div>
+    <div class="form-columns">
+      <label>
+        Date<input name="date" type="date" value="{{ today }}" required>
+      </label>
+      <label>
+        Account<select name="accountId" required>
+      {% for account in manual_accounts %}<option value="{{ account.id }}">{{ account.name }}</option>
+    {% endfor %}
+    </select>
+  </label>
+</div>
+<label>
+  Category<select name="categoryId" data-null>
+  <option value="">Income / uncategorized</option>
+{% for category in data.categories %}<option value="{{ category.id }}">{{ category.name }}</option>
+{% endfor %}
+</select>
+</label>
+<label>
+  Note<input name="note" maxlength="300" placeholder="Optional">
+</label>
+<p class="field-error" role="alert" hidden></p>
+<button class="button primary full-width">Save transaction</button>
+</form>
+</dialog>
+<dialog class="modal"
+        id="disconnect-dialog">{{ heading('Disconnect this bank?', 'Imported transactions will stay in your budget.') }}
+  <p class="modal-description">This stops bank importing and revokes this connection. A new connection will use another Trial slot.</p>
+  <div class="modal-actions">
+    <button class="button secondary" data-close-dialog>Keep connected</button><button class="button primary" id="confirm-disconnect">Disconnect</button>
+  </div>
+</dialog>
+<dialog class="modal"
+        id="about-dialog">{{ heading('I Have A Budget', 'IHAB · Python + SQLite prototype 0.2') }}
+  <div class="about-copy">
+    <p>A place to categorize spending, review your habits, and plan each month.</p>
+    <p>This app runs on your computer. Python handles the pages, budget calculations, storage, and Plaid integration. A small browser script handles controls and Plaid Link.</p>
+    <p>Shared family logins, investments imports, splits, recurring bills, and the full credit-card payment budget model are planned.</p>
+    <p>Balances are imported snapshots. Category planning conservatively reserves card debt; reconcile against your accounts before relying on allocations.</p>
+    <p>Demo, Sandbox, and production data are isolated. Sandbox connections contain test data.</p>
+  </div>
+  <button class="button primary full-width" data-close-dialog>Back to my budget</button>
+</dialog>
