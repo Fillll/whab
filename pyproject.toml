@@ -1,6 +1,6 @@
 [project]
 name = "ihab"
-version = "0.2.0"
+dynamic = ["version"]
 description = "I Have A Budget — a local Python and SQLite budgeting app"
 requires-python = ">=3.11"
 dependencies = [
@@ -21,6 +21,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["ihab"]
+
+[tool.setuptools.dynamic]
+version = {attr = "ihab.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
