@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from urllib.parse import urlencode
 
+from . import __version__
 from .icons import category_icon, icon
 from .store import today
 
@@ -94,6 +95,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         return "/?" + urlencode({key: value for key, value in values.items() if value is not None})
 
     return {
+        "version": __version__,
         "data": data,
         "status": status,
         "items": items,
