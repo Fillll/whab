@@ -1,6 +1,6 @@
-# IHAB
+# WHAB
 
-IHAB uses Python, FastAPI, Jinja, and SQLite. Read README.md for setup and current limitations.
+WHAB uses Python, FastAPI, Jinja, and SQLite. Read README.md for setup and current limitations.
 
 - Support Python 3.13 and newer only. Keep package requirements, Ruff, CI, setup instructions, and pending branch-protection check names aligned; do not add compatibility code or CI for older Python versions.
 - Keep monetary values in integer USD cents. Preserve demo/personal and Sandbox/production isolation.
@@ -10,8 +10,9 @@ IHAB uses Python, FastAPI, Jinja, and SQLite. Read README.md for setup and curre
 - Save transaction changes and synchronization cursors atomically. Preserve user annotations through matched pending-to-posted transitions.
 - Imported history before `budgetStartMonth` is analytics data, not envelope debt. Avoid adding imported income to account balance snapshots.
 - This prototype is local only. Shared family access requires authentication and authorization before network deployment.
-- For substantive changes, update relevant README behavior or limitations and run `.venv/bin/python -m pytest` and `.venv/bin/python -m ruff check ihab scripts tests`. Browser checks should use demo or Sandbox data.
+- For substantive changes, update relevant README behavior or limitations and run `.venv/bin/python -m pytest` and `.venv/bin/python -m ruff check whab scripts tests`. Browser checks should use demo or Sandbox data.
 - Keep browser JavaScript small; business logic and page rendering belong in Python. No Node build or React runtime is required.
 - Keep private files and generated assets out of Git; stage source files explicitly.
-- Use a feature branch and a pull request for every change to `main`; never push commits directly to `main`. Squash merge after reviewing the final diff and passing CI. The sole maintainer has authorized routine IHAB PR review and merging without another confirmation; fix failing checks or substantive review findings first. GitHub cannot approve a PR using its author's account, so no second-person approval is required.
-- Follow SemVer from `1.0.0`: patch for compatible fixes/maintenance, minor for compatible features, major for breaking the documented compatibility contract. Every material change, including runtime or dependency support changes, must bump `ihab/__init__.py::__version__` and add a dated CHANGELOG.md entry in the same PR. Verify packaging, CLI, FastAPI, and About versions match before merging; create an immutable `vX.Y.Z` tag and GitHub release on the merged commit. Small documentation-only changes may wait for the next release. See README.md for the compatibility contract and current branch-protection status.
+- Preserve legacy SQLite filenames, the opaque Plaid household identity, and browser OAuth storage keys through renames. The app package and command are only `whab`; do not reintroduce an `ihab` launch alias. WHAB's version source is `whab/__init__.py`.
+- Use a feature branch and a pull request for every change to `main`; never push commits directly to `main`. Squash merge after reviewing the final diff and passing CI. The sole maintainer has authorized routine WHAB PR review and merging without another confirmation; fix failing checks or substantive review findings first. GitHub cannot approve a PR using its author's account, so no second-person approval is required.
+- Follow SemVer from `1.0.0`: patch for compatible fixes/maintenance, minor for compatible features, major for breaking the documented compatibility contract. Every material change, including runtime or dependency support changes, must bump `whab/__init__.py::__version__` and add a dated CHANGELOG.md entry in the same PR. Verify packaging, CLI, FastAPI, and About versions match before merging; create an immutable `vX.Y.Z` tag and GitHub release on the merged commit. Small documentation-only changes may wait for the next release. See README.md for the compatibility contract and current branch-protection status.

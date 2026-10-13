@@ -1,8 +1,14 @@
 # Changelog
 
-IHAB uses Semantic Versioning. Released tags are immutable.
+WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
+
+## 1.0.2 — 2026-10-12
+
+- Rename the app to WHAB — We Have A Budget, and the private GitHub repository to Fillll/whab.
+- Update the Python package, UI, favicon, Plaid display name, exports, documentation, and CI paths.
+- Preserve existing databases, encrypted connections, and browser OAuth state. Use only `python -m whab` for launching the renamed app.
 
 ## 1.0.1 — 2026-10-12
 

@@ -1,7 +1,8 @@
-/* IHAB browser controls. Budgeting, persistence, and API integration live in Python. */
+/* WHAB browser controls. Budgeting, persistence, and API integration live in Python. */
 'use strict';
 
-const context = JSON.parse(document.getElementById('ihab-context').textContent);
+const context = JSON.parse(document.getElementById('whab-context').textContent);
+// OAuth token/item pairs keep their legacy storage namespace through rebranding.
 const toast = document.getElementById('toast');
 let toastTimer;
 

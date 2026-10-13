@@ -13,14 +13,14 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
-from ihab.plaid_service import (
+from whab.plaid_service import (
     PlaidError,
     PlaidService,
     decrypt_token,
     encrypt_token,
     plaid_configuration,
 )
-from ihab.store import Store, StoreError, dollars_to_cents
+from whab.store import Store, StoreError, dollars_to_cents
 
 ENV = {
     "PLAID_CLIENT_ID": "fixture-client",

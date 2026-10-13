@@ -5,10 +5,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from ihab.app import create_app
-from ihab.config import Settings
-from ihab.plaid_service import PlaidService
-from ihab.store import Store
+from whab import __version__
+from whab.app import create_app
+from whab.config import Settings
+from whab.plaid_service import PlaidService
+from whab.store import Store
 
 
 @pytest.fixture
@@ -39,6 +40,10 @@ def test_all_pages_render_and_escape_user_content(client):
         assert response.status_code == 200
         assert "Sample data" in response.text
         assert "/static/app.js" in response.text
+        assert "WHAB · We Have A Budget" in response.text
+        assert f"WHAB · Python + SQLite · {__version__}" in response.text
+        assert 'id="whab-context"' in response.text
+    assert client.app.version == __version__
     name = '<script>alert("x")</script>'
     assert (
         client.post(

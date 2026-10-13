@@ -1,4 +1,4 @@
-"""Python HTTP routes, validation, and server-rendered pages for IHAB."""
+"""Python HTTP routes, validation, and server-rendered pages for WHAB."""
 
 import csv
 import io
@@ -168,7 +168,7 @@ def create_app(store=None, plaid=None, settings=None):
             store.close()
 
     app = FastAPI(
-        title="IHAB",
+        title="WHAB",
         version=__version__,
         docs_url=None,
         redoc_url=None,
@@ -321,7 +321,7 @@ def create_app(store=None, plaid=None, settings=None):
         return Response(
             buffer.getvalue(),
             media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="ihab-{workspace}.csv"'},
+            headers={"Content-Disposition": f'attachment; filename="whab-{workspace}.csv"'},
         )
 
     @app.patch("/api/transactions/{transaction_id}")
