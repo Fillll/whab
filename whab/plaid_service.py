@@ -151,8 +151,9 @@ class PlaidService:
     async def link_token(self, item_id: str | None = None) -> str:
         self.require_configured()
         payload = {
+            # This opaque household identity stays stable through rebranding.
             "user": {"client_user_id": "ihab-local-household"},
-            "client_name": "IHAB",
+            "client_name": "WHAB",
             "country_codes": ["US"],
             "language": "en",
         }

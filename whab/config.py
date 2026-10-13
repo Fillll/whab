@@ -31,6 +31,7 @@ class Settings:
         if not 1024 <= port <= 65535:
             raise ValueError("PORT must be between 1024 and 65535.")
         return cls(
+            # Preserve legacy filenames so a rename never starts an empty budget.
             database_path=ROOT / "data" / f"ihab-{environment}.sqlite",
             port=port,
             plaid_env=environment,

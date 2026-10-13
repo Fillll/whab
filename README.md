@@ -1,21 +1,21 @@
-# IHAB — I Have A Budget
+# WHAB — We Have A Budget
 
 A local budgeting app built with **Python, FastAPI, Jinja, and SQLite**. It has monthly category allocations and rollover, transaction categorization and review, spending analytics, manual accounts, CSV export, and a server-side Plaid Transactions connection. Pages and budgeting logic run in Python; a small browser script handles forms and Plaid Link. No Node.js build is required.
 
-Current version: **1.0.1**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
+Current version: **1.0.2**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
 
 ## Versioning and contributions
 
-IHAB follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html): patch releases fix compatible behavior, minor releases add compatible features, and major releases introduce breaking changes. The compatibility contract covers documented HTTP/CSV interfaces and the ability to open existing ledgers and encrypted connections through supported migrations. A schema change with a supported automatic migration can be compatible; dropping or changing documented fields, requiring manual data conversion, or invalidating existing tokens requires a major release. Internal refactoring and visual changes do not by themselves break this contract.
+WHAB follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html): patch releases fix compatible behavior, minor releases add compatible features, and major releases introduce breaking changes. The compatibility contract covers documented HTTP/CSV interfaces and the ability to open existing ledgers and encrypted connections through supported migrations. A schema change with a supported automatic migration can be compatible; dropping or changing documented fields, requiring manual data conversion, or invalidating existing tokens requires a major release. Internal refactoring and visual changes do not by themselves break this contract.
 
-`ihab/__init__.py` contains the single version value used by packaging, the CLI, FastAPI, and the About dialog. Check it with `.venv/bin/python -m ihab --version`. Every material change, including runtime or dependency support changes, must include the appropriate SemVer bump and a dated changelog entry in the same PR. Verify the package and runtime versions match before merging, then tag the merged `main` commit as `vX.Y.Z` and publish matching GitHub release notes. Never move an existing release tag. Small documentation-only changes can remain unreleased until the next app release.
+`whab/__init__.py` contains the single version value used by packaging, the CLI, FastAPI, and the About dialog. Check it with `.venv/bin/python -m whab --version`. Every material change, including runtime or dependency support changes, must include the appropriate SemVer bump and a dated changelog entry in the same PR. Verify the package and runtime versions match before merging, then tag the merged `main` commit as `vX.Y.Z` and publish matching GitHub release notes. Never move an existing release tag. Small documentation-only changes can remain unreleased until the next app release.
 
 All changes use a feature branch and a pull request targeting `main`. CI runs pytest and Ruff on Python 3.13, 3.14, and 3.15 without Plaid credentials or private data. Review the final diff, fix failures, and squash merge after the checks pass. The sole maintainer has authorized routine PR review and merging without another confirmation. There is no second-person approval requirement because [GitHub cannot approve a PR through its author's account](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews).
 
 **Branch protection is pending.** GitHub rejected protection for this private repository on the current account plan; the maintainer chose to leave enforcement pending. [Private repository protection requires Pro or an eligible organization plan](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches). The PR workflow is a project convention until Pro is enabled. `.github/main-protection.json` records the intended rule: require PRs and passing CI, apply it to administrators, prevent force pushes/deletion, and require resolved conversations and linear history. After enabling Pro, apply it with:
 
 ```sh
-gh api --method PUT repos/Fillll/ihab/branches/main/protection \
+gh api --method PUT repos/Fillll/whab/branches/main/protection \
   --input .github/main-protection.json
 ```
 
@@ -27,21 +27,23 @@ Requires **Python 3.13 or newer**. Older Python versions are unsupported and rej
 python3.13 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python scripts/setup.py
-.venv/bin/python -m ihab
+.venv/bin/python -m whab
 ```
 
 Open http://127.0.0.1:5173. The demo workspace contains fictional data. Switch to **My budget** for your own accounts. A manual account works immediately without Plaid.
 
-The setup script creates a private `.env` and a random 32-byte token encryption key when the file is missing. It preserves existing credentials and encryption keys, and migrates the earlier local API port to 5173. After changing `.env`, restart the server. Use `.venv/bin/python -m ihab --reload` while developing, or `--port 5174` to choose another local port.
+The setup script creates a private `.env` and a random 32-byte token encryption key when the file is missing. It preserves existing credentials and encryption keys, and migrates the earlier local API port to 5173. After changing `.env`, restart the server. Use `.venv/bin/python -m whab --reload` while developing, or `--port 5174` to choose another local port.
 
 SQLite is embedded: there is no database server to install. The app creates its database on first launch. Existing IHAB SQLite data and encrypted Plaid tokens are supported; keep the same encryption key when upgrading.
 
+WHAB was formerly IHAB. The GitHub repository is now [Fillll/whab](https://github.com/Fillll/whab), and the Python package and launch command are only `whab`. Update existing launch commands to `python -m whab`. Database filenames, the opaque Plaid household identity, and browser OAuth storage keys retain their legacy names to preserve existing data and connections. The local checkout path can remain unchanged.
+
 ### Source layout
 
-- `ihab/store.py` — SQLite schema, budget calculations, and atomic transaction imports
-- `ihab/plaid_service.py` — Plaid API calls, encrypted tokens, synchronization, and webhook verification
-- `ihab/app.py` — HTTP routes, validated requests, and local access checks
-- `ihab/views.py` — presentation data and analytics
+- `whab/store.py` — SQLite schema, budget calculations, and atomic transaction imports
+- `whab/plaid_service.py` — Plaid API calls, encrypted tokens, synchronization, and webhook verification
+- `whab/app.py` — HTTP routes, validated requests, and local access checks
+- `whab/views.py` — presentation data and analytics
 - `templates/` — server-rendered Jinja pages
 - `static/` — styles, icons, and browser interactions
 - `tests/` — isolated SQLite and mocked Plaid tests
@@ -50,7 +52,7 @@ SQLite is embedded: there is no database server to install. The app creates its 
 
 1. Open the Plaid Dashboard's **Team settings → Keys** and find your Client ID and **Sandbox** secret.
 2. Add them to your local `.env` as `PLAID_CLIENT_ID` and `PLAID_SECRET`. Keep `PLAID_ENV=sandbox` and `ALLOW_LIVE_PLAID=false`.
-3. Restart IHAB. Open **Accounts → Connect account**.
+3. Restart WHAB. Open **Accounts → Connect account**.
 4. Connect a Plaid Sandbox test institution/account. The standard test credentials are `user_good` / `pass_good` where a credential-based Sandbox institution asks for them. Sandbox OAuth institutions have their own simulated flow.
 5. After Link finishes, the server exchanges the public token, saves an encrypted access token, and starts a transaction sync. Use **Sync now** again if the initial import is still loading.
 
@@ -95,7 +97,7 @@ This is an initial planning model, not the complete YNAB credit-card payment sys
 
 The Python server binds to `127.0.0.1`. API access checks the Host and browser origin; the app has no family login/authentication layer yet. Keep it local. A hosted version requires authentication, authorization, secure deployment, backup operations, and an explicit account-sharing model.
 
-`.env`, `data/`, `work/`, and `.venv/` are ignored by Git. Database files contain private financial data even though Plaid tokens are encrypted. Back up the database and the encryption key separately before relying on the app. Stop IHAB before copying the database, or use SQLite's backup API while it is running. Do not replace the encryption key after linking accounts without a migration: existing tokens will no longer decrypt.
+`.env`, `data/`, `work/`, and `.venv/` are ignored by Git. Database files contain private financial data even though Plaid tokens are encrypted. Back up the database and the encryption key separately before relying on the app. Stop WHAB before copying the database, or use SQLite's backup API while it is running. Do not replace the encryption key after linking accounts without a migration: existing tokens will no longer decrypt.
 
 Files:
 
@@ -107,12 +109,12 @@ Files:
 
 ```sh
 .venv/bin/python -m pytest
-.venv/bin/python -m ruff check ihab scripts tests
+.venv/bin/python -m ruff check whab scripts tests
 ```
 
 The tests cover workspace isolation, legacy database compatibility, valid integer money and dates, API origin/Host and request-size checks, transaction review, CSV safety, Plaid token encryption, webhook authenticity, pending-to-posted annotations, pagination restart, atomic failed sync, category rollover/refunds, and cash/debt reservations. They use temporary databases and do not require Plaid credentials.
 
-Current validation: 25 passing tests, Ruff checks, browser checks for persisted allocations, categorization, and review status, and an actual Plaid Sandbox API connection with 7 test accounts and 362 simulated transactions. A repeated Python sync kept the count unchanged. The Link dialog launches; its full consent/OAuth completion has not been exercised. Real institution access is not verified yet.
+Current validation: 27 passing tests, Ruff checks, browser checks for persisted allocations, categorization, and review status, and an actual Plaid Sandbox API connection with 7 test accounts and 362 simulated transactions. Rebrand checks verify existing budget data and the WHAB launch command remain usable. A repeated Python sync kept the count unchanged. The Link dialog launches; its full consent/OAuth completion has not been exercised. Real institution access is not verified yet.
 
 ## Official references
 

@@ -21,7 +21,7 @@
       <h2>Finish Plaid setup</h2>
       {{ icon('settings', 19) }}
     </div>
-    <p>Save your Plaid keys in the local <code>.env</code> file, then restart IHAB.</p>
+    <p>Save your Plaid keys in the local <code>.env</code> file, then restart WHAB.</p>
     <div class="setup-checks">
       {% for key,label in [('PLAID_CLIENT_ID','Client ID'),('PLAID_SECRET','Sandbox secret'),('TOKEN_ENCRYPTION_KEY','Token encryption key')] %}
         <div><span class="setup-dot {% if key not in status.missingConfig %}complete {% endif %}"></span><span>{{ label }}</span><small>{{ 'Needed' if key in status.missingConfig else 'Configured' }}</small>
