@@ -2,6 +2,7 @@
 name = "whab"
 dynamic = ["version"]
 description = "We Have A Budget — a local Python and SQLite budgeting app"
+readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
   "fastapi==0.143.0",
@@ -15,12 +16,26 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest==9.1.1", "ruff==0.17.0"]
 
+[project.urls]
+Repository = "https://github.com/Fillll/whab"
+Issues = "https://github.com/Fillll/whab/issues"
+
+[project.entry-points."whab.plugins"]
+plaid = "whab.integrations.plaid.plugin:plugin"
+sqlite = "whab.storage.sqlite.plugin:plugin"
+web = "whab.interfaces.web.plugin:plugin"
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["whab"]
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["whab*"]
+
+[tool.setuptools.package-data]
+"whab.interfaces.web" = ["templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]
+"whab.integrations.plaid" = ["templates/*.html", "static/*.js"]
 
 [tool.setuptools.dynamic]
 version = {attr = "whab.__version__"}

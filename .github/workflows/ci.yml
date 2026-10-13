@@ -40,4 +40,6 @@ jobs:
       - name: Run tests
         run: python -m pytest
       - name: Lint Python
-        run: python -m ruff check whab scripts tests
+        run: python -m ruff check src scripts tests examples
+      - name: Verify distributable wheel and example plugin
+        run: python scripts/check_distribution.py

@@ -1,0 +1,42 @@
+"""SQLite plugin schema and additive, idempotent legacy migrations."""
+
+import sqlite3
+
+from whab.domain.dates import shift_month
+from whab.domain.validation import validate_month
+
+
+def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
+    db.executescript("""
+        PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+        CREATE TABLE IF NOT EXISTS meta(workspace TEXT PRIMARY KEY,opening_cash INTEGER NOT NULL DEFAULT 0,baseline_ready INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS accounts(id TEXT NOT NULL,workspace TEXT NOT NULL,name TEXT NOT NULL,institution TEXT NOT NULL,type TEXT NOT NULL,balance INTEGER NOT NULL,source TEXT NOT NULL,item_id TEXT,mask TEXT,PRIMARY KEY(workspace,id));
+        CREATE TABLE IF NOT EXISTS categories(id TEXT NOT NULL,workspace TEXT NOT NULL,name TEXT NOT NULL,group_name TEXT NOT NULL,target INTEGER NOT NULL,PRIMARY KEY(workspace,id));
+        CREATE TABLE IF NOT EXISTS transactions(id TEXT NOT NULL,workspace TEXT NOT NULL,account_id TEXT NOT NULL,date TEXT NOT NULL,merchant TEXT NOT NULL,amount INTEGER NOT NULL,category_id TEXT,pending INTEGER NOT NULL DEFAULT 0,reviewed INTEGER NOT NULL DEFAULT 0,source TEXT NOT NULL,note TEXT NOT NULL DEFAULT '',is_transfer INTEGER NOT NULL DEFAULT 0,category_edited INTEGER NOT NULL DEFAULT 0,deleted INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(workspace,id));
+        CREATE TABLE IF NOT EXISTS budget(workspace TEXT NOT NULL,month TEXT NOT NULL,category_id TEXT NOT NULL,assigned INTEGER NOT NULL,PRIMARY KEY(workspace,month,category_id));
+        CREATE TABLE IF NOT EXISTS items(id TEXT PRIMARY KEY,token TEXT,institution_name TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'connected',last_synced TEXT,error TEXT,cursor TEXT,baseline_ready INTEGER NOT NULL DEFAULT 0);
+        CREATE INDEX IF NOT EXISTS tx_month ON transactions(workspace,date);
+    """)
+    migrations = {
+        "accounts": {
+            "active": "INTEGER NOT NULL DEFAULT 1",
+            "balance_unknown": "INTEGER NOT NULL DEFAULT 0",
+        },
+        "transactions": {"inferred_transfer": "INTEGER NOT NULL DEFAULT 0"},
+        "meta": {"budget_start_month": "TEXT"},
+        "items": {"provider": "TEXT NOT NULL DEFAULT 'plaid'"},
+    }
+    for table, columns in migrations.items():
+        present = {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}
+        for name, declaration in columns.items():
+            if name not in present:
+                db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+                if name == "inferred_transfer":
+                    db.execute(
+                        "UPDATE transactions SET inferred_transfer=is_transfer WHERE source='plaid' AND category_edited=0"
+                    )
+    validate_month(selected_month)
+    db.execute(
+        "UPDATE meta SET budget_start_month=CASE WHEN workspace='demo' THEN COALESCE((SELECT MIN(substr(date,1,7)) FROM transactions WHERE workspace='demo'),?) ELSE COALESCE((SELECT MIN(month) FROM budget WHERE workspace='personal'),?) END WHERE budget_start_month IS NULL",
+        (shift_month(selected_month, -5), selected_month),
+    )
