@@ -3,7 +3,7 @@ name = "whab"
 dynamic = ["version"]
 description = "We Have A Budget — a local Python and SQLite budgeting app"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
   "fastapi==0.143.0",
   "uvicorn==0.54.0",
@@ -46,7 +46,7 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

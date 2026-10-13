@@ -2,7 +2,7 @@
 
 WHAB uses Python, FastAPI and Jinja with bundled SQLite storage and Plaid bank plugins. Read README.md for setup and current limitations.
 
-- Support Python 3.13 and newer only. Keep package requirements, Ruff, CI, setup instructions, and pending branch-protection check names aligned; do not add compatibility code or CI for older Python versions.
+- Support Python 3.14 and newer only. Keep package requirements, Ruff, CI, setup instructions, and pending branch-protection check names aligned; do not add compatibility code or CI for older Python versions.
 - Keep monetary values in integer USD cents. Preserve demo/personal and Sandbox/production isolation.
 - Never print, commit, or send `.env` contents, Plaid secrets, access tokens, or private data files. Configure credentials locally.
 - Default to Sandbox. Production Item creation consumes a cumulative Trial allowance; avoid duplicate connections. Use Link update mode for existing connections.

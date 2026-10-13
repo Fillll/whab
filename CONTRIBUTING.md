@@ -4,10 +4,10 @@ Start with [README.md](README.md) for setup, supported behavior and limitations,
 
 ## Development environment
 
-WHAB supports Python 3.13 and newer; CI exercises Python 3.13, 3.14 and 3.15. From the checkout:
+WHAB supports Python 3.14 and newer; CI exercises Python 3.14 and 3.15. From the checkout:
 
 ```sh
-python3.13 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python -m whab --version
 ```
