@@ -1,0 +1,73 @@
+<section class="bank-provider" data-bank-provider="plaid">
+  <div class="section-title">
+    <h2>Plaid connections</h2>
+    <button class="button primary" data-plaid-connect {% if not status.configured %}disabled{% endif %}>{{ icon('link', 16) if icon is defined else '' }}Connect account</button>
+  </div>
+<div class="connection-notice">
+  {{ icon('shield', 20) if icon is defined else '' }}
+  <div>
+    <strong>{{ 'Live connections' if status.environment=='production' else 'Sandbox connections' }}</strong>
+    <p>{{ 'Real bank data. Connect each account once to preserve your Trial connection allowance.' if status.environment=='production' else 'Plaid Sandbox imports test accounts. Connecting here will not connect your real bank.' }}</p>
+  </div>
+  <span class="mode-badge">{{ status.environment }}</span>
+</div>
+{% if not status.configured %}
+  <section class="setup-panel">
+    <div class="section-title">
+      <h2>Finish Plaid setup</h2>
+      {{ icon('settings', 19) if icon is defined else '' }}
+    </div>
+    <p>Save your Plaid keys in the local <code>.env</code> file, then restart WHAB.</p>
+    <div class="setup-checks">
+      {% for key,label in [('PLAID_CLIENT_ID','Client ID'),('PLAID_SECRET','Sandbox secret'),('TOKEN_ENCRYPTION_KEY','Token encryption key')] %}
+        <div><span class="setup-dot {% if key not in status.missingConfig %}complete {% endif %}"></span><span>{{ label }}</span><small>{{ 'Needed' if key in status.missingConfig else 'Configured' }}</small>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="setup-footer">
+      <span>Your keys stay on this computer.</span><a class="text-link"
+   href="https://dashboard.plaid.com/team/keys"
+   target="_blank"
+   rel="noreferrer">Open Plaid Dashboard {{ icon('arrow-up', 14) if icon is defined else '' }}</a>
+    </div>
+  {% if status.environment=="production" and not status.liveEnabled %}<p class="field-error">Live access is disabled. Enable it in the server configuration when you’re ready.</p>
+{% endif %}
+</section>
+{% endif %}
+{% if items %}
+  <section class="connected-items">
+    <div class="section-title">
+      <h2>Connected banks</h2>
+      <button class="button secondary compact" data-plaid-sync>{{ icon('refresh', 14) if icon is defined else '' }}Sync now</button>
+    </div>
+    {% for item in items %}
+      <div class="connection-row">
+        <div>
+          <strong>{{ item.institutionName }}</strong>
+          <p>
+          {% if item.lastSynced %}Last sync <time data-local-time
+       datetime="{{ item.lastSynced }}">{{ item.lastSynced }}</time>
+    {% else %}Initial import pending
+    {% endif %}
+    {% if item.error %} · {{ item.error }}
+    {% endif %}
+  </p>
+  </div>
+  <div class="connection-actions">
+    <button class="text-link" data-plaid-connect="{{ item.id }}">{{ 'Reconnect' if item.status=='reconnect' else 'Manage' }}</button><button class="disconnect-button"
+        data-plaid-disconnect="{{ item.id }}"
+        data-institution="{{ item.institutionName }}">Disconnect</button>
+  </div>
+  </div>
+{% endfor %}
+</section>
+{% endif %}
+<dialog class="modal"
+        id="plaid-disconnect-dialog"><div class="modal-heading"><div><h2>Disconnect this bank?</h2><p>Imported transactions will stay in your budget.</p></div><button class="icon-button" data-plaid-close-dialog aria-label="Close dialog">{{ icon('close', 20) if icon is defined else '' }}</button></div>
+  <p class="modal-description">This stops bank importing and revokes this connection. A new connection will use another Trial slot.</p>
+  <div class="modal-actions">
+    <button class="button secondary" data-plaid-close-dialog>Keep connected</button><button class="button primary" id="plaid-confirm-disconnect">Disconnect</button>
+  </div>
+</dialog>
+
+</section>
