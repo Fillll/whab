@@ -1,8 +1,8 @@
 [project]
 name = "whab-example-plugin"
-version = "1.0.0"
+version = "1.0.1"
 description = "A small trusted insights and CSV export extension for WHAB"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = ["whab>=1.1.0,<2"]
 
 [project.entry-points."whab.plugins"]

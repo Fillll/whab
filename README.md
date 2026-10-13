@@ -2,7 +2,7 @@
 
 A local budgeting app built with **Python, FastAPI and Jinja**, with bundled SQLite storage and Plaid bank plugins. It has monthly category allocations and rollover, transaction categorization and review, spending analytics, manual accounts, CSV export, and a server-side Plaid Transactions connection. Pages and budgeting logic run in Python; a small browser script handles forms and Plaid Link. No Node.js build is required.
 
-Current version: **1.1.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
+Current version: **1.1.1**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
 
 ## Versioning and contributions
 
@@ -10,7 +10,7 @@ WHAB follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html): p
 
 `src/whab/__init__.py` contains the single version value used by packaging, the CLI, FastAPI, and the About dialog. Check it with `.venv/bin/python -m whab --version`. Every material change, including runtime or dependency support changes, must include the appropriate SemVer bump and a dated changelog entry in the same PR. Verify the package and runtime versions match before merging, then tag the merged `main` commit as `vX.Y.Z` and publish matching GitHub release notes. Never move an existing release tag. Small documentation-only changes can remain unreleased until the next app release.
 
-All changes use a feature branch and a pull request targeting `main`. CI runs pytest and Ruff on Python 3.13, 3.14, and 3.15 without Plaid credentials or private data. Review the final diff, fix failures, and squash merge after the checks pass. The sole maintainer has authorized routine PR review and merging without another confirmation. There is no second-person approval requirement because [GitHub cannot approve a PR through its author's account](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews).
+All changes use a feature branch and a pull request targeting `main`. CI runs pytest and Ruff on Python 3.14 and 3.15 without Plaid credentials or private data. Review the final diff, fix failures, and squash merge after the checks pass. The sole maintainer has authorized routine PR review and merging without another confirmation. There is no second-person approval requirement because [GitHub cannot approve a PR through its author's account](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews).
 
 **Branch protection is pending.** GitHub rejected protection for this private repository on the current account plan; the maintainer chose to leave enforcement pending. [Private repository protection requires Pro or an eligible organization plan](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches). The PR workflow is a project convention until Pro is enabled. `.github/main-protection.json` records the intended rule: require PRs and passing CI, apply it to administrators, prevent force pushes/deletion, and require resolved conversations and linear history. After enabling Pro, apply it with:
 
@@ -21,14 +21,16 @@ gh api --method PUT repos/Fillll/whab/branches/main/protection \
 
 ## Run locally
 
-Requires **Python 3.13 or newer**. Older Python versions are unsupported and rejected by package installation. For development, use an editable source install as shown below. Templates and static assets are packaged, so installed wheels also work.
+Requires **Python 3.14 or newer**. Older Python versions are unsupported and rejected by package installation. For development, use an editable source install as shown below. Templates and static assets are packaged, so installed wheels also work.
 
 ```sh
-python3.13 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python scripts/setup.py
 .venv/bin/python -m whab
 ```
+
+When upgrading from an older Python version, stop WHAB and recreate `.venv` with Python 3.14 or newer, then reinstall the app and any additional plugins. Keep your existing `.env` and `data/` in place.
 
 Open http://127.0.0.1:5173. The demo workspace contains fictional data. Switch to **My budget** for your own accounts. A manual account works immediately without Plaid.
 
@@ -146,7 +148,7 @@ Default SQLite files:
 
 The tests cover workspace isolation, legacy database compatibility, valid integer money and dates, API origin/Host and request-size checks, transaction review, CSV safety, Plaid token encryption, webhook authenticity, pending-to-posted annotations, pagination restart, atomic failed sync, category rollover/refunds, and cash/debt reservations. They use temporary databases and do not require Plaid credentials.
 
-CI checks Python 3.13, 3.14, and 3.15. Tests use temporary databases and mocked services. Packaging checks build the app and example plugin wheels, install them in a temporary target, and render every page from outside the checkout with fictional data. Plugin checks cover required storage selection, visual/headless selection, optional enablement, API versions, workspace/month isolation, immutable snapshots, escaping, failure handling and cleanup. Dependency guards keep domain rules independent and prevent core code from importing concrete SQLite, Plaid or visual implementations.
+CI checks Python 3.14 and 3.15. Tests use temporary databases and mocked services. Packaging checks build the app and example plugin wheels, install them in a temporary target, and render every page from outside the checkout with fictional data. Plugin checks cover required storage selection, visual/headless selection, optional enablement, API versions, workspace/month isolation, immutable snapshots, escaping, failure handling and cleanup. Dependency guards keep domain rules independent and prevent core code from importing concrete SQLite, Plaid or visual implementations.
 
 Previously verified integration state: a Plaid Sandbox connection with 7 test accounts and 362 simulated transactions, with no duplicates after repeated sync. The Link dialog launches; its full consent/OAuth completion has not been exercised. Real institution access is not verified yet.
 

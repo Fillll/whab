@@ -4,6 +4,11 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.1.1 — 2026-10-12
+
+- Raise the minimum Python version to 3.14 for WHAB and its example plugin. Align package metadata, Ruff, setup instructions, CI, and pending branch-protection checks; retain CI coverage for Python 3.14 and 3.15.
+- Bump the independently versioned example plugin to 1.0.1 for its runtime support change.
+
 ## 1.1.0 — 2026-10-12
 
 - Adopt a `src/whab` layout with separate domain rules, storage adapters, bank integrations, web presentation, and application composition.
