@@ -2,7 +2,7 @@
 
 A local budgeting app built with **Python, FastAPI and Jinja**, with bundled SQLite storage and Plaid bank plugins. It has monthly category allocations and rollover, transaction categorization and review, spending analytics, manual accounts, CSV export, and a server-side Plaid Transactions connection. Pages and budgeting logic run in Python; a small browser script handles forms and Plaid Link. No Node.js build is required.
 
-Current development version: **1.1.0** (unreleased). See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
+Current version: **1.1.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
 
 ## Versioning and contributions
 
