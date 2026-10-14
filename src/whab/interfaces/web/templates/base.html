@@ -14,7 +14,7 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <a class="brand" href="{{ url('budget') }}" aria-label="WHAB home"><img class="brand-symbol" src="/static/logo.svg?v={{ version }}" alt="" width="48" height="32"><span><strong>WHAB</strong><small>We Have A Budget</small></span></a>
+        <a class="brand" href="{{ url('budget') }}" aria-label="WHAB home"><img class="brand-symbol" src="/static/logo.svg?v={{ version }}" alt="" width="40" height="40"><span><strong>WHAB</strong><small>We Have A Budget</small></span></a>
         <div class="workspace-switch"><span class="workspace-avatar">WH</span><select aria-label="Budget workspace" data-navigation="workspace"><option value="demo" {% if workspace=='demo' %}selected {% endif %}>Demo budget</option><option value="personal" {% if workspace=='personal' %}selected {% endif %}>My budget</option></select>{{ icon('chevron-down', 14) }}
         </div>
         <div class="nav-label">WORKSPACE</div>
@@ -37,11 +37,9 @@
 {% endfor %}
 </div>
 <div class="sidebar-bottom">
-  <button class="nav-item"
-          aria-label="About WHAB"
-          data-dialog="about-dialog">{{ icon('help', 18) }}<span>About this prototype</span></button>
   <div class="local-status">
-    <span></span>Local workspace
+    <button class="settings-trigger" aria-label="Settings" data-dialog="settings-dialog">{{ icon('settings', 18) }}</button>
+    <span class="local-status-dot"></span><span class="local-status-label">Local workspace</span>
   </div>
 </div>
 </aside>
@@ -52,9 +50,7 @@
     </div>
     <div class="topbar-right"><select class="mobile-workspace"
         aria-label="Mobile budget workspace"
-        data-navigation="workspace"><option value="demo" {% if workspace=='demo' %}selected {% endif %}>Demo</option><option value="personal" {% if workspace=='personal' %}selected {% endif %}>My budget</option></select><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' if status.environment=='sandbox' else 'Live data' }}</span><button class="user-avatar"
-        data-dialog="about-dialog"
-        aria-label="About WHAB"><img class="avatar-symbol" src="/static/logo.svg?v={{ version }}" alt="" width="24" height="16"></button>
+        data-navigation="workspace"><option value="demo" {% if workspace=='demo' %}selected {% endif %}>Demo</option><option value="personal" {% if workspace=='personal' %}selected {% endif %}>My budget</option></select><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' if status.environment=='sandbox' else 'Live data' }}</span>
     </div>
   </header>
   {% if workspace=="demo" %}

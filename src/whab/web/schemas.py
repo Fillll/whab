@@ -83,3 +83,7 @@ class AccountBody(Body):
     name: Label
     type: Literal["depository", "credit"]
     balance: Cents
+
+
+class PluginSelectionBody(Body):
+    plugins: Annotated[list[Annotated[str, StringConstraints(min_length=1, max_length=64)]], Field(max_length=100)]

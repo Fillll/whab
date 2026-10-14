@@ -114,6 +114,35 @@
 <button class="button primary full-width">Save transaction</button>
 </form>
 </dialog>
+<dialog class="modal settings-modal" id="settings-dialog" aria-label="Settings">
+  {{ heading('Settings', 'Manage this local workspace.') }}
+  {% set manager = plugin_management|default({'plugins': [], 'restart_required': false, 'error': none}) %}
+  <section class="plugin-manager" aria-labelledby="plugin-manager-title">
+    <h3 id="plugin-manager-title">Plugin manager</h3>
+    <p class="settings-notice">Choose which installed optional plugins to use. Saved changes apply when you restart WHAB.</p>
+    {% if manager.error %}<p class="field-error" role="alert">{{ manager.error }}</p>{% endif %}
+    <form data-plugin-selection>
+      <div class="plugin-list">
+        {% for plugin in manager.plugins %}
+          <div class="plugin-row">
+            <label class="plugin-toggle">
+              <input type="checkbox" value="{{ plugin.id }}"{% if not plugin.required %} name="plugin"{% endif %}{% if plugin.enabled %} checked{% endif %}{% if plugin.required or (not plugin.manageable and not plugin.enabled) %} disabled{% endif %}>
+              <span><strong>{{ plugin.display_name }}</strong><small class="plugin-meta">{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</small>{% if plugin.reason %}<small class="plugin-meta">{{ plugin.reason }}</small>{% endif %}</span>
+            </label>
+            <div class="plugin-state">
+              <span>{% if plugin.required %}Required{% elif plugin.active and plugin.enabled %}Enabled{% elif plugin.active %}Will disable after restart{% elif plugin.enabled %}Will enable after restart{% else %}Disabled{% endif %}</span>
+              {% for kind in plugin.kinds %}<span class="plugin-kind">{{ {'user_interface': 'Interface', 'storage': 'Storage', 'data_ingestion': 'Bank import', 'reporting': 'Reports'}.get(kind, kind) }}</span>{% endfor %}
+            </div>
+          </div>
+        {% else %}<p class="settings-notice">No installed plugins were found.</p>{% endfor %}
+      </div>
+      <p class="plugin-restart-notice" role="status"{% if not manager.restart_required %} hidden{% endif %}>Restart WHAB to apply your saved plugin selection. Running plugins stay active until then.</p>
+      <p class="field-error" role="alert" hidden></p>
+      <div class="settings-actions"><button class="button primary" type="submit">Save plugin selection</button></div>
+    </form>
+  </section>
+  <div class="settings-about"><button type="button" data-dialog="about-dialog">{{ icon('help', 18) }}<span>About this prototype</span>{{ icon('chevron-right', 16) }}</button></div>
+</dialog>
 <dialog class="modal"
         id="about-dialog">{{ heading('We Have A Budget', 'WHAB · ' ~ version) }}
   <div class="about-copy">
@@ -123,5 +152,5 @@
     <p>Balances are imported snapshots. Category planning conservatively reserves card debt; reconcile against your accounts before relying on allocations.</p>
     <p>Demo, Sandbox, and production data are isolated. Sandbox connections contain test data.</p>
   </div>
-  <button class="button primary full-width" data-close-dialog>Back to my budget</button>
+  <button class="button primary full-width" data-close-dialog>Back to settings</button>
 </dialog>

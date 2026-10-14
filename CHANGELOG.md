@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.2.0 — 2026-10-13
+
+- Add Settings beside Local workspace and move About this prototype into it; remove the top-right About control.
+- Add a plugin manager for installed optional plugins. Save a validated selection for the next app restart while keeping the active storage and interface required.
+- Keep saved plugin choices in an atomic local plugins.json file, with separate running and pending states. Existing environment defaults apply when no saved selection exists.
+- Make the yellow-compass-on-red logo square and center its compass.
+
 ## 1.1.2 — 2026-10-13
 
 - Adopt a flat yellow eight-point compass on a red background for the bundled Web UI, sidebar branding, and favicon.

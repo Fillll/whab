@@ -1,16 +1,31 @@
 # WHAB plugins — API v1
 
-WHAB 1.1 provides **user-interface**, **storage**, **data-ingestion** and **reporting** plugin capabilities. Plugins are installed Python packages registered through `whab.plugins` entry points. Web, SQLite and Plaid are bundled descriptors using those same contracts. Reports receive immutable snapshots; storage and bank factories receive separate privileged contexts.
+WHAB provides **user-interface**, **storage**, **data-ingestion** and **reporting** plugin capabilities under API v1. WHAB 1.2 adds a host-owned manager for optional plugin selections. Plugins are installed Python packages registered through `whab.plugins` entry points. Web, SQLite and Plaid are bundled descriptors using those same contracts. Reports receive immutable snapshots; storage and bank factories receive separate privileged contexts.
 
 ## Trust and enablement
 
 **Installed Python plugins are trusted code running in WHAB's server process, not a security sandbox.** Reports receive no backend, settings or credentials. Bank factories receive scoped persistence/configuration and an encryption key. Storage factories own the full ledger and backend credentials; visual descriptors provide trusted templates, scripts and presentation code. Python can independently access files/network or import internals with WHAB's privileges. Select only reviewed code. These interfaces limit host-supplied capabilities and accidental mutation, not malicious code.
 
-Installation alone does not select an additional package. The host loads the required `WHAB_STORAGE` descriptor (`sqlite` by default), selected `WHAB_UI` descriptor (`web` by default), and optional `WHAB_PLUGINS` names (`plaid` when absent). `WHAB_UI=` is headless: APIs/storage remain without the root page or core visual assets. `WHAB_PLUGINS=` disables optional banks/reports while retaining storage and selected UI. Restart after changing settings. Names are lowercase slugs of at most 64 characters.
+Installation alone does not select an additional package. The host loads the required `WHAB_STORAGE` descriptor (`sqlite` by default), selected `WHAB_UI` descriptor (`web` by default), and optional names saved in the runtime home's `plugins.json`. Without a saved selection, `WHAB_PLUGINS` supplies optional names (`plaid` when absent); `WHAB_PLUGINS=` disables optional banks/reports while retaining storage and selected UI. `WHAB_UI=` is headless: APIs/storage remain without the root page or core visual assets. Restart after changing settings. Names are lowercase slugs of at most 64 characters.
 
 Select storage and visual implementations through their dedicated settings. Exactly one backend is required; at most one visual interface may be selected. Missing selections, incompatible capabilities and multiple enabled storage/UI descriptors fail with actionable errors. The host deduplicates a selected name also present in the optional list; repeated optional names remain invalid. A standalone `load_plugins(())` loads nothing, but app composition adds required storage and selected UI before discovery.
 
 An enabled name must match exactly one entry point and its descriptor ID. A duplicate setting name, duplicate installed entry point, missing package, invalid descriptor, or unsupported API version prevents startup with an actionable message. WHAB resolves all configured names before importing any plugin; it never silently chooses one of two installed packages claiming the same name. Ordinary import or hook exceptions are reported through fixed messages without their original exception text or traceback in WHAB's public responses/logging. Arbitrary plugin code can still produce its own logs or hang, so this is error handling rather than sandboxing.
+
+## Manage optional selections
+
+The bundled Web UI's **Settings → Plugin manager** lists installed registrations alongside the running and configured selections. Discovery reads package metadata without importing disabled plugin code. Inactive registrations use their entry-point names until their descriptors are explicitly loaded; their capability kinds are unknown. Selected storage and UI plugins remain required. An unavailable or duplicate optional registration cannot be enabled, but a selected one can be unchecked to repair the selection for the next startup.
+
+**Save plugin selection** loads and validates the proposed descriptors without calling storage/bank factories or reporting hooks. It rejects missing or ambiguous registrations, incompatible descriptors, and attempts to change the selected storage or interface. Saving leaves the running registry, provider services, connections and ledger unchanged; changes apply after restart. An imported bank's history and saved connections remain when its plugin is disabled.
+
+The host stores at most 100 unique optional IDs in an atomic `plugins.json` replacement in the runtime home (`WHAB_HOME`, or the launch directory). The file uses `{"version": 1, "plugins": ["plaid", "example"]}` and contains no credentials or ledger records. Its optional selection takes precedence over `WHAB_PLUGINS`, including an explicitly empty saved list. Removing this file restores environment defaults on the next start. Invalid or unreadable saved settings cause an actionable startup error; repair the file, or explicitly save a replacement while WHAB is still running.
+
+Host-owned endpoints expose this behavior to custom interfaces and headless clients:
+
+- `GET /api/plugins/management` returns `plugins`, optional-ID lists `active` and `configured`, `restart_required` and a safe optional `error`. Catalog rows include `id`, `display_name`, `kinds`, package `distribution`/`version`, `active`, `enabled`, `required`, `manageable` and a safe optional `reason`. A row's `active` describes the fixed running registry; `enabled` describes the configured selection plus required plugins; `manageable` indicates whether an optional registration is available for selection.
+- `PUT /api/plugins/management` accepts an application/json body such as `{"plugins": ["plaid", "example"]}` containing only optional IDs. A successful save returns the same projection. Host/origin, request-size and strict body validation guards apply. These are host routes, not plugin-owned HTTP extensions.
+
+`GET /api/plugins` continues to describe running plugins only. A pending selection does not change exports, bank routes or mounted resources until restart.
 
 ## Install the working example
 
@@ -21,7 +36,7 @@ Run these commands from a WHAB source checkout using the same virtual environmen
 .venv/bin/python -m pip install -e examples/whab-example-plugin
 ```
 
-Add this line to the private local `.env`, then restart WHAB:
+Enable **example** in **Settings → Plugin manager**, save, and restart WHAB. If the runtime home has no saved `plugins.json`, you can instead add this line to the private local `.env` and restart:
 
 ```dotenv
 WHAB_PLUGINS=plaid,example
@@ -29,7 +44,7 @@ WHAB_PLUGINS=plaid,example
 
 Open **Insights** for either the fictional demo or your selected personal month. The example shows cleared net spending and income. Pending transactions and transfers are excluded from these totals; categorized inflows count as refunds, while uncategorized inflows count as income. Imported income is analytics only and does not increase WHAB's assignable cash. The example export includes all selected-month transactions with pending/transfer flags and integer cents.
 
-To disable optional extensions, use `WHAB_PLUGINS=` and restart. Removing that setting restores default Plaid. Storage remains required, and the selected UI remains until `WHAB_UI=` requests headless mode. Disabling only the example uses `WHAB_PLUGINS=plaid`. Disabling a bank does not delete records or create another connection. The example package has its own version; public compatibility uses `api_version=1`.
+To disable optional extensions, uncheck them in Settings, save, and restart. With no saved selection, `WHAB_PLUGINS=` disables all optional extensions, removing that environment setting restores default Plaid, and `WHAB_PLUGINS=plaid` disables only the example. These environment changes do not override `plugins.json`. Storage remains required, and the selected UI remains until `WHAB_UI=` requests headless mode. Disabling a bank does not delete records or create another connection. The example package has its own version; public compatibility uses `api_version=1`.
 
 ## Public SDK
 
@@ -115,7 +130,7 @@ At least one UI descriptor, storage factory, bank factory or reporting hook is r
 my-summary = "my_package:plugin"
 ```
 
-Set `WHAB_PLUGINS=plaid,my-summary` after installing the package to keep the default bank connection capability. Multiple names use commas; configured order controls insight panel order. Your package should declare a compatible WHAB dependency, for example `whab>=1.1.0,<2` for this API.
+After installing the package, select **plaid** and **my-summary** in Settings, save, and restart. With no saved selection, use `WHAB_PLUGINS=plaid,my-summary` instead. Multiple environment names use commas; configured order controls insight panel order, and Settings saves its displayed order. Your package should declare a compatible WHAB dependency, for example `whab>=1.1.0,<2` for this API; using the new host management endpoints requires WHAB 1.2 or newer.
 
 ## Storage backends
 
@@ -191,7 +206,7 @@ def build_context(data: dict, status: dict, items: list[dict], *,
                   selected: str | None = None) -> dict: ...
 ```
 
-Inputs are public ledger/status views, not a backend, settings or credential context. Return custom presentation values; the host supplies `data`, `status`, `workspace`, `page`, `month`, `version`, `bank_panels`, `plugin_scripts`, `plugins` and `plugin_insights`. A builder can omit bundled helpers. The host renders the selected `base.html`, mounts its static resources at `/static`, and serves the existing four page choices. Templates/scripts are trusted code and must escape user data appropriately. API v1 is this server-rendered HTML/Jinja contract, not an arbitrary renderer factory or native application framework.
+Inputs are public ledger/status views, not a backend, settings or credential context. Return custom presentation values; the host supplies `data`, `status`, `workspace`, `page`, `month`, `version`, `bank_panels`, `plugin_scripts`, `plugins`, `plugin_insights` and, from WHAB 1.2, `plugin_management`. The management projection has the same safe fields as `GET /api/plugins/management`; it contains package metadata and selection state, not credentials. A builder can omit bundled helpers. The host renders the selected `base.html`, mounts its static resources at `/static`, and serves the existing four page choices. Templates/scripts are trusted code and must escape user data appropriately. API v1 is this server-rendered HTML/Jinja contract, not an arbitrary renderer factory or native application framework.
 
 To show bank controls, include each `bank_panels` template with its scoped `status` and `items`; use `bank['items']` because `bank.items` resolves a dict method in Jinja. Include the enabled provider modules from `plugin_scripts`. The decorative `icon` helper is optional. Provider modules own their HTTP helpers and dialog handlers, so alternate interfaces need not copy private bundled JavaScript.
 
@@ -280,6 +295,7 @@ load_plugins(
 ) -> PluginRegistry
 
 registry.describe() -> tuple[PluginDescription, ...]
+registry.descriptors() -> tuple[Plugin, ...]  # Added in WHAB 1.2.
 registry.storage_plugin(plugin_id: str) -> Plugin
 registry.ui_plugin(plugin_id: str) -> Plugin
 registry.bank_plugins() -> tuple[Plugin, ...]
@@ -287,7 +303,7 @@ registry.insights(snapshot: BudgetSnapshot) -> tuple[PluginInsightResult, ...]
 registry.export(plugin_id: str, snapshot: BudgetSnapshot) -> ExportTable
 ```
 
-An optional entry-point sequence lets tests supply fake installed packages. `PluginDescription` includes `id`, `display_name`, `api_version`, `has_ui`, `has_storage`, `has_bank`, `has_insights`, `has_export` and computed `kinds`. Storage/UI selectors require a unique enabled descriptor with the requested capability; the host skips UI selection when headless. `bank_plugins()` returns descriptors without creating services. Host composition supplies contexts and owns lifecycle. `PluginInsightResult` contains `plugin_id`, `display_name`, `insights` and an optional sanitized `error`. Failures use authored `PluginError` messages with `code` and optional `plugin_id`; never append underlying exceptions or private records.
+An optional entry-point sequence lets tests supply fake installed packages. `PluginDescription` includes `id`, `display_name`, `api_version`, `has_ui`, `has_storage`, `has_bank`, `has_insights`, `has_export` and computed `kinds`. `descriptors()` returns the loaded immutable descriptors without executing their hooks or factories, so the host can reuse required plugins when validating a pending selection. Storage/UI selectors require a unique enabled descriptor with the requested capability; the host skips UI selection when headless. `bank_plugins()` returns descriptors without creating services. Host composition supplies contexts and owns lifecycle. `PluginInsightResult` contains `plugin_id`, `display_name`, `insights` and an optional sanitized `error`. Failures use authored `PluginError` messages with `code` and optional `plugin_id`; never append underlying exceptions or private records.
 
 API v1's documented records, hook signatures, and runtime methods are part of WHAB's SemVer contract. Compatible additions may ship in minor releases; changing/removing their meaning or shape requires a major WHAB release and a new plugin API version. WHAB rejects incompatible descriptors before executing hooks.
 
