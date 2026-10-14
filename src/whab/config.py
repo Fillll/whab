@@ -6,6 +6,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from whab.plugins.configuration import read_selection
+
 # Runtime files belong to the working directory, never to site-packages or src/.
 # WHAB_HOME supports launching an installed wheel from elsewhere.
 ROOT = Path.cwd()
@@ -36,6 +38,14 @@ class Settings:
         port = int(os.getenv("PORT", "5173"))
         if not 1024 <= port <= 65535:
             raise ValueError("PORT must be between 1024 and 65535.")
+        optional = tuple(
+            name.strip()
+            for name in os.getenv("WHAB_PLUGINS", "plaid").split(",")
+            if name.strip()
+        )
+        saved = read_selection(home)
+        if saved is not None:
+            optional = saved
         return cls(
             home=home,
             port=port,
@@ -46,11 +56,7 @@ class Settings:
             allow_live=os.getenv("ALLOW_LIVE_PLAID", "false").lower() == "true",
             webhook_url=os.getenv("PLAID_WEBHOOK_URL", ""),
             redirect_uri=os.getenv("PLAID_REDIRECT_URI", ""),
-            plugins=tuple(
-                name.strip()
-                for name in os.getenv("WHAB_PLUGINS", "plaid").split(",")
-                if name.strip()
-            ),
+            plugins=optional,
             storage=os.getenv("WHAB_STORAGE", "sqlite").strip(),
             ui=os.getenv("WHAB_UI", "web").strip(),
         )

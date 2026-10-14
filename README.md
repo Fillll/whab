@@ -2,7 +2,7 @@
 
 A local budgeting app built with **Python, FastAPI and Jinja**, with bundled SQLite storage and Plaid bank plugins. It has monthly category allocations and rollover, transaction categorization and review, spending analytics, manual accounts, CSV export, and a server-side Plaid Transactions connection. Pages and budgeting logic run in Python; a small browser script handles forms and Plaid Link. No Node.js build is required.
 
-Current version: **1.1.2**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
+Current version: **1.2.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
 
 ## Versioning and contributions
 
@@ -70,18 +70,28 @@ Plugins are separate Python packages registered through the `whab.plugins` entry
 | --- | --- | --- |
 | `WHAB_STORAGE` | `sqlite` | Exactly one required storage backend |
 | `WHAB_UI` | `web` | Selected server-rendered visual interface; an empty value runs APIs headlessly |
-| `WHAB_PLUGINS` | `plaid` | Optional bank/report extensions; an empty value disables these |
+| `WHAB_PLUGINS` | `plaid` | Default optional bank/report selection when no saved `plugins.json` exists; an empty value disables these |
 
-`WHAB_PLUGINS=` retains storage and the selected visual interface for manual budgeting. `WHAB_UI=` removes the page at `/` and core visual assets while keeping APIs and storage available. API v1's data-ingestion capability is the bank connection/sync contract; arbitrary one-time imports and native UI runtimes are not implemented. Installation alone does not enable an additional plugin. Try the included example:
+Without a saved `plugins.json`, `WHAB_PLUGINS=` retains storage and the selected visual interface for manual budgeting. A selection saved in **Settings → Plugin manager** takes precedence over this environment setting. `WHAB_UI=` removes the page at `/` and core visual assets while keeping APIs and storage available. API v1's data-ingestion capability is the bank connection/sync contract; arbitrary one-time imports and native UI runtimes are not implemented. Installation alone does not enable an additional plugin. Try the included example; the launch setting below applies when the runtime home has no saved selection:
 
 ```sh
 .venv/bin/python -m pip install -e examples/whab-example-plugin
 WHAB_PLUGINS=plaid,example .venv/bin/python -m whab
 ```
 
-Open **Insights** to see the extra report and its CSV download. Disable the example by setting `WHAB_PLUGINS=plaid` and restarting. Plugins run as trusted Python code in the server process; this is an extension contract, not a sandbox. Reporting hooks receive no settings, tokens, or database handles. Bank factories receive a separate privileged context with provider-scoped configuration, an encryption key, and a scoped atomic import interface. Storage factories receive the runtime home, environment and backend configuration, and own ledger persistence and migrations for their backend. The host renders escaped text, guards endpoints, and contains ordinary reporting-hook failures.
+If you already have a saved selection, enable **example** in **Settings → Plugin manager**, save, and restart. Open **Insights** to see the extra report and its CSV download. Disable the example in the same manager, save, and restart; `WHAB_PLUGINS=plaid` is an alternative only when no saved selection exists. Plugins run as trusted Python code in the server process; this is an extension contract, not a sandbox. Reporting hooks receive no settings, tokens, or database handles. Bank factories receive a separate privileged context with provider-scoped configuration, an encryption key, and a scoped atomic import interface. Storage factories receive the runtime home, environment and backend configuration, and own ledger persistence and migrations for their backend. The host renders escaped text, guards endpoints, and contains ordinary reporting-hook failures.
 
 Plaid owns its Link UI, encryption, remote requests, synchronization, and signed webhooks. The generic bank facade owns provider-scoped identities; the selected storage backend implements ledger validation and atomic cursor updates using core domain rules. SQLite and the visual Web interface are registered through the same plugin mechanism. Core app/web code imports their protocols rather than concrete implementations. The Web plugin owns presentation logic, templates, styles and browser controls; the host owns HTTP transport and access checks. Disabling Plaid preserves imported history. Arbitrary report/bank ledger-write hooks, one-time migration hooks and custom routes are not public extension points; storage implementations own their own compatible schema migrations. The repository remains private and no open-source license is granted by this structural change.
+
+## Settings and plugin manager
+
+Open the gear beside **Local workspace** to find **Plugin manager** and **About this prototype**. The compass logo is a square mark; the top bar contains only workspace and data-mode controls.
+
+The plugin manager lists installed plugin packages and their running and saved states. Enable or disable optional bank/report plugins, then choose **Save plugin selection**. Changes apply after restarting WHAB. The selected storage and interface remain required; choose a different backend or interface through their existing configuration settings.
+
+Saving creates a private `plugins.json` in the runtime home. Its validated optional selection takes precedence over `WHAB_PLUGINS` on the next start; without this file, the environment setting remains the default. Save loads and validates the selected descriptors without running their factories or hooks, then writes the file atomically. Plugin discovery reads package metadata without loading disabled code. The manager selects already-installed packages; package installation remains a separate local step. Unavailable selected optional plugins can be unchecked before saving. Invalid or unreadable saved settings prevent startup; repair the file, or save a replacement through Settings while WHAB is still running.
+
+Disabling a bank plugin takes effect on restart and retains imported history and saved connections. Saving a selection does not disconnect a bank or activate new connections. Back up `plugins.json` with the runtime configuration; removing it restores the environment default.
 
 ## Connect Plaid Sandbox
 
@@ -132,7 +142,7 @@ This is an initial planning model, not the complete YNAB credit-card payment sys
 
 The Python server binds to `127.0.0.1`. API access checks the Host and browser origin; the app has no family login/authentication layer yet. Keep it local. A hosted version requires authentication, authorization, secure deployment, backup operations, and an explicit account-sharing model.
 
-`.env`, `data/`, `work/`, and `.venv/` are ignored by Git. Database files contain private financial data even though Plaid tokens are encrypted. Back up the database and the encryption key separately before relying on the app. Stop WHAB before copying the database, or use SQLite's backup API while it is running. Do not replace the encryption key after linking accounts without a migration: existing tokens will no longer decrypt.
+`.env`, `plugins.json`, `data/`, `work/`, and `.venv/` are ignored by Git. Database files contain private financial data even though Plaid tokens are encrypted. Back up the database and the encryption key separately before relying on the app. Stop WHAB before copying the database, or use SQLite's backup API while it is running. Do not replace the encryption key after linking accounts without a migration: existing tokens will no longer decrypt.
 
 Default SQLite files:
 

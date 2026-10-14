@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title description">
   <title id="title">WHAB compass logo</title>
-  <desc id="description">A yellow eight-point compass star on a flat red background.</desc>
-  <rect width="300" height="200" fill="#C52F36"/>
-  <path transform="translate(93 100)" fill="#FFD338" d="M0-48 8.42-20.33 24-24 20.33-8.42 48 0 20.33 8.42 24 24 8.42 20.33 0 48-8.42 20.33-24 24-20.33 8.42-48 0-20.33-8.42-24-24-8.42-20.33Z"/>
+  <desc id="description">A yellow eight-point compass centered on a square red background.</desc>
+  <rect width="64" height="64" fill="#C52F36"/>
+  <path transform="translate(32 32) scale(.42)" fill="#FFD338" d="M0-48 8.42-20.33 24-24 20.33-8.42 48 0 20.33 8.42 24 24 8.42 20.33 0 48-8.42 20.33-24 24-20.33 8.42-48 0-20.33-8.42-24-24-8.42-20.33Z"/>
 </svg>

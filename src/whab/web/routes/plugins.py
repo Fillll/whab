@@ -1,4 +1,4 @@
-"""Read-only extension discovery and downloads; no plugin-owned HTTP routes."""
+"""Host-owned discovery, restart-bound settings and downloads; no plugin HTTP routes."""
 
 import csv
 import io
@@ -10,15 +10,24 @@ from fastapi.responses import Response
 from whab.domain.dates import current_month
 from whab.web.csv import safe_cell
 from whab.web.plugin_snapshot import build_snapshot
-from whab.web.schemas import Workspace, valid_month
+from whab.web.schemas import PluginSelectionBody, Workspace, valid_month
 
 
-def create_router(store, plugins):
+def create_router(store, plugins, plugin_manager=None):
     router = APIRouter(prefix="/api/plugins")
 
     @router.get("")
     def describe():
         return {"plugins": [asdict(plugin) for plugin in plugins.describe()]}
+
+    if plugin_manager is not None:
+        @router.get("/management")
+        def management():
+            return plugin_manager.projection()
+
+        @router.put("/management")
+        def configure(body: PluginSelectionBody):
+            return plugin_manager.save(tuple(body.plugins))
 
     @router.get("/{plugin_id}/export")
     def export(plugin_id: str, workspace: Workspace, month: str | None = None):

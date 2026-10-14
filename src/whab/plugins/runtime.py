@@ -55,6 +55,10 @@ class PluginRegistry:
     def __init__(self, plugins: tuple[Plugin, ...] = ()) -> None:
         self._plugins = plugins
 
+    def descriptors(self) -> tuple[Plugin, ...]:
+        """Return immutable loaded descriptors for composition without invoking hooks."""
+        return self._plugins
+
     def describe(self) -> tuple[PluginDescription, ...]:
         return tuple(
             PluginDescription(

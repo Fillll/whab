@@ -56,6 +56,45 @@ document.querySelector('[data-dismiss-toast]').addEventListener('click', () => {
   toast.hidden = true;
 });
 
+const pluginSelection = document.querySelector('[data-plugin-selection]');
+if (pluginSelection) {
+  const initialSelection = new Set([...pluginSelection.querySelectorAll('input[name="plugin"]:checked')].map(input => input.value));
+  const pending = pluginSelection.querySelector('.plugin-restart-notice');
+  pluginSelection.addEventListener('change', () => {
+    const selection = new Set([...pluginSelection.querySelectorAll('input[name="plugin"]:checked')].map(input => input.value));
+    const changed = selection.size !== initialSelection.size || [...selection].some(id => !initialSelection.has(id));
+    if (changed) {
+      pending.textContent = 'You have unsaved plugin changes. Save your selection, then restart WHAB to apply it.';
+      pending.hidden = false;
+    } else if (pending.dataset.restartRequired === 'true') {
+      pending.textContent = 'Restart WHAB to apply your saved plugin selection. Running plugins stay active until then.';
+      pending.hidden = false;
+    } else pending.hidden = true;
+  });
+  pending.dataset.restartRequired = String(!pending.hidden);
+  pluginSelection.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (pluginSelection.dataset.busy) return;
+    const error = pluginSelection.querySelector('.field-error');
+    const submit = pluginSelection.querySelector('button[type="submit"]');
+    try {
+      pluginSelection.dataset.busy = 'true';
+      error.hidden = true;
+      submit.disabled = true;
+      const plugins = [...pluginSelection.querySelectorAll('input[name="plugin"]:checked')].map(input => input.value);
+      await api('/plugins/management', {plugins}, 'PUT');
+      location.hash = 'settings';
+      location.reload();
+    } catch (failure) {
+      error.textContent = failure.message;
+      error.hidden = false;
+      delete pluginSelection.dataset.busy;
+      submit.disabled = false;
+    }
+  });
+  if (location.hash === '#settings') document.getElementById('settings-dialog').showModal();
+}
+
 for (const input of document.querySelectorAll('[data-navigation]')) input.addEventListener('change', () => {
   const url = new URL(location.href);
   url.hash = '';

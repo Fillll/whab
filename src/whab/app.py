@@ -12,6 +12,7 @@ from jinja2 import ChoiceLoader, FileSystemLoader, PrefixLoader
 from whab import __version__
 from whab.config import Settings
 from whab.plugins import BankContext, PluginError, StorageContext, load_plugins
+from whab.plugins.management import PluginManager
 from whab.plugins.storage import close_storage, open_storage
 from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
@@ -161,13 +162,18 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
             app.include_router(
                 banks_router(plugin.id, banks, bank_stores[plugin.id], prefix="/api/plaid")
             )
-    app.include_router(plugins_router(store, plugins))
+    plugin_manager = PluginManager(settings, plugins)
+    app.include_router(plugins_router(store, plugins, plugin_manager))
     app.include_router(
-        pages_router(store, banks, bank_stores, plugins, templates, settings.plaid_env, ui)
+        pages_router(
+            store, banks, bank_stores, plugins, templates, settings.plaid_env, ui,
+            plugin_manager=plugin_manager,
+        )
     )
     app.state.store = store
     app.state.banks = banks
     app.state.plugins = plugins
+    app.state.plugin_manager = plugin_manager
     app.state.storage_plugin = settings.storage if owned_store else None
     app.state.ui_plugin = ui_plugin.id if ui_plugin else None
     return app

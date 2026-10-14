@@ -12,7 +12,9 @@ from whab.web.plugin_snapshot import build_snapshot
 from whab.web.schemas import Workspace, valid_month
 
 
-def create_router(store, banks, bank_stores, plugins, templates, environment, ui):
+def create_router(
+    store, banks, bank_stores, plugins, templates, environment, ui, plugin_manager=None
+):
     router = APIRouter()
 
     def public_status():
@@ -83,6 +85,9 @@ def create_router(store, banks, bank_stores, plugins, templates, environment, ui
             if p.bank_ui and p.id in banks
         ]
         context["plugins"] = plugins.describe()
+        context["plugin_management"] = (
+            plugin_manager.projection() if plugin_manager is not None else None
+        )
         context["plugin_insights"] = (
             plugins.insights(build_snapshot(workspace, data))
             if page == "insights" and any(p.has_insights for p in context["plugins"])
