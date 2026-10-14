@@ -2,7 +2,7 @@
 
 A local budgeting app built with **Python, FastAPI and Jinja**, with bundled SQLite storage and Plaid bank plugins. It has monthly category allocations and rollover, transaction categorization and review, spending analytics, manual accounts, CSV export, and a server-side Plaid Transactions connection. Pages and budgeting logic run in Python; a small browser script handles forms and Plaid Link. No Node.js build is required.
 
-Current version: **1.1.1**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
+Current version: **1.1.2**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
 
 ## Versioning and contributions
 
@@ -41,6 +41,8 @@ The default storage plugin is `WHAB_STORAGE=sqlite`. SQLite is embedded: there i
 WHAB was formerly IHAB. The GitHub repository is now [Fillll/whab](https://github.com/Fillll/whab), and the Python package and launch command are only `whab`. Update existing launch commands to `python -m whab`. Database filenames, the opaque Plaid household identity, and browser OAuth storage keys retain their legacy names to preserve existing data and connections. The local checkout path can remain unchanged.
 
 ## Develop and extend WHAB
+
+The bundled Web UI uses a flat yellow eight-point compass on a red background, warm neutral surfaces, and red controls. Its templates, styles, and SVG brand assets live in `src/whab/interfaces/web/`; financial status colors remain distinct from branding.
 
 Start with [CONTRIBUTING.md](CONTRIBUTING.md), the [architecture guide](docs/architecture.md), and the [plugin author guide](docs/plugins.md).
 

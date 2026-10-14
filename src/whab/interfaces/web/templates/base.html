@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f5f6f1">
+    <meta name="theme-color" content="#FFFCF7">
     <title>WHAB · We Have A Budget</title>
     <link rel="icon" href="/static/favicon.svg?v={{ version }}" type="image/svg+xml">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v={{ version }}">
     <script id="whab-context" type="application/json">{{ client_context|tojson }}</script>
     <script src="/static/app.js?v={{ version }}" type="module"></script>
     {% for script in plugin_scripts %}<script src="{{ script }}" type="module"></script>{% endfor %}
@@ -14,7 +14,7 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <a class="brand" href="{{ url('budget') }}" aria-label="WHAB home"><span class="brand-symbol">W</span><span><strong>WHAB<span class="brand-dot">.</span></strong><small>We Have A Budget</small></span></a>
+        <a class="brand" href="{{ url('budget') }}" aria-label="WHAB home"><img class="brand-symbol" src="/static/logo.svg?v={{ version }}" alt="" width="48" height="32"><span><strong>WHAB</strong><small>We Have A Budget</small></span></a>
         <div class="workspace-switch"><span class="workspace-avatar">WH</span><select aria-label="Budget workspace" data-navigation="workspace"><option value="demo" {% if workspace=='demo' %}selected {% endif %}>Demo budget</option><option value="personal" {% if workspace=='personal' %}selected {% endif %}>My budget</option></select>{{ icon('chevron-down', 14) }}
         </div>
         <div class="nav-label">WORKSPACE</div>
@@ -54,7 +54,7 @@
         aria-label="Mobile budget workspace"
         data-navigation="workspace"><option value="demo" {% if workspace=='demo' %}selected {% endif %}>Demo</option><option value="personal" {% if workspace=='personal' %}selected {% endif %}>My budget</option></select><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' if status.environment=='sandbox' else 'Live data' }}</span><button class="user-avatar"
         data-dialog="about-dialog"
-        aria-label="About WHAB">WH</button>
+        aria-label="About WHAB"><img class="avatar-symbol" src="/static/logo.svg?v={{ version }}" alt="" width="24" height="16"></button>
     </div>
   </header>
   {% if workspace=="demo" %}

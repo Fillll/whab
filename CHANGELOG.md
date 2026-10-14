@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.1.2 — 2026-10-13
+
+- Adopt a flat yellow eight-point compass on a red background for the bundled Web UI, sidebar branding, and favicon.
+- Refresh the Web UI with warm neutral surfaces, red controls and navigation, yellow accents, and distinct financial status colors.
+- Version stylesheet and logo URLs and verify the new logo asset in installed-wheel checks.
+
 ## 1.1.1 — 2026-10-12
 
 - Raise the minimum Python version to 3.14 for WHAB and its example plugin. Align package metadata, Ruff, setup instructions, CI, and pending branch-protection checks; retain CI coverage for Python 3.14 and 3.15.

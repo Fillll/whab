@@ -40,7 +40,7 @@ with TestClient(app, base_url="http://127.0.0.1:5173") as client:
         response = client.get("/", params={"page": page, "workspace": "demo"})
         assert response.status_code == 200, page
         assert f"WHAB · {whab.__version__}" in response.text
-    for asset in ("styles.css", "app.js", "favicon.svg"):
+    for asset in ("styles.css", "app.js", "favicon.svg", "logo.svg"):
         assert client.get("/static/" + asset).status_code == 200, asset
     assert client.get("/plugins/plaid/static/connect.js").status_code == 200
     assert client.post("/api/plaid/link-token", json={}).status_code == 400
