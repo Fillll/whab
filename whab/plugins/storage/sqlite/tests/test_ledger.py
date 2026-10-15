@@ -208,10 +208,10 @@ def test_manual_money_and_import_currency_validation(
     with pytest.raises(StoreError):
         store.add_account("personal", {"name": "Cash", "type": "depository", "balance": True})
     save_item(store)
-    with pytest.raises(StoreError, match="USD"):
+    with pytest.raises(StoreError, match="[Cc]urrency"):
         apply_import(
             "item",
             sync_changes(),
             "one",
-            [imported_account(balance=10000, currency="EUR")],
+            [imported_account(balance=10000, currency="XXX")],
         )

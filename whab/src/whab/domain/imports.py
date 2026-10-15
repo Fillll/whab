@@ -1,13 +1,13 @@
 """Provider-independent records accepted by the atomic ledger importer.
 
-Amounts are integer USD cents. Provider adapters supply category suggestions,
+Amounts are integer currency minor units. Provider adapters supply category suggestions,
 while user annotations are merged only after the repository locks its ledger.
 """
 
 from typing import NotRequired, TypedDict
 
 from .errors import StoreError
-from .money import cents
+from .money import cents, currency_code
 from .validation import validate_date
 
 
@@ -83,8 +83,7 @@ def validate_imported_transaction(record: ImportedTransaction) -> None:
 def imported_account(record: ImportedAccount) -> dict:
     """Validate normalized money and retain only the public account fields."""
     try:
-        if record["currency"] != "USD":
-            raise StoreError("Only USD bank accounts are supported.")
+        currency_code(record["currency"])
         bank_identifier(record["id"])
         bank_identifier(record["itemId"], limit=4096)
         _text(record["name"])
@@ -102,6 +101,7 @@ def imported_account(record: ImportedAccount) -> dict:
         "institution": record["institution"],
         "type": record["type"],
         "balance": cents(record["balance"]),
+        "currency": record["currency"],
         "source": record["source"],
         "itemId": record["itemId"],
         "mask": record.get("mask", ""),

@@ -12,6 +12,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from whab.domain.budget import calculate_workspace, ensure_assignment_allowed
+from whab.domain.categories import create_category, ensure_child_category, public_categories
 from whab.domain.dates import current_month
 from whab.domain.errors import StoreError
 from whab.domain.file_imports import WorkspaceImport, validate_workspace_import
@@ -23,7 +24,7 @@ from whab.domain.imports import (
     imported_account,
     validate_imported_transaction,
 )
-from whab.domain.money import cents
+from whab.domain.money import cents, currency_code
 from whab.domain.transactions import UNSET, transaction_rows
 from whab.domain.validation import validate_date, validate_label, validate_month
 
@@ -112,6 +113,7 @@ class Store:
                 "institution": row["institution"],
                 "type": row["type"],
                 "balance": row["balance"],
+                "currency": row["currency"],
                 "source": row["source"],
                 "stale": not bool(row["active"]),
                 "balanceUnknown": bool(row["balance_unknown"]),
@@ -129,6 +131,7 @@ class Store:
                 "name": row["name"],
                 "group": row["group_name"],
                 "target": row["target"],
+                "currency": row["currency"],
             }
         for row in self.db.execute(
             "SELECT * FROM transactions WHERE workspace=? ORDER BY rowid", (workspace,)
@@ -172,7 +175,7 @@ class Store:
             (workspace, state["budgetStartMonth"]),
         )
         self.db.executemany(
-            "INSERT INTO accounts(id,workspace,name,institution,type,balance,source,item_id,mask,active,balance_unknown) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,institution=excluded.institution,type=excluded.type,balance=excluded.balance,source=excluded.source,item_id=excluded.item_id,mask=excluded.mask,active=excluded.active,balance_unknown=excluded.balance_unknown",
+            "INSERT INTO accounts(id,workspace,name,institution,type,balance,source,item_id,mask,active,balance_unknown,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,institution=excluded.institution,type=excluded.type,balance=excluded.balance,source=excluded.source,item_id=excluded.item_id,mask=excluded.mask,active=excluded.active,balance_unknown=excluded.balance_unknown,currency=excluded.currency",
             [
                 (
                     a["id"],
@@ -186,14 +189,15 @@ class Store:
                     a.get("mask"),
                     int(not a.get("stale")),
                     int(a.get("balanceUnknown", False)),
+                    a.get("currency", "USD"),
                 )
                 for a in state["accounts"].values()
             ],
         )
         self.db.executemany(
-            "INSERT INTO categories(id,workspace,name,group_name,target) VALUES(?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,group_name=excluded.group_name,target=excluded.target",
+            "INSERT INTO categories(id,workspace,name,group_name,target,currency) VALUES(?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,group_name=excluded.group_name,target=excluded.target,currency=excluded.currency",
             [
-                (c["id"], workspace, c["name"], c["group"], c["target"])
+                (c["id"], workspace, c["name"], c["group"], c["target"], c.get("currency", "USD"))
                 for c in state["categories"].values()
             ],
         )
@@ -292,8 +296,14 @@ class Store:
                 "assignments": len(imported.assignments),
             }
             self.db.execute("DELETE FROM categories WHERE workspace=?", (workspace,))
-            state["accounts"] = {record["id"]: record for record in imported.accounts}
-            state["categories"] = {record["id"]: record for record in imported.categories}
+            state["accounts"] = {
+                record["id"]: {**record, "currency": imported.currency}
+                for record in imported.accounts
+            }
+            state["categories"] = {
+                record["id"]: {**record, "currency": imported.currency}
+                for record in imported.categories
+            }
             state["transactions"] = {record["id"]: record for record in imported.transactions}
             state["budget"] = {}
             for assignment in imported.assignments:
@@ -350,7 +360,7 @@ class Store:
         return list(self.state(workspace)["accounts"].values())
 
     def categories(self, workspace: str) -> list[dict]:
-        return list(self.state(workspace)["categories"].values())
+        return public_categories(self.state(workspace)["categories"])
 
     def transactions(self, workspace: str, month: str | None = None) -> list[dict]:
         return transaction_rows(self.state(workspace), month)
@@ -362,6 +372,7 @@ class Store:
         account_id = str(uuid4())
         name = validate_label(account["name"])
         kind, balance = account["type"], cents(account["balance"])
+        currency = currency_code(account.get("currency", "USD"))
         if kind not in {"depository", "credit"}:
             raise StoreError("Invalid account type.")
 
@@ -372,6 +383,7 @@ class Store:
                 "institution": "Manual account",
                 "type": kind,
                 "balance": balance,
+                "currency": currency,
                 "source": "manual",
                 "stale": False,
             }
@@ -381,21 +393,19 @@ class Store:
 
     def add_category(self, workspace: str, category: dict) -> str:
         category_id = str(uuid4())
-        name, group, target = (
-            validate_label(category["name"]),
-            validate_label(category["group"]),
-            cents(category["target"]),
-        )
-        if target < 0:
-            raise StoreError("Target cannot be negative.")
+        if set(category) - {"name", "group", "target", "parentId", "currency"}:
+            raise StoreError("Categories support exactly two levels.")
 
         def operation(state):
-            state["categories"][category_id] = {
-                "id": category_id,
-                "name": name,
-                "group": group,
-                "target": target,
-            }
+            state["categories"][category_id] = create_category(
+                category_id,
+                category["name"],
+                category.get("group"),
+                category.get("target", 0),
+                categories=state["categories"],
+                parent_id=category.get("parentId"),
+                currency=category.get("currency", "USD"),
+            )
             return category_id
 
         return self._mutate(workspace, operation)
@@ -418,8 +428,10 @@ class Store:
                     "Use a manual account for manual entries; bank imports cannot yet reconcile them."
                 )
             category = transaction.get("categoryId")
-            if category is not None and category not in state["categories"]:
-                raise StoreError("Category not found.")
+            if category is not None:
+                child = ensure_child_category(state["categories"], category)
+                if child.get("currency", "USD") != account.get("currency", "USD"):
+                    raise StoreError("Category currency must match the account currency.")
             if transaction_id in state["transactions"]:
                 raise StoreError("Transaction already exists.")
             state["transactions"][transaction_id] = {
@@ -457,8 +469,11 @@ class Store:
             if not transaction or transaction.get("deleted"):
                 raise StoreError("Transaction not found.")
             if category_id is not UNSET:
-                if category_id is not None and category_id not in state["categories"]:
-                    raise StoreError("Category not found.")
+                if category_id is not None:
+                    child = ensure_child_category(state["categories"], category_id)
+                    account = state["accounts"][transaction["accountId"]]
+                    if child.get("currency", "USD") != account.get("currency", "USD"):
+                        raise StoreError("Category currency must match the account currency.")
                 transaction.update(
                     categoryId=category_id,
                     categoryEdited=True,
@@ -582,6 +597,11 @@ class Store:
                 previous_account = state["accounts"].get(normalized_account["id"])
                 if previous_account and previous_account.get("itemId") != item_id:
                     raise StoreError("Bank account belongs to another connection.")
+                if (
+                    previous_account
+                    and previous_account.get("currency", "USD") != normalized_account["currency"]
+                ):
+                    raise StoreError("An existing account currency cannot change.")
                 state["accounts"][normalized_account["id"]] = normalized_account
             for imported in changes.get("added", []) + changes.get("modified", []):
                 validate_imported_transaction(imported)
@@ -602,12 +622,17 @@ class Store:
                 annotations = existing or pending or {}
                 normalized_transaction = annotated_transaction(imported, annotations)
                 category_id = normalized_transaction["categoryId"]
-                if category_id is not None and category_id not in state["categories"]:
-                    if annotations.get("categoryEdited"):
-                        raise StoreError("Category not found.")
-                    # Provider suggestions are optional; an unknown suggestion must
-                    # not create a dangling category reference in public snapshots.
-                    normalized_transaction["categoryId"] = None
+                if category_id is not None:
+                    try:
+                        child = ensure_child_category(state["categories"], category_id)
+                        if child.get("currency", "USD") != account.get("currency", "USD"):
+                            raise StoreError("Category currency must match the account currency.")
+                    except StoreError:
+                        if annotations.get("categoryEdited"):
+                            raise
+                        # A provider suggestion is optional and cannot cross currencies
+                        # or introduce a parent/dangling category reference.
+                        normalized_transaction["categoryId"] = None
                 state["transactions"][transaction_id] = normalized_transaction
             for removed_id in changes.get("removed", []):
                 bank_identifier(removed_id)

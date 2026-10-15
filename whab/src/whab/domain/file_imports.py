@@ -1,4 +1,4 @@
-"""Provider-independent, complete workspace imports in integer USD cents.
+"""Provider-independent, complete workspace imports in integer currency minor units.
 
 Adapters construct these records without storage knowledge. The storage boundary
 validates and copies them again while holding its write lock before committing.
@@ -6,8 +6,9 @@ validates and copies them again while holding its write lock before committing.
 
 from dataclasses import dataclass
 
+from .categories import validate_child_category
 from .errors import StoreError
-from .money import MAX_SAFE_INTEGER, cents
+from .money import MAX_SAFE_INTEGER, cents, currency_code
 from .validation import validate_date, validate_month
 
 
@@ -19,6 +20,7 @@ class WorkspaceImport:
     assignments: tuple[dict, ...]
     budget_start_month: str
     warnings: tuple[str, ...] = ()
+    currency: str = "USD"
 
     def validated_copy(self) -> "WorkspaceImport":
         return validate_workspace_import(self)
@@ -64,6 +66,7 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
     """Reject malformed or unbounded payloads and return independent records."""
     if type(data) is not WorkspaceImport:
         raise StoreError("Invalid workspace import.")
+    currency_code(data.currency)
     _text(data.budget_start_month, limit=7)
     validate_month(data.budget_start_month)
     accounts = _records(
@@ -98,6 +101,7 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
             raise StoreError("Unsupported accounts must have stale and unknown balances.")
         total += abs(cents(account["balance"]))
     for category in categories:
+        validate_child_category(category)
         _text(category["name"])
         _text(category["group"])
         if cents(category["target"]) < 0:
@@ -142,5 +146,6 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
     for warning in data.warnings:
         _text(warning, limit=1000)
     return WorkspaceImport(
-        accounts, categories, transactions, assignments, data.budget_start_month, data.warnings
+        accounts, categories, transactions, assignments, data.budget_start_month, data.warnings,
+        data.currency,
     )

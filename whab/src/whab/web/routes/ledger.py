@@ -6,7 +6,9 @@ import io
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
+from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
+from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
 from whab.web.csv import safe_cell
 from whab.web.schemas import (
@@ -24,16 +26,19 @@ def create_router(store):
     router = APIRouter()
 
     @router.get("/api/workspace")
-    def workspace_data(workspace: Workspace, month: str | None = None):
+    def workspace_data(workspace: Workspace, month: str | None = None, currency: str | None = None):
         month = month or current_month()
         try:
             valid_month(month)
         except ValueError as error:
             raise HTTPException(400, "Invalid month") from error
-        return store.workspace(workspace, month)
+        data = store.workspace(workspace, month)
+        return select_currency(data, currency) if currency is not None else data
 
     @router.get("/api/export")
-    def export(workspace: Workspace):
+    def export(workspace: Workspace, currency: str | None = None):
+        if currency is not None:
+            currency_code(currency)
         buffer = io.StringIO()
         writer = csv.writer(buffer)
         writer.writerow(
@@ -48,12 +53,16 @@ def create_router(store):
                 "source",
                 "note",
                 "transfer",
+                "currency",
             ]
         )
         accounts = {row["id"]: row["name"] for row in store.accounts(workspace)}
+        currencies = {row["id"]: row.get("currency", "USD") for row in store.accounts(workspace)}
         categories = {row["id"]: row["name"] for row in store.categories(workspace)}
 
         for transaction in store.transactions(workspace):
+            if currency is not None and currencies[transaction["accountId"]] != currency:
+                continue
             writer.writerow(
                 [
                     transaction["date"],
@@ -66,6 +75,7 @@ def create_router(store):
                     transaction["source"],
                     safe_cell(transaction["note"]),
                     transaction.get("isTransfer", False),
+                    currencies[transaction["accountId"]],
                 ]
             )
         return Response(

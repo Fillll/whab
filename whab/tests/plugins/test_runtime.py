@@ -190,7 +190,7 @@ def test_snapshot_rejects_cross_month_unknown_account_or_category(snapshot):
     with pytest.raises(ValueError):
         replace(snapshot, workspace="all")
     with pytest.raises(ValueError):
-        replace(snapshot, currency="EUR")
+        replace(snapshot, currency="XXX")
     with pytest.raises(ValueError):
         replace(snapshot, transactions=(snapshot.transactions[0], snapshot.transactions[0]))
 

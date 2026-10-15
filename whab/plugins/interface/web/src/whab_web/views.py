@@ -1,22 +1,32 @@
 """Web presentation helpers over already-calculated public ledger views."""
 
 from collections import defaultdict
-from datetime import date, datetime
 from urllib.parse import urlencode
 
 from whab import __version__
 from whab.domain.dates import today
+from whab.plugins import (
+    SUPPORTED_CURRENCIES,
+    currency_code,
+    currency_minor_units,
+    format_date,
+    format_money,
+)
 
 from .icons import category_icon, icon
 
 
-def money(cents, digits=2):
-    sign = "-" if cents < 0 else ""
-    return f"{sign}${abs(cents) / 100:,.{digits}f}"
+def money_input(value, currency="USD"):
+    """Render exact minor units for an ungrouped amount input."""
+    digits = currency_minor_units(currency)
+    whole, fraction = divmod(abs(value), 10**digits)
+    sign = "-" if value < 0 else ""
+    return f"{sign}{whole}.{fraction:0{digits}d}" if digits else f"{sign}{whole}"
 
 
 def month_label(month, short=False):
-    return datetime.strptime(month, "%Y-%m").strftime("%b %Y" if short else "%B %Y")
+    """Months are periods, displayed numerically without locale-dependent labels."""
+    return month
 
 
 def shift_month(month, step):
@@ -27,17 +37,32 @@ def shift_month(month, step):
 
 def build_context(data, status, items, *, workspace, page, month, selected=None):
     categories = data["categories"]
+    currency = currency_code(data.get("currency", "USD"))
     budgets = {row["categoryId"]: row for row in data["budget"]}
     selected = next((c for c in categories if c["id"] == selected), None) or next(
         (c for c in categories if c["name"].lower() == "groceries"),
         categories[0] if categories else None,
     )
+    category_groups = data.get("categoryGroups")
+    if category_groups is None:
+        category_groups = [
+            {
+                "name": name,
+                "children": [c for c in categories if c["group"] == name],
+            }
+            for name in dict.fromkeys(c["group"] for c in categories)
+        ]
     groups = []
-    for group in dict.fromkeys(c["group"] for c in categories):
-        rows = [{"category": c, **budgets[c["id"]]} for c in categories if c["group"] == group]
+    category_names = {}
+    category_parents = {}
+    for group in category_groups:
+        rows = [{"category": c, **budgets[c["id"]]} for c in group["children"]]
+        for child in group["children"]:
+            category_names[child["id"]] = f"{group['name']} / {child['name']}"
+            category_parents[child["id"]] = group["name"]
         groups.append(
             {
-                "name": group,
+                **group,
                 "rows": rows,
                 **{
                     field: sum(r[field] for r in rows)
@@ -72,10 +97,11 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         else None
     )
     trend = data["trend"]
-    maximum = max(10000, *(t["spent"] for t in trend)) * 1.2
+    minimum = 100 * 10**currency_minor_units(currency)
+    maximum = (max(minimum, *(t["spent"] for t in trend)) * 6 + 4) // 5
     points = [
         {
-            "x": 64 + i * 800 / max(1, len(trend) - 1),
+            "x": 112 + i * 752 / max(1, len(trend) - 1),
             "y": 192 - max(0, row["spent"]) / maximum * 170,
             **row,
         }
@@ -92,7 +118,10 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
     ]
 
     def url(next_page=page, **overrides):
-        values = {"page": next_page, "workspace": workspace, "month": month, **overrides}
+        values = {
+            "page": next_page, "workspace": workspace, "month": month,
+            "currency": currency, **overrides,
+        }
         return "/?" + urlencode({key: value for key, value in values.items() if value is not None})
 
     return {
@@ -105,12 +134,19 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "month": month,
         "nav": nav,
         "url": url,
-        "money": money,
+        "currency": currency,
+        "currencies": data.get("currencies", [currency]),
+        "currency_choices": [(code, currency_minor_units(code)) for code in SUPPORTED_CURRENCIES],
+        "minor_units": currency_minor_units(currency),
+        "money": lambda value: format_money(value, currency),
+        "money_input": lambda value: money_input(value, currency),
         "month_label": month_label,
         "shift_month": shift_month,
         "icon": icon,
         "category_icon": category_icon,
         "groups": groups,
+        "category_names": category_names,
+        "category_parents": category_parents,
         "selected": selected,
         "selected_budget": budgets.get(selected["id"]) if selected else None,
         "transactions": transactions,
@@ -133,8 +169,14 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "points": points,
         "chart_path": chart_path,
         "chart_max": maximum,
+        "chart_ticks": [
+            {"y": 192 - index * 170 / 4, "amount": maximum * index // 4}
+            for index in range(5)
+        ],
         "uncategorized": uncategorized,
         "today": today(),
-        "client_context": {"workspace": workspace, "page": page, "month": month},
-        "date_label": lambda value: date.fromisoformat(value).strftime("%b %-d"),
+        "client_context": {
+            "workspace": workspace, "page": page, "month": month, "currency": currency,
+        },
+        "date_label": format_date,
     }

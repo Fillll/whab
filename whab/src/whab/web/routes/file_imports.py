@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from whab.domain.file_imports import validate_workspace_import
+from whab.domain.money import currency_code
 from whab.plugins import StoreError
 
 
@@ -20,8 +21,12 @@ def create_router(store, plugins):
         return plugin
 
     async def parse(request, plugin):
-        if request.headers.get("x-import-currency") != "USD":
-            raise HTTPException(400, "Confirm that the export uses USD before importing.")
+        try:
+            confirmed_currency = currency_code(request.headers.get("x-import-currency"))
+        except StoreError:
+            raise HTTPException(
+                400, "Confirm the export currency before importing (for example USD)."
+            ) from None
         raw = await request.body()
         if not raw or len(raw) > 10 * 1024 * 1024:
             raise HTTPException(400, "Choose a ZIP export no larger than 10 MiB.")
@@ -31,7 +36,10 @@ def create_router(store, plugins):
                 result = plugin.file_import.parse(raw)
                 if inspect.iscoroutine(result):
                     result.close()
-                return validate_workspace_import(result)
+                data = validate_workspace_import(result)
+                if data.currency != confirmed_currency:
+                    raise StoreError("The confirmed currency must match the import currency.")
+                return data
             except StoreError:
                 raise
             except Exception:
@@ -45,9 +53,13 @@ def create_router(store, plugins):
         fingerprint, data = await parse(request, plugin)
 
         def availability():
-            if not all(callable(getattr(store, name, None)) for name in (
-                "import_workspace", "preview_workspace_import",
-            )):
+            if not all(
+                callable(getattr(store, name, None))
+                for name in (
+                    "import_workspace",
+                    "preview_workspace_import",
+                )
+            ):
                 return {
                     "canImport": False,
                     "reason": "The selected storage plugin does not support file imports.",
@@ -63,6 +75,7 @@ def create_router(store, plugins):
             "transactions": len(data.transactions),
             "assignments": len(data.assignments),
             "budgetStartMonth": data.budget_start_month,
+            "currency": data.currency,
             "warnings": data.warnings,
             **availability,
         }
@@ -72,7 +85,9 @@ def create_router(store, plugins):
         plugin = descriptor(plugin_id)
         fingerprint, data = await parse(request, plugin)
         if request.headers.get("x-import-fingerprint") != fingerprint:
-            raise HTTPException(409, "The file changed. Preview this export again before importing.")
+            raise HTTPException(
+                409, "The file changed. Preview this export again before importing."
+            )
         importer = getattr(store, "import_workspace", None)
         if not callable(importer):
             raise HTTPException(400, "The selected storage plugin does not support file imports.")

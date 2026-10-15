@@ -95,7 +95,7 @@ input[type='checkbox'] {
   height: 16px;
   cursor: pointer;
 }
-input[type='month'] {
+input[data-navigation='month'] {
   font-size: 13px;
   max-width: 168px;
 }
@@ -1013,7 +1013,7 @@ strong {
   max-width: 200px;
   background: var(--page);
 }
-.transaction-filters input[type='month'] {
+.transaction-filters input[data-navigation='month'] {
   font-size: 11px;
   background: var(--page);
   min-height: 39px;
@@ -1097,6 +1097,10 @@ strong {
 .account-cell {
   color: var(--muted);
   font-size: 10px;
+}
+.date-cell {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .amount-cell {
   font-variant-numeric: tabular-nums;
@@ -2253,7 +2257,7 @@ strong {
     flex: 1;
     max-width: calc(50% - 8px);
   }
-  .transaction-filters > input[type='month'] {
+  .transaction-filters > input[data-navigation='month'] {
     max-width: calc(50% - 8px);
     flex: 1;
   }
@@ -2444,7 +2448,7 @@ strong {
   .page-title-row > .button-group .button > svg {
     width: 12px;
   }
-  .page-title-row > input[type='month'] {
+  .page-title-row > input[data-navigation='month'] {
     max-width: 120px;
     font-size: 10px;
   }

@@ -86,11 +86,17 @@ This prototype requests **Transactions**. Investments import is the next separat
 - Optional `PLAID_WEBHOOK_URL` must be public HTTPS. Webhooks verify Plaid's ES256 signature, timestamp, and hash of the exact body before scheduling a sync. Without a webhook endpoint, use manual sync while working locally.
 - Disconnect removes the remote Item before marking the local connection disconnected. Imported transactions remain.
 - **Manage** uses Link update mode for existing healthy connections; **Reconnect** repairs expired authorization. The frontend checks institution/account name/mask before exchanging a likely duplicate connection. This is a practical safeguard, not complete joint-account deduplication across different logins.
-- Only USD is supported. CSV exports use integer cents and guard against spreadsheet formula injection.
+- Core supports multiple currencies with separate totals and no conversion; the bundled Plaid and YNAB importers currently accept USD only. CSV exports retain `amount_cents` for compatibility, containing integer currency minor units, and append a `currency` column. Text cells are protected against spreadsheet formula injection.
 
 ## Budget scope
 
-Amounts are stored as integer cents. Category available money equals carried-over money plus assigned money minus cleared categorized activity; categorized refunds add back to the category. Analytics retain imported historical spending.
+Amounts are stored as integer currency minor units (USD cents). Select a currency in the header to view its accounts, categories, budget and analytics. Each manual account declares its currency; new categories use the selected currency. A transaction inherits its account currency and can use only a matching child category. Cash, credit debt, rollover, trends and ready-to-assign totals are calculated separately for each currency, without exchange rates or conversion.
+
+Categories have exactly two levels: a parent group and a child category. Create a child under a new or existing parent name. Parent headings organize the budget; only children receive targets, transactions and allocations. Existing saved category IDs and group labels are preserved.
+
+Core formats are fixed and locale-independent: dates `YYYY-MM-DD`, monthly periods `YYYY-MM`, and USD `$1,234.56` (negative `-$1,234.56`). Other currencies use a code, such as `EUR 1,234.56`, `JPY 1,234` or `KWD 1,234.567`, with ISO minor-unit precision. The selected UI plugin can override presentation; there are no locale-format settings in core.
+
+Category available money equals carried-over money plus assigned money minus cleared categorized activity; categorized refunds add back to the category. Analytics retain imported historical spending.
 
 The personal budget starts in its initialization month. Pre-budget imports remain available for analytics and do not create old envelope deficits. Earlier months cannot receive assignments. The demo begins earlier to demonstrate rollover.
 

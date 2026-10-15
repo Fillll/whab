@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from whab import __version__
+from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.plugins import PluginError
 from whab.web.plugin_snapshot import build_snapshot
@@ -40,13 +41,14 @@ def create_router(
         page: Literal["budget", "transactions", "insights", "accounts"] = "budget",
         month: str | None = None,
         category: str | None = None,
+        currency: str = "USD",
     ):
         month = month or current_month()
         try:
             valid_month(month)
         except ValueError as error:
             raise HTTPException(400, "Invalid month") from error
-        data = store.workspace(workspace, month)
+        data = select_currency(store.workspace(workspace, month), currency)
         status = public_status()
         try:
             context = ui.build_context(

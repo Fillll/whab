@@ -4,14 +4,15 @@ No imported income is added to balance snapshots. Pre-budget history remains
 analytics data; stale cash and unknown credit balances cannot create funding.
 """
 
+from .categories import category_tree, ensure_child_category, public_categories
 from .dates import shift_month
 from .errors import StoreError
-from .money import MAX_SAFE_INTEGER
+from .money import MAX_SAFE_INTEGER, currency_code, currency_minor_units
 from .transactions import public_transaction
 from .validation import validate_month
 
 
-def calculate_workspace(state: dict, month: str) -> dict:
+def _calculate_currency(state: dict, month: str) -> dict:
     validate_month(month)
     transactions = [
         public_transaction(t) for t in state["transactions"].values() if not t.get("deleted")
@@ -100,15 +101,115 @@ def calculate_workspace(state: dict, month: str) -> dict:
 def ensure_assignment_allowed(
     state: dict, category_id: str, month: str, assigned: int, as_of_month: str
 ) -> None:
-    if category_id not in state["categories"]:
-        raise StoreError("Category not found.")
+    category = ensure_child_category(state["categories"], category_id)
+    currency = category.get("currency", "USD")
     if month < state["budgetStartMonth"]:
         raise StoreError(
             "This month is before the budget start month. Historical data remains available in analytics."
         )
     previous = state["budget"].get(month, {}).get(category_id, 0)
     as_of = min(month, as_of_month)
-    available = calculate_workspace(state, as_of)["summary"]["readyToAssign"]
-    future = sum(sum(rows.values()) for m, rows in state["budget"].items() if m > as_of)
+    available = calculate_workspace(state, as_of)["summariesByCurrency"][currency]["readyToAssign"]
+    future = sum(
+        amount
+        for m, rows in state["budget"].items()
+        if m > as_of
+        for key, amount in rows.items()
+        if state["categories"][key].get("currency", "USD") == currency
+    )
     if assigned > previous and assigned - previous > available - future:
         raise StoreError("Assignment exceeds available money.")
+
+
+def calculate_workspace(state: dict, month: str) -> dict:
+    """Project each currency independently; never add or convert unlike money."""
+    validate_month(month)
+    accounts = {
+        key: {**row, "currency": currency_code(row.get("currency", "USD"))}
+        for key, row in state["accounts"].items()
+    }
+    categories = {row["id"]: row for row in public_categories(state["categories"])}
+    currencies = sorted(
+        {
+            "USD",
+            *(a["currency"] for a in accounts.values()),
+            *(c["currency"] for c in categories.values()),
+        }
+    )
+    for rows in state["budget"].values():
+        for category_id in rows:
+            ensure_child_category(categories, category_id)
+    transactions = {}
+    for key, row in state["transactions"].items():
+        account = accounts.get(row["accountId"])
+        if account is None:
+            raise StoreError("Transaction account not found.")
+        category_id = row.get("categoryId")
+        if category_id is not None:
+            category = ensure_child_category(categories, category_id)
+            if category["currency"] != account["currency"]:
+                raise StoreError("Category currency must match the account currency.")
+        transactions[key] = {**row, "currency": account["currency"]}
+    projections = {}
+    for currency in currencies:
+        children = {key: c for key, c in categories.items() if c["currency"] == currency}
+        scoped = {
+            **state,
+            "accounts": {key: a for key, a in accounts.items() if a["currency"] == currency},
+            "categories": children,
+            "transactions": {
+                key: t for key, t in transactions.items() if t["currency"] == currency
+            },
+            "budget": {
+                m: {key: amount for key, amount in rows.items() if key in children}
+                for m, rows in state["budget"].items()
+            },
+        }
+        projections[currency] = _calculate_currency(scoped, month)
+    default = projections["USD"]
+    return {
+        **default,
+        "currency": "USD",
+        "currencyMinorUnits": 2,
+        "currencies": currencies,
+        "accounts": list(accounts.values()),
+        "categories": list(categories.values()),
+        "categoryGroups": category_tree(categories),
+        "transactions": sorted(
+            [t for p in projections.values() for t in p["transactions"]],
+            key=lambda t: (t["date"], t["id"]),
+            reverse=True,
+        ),
+        "budget": [
+            {**b, "currency": currency} for currency, p in projections.items() for b in p["budget"]
+        ],
+        "summariesByCurrency": {c: p["summary"] for c, p in projections.items()},
+        "trendsByCurrency": {c: p["trend"] for c, p in projections.items()},
+    }
+
+
+def select_currency(data: dict, currency: str = "USD") -> dict:
+    """A homogeneous public view for interfaces and immutable plugin snapshots."""
+    currency = currency_code(currency)
+    categories = [c for c in data["categories"] if c.get("currency", "USD") == currency]
+    accounts = [a for a in data["accounts"] if a.get("currency", "USD") == currency]
+    account_ids = {a["id"] for a in accounts}
+    category_ids = {c["id"] for c in categories}
+    empty_summary = dict.fromkeys(("income", "spent", "assigned", "available", "readyToAssign"), 0)
+    return {
+        **data,
+        "currency": currency,
+        "currencyMinorUnits": currency_minor_units(currency),
+        "currencies": sorted({*data.get("currencies", ["USD"]), currency}),
+        "accounts": accounts,
+        "categories": categories,
+        "categoryGroups": category_tree(categories),
+        "transactions": [t for t in data["transactions"] if t["accountId"] in account_ids],
+        "budget": [b for b in data["budget"] if b["categoryId"] in category_ids],
+        "summary": data.get("summariesByCurrency", {"USD": data["summary"]}).get(
+            currency, empty_summary
+        ),
+        "trend": data.get("trendsByCurrency", {"USD": data["trend"]}).get(
+            currency, [{"month": row["month"], "income": 0, "spent": 0} for row in data["trend"]]
+        ),
+    }

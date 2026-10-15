@@ -5,7 +5,7 @@
     <p>Review spending and put it in the right category.</p>
   </div>
   <div class="button-group"><a class="button secondary"
-   href="/api/export?workspace={{ workspace }}"
+   href="/api/export?workspace={{ workspace }}&amp;currency={{ currency }}"
    download>{{ icon('download', 16) }}Export</a><button class="button primary"
         data-dialog="transaction-dialog"
         {% if not manual_accounts %}disabled title="Add a manual account in Accounts first" {% endif %}>{{ icon('plus', 16) }}Add transaction</button>
@@ -20,7 +20,7 @@
   <select aria-label="Filter by account" id="account-filter">
     <option value="all">All accounts</option>
   {% for account in data.accounts %}<option value="{{ account.id }}">{{ account.name }}</option>
-{% endfor %}</select><input type="month"
+{% endfor %}</select><input type="text" pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM"
        aria-label="Transaction month"
        data-navigation="month"
        value="{{ month }}"><button class="filter-button" id="review-filter" aria-pressed="false">{{ icon('check-circle', 15) }}Needs review</button>
@@ -76,16 +76,17 @@
         data-null
         aria-label="Category for {{ transaction.merchant }}"
         class="{% if not transaction.categoryId and not transaction.isTransfer %}uncategorized {% endif %}"><option value="">{{ 'Transfer (excluded)' if transaction.inferredTransfer else 'Income / uncategorized' if transaction.amount<0 else 'Uncategorized' }}</option>
-              {% for category in data.categories %}<option value="{{ category.id }}"
-        {% if transaction.categoryId==category.id %}selected {% endif %}>{{ category.name }}</option>
-      {% endfor %}
+              {% for group in groups %}<optgroup label="{{ group.name }}">
+                {% for row in group.rows %}<option value="{{ row.category.id }}"
+                  {% if transaction.categoryId==row.category.id %}selected {% endif %}>{{ row.category.name }}</option>{% endfor %}
+              </optgroup>{% endfor %}
       </select>
     </form>
   </td>
   <td class="account-cell">
     {{ accounts_by_id[transaction.accountId].name if transaction.accountId in accounts_by_id else 'Disconnected account' }}
   </td>
-  <td class="amount-cell {% if transaction.amount<0 %}inflow {% endif %}">{{ '+' if transaction.amount<0 else '−' }}{{ money(transaction.amount|abs) }}
+  <td class="amount-cell {% if transaction.amount<0 %}inflow {% endif %}">{{ money(-transaction.amount) }}
   </td>
 </tr>
 {% endfor %}

@@ -7,6 +7,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
+from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.web.csv import safe_cell
 from whab.web.plugin_snapshot import build_snapshot
@@ -41,7 +42,7 @@ def create_router(store, plugins, plugin_manager=None):
             return plugin_manager.save(tuple(body.plugins))
 
     @router.get("/{plugin_id}/export")
-    def export(plugin_id: str, workspace: Workspace, month: str | None = None):
+    def export(plugin_id: str, workspace: Workspace, month: str | None = None, currency: str = "USD"):
         month = month or current_month()
         try:
             valid_month(month)
@@ -49,7 +50,7 @@ def create_router(store, plugins, plugin_manager=None):
             raise HTTPException(400, "Invalid month") from error
         if not any(p.id == plugin_id and p.has_export for p in plugins.describe()):
             raise HTTPException(404, "Plugin export not found")
-        snapshot = build_snapshot(workspace, store.workspace(workspace, month))
+        snapshot = build_snapshot(workspace, select_currency(store.workspace(workspace, month), currency))
         table = plugins.export(plugin_id, snapshot)
         buffer = io.StringIO()
         writer = csv.writer(buffer)

@@ -6,6 +6,7 @@ from whab_sqlite import Store
 from whab_sqlite.plugin import plugin
 
 from whab.config import Settings
+from whab.domain.categories import category_group_id
 from whab.plugins import StorageContext
 
 
@@ -48,7 +49,8 @@ def test_node_schema_and_encrypted_fixture_remain_usable(monkeypatch, tmp_path, 
         assert snapshot["accounts"][0]["mask"] == "1234"
         assert snapshot["accounts"][0]["stale"] is False
         assert snapshot["categories"] == [
-            {"id": "fun", "name": "Fun", "group": "Life", "target": 10000}
+            {"id": "fun", "name": "Fun", "group": "Life", "target": 10000,
+             "parentId": category_group_id("Life"), "currency": "USD"}
         ]
         assert snapshot["budget"][0]["assigned"] == 2000
         assert snapshot["budget"][0]["spent"] == 1000

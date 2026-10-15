@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.5.0 — 2026-10-14
+
+- Make the two-level category hierarchy a core contract. Parent groups organize child categories; transactions, category targets and envelope assignments accept children only. Existing child IDs, allocations and annotations remain intact.
+- Support accounts and child categories in multiple ISO currencies within one budget. Keep cash, debt, rollover, activity, trends and funding separate by currency, without exchange rates or conversion. Transactions inherit account currency and reject mismatched category assignments.
+- Use fixed core formats: dates `YYYY-MM-DD`, USD `$1,234.56`, and other currencies with their ISO code and defined minor-unit precision. The selected interface plugin can replace presentation. The bundled Web interface uses these defaults and provides a currency selector.
+- Add compatible SQLite currency columns defaulting existing records to USD. Scope reporting snapshots to one currency and add currency identification to CSV exports; preserve the legacy integer amount field names.
+
 ## 1.4.0 — 2026-10-14
 
 - Add the optional YNAB export plugin, with bounded ZIP/TSV/CSV parsing, USD confirmation, a read-only preview, and an explicit atomic import into an empty personal budget. Preserve categories, register rows, memos, clearing status, flags and monthly assignments; repeat imports of the identical archive do not duplicate data or overwrite edits.

@@ -30,7 +30,13 @@ def build_initial_state(workspace: str, month: str) -> dict:
         "items": {},
     }
     state["categories"] = {
-        name.lower(): {"id": name.lower(), "name": name, "group": group, "target": target}
+        name.lower(): {
+            "id": name.lower(),
+            "name": name,
+            "group": group,
+            "target": target,
+            "currency": "USD",
+        }
         for name, group, target in CATEGORY_TEMPLATE
     }
     if workspace != "demo":
@@ -46,6 +52,7 @@ def build_initial_state(workspace: str, month: str) -> dict:
             "institution": "Demo Bank",
             "type": kind,
             "balance": balance,
+            "currency": "USD",
             "source": "demo",
             "mask": mask,
             "stale": False,

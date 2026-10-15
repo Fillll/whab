@@ -13,15 +13,16 @@
         id="category-dialog">{{ heading('New category', 'Make space for something you want to budget for.') }}
   <form class="modal-form" data-api="/categories">
     <input type="hidden" name="workspace" value="{{ workspace }}">
+    <input type="hidden" name="currency" value="{{ currency }}">
     <label>
-      Category name<input name="name"
+      Child category name<input name="name"
        required
        maxlength="80"
        placeholder="e.g. School supplies"
        autofocus>
     </label>
     <label>
-      Group<input name="group"
+      Parent category<input name="group"
        required
        maxlength="80"
        list="category-groups"
@@ -33,7 +34,7 @@
       </datalist>
     </label>
     <label>
-      Monthly target ($)<input name="target" data-cents inputmode="decimal" value="0" required>
+      Monthly target ({{ currency }})<input name="target" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" value="{{ money_input(0) }}" required>
     </label>
     <p class="field-error" role="alert" hidden></p>
     <button class="button primary full-width">Create category</button>
@@ -57,8 +58,13 @@
       </select>
     </label>
     <label>
-      Current balance / amount owed ($)<input name="balance"
-       data-cents
+      Currency<select name="currency">
+      {% for code, digits in currency_choices %}<option value="{{ code }}" data-minor-units="{{ digits }}"{% if code==currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      Current balance / amount owed<input name="balance"
+       data-cents data-minor-units="{{ minor_units }}"
        inputmode="decimal"
        value="0"
        required>
@@ -80,7 +86,7 @@
     </label>
     <div class="form-columns">
       <label>
-        Amount ($)<input name="amount" data-cents required inputmode="decimal">
+        Amount ({{ currency }})<input name="amount" data-cents data-minor-units="{{ minor_units }}" required inputmode="decimal">
       </label>
       <label>
         Type<select name="_kind">
@@ -91,7 +97,7 @@
     </div>
     <div class="form-columns">
       <label>
-        Date<input name="date" type="date" value="{{ today }}" required>
+        Date (YYYY-MM-DD)<input name="date" type="text" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" placeholder="YYYY-MM-DD" value="{{ today }}" required>
       </label>
       <label>
         Account<select name="accountId" required>
@@ -103,8 +109,9 @@
 <label>
   Category<select name="categoryId" data-null>
   <option value="">Income / uncategorized</option>
-{% for category in data.categories %}<option value="{{ category.id }}">{{ category.name }}</option>
-{% endfor %}
+{% for group in groups %}<optgroup label="{{ group.name }}">
+  {% for row in group.rows %}<option value="{{ row.category.id }}">{{ row.category.name }}</option>{% endfor %}
+</optgroup>{% endfor %}
 </select>
 </label>
 <label>

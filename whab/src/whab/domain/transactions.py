@@ -19,13 +19,19 @@ def public_transaction(transaction: dict) -> dict:
             "note",
             "isTransfer",
             "inferredTransfer",
+            "currency",
         )
     }
 
 
 def transaction_rows(state: dict, month: str | None = None) -> list[dict]:
     rows = [
-        public_transaction(transaction)
+        public_transaction(
+            {
+                **transaction,
+                "currency": state["accounts"][transaction["accountId"]].get("currency", "USD"),
+            }
+        )
         for transaction in state["transactions"].values()
         if not transaction.get("deleted") and (not month or transaction["date"].startswith(month))
     ]
