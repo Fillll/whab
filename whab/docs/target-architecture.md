@@ -35,10 +35,10 @@ Bank logos and similar presentation enhancements also belong under Interface. Th
 
 ## Client/server deployment proposal
 
-As an alternative to one local instance, two WHAB instances could divide interface and persistence responsibilities. The [README diagram](../../README.md#alternative-proposal-client-and-server) shows the client selecting a remote storage plugin and the server exposing only an API, with no visual interface.
+As an alternative to one local instance, two WHAB instances could divide interface and persistence responsibilities. The [README diagram](../../README.md#alternative-proposal-client-and-server) shows the client selecting a remote storage plugin and the server exposing only an API interface plugin, with no visual interface. The API belongs to the Interface plugin family alongside Web, TUI and CLI.
 
 - **Client instance:** runs an interface and the financial core, with a remote storage adapter as its selected storage plugin. The adapter translates ledger reads and changes into authenticated API requests to the server. Interface calculations can provide previews, but the server's validation and committed state remain authoritative.
-- **Server instance:** runs the API, financial core and a persistent storage plugin such as SQLite. It owns the canonical ledger, migrations, bank ingestion, synchronization cursors and encrypted provider credentials. Provider access tokens and encryption keys stay on this instance.
+- **Server instance:** runs an API interface plugin, financial core and a persistent storage plugin such as SQLite. It owns the canonical ledger, migrations, bank ingestion, synchronization cursors and encrypted provider credentials. Provider access tokens and encryption keys stay on this instance.
 
 The remote contract needs scoped public queries and validated domain commands. It must not expose a database or the full privileged `StorageBackend` protocol over HTTP: internal bank-store operations and token records are not client capabilities. Ingestion remains on the server so normalized records and synchronization cursors can commit atomically under the existing storage guarantees.
 
@@ -49,7 +49,7 @@ Before implementation, define:
 - API version negotiation and compatible plugin capabilities, including how server-owned ingestion workflows are invoked and presented by the client.
 - Explicit connection failures and recovery. The client must not silently switch to a local ledger; offline writes, caching, replication and automatic data migration are outside this proposal.
 
-The current app already supports `WHAB_UI=` for headless APIs with storage, but it has no remote storage plugin or authenticated network deployment contract. This future topology requires new remote contracts beyond SDK v1. Until those contracts exist, keep the current application bound to localhost.
+The current app already supports `WHAB_UI=` for headless host-owned APIs with storage, but it has no remote storage plugin or authenticated network deployment contract. This future topology requires new remote contracts beyond SDK v1. Until those contracts exist, keep the current application bound to localhost.
 
 ## Ingestion
 
