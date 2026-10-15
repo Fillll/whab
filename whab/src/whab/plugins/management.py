@@ -129,6 +129,17 @@ class PluginManager:
                     code="invalid_configuration",
                 )
             if self.settings.ui:
+                for plugin in optional.file_import_plugins():
+                    capability = plugin.file_import
+                    if capability.templates is not None and (
+                        not (capability.templates / "accounts.html").is_file()
+                        or not (capability.static / "import.js").is_file()
+                    ):
+                        raise PluginError(
+                            "Import plugin UI resources are missing. Reinstall or disable the plugin.",
+                            code="missing_resources",
+                            plugin_id=plugin.id,
+                        )
                 for plugin in optional.bank_plugins():
                     if plugin.bank_ui and (
                         not (plugin.bank_ui.templates / "accounts.html").is_file()

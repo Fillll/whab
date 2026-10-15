@@ -1,0 +1,30 @@
+<section class="setup-panel" data-file-import="{{ importer.id }}">
+  <div class="section-title">
+    <h2>Import from {{ importer.display_name }}</h2>
+  </div>
+  <p>Choose the original YNAB ZIP export, up to 10 MiB. Preview checks the archive without changing your budget. Import is available only in an empty personal budget.</p>
+  <form data-import-form>
+    <div class="modal-form">
+      <label for="{{ importer.id }}-archive">YNAB ZIP export
+        <input id="{{ importer.id }}-archive" type="file" accept=".zip,application/zip,application/x-zip-compressed" data-import-file required>
+      </label>
+    </div>
+    <div class="setup-checks">
+      <div>
+        <input id="{{ importer.id }}-usd" type="checkbox" data-import-usd required>
+        <label for="{{ importer.id }}-usd">I confirm this export uses US dollars (USD).</label>
+      </div>
+    </div>
+    <p class="field-error" data-import-error role="alert" hidden></p>
+    <p class="modal-description" data-import-progress role="status" hidden></p>
+    <button class="button secondary" type="submit" data-import-preview-button disabled>Preview import</button>
+  </form>
+  <section data-import-preview aria-live="polite" hidden>
+    <div class="section-title"><h3>Import preview</h3></div>
+    <p class="modal-description" data-import-summary></p>
+    <p class="modal-description" data-import-month></p>
+    <ul class="modal-description" data-import-warnings></ul>
+    <p class="modal-description" data-import-reason role="status"></p>
+    <button class="button primary" type="button" data-import-commit disabled>Import into empty budget</button>
+  </section>
+</section>

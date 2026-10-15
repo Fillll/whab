@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
@@ -13,6 +14,7 @@ from uuid import uuid4
 from whab.domain.budget import calculate_workspace, ensure_assignment_allowed
 from whab.domain.dates import current_month
 from whab.domain.errors import StoreError
+from whab.domain.file_imports import WorkspaceImport, validate_workspace_import
 from whab.domain.imports import (
     ImportedAccount,
     SyncChanges,
@@ -65,9 +67,8 @@ class Store:
         with self._lock:
             self.db.close()
 
-    def state(self, workspace: str) -> dict:
-        if not isinstance(workspace, str) or workspace not in {"demo", "personal"}:
-            raise StoreError("Invalid workspace.")
+    @contextmanager
+    def _snapshot(self):
         with self._lock:
             # A read transaction makes the account/ledger/cursor snapshot coherent
             # even if another process commits a sync between these SELECTs.
@@ -75,14 +76,19 @@ class Store:
             if own_transaction:
                 self.db.execute("BEGIN")
             try:
-                result = self._read_state(workspace)
+                yield
                 if own_transaction:
                     self.db.execute("COMMIT")
-                return result
             except Exception:
                 if own_transaction:
                     self.db.execute("ROLLBACK")
                 raise
+
+    def state(self, workspace: str) -> dict:
+        if not isinstance(workspace, str) or workspace not in {"demo", "personal"}:
+            raise StoreError("Invalid workspace.")
+        with self._snapshot():
+            return self._read_state(workspace)
 
     def _read_state(self, workspace: str) -> dict:
         meta = self.db.execute("SELECT * FROM meta WHERE workspace=?", (workspace,)).fetchone()
@@ -107,7 +113,7 @@ class Store:
                 "type": row["type"],
                 "balance": row["balance"],
                 "source": row["source"],
-                "stale": row["source"] not in {"demo", "manual"} and not bool(row["active"]),
+                "stale": not bool(row["active"]),
                 "balanceUnknown": bool(row["balance_unknown"]),
             }
             if row["item_id"]:
@@ -240,18 +246,105 @@ class Store:
                 ],
             )
 
-    def _mutate(self, workspace: str, operation: Callable[[dict], Any]) -> Any:
+    def _mutate(
+        self,
+        workspace: str,
+        operation: Callable[[dict], Any],
+        *,
+        write_if: Callable[[Any], bool] | None = None,
+    ) -> Any:
         with self._lock:
             self.db.execute("BEGIN IMMEDIATE")
             try:
                 state = self.state(workspace)
                 result = operation(state)
-                self._write_state(state)
+                if write_if is None or write_if(result):
+                    self._write_state(state)
                 self.db.execute("COMMIT")
                 return result
             except Exception:
                 self.db.execute("ROLLBACK")
                 raise
+
+    def import_workspace(
+        self, workspace: str, plugin_id: str, fingerprint: str, data: WorkspaceImport
+    ) -> dict:
+        """Atomically initialize an empty personal ledger from a validated file."""
+        self._validate_import_identifiers(workspace, plugin_id, fingerprint)
+
+        def operation(state):
+            imported = validate_workspace_import(data)
+            receipt = self._workspace_import_receipt(state, plugin_id, fingerprint)
+            if receipt:
+                return {
+                    "counts": {
+                        "accounts": receipt["account_count"],
+                        "categories": receipt["category_count"],
+                        "transactions": receipt["transaction_count"],
+                        "assignments": receipt["assignment_count"],
+                    },
+                    "alreadyImported": True,
+                }
+            counts = {
+                "accounts": len(imported.accounts),
+                "categories": len(imported.categories),
+                "transactions": len(imported.transactions),
+                "assignments": len(imported.assignments),
+            }
+            self.db.execute("DELETE FROM categories WHERE workspace=?", (workspace,))
+            state["accounts"] = {record["id"]: record for record in imported.accounts}
+            state["categories"] = {record["id"]: record for record in imported.categories}
+            state["transactions"] = {record["id"]: record for record in imported.transactions}
+            state["budget"] = {}
+            for assignment in imported.assignments:
+                state["budget"].setdefault(assignment["month"], {})[assignment["categoryId"]] = (
+                    assignment["assigned"]
+                )
+            state["budgetStartMonth"] = imported.budget_start_month
+            self.db.execute(
+                "INSERT INTO workspace_imports(workspace,plugin_id,fingerprint,account_count,category_count,transaction_count,assignment_count) VALUES(?,?,?,?,?,?,?)",
+                (workspace, plugin_id, fingerprint, *counts.values()),
+            )
+            return {"counts": counts, "alreadyImported": False}
+
+        return self._mutate(
+            workspace, operation, write_if=lambda result: not result["alreadyImported"]
+        )
+
+    @staticmethod
+    def _validate_import_identifiers(workspace: str, plugin_id: str, fingerprint: str) -> None:
+        if workspace != "personal":
+            raise StoreError("Workspace imports require the personal workspace.")
+        bank_identifier(plugin_id, limit=64)
+        bank_identifier(fingerprint)
+
+    def _workspace_import_receipt(
+        self, state: dict, plugin_id: str, fingerprint: str
+    ) -> sqlite3.Row | None:
+        receipt = self.db.execute(
+            "SELECT * FROM workspace_imports WHERE workspace=?", (state["_id"],)
+        ).fetchone()
+        if receipt:
+            if receipt["plugin_id"] != plugin_id or receipt["fingerprint"] != fingerprint:
+                raise StoreError("This workspace has already received a different file import.")
+            return receipt
+        if any(state[key] for key in ("accounts", "transactions", "budget", "items")):
+            raise StoreError("File imports require an empty personal workspace.")
+        templates = build_initial_state("personal", state["budgetStartMonth"])["categories"]
+        if state["categories"] and state["categories"] != templates:
+            raise StoreError("File imports require untouched template categories.")
+        return None
+
+    def preview_workspace_import(self, workspace: str, plugin_id: str, fingerprint: str) -> dict:
+        """Report eligibility from one read snapshot without changing the ledger."""
+        try:
+            self._validate_import_identifiers(workspace, plugin_id, fingerprint)
+            with self._snapshot():
+                state = self._read_state(workspace)
+                receipt = self._workspace_import_receipt(state, plugin_id, fingerprint)
+            return {"canImport": True, "reason": "", "alreadyImported": receipt is not None}
+        except StoreError as error:
+            return {"canImport": False, "reason": str(error), "alreadyImported": False}
 
     def accounts(self, workspace: str) -> list[dict]:
         return list(self.state(workspace)["accounts"].values())

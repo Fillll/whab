@@ -10,6 +10,9 @@
     {% include bank.template %}
   {% endwith %}
 {% endfor %}
+{% for importer in import_panels %}
+  {% include importer.template %}
+{% endfor %}
 <div class="section-title accounts-heading">
   <h2>{{ 'Sample accounts' if workspace=='demo' else 'Accounts' }} <span>{{ data.accounts|length }}</span></h2>
   <button class="text-link"
@@ -28,7 +31,7 @@
             {% endif %}
           </span>
         </div>
-        <span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' else account.source|capitalize }}</span>
+        <span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' and account.source in bank_source_ids else account.source|capitalize }}</span>
         <div class="account-balance">
           <strong>{{ 'Unavailable' if account.balanceUnknown else money(account.balance) }}</strong><small>{{ 'Owed' if account.type in ['credit','loan'] else 'Balance' }}</small>
         </div>

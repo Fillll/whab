@@ -37,9 +37,9 @@ for name in ("whab", "whab-example-plugin"):
 settings = Settings.load()
 assert settings.home == Path.cwd()
 assert settings.storage == "sqlite" and settings.ui == "web"
-assert settings.plugins == ("plaid", "example", "bank-logos")
+assert settings.plugins == ("plaid", "example", "bank-logos", "ynab")
 registry = load_plugins(settings.enabled_plugins())
-assert [p.id for p in registry.describe()] == ["plaid", "example", "bank-logos", "sqlite", "web"]
+assert [p.id for p in registry.describe()] == ["plaid", "example", "bank-logos", "ynab", "sqlite", "web"]
 assert registry.bank_logo("Chase") == ("bank-logos", "chase")
 assert registry.bank_logo("Demo Bank") is None
 app = create_app(settings=settings, plugins=registry)
@@ -52,6 +52,10 @@ with TestClient(app, base_url="http://127.0.0.1:5173") as client:
     for asset in ("styles.css", "app.js", "favicon.svg", "logo.svg"):
         assert client.get("/static/" + asset).status_code == 200, asset
     assert client.get("/plugins/plaid/static/connect.js").status_code == 200
+    assert client.get("/imports/ynab/static/import.js").status_code == 200
+    personal = client.get("/?workspace=personal&page=accounts")
+    assert personal.status_code == 200 and 'data-file-import="ynab"' in personal.text
+    assert any(p["id"] == "ynab" and p["has_file_import"] for p in client.get("/api/plugins").json()["plugins"])
     assert client.get("/api/plugins/bank-logos/bank-logos/unknown").status_code == 404
     assert any(p["id"] == "bank-logos" and p["has_bank_logos"] for p in client.get("/api/plugins").json()["plugins"])
     assert client.post("/api/plaid/link-token", json={}).status_code == 400
@@ -75,7 +79,7 @@ def main():
         and key not in {"TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID", "PORT", "PYTHONPATH"}
     }
     env.update(
-        PLAID_ENV="sandbox", ALLOW_LIVE_PLAID="false", WHAB_PLUGINS="plaid,example,bank-logos", PORT="5173"
+        PLAID_ENV="sandbox", ALLOW_LIVE_PLAID="false", WHAB_PLUGINS="plaid,example,bank-logos,ynab", PORT="5173"
     )
     with tempfile.TemporaryDirectory(prefix="whab-distribution-") as temporary:
         base = Path(temporary)

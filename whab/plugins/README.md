@@ -39,6 +39,7 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | --- | --- | --- | --- |
 | `storage/sqlite/` | `sqlite` | `whab_sqlite` | Default ledger backend, schema upgrades and demo seeding |
 | `ingestion/plaid/` | `plaid` | `whab_plaid` | Bank normalization, credentials, connection UI and synchronization |
+| `ingestion/ynab/` | `ynab` | `whab_ynab` | Local YNAB ZIP parsing, migration preview and import controls |
 | `interface/web/` | `web` | `whab_web` | View models, icons, templates and browser assets |
 | `interface/bank-logos/` | `bank-logos` | `whab_bank_logos` | Curated institution lookup and public icon fetching |
 | `example/example/` | `example` | `whab_example_plugin` | Independently installable reporting/export example |
@@ -63,7 +64,7 @@ Every plugin must have **100% Python statement and branch coverage**. The covera
 
 ## Packaging and contracts
 
-The four bundled plugins ship in the same `whab` wheel, so the normal app installation still supplies its default storage and interface. Each has its own Python namespace and is loaded through a `whab.plugins` entry point. Adding a bundled plugin requires maintainer wiring in the application `pyproject.toml`: register its entry point and source root, plus package data when it has assets. Refresh an editable installation after moving packages or changing registrations:
+The bundled plugins ship in the same `whab` wheel, so the normal app installation still supplies its default storage and interface. Each has its own Python namespace and is loaded through a `whab.plugins` entry point. Adding a bundled plugin requires maintainer wiring in the application `pyproject.toml`: register its entry point and source root, plus package data when it has assets. Refresh an editable installation after moving packages or changing registrations:
 
 ```sh
 .venv/bin/python -m pip install --no-deps -e .

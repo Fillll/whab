@@ -27,6 +27,7 @@ bank-logos = "whab_bank_logos.plugin:plugin"
 plaid = "whab_plaid.plugin:plugin"
 sqlite = "whab_sqlite.plugin:plugin"
 web = "whab_web.plugin:plugin"
+ynab = "whab_ynab.plugin:plugin"
 
 [build-system]
 requires = ["setuptools>=77.0.3"]
@@ -39,12 +40,14 @@ where = [
   "plugins/storage/sqlite/src",
   "plugins/ingestion/plaid/src",
   "plugins/interface/bank-logos/src",
+  "plugins/ingestion/ynab/src",
 ]
 include = ["whab*"]
 
 [tool.setuptools.package-data]
 "whab_web" = ["templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]
 "whab_plaid" = ["templates/*.html", "static/*.js"]
+"whab_ynab" = ["templates/*.html", "static/*.js"]
 
 [tool.setuptools.dynamic]
 version = {attr = "whab.__version__"}

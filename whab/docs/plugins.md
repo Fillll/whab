@@ -343,6 +343,35 @@ An optional entry-point sequence lets tests supply fake installed packages. `Plu
 
 API v1's documented records, hook signatures, and runtime methods are part of WHAB's SemVer contract. Compatible additions may ship in minor releases; changing/removing their meaning or shape requires a major WHAB release and a new plugin API version. WHAB rejects incompatible descriptors before executing hooks.
 
+## Local file imports (WHAB 1.4+)
+
+The optional bundled `ynab` descriptor uses a credential-free `FileImport` capability, independently of the bank connection lifecycle:
+
+```python
+from whab.plugins import FileImport, Plugin, WorkspaceImport
+
+def parse_export(raw: bytes) -> WorkspaceImport:
+    # Normalize the complete archive. No store, settings or credentials are supplied.
+    ...
+
+plugin = Plugin("my-import", "My importer", file_import=FileImport(parse=parse_export))
+```
+
+`Plugin.file_import` defaults to `None`. `FileImport(parse, templates=None, static=None)` is frozen and requires a synchronous parser; optional `pathlib.Path` template/static directories must be supplied together. The template fragment is `accounts.html` and the browser module is `import.js`, mounted under `imports/{id}/` and `/imports/{id}/static/`. `import_panels` and their `plugin_scripts` are supplied on the personal Accounts page. Alternate interfaces can render those panels. Headless mode retains the HTTP capability. Disabling the plugin removes its resources and prevents parsing. This is an additive API v1 capability, classified as `data_ingestion`; `PluginDescription.has_file_import` and `registry.file_import_plugins()` expose it without invoking the parser.
+
+`WorkspaceImport` holds tuples of plain dictionaries in `accounts`, `categories`, `transactions` and `assignments`, a `budget_start_month`, and a tuple of plain-text `warnings`. Its public `validated_copy()` checks types, field sets, references, money bounds and duplicate IDs/assignments, and returns independent records. Its exact fields are documented in [`domain/file_imports.py`](../src/whab/domain/file_imports.py). Unknown account types use `other`, `stale=True` and `balanceUnknown=True` so they cannot create budget funding. Transaction dictionaries preserve notes, review state and transfer annotations. Assignments use `month`, `categoryId`, `assigned`, including negative historical reallocations.
+
+The host accepts raw ZIP bytes at `POST /api/plugins/{id}/import/preview` and `/commit`, using `Content-Type: application/zip` and an explicit `X-Import-Currency: USD`. Uploads are bounded to 10 MiB before request parsing, including chunked bodies; all ordinary APIs retain their existing content types and limits. Host/origin checks and no-store responses apply. A preview returns SHA-256 `fingerprint`, account/category/transaction/assignment counts, `budgetStartMonth`, warnings, `canImport`, a plain-text `reason` and `alreadyImported`. It does not save financial data. Commit requires the same file and `X-Import-Fingerprint` from that preview; it reparses and validates before a storage transaction. Unexpected parser failures are sanitized. Authored `StoreError` messages must never contain private row values.
+
+Storage support is optional, separate from the unchanged required `StorageBackend` protocol. The public `WorkspaceImporter` protocol supplies:
+
+```python
+preview_workspace_import(workspace, plugin_id, fingerprint) -> dict
+import_workspace(workspace, plugin_id, fingerprint, data: WorkspaceImport) -> dict
+```
+
+Preview reports availability without mutation. Commit returns `{"counts": {"accounts": ..., "categories": ..., "transactions": ..., "assignments": ...}, "alreadyImported": bool}`. SQLite allows only a pristine personal workspace, replacing untouched seed categories; financial records, assignments, customized categories and even disconnected bank connection records block the migration. It revalidates under the write lock, committing all data, budget start and a receipt atomically. A receipt for the identical plugin/fingerprint makes retries harmless and preserves later edits. Any different subsequent archive is refused. Other backends can keep working without this capability and report imports unavailable. See the [YNAB importer](../plugins/ingestion/ynab/README.md) for its format-specific limits.
+
 ## Extension scope
 
-This release supports selected server-rendered interfaces, required storage backends, bank-service factories with scoped normalized imports, reports, and optional bank-logo branding. UI/storage selection does not create native runtimes or cross-backend migration. Report/bank plugins have no arbitrary ledger-write or route-registration hook; family authentication is not implemented. Plaid is the bundled bank provider, not proof of institution access. Every backend/provider must preserve monetary rules, isolation, encrypted credentials, annotations and atomic checkpoints.
+This release supports selected server-rendered interfaces, required storage backends, bank-service factories with scoped normalized imports, bounded local file imports, reports, and optional bank-logo branding. UI/storage selection does not create native runtimes or cross-backend migration. Plugins have no arbitrary route-registration hook; family authentication is not implemented. Plaid is the bundled bank provider, not proof of institution access. Every backend/provider must preserve monetary rules, isolation, encrypted credentials, annotations and atomic checkpoints.

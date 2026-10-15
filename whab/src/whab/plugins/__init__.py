@@ -1,6 +1,7 @@
 """Public WHAB plugin API v1. Installed plugins are trusted, explicitly enabled code."""
 
 from whab.domain.errors import StoreError
+from whab.domain.file_imports import WorkspaceImport
 from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
 from whab.domain.transactions import UNSET
 
@@ -21,6 +22,7 @@ from .sdk import (
     ExportCell,
     ExportHook,
     ExportTable,
+    FileImport,
     Insight,
     InsightsHook,
     LogoImage,
@@ -34,6 +36,7 @@ from .sdk import (
     UIContextBuilder,
     UserInterface,
     WebhookResult,
+    WorkspaceImporter,
 )
 
 __all__ = [
@@ -53,6 +56,7 @@ __all__ = [
     "ExportCell",
     "ExportHook",
     "ExportTable",
+    "FileImport",
     "Insight",
     "InsightsHook",
     "LogoImage",
@@ -72,6 +76,8 @@ __all__ = [
     "TransactionSnapshot",
     "SyncChanges",
     "WebhookResult",
+    "WorkspaceImport",
+    "WorkspaceImporter",
     "copy_snapshot",
     "load_plugins",
 ]

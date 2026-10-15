@@ -8,9 +8,10 @@ from fastapi.responses import JSONResponse
 class RequestBodyLimit:
     """Bound chunked request bodies before Starlette/Pydantic buffer or parse them."""
 
-    def __init__(self, app, webhook_paths):
+    def __init__(self, app, webhook_paths, file_import_paths=()):
         self.app = app
         self.webhook_paths = frozenset(webhook_paths)
+        self.file_import_paths = frozenset(file_import_paths)
 
     async def __call__(self, scope, receive, send):
         if (
@@ -20,7 +21,10 @@ class RequestBodyLimit:
         ):
             await self.app(scope, receive, send)
             return
-        limit = 128 * 1024 if scope["path"] in self.webhook_paths else 32 * 1024
+        limit = (
+            10 * 1024 * 1024 if scope["path"] in self.file_import_paths
+            else 128 * 1024 if scope["path"] in self.webhook_paths else 32 * 1024
+        )
         chunks = []
         size = 0
         while True:
@@ -48,8 +52,9 @@ class RequestBodyLimit:
         await self.app(scope, replay, send)
 
 
-def install_middleware(app, port, webhook_paths=()):
+def install_middleware(app, port, webhook_paths=(), file_import_paths=()):
     webhook_paths = frozenset(webhook_paths)
+    file_import_paths = frozenset(file_import_paths)
     origins = {f"http://{host}:{port}" for host in ("localhost", "127.0.0.1")}
 
     @app.middleware("http")
@@ -72,12 +77,14 @@ def install_middleware(app, port, webhook_paths=()):
             "HEAD",
             "OPTIONS",
         }:
+            file_import = request.url.path in file_import_paths
+            content_type = "application/zip" if file_import else "application/json"
             if (
                 request.method != "DELETE"
-                and request.headers.get("content-type", "").split(";")[0] != "application/json"
+                and request.headers.get("content-type", "").split(";")[0] != content_type
             ):
-                return JSONResponse({"error": "Use application/json"}, status_code=415)
-            limit = 128 * 1024 if webhook else 32 * 1024
+                return JSONResponse({"error": f"Use {content_type}"}, status_code=415)
+            limit = 10 * 1024 * 1024 if file_import else 128 * 1024 if webhook else 32 * 1024
             try:
                 if int(request.headers.get("content-length", "0")) > limit:
                     return JSONResponse({"error": "Request too large"}, status_code=413)
@@ -91,4 +98,6 @@ def install_middleware(app, port, webhook_paths=()):
             response.headers["Cache-Control"] = "no-store"
         return response
 
-    app.add_middleware(RequestBodyLimit, webhook_paths=webhook_paths)
+    app.add_middleware(
+        RequestBodyLimit, webhook_paths=webhook_paths, file_import_paths=file_import_paths
+    )
