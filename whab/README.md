@@ -4,6 +4,8 @@ A local Python budgeting app with monthly envelopes and rollover, transaction re
 
 See the [proposed architecture and Mermaid diagram](../README.md#architecture) and [current implementation](docs/architecture.md). Current version: **1.5.0** ([changelog](CHANGELOG.md)).
 
+An additional [client/server proposal and diagram](../README.md#alternative-proposal-client-and-server) pairs a WHAB client running an interface and remote storage with a headless WHAB server providing its API and persistent ledger. This deployment is not implemented.
+
 ## Run locally
 
 Requires **Python 3.14 or newer**. Run these commands from this application directory (`whab/`):
