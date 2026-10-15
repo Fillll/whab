@@ -34,11 +34,11 @@ Configuration reads `.env` from `WHAB_HOME`, or from the process's launch direct
 <runtime home>/
   .env
   data/
-    ihab-sandbox.sqlite
-    ihab-production.sqlite
+    whab-sandbox.sqlite
+    whab-production.sqlite
 ```
 
-The SQLite factory owns those legacy filenames and its additive schema migrations, preserving saved budgets through the WHAB rename. Core configuration supplies a home/environment rather than choosing a concrete database file. Other storage plugins own their connection settings and migrations. Selecting a different backend does not automatically transfer the previous ledger. Runtime paths do not derive from the checkout or `site-packages`. Keep the existing home and encryption key when upgrading SQLite. The `ihab` module/command is not provided.
+The SQLite factory owns ledger selection and additive schema migrations. It reopens a single `data/*-{environment}.sqlite` file in place, validating the base schema for a noncanonical filename. It creates the canonical filename shown above only when no matching file exists. Multiple matches fail safely, even if one has the canonical filename. This preserves saved budgets and encrypted connections. Core configuration supplies a home/environment rather than choosing a concrete database file. Other storage plugins own their connection settings and migrations. Selecting a different backend does not automatically transfer the previous ledger. Runtime paths do not derive from the checkout or `site-packages`. Keep the existing home and encryption key when upgrading SQLite. The package and launch command are only `whab`.
 
 `src/whab/__init__.py::__version__` is the single version source for distribution metadata, CLI, FastAPI and About. `scripts/check_distribution.py` tests a wheel and example plugin from an unrelated temporary directory; source-checkout tests alone do not establish that the distribution includes its assets.
 
@@ -58,7 +58,7 @@ Manual transactions update manual-account balances; entries into connected Plaid
 
 The browser obtains a short-lived Link token from the server and returns a public token after linking. The server exchanges that token, encrypts the access token and stores the Item before synchronizing. Reconnecting an existing Item uses Link update mode. Disconnecting removes its token and marks its account snapshots stale while retaining ledger history.
 
-Access tokens use AES-GCM with the Item ID as authenticated associated data. The encoded nonce/tag/ciphertext layout remains compatible with synthetic fixtures from the original implementation. Renaming UI or package identifiers must not change this token contract, the encryption key, the opaque household identity or existing OAuth continuation keys without a migration.
+Access tokens use AES-GCM with the Item ID as authenticated associated data. The encoded nonce/tag/ciphertext layout remains compatible with synthetic fixtures from the original implementation. Renaming UI or package identifiers must preserve this token contract and the encryption key. New Plaid Link tokens use `whab-local-household`; existing connected Items remain unchanged. Browser OAuth continuation keys use `whab`, so users must finish in-progress Link flows before upgrading.
 
 Synchronization starts from the stored cursor, accumulates every page and refreshes account snapshots before committing the batch. A pagination mutation restarts accumulation from the original cursor. SQLite applies accounts, added/modified/removed transactions and the new cursor in one transaction, checking the expected cursor and reading current user annotations inside that transaction. Validation or SQL failures leave the ledger and cursor unchanged. Matched pending-to-posted records preserve category edits, review state and notes; replay remains idempotent.
 

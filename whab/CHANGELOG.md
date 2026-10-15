@@ -10,6 +10,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 - Add an API v1 file-import capability that receives file bytes without credentials or ledger access. The host owns local-only upload routes and storage commits; SQLite implements the optional migration method with transactional receipts.
 - Keep exported accounts unclassified and outside budget funding because YNAB dumps omit account types and verified balance snapshots. Explain differences in credit-card envelopes, targets and recomputed activity/availability before import. Existing financial workspaces are never merged or replaced by this importer.
 
+## 1.3.4 — 2026-10-14
+
+- Use WHAB throughout maintained source and documentation, including new SQLite filenames, Plaid Link session keys and the Link household identifier.
+- Reopen a single existing SQLite ledger for the selected environment in place, preserving budgets, encrypted connections and journal files. Reject ambiguous or unrecognized saved ledgers instead of starting an empty budget or modifying an unrelated database.
+- Finish any in-progress Plaid Link session before upgrading; saved bank connections and their encrypted access tokens remain usable.
+
 ## 1.3.3 — 2026-10-14
 
 - Organize contributor plugins under singular category folders: `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`. Keep each plugin's implementation, assets, documentation and tests together under `plugins/<category>/<id>/`.

@@ -49,8 +49,8 @@ Automation is a clearer family name than “Logic,” because financial logic re
 
 ## Implementation boundary
 
-The current application already has selected SQLite and Web plugins, optional Plaid ingestion, reporting/export hooks and optional bank-logo branding. Its descriptors currently expose `storage`, `user_interface`, `data_ingestion`, `reporting` and `branding` kinds.
+The current application already has selected SQLite and Web plugins, optional Plaid and YNAB file ingestion, reporting/export hooks and optional bank-logo branding. Its descriptors currently expose `storage`, `user_interface`, `data_ingestion`, `reporting` and `branding` kinds.
 
-The proposed families are a design vocabulary, not new SDK names. API-as-interface, multiple interface runtimes, general statement/manual/YNAB ingestion contracts, rich visual insights, extension persistence and Automation require further design and implementation. The current API remains host-owned, manual entry remains in the existing ledger routes, and SDK v1's data-ingestion contract remains bank-specific.
+The proposed families are a design vocabulary, not new SDK names. API-as-interface, multiple interface runtimes, general statement/manual ingestion contracts, rich visual insights, extension persistence and Automation require further design and implementation. The current API remains host-owned and manual entry remains in the existing ledger routes. SDK v1 provides bank synchronization and bounded file-import contracts; the YNAB adapter currently migrates history and assignments into an empty personal budget, with source metadata and reconciliation limits explained in its preview.
 
 Moving those capabilities must preserve saved ledgers, encrypted connections, isolation and atomic imports. Existing documented interfaces and SDK contracts remain subject to the [compatibility policy](../CONTRIBUTING.md#pull-requests-and-releases); this proposal does not itself change them.

@@ -54,7 +54,7 @@ To disable optional extensions, uncheck them in Settings, save, and restart. Wit
 
 ## Public SDK
 
-Import public types from `whab.plugins`; concrete database, visual/transport internals and global configuration are outside the stable SDK. Descriptors may provide `ui`, `storage`, `bank`, `insights`, `export` and `bank_logos`. Their computed `kinds` are `user_interface`, `storage`, `data_ingestion`, `reporting` and `branding`; one descriptor may have multiple kinds. At least one capability is required. Data ingestion currently means bank connection/sync, not arbitrary file imports.
+Import public types from `whab.plugins`; concrete database, visual/transport internals and global configuration are outside the stable SDK. Descriptors may provide `ui`, `storage`, `bank`, `file_import`, `insights`, `export` and `bank_logos`. Their computed `kinds` are `user_interface`, `storage`, `data_ingestion`, `reporting` and `branding`; one descriptor may have multiple kinds. At least one capability is required. Data ingestion includes bank connection/sync and, from WHAB 1.4, bounded local file imports.
 
 Frozen report records use immutable tuples and exact primitives. Every hook receives fresh records from a whitelisted snapshot, protecting against accidental mutation. Storage, visual and bank capabilities are described below.
 
@@ -184,7 +184,7 @@ Public account/category/transaction/workspace results must preserve documented H
 
 Implementations must preserve integer USD cents, workspace/environment isolation, conservative budgets, budget start, valid category references and annotation-preserving pending matches. Imports, account snapshots and cursors commit atomically, with expected-cursor checks and the latest annotations read inside the mutation. Validation/commit failures must leave every ledger field and cursor unchanged; reads must be coherent. Test these guarantees with fictional fixtures.
 
-The host closes owned backends after bank cleanup on shutdown/startup failure; tests own injected backends. SQLite owns `home/data/ihab-{environment}.sqlite`, additive migrations and seeds. Other backends own settings/schema and compatible reopen behavior. Changing `WHAB_STORAGE` does not copy an existing ledger or migrate credentials/history. Configure existing or new data deliberately; cross-backend migration is outside API v1.
+The host closes owned backends after bank cleanup on shutdown/startup failure; tests own injected backends. SQLite owns ledger selection, additive migrations and seeds. It reopens a single `home/data/*-{environment}.sqlite` file in place, validating the base schema for a noncanonical filename. With no matching file, it creates `home/data/whab-{environment}.sqlite`; multiple matches fail safely, even if one has the canonical filename. Other backends own settings/schema and compatible reopen behavior. Changing `WHAB_STORAGE` does not copy an existing ledger or migrate credentials/history. Configure existing or new data deliberately; cross-backend migration is outside API v1.
 
 ## User interfaces
 
