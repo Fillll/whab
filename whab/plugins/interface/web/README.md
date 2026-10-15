@@ -5,3 +5,7 @@
 Templates and static files must ship in the wheel. Use demo data for browser checks and preserve escaping and visual fallbacks.
 
 From the application directory, run `.venv/bin/python -m pytest plugins/interface/web/tests`. See [plugin contribution rules](../../README.md) for all checks and packaging.
+
+Open **Settings → Plugins → Installed** to select plugins. The category filter starts with **All categories**; required storage and interface plugins stay selected. Saving an optional selection applies it on the next restart and preserves the running plugins until then.
+
+Every installed plugin has an **Options** page with its category, version, saved selection and running state. Running plugins can expose generic settings information and actions through the public SDK; inactive plugins show enable/restart guidance without running their hooks. Settings values and action feedback render as text. The bank-logo plugin uses this page for its one-year cache policy and **Flush cache** action.

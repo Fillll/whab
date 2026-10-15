@@ -31,7 +31,7 @@ The core owns budgeting rules, HTTP access checks and plugin contracts. Concrete
 | `WHAB_UI` | `web` | Visual interface; an empty value runs APIs headlessly |
 | `WHAB_PLUGINS` | `plaid` | Optional extensions when no saved `plugins.json` exists |
 
-Use **Settings → Plugin manager** to enable or disable installed optional plugins, save, and restart. Its saved selection takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/example/README.md) is separately installable. Plugins run as trusted server code.
+Use **Settings → Plugins → Installed** to enable or disable installed optional plugins, save, and restart. Its saved selection takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/example/README.md) is separately installable. Choose **All categories** or a category to browse installed plugins, then open **Options** for plugin details and controls. Bank logos options include **Flush cache**; successful logos stay cached locally for 365 days across restarts and refresh on the next image request after expiry. Plugins run as trusted server code.
 
 For bank imports, follow the [Plaid Sandbox guide](docs/usage.md#connect-plaid-sandbox). Keep `WHAB_ENV=sandbox` and `ALLOW_LIVE_PLAID=false` for test data. Production access requires deliberate configuration and institution access; a successful Sandbox flow does not establish live access.
 
@@ -44,7 +44,7 @@ For a YNAB ZIP dump, enable **ynab** in the plugin manager, save, and restart. I
 - **Two category levels:** parent groups organize child categories. Only children receive transactions, targets and allocations. Core dates use `YYYY-MM-DD`; USD money uses `$1,234.56` (other currencies use their ISO code and fixed minor-unit precision). A selected interface plugin can override presentation.
 - **Initial budgeting model:** credit-card handling conservatively reserves debt. Payment categories, splits, manual/import reconciliation, editable transfer matching, merchant rules, recurring bills and goals editing are not implemented.
 - **Transactions only:** investment holdings are not imported. Bank history and refresh timing depend on the institution and Plaid.
-- **Private local files:** keep `.env`, `plugins.json`, `data/`, `work/` and `.venv/` out of Git. Databases contain private financial data. Back up the database and encryption key separately; replacing the key makes existing bank tokens unreadable.
+- **Private local files:** keep `.env`, `plugins.json`, `data/`, `cache/`, `work/` and `.venv/` out of Git. Databases contain private financial data. Back up the database and encryption key separately; replacing the key makes existing bank tokens unreadable.
 
 See [budget behavior](docs/usage.md#budget-scope), [import handling](docs/usage.md#importing-and-data-handling) and [backup guidance](docs/usage.md#local-access-and-private-files) for details.
 

@@ -102,7 +102,7 @@ if (pluginSelection) {
       submit.disabled = true;
       const plugins = [...pluginSelection.querySelectorAll('input[name="plugin"]:checked')].map(input => input.value);
       await api('/plugins/management', {plugins}, 'PUT');
-      location.hash = 'settings';
+      location.hash = 'plugins';
       location.reload();
     } catch (failure) {
       error.textContent = failure.message;
@@ -111,8 +111,94 @@ if (pluginSelection) {
       submit.disabled = false;
     }
   });
-  if (location.hash === '#settings') document.getElementById('settings-dialog').showModal();
+  if (['#settings', '#plugins'].includes(location.hash)) document.getElementById('settings-dialog').showModal();
+  if (location.hash === '#plugins') document.getElementById('plugins-dialog').showModal();
 }
+
+
+const pluginCategory = document.querySelector('[data-plugin-category-filter]');
+if (pluginCategory) pluginCategory.addEventListener('change', () => {
+  let visible = 0;
+  for (const row of pluginSelection.querySelectorAll('[data-plugin-category]')) {
+    row.hidden = pluginCategory.value !== 'all' && row.dataset.pluginCategory !== pluginCategory.value;
+    if (!row.hidden) visible += 1;
+  }
+  pluginSelection.querySelector('[data-plugin-category-empty]').hidden = visible > 0;
+});
+
+function settingsText(tag, value, className) {
+  const element = document.createElement(tag);
+  element.textContent = value;
+  if (className) element.className = className;
+  return element;
+}
+
+function renderPluginSettings(dialog, settings) {
+  const content = dialog.querySelector('[data-plugin-settings]');
+  content.replaceChildren();
+  const insights = document.createElement('dl');
+  insights.className = 'plugin-settings-insights';
+  for (const insight of settings.insights) {
+    const row = document.createElement('div');
+    row.append(settingsText('dt', insight.title), settingsText('dd', insight.value));
+    if (insight.detail) row.append(settingsText('p', insight.detail));
+    insights.append(row);
+  }
+  content.append(insights);
+  for (const action of settings.actions) {
+    const row = document.createElement('div');
+    row.className = 'plugin-setting-action';
+    row.append(settingsText('p', action.description, 'settings-notice'));
+    const button = settingsText('button', action.label, 'button');
+    button.type = 'button';
+    button.addEventListener('click', async () => {
+      if (dialog.dataset.busy) return;
+      const error = dialog.querySelector('[data-plugin-settings-error]');
+      const status = dialog.querySelector('[data-plugin-settings-status]');
+      dialog.dataset.busy = 'true';
+      for (const control of content.querySelectorAll('button')) control.disabled = true;
+      error.hidden = true;
+      status.textContent = 'Applying change…';
+      try {
+        const result = await api(`/plugins/${encodeURIComponent(dialog.dataset.pluginId)}/settings/actions/${encodeURIComponent(action.id)}`, {});
+        renderPluginSettings(dialog, result.settings);
+        status.textContent = result.message;
+      } catch (failure) {
+        status.textContent = '';
+        error.textContent = failure.message;
+        error.hidden = false;
+      } finally {
+        delete dialog.dataset.busy;
+        for (const control of content.querySelectorAll('button')) control.disabled = false;
+      }
+    });
+    row.append(button);
+    content.append(row);
+  }
+  if (!settings.insights.length && !settings.actions.length) content.append(settingsText('p', 'This plugin has no additional settings.', 'settings-notice'));
+}
+
+for (const button of document.querySelectorAll('[data-plugin-options]')) button.addEventListener('click', async () => {
+  const dialog = document.getElementById(button.dataset.dialog);
+  if (dialog.dataset.pluginActive !== 'true' || dialog.dataset.busy) return;
+  const error = dialog.querySelector('[data-plugin-settings-error]');
+  const status = dialog.querySelector('[data-plugin-settings-status]');
+  dialog.dataset.busy = 'true';
+  dialog.querySelector('[data-plugin-settings]').replaceChildren();
+  error.hidden = true;
+  status.textContent = 'Loading settings…';
+  try {
+    const settings = await api(`/plugins/${encodeURIComponent(dialog.dataset.pluginId)}/settings`);
+    renderPluginSettings(dialog, settings);
+    status.textContent = '';
+  } catch (failure) {
+    status.textContent = '';
+    error.textContent = failure.message;
+    error.hidden = false;
+  } finally {
+    delete dialog.dataset.busy;
+  }
+});
 
 for (const input of document.querySelectorAll('[data-navigation]')) input.addEventListener('change', () => {
   if (!input.checkValidity()) {

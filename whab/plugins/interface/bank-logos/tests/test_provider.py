@@ -61,6 +61,8 @@ def test_import_resolution_and_unknown_fetch_never_create_a_client(monkeypatch):
     assert provider.resolve("Chase") == "chase"
     assert provider.fetch("https://private.example") is None
     assert provider.fetch("unknown") is None
+    assert provider.fetch_logo("unknown") is None
+    assert provider.fetch_logo(None) is None
 
 
 def test_descriptor_exposes_only_optional_public_artwork_hooks():

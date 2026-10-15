@@ -9,6 +9,7 @@ from fastapi.responses import Response
 
 from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
+from whab.plugins import PluginError
 from whab.web.csv import safe_cell
 from whab.web.plugin_snapshot import build_snapshot
 from whab.web.schemas import PluginSelectionBody, Workspace, valid_month
@@ -20,6 +21,29 @@ def create_router(store, plugins, plugin_manager=None):
     @router.get("")
     def describe():
         return {"plugins": [asdict(plugin) for plugin in plugins.describe()]}
+
+    def settings_data(plugin_id):
+        try:
+            settings = plugins.settings(plugin_id)
+        except PluginError as error:
+            if error.code == "unavailable":
+                raise HTTPException(404, "Plugin settings not found") from None
+            raise
+        return {key: [asdict(record) for record in records] for key, records in settings.items()}
+
+    @router.get("/{plugin_id}/settings")
+    def plugin_settings(plugin_id: str):
+        return settings_data(plugin_id)
+
+    @router.post("/{plugin_id}/settings/actions/{action_id}")
+    def settings_action(plugin_id: str, action_id: str):
+        try:
+            message = plugins.settings_action(plugin_id, action_id)
+        except PluginError as error:
+            if error.code == "unavailable":
+                raise HTTPException(404, "Plugin action not found") from None
+            raise
+        return {"message": message, "settings": settings_data(plugin_id)}
 
     @router.get("/{plugin_id}/bank-logos/{key}")
     def bank_logo(plugin_id: str, key: str):

@@ -7,6 +7,34 @@ from .configuration import read_selection, validate_selection, write_selection
 from .runtime import PluginError, PluginRegistry, load_plugins
 from .sdk import ENTRYPOINT_GROUP, valid_plugin_name
 
+# Registration identity is package metadata, so disabled plugins remain unloaded.
+_BUNDLED_CATEGORIES = {
+    ("bank-logos", "whab_bank_logos.plugin:plugin"): "interface",
+    ("web", "whab_web.plugin:plugin"): "interface",
+    ("plaid", "whab_plaid.plugin:plugin"): "ingestion",
+    ("ynab", "whab_ynab.plugin:plugin"): "ingestion",
+    ("sqlite", "whab_sqlite.plugin:plugin"): "storage",
+    ("example", "whab_example_plugin:plugin"): "example",
+}
+
+
+def plugin_category(name, entries, description):
+    """Use known registration metadata or active capabilities, never disabled imports."""
+    if len(entries) == 1:
+        identity = (name, getattr(entries[0], "value", None))
+        if identity in _BUNDLED_CATEGORIES:
+            return _BUNDLED_CATEGORIES[identity]
+    if description:
+        if description.has_ui or description.has_bank_logos:
+            return "interface"
+        if description.has_storage:
+            return "storage"
+        if description.has_bank or description.has_file_import:
+            return "ingestion"
+        if description.has_insights or description.has_export:
+            return "insight"
+    return "extension"
+
 
 def installed_entrypoints():
     """Read package registration metadata without importing disabled plugin code."""
@@ -85,6 +113,7 @@ class PluginManager:
                 "id": name,
                 "display_name": description.display_name if description else name,
                 "kinds": list(description.kinds) if description else [],
+                "category": plugin_category(name, matches, description),
                 "distribution": distribution,
                 "version": version,
                 "active": name in descriptions,

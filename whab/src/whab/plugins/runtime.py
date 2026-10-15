@@ -4,6 +4,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import fields
 from importlib import metadata
+from pathlib import Path
 from threading import Lock
 from time import monotonic
 
@@ -17,8 +18,10 @@ from .sdk import (
     Insight,
     LogoImage,
     Plugin,
+    PluginAction,
     PluginDescription,
     PluginInsightResult,
+    PluginSettings,
     TransactionSnapshot,
     valid_plugin_name,
 )
@@ -59,6 +62,7 @@ class PluginRegistry:
     def __init__(self, plugins: tuple[Plugin, ...] = ()) -> None:
         self._plugins = plugins
         self._logo_cache = OrderedDict()
+        self._logo_generations = {plugin.id: 0 for plugin in plugins}
         self._logo_lock = Lock()
         self._logo_fetch_locks = tuple(Lock() for _ in range(16))
 
@@ -79,6 +83,7 @@ class PluginRegistry:
                 has_ui=plugin.ui is not None,
                 has_bank_logos=plugin.bank_logos is not None,
                 has_file_import=plugin.file_import is not None,
+                has_settings=plugin.settings is not None,
                 kinds=tuple(
                     name
                     for name, enabled in (
@@ -102,6 +107,82 @@ class PluginRegistry:
         """Return enabled parsers without calling them or giving them ledger access."""
         return tuple(plugin for plugin in self._plugins if plugin.file_import is not None)
 
+    def configure_logo_caches(self, home: Path) -> None:
+        """Give active branding plugins their own cache path, without runtime configuration."""
+        for plugin in self._plugins:
+            if plugin.bank_logos is None or plugin.bank_logos.configure_cache is None:
+                continue
+            try:
+                if not valid_plugin_name(plugin.id):
+                    raise ValueError("Invalid plugin ID")
+                plugin.bank_logos.configure_cache(home / "cache" / "plugins" / plugin.id)
+            except Exception:
+                raise PluginError(
+                    "Bank logo cache could not start. Check local file permissions or disable the plugin.",
+                    code="logo_cache_startup_failed",
+                    plugin_id=plugin.id,
+                ) from None
+
+    def _settings_plugin(self, plugin_id: str) -> Plugin:
+        if valid_plugin_name(plugin_id):
+            plugin = next((p for p in self._plugins if p.id == plugin_id), None)
+            if plugin is not None:
+                return plugin
+        raise PluginError("Plugin settings are not available.", code="unavailable")
+
+    def settings(self, plugin_id: str) -> dict:
+        """Read bounded plain-text status only for an active plugin, without ledger context."""
+        plugin = self._settings_plugin(plugin_id)
+        if plugin.settings is None:
+            return {"insights": (), "actions": ()}
+        try:
+            settings = _copy_record(plugin.settings, PluginSettings)
+            output = settings.read()
+            if type(output) is not tuple or len(output) > 50:
+                raise ValueError("Settings output must be a tuple of at most 50 records.")
+            return {
+                "insights": tuple(_copy_record(row, Insight) for row in output),
+                "actions": tuple(_copy_record(action, PluginAction) for action in settings.actions),
+            }
+        except Exception:
+            raise PluginError(
+                "Plugin settings could not be read. Disable the plugin or contact its author.",
+                code="hook_failed",
+                plugin_id=plugin.id,
+            ) from None
+
+    def settings_action(self, plugin_id: str, action_id: str) -> str:
+        """Only advertised action IDs may enter a plugin's action handler."""
+        plugin = self._settings_plugin(plugin_id)
+        if not valid_plugin_name(action_id) or plugin.settings is None:
+            raise PluginError("Plugin action is not available.", code="unavailable")
+        try:
+            settings = _copy_record(plugin.settings, PluginSettings)
+        except Exception:
+            raise PluginError(
+                "Plugin settings could not be read. Disable the plugin or contact its author.",
+                code="hook_failed",
+                plugin_id=plugin.id,
+            ) from None
+        if not any(action.id == action_id for action in settings.actions):
+            raise PluginError("Plugin action is not available.", code="unavailable")
+        try:
+            message = settings.act(action_id)
+            if type(message) is not str or not 0 < len(message) <= 2000:
+                raise ValueError("Plugin action message must be plain text within 2000 characters.")
+        except Exception:
+            raise PluginError(
+                "Plugin action could not complete. Retry or contact its author.",
+                code="hook_failed",
+                plugin_id=plugin.id,
+            ) from None
+        with self._logo_lock:
+            self._logo_generations[plugin_id] += 1
+            for key in tuple(self._logo_cache):
+                if key[0] == plugin_id:
+                    del self._logo_cache[key]
+        return message
+
     def bank_logo(self, institution: str) -> tuple[str, str] | None:
         """First enabled match wins. Only institution text reaches resolver hooks."""
         if type(institution) is not str or not institution or len(institution) > 200:
@@ -124,6 +205,14 @@ class PluginRegistry:
         plugin = next((p for p in self._plugins if p.id == plugin_id), None)
         if plugin is None or plugin.bank_logos is None:
             return None
+        if plugin.bank_logos.configure_cache is not None:
+            # Persistent cache owners enforce their own fetched-at expiry and
+            # flush behavior. A second host cache would hide their invalidation.
+            try:
+                result = plugin.bank_logos.fetch(key)
+                return _copy_record(result, LogoImage) if result is not None else None
+            except Exception:
+                return None
         cache_key = (plugin_id, key)
         with self._logo_lock:
             cached = self._logo_cache.get(cache_key)
@@ -138,16 +227,18 @@ class PluginRegistry:
                 if cached is not None and cached[0] > monotonic():
                     self._logo_cache.move_to_end(cache_key)
                     return cached[1]
+                generation = self._logo_generations[plugin_id]
             try:
                 result = plugin.bank_logos.fetch(key)
                 image = _copy_record(result, LogoImage) if result is not None else None
             except Exception:
                 image = None
             with self._logo_lock:
-                self._logo_cache[cache_key] = (monotonic() + (86400 if image else 300), image)
-                self._logo_cache.move_to_end(cache_key)
-                while len(self._logo_cache) > 128:
-                    self._logo_cache.popitem(last=False)
+                if generation == self._logo_generations[plugin_id]:
+                    self._logo_cache[cache_key] = (monotonic() + (86400 if image else 300), image)
+                    self._logo_cache.move_to_end(cache_key)
+                    while len(self._logo_cache) > 128:
+                        self._logo_cache.popitem(last=False)
             return image
 
     def storage_plugin(self, plugin_id: str) -> Plugin:
