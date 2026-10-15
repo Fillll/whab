@@ -1,6 +1,6 @@
 # WHAB architecture
 
-WHAB is a local Python application with plugins for visual presentation, persistence, bank providers and reporting. Web and SQLite are its selected default UI/storage plugins; Plaid is an optional bank plugin enabled by default. The core app assembles descriptors through SDK protocols. Headless mode keeps APIs and storage without rendering pages. There is no arbitrary report/bank ledger-write or one-time migration plugin interface.
+WHAB is a local Python application with plugins for visual presentation, persistence, bank providers and reporting. Web and SQLite are its selected default UI/storage plugins; Plaid is an optional bank plugin enabled by default. The core app assembles descriptors through SDK protocols. Headless mode keeps APIs and storage without rendering pages. There is no arbitrary report/bank ledger-write or one-time migration plugin interface. See the [Mermaid overview](../../README.md#architecture) for the component map.
 
 ## Package map
 
@@ -90,4 +90,4 @@ Python plugins run with the server's privileges and are trusted code, not sandbo
 
 Change domain rules with direct domain regressions, storage behavior with isolated SQLite fixtures, provider flows with mocked HTTP, and public behavior with web tests. Keep plugin compatibility tests against the exported SDK rather than private internals. Preserve installed-wheel checks whenever packaging, assets or entry points change.
 
-Adding a bank provider requires normalization into the existing import contract and careful handling of source identity, money conversion, credentials, deduplication and atomic checkpoints. A one-time migration additionally needs a design for account matching, split transactions, transfers and budget history; it is not an insights/export hook. See README for current limitations and the release compatibility policy.
+Adding a bank provider requires normalization into the existing import contract and careful handling of source identity, money conversion, credentials, deduplication and atomic checkpoints. A one-time migration additionally needs a design for account matching, split transactions, transfers and budget history; it is not an insights/export hook. See the [README](../README.md#limits-and-data-safety) for current limitations and [contribution guide](../CONTRIBUTING.md#pull-requests-and-releases) for the release compatibility policy.
