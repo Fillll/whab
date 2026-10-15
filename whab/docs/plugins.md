@@ -6,7 +6,7 @@ The [target architecture](target-architecture.md) proposes broader capability fa
 
 ## Trust and enablement
 
-Bundled implementations live in dedicated contributor folders: `plugins/web/`, `plugins/sqlite/`, `plugins/plaid/` and `plugins/bank-logos/`. Each contains its own source package, assets, README and tests; a plugin may use as many supporting files as needed. `plugins/example/` includes its own distribution metadata as well. Keep implementation tests beside their plugin and shared SDK/host contracts in `tests/`. See [folder ownership and test commands](../plugins/README.md). The public `whab.plugins` SDK stays in core under `src/whab/plugins/`.
+Bundled implementations live in dedicated contributor folders: `plugins/interface/web/`, `plugins/storage/sqlite/`, `plugins/ingestion/plaid/` and `plugins/interface/bank-logos/`. Each contains its own source package, assets, README and tests; a plugin may use as many supporting files as needed. `plugins/example/example/` includes its own distribution metadata as well. Keep implementation tests beside their plugin and shared SDK/host contracts in `tests/`. See [folder ownership and test commands](../plugins/README.md). The public `whab.plugins` SDK stays in core under `src/whab/plugins/`.
 
 CI requires 100% Python statement and branch coverage for each plugin's entire source tree. The application command `.venv/bin/python scripts/check_plugin_coverage.py` discovers all plugin source roots, includes unimported files, and measures the complete local/shared suite. New behavior needs regression tests in its owning plugin folder; do not suppress runtime coverage gaps.
 
@@ -39,7 +39,7 @@ Run these commands from a WHAB source checkout using the same virtual environmen
 
 ```sh
 .venv/bin/python -m pip install -e '.[dev]'
-.venv/bin/python -m pip install -e plugins/example
+.venv/bin/python -m pip install -e plugins/example/example
 ```
 
 Enable **example** in **Settings → Plugin manager**, save, and restart WHAB. If the runtime home has no saved `plugins.json`, you can instead add this line to the private local `.env` and restart:

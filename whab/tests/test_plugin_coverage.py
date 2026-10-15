@@ -18,7 +18,7 @@ def gate(monkeypatch, tmp_path):
 
 @pytest.fixture
 def source(tmp_path):
-    root = tmp_path / "plugins" / "new-plugin" / "src"
+    root = tmp_path / "plugins" / "extension" / "new-plugin" / "src"
     root.mkdir(parents=True)
     (root / "implementation.py").write_text("VALUE = 1\n")
     return root
@@ -28,12 +28,44 @@ def report(*, missing_lines=0, missing_branches=0):
     return {
         "meta": {"branch_coverage": True},
         "files": {
-            "plugins/new-plugin/src/implementation.py": {
+            "plugins/extension/new-plugin/src/implementation.py": {
                 "summary": {"missing_lines": missing_lines, "missing_branches": missing_branches}
             }
         },
         "totals": {"percent_covered": 100},
     }
+
+
+def test_source_discovery_includes_every_category_and_preserves_plugin_ids(gate, source):
+    example = gate.ROOT / "plugins" / "example" / "example" / "src"
+    example.mkdir(parents=True)
+    future = gate.ROOT / "plugins" / "future-category" / "future-plugin" / "src"
+    future.mkdir(parents=True)
+    # Ignore source trees at other depths, including the old flat layout.
+    (gate.ROOT / "plugins" / "flat-plugin" / "src").mkdir(parents=True)
+    (gate.ROOT / "plugins" / "nested" / "too" / "deep" / "src").mkdir(parents=True)
+
+    assert gate.plugin_sources() == {
+        "example": example,
+        "new-plugin": source,
+        "future-plugin": future,
+    }
+
+
+def test_duplicate_plugin_ids_fail_with_both_locations(gate, source, monkeypatch, capsys):
+    duplicate = gate.ROOT / "plugins" / "interface" / "new-plugin" / "src"
+    duplicate.mkdir(parents=True)
+    monkeypatch.setattr("sys.argv", ["check_plugin_coverage.py"])
+
+    with pytest.raises(SystemExit) as error:
+        gate.main()
+
+    assert error.value.code == 2
+    message = capsys.readouterr().err
+    assert "Duplicate plugin ID 'new-plugin'" in message
+    assert "plugins/extension/new-plugin" in message
+    assert "plugins/interface/new-plugin" in message
+    assert "must be unique across categories" in message
 
 
 def test_complete_source_passes(gate, source):

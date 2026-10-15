@@ -11,6 +11,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def plugin_sources() -> dict[str, Path]:
+    """Find source trees by stable plugin ID in every category."""
+    sources = {}
+    for path in sorted((ROOT / "plugins").glob("*/*/src")):
+        plugin_id = path.parent.name
+        if plugin_id in sources:
+            previous = sources[plugin_id].parent.relative_to(ROOT)
+            current = path.parent.relative_to(ROOT)
+            raise ValueError(
+                f"Duplicate plugin ID {plugin_id!r}: {previous} and {current}. "
+                "Plugin IDs must be unique across categories."
+            )
+        sources[plugin_id] = path
+    return sources
+
+
 def validate_report(report: dict, sources: tuple[Path, ...]) -> None:
     """Reject unmeasured source, missed statements and missed branches independently."""
     if report.get("meta", {}).get("branch_coverage") is not True:
@@ -34,8 +50,11 @@ def validate_report(report: dict, sources: tuple[Path, ...]) -> None:
 
 
 def main() -> int:
-    sources = {path.parent.name: path for path in sorted((ROOT / "plugins").glob("*/src"))}
     parser = argparse.ArgumentParser(description=__doc__)
+    try:
+        sources = plugin_sources()
+    except ValueError as error:
+        parser.error(str(error))
     parser.add_argument("--plugin", choices=tuple(sources), help="Measure only this plugin's source.")
     arguments = parser.parse_args()
     selected = (sources[arguments.plugin],) if arguments.plugin else tuple(sources.values())

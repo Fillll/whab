@@ -4,4 +4,4 @@
 
 Preserve integer cents, workspace/environment isolation, legacy filenames, saved annotations and atomic synchronization cursors. Compatibility fixtures use temporary databases.
 
-From the application directory, run `.venv/bin/python -m pytest plugins/sqlite/tests`. See [plugin contribution rules](../README.md) for all checks and packaging.
+From the application directory, run `.venv/bin/python -m pytest plugins/storage/sqlite/tests`. See [plugin contribution rules](../../README.md) for all checks and packaging.

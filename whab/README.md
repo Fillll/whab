@@ -2,7 +2,7 @@
 
 A local Python budgeting app with monthly envelopes and rollover, transaction review, spending analytics, manual accounts, CSV export, and optional Plaid Transactions imports. FastAPI serves Jinja pages with a small browser script; no Node.js build is required.
 
-See the [proposed architecture and Mermaid diagram](../README.md#architecture) and [current implementation](docs/architecture.md). Current version: **1.3.2** ([changelog](CHANGELOG.md)).
+See the [proposed architecture and Mermaid diagram](../README.md#architecture) and [current implementation](docs/architecture.md). Current version: **1.3.3** ([changelog](CHANGELOG.md)).
 
 ## Run locally
 
@@ -21,7 +21,7 @@ Setup creates a private `.env` and token encryption key if missing. Runtime file
 
 ## Configuration and plugins
 
-The core owns budgeting rules, HTTP access checks and plugin contracts. Concrete implementations live under `plugins/<id>/`, each with its own source, assets, tests and documentation.
+The core owns budgeting rules, HTTP access checks and plugin contracts. Concrete implementations live under `plugins/<category>/<id>/`, each with its own source, assets, tests and documentation. The singular categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; see [plugin folders and naming](plugins/README.md).
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
@@ -31,7 +31,7 @@ The core owns budgeting rules, HTTP access checks and plugin contracts. Concrete
 | `WHAB_UI` | `web` | Visual interface; an empty value runs APIs headlessly |
 | `WHAB_PLUGINS` | `plaid` | Optional extensions when no saved `plugins.json` exists |
 
-Use **Settings → Plugin manager** to enable or disable installed optional plugins, save, and restart. Its saved selection takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/README.md) is separately installable. Plugins run as trusted server code.
+Use **Settings → Plugin manager** to enable or disable installed optional plugins, save, and restart. Its saved selection takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/example/README.md) is separately installable. Plugins run as trusted server code.
 
 For bank imports, follow the [Plaid Sandbox guide](docs/usage.md#connect-plaid-sandbox). Keep `WHAB_ENV=sandbox` and `ALLOW_LIVE_PLAID=false` for test data. Production access requires deliberate configuration and institution access; a successful Sandbox flow does not establish live access.
 

@@ -33,7 +33,13 @@ requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["src", "plugins/web/src", "plugins/sqlite/src", "plugins/plaid/src", "plugins/bank-logos/src"]
+where = [
+  "src",
+  "plugins/interface/web/src",
+  "plugins/storage/sqlite/src",
+  "plugins/ingestion/plaid/src",
+  "plugins/interface/bank-logos/src",
+]
 include = ["whab*"]
 
 [tool.setuptools.package-data]

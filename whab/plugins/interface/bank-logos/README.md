@@ -4,4 +4,4 @@
 
 Resolution stays local. Fetch only allowlisted public bank domains with bounded bytes, short timeouts and no redirects. Provider tests must mock HTTP requests.
 
-From the application directory, run `.venv/bin/python -m pytest plugins/bank-logos/tests`. See [plugin contribution rules](../README.md) for all checks and packaging.
+From the application directory, run `.venv/bin/python -m pytest plugins/interface/bank-logos/tests`. See [plugin contribution rules](../../README.md) for all checks and packaging.
