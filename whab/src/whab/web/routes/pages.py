@@ -79,11 +79,25 @@ def create_router(
             for p in plugins.bank_plugins()
             if p.bank_ui and p.id in banks
         ]
+        context["bank_source_ids"] = tuple(p.id for p in plugins.bank_plugins())
         context["plugin_scripts"] = [
             f"/plugins/{p.id}/static/connect.js?v={context['version']}"
             for p in plugins.bank_plugins()
             if p.bank_ui and p.id in banks
         ]
+        context["import_panels"] = [
+            {
+                "template": f"imports/{p.id}/accounts.html",
+                "id": p.id,
+                "display_name": p.display_name,
+            }
+            for p in plugins.file_import_plugins()
+            if p.file_import.templates is not None and workspace == "personal" and page == "accounts"
+        ]
+        context["plugin_scripts"].extend(
+            f"/imports/{panel['id']}/static/import.js?v={context['version']}"
+            for panel in context["import_panels"]
+        )
         context["plugins"] = plugins.describe()
         # Resolve public institution text only; fetching is deferred to image requests.
         institution_logos = {

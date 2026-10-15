@@ -18,6 +18,7 @@ from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
 from whab.web.middleware import install_middleware
 from whab.web.routes.banks import create_router as banks_router
+from whab.web.routes.file_imports import create_router as file_imports_router
 from whab.web.routes.ledger import create_router as ledger_router
 from whab.web.routes.pages import create_router as pages_router
 from whab.web.routes.plugins import create_router as plugins_router
@@ -47,6 +48,18 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
         ):
             raise PluginError(
                 "Bank plugin UI resources are missing. Reinstall or disable the plugin.",
+                code="missing_resources",
+                plugin_id=plugin.id,
+            )
+    import_descriptors = plugins.file_import_plugins()
+    for plugin in import_descriptors:
+        file_import = plugin.file_import
+        if ui and file_import.templates is not None and (
+            not (file_import.templates / "accounts.html").is_file()
+            or not (file_import.static / "import.js").is_file()
+        ):
+            raise PluginError(
+                "Import plugin UI resources are missing. Reinstall or disable the plugin.",
                 code="missing_resources",
                 plugin_id=plugin.id,
             )
@@ -134,6 +147,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
     )
     templates = Jinja2Templates(directory=ui.templates) if ui else None
     loaders = {}
+    import_loaders = {}
     for plugin in descriptors:
         if ui and plugin.bank_ui:
             loaders[plugin.id] = FileSystemLoader(plugin.bank_ui.templates)
@@ -142,20 +156,40 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
                 StaticFiles(directory=plugin.bank_ui.static),
                 name=f"plugin-{plugin.id}",
             )
+    for plugin in import_descriptors:
+        file_import = plugin.file_import
+        if ui and file_import.templates is not None:
+            import_loaders[plugin.id] = FileSystemLoader(file_import.templates)
+            app.mount(
+                f"/imports/{plugin.id}/static",
+                StaticFiles(directory=file_import.static),
+                name=f"import-{plugin.id}",
+            )
     if ui:
         templates.env.loader = ChoiceLoader(
             [
                 templates.env.loader,
                 PrefixLoader({"plugins": PrefixLoader(loaders)}),
+                PrefixLoader({"imports": PrefixLoader(import_loaders)}),
             ]
         )
         app.mount("/static", StaticFiles(directory=ui.static), name="static")
     webhook_paths = {f"/api/banks/{p.id}/webhook" for p in descriptors}
     if "plaid" in bank_stores:
         webhook_paths.add("/api/plaid/webhook")  # Existing documented callback URL.
-    install_middleware(app, settings.port, webhook_paths)
+    install_middleware(
+        app,
+        settings.port,
+        webhook_paths,
+        file_import_paths={
+            f"/api/plugins/{plugin.id}/import/{action}"
+            for plugin in import_descriptors
+            for action in ("preview", "commit")
+        },
+    )
     install_error_handlers(app)
     app.include_router(ledger_router(store))
+    app.include_router(file_imports_router(store, plugins))
     for plugin in descriptors:
         app.include_router(banks_router(plugin.id, banks, bank_stores[plugin.id]))
         if plugin.id == "plaid":

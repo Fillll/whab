@@ -10,6 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Protocol, TypeAlias
 
+from whab.domain.file_imports import WorkspaceImport
 from whab.domain.imports import ImportedAccount, SyncChanges
 from whab.domain.transactions import UNSET
 
@@ -458,6 +459,37 @@ class BankLogos:
 
 
 @dataclass(frozen=True, slots=True)
+class FileImport:
+    """Parse a bounded local file without ledger access; the host owns persistence."""
+
+    parse: Callable[[bytes], WorkspaceImport]
+    templates: Path | None = None
+    static: Path | None = None
+
+    def __post_init__(self) -> None:
+        if not callable(self.parse):
+            raise ValueError("File import parser must be callable.")
+        if (self.templates is None) != (self.static is None):
+            raise ValueError("File import UI requires both template and static directories.")
+        if self.templates is not None and (
+            not isinstance(self.templates, Path) or not isinstance(self.static, Path)
+        ):
+            raise ValueError("File import resources must be pathlib.Path directories.")
+
+
+class WorkspaceImporter(Protocol):
+    """Optional storage capability; existing StorageBackend implementations stay valid."""
+
+    def preview_workspace_import(
+        self, workspace: str, plugin_id: str, fingerprint: str,
+    ) -> dict: ...
+
+    def import_workspace(
+        self, workspace: str, plugin_id: str, fingerprint: str, data: WorkspaceImport,
+    ) -> dict: ...
+
+
+@dataclass(frozen=True, slots=True)
 class Plugin:
     id: str
     display_name: str
@@ -469,6 +501,7 @@ class Plugin:
     storage: StorageFactory | None = None
     ui: UserInterface | None = None
     bank_logos: BankLogos | None = None
+    file_import: FileImport | None = None
 
     def __post_init__(self) -> None:
         if not valid_plugin_name(self.id):
@@ -494,6 +527,10 @@ class Plugin:
             if type(self.bank_logos) is not BankLogos:
                 raise ValueError("Plugin bank logos must be a BankLogos descriptor or None.")
             BankLogos(self.bank_logos.resolve, self.bank_logos.fetch)
+        if self.file_import is not None:
+            if type(self.file_import) is not FileImport:
+                raise ValueError("Plugin file import must be a FileImport descriptor or None.")
+            FileImport(self.file_import.parse, self.file_import.templates, self.file_import.static)
         if (
             self.insights is None
             and self.export is None
@@ -501,6 +538,7 @@ class Plugin:
             and self.storage is None
             and self.ui is None
             and self.bank_logos is None
+            and self.file_import is None
         ):
             raise ValueError(
                 "Plugin must provide a reporting, bank, storage, user interface, or branding capability."
@@ -519,6 +557,7 @@ class PluginDescription:
     has_ui: bool
     kinds: tuple[str, ...]
     has_bank_logos: bool = False
+    has_file_import: bool = False
 
 
 @dataclass(frozen=True, slots=True)

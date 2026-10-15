@@ -78,12 +78,13 @@ class PluginRegistry:
                 has_storage=plugin.storage is not None,
                 has_ui=plugin.ui is not None,
                 has_bank_logos=plugin.bank_logos is not None,
+                has_file_import=plugin.file_import is not None,
                 kinds=tuple(
                     name
                     for name, enabled in (
                         ("user_interface", plugin.ui is not None),
                         ("storage", plugin.storage is not None),
-                        ("data_ingestion", plugin.bank is not None),
+                        ("data_ingestion", plugin.bank is not None or plugin.file_import is not None),
                         ("reporting", plugin.insights is not None or plugin.export is not None),
                         ("branding", plugin.bank_logos is not None),
                     )
@@ -96,6 +97,10 @@ class PluginRegistry:
     def bank_plugins(self) -> tuple[Plugin, ...]:
         """Return enabled descriptors; the host supplies scoped contexts and owns lifecycle."""
         return tuple(plugin for plugin in self._plugins if plugin.bank is not None)
+
+    def file_import_plugins(self) -> tuple[Plugin, ...]:
+        """Return enabled parsers without calling them or giving them ledger access."""
+        return tuple(plugin for plugin in self._plugins if plugin.file_import is not None)
 
     def bank_logo(self, institution: str) -> tuple[str, str] | None:
         """First enabled match wins. Only institution text reaches resolver hooks."""
