@@ -2,7 +2,7 @@
 
 A local Python budgeting app with monthly envelopes and rollover, transaction review, spending analytics, manual accounts, CSV export, and optional Plaid Transactions imports. FastAPI serves Jinja pages with a small browser script; no Node.js build is required.
 
-See the [repository overview and Mermaid architecture](../README.md#architecture). Current version: **1.3.2** ([changelog](CHANGELOG.md)).
+See the [proposed architecture and Mermaid diagram](../README.md#architecture) and [current implementation](docs/architecture.md). Current version: **1.3.2** ([changelog](CHANGELOG.md)).
 
 ## Run locally
 
@@ -59,7 +59,7 @@ Run checks from this directory:
 Tests use fictional data and mocked services. CI checks Python 3.14 and 3.15 and requires 100% Python statement and branch coverage for every plugin.
 
 - [Local setup and usage](docs/usage.md) — runtime files, plugin manager, Plaid, budgets and backups
-- [Architecture](docs/architecture.md) — ownership, composition and data contracts
+- [Target architecture](docs/target-architecture.md) and [current implementation](docs/architecture.md)
 - [Plugin author guide](docs/plugins.md) and [folder ownership](plugins/README.md)
 - [Contributing](CONTRIBUTING.md) — checks, PR workflow, SemVer compatibility and pending branch protection
 

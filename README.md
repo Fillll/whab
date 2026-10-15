@@ -18,39 +18,33 @@ Open [127.0.0.1:5173](http://127.0.0.1:5173) to explore fictional demo data, or 
 
 ## Architecture
 
-The core hosts HTTP APIs and loads plugins through the public `whab.plugins` SDK. Arrows show runtime collaboration through those contracts; core code does not import concrete plugins.
+**Proposed direction:** a minimal financial core for accounts, transactions, categories and budgets. Almost everything else is supplied by plugins. A small host handles plugin discovery, capability contracts and lifecycle outside the domain core.
 
 ```mermaid
-flowchart TD
-    Browser["Browser"] <--> Host
+flowchart LR
+    Interfaces["Interfaces<br/>Web · API · TUI · CLI<br/>iOS client · Bank logos"] --- Core
+    Ingestion["Ingestion<br/>Plaid · Statements<br/>Manual entry · YNAB"] --- Core
+    Automation["Automation<br/>Smart categorization<br/>Rules · Random forest"] --- Core
 
-    Host["Core FastAPI host<br/>Routes, access checks, composition"]
-    SDK["Core plugin SDK and runtime<br/>Discovery and capability contracts"]
-    Host --> SDK
+    Core["Core<br/>Accounts · Transactions<br/>Categories · Budget"] --- Storage["Storage · required<br/>One active backend per ledger"]
+    Core --- Insights["Insights<br/>Sankey diagrams · Reports"]
+    Core --- Extensions["Extensions<br/>Mortgages · Loans<br/>Investments · Stocks"]
 
-    subgraph Plugins["Plugins · whab/plugins"]
-        Web["Web UI<br/>Views, templates, browser assets"]
-        SQLite["SQLite storage<br/>Ledger, migrations, atomic imports"]
-        Plaid["Plaid<br/>Bank connection and sync"]
-        Extensions["Optional extensions<br/>Reports and bank logos"]
-    end
-
-    SDK --> Web
-    SDK --> SQLite
-    SDK --> Plaid
-    SDK --> Extensions
-    SQLite --> Domain["Pure core domain rules<br/>Integer money and monthly budgets"]
-    SQLite --> Database[("Local database")]
-    Plaid <--> PlaidAPI["Plaid API"]
+    classDef domain fill:#fff6d6,stroke:#b83a36,stroke-width:2px
+    class Core domain
 ```
 
-Web and SQLite are the default interface and storage plugins. Plaid is optional and enabled by default; it imports normalized changes through a provider-scoped storage facade. Reports receive immutable snapshots, and bank logos receive institution text. Plugins run as trusted Python code in the server process. Headless mode keeps the APIs and storage with `WHAB_UI=`.
+Connections show capability boundaries around the core, not code imports. Storage is a required capability with exactly one active backend per ledger; other families can have several plugins. Interactive use needs at least one usable interface. Bank logos enhance an interface; an iOS app is a separate client, usually using the API interface. One plugin may supply several capabilities.
+
+The core validates every ledger change and owns financial rules. Ingestion submits normalized inputs, Insights reads snapshots, Extensions adds specialized models, and Automation suggests or applies configured actions through core commands. Random forest is one replaceable categorization implementation.
+
+This is a design proposal. The current app still owns its HTTP API, and SDK v1 does not yet support all of these capabilities. See the [target design](whab/docs/target-architecture.md) and [current implementation](whab/docs/architecture.md).
 
 ## Guides
 
 - [Application setup and configuration](whab/README.md)
 - [Local usage, Plaid setup, budgets and backups](whab/docs/usage.md)
-- [Architecture and data flow](whab/docs/architecture.md)
+- [Target architecture](whab/docs/target-architecture.md) and [current implementation](whab/docs/architecture.md)
 - [Plugin API](whab/docs/plugins.md) and [plugin folders](whab/plugins/README.md)
 - [Contributing and checks](whab/CONTRIBUTING.md) · [Changelog](whab/CHANGELOG.md)
 

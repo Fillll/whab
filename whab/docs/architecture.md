@@ -1,6 +1,6 @@
 # WHAB architecture
 
-WHAB is a local Python application with plugins for visual presentation, persistence, bank providers and reporting. Web and SQLite are its selected default UI/storage plugins; Plaid is an optional bank plugin enabled by default. The core app assembles descriptors through SDK protocols. Headless mode keeps APIs and storage without rendering pages. There is no arbitrary report/bank ledger-write or one-time migration plugin interface. See the [Mermaid overview](../../README.md#architecture) for the component map.
+**Current implementation.** WHAB is a local Python application with plugins for visual presentation, persistence, bank providers and reporting. Web and SQLite are its selected default UI/storage plugins; Plaid is an optional bank plugin enabled by default. The core app assembles descriptors through SDK protocols. Headless mode keeps APIs and storage without rendering pages. There is no arbitrary report/bank ledger-write or one-time migration plugin interface. The [target architecture](target-architecture.md) proposes a smaller financial core and broader plugin capabilities; its [Mermaid diagram](../../README.md#architecture) describes that proposal, rather than the runtime documented here.
 
 ## Package map
 

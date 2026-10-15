@@ -2,6 +2,8 @@
 
 WHAB provides **user-interface**, **storage**, **data-ingestion**, **reporting** and **branding** plugin capabilities under API v1. WHAB 1.2 adds a host-owned manager for optional plugin selections; WHAB 1.3 adds optional bank-logo branding. Plugins are installed Python packages registered through `whab.plugins` entry points. Web, SQLite, Plaid and Bank logos are bundled descriptors using those same contracts. Reports receive immutable snapshots; storage and bank factories receive separate privileged contexts.
 
+The [target architecture](target-architecture.md) proposes broader capability families. This guide describes implemented API v1 contracts; the proposal does not add or rename SDK hooks.
+
 ## Trust and enablement
 
 Bundled implementations live in dedicated contributor folders: `plugins/web/`, `plugins/sqlite/`, `plugins/plaid/` and `plugins/bank-logos/`. Each contains its own source package, assets, README and tests; a plugin may use as many supporting files as needed. `plugins/example/` includes its own distribution metadata as well. Keep implementation tests beside their plugin and shared SDK/host contracts in `tests/`. See [folder ownership and test commands](../plugins/README.md). The public `whab.plugins` SDK stays in core under `src/whab/plugins/`.
