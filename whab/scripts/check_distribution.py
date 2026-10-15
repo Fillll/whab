@@ -58,6 +58,15 @@ with TestClient(app, base_url="http://127.0.0.1:5173") as client:
     assert any(p["id"] == "ynab" and p["has_file_import"] for p in client.get("/api/plugins").json()["plugins"])
     assert client.get("/api/plugins/bank-logos/bank-logos/unknown").status_code == 404
     assert any(p["id"] == "bank-logos" and p["has_bank_logos"] for p in client.get("/api/plugins").json()["plugins"])
+    management = client.get("/api/plugins/management").json()
+    logos = next(row for row in management["plugins"] if row["id"] == "bank-logos")
+    assert logos["category"] == "interface"
+    options = client.get("/api/plugins/bank-logos/settings")
+    assert options.status_code == 200 and options.json()["insights"]
+    assert any(action["id"] == "flush-cache" for action in options.json()["actions"])
+    flushed = client.post("/api/plugins/bank-logos/settings/actions/flush-cache", json={})
+    assert flushed.status_code == 200 and flushed.json()["message"]
+    assert client.get("/api/plugins/web/settings").json() == {"insights": [], "actions": []}
     assert client.post("/api/plaid/link-token", json={}).status_code == 400
     export = client.get("/api/plugins/example/export?workspace=demo")
     assert export.status_code == 200

@@ -22,3 +22,4 @@ plugins.json
 coverage.xml
 htmlcov/
 _tmp/
+cache/

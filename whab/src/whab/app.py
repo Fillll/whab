@@ -63,6 +63,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
                 code="missing_resources",
                 plugin_id=plugin.id,
             )
+    plugins.configure_logo_caches(settings.home)
     owned_store = store is None
     if owned_store:
         store = open_storage(

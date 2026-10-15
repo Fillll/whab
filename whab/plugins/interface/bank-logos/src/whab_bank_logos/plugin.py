@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import base64
+import json
+import math
+import threading
+import time
+from pathlib import Path
+
 import httpx
 
-from whab.plugins import BankLogos, LogoImage, Plugin
+from whab.plugins import BankLogos, Insight, LogoImage, Plugin, PluginAction, PluginSettings
 
 _MAX_BYTES = 128 * 1024
+_MAX_CACHE_BYTES = 2 * _MAX_BYTES
+_CACHE_SECONDS = 365 * 24 * 60 * 60
+_FAILURE_SECONDS = 5 * 60
 _MEDIA_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
 _DOMAINS = {
     "chase": "chase.com",
@@ -112,12 +122,175 @@ def fetch_logo(key: str, *, client: httpx.Client | None = None) -> LogoImage | N
         return _fetch(owned_client, domain)
 
 
+class _LogoCache:
+    """Bounded public artwork cache; a flush also invalidates in-flight writes."""
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._entries: dict[str, tuple[float, LogoImage | None]] = {}
+        self._pending: dict[str, threading.Event] = {}
+        self._generation = 0
+        self._directory: Path | None = None
+
+    def _reset(self) -> None:
+        self._generation += 1
+        self._entries.clear()
+        for pending in self._pending.values():
+            pending.set()
+        self._pending.clear()
+
+    def configure(self, directory: Path) -> None:
+        with self._lock:
+            self._reset()
+            self._directory = directory
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                return
+            now = time.time()
+            for key in _DOMAINS:
+                entry = self._load(directory / f"{key}.json", now)
+                if entry is not None:
+                    self._entries[key] = entry
+
+    @staticmethod
+    def _load(path: Path, now: float) -> tuple[float, LogoImage] | None:
+        try:
+            with path.open("rb") as saved:
+                content = saved.read(_MAX_CACHE_BYTES + 1)
+            if len(content) > _MAX_CACHE_BYTES:
+                return None
+            record = json.loads(content)
+            saved_at = record["saved_at"]
+            if (
+                type(saved_at) not in (int, float)
+                or not math.isfinite(saved_at)
+                or not 0 <= saved_at <= now
+                or now - saved_at >= _CACHE_SECONDS
+            ):
+                return None
+            image = LogoImage(
+                data=base64.b64decode(record["data"], validate=True),
+                media_type=record["media_type"],
+            )
+            return saved_at + _CACHE_SECONDS, image
+        except (OSError, ValueError, TypeError, KeyError, OverflowError, RecursionError):
+            return None
+
+    def _save(self, key: str, image: LogoImage, saved_at: float) -> None:
+        if self._directory is not None:
+            path = self._directory / f"{key}.json"
+            temporary = self._directory / f".{key}.json.tmp"
+            content = json.dumps({
+                "saved_at": saved_at,
+                "media_type": image.media_type,
+                "data": base64.b64encode(image.data).decode("ascii"),
+            })
+            try:
+                temporary.unlink(missing_ok=True)
+                with temporary.open("x", encoding="utf-8") as saved:
+                    saved.write(content)
+                temporary.replace(path)
+            except OSError:
+                # Public artwork remains optional when its cache directory is unavailable.
+                pass
+
+    def get(self, key: str) -> LogoImage | None:
+        if type(key) is not str or key not in _DOMAINS:
+            return None
+        while True:
+            with self._lock:
+                entry = self._entries.get(key)
+                if entry is not None and time.time() < entry[0]:
+                    return entry[1]
+                pending = self._pending.get(key)
+                if pending is None:
+                    pending = threading.Event()
+                    self._pending[key] = pending
+                    generation = self._generation
+                    break
+            pending.wait()
+        image = None
+        try:
+            image = fetch_logo(key)
+        finally:
+            with self._lock:
+                if generation == self._generation:
+                    now = time.time()
+                    lifetime = _FAILURE_SECONDS if image is None else _CACHE_SECONDS
+                    self._entries[key] = now + lifetime, image
+                    if image is not None:
+                        self._save(key, image, now)
+                if self._pending.get(key) is pending:
+                    del self._pending[key]
+                pending.set()
+        return image
+
+    def read(self) -> tuple[Insight, ...]:
+        with self._lock:
+            now = time.time()
+            count = sum(
+                image is not None and expires > now
+                for expires, image in self._entries.values()
+            )
+        return (
+            Insight(
+                title="Cache duration",
+                value="1 year (365 days)",
+                detail="Logos refresh on the next request after they expire. "
+                "Unavailable logos are retried after 5 minutes.",
+            ),
+            Insight(title="Cached logos", value=str(count)),
+            Insight(
+                title="Public artwork",
+                value="Curated bank domains only",
+                detail="Only allowlisted public bank domains are sent to Icon Horse. "
+                "Account details and bank credentials are never sent.",
+            ),
+        )
+
+    def flush(self) -> None:
+        with self._lock:
+            self._reset()
+            if self._directory is not None:
+                for key in _DOMAINS:
+                    (self._directory / f"{key}.json").unlink(missing_ok=True)
+                    (self._directory / f".{key}.json.tmp").unlink(missing_ok=True)
+
+
+_cache = _LogoCache()
+
+
 def fetch(key: str) -> LogoImage | None:
-    return fetch_logo(key)
+    return _cache.get(key)
+
+
+def configure_cache(directory: Path) -> None:
+    _cache.configure(directory)
+
+
+def read_settings() -> tuple[Insight, ...]:
+    return _cache.read()
+
+
+def apply_setting(action_id: str) -> str:
+    if action_id != "flush-cache":
+        raise ValueError("Unknown bank logos action.")
+    _cache.flush()
+    return "Bank logo cache cleared. Logos will download again when requested."
 
 
 plugin = Plugin(
     id="bank-logos",
     display_name="Bank logos (Icon Horse)",
-    bank_logos=BankLogos(resolve=resolve, fetch=fetch),
+    bank_logos=BankLogos(resolve=resolve, fetch=fetch, configure_cache=configure_cache),
+    settings=PluginSettings(
+        read=read_settings,
+        actions=(PluginAction(
+            id="flush-cache",
+            label="Flush cache",
+            description="Remove all cached bank logos and retry unavailable logos immediately.",
+        ),),
+        act=apply_setting,
+    ),
 )

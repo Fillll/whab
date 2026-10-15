@@ -20,7 +20,7 @@ An enabled name must match exactly one entry point and its descriptor ID. A dupl
 
 ## Manage optional selections
 
-The bundled Web UI's **Settings → Plugin manager** lists installed registrations alongside the running and configured selections. Discovery reads package metadata without importing disabled plugin code. Inactive registrations use their entry-point names until their descriptors are explicitly loaded; their capability kinds are unknown. Selected storage and UI plugins remain required. An unavailable or duplicate optional registration cannot be enabled, but a selected one can be unchecked to repair the selection for the next startup.
+The bundled Web UI's **Settings → Plugins → Installed** lists installed registrations alongside the running and configured selections. It defaults to **All categories**; a category filter narrows the installed list. Every row has an **Options** page with package details and any controls supplied by the active plugin. Inactive registrations show enable/restart guidance without executing settings hooks. Discovery reads package metadata without importing disabled plugin code. Inactive registrations use their entry-point names until their descriptors are explicitly loaded; their capability kinds are unknown. Selected storage and UI plugins remain required. An unavailable or duplicate optional registration cannot be enabled, but a selected one can be unchecked to repair the selection for the next startup.
 
 **Save plugin selection** loads and validates the proposed descriptors without calling storage/bank factories or reporting hooks. It rejects missing or ambiguous registrations, incompatible descriptors, and attempts to change the selected storage or interface. Saving leaves the running registry, provider services, connections and ledger unchanged; changes apply after restart. An imported bank's history and saved connections remain when its plugin is disabled.
 
@@ -28,7 +28,7 @@ The host stores at most 100 unique optional IDs in an atomic `plugins.json` repl
 
 Host-owned endpoints expose this behavior to custom interfaces and headless clients:
 
-- `GET /api/plugins/management` returns `plugins`, optional-ID lists `active` and `configured`, `restart_required` and a safe optional `error`. Catalog rows include `id`, `display_name`, `kinds`, package `distribution`/`version`, `active`, `enabled`, `required`, `manageable` and a safe optional `reason`. A row's `active` describes the fixed running registry; `enabled` describes the configured selection plus required plugins; `manageable` indicates whether an optional registration is available for selection.
+- `GET /api/plugins/management` returns `plugins`, optional-ID lists `active` and `configured`, `restart_required` and a safe optional `error`. Catalog rows include `id`, `display_name`, `category`, `kinds`, package `distribution`/`version`, `active`, `enabled`, `required`, `manageable` and a safe optional `reason`. A row's `active` describes the fixed running registry; `enabled` describes the configured selection plus required plugins; `manageable` indicates whether an optional registration is available for selection.
 - `PUT /api/plugins/management` accepts an application/json body such as `{"plugins": ["plaid", "example"]}` containing only optional IDs. A successful save returns the same projection. Host/origin, request-size and strict body validation guards apply. These are host routes, not plugin-owned HTTP extensions.
 
 `GET /api/plugins` continues to describe running plugins only. A pending selection does not change exports, bank routes or mounted resources until restart.
@@ -42,7 +42,7 @@ Run these commands from a WHAB source checkout using the same virtual environmen
 .venv/bin/python -m pip install -e plugins/example/example
 ```
 
-Enable **example** in **Settings → Plugin manager**, save, and restart WHAB. If the runtime home has no saved `plugins.json`, you can instead add this line to the private local `.env` and restart:
+Enable **example** in **Settings → Plugins → Installed**, save, and restart WHAB. If the runtime home has no saved `plugins.json`, you can instead add this line to the private local `.env` and restart:
 
 ```dotenv
 WHAB_PLUGINS=plaid,example
@@ -54,7 +54,7 @@ To disable optional extensions, uncheck them in Settings, save, and restart. Wit
 
 ## Public SDK
 
-Import public types from `whab.plugins`; concrete database, visual/transport internals and global configuration are outside the stable SDK. Descriptors may provide `ui`, `storage`, `bank`, `file_import`, `insights`, `export` and `bank_logos`. Their computed `kinds` are `user_interface`, `storage`, `data_ingestion`, `reporting` and `branding`; one descriptor may have multiple kinds. At least one capability is required. Data ingestion includes bank connection/sync and, from WHAB 1.4, bounded local file imports.
+Import public types from `whab.plugins`; concrete database, visual/transport internals and global configuration are outside the stable SDK. Descriptors may provide `ui`, `storage`, `bank`, `file_import`, `insights`, `export` and `bank_logos`, plus optional `settings` (WHAB 1.6+). Their computed `kinds` are `user_interface`, `storage`, `data_ingestion`, `reporting` and `branding`; one descriptor may have multiple kinds. At least one capability is required. Data ingestion includes bank connection/sync and, from WHAB 1.4, bounded local file imports.
 
 Frozen report records use immutable tuples and exact primitives. Every hook receives fresh records from a whitelisted snapshot, protecting against accidental mutation. Storage, visual and bank capabilities are described below.
 
@@ -314,11 +314,31 @@ plugin = Plugin(
 )
 ```
 
-`BankLogos` is frozen and has two synchronous hooks. `resolve(institution: str) -> str | None` receives only institution display text (at most 200 characters), and must perform a local lookup without remote requests. A match returns an opaque lowercase slug of at most 64 characters, using the same syntax as plugin IDs; unknown names return `None`. The first enabled valid match wins. The host supplies `account_logos`, a map of account IDs to local image URLs, to the selected UI context; unmatched accounts are omitted. Interfaces may ignore the map and should retain a visible icon/initial fallback.
+`BankLogos` is frozen and has two required synchronous hooks plus an optional `configure_cache` hook (WHAB 1.6+). `resolve(institution: str) -> str | None` receives only institution display text (at most 200 characters), and must perform a local lookup without remote requests. A match returns an opaque lowercase slug of at most 64 characters, using the same syntax as plugin IDs; unknown names return `None`. The first enabled valid match wins. The host supplies `account_logos`, a map of account IDs to local image URLs, to the selected UI context; unmatched accounts are omitted. Interfaces may ignore the map and should retain a visible icon/initial fallback.
 
 `fetch(key: str) -> LogoImage | None` runs only when the guarded host route `GET /api/plugins/{id}/bank-logos/{key}` is requested. It receives a logo key, never an account, snapshot, backend, settings or credentials. It must allowlist its keys and remote destinations, bound streamed bytes, disable redirects and use a short timeout. `LogoImage(data: bytes, media_type: str)` accepts up to 128 KiB of PNG, JPEG, GIF or WebP bytes with matching file signatures; SVG, HTML and arbitrary URLs are unsupported. The host revalidates the returned record and serves the bytes with `nosniff`; this is signature checking, not complete image decoding. Hook errors, malformed results, unknown keys and disabled plugins return a sanitized 404, allowing the UI fallback.
 
-The registry caches up to 128 images/misses in memory, coalesces concurrent fetches, and retries after 24 hours for successes or five minutes for failures. The cache clears on restart, and HTTP responses retain the host's `no-store` policy. Page rendering, startup, plugin discovery and selection saving never fetch images. Headless ledger requests do not fetch images. Python plugins remain trusted code; these scoped inputs do not sandbox a plugin's own network or filesystem access. External branding packages should require `whab>=1.3,<2`.
+Without `configure_cache`, the registry caches up to 128 images/misses in memory, coalesces concurrent fetches, and retries after 24 hours for successes or five minutes for failures; that fallback cache clears on restart. An optional `configure_cache(directory: Path) -> None` receives only `WHAB_HOME/cache/plugins/{id}/`, with no credentials or ledger context. It must prepare local storage without fetching images; a provider using it owns bounded caching, expiry and concurrent request coalescing. The bundled Bank logos provider stores validated successful images for 365 days across restarts and refreshes on the first request after expiry; failed requests stay in memory for five minutes. Its settings action flushes both caches without a remote fetch. HTTP responses retain the host's `no-store` policy so flush and expiry apply to the next image request. Page rendering, startup, plugin discovery and selection saving never fetch images. Headless ledger requests do not fetch images. Python plugins remain trusted code; these scoped inputs do not sandbox a plugin's own network or filesystem access. External branding packages should require `whab>=1.3,<2`.
+
+## Plugin settings (WHAB 1.6+)
+
+Every installed plugin has an Options page in the bundled Web UI. Active plugins may add structured details and declared actions through the optional `Plugin.settings` capability:
+
+```python
+from whab.plugins import Insight, PluginAction, PluginSettings
+
+settings = PluginSettings(
+    read=lambda: (Insight("Cache duration", "365 days"),),
+    actions=(PluginAction("flush-cache", "Flush cache", "Fetch again on the next image request."),),
+    act=perform_action,
+)
+```
+
+`read() -> tuple[Insight, ...]` returns at most 50 validated plain-text details. `actions` is a tuple of at most 50 `PluginAction(id, label, description="")` controls with unique lowercase slug IDs. Labels are at most 120 characters; descriptions and result messages are at most 2,000 characters. `act(action_id: str) -> str` performs a declared action and returns a safe plain-text result message. Hooks receive no ledger, credentials or application configuration. The host validates records and outputs, rejects undeclared actions before calling plugin code, and sanitizes unexpected exceptions. The interface escapes all plugin text. Settings supplement an existing capability; they do not make an otherwise empty descriptor valid.
+
+Host-owned `GET /api/plugins/{id}/settings` returns `insights` and `actions` for an active plugin, with empty lists when it has no custom settings. `POST /api/plugins/{id}/settings/actions/{action_id}` invokes a declared action and returns `message` and refreshed `settings`. Send JSON (`{}` is sufficient); local Host/origin, request-size and no-store guards apply. Unknown/inactive plugins and unavailable actions return sanitized errors. A successful action also clears that plugin's fallback host logo cache. Browsing inactive options reads only the installed metadata projection and does not execute hooks. Enabling/disabling still applies after restart; an action such as flushing the active logo cache takes effect immediately.
+
+The management projection's `category` is one of `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` or `example`. Bundled registrations can be categorized without importing disabled descriptors; otherwise running capabilities supply a category and unknown registrations use `extension`.
 
 ## Runtime interface for host integration and tests
 
@@ -335,11 +355,14 @@ registry.ui_plugin(plugin_id: str) -> Plugin
 registry.bank_plugins() -> tuple[Plugin, ...]
 registry.bank_logo(institution: str) -> tuple[str, str] | None  # (plugin ID, logo key)
 registry.logo_image(plugin_id: str, key: str) -> LogoImage | None
+registry.configure_logo_caches(home: Path) -> None  # Added in WHAB 1.6.
+registry.settings(plugin_id: str) -> dict  # tuples of validated insights/actions
+registry.settings_action(plugin_id: str, action_id: str) -> str
 registry.insights(snapshot: BudgetSnapshot) -> tuple[PluginInsightResult, ...]
 registry.export(plugin_id: str, snapshot: BudgetSnapshot) -> ExportTable
 ```
 
-An optional entry-point sequence lets tests supply fake installed packages. `PluginDescription` includes `id`, `display_name`, `api_version`, `has_ui`, `has_storage`, `has_bank`, `has_insights`, `has_export`, `has_bank_logos` (added in 1.3) and computed `kinds`. `descriptors()` returns the loaded immutable descriptors without executing their hooks or factories, so the host can reuse required plugins when validating a pending selection. Storage/UI selectors require a unique enabled descriptor with the requested capability; the host skips UI selection when headless. `bank_plugins()` returns descriptors without creating services. Host composition supplies contexts and owns lifecycle. `PluginInsightResult` contains `plugin_id`, `display_name`, `insights` and an optional sanitized `error`. Failures use authored `PluginError` messages with `code` and optional `plugin_id`; never append underlying exceptions or private records.
+An optional entry-point sequence lets tests supply fake installed packages. `PluginDescription` includes `id`, `display_name`, `api_version`, `has_ui`, `has_storage`, `has_bank`, `has_insights`, `has_export`, `has_bank_logos` (added in 1.3), `has_file_import` (added in 1.4), `has_settings` (added in 1.6) and computed `kinds`. `descriptors()` returns the loaded immutable descriptors without executing their hooks or factories, so the host can reuse required plugins when validating a pending selection. Storage/UI selectors require a unique enabled descriptor with the requested capability; the host skips UI selection when headless. `bank_plugins()` returns descriptors without creating services. Host composition supplies contexts and owns lifecycle. `PluginInsightResult` contains `plugin_id`, `display_name`, `insights` and an optional sanitized `error`. Failures use authored `PluginError` messages with `code` and optional `plugin_id`; never append underlying exceptions or private records.
 
 API v1's documented records, hook signatures, and runtime methods are part of WHAB's SemVer contract. Compatible additions may ship in minor releases; changing/removing their meaning or shape requires a major WHAB release and a new plugin API version. WHAB rejects incompatible descriptors before executing hooks.
 

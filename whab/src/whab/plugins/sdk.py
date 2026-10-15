@@ -458,10 +458,53 @@ class BankLogos:
 
     resolve: Callable[[str], str | None]
     fetch: Callable[[str], LogoImage | None]
+    configure_cache: Callable[[Path], None] | None = None
 
     def __post_init__(self) -> None:
         if not callable(self.resolve) or not callable(self.fetch):
             raise ValueError("Bank logo resolution and fetching must be callable.")
+        if self.configure_cache is not None and not callable(self.configure_cache):
+            raise ValueError("Bank logo cache configuration must be callable or None.")
+
+
+@dataclass(frozen=True, slots=True)
+class PluginAction:
+    """An explicit local settings operation, executed only after a user request."""
+
+    id: str
+    label: str
+    description: str = ""
+
+    def __post_init__(self) -> None:
+        if not valid_plugin_name(self.id):
+            raise ValueError("Plugin action ID must be a lowercase slug of at most 64 characters.")
+        _text(self.label, "Plugin action label", limit=120, empty=False)
+        _text(self.description, "Plugin action description", limit=2000)
+
+
+@dataclass(frozen=True, slots=True)
+class PluginSettings:
+    """Plain local settings information and actions, without host or ledger context."""
+
+    read: Callable[[], tuple[Insight, ...]]
+    actions: tuple[PluginAction, ...] = ()
+    act: Callable[[str], str] | None = None
+
+    def __post_init__(self) -> None:
+        if not callable(self.read):
+            raise ValueError("Plugin settings reader must be callable.")
+        if type(self.actions) is not tuple or len(self.actions) > 50:
+            raise ValueError("Plugin settings actions must be a tuple of at most 50 actions.")
+        for action in self.actions:
+            if type(action) is not PluginAction:
+                raise ValueError("Plugin settings actions must use PluginAction records.")
+            PluginAction(action.id, action.label, action.description)
+        if len({action.id for action in self.actions}) != len(self.actions):
+            raise ValueError("Plugin settings actions must have unique IDs.")
+        if self.act is not None and not callable(self.act):
+            raise ValueError("Plugin settings action handler must be callable or None.")
+        if self.actions and self.act is None:
+            raise ValueError("Plugin settings actions require an action handler.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -508,6 +551,7 @@ class Plugin:
     ui: UserInterface | None = None
     bank_logos: BankLogos | None = None
     file_import: FileImport | None = None
+    settings: PluginSettings | None = None
 
     def __post_init__(self) -> None:
         if not valid_plugin_name(self.id):
@@ -532,11 +576,17 @@ class Plugin:
         if self.bank_logos is not None:
             if type(self.bank_logos) is not BankLogos:
                 raise ValueError("Plugin bank logos must be a BankLogos descriptor or None.")
-            BankLogos(self.bank_logos.resolve, self.bank_logos.fetch)
+            BankLogos(
+                self.bank_logos.resolve, self.bank_logos.fetch, self.bank_logos.configure_cache,
+            )
         if self.file_import is not None:
             if type(self.file_import) is not FileImport:
                 raise ValueError("Plugin file import must be a FileImport descriptor or None.")
             FileImport(self.file_import.parse, self.file_import.templates, self.file_import.static)
+        if self.settings is not None:
+            if type(self.settings) is not PluginSettings:
+                raise ValueError("Plugin settings must be a PluginSettings descriptor or None.")
+            PluginSettings(self.settings.read, self.settings.actions, self.settings.act)
         if (
             self.insights is None
             and self.export is None
@@ -564,6 +614,7 @@ class PluginDescription:
     kinds: tuple[str, ...]
     has_bank_logos: bool = False
     has_file_import: bool = False
+    has_settings: bool = False
 
 
 @dataclass(frozen=True, slots=True)

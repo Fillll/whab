@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.6.0 — 2026-10-14
+
+- Add Settings → Plugins → Installed with an All categories view, category filtering, selection checkboxes and an Options page for every installed plugin. Keep required storage/interface selections locked and apply optional selection changes after restart.
+- Add an optional API v1 settings capability with validated plain-text details and declared actions, served through guarded host endpoints. Disabled plugin settings do not execute code.
+- Keep successful Bank logos images for 365 days in a bounded local disk cache that survives restarts. Refresh on the first image request after expiry; keep failed requests cached for five minutes. Add a Flush cache button in Bank logos options to clear saved images and transient misses immediately.
+
 ## 1.5.0 — 2026-10-14
 
 - Make the two-level category hierarchy a core contract. Parent groups organize child categories; transactions, category targets and envelope assignments accept children only. Existing child IDs, allocations and annotations remain intact.

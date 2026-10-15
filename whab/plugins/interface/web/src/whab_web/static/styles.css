@@ -1642,7 +1642,7 @@ strong {
 .settings-modal {
   width: 650px;
 }
-.plugin-manager > h3 {
+.plugin-list-heading > h3 {
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.2px;
@@ -1661,7 +1661,7 @@ strong {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 16px;
-  padding: 16px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
 .plugin-toggle {
@@ -1694,25 +1694,23 @@ strong {
   color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
-.plugin-state {
+.plugin-controls {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-width: 200px;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 8px;
+}
+.plugin-state {
   font-size: 10px;
   line-height: 1.6;
   color: var(--text-secondary);
 }
-.plugin-kind {
+.plugin-options {
   display: inline-flex;
   align-items: center;
-  padding: 2px 6px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text-secondary);
+  gap: 6px;
+  padding: 7px 10px;
+  font-size: 11px;
 }
 .plugin-restart-notice {
   margin-top: 16px;
@@ -1731,29 +1729,122 @@ strong {
   justify-content: flex-end;
   margin-top: 18px;
 }
-.settings-about {
-  margin-top: 24px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
-.settings-about > button {
+.settings-menu > button {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 12px 0;
-  font-size: 12px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
   color: var(--text-secondary);
   text-align: left;
 }
-.settings-about > button:hover {
+.settings-menu strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.settings-menu small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.settings-menu > button:hover strong,
+.settings-back:hover {
   color: var(--brand-red);
 }
-.settings-about > button > svg {
+.settings-menu > button > svg {
   flex-shrink: 0;
 }
-.settings-about > button > svg:last-child {
+.settings-menu > button > svg:last-child {
   margin-left: auto;
+}
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 18px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.plugin-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.plugin-category-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.plugin-category-filter select {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  font-size: 11px;
+}
+.plugin-details {
+  margin: 0;
+  font-size: 11px;
+}
+.plugin-details > div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 16px;
+  padding: 9px 0;
+}
+.plugin-details dt {
+  color: var(--text-secondary);
+}
+.plugin-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.plugin-settings {
+  margin-top: 20px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.plugin-settings-insights {
+  margin: 0;
+}
+.plugin-settings-insights > div {
+  padding: 12px 0;
+}
+.plugin-settings-insights dt {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.plugin-settings-insights dd {
+  margin: 5px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.plugin-settings-insights p {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.plugin-setting-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.plugin-setting-action > p {
+  margin: 0;
+}
+.plugin-setting-action > button {
+  flex-shrink: 0;
 }
 .spin {
   animation: spin 1s linear infinite;
@@ -2114,14 +2205,6 @@ strong {
   }
   .settings-modal {
     padding: 22px;
-  }
-  .plugin-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 7px;
-  }
-  .plugin-state {
-    padding-left: 28px;
-    justify-content: flex-start;
   }
   .app-shell > main {
     margin-left: 71px;
