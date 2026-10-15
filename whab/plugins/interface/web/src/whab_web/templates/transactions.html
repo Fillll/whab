@@ -1,3 +1,4 @@
+{% set merchant_logos = merchant_logos|default({}) %}
 <div class="page-title-row">
   <div>
     <div class="eyebrow">YOUR MONEY, IN DETAIL</div>
@@ -57,16 +58,23 @@
           </td>
           <td class="date-cell">{{ date_label(transaction.date) }}</td>
           <td>
-            <strong>{{ transaction.merchant }}</strong>
-            <div class="transaction-meta">
-              {% if transaction.pending %}<span>Pending</span>
+            <div class="transaction-payee">
+              {% if merchant_logos.get(transaction.id) %}
+                <span class="merchant-mark" aria-hidden="true"><span>{{ transaction.merchant[:1]|upper }}</span><img class="merchant-logo-image" data-merchant-logo src="{{ merchant_logos[transaction.id] }}" alt="" width="28" height="28" decoding="async" hidden></span>
               {% endif %}
-              {% if transaction.isTransfer %}<span>Transfer</span>
-              {% endif %}
-              {% if transaction.source=="manual" %}<span>Manual</span>
-              {% endif %}
-              {% if transaction.note %}<span>{{ transaction.note }}</span>
-              {% endif %}
+              <div>
+                <strong>{{ transaction.merchant }}</strong>
+                <div class="transaction-meta">
+                  {% if transaction.pending %}<span>Pending</span>
+                  {% endif %}
+                  {% if transaction.isTransfer %}<span>Transfer</span>
+                  {% endif %}
+                  {% if transaction.source=="manual" %}<span>Manual</span>
+                  {% endif %}
+                  {% if transaction.note %}<span>{{ transaction.note }}</span>
+                  {% endif %}
+                </div>
+              </div>
             </div>
           </td>
           <td>

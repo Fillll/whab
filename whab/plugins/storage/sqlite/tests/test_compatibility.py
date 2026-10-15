@@ -10,7 +10,9 @@ from whab.domain.categories import category_group_id
 from whab.plugins import StorageContext
 
 
-def test_node_schema_and_encrypted_fixture_remain_usable(monkeypatch, tmp_path, legacy_token):
+def test_node_schema_and_encrypted_fixture_remain_usable(
+    monkeypatch, tmp_path, legacy_token, imported_account, imported_transaction, sync_changes
+):
     path = tmp_path / "data" / "previous-sandbox.sqlite"
     path.parent.mkdir()
     # Synthetic legacy Node schema intentionally lacks all additive Python flags.
@@ -42,6 +44,7 @@ def test_node_schema_and_encrypted_fixture_remain_usable(monkeypatch, tmp_path, 
         assert reopened.transactions("personal")[0]["categoryId"] == "fun"
         assert reopened.transactions("personal")[0]["reviewed"] is True
         assert reopened.transactions("personal")[0]["note"] == "Fixture note"
+        assert reopened.state("personal")["transactions"]["legacy"]["merchantLogo"] is None
         snapshot = reopened.workspace("personal", "2026-10")
         assert snapshot["budgetStartMonth"] == "2026-10"
         assert snapshot["accounts"][0]["balance"] == 10000
@@ -57,19 +60,35 @@ def test_node_schema_and_encrypted_fixture_remain_usable(monkeypatch, tmp_path, 
         assert snapshot["budget"][0]["available"] == 1000
         for table, expected in [
             ("accounts", {"active", "balance_unknown"}),
-            ("transactions", {"inferred_transfer"}),
+            ("transactions", {"inferred_transfer", "merchant_logo"}),
             ("meta", {"budget_start_month"}),
         ]:
             columns = {row["name"] for row in reopened.db.execute(f"PRAGMA table_info({table})")}
             assert expected <= columns
         assert len(reopened.transactions("demo")) == 55
+        column = next(
+            row for row in reopened.db.execute("PRAGMA table_info(transactions)")
+            if row["name"] == "merchant_logo"
+        )
+        assert (column["type"], column["notnull"], column["dflt_value"]) == ("TEXT", 0, None)
+        reopened.apply_sync(
+            "fixture-item",
+            sync_changes(modified=[imported_transaction("legacy", merchantLogo="saved-logo")]),
+            "logo-cursor",
+            [imported_account(itemId="fixture-item")],
+        )
     finally:
         reopened.close()
     twice = Store(path, month="2026-12")
     try:
         assert len(twice.transactions("personal")) == 1
         assert len(twice.transactions("demo")) == 55
-        assert twice.get_item("fixture-item")["cursor"] == "legacy-cursor"
+        assert twice.get_item("fixture-item")["cursor"] == "logo-cursor"
+        saved = twice.state("personal")["transactions"]["legacy"]
+        assert saved["merchantLogo"] == "saved-logo"
+        assert (saved["categoryId"], saved["reviewed"], saved["note"]) == (
+            "fun", True, "Fixture note"
+        )
     finally:
         twice.close()
 

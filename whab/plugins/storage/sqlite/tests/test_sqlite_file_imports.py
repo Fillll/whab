@@ -67,7 +67,9 @@ def test_import_preserves_snapshot_money_history_annotations_and_demo(store):
     assert tuple(state["categories"].values()) == tuple(
         {**record, "currency": data.currency} for record in data.categories
     )
-    assert tuple(state["transactions"].values()) == data.transactions
+    assert tuple(state["transactions"].values()) == tuple(
+        {**record, "merchantLogo": None} for record in data.transactions
+    )
     assert state["budget"] == {"2026-09": {"food": 3000}, "2026-10": {"food": -100}}
     assert state["budgetStartMonth"] == "2026-09"
     assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 97600

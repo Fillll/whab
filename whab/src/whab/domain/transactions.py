@@ -11,6 +11,7 @@ def public_transaction(transaction: dict) -> dict:
             "accountId",
             "date",
             "merchant",
+            "merchantLogo",
             "amount",
             "categoryId",
             "pending",

@@ -9,6 +9,7 @@ from whab import __version__
 from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.plugins import PluginError
+from whab.plugins.sdk import valid_merchant_logo_key
 from whab.web.plugin_snapshot import build_snapshot
 from whab.web.schemas import Workspace, valid_month
 
@@ -110,6 +111,17 @@ def create_router(
             account["id"]: f"/api/plugins/{logo[0]}/bank-logos/{logo[1]}"
             for account in data["accounts"]
             if (logo := institution_logos.get(account.get("institution", ""))) is not None
+        }
+        merchant_providers = {
+            plugin.id for plugin in plugins.bank_plugins() if plugin.merchant_logos is not None
+        }
+        context["merchant_logos"] = {
+            transaction["id"]: (
+                f"/api/plugins/{transaction['source']}/merchant-logos/{transaction['merchantLogo']}"
+            )
+            for transaction in data["transactions"]
+            if transaction.get("source") in merchant_providers
+            and valid_merchant_logo_key(transaction.get("merchantLogo"))
         }
         context["plugin_management"] = (
             plugin_manager.projection() if plugin_manager is not None else None

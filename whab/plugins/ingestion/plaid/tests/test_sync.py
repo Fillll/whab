@@ -81,6 +81,42 @@ def test_failed_sync_does_not_advance_and_does_not_leak_remote_error(
     asyncio.run(scenario())
 
 
+def test_supplied_merchant_artwork_survives_sync_without_image_requests(
+    store, bank_account, bank_transaction, plaid_client, plaid_env, save_plaid_item, sync_changes
+):
+    async def scenario():
+        save_plaid_item(store)
+        requests = []
+        artwork = "https://plaid-merchant-logos.plaid.com/fixture.png"
+
+        def handler(request):
+            requests.append(request.url.path)
+            if request.url.path == "/accounts/get":
+                return httpx.Response(200, json={"accounts": [bank_account()]})
+            assert request.url.path == "/transactions/sync"
+            return httpx.Response(
+                200,
+                json={
+                    **sync_changes([
+                        bank_transaction("artwork", logo_url=artwork),
+                        bank_transaction("fallback", logo_url="https://example.com/private.png"),
+                    ]),
+                    "has_more": False,
+                    "next_cursor": "artwork-cursor",
+                },
+            )
+
+        async with plaid_client(handler) as client:
+            await PlaidService(store, plaid_env, client).sync("item")
+        records = {row["id"]: row for row in store.transactions("personal")}
+        assert records["artwork"]["merchantLogo"] == "merchant-fixture"
+        assert records["fallback"].get("merchantLogo") is None
+        assert store.get_item("item")["cursor"] == "artwork-cursor"
+        assert requests == ["/transactions/sync", "/accounts/get"]
+
+    asyncio.run(scenario())
+
+
 def test_reconnect_update_mode_and_disconnect_preserves_ledger(
     store,
     apply_plaid_sync,

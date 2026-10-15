@@ -4,6 +4,8 @@
 
 Templates and static files must ship in the wheel. Use demo data for browser checks and preserve escaping and visual fallbacks.
 
+Transactions display merchant artwork supplied by the enabled Plaid plugin through a local image route. The payee name and notes remain visible; artwork loads independently and falls back to the merchant's initial on failure. Transactions without supplied artwork keep their text-only presentation.
+
 From the application directory, run `.venv/bin/python -m pytest plugins/interface/web/tests`. See [plugin contribution rules](../../README.md) for all checks and packaging.
 
 Open **Settings → Plugins → Installed** to select plugins. The category filter starts with **All categories**; required storage and interface plugins stay selected. Saving an optional selection applies it on the next restart and preserves the running plugins until then.

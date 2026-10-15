@@ -12,14 +12,19 @@ def test_pending_posted_preserves_edits_and_replay_is_unique(
 ):
     save_item(store)
     apply_import(
-        "item", sync_changes([imported_transaction("pending", pending=True)]), "one", [imported_account()]
+        "item",
+        sync_changes([imported_transaction("pending", pending=True, merchantLogo="pending-logo")]),
+        "one",
+        [imported_account()],
     )
     assert store.workspace("personal", "2026-10")["summary"]["spent"] == 0
     store.edit_transaction("personal", "pending", "fun", True)
     store.db.execute(
         "UPDATE transactions SET note='Family outing' WHERE id='pending' AND workspace='personal'"
     )
-    posted = imported_transaction("posted", amount=1200, pendingTransactionId="pending")
+    posted = imported_transaction(
+        "posted", amount=1200, pendingTransactionId="pending", merchantLogo="posted-logo"
+    )
     batch = sync_changes([posted], removed=["pending"])
     apply_import("item", batch, "two", [imported_account()])
     apply_import("item", batch, "two", [imported_account()])
@@ -31,13 +36,41 @@ def test_pending_posted_preserves_edits_and_replay_is_unique(
         "Family outing",
         1200,
     )
+    assert store.state("personal")["transactions"]["posted"]["merchantLogo"] == "posted-logo"
     apply_import(
         "item",
-        sync_changes(modified=[imported_transaction("posted", amount=1300)]),
+        sync_changes(modified=[imported_transaction("posted", amount=1300, merchantLogo="updated-logo")]),
         "three",
         [imported_account()],
     )
     assert store.transactions("personal")[0]["categoryId"] == "fun"
+    assert store.state("personal")["transactions"]["posted"]["merchantLogo"] == "updated-logo"
+    apply_import(
+        "item", sync_changes(modified=[imported_transaction("posted")]), "four", [imported_account()]
+    )
+    assert store.state("personal")["transactions"]["posted"]["merchantLogo"] is None
+
+
+@pytest.mark.parametrize("invalid_key", ["", "a" * 201, "../logo", "logo\n", True, {}])
+def test_invalid_merchant_logo_rolls_back_the_ledger_and_cursor(
+    store, apply_import, imported_account, imported_transaction, save_item, sync_changes, invalid_key
+):
+    save_item(store)
+    apply_import(
+        "item", sync_changes([imported_transaction("prior", merchantLogo="saved-logo")]),
+        "one", [imported_account()],
+    )
+    before = store.state("personal")
+    with pytest.raises(StoreError, match="Invalid normalized bank record"):
+        apply_import(
+            "item",
+            sync_changes([
+                imported_transaction("valid", merchantLogo="new-logo"),
+                imported_transaction("broken", merchantLogo=invalid_key),
+            ]),
+            "advance", [imported_account(99900)],
+        )
+    assert store.state("personal") == before
 
 
 def test_atomic_batch_and_cursor_rollback_on_invalid_bank_amount(

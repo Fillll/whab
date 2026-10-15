@@ -8,7 +8,7 @@ document.addEventListener('whab:notice', event => {
   notify(event.detail.message);
 });
 
-for (const image of document.querySelectorAll('[data-bank-logo]')) {
+for (const image of document.querySelectorAll('[data-bank-logo], [data-merchant-logo]')) {
   const update = () => {
     const loaded = image.naturalWidth > 0;
     image.hidden = !loaded;
