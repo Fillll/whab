@@ -42,6 +42,25 @@ Contributor folders use singular category names under `whab/plugins/`: `interfac
 
 This is a design proposal. The current app still owns its HTTP API, and SDK v1 does not yet support all of these capabilities. See the [target design](whab/docs/target-architecture.md) and [current implementation](whab/docs/architecture.md).
 
+### Alternative proposal: client and server
+
+Two WHAB instances could separate the interface from persistent storage. The **client** runs an interface and selects a remote storage plugin that forwards ledger reads and changes to the other instance's API. The **server** runs headlessly, with an **API interface plugin** as its only interface, and uses a storage plugin such as SQLite to keep the authoritative ledger.
+
+```mermaid
+flowchart LR
+    subgraph Client["WHAB instance · client"]
+        UI["Interface plugin<br/>Web · TUI · CLI"] --> ClientCore["Financial core"]
+        ClientCore --> Remote["Remote storage plugin"]
+    end
+    subgraph Server["WHAB instance · server · no visual UI"]
+        API["API interface plugin"] --> ServerCore["Authoritative financial core"]
+        ServerCore --> Store["Persistent storage plugin<br/>e.g. SQLite"]
+    end
+    Remote <-->|Authenticated HTTPS API| API
+```
+
+The server validates every change before saving it. Bank ingestion and credentials stay on the server; the client uses scoped ledger operations. This proposal requires a remote storage plugin, a defined remote API contract, authentication and authorization. Headless mode (`WHAB_UI=`) exists today with a host-owned API, but this client/server deployment is **not implemented**; the current app remains local only. See the [client/server design proposal](whab/docs/target-architecture.md#clientserver-deployment-proposal) for ownership and consistency requirements.
+
 ## Guides
 
 - [Application setup and configuration](whab/README.md)
