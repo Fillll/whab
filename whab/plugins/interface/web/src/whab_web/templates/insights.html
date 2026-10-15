@@ -4,7 +4,7 @@
     <h1>Spending insights</h1>
     <p>See where your money went and how it changes.</p>
   </div>
-  <input type="month"
+  <input type="text" pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM"
          aria-label="Insights month"
          data-navigation="month"
          value="{{ month }}">
@@ -28,19 +28,19 @@
 <section class="trend-section">
   <div class="section-title">
     <h2>Spending over time</h2>
-    <span class="chart-legend"><span></span>Monthly spending · USD</span>
+    <span class="chart-legend"><span></span>Monthly spending · {{ currency }}</span>
   </div>
   <svg class="spend-chart"
        viewBox="0 0 880 230"
        role="img"
        aria-label="Monthly spending over six months">
     <defs><linearGradient id="spend-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--brand-red)" stop-opacity=".13" /><stop offset="100%" stop-color="var(--brand-red)" stop-opacity="0" /></linearGradient></defs>
-    {% for fraction in [0,0.25,0.5,0.75,1] %}<line x1="64" x2="864" y1="{{ 192-fraction*170 }}" y2="{{ 192-fraction*170 }}" stroke="var(--line)" stroke-dasharray="4 5" /><text x="52" y="{{ 196-fraction*170 }}" text-anchor="end">{{ money(chart_max*fraction,0) }}</text>
+    {% for tick in chart_ticks %}<line x1="112" x2="864" y1="{{ tick.y }}" y2="{{ tick.y }}" stroke="var(--line)" stroke-dasharray="4 5" /><text x="100" y="{{ tick.y+4 }}" text-anchor="end">{{ money(tick.amount) }}</text>
     {% endfor %}
     {% if points %}
-      <path d="{{ chart_path }} L{{ points[-1].x }},192 L64,192 Z" fill="url(#spend-fill)" />
+      <path d="{{ chart_path }} L{{ points[-1].x }},192 L112,192 Z" fill="url(#spend-fill)" />
       <path d="{{ chart_path }}" fill="none" stroke="var(--brand-red)" stroke-width="2.5" stroke-linejoin="round" />
-      {% for point in points %}<circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" fill="var(--page)" stroke="var(--brand-red)" stroke-width="2"><title>{{ month_label(point.month) }}: {{ money(point.spent) }}</title></circle><text x="{{ point.x }}" y="219" text-anchor="middle">{{ month_label(point.month,true).split(' ')[0] }}</text>
+      {% for point in points %}<circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" fill="var(--page)" stroke="var(--brand-red)" stroke-width="2"><title>{{ month_label(point.month) }}: {{ money(point.spent) }}</title></circle><text x="{{ point.x }}" y="219" text-anchor="middle">{{ month_label(point.month,true) }}</text>
       {% endfor %}
     {% endif %}
   </svg>
@@ -54,7 +54,7 @@
     {% for row in spending %}
       <div class="spending-row">
         <div>
-          <span>{{ row.category.name }}</span><strong>{{ money(row.spent) }}</strong>
+          <span>{{ category_names[row.category.id] }}</span><strong>{{ money(row.spent) }}</strong>
         </div>
         <div class="spend-bar">
           <span style="width:{{ [100,row.spent/data.summary.spent*100 if data.summary.spent>0 else 0]|min }}%"></span>
@@ -103,7 +103,7 @@
       </section>
     {% endfor %}
     {% for plugin in plugins if plugin.has_export %}
-      <a class="text-link plugin-download" href="/api/plugins/{{ plugin.id }}/export?workspace={{ workspace }}&amp;month={{ month }}">Download {{ plugin.display_name }} CSV {{ icon('download', 15) }}</a>
+      <a class="text-link plugin-download" href="/api/plugins/{{ plugin.id }}/export?workspace={{ workspace }}&amp;month={{ month }}&amp;currency={{ currency }}">Download {{ plugin.display_name }} CSV {{ icon('download', 15) }}</a>
     {% endfor %}
   </section>
 {% endif %}

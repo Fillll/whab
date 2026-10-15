@@ -116,7 +116,7 @@
       <div class="inspector-head">
         <span class="inspector-icon">{{ icon(category_icon(selected.name),20) }}</span>
         <div>
-          <small>{{ selected.group }}</small>
+          <small>{{ category_parents[selected.id] }}</small>
           <h2>{{ selected.name }}</h2>
         </div>
       </div>
@@ -144,10 +144,10 @@
        name="month"
        value="{{ month }}">
         <label for="assigned-amount">Assigned this month</label>
-        <div class="money-input"><span>$</span><input id="assigned-amount"
+        <div class="money-input"><span>{{ currency }}</span><input id="assigned-amount"
        name="assigned"
-       data-cents
-       value="{{ '%.2f'|format(row.assigned/100) }}"
+       data-cents data-minor-units="{{ minor_units }}"
+       value="{{ money_input(row.assigned) }}"
        inputmode="decimal"
        autocomplete="off"
        required

@@ -2,7 +2,7 @@
 
 A local Python budgeting app with monthly envelopes and rollover, transaction review, spending analytics, manual accounts, CSV export, and optional Plaid Transactions and YNAB export imports. FastAPI serves Jinja pages with a small browser script; no Node.js build is required.
 
-See the [proposed architecture and Mermaid diagram](../README.md#architecture) and [current implementation](docs/architecture.md). Current version: **1.4.0** ([changelog](CHANGELOG.md)).
+See the [proposed architecture and Mermaid diagram](../README.md#architecture) and [current implementation](docs/architecture.md). Current version: **1.5.0** ([changelog](CHANGELOG.md)).
 
 ## Run locally
 
@@ -40,7 +40,8 @@ For a YNAB ZIP dump, enable **ynab** in the plugin manager, save, and restart. I
 ## Limits and data safety
 
 - **Local only:** WHAB binds to `127.0.0.1` and checks Host/origin, but has no family authentication or authorization. Shared deployment needs both.
-- **USD only:** money uses integer cents. Pre-budget history remains available for analytics; imported income is not added again to bank balance snapshots.
+- **Multiple currencies:** accounts and child categories declare an ISO currency; each currency has separate balances, activity, rollover and allocations. There is no automatic conversion. Money uses integer currency minor units. Plaid and the bundled YNAB importer currently accept USD only.
+- **Two category levels:** parent groups organize child categories. Only children receive transactions, targets and allocations. Core dates use `YYYY-MM-DD`; USD money uses `$1,234.56` (other currencies use their ISO code and fixed minor-unit precision). A selected interface plugin can override presentation.
 - **Initial budgeting model:** credit-card handling conservatively reserves debt. Payment categories, splits, manual/import reconciliation, editable transfer matching, merchant rules, recurring bills and goals editing are not implemented.
 - **Transactions only:** investment holdings are not imported. Bank history and refresh timing depend on the institution and Plaid.
 - **Private local files:** keep `.env`, `plugins.json`, `data/`, `work/` and `.venv/` out of Git. Databases contain private financial data. Back up the database and encryption key separately; replacing the key makes existing bank tokens unreadable.

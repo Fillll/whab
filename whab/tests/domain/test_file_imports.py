@@ -142,3 +142,43 @@ def test_budget_start_requires_a_supported_month(month):
 def test_warnings_are_bounded_text(warnings):
     with pytest.raises(StoreError):
         replace(sample_import(), warnings=warnings).validated_copy()
+
+
+def test_imported_group_labels_become_two_level_parents_without_changing_record_shape():
+    from whab.domain.categories import category_group_id, category_tree
+
+    data = sample_import().validated_copy()
+    assert set(data.categories[0]) == {"id", "name", "group", "target"}
+    group = category_tree(data.categories)[0]
+    assert group["id"] == category_group_id("Everyday")
+    assert group["children"][0]["id"] == "food"
+
+
+@pytest.mark.parametrize("changes", [
+    {"children": []}, {"parentId": "food"}, {"group": {"name": "Deeper"}},
+    {"group": "Everyday\x00"},
+])
+def test_imported_categories_cannot_contain_parent_or_deeper_records(changes):
+    data = sample_import()
+    data.categories[0].update(changes)
+    with pytest.raises(StoreError):
+        data.validated_copy()
+
+
+@pytest.mark.parametrize("field", ["transactions", "assignments"])
+def test_imports_cannot_assign_parent_groups(field):
+    from whab.domain.categories import category_group_id
+
+    data = sample_import()
+    getattr(data, field)[0]["categoryId"] = category_group_id("Everyday")
+    with pytest.raises(StoreError, match="category reference"):
+        data.validated_copy()
+
+
+def test_imported_parent_identifier_cannot_masquerade_as_an_assignable_child():
+    from whab.domain.categories import category_group_id
+
+    data = sample_import()
+    data.categories[0]["id"] = category_group_id("Everyday")
+    with pytest.raises(StoreError, match="child category identifier"):
+        data.validated_copy()

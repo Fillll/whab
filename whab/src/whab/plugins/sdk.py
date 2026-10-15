@@ -10,8 +10,10 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Protocol, TypeAlias
 
+from whab.domain.categories import category_group_id, validate_child_category
 from whab.domain.file_imports import WorkspaceImport
 from whab.domain.imports import ImportedAccount, SyncChanges
+from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
 
 API_VERSION = 1
@@ -27,7 +29,7 @@ def _text(value: object, label: str, *, limit: int = 2000, empty: bool = True) -
 
 def _integer(value: object, label: str) -> None:
     if type(value) is not int:
-        raise ValueError(f"{label} must be integer USD cents.")
+        raise ValueError(f"{label} must be integer currency minor units.")
 
 
 def _boolean(value: object, label: str) -> None:
@@ -72,6 +74,10 @@ class CategorySnapshot:
     activity_cents: int
     available_cents: int
 
+    @property
+    def parent_id(self) -> str:
+        return category_group_id(self.group)
+
     def __post_init__(self) -> None:
         _identifier(self.id, "Category ID")
         _text(self.name, "Category name")
@@ -79,6 +85,7 @@ class CategorySnapshot:
         _integer(self.assigned_cents, "Category assignment")
         _integer(self.activity_cents, "Category activity")
         _integer(self.available_cents, "Category availability")
+        validate_child_category({"id": self.id, "name": self.name, "group": self.group, "target": 0})
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,8 +146,7 @@ class BudgetSnapshot:
             raise ValueError("Snapshot month must be a valid YYYY-MM month.") from None
         if parsed.isoformat()[:7] != self.month:
             raise ValueError("Snapshot month must use YYYY-MM.")
-        if type(self.currency) is not str or self.currency != "USD":
-            raise ValueError("Plugin API v1 supports USD only.")
+        currency_code(self.currency)
         _records(self.accounts, AccountSnapshot, "Accounts")
         _records(self.categories, CategorySnapshot, "Categories")
         _records(self.transactions, TransactionSnapshot, "Transactions")
@@ -201,7 +207,7 @@ ExportHook: TypeAlias = Callable[[BudgetSnapshot], ExportTable]
 class StorageBackend(Protocol):
     """Synchronous application ledger contract, independent of any database driver.
 
-    Implementations preserve USD cents, isolation, annotations, and atomic imports.
+    Implementations preserve currency minor units, isolation, annotations, and atomic imports.
     Internal state, database connections, schema operations, and migrations are not
     host-facing methods. ``items`` is sanitized; ``get_item`` is server-private.
     """

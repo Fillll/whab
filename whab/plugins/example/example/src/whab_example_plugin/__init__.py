@@ -1,12 +1,6 @@
 """Example API v1 plugin: selected-month totals and a structured transaction export."""
 
-from whab.plugins import BudgetSnapshot, ExportTable, Insight, Plugin
-
-
-def _usd(cents: int) -> str:
-    sign = "-" if cents < 0 else ""
-    dollars, remainder = divmod(abs(cents), 100)
-    return f"{sign}${dollars:,}.{remainder:02d}"
+from whab.plugins import BudgetSnapshot, ExportTable, Insight, Plugin, format_money
 
 
 def insights(snapshot: BudgetSnapshot) -> tuple[Insight, ...]:
@@ -21,12 +15,12 @@ def insights(snapshot: BudgetSnapshot) -> tuple[Insight, ...]:
     return (
         Insight(
             "Net spending",
-            _usd(spending - refunds),
+            format_money(spending - refunds, snapshot.currency),
             f"{snapshot.month}: cleared purchases less categorized refunds; pending and transfers excluded.",
         ),
         Insight(
             "Income",
-            _usd(income),
+            format_money(income, snapshot.currency),
             "Uncategorized cleared inflows. This is transaction analytics, not extra assignable cash.",
         ),
     )
@@ -36,7 +30,9 @@ def export(snapshot: BudgetSnapshot) -> ExportTable:
     accounts = {row.id: row.name for row in snapshot.accounts}
     categories = {row.id: row.name for row in snapshot.categories}
     return ExportTable(
-        columns=("date", "payee", "account", "category", "amount_cents", "pending", "is_transfer"),
+        columns=(
+            "date", "payee", "account", "category", "amount_cents", "pending", "is_transfer", "currency",
+        ),
         rows=tuple(
             (
                 row.date,
@@ -46,6 +42,7 @@ def export(snapshot: BudgetSnapshot) -> ExportTable:
                 row.amount_cents,
                 row.pending,
                 row.is_transfer,
+                snapshot.currency,
             )
             for row in snapshot.transactions
         ),

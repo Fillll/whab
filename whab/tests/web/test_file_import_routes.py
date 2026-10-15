@@ -131,3 +131,22 @@ def test_raw_upload_retains_local_guards_and_bounds_streams(store, tmp_path):
         assert client.post(BASE + "preview", content=RAW, headers={**HEADERS, "content-length": str(11 * 1024 * 1024)}).status_code == 413
         chunks = (b"x" * 1024 * 1024 for _ in range(11))
         assert client.post(BASE + "preview", content=chunks, headers=HEADERS).status_code == 413
+
+
+
+def test_confirmed_currency_must_match_parser_before_preview_or_commit(store, tmp_path):
+    from dataclasses import replace
+
+    with client_for(store, tmp_path, lambda raw: replace(payload(), currency="EUR")) as client:
+        before = store.state("personal")
+        mismatch = client.post(BASE + "preview", content=RAW, headers=HEADERS)
+        assert mismatch.status_code == 400
+        assert store.state("personal") == before
+        headers = {**HEADERS, "x-import-currency": "EUR"}
+        preview = client.post(BASE + "preview", content=RAW, headers=headers)
+        assert preview.status_code == 200 and preview.json()["currency"] == "EUR"
+        committed = client.post(BASE + "commit", content=RAW, headers={
+            **headers, "x-import-fingerprint": preview.json()["fingerprint"],
+        })
+        assert committed.status_code == 200
+        assert {a["currency"] for a in store.accounts("personal")} == {"EUR"}

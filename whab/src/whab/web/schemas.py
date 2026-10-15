@@ -14,6 +14,8 @@ from pydantic import (
     field_validator,
 )
 
+from whab.domain.money import currency_code
+
 Workspace = Literal["demo", "personal"]
 Id = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 Label = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -74,8 +76,11 @@ class AssignmentBody(Body):
 class CategoryBody(Body):
     workspace: Workspace
     name: Label
-    group: Label
+    group: Label | None = None
+    parentId: Id | None = None
     target: PositiveCents
+    currency: str = "USD"
+    _currency = field_validator("currency")(currency_code)
 
 
 class AccountBody(Body):
@@ -83,7 +88,11 @@ class AccountBody(Body):
     name: Label
     type: Literal["depository", "credit"]
     balance: Cents
+    currency: str = "USD"
+    _currency = field_validator("currency")(currency_code)
 
 
 class PluginSelectionBody(Body):
-    plugins: Annotated[list[Annotated[str, StringConstraints(min_length=1, max_length=64)]], Field(max_length=100)]
+    plugins: Annotated[
+        list[Annotated[str, StringConstraints(min_length=1, max_length=64)]], Field(max_length=100)
+    ]

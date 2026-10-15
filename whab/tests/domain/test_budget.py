@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from whab.domain.budget import calculate_workspace, ensure_assignment_allowed
+from whab.domain.budget import calculate_workspace, ensure_assignment_allowed, select_currency
 from whab.domain.errors import StoreError
 
 
@@ -99,3 +99,144 @@ def test_future_assignments_are_reserved_but_deficit_reductions_are_allowed(stat
         ensure_assignment_allowed(state, "groceries", "2026-10", 85000, "2026-10")
     state["accounts"]["cash"]["balance"] = 0
     ensure_assignment_allowed(state, "groceries", "2026-10", 0, "2026-10")
+
+
+@pytest.fixture
+def multicurrency_state(state):
+    """Three currencies with different precision and independently funded envelopes."""
+    state["accounts"] = {}
+    state["categories"] = {}
+    state["budget"] = {"2026-08": {}, "2026-09": {}}
+    fixtures = (
+        ("USD", 100000, 20000, 20000, 10000, 7000, -500, 12000),
+        ("EUR", 50000, 7000, 8000, 6000, 2000, 2500, 9000),
+        ("JPY", 3000, 200, 400, 300, 100, 200, 1000),
+    )
+    for code, cash, debt, prior_budget, assigned, prior_spend, spent, income in fixtures:
+        account_id = f"cash-{code}"
+        category_id = f"groceries-{code}"
+        state["accounts"][account_id] = {
+            "id": account_id, "type": "depository", "balance": cash, "currency": code,
+        }
+        state["accounts"][f"card-{code}"] = {
+            "id": f"card-{code}", "type": "credit", "balance": debt, "currency": code,
+        }
+        state["categories"][category_id] = {
+            "id": category_id, "name": "Groceries", "group": "Everyday",
+            "target": assigned, "currency": code,
+        }
+        state["budget"]["2026-08"][category_id] = prior_budget
+        state["budget"]["2026-09"][category_id] = assigned
+        for label, date, amount, category in (
+            ("prior", "2026-08-10", prior_spend, category_id),
+            ("spend", "2026-09-10", spent, category_id),
+            ("income", "2026-09-15", -income, None),
+        ):
+            key = f"{label}-{code}"
+            row = transaction(key, date, amount)
+            row.update(accountId=account_id, categoryId=category)
+            state["transactions"][key] = row
+    return state
+
+
+def test_multiple_currencies_keep_cash_debt_income_and_rollover_separate(multicurrency_state):
+    before = deepcopy(multicurrency_state)
+    view = calculate_workspace(multicurrency_state, "2026-09")
+    assert view["currencies"] == ["EUR", "JPY", "USD"]
+    assert view["summariesByCurrency"] == {
+        "USD": {"income": 12000, "spent": -500, "assigned": 10000,
+                "available": 23500, "readyToAssign": 56500},
+        "EUR": {"income": 9000, "spent": 2500, "assigned": 6000,
+                "available": 9500, "readyToAssign": 33500},
+        "JPY": {"income": 1000, "spent": 200, "assigned": 300,
+                "available": 400, "readyToAssign": 2400},
+    }
+    assert view["summary"] == view["summariesByCurrency"]["USD"]
+    by_currency = {row["currency"]: row for row in view["budget"]}
+    assert {code: (row["carryover"], row["available"]) for code, row in by_currency.items()} == {
+        "USD": (13000, 23500), "EUR": (6000, 9500), "JPY": (300, 400),
+    }
+    for code, income, spent in (("USD", 12000, -500), ("EUR", 9000, 2500), ("JPY", 1000, 200)):
+        assert view["trendsByCurrency"][code][-1] == {
+            "month": "2026-09", "income": income, "spent": spent,
+        }
+    assert multicurrency_state == before
+
+
+def test_later_transactions_reconstruct_only_their_own_currency_cash(multicurrency_state):
+    view = calculate_workspace(multicurrency_state, "2026-08")
+    assert {code: row["readyToAssign"] for code, row in view["summariesByCurrency"].items()} == {
+        "USD": 54500, "EUR": 30500, "JPY": 1700,
+    }
+
+
+def test_unknown_credit_and_stale_cash_restrict_only_their_own_currency(multicurrency_state):
+    multicurrency_state["accounts"]["card-EUR"]["balanceUnknown"] = True
+    multicurrency_state["accounts"]["stale-USD"] = {
+        "id": "stale-USD", "type": "depository", "balance": 999999,
+        "stale": True, "currency": "USD",
+    }
+    view = calculate_workspace(multicurrency_state, "2026-09")
+    assert {code: row["readyToAssign"] for code, row in view["summariesByCurrency"].items()} == {
+        "USD": 56500, "EUR": 0, "JPY": 2400,
+    }
+
+
+def test_assignment_reserves_only_future_assignments_in_the_same_currency(multicurrency_state):
+    multicurrency_state["budget"]["2026-10"] = {
+        "groceries-USD": 30000, "groceries-EUR": 900000, "groceries-JPY": 500,
+    }
+    # USD has 56,500 unassigned and reserves 30,000 for October: an increase
+    # of 26,500 is funded, regardless of the separate EUR oversubscription.
+    ensure_assignment_allowed(multicurrency_state, "groceries-USD", "2026-09", 36500, "2026-09")
+    with pytest.raises(StoreError, match="exceeds available money"):
+        ensure_assignment_allowed(multicurrency_state, "groceries-USD", "2026-09", 36501, "2026-09")
+    ensure_assignment_allowed(multicurrency_state, "groceries-JPY", "2026-09", 2200, "2026-09")
+    with pytest.raises(StoreError, match="exceeds available money"):
+        ensure_assignment_allowed(multicurrency_state, "groceries-JPY", "2026-09", 2201, "2026-09")
+    # A reduction remains allowed when that same currency is overallocated.
+    ensure_assignment_allowed(multicurrency_state, "groceries-EUR", "2026-09", 0, "2026-09")
+
+
+def test_account_and_category_currency_mismatch_is_rejected(multicurrency_state):
+    multicurrency_state["transactions"]["spend-USD"]["categoryId"] = "groceries-EUR"
+    with pytest.raises(StoreError, match="currency must match"):
+        calculate_workspace(multicurrency_state, "2026-09")
+
+
+@pytest.mark.parametrize(("code", "places"), [("USD", 2), ("EUR", 2), ("JPY", 0)])
+def test_currency_selection_scopes_every_projection(multicurrency_state, code, places):
+    view = calculate_workspace(multicurrency_state, "2026-09")
+    before = deepcopy(view)
+    selected = select_currency(view, code)
+    assert selected["currency"] == code
+    assert selected["currencyMinorUnits"] == places
+    assert {row["id"] for row in selected["accounts"]} == {f"cash-{code}", f"card-{code}"}
+    assert {row["id"] for row in selected["categories"]} == {f"groceries-{code}"}
+    assert {row["id"] for row in selected["transactions"]} == {f"spend-{code}", f"income-{code}"}
+    assert {row["categoryId"] for row in selected["budget"]} == {f"groceries-{code}"}
+    assert [row["id"] for group in selected["categoryGroups"] for row in group["children"]] == [
+        f"groceries-{code}"
+    ]
+    assert selected["summary"] == view["summariesByCurrency"][code]
+    assert selected["trend"] == view["trendsByCurrency"][code]
+    assert view == before
+
+
+def test_currency_without_records_has_an_empty_projection(multicurrency_state):
+    view = select_currency(calculate_workspace(multicurrency_state, "2026-09"), "KWD")
+    assert view["currency"] == "KWD"
+    assert view["currencyMinorUnits"] == 3
+    assert "KWD" in view["currencies"]
+    assert all(view[key] == [] for key in ("accounts", "categories", "categoryGroups",
+                                         "transactions", "budget"))
+    assert set(view["summary"].values()) == {0}
+    assert view["trend"] == [
+        {"month": month, "income": 0, "spent": 0}
+        for month in ("2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09")
+    ]
+
+
+def test_select_currency_rejects_invalid_currency(multicurrency_state):
+    with pytest.raises(StoreError, match="ISO 4217"):
+        select_currency(calculate_workspace(multicurrency_state, "2026-09"), "ZZZ")

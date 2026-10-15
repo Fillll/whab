@@ -20,10 +20,12 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
     """)
     migrations = {
         "accounts": {
+            "currency": "TEXT NOT NULL DEFAULT 'USD'",
             "active": "INTEGER NOT NULL DEFAULT 1",
             "balance_unknown": "INTEGER NOT NULL DEFAULT 0",
         },
         "transactions": {"inferred_transfer": "INTEGER NOT NULL DEFAULT 0"},
+        "categories": {"currency": "TEXT NOT NULL DEFAULT 'USD'"},
         "meta": {"budget_start_month": "TEXT"},
         "items": {"provider": "TEXT NOT NULL DEFAULT 'plaid'"},
     }

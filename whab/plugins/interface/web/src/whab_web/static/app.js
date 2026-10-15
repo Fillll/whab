@@ -20,13 +20,16 @@ for (const image of document.querySelectorAll('[data-bank-logo]')) {
   if (image.complete) update();
 }
 
-function cents(value) {
-  const clean = value.trim().replace(/[$,]/g, '');
-  if (!/^\d+(\.\d{1,2})?$/.test(clean)) throw new Error('Enter a positive amount with up to two decimal places.');
+function minorAmount(value, digits) {
+  const clean = value.trim();
+  const decimal = digits ? `(\\.\\d{1,${digits}})?` : '';
+  if (!new RegExp(`^\\d+${decimal}$`).test(clean)) {
+    throw new Error(digits ? `Enter an amount with up to ${digits} decimal places.` : 'Enter a whole-number amount.');
+  }
   const [whole, fraction = ''] = clean.split('.');
-  const result = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
-  if (!Number.isSafeInteger(result) || result > 1_000_000_000_000) throw new Error('That amount is too large.');
-  return result;
+  const result = BigInt(whole) * 10n ** BigInt(digits) + BigInt(fraction.padEnd(digits, '0'));
+  if (result > 1_000_000_000_000n) throw new Error('That amount is too large.');
+  return Number(result);
 }
 
 for (const form of document.querySelectorAll('form[data-api]')) {
@@ -39,7 +42,7 @@ for (const form of document.querySelectorAll('form[data-api]')) {
       for (const field of form.elements) {
         if (!field.name || field.disabled) continue;
         body[field.name] = field.hasAttribute('data-boolean') ? field.checked :
-          field.hasAttribute('data-cents') ? cents(field.value) :
+          field.hasAttribute('data-cents') ? minorAmount(field.value, Number(form.elements.namedItem('currency')?.selectedOptions?.[0]?.dataset.minorUnits ?? field.dataset.minorUnits)) :
           field.hasAttribute('data-null') && !field.value ? null : field.value;
       }
       if (body._kind === 'income') body.amount = -body.amount;
@@ -47,7 +50,11 @@ for (const form of document.querySelectorAll('form[data-api]')) {
       form.dataset.busy = 'true';
       if (error) error.hidden = true;
       await api(form.dataset.api, body, form.dataset.method || 'POST');
-      location.reload();
+      if (body.currency) {
+        const url = new URL(location.href);
+        url.searchParams.set('currency', body.currency);
+        location.assign(url);
+      } else location.reload();
     } catch (failure) {
       if (error) {
         error.textContent = failure.message;
@@ -108,6 +115,10 @@ if (pluginSelection) {
 }
 
 for (const input of document.querySelectorAll('[data-navigation]')) input.addEventListener('change', () => {
+  if (!input.checkValidity()) {
+    input.reportValidity();
+    return;
+  }
   const url = new URL(location.href);
   url.hash = '';
   url.searchParams.set(input.dataset.navigation, input.value);
@@ -121,7 +132,7 @@ for (const button of document.querySelectorAll('[data-toggle-group]')) button.ad
   for (const row of document.querySelectorAll('[data-group]'))
     if (row.dataset.group === button.dataset.toggleGroup) row.hidden = expanded;
 });
-for (const time of document.querySelectorAll('[data-local-time]')) time.textContent = new Date(time.dateTime).toLocaleString();
+for (const time of document.querySelectorAll('[data-local-time]')) time.textContent = new Date(time.dateTime).toISOString().slice(0, 10);
 
 const search = document.getElementById('transaction-search');
 const accountFilter = document.getElementById('account-filter');

@@ -7,6 +7,7 @@ import whab_sqlite
 from whab_sqlite import Store
 from whab_sqlite.schema import initialize_schema
 
+from whab.domain.categories import category_group_id
 from whab.domain.errors import StoreError
 
 
@@ -116,7 +117,10 @@ def test_custom_category_is_persisted_and_negative_target_is_rejected(store):
         "personal", {"name": "  Child care  ", "group": "  Family  ", "target": 12345}
     )
     category = next(record for record in store.categories("personal") if record["id"] == category_id)
-    assert category == {"id": category_id, "name": "Child care", "group": "Family", "target": 12345}
+    assert category == {
+        "id": category_id, "name": "Child care", "group": "Family", "target": 12345,
+        "parentId": category_group_id("Family"), "currency": "USD",
+    }
     before = store.categories("personal")
     with pytest.raises(StoreError, match="Target cannot be negative"):
         store.add_category("personal", {"name": "Invalid", "group": "Family", "target": -1})

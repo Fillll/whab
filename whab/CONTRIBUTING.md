@@ -71,7 +71,7 @@ External extensions use the documented [`whab.plugins` API v1](docs/plugins.md).
 
 Preserve these invariants when changing the corresponding layer:
 
-- Use integer USD cents: positive transactions are outflows and negative transactions are inflows. Avoid floats for stored money.
+- Use integer currency minor units (USD cents): positive transactions are outflows and negative transactions are inflows. Keep totals and allocations separate by currency and reject account/category currency mismatches. Avoid floats for stored money. Parent category groups are organizational; transactions, targets and allocations refer only to children.
 - Keep demo/personal workspaces and Sandbox/production databases separate. Bank balance snapshots already include income; importing income must not add it again to assignable cash.
 - Preserve `budgetStartMonth`, category overrides, notes and review state. Pending-to-posted matches must retain annotations, and all synchronization changes and their cursor must commit together.
 - Preserve compatible SQLite ledgers in place and retain encrypted-token compatibility. New Plaid Link tokens use `whab-local-household`, and browser OAuth keys use `whab`; finish in-progress Link flows before upgrading. The package and launch command are only `whab`.

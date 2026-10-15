@@ -188,3 +188,61 @@ def test_csv_formula_safety_and_no_credentials(client):
     assert "'\t@SUM" in text
     assert "PLAID_SECRET" not in text
     assert "access_token" not in client.get("/api/status").text
+
+
+
+def test_multiple_currency_http_views_reject_mixing_and_identify_exports(client):
+    import csv
+    import io
+
+    ids = {}
+    for code, balance in (("USD", 50000), ("EUR", 30000)):
+        response = client.post("/api/accounts", json={
+            "workspace": "personal", "name": f"{code} cash", "type": "depository",
+            "balance": balance, "currency": code,
+        })
+        assert response.status_code == 200
+        ids[code] = response.json()["accountId"]
+    assert client.post("/api/categories", json={
+        "workspace": "personal", "name": "European food", "group": "Everyday",
+        "target": 1000, "currency": "EUR",
+    }).status_code == 200
+    all_data = client.get("/api/workspace?workspace=personal&month=2026-10").json()
+    food = next(c for c in all_data["categories"] if c["currency"] == "EUR")
+    tx = {"workspace": "personal", "accountId": ids["EUR"], "date": "2026-10-03",
+          "merchant": "Fixture market", "amount": 500, "categoryId": food["id"]}
+    assert client.post("/api/transactions", json=tx).status_code == 200
+    before = client.get("/api/workspace?workspace=personal&month=2026-10").json()
+    for category in ("groceries", food["parentId"]):
+        assert client.post("/api/transactions", json={**tx, "categoryId": category}).status_code == 400
+    assert client.get("/api/workspace?workspace=personal&month=2026-10").json() == before
+    eur = client.get("/api/workspace?workspace=personal&month=2026-10&currency=EUR").json()
+    assert eur["currency"] == "EUR" and eur["summary"]["spent"] == 500
+    assert {a["currency"] for a in eur["accounts"]} == {"EUR"}
+    assert len(eur["transactions"]) == 1 and eur["categoryGroups"][0]["children"] == [food]
+    assert before["summary"]["spent"] == 0
+    assert before["summariesByCurrency"]["EUR"]["readyToAssign"] == 29500
+    assert before["summariesByCurrency"]["USD"]["readyToAssign"] == 50000
+    rows = list(csv.DictReader(io.StringIO(client.get("/api/export?workspace=personal").text)))
+    assert rows[0]["currency"] == "EUR" and rows[0]["amount_cents"] == "500"
+    assert list(csv.DictReader(io.StringIO(client.get(
+        "/api/export?workspace=personal&currency=USD").text))) == []
+    for url in ("/api/workspace?workspace=personal&currency=XXX", "/api/export?workspace=personal&currency=XXX"):
+        assert client.get(url).status_code == 400
+
+
+def test_category_parent_and_fixed_date_http_contract(client):
+    data = client.get("/api/workspace?workspace=demo&month=2026-10").json()
+    parent = data["categories"][0]["parentId"]
+    body = {"workspace": "demo", "name": "New child", "parentId": parent, "target": 0}
+    assert client.post("/api/categories", json=body).status_code == 200
+    assert client.post("/api/categories", json={**body, "parentId": "groceries"}).status_code == 400
+    assert client.post("/api/categories", json={**body, "children": []}).status_code == 400
+    assert client.put(f"/api/budget/{parent}", json={
+        "workspace": "demo", "month": "2026-10", "assigned": 100,
+    }).status_code == 400
+    tx = {"workspace": "demo", "accountId": "checking", "date": "2026-10-03",
+          "merchant": "Fixture market", "amount": 500, "categoryId": "groceries"}
+    for date_value in ("10/03/2026", "20261003", "2026-10-3", "2026-02-30"):
+        assert client.post("/api/transactions", json={**tx, "date": date_value}).status_code == 400
+    assert client.post("/api/transactions", json=tx).status_code == 200

@@ -1,13 +1,16 @@
 """Explicit allowlist between the ledger's private state and the public plugin API."""
 
+from whab.domain.budget import select_currency
 from whab.plugins import AccountSnapshot, BudgetSnapshot, CategorySnapshot, TransactionSnapshot
 
 
 def build_snapshot(workspace, data):
+    data = select_currency(data, data.get("currency", "USD"))
     budget = {row["categoryId"]: row for row in data["budget"]}
     return BudgetSnapshot(
         workspace=workspace,
         month=data["month"],
+        currency=data.get("currency", "USD"),
         accounts=tuple(
             AccountSnapshot(
                 id=a["id"],
