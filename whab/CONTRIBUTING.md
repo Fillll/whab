@@ -82,9 +82,9 @@ Preserve these invariants when changing the corresponding layer:
 
 Use a feature branch and pull request for every change to `main`. Describe the concrete problem, resulting behavior and relevant validation. Include a fixture-based regression for a behavior fix and update the owning documentation when a contract or limitation changes. Do not commit `.env`, databases, private exports, generated build files or unrelated workspace changes; stage source paths explicitly.
 
-Every material change includes a SemVer bump in `src/whab/__init__.py` and a dated entry in `CHANGELOG.md` in the same PR. Use a patch for compatible fixes or maintenance, a minor for compatible features, and a major for breaking the documented compatibility contract. Runtime and dependency support changes require a release too. Small documentation-only changes may wait for the next release.
+Every material change includes a SemVer bump in `src/whab/__init__.py` and a dated entry in `CHANGELOG.md` in the same PR. Use a patch for compatible fixes or maintenance, a minor for compatible features, and a major for breaking the documented compatibility contract. Runtime and dependency support changes require a version bump too. Small documentation-only changes may wait for the next version bump.
 
-The package version, `python -m whab --version`, FastAPI metadata and About dialog derive from that one version source. Review the final diff and pass CI before squash merging. Then create an immutable `vX.Y.Z` tag and GitHub release on the merged commit. Do not reuse or move an existing release tag. The current branch-protection limitation and desired check names are recorded in [README.md](README.md) and [`.github/main-protection.json`](../.github/main-protection.json).
+The package version, `python -m whab --version`, FastAPI metadata and About dialog derive from that one version source. Review the final diff and pass CI before squash merging. Create an immutable `vX.Y.Z` tag and GitHub release on the merged commit only when the user explicitly requests a release; version bumps and merges do not require publishing one. Do not reuse or move an existing release tag. The current branch-protection limitation and desired check names are recorded in [README.md](README.md) and [`.github/main-protection.json`](../.github/main-protection.json).
 
 ## Reporting sensitive bugs
 
