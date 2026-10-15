@@ -22,19 +22,19 @@ Open [127.0.0.1:5173](http://127.0.0.1:5173) to explore fictional demo data, or 
 
 ```mermaid
 flowchart LR
-    Interfaces["Interfaces<br/>Web · API · TUI · CLI<br/>iOS client · Bank logos"] --- Core
-    Ingestion["Ingestion<br/>Plaid · Statements<br/>Manual entry · YNAB"] --- Core
-    Automation["Automation<br/>Smart categorization<br/>Rules · Random forest"] --- Core
+    Interfaces["Interface plugins<br/>Web · API · TUI · CLI<br/>Bank logos"] --- Core
+    Ingestion["Ingestion plugins<br/>Plaid · Statements<br/>Manual entry · YNAB"] --- Core
+    Automation["Automation plugins<br/>Smart categorization<br/>Rules · Random forest"] --- Core
 
-    Core["Core<br/>Accounts · Transactions<br/>Categories · Budget"] --- Storage["Storage · required<br/>One active backend per ledger"]
-    Core --- Insights["Insights<br/>Sankey diagrams · Reports"]
-    Core --- Extensions["Extensions<br/>Mortgages · Loans<br/>Investments · Stocks"]
+    Core["Core<br/>Accounts · Transactions<br/>Categories · Budget"] --- Storage["Storage plugins · required<br/>At least one active"]
+    Core --- Insights["Insights plugins<br/>Sankey diagrams · Reports"]
+    Core --- Extensions["Extension plugins<br/>Mortgages · Loans<br/>Investments · Stocks"]
 
     classDef domain fill:#fff6d6,stroke:#b83a36,stroke-width:2px
     class Core domain
 ```
 
-Connections show capability boundaries around the core, not code imports. Storage is a required capability with exactly one active backend per ledger; other families can have several plugins. Interactive use needs at least one usable interface. Bank logos enhance an interface; an iOS app is a separate client, usually using the API interface. One plugin may supply several capabilities.
+Each surrounding box is a plugin family; connections show capability boundaries around the core, not code imports. At least one storage plugin must be active, and multiple storage plugins may be selected. Interactive use needs at least one usable interface. Bank logos enhance an interface. One plugin may supply several capabilities.
 
 The core validates every ledger change and owns financial rules. Ingestion submits normalized inputs, Insights reads snapshots, Extensions adds specialized models, and Automation suggests or applies configured actions through core commands. Random forest is one replaceable categorization implementation.
 

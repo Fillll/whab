@@ -12,24 +12,22 @@ A small host sits outside the domain core. It loads plugins, resolves required c
 
 ## Capability families
 
-These are capabilities, not mutually exclusive package types. A plugin may provide several: Plaid can supply ingestion and connection controls; a mortgage extension can supply a model, reports and interface panels.
+These are plugin capability families, not mutually exclusive package types. A plugin may provide several: Plaid can supply ingestion and connection controls; a mortgage extension can supply a model, reports and interface panels.
 
 | Family | Examples | Selection rule |
 | --- | --- | --- |
-| Storage | SQLite or another backend | At least one implementation must be available; exactly one active backend owns a given ledger |
-| Interfaces | Web, API, TUI, CLI, iOS client integration; bank-logo enhancement | Multiple interfaces may coexist; interactive use requires at least one usable interface |
+| Storage | SQLite or another backend | At least one storage plugin must be active; multiple storage plugins may be selected |
+| Interfaces | Web, API, TUI, CLI; bank-logo enhancement | Multiple interfaces may coexist; interactive use requires at least one usable interface |
 | Ingestion | Plaid, bank statements, manual entry, YNAB import | Zero or more; at least one is needed to enter or import new financial records |
 | Insights | Sankey diagrams, reports, exports | Zero or more; read scoped snapshots |
 | Extensions | Mortgages, loans, investments, stocks | Zero or more; add specialized models and workflows |
 | Automation | Rules and smart categorization, including random forest | Zero or more; propose or apply configured actions through core commands |
 
-Requirements name capabilities rather than specific packages. Missing required capabilities or incompatible dependencies must fail at startup with an actionable error. Multiple installed storage implementations do not imply multiple writers to one ledger. A background-only profile may run without a user interface.
+Requirements name capabilities rather than specific packages. Missing required capabilities or incompatible dependencies must fail at startup with an actionable error. When multiple storage plugins are active, their data ownership, routing and consistency guarantees must be explicit in the storage contract. A background-only profile may run without a user interface.
 
 ## Interfaces
 
 Web, API, TUI and CLI are peers. HTTP transport belongs to the API interface rather than the financial core. A Web interface may call core services locally or depend on an API capability; it does not make the API mandatory for every other interface.
-
-An iOS app is normally a separately built and deployed client consuming the API interface. It belongs to the Interfaces family conceptually, but does not run as an imported Python plugin. Supporting native clients needs a versioned client contract in addition to host-side plugin contracts.
 
 Bank logos and similar presentation enhancements also belong under Interfaces. They augment another interface and do not satisfy the requirement for a usable interactive entry point by themselves. Optional interface contributions need fallbacks when an enhancement is disabled.
 
