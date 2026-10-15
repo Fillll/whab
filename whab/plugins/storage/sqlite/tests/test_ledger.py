@@ -27,6 +27,19 @@ def test_workspaces_isolated_and_invalid_foreign_references_rejected(store):
     assert store.transactions("personal") == []
 
 
+def test_manual_transactions_have_no_provider_artwork(store):
+    account = store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+    transaction = store.add_transaction(
+        "personal",
+        {
+            "accountId": account, "date": "2026-10-01", "merchant": "Market", "amount": 100,
+            "categoryId": None, "merchantLogo": "untrusted-input",
+        },
+    )
+    assert store.state("personal")["transactions"][transaction]["merchantLogo"] is None
+    assert all(row["merchantLogo"] is None for row in store.state("demo")["transactions"].values())
+
+
 def test_monthly_rollover_cents_refunds_and_credit_balances():
     store = Store(":memory:", month="2026-08")
     try:

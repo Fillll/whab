@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.7.0 — 2026-10-14
+
+- Show Plaid-supplied merchant logos beside transaction payees as part of the existing Plaid plugin. Import only the supplied artwork reference, with no merchant guessing, external lookup service or additional plugin selection. Keep names visible when artwork is absent or fails.
+- Add an optional API v1 merchant-artwork capability for bank providers, guarded local image serving and a bounded in-memory cache. Plaid downloads only PNGs from its public logo CDNs, without banking credentials, redirects or transaction data.
+- Preserve merchant artwork through atomic synchronization and pending-to-posted transitions with a compatible nullable SQLite column. Existing rows remain without artwork until a subsequent provider import or update supplies it.
+
 ## 1.6.0 — 2026-10-14
 
 - Add Settings → Plugins → Installed with an All categories view, category filtering, selection checkboxes and an Options page for every installed plugin. Keep required storage/interface selections locked and apply optional selection changes after restart.

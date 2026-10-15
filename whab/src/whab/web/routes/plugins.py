@@ -56,6 +56,17 @@ def create_router(store, plugins, plugin_manager=None):
             headers={"X-Content-Type-Options": "nosniff"},
         )
 
+    @router.get("/{plugin_id}/merchant-logos/{key}")
+    def merchant_logo(plugin_id: str, key: str):
+        image = plugins.merchant_logo_image(plugin_id, key)
+        if image is None:
+            raise HTTPException(404, "Merchant logo unavailable")
+        return Response(
+            image.data,
+            media_type=image.media_type,
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
+
     if plugin_manager is not None:
         @router.get("/management")
         def management():

@@ -5,6 +5,8 @@ from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChange
 from whab.domain.money import dollars_to_cents
 from whab.domain.validation import validate_date
 
+from .logos import logo_key
+
 
 def transfer_category(transaction: dict) -> bool:
     category = transaction.get("personal_finance_category") or {}
@@ -70,6 +72,7 @@ def normalize_transaction(imported: dict) -> ImportedTransaction:
         "merchant": (imported.get("merchant_name") or imported.get("name") or "Bank transaction")[
             :200
         ],
+        "merchantLogo": logo_key(imported.get("logo_url")),
         "amount": dollars_to_cents(imported["amount"]),
         "suggestedCategoryId": suggest_category(imported),
         "pending": bool(imported.get("pending")),

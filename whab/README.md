@@ -2,7 +2,7 @@
 
 A local Python budgeting app with monthly envelopes and rollover, transaction review, spending analytics, manual accounts, CSV export, and optional Plaid Transactions and YNAB export imports. FastAPI serves Jinja pages with a small browser script; no Node.js build is required.
 
-See the [proposed architecture and Mermaid diagram](../README.md#architecture) and [current implementation](docs/architecture.md). Current version: **1.5.0** ([changelog](CHANGELOG.md)).
+See the [proposed architecture and Mermaid diagram](../README.md#architecture) and [current implementation](docs/architecture.md). Current version: **1.7.0** ([changelog](CHANGELOG.md)).
 
 An additional [client/server proposal and diagram](../README.md#alternative-proposal-client-and-server) pairs a WHAB client running an interface and remote storage with a headless WHAB server providing an API interface plugin and persistent ledger. This deployment is not implemented.
 
@@ -36,6 +36,8 @@ The core owns budgeting rules, HTTP access checks and plugin contracts. Concrete
 Use **Settings → Plugins → Installed** to enable or disable installed optional plugins, save, and restart. Its saved selection takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/example/README.md) is separately installable. Choose **All categories** or a category to browse installed plugins, then open **Options** for plugin details and controls. Bank logos options include **Flush cache**; successful logos stay cached locally for 365 days across restarts and refresh on the next image request after expiry. Plugins run as trusted server code.
 
 For bank imports, follow the [Plaid Sandbox guide](docs/usage.md#connect-plaid-sandbox). Keep `WHAB_ENV=sandbox` and `ALLOW_LIVE_PLAID=false` for test data. Production access requires deliberate configuration and institution access; a successful Sandbox flow does not establish live access.
+
+Plaid merchant logos are included with the existing **Plaid** plugin. Transactions display the artwork supplied by Plaid when available; missing artwork leaves the payee text visible. Only public logo files are downloaded, through guarded local image routes with a bounded memory cache (24 hours for successes, five minutes for failures). No merchant lookup service, LLM key or separate merchant-logo plugin is needed. Existing imported transactions receive artwork only when Plaid supplies them again in an import or update; enabling this feature does not reconnect a bank or automatically backfill history. See the [Plaid plugin guide](plugins/ingestion/plaid/README.md).
 
 For a YNAB ZIP dump, enable **ynab** in the plugin manager, save, and restart. In an empty **My budget → Accounts**, choose the ZIP, confirm USD, preview the counts and limitations, then explicitly import. Use a fresh `WHAB_HOME` for migration when your current budget already has financial data. Preview never saves financial records. See the [YNAB plugin guide](plugins/ingestion/ynab/README.md) for supported formats and migration limits.
 

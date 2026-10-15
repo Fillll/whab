@@ -4,6 +4,7 @@ Amounts are integer currency minor units. Provider adapters supply category sugg
 while user annotations are merged only after the repository locks its ledger.
 """
 
+import re
 from typing import NotRequired, TypedDict
 
 from .errors import StoreError
@@ -30,6 +31,7 @@ class ImportedTransaction(TypedDict):
     accountId: str
     date: str
     merchant: str
+    merchantLogo: NotRequired[str | None]
     amount: int
     suggestedCategoryId: str | None
     pending: bool
@@ -68,6 +70,12 @@ def validate_imported_transaction(record: ImportedTransaction) -> None:
         bank_identifier(record["accountId"])
         validate_date(record["date"])
         _text(record["merchant"])
+        merchant_logo = record.get("merchantLogo")
+        if merchant_logo is not None and (
+            type(merchant_logo) is not str
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,199}", merchant_logo) is None
+        ):
+            raise StoreError("Invalid normalized bank record.")
         cents(record["amount"])
         _text(record["source"], limit=64)
         _boolean(record["pending"])
@@ -123,6 +131,7 @@ def annotated_transaction(record: ImportedTransaction, annotations: dict) -> dic
         "accountId": record["accountId"],
         "date": record["date"],
         "merchant": record["merchant"],
+        "merchantLogo": record.get("merchantLogo"),
         "amount": cents(record["amount"]),
         "categoryId": category,
         "pending": record["pending"],

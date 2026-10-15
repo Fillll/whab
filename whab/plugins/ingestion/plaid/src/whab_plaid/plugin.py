@@ -2,7 +2,9 @@
 
 from pathlib import Path
 
-from whab.plugins import BankUI, Plugin
+from whab.plugins import BankUI, MerchantLogos, Plugin
+
+from .logos import fetch
 
 
 def create_bank(context):
@@ -25,4 +27,5 @@ plugin = Plugin(
     display_name="Plaid",
     bank=create_bank,
     bank_ui=BankUI(templates=assets / "templates", static=assets / "static"),
+    merchant_logos=MerchantLogos(fetch=fetch),
 )

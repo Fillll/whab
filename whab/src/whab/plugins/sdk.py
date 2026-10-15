@@ -45,6 +45,13 @@ def valid_plugin_name(value: object) -> bool:
     return type(value) is str and len(value) <= 64 and _PLUGIN_NAME.fullmatch(value) is not None
 
 
+def valid_merchant_logo_key(value: object) -> bool:
+    return (
+        type(value) is str
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,199}", value) is not None
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class AccountSnapshot:
     id: str
@@ -468,6 +475,22 @@ class BankLogos:
 
 
 @dataclass(frozen=True, slots=True)
+class MerchantLogos:
+    """Fetch a bank provider's public artwork by an imported opaque key.
+
+    Keys contain 1–200 ASCII letters, digits, underscores or hyphens and begin
+    with a letter or digit. Hooks receive no transaction or banking context.
+    The provider must allowlist destinations; missing artwork returns None.
+    """
+
+    fetch: Callable[[str], LogoImage | None]
+
+    def __post_init__(self) -> None:
+        if not callable(self.fetch):
+            raise ValueError("Merchant logo fetching must be callable.")
+
+
+@dataclass(frozen=True, slots=True)
 class PluginAction:
     """An explicit local settings operation, executed only after a user request."""
 
@@ -552,6 +575,7 @@ class Plugin:
     bank_logos: BankLogos | None = None
     file_import: FileImport | None = None
     settings: PluginSettings | None = None
+    merchant_logos: MerchantLogos | None = None
 
     def __post_init__(self) -> None:
         if not valid_plugin_name(self.id):
@@ -587,6 +611,12 @@ class Plugin:
             if type(self.settings) is not PluginSettings:
                 raise ValueError("Plugin settings must be a PluginSettings descriptor or None.")
             PluginSettings(self.settings.read, self.settings.actions, self.settings.act)
+        if self.merchant_logos is not None:
+            if type(self.merchant_logos) is not MerchantLogos:
+                raise ValueError("Plugin merchant logos must be a MerchantLogos descriptor or None.")
+            MerchantLogos(self.merchant_logos.fetch)
+            if self.bank is None:
+                raise ValueError("Plugin merchant logos require a bank factory.")
         if (
             self.insights is None
             and self.export is None
@@ -615,6 +645,7 @@ class PluginDescription:
     has_bank_logos: bool = False
     has_file_import: bool = False
     has_settings: bool = False
+    has_merchant_logos: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -141,6 +141,7 @@ class Store:
                 "accountId": row["account_id"],
                 "date": row["date"],
                 "merchant": row["merchant"],
+                "merchantLogo": row["merchant_logo"],
                 "amount": row["amount"],
                 "categoryId": row["category_id"],
                 "pending": bool(row["pending"]),
@@ -202,7 +203,7 @@ class Store:
             ],
         )
         self.db.executemany(
-            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer",
+            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer,merchant_logo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer,merchant_logo=excluded.merchant_logo",
             [
                 (
                     t["id"],
@@ -220,6 +221,7 @@ class Store:
                     int(t.get("categoryEdited", False)),
                     int(t.get("deleted", False)),
                     int(t.get("inferredTransfer", False)),
+                    t.get("merchantLogo"),
                 )
                 for t in state["transactions"].values()
             ],
@@ -439,6 +441,7 @@ class Store:
                 "accountId": account["id"],
                 "date": transaction["date"],
                 "merchant": merchant,
+                "merchantLogo": None,
                 "amount": amount,
                 "categoryId": category,
                 "pending": False,

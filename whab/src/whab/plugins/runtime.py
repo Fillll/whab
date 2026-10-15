@@ -23,6 +23,7 @@ from .sdk import (
     PluginInsightResult,
     PluginSettings,
     TransactionSnapshot,
+    valid_merchant_logo_key,
     valid_plugin_name,
 )
 
@@ -84,6 +85,7 @@ class PluginRegistry:
                 has_bank_logos=plugin.bank_logos is not None,
                 has_file_import=plugin.file_import is not None,
                 has_settings=plugin.settings is not None,
+                has_merchant_logos=plugin.merchant_logos is not None,
                 kinds=tuple(
                     name
                     for name, enabled in (
@@ -91,7 +93,7 @@ class PluginRegistry:
                         ("storage", plugin.storage is not None),
                         ("data_ingestion", plugin.bank is not None or plugin.file_import is not None),
                         ("reporting", plugin.insights is not None or plugin.export is not None),
-                        ("branding", plugin.bank_logos is not None),
+                        ("branding", plugin.bank_logos is not None or plugin.merchant_logos is not None),
                     )
                     if enabled
                 ),
@@ -213,7 +215,19 @@ class PluginRegistry:
                 return _copy_record(result, LogoImage) if result is not None else None
             except Exception:
                 return None
-        cache_key = (plugin_id, key)
+        return self._cached_logo_image((plugin_id, "bank", key), plugin.bank_logos.fetch)
+
+    def merchant_logo_image(self, plugin_id: str, key: str) -> LogoImage | None:
+        """Fetch an enabled bank provider's artwork without passing ledger context."""
+        if not valid_plugin_name(plugin_id) or not valid_merchant_logo_key(key):
+            return None
+        plugin = next((p for p in self._plugins if p.id == plugin_id), None)
+        if plugin is None or plugin.merchant_logos is None:
+            return None
+        return self._cached_logo_image((plugin_id, "merchant", key), plugin.merchant_logos.fetch)
+
+    def _cached_logo_image(self, cache_key, fetch) -> LogoImage | None:
+        plugin_id = cache_key[0]
         with self._logo_lock:
             cached = self._logo_cache.get(cache_key)
             if cached is not None and cached[0] > monotonic():
@@ -229,7 +243,7 @@ class PluginRegistry:
                     return cached[1]
                 generation = self._logo_generations[plugin_id]
             try:
-                result = plugin.bank_logos.fetch(key)
+                result = fetch(cache_key[2])
                 image = _copy_record(result, LogoImage) if result is not None else None
             except Exception:
                 image = None

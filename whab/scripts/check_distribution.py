@@ -22,6 +22,7 @@ import whab
 from whab.app import create_app
 from whab.config import Settings
 from whab.plugins import load_plugins
+from whab_plaid.logos import logo_key
 from fastapi.testclient import TestClient
 
 target = Path(sys.argv[1]).resolve()
@@ -42,6 +43,8 @@ registry = load_plugins(settings.enabled_plugins())
 assert [p.id for p in registry.describe()] == ["plaid", "example", "bank-logos", "ynab", "sqlite", "web"]
 assert registry.bank_logo("Chase") == ("bank-logos", "chase")
 assert registry.bank_logo("Demo Bank") is None
+assert logo_key("https://plaid-merchant-logos.plaid.com/walmart_1100.png") == "merchant-walmart_1100"
+assert next(p for p in registry.describe() if p.id == "plaid").has_merchant_logos
 app = create_app(settings=settings, plugins=registry)
 assert app.version == whab.__version__
 with TestClient(app, base_url="http://127.0.0.1:5173") as client:
@@ -57,6 +60,7 @@ with TestClient(app, base_url="http://127.0.0.1:5173") as client:
     assert personal.status_code == 200 and 'data-file-import="ynab"' in personal.text
     assert any(p["id"] == "ynab" and p["has_file_import"] for p in client.get("/api/plugins").json()["plugins"])
     assert client.get("/api/plugins/bank-logos/bank-logos/unknown").status_code == 404
+    assert client.get("/api/plugins/plaid/merchant-logos/unknown").status_code == 404
     assert any(p["id"] == "bank-logos" and p["has_bank_logos"] for p in client.get("/api/plugins").json()["plugins"])
     management = client.get("/api/plugins/management").json()
     logos = next(row for row in management["plugins"] if row["id"] == "bank-logos")
