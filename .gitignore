@@ -9,6 +9,7 @@ work/
 *.log
 .DS_Store
 .venv/
+.venv
 __pycache__/
 .pytest_cache/
 .ruff_cache/
@@ -17,3 +18,7 @@ __pycache__/
 *.tsbuildinfo
 plugins.json
 .plugins-*.json
+.coverage*
+coverage.xml
+htmlcov/
+_tmp/

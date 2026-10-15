@@ -1,0 +1,67 @@
+[project]
+name = "whab"
+dynamic = ["version"]
+description = "We Have A Budget — a local Python and SQLite budgeting app"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+  "fastapi==0.143.0",
+  "uvicorn==0.54.0",
+  "jinja2==3.1.6",
+  "httpx==0.28.1",
+  "cryptography==50.0.2",
+  "python-dotenv==1.2.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "pytest-cov==7.1.0", "coverage==7.16.2", "ruff==0.17.0"]
+
+[project.urls]
+Repository = "https://github.com/Fillll/whab"
+Issues = "https://github.com/Fillll/whab/issues"
+
+[project.entry-points."whab.plugins"]
+bank-logos = "whab_bank_logos.plugin:plugin"
+plaid = "whab_plaid.plugin:plugin"
+sqlite = "whab_sqlite.plugin:plugin"
+web = "whab_web.plugin:plugin"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src", "plugins/web/src", "plugins/sqlite/src", "plugins/plaid/src", "plugins/bank-logos/src"]
+include = ["whab*"]
+
+[tool.setuptools.package-data]
+"whab_web" = ["templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]
+"whab_plaid" = ["templates/*.html", "static/*.js"]
+
+[tool.setuptools.dynamic]
+version = {attr = "whab.__version__"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "plugins"]
+addopts = "-q"
+
+[tool.coverage.run]
+branch = true
+patch = ["subprocess"]
+
+[tool.coverage.report]
+fail_under = 100
+precision = 2
+show_missing = true
+# Static typing imports have no runtime behavior. Do not exclude runtime code
+# or honor pragma-based coverage exemptions in contributor plugins.
+exclude_lines = ['^\s*if (typing\.)?TYPE_CHECKING:']
+partial_branches = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
