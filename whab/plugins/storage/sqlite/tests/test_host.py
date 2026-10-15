@@ -31,7 +31,10 @@ def test_default_storage_selection_reopens_existing_database(tmp_path):
         )
         assert response.status_code == 200
         account_id = response.json()["accountId"]
-    assert (tmp_path / "data" / "ihab-sandbox.sqlite").is_file()
+    canonical_path = tmp_path / "data" / "whab-sandbox.sqlite"
+    assert canonical_path.is_file()
+    previous_path = tmp_path / "data" / "previous-sandbox.sqlite"
+    canonical_path.rename(previous_path)
     reopened_app = create_app(settings=settings(tmp_path))
     with TestClient(reopened_app, base_url="http://127.0.0.1:5173") as client:
         saved = client.get("/api/workspace?workspace=personal").json()["accounts"]
@@ -42,6 +45,7 @@ def test_default_storage_selection_reopens_existing_database(tmp_path):
             9000,
         )
     assert not (tmp_path / "data" / "whab-sandbox.sqlite").exists()
+    assert previous_path.is_file()
 
 
 def test_explicit_sqlite_registry_constructs_backend_through_storage_factory(tmp_path):
@@ -49,4 +53,4 @@ def test_explicit_sqlite_registry_constructs_backend_through_storage_factory(tmp
     with TestClient(app, base_url="http://127.0.0.1:5173") as client:
         assert client.get("/api/workspace?workspace=demo").status_code == 200
         assert app.state.storage_plugin == "sqlite"
-    assert (tmp_path / "data" / "ihab-sandbox.sqlite").is_file()
+    assert (tmp_path / "data" / "whab-sandbox.sqlite").is_file()

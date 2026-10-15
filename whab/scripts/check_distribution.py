@@ -58,7 +58,7 @@ with TestClient(app, base_url="http://127.0.0.1:5173") as client:
     export = client.get("/api/plugins/example/export?workspace=demo")
     assert export.status_code == 200
     assert "text/csv" in export.headers["content-type"]
-assert (settings.home / "data" / "ihab-sandbox.sqlite").is_file()
+assert (settings.home / "data" / "whab-sandbox.sqlite").is_file()
 print("Installed wheels: MIT licenses, pages, assets, version, runtime home and plugin entry point passed.")
 """
 

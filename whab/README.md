@@ -17,7 +17,7 @@ python3.14 -m venv .venv
 
 Open [127.0.0.1:5173](http://127.0.0.1:5173). Explore fictional data in the demo workspace, or switch to **My budget** and add a manual account. No Plaid credentials are needed for manual budgeting. Use `--reload` while developing or `--port 5174` for another local port.
 
-Setup creates a private `.env` and token encryption key if missing. Runtime files live in the launch directory, or the absolute directory set by `WHAB_HOME`. Keep the existing runtime home, data and encryption key together when upgrading, and restart after configuration changes. See [runtime setup](docs/usage.md#runtime-setup) for upgrades and existing IHAB data.
+Setup creates a private `.env` and token encryption key if missing. Runtime files live in the launch directory, or the absolute directory set by `WHAB_HOME`. Keep the existing runtime home, data and encryption key together when upgrading, and restart after configuration changes. See [runtime setup](docs/usage.md#runtime-setup) for upgrades and saved-data compatibility.
 
 ## Configuration and plugins
 

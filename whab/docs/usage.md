@@ -31,9 +31,9 @@ Open http://127.0.0.1:5173. The demo workspace contains fictional data. Switch t
 
 The setup script creates a private `.env` in the application directory (`whab/`) and a random 32-byte token encryption key when the file is missing. It preserves existing credentials and encryption keys, and migrates the earlier local API port to 5173. After changing `.env`, restart the server. Launch from `whab/` to reuse its `.env` and `data/`. To reuse runtime files kept elsewhere, including an older checkout root, set `WHAB_HOME` to the absolute directory containing those files before launching; the default is the working directory. Keep an existing runtime home and encryption key together when upgrading. Code and installed assets never determine the data location. `WHAB_ENV` selects `sandbox` or `production`; existing `PLAID_ENV` remains the fallback for upgrades. Use `.venv/bin/python -m whab --reload` while developing, or `--port 5174` to choose another local port.
 
-The default storage plugin is `WHAB_STORAGE=sqlite`. SQLite is embedded: there is no database server to install, and its plugin opens or creates the database under the runtime home. Existing IHAB SQLite data and encrypted Plaid tokens are supported; keep the same home and encryption key when upgrading. Exactly one storage backend is required, including when optional bank/report plugins are disabled. Selecting another installed storage plugin does not copy or migrate existing SQLite data automatically; configure the chosen backend's data location deliberately.
+The default storage plugin is `WHAB_STORAGE=sqlite`. SQLite is embedded: there is no database server to install, and its plugin opens or creates the database under the runtime home. A single existing `data/*-{environment}.sqlite` file is reopened in place; a noncanonical filename requires base-schema validation. With no matching file, the plugin creates `data/whab-{environment}.sqlite`. Multiple matches fail safely, even if one has the canonical filename. Saved budgets and encrypted Plaid tokens remain supported; keep the same home and encryption key when upgrading. Exactly one storage backend is required, including when optional bank/report plugins are disabled. Selecting another installed storage plugin does not copy or migrate existing SQLite data automatically; configure the chosen backend's data location deliberately.
 
-WHAB was formerly IHAB. The GitHub repository is now [Fillll/whab](https://github.com/Fillll/whab), and the Python package and launch command are only `whab`. Update existing launch commands to `python -m whab`. Database filenames, the opaque Plaid household identity, and browser OAuth storage keys retain their legacy names to preserve existing data and connections. The local checkout path can remain unchanged.
+The GitHub repository is [Fillll/whab](https://github.com/Fillll/whab), and the Python package and launch command are only `whab`. Use `python -m whab` in launch commands. Browser OAuth session keys use `whab`, so finish any in-progress Plaid Link flow before upgrading. New Link tokens use `whab-local-household`; saved connected Items and their encrypted tokens remain unchanged. The local checkout path can remain unchanged.
 
 ## Settings and plugin manager
 
@@ -106,9 +106,11 @@ The Python server binds to `127.0.0.1`. API access checks the Host and browser o
 
 Default SQLite files:
 
-- `data/ihab-sandbox.sqlite` — demo and Sandbox personal data
-- `data/ihab-production.sqlite` — demo and production personal data
+- `data/whab-sandbox.sqlite` — demo and Sandbox personal data
+- `data/whab-production.sqlite` — demo and production personal data
 - `.env` — private local credentials and encryption key
+
+An existing compatible ledger may retain its earlier filename; back up the file WHAB reopens in the same runtime home's `data/` directory.
 
 ## Official references
 

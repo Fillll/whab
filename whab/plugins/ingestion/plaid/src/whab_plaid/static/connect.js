@@ -1,4 +1,4 @@
-/* Plaid Link controls. Legacy OAuth storage keys deliberately remain stable. */
+/* WHAB Plaid Link controls. */
 // A provider must not depend on the selected visual plugin's JavaScript modules.
 async function api(path, body, method = 'POST') {
   const response = await fetch(`/api${path}`, {
@@ -47,8 +47,8 @@ async function connect(itemId, resumeToken) {
     button.disabled = true;
   });
   const clearSession = () => {
-    sessionStorage.removeItem('ihab-link-token');
-    sessionStorage.removeItem('ihab-link-item');
+    sessionStorage.removeItem('whab-link-token');
+    sessionStorage.removeItem('whab-link-item');
   };
   const unlock = () => {
     linking = false;
@@ -60,9 +60,9 @@ async function connect(itemId, resumeToken) {
     const token = resumeToken || (await api('/plaid/link-token', itemId ? {
       itemId
     } : {})).link_token;
-    sessionStorage.setItem('ihab-link-token', token);
-    if (itemId) sessionStorage.setItem('ihab-link-item', itemId);
-    else sessionStorage.removeItem('ihab-link-item');
+    sessionStorage.setItem('whab-link-token', token);
+    if (itemId) sessionStorage.setItem('whab-link-item', itemId);
+    else sessionStorage.removeItem('whab-link-item');
     await loadPlaid();
     const handler = window.Plaid.create({
       token,
@@ -90,7 +90,7 @@ async function connect(itemId, resumeToken) {
           location.assign('/?page=accounts&workspace=personal');
         } catch (failure) {
           clearSession();
-          sessionStorage.setItem('ihab-notice', failure.message);
+          sessionStorage.setItem('whab-notice', failure.message);
           location.assign('/?page=accounts&workspace=personal');
         } finally {
           setTimeout(() => handler.destroy(), 0);
@@ -140,13 +140,13 @@ document.getElementById('plaid-confirm-disconnect')?.addEventListener('click', a
 
 
 if (location.search.includes('oauth_state_id')) {
-  const token = sessionStorage.getItem('ihab-link-token');
-  if (token) connect(sessionStorage.getItem('ihab-link-item') || undefined, token);
+  const token = sessionStorage.getItem('whab-link-token');
+  if (token) connect(sessionStorage.getItem('whab-link-item') || undefined, token);
   else notify('The bank connection session expired. Open Accounts and connect again.');
 }
 
-const previousNotice = sessionStorage.getItem('ihab-notice');
+const previousNotice = sessionStorage.getItem('whab-notice');
 if (previousNotice) {
-  sessionStorage.removeItem('ihab-notice');
+  sessionStorage.removeItem('whab-notice');
   notify(previousNotice);
 }

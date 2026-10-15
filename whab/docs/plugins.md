@@ -184,7 +184,7 @@ Public account/category/transaction/workspace results must preserve documented H
 
 Implementations must preserve integer USD cents, workspace/environment isolation, conservative budgets, budget start, valid category references and annotation-preserving pending matches. Imports, account snapshots and cursors commit atomically, with expected-cursor checks and the latest annotations read inside the mutation. Validation/commit failures must leave every ledger field and cursor unchanged; reads must be coherent. Test these guarantees with fictional fixtures.
 
-The host closes owned backends after bank cleanup on shutdown/startup failure; tests own injected backends. SQLite owns `home/data/ihab-{environment}.sqlite`, additive migrations and seeds. Other backends own settings/schema and compatible reopen behavior. Changing `WHAB_STORAGE` does not copy an existing ledger or migrate credentials/history. Configure existing or new data deliberately; cross-backend migration is outside API v1.
+The host closes owned backends after bank cleanup on shutdown/startup failure; tests own injected backends. SQLite owns ledger selection, additive migrations and seeds. It reopens a single `home/data/*-{environment}.sqlite` file in place, validating the base schema for a noncanonical filename. With no matching file, it creates `home/data/whab-{environment}.sqlite`; multiple matches fail safely, even if one has the canonical filename. Other backends own settings/schema and compatible reopen behavior. Changing `WHAB_STORAGE` does not copy an existing ledger or migrate credentials/history. Configure existing or new data deliberately; cross-backend migration is outside API v1.
 
 ## User interfaces
 
