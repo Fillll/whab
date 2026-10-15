@@ -89,3 +89,7 @@ The package version, `python -m whab --version`, FastAPI metadata and About dial
 ## Reporting sensitive bugs
 
 Keep reports reproducible with synthetic records, redacted responses and public error messages. Do not put financial records, institution account identifiers, Plaid credentials, access tokens, encryption keys or private `.env` contents in an issue, PR, screenshot or log attachment. Report a suspected credential exposure privately to the repository maintainer rather than publishing the sensitive material.
+
+## License
+
+Contributions to WHAB's own code, documentation and assets are accepted under the [MIT License](LICENSE). Preserve applicable third-party notices. Independently written plugins may use their authors' chosen licenses.

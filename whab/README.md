@@ -2,7 +2,11 @@
 
 A local budgeting app built with **Python, FastAPI and Jinja**, with bundled SQLite storage and Plaid bank plugins. It has monthly category allocations and rollover, transaction categorization and review, spending analytics, manual accounts, CSV export, and a server-side Plaid Transactions connection. Pages and budgeting logic run in Python; a small browser script handles forms and Plaid Link. No Node.js build is required.
 
-Current version: **1.3.1**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
+Current version: **1.3.2**. See [CHANGELOG.md](CHANGELOG.md) for release notes. The limitations below still apply.
+
+## License
+
+WHAB's own code, public plugin SDK, bundled plugins, example plugin, documentation and assets are licensed under the [MIT License](LICENSE). Commercial use, proprietary plugins and commercial forks are permitted; retain the required copyright and permission notices. Third-party dependencies, services and institution logos retain their own licenses or terms.
 
 ## Versioning and contributions
 
@@ -89,7 +93,7 @@ WHAB_PLUGINS=plaid,example .venv/bin/python -m whab
 
 If you already have a saved selection, enable **example** in **Settings → Plugin manager**, save, and restart. Open **Insights** to see the extra report and its CSV download. Disable the example in the same manager, save, and restart; `WHAB_PLUGINS=plaid` is an alternative only when no saved selection exists. Plugins run as trusted Python code in the server process; this is an extension contract, not a sandbox. Reporting hooks receive no settings, tokens, or database handles. Bank factories receive a separate privileged context with provider-scoped configuration, an encryption key, and a scoped atomic import interface. Storage factories receive the runtime home, environment and backend configuration, and own ledger persistence and migrations for their backend. The host renders escaped text, guards endpoints, and contains ordinary reporting-hook failures.
 
-Plaid owns its Link UI, encryption, remote requests, synchronization, and signed webhooks. The generic bank facade owns provider-scoped identities; the selected storage backend implements ledger validation and atomic cursor updates using core domain rules. SQLite and the visual Web interface are registered through the same plugin mechanism. Core app/web code imports their protocols rather than concrete implementations. The Web plugin owns presentation logic, templates, styles and browser controls; the host owns HTTP transport and access checks. Disabling Plaid preserves imported history. Arbitrary report/bank ledger-write hooks, one-time migration hooks and custom routes are not public extension points; storage implementations own their own compatible schema migrations. The repository remains private and no open-source license is granted by this structural change.
+Plaid owns its Link UI, encryption, remote requests, synchronization, and signed webhooks. The generic bank facade owns provider-scoped identities; the selected storage backend implements ledger validation and atomic cursor updates using core domain rules. SQLite and the visual Web interface are registered through the same plugin mechanism. Core app/web code imports their protocols rather than concrete implementations. The Web plugin owns presentation logic, templates, styles and browser controls; the host owns HTTP transport and access checks. Disabling Plaid preserves imported history. Arbitrary report/bank ledger-write hooks, one-time migration hooks and custom routes are not public extension points; storage implementations own their own compatible schema migrations.
 
 ## Settings and plugin manager
 

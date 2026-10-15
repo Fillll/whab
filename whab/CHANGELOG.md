@@ -4,6 +4,11 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.3.2 — 2026-10-14
+
+- License WHAB's own code, SDK, bundled plugins, documentation and assets under MIT, permitting commercial forks and proprietary extensions.
+- Include MIT license metadata and license files in the application and independently packaged example plugin; bump the example to 1.0.2 and verify both installed distributions carry the license.
+
 ## 1.3.1 — 2026-10-14
 
 - Group each bundled plugin's implementation, assets, documentation and tests in its own `plugins/<id>/` contributor folder. Keep the public `whab.plugins` SDK and host contracts in core.
