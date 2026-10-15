@@ -136,7 +136,7 @@ def test_new_link_includes_valid_urls_without_reusing_an_access_token(
             assert await PlaidService(store, env, client).link_token() == "fixture-link"
         assert requests == [
             {
-                "user": {"client_user_id": "ihab-local-household"},
+                "user": {"client_user_id": "whab-local-household"},
                 "client_name": "WHAB",
                 "country_codes": ["US"],
                 "language": "en",

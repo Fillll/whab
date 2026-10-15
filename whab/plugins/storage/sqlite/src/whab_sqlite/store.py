@@ -33,7 +33,7 @@ __all__ = ["Store"]
 
 class Store:
     def __init__(
-        self, database_path: str | Path = "data/ihab-sandbox.sqlite", *, month: str | None = None
+        self, database_path: str | Path = "data/whab-sandbox.sqlite", *, month: str | None = None
     ):
         self._lock = RLock()
         self.database_path = str(database_path)

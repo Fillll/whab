@@ -9,8 +9,9 @@ from whab.config import Settings
 from whab.plugins import StorageContext
 
 
-def test_node_schema_and_encrypted_fixture_remain_usable(tmp_path, legacy_token):
-    path = tmp_path / "legacy.sqlite"
+def test_node_schema_and_encrypted_fixture_remain_usable(monkeypatch, tmp_path, legacy_token):
+    path = tmp_path / "data" / "previous-sandbox.sqlite"
+    path.parent.mkdir()
     # Synthetic legacy Node schema intentionally lacks all additive Python flags.
     original = sqlite3.connect(path)
     original.executescript("""
@@ -32,7 +33,8 @@ def test_node_schema_and_encrypted_fixture_remain_usable(tmp_path, legacy_token)
     )
     original.commit()
     original.close()
-    reopened = Store(path, month="2026-11")
+    monkeypatch.setattr("whab_sqlite.store.current_month", lambda: "2026-11")
+    reopened = plugin.storage(StorageContext(tmp_path, "sandbox", {}))
     try:
         assert reopened.get_item("fixture-item")["cursor"] == "legacy-cursor"
         assert reopened.get_item("fixture-item")["token"] == legacy_token
@@ -71,7 +73,7 @@ def test_node_schema_and_encrypted_fixture_remain_usable(tmp_path, legacy_token)
 
 
 def test_rebrand_opens_existing_budget(monkeypatch, tmp_path):
-    legacy_path = tmp_path / "data" / "ihab-sandbox.sqlite"
+    legacy_path = tmp_path / "data" / "previous-sandbox.sqlite"
     existing = Store(legacy_path, month="2026-10")
     existing.add_account(
         "personal", {"name": "Saved checking", "type": "depository", "balance": 12345}
