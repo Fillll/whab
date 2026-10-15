@@ -9,3 +9,7 @@ cd whab
 ```
 
 Each concrete plugin owns its implementation, assets, documentation and tests under `whab/plugins/<id>/`.
+
+## License
+
+WHAB is licensed under the [MIT License](LICENSE). See the [application license notes](whab/README.md#license) for scope and third-party terms.

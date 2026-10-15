@@ -27,6 +27,13 @@ from fastapi.testclient import TestClient
 target = Path(sys.argv[1]).resolve()
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__
+for name in ("whab", "whab-example-plugin"):
+    distribution = metadata.distribution(name)
+    assert distribution.metadata["License-Expression"] == "MIT", name
+    assert distribution.metadata.get_all("License-File") == ["LICENSE"], name
+    license_text = distribution.read_text("licenses/LICENSE")
+    assert license_text and license_text.startswith("MIT License"), name
+    assert "Permission is hereby granted, free of charge" in license_text, name
 settings = Settings.load()
 assert settings.home == Path.cwd()
 assert settings.storage == "sqlite" and settings.ui == "web"
@@ -52,7 +59,7 @@ with TestClient(app, base_url="http://127.0.0.1:5173") as client:
     assert export.status_code == 200
     assert "text/csv" in export.headers["content-type"]
 assert (settings.home / "data" / "ihab-sandbox.sqlite").is_file()
-print("Installed wheels: pages, assets, version, runtime home and plugin entry point passed.")
+print("Installed wheels: MIT licenses, pages, assets, version, runtime home and plugin entry point passed.")
 """
 
 
@@ -87,7 +94,7 @@ def main():
                 "__pycache__", "*.egg-info", "*.pyc", "tests", "build", "dist", ".pytest_cache", ".ruff_cache"
             ),
         )
-        for name in ("pyproject.toml", "README.md"):
+        for name in ("pyproject.toml", "README.md", "LICENSE"):
             shutil.copy2(ROOT / name, source / name)
         example = base / "example"
         shutil.copytree(ROOT / "plugins/example", example, ignore=ignore)
