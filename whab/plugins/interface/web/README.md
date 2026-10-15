@@ -4,4 +4,4 @@
 
 Templates and static files must ship in the wheel. Use demo data for browser checks and preserve escaping and visual fallbacks.
 
-From the application directory, run `.venv/bin/python -m pytest plugins/web/tests`. See [plugin contribution rules](../README.md) for all checks and packaging.
+From the application directory, run `.venv/bin/python -m pytest plugins/interface/web/tests`. See [plugin contribution rules](../../README.md) for all checks and packaging.

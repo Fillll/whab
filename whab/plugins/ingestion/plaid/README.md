@@ -4,4 +4,4 @@
 
 Tests use fictional credentials, in-memory storage, temporary homes and HTTP mock transports. Preserve encrypted-token compatibility, pending-to-posted annotations and atomic imports/cursors.
 
-From the application directory, run `.venv/bin/python -m pytest plugins/plaid/tests`. See [plugin contribution rules](../README.md) for all checks and packaging.
+From the application directory, run `.venv/bin/python -m pytest plugins/ingestion/plaid/tests`. See [plugin contribution rules](../../README.md) for all checks and packaging.

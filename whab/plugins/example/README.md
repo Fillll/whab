@@ -1,12 +1,5 @@
-# Example report and export plugin
+# Example plugins
 
-This folder is an independently distributed plugin, with its own `pyproject.toml`, source and tests. `src/whab_example_plugin/` uses the public SDK to produce Insights and CSV exports from immutable snapshots.
+This category owns teaching and reference plugins. The independently installable [example reporting/export plugin](example/README.md) lives in `example/` and keeps the plugin ID `example`.
 
-From the application directory:
-
-```sh
-.venv/bin/python -m pip install -e plugins/example
-.venv/bin/python -m pytest plugins/example/tests
-```
-
-Enable `example` in the plugin manager and restart WHAB to use it. See [plugin contribution rules](../README.md) and [the API guide](../../docs/plugins.md).
+Examples follow the same implementation, asset, test and documentation ownership rules as other plugins. See [plugin contribution rules](../README.md) for naming, SDK contracts and checks.

@@ -42,22 +42,22 @@ Tests are grouped by the contract they verify:
 | Location | Responsibility |
 | --- | --- |
 | `tests/domain/` | Money validation and budgeting rules without database or HTTP dependencies |
-| `plugins/sqlite/tests/` | SQLite ledger, rollback, migrations and saved-data compatibility |
-| `plugins/plaid/tests/` | Mocked Plaid pagination, update mode, token encryption, signed webhooks and connection UI |
-| `plugins/web/tests/` | Bundled Web rendering, escaping and visual fallbacks |
-| `plugins/bank-logos/tests/` | Curated institution lookup and bounded mocked icon requests |
-| `plugins/example/tests/` | Example reporting/export implementation |
+| `plugins/storage/sqlite/tests/` | SQLite ledger, rollback, migrations and saved-data compatibility |
+| `plugins/ingestion/plaid/tests/` | Mocked Plaid pagination, update mode, token encryption, signed webhooks and connection UI |
+| `plugins/interface/web/tests/` | Bundled Web rendering, escaping and visual fallbacks |
+| `plugins/interface/bank-logos/tests/` | Curated institution lookup and bounded mocked icon requests |
+| `plugins/example/example/tests/` | Example reporting/export implementation |
 | `tests/storage/` | Shared provider-scoping and bank-facade contracts |
 | `tests/web/` | Host HTTP validation, local access checks, CSV, selection and plugin routes |
 | `tests/plugins/` | Public SDK, discovery, hook validation and plugin management |
 | `tests/test_cli.py` | Application launch and version contract |
 | `tests/test_architecture.py` | Pure domain boundaries and core independence from concrete storage/bank implementations |
 
-Keep an existing plugin's source, assets, documentation and implementation tests in its own `plugins/<id>/` folder. Keep shared API contracts and interactions between plugins in `tests/`; a host-contract change may require edits there too. New bundled plugins need maintainer registration in the application `pyproject.toml`; independently distributed plugins own their entry point in their own `pyproject.toml`, as shown by `plugins/example/`. See [plugin folder ownership](plugins/README.md).
+Keep an existing plugin's source, assets, documentation and implementation tests in its own `plugins/<category>/<id>/` folder. Keep shared API contracts and interactions between plugins in `tests/`; a host-contract change may require edits there too. New bundled plugins need maintainer registration in the application `pyproject.toml`; independently distributed plugins own their entry point in their own `pyproject.toml`, as shown by `plugins/example/example/`. See [plugin folder ownership](plugins/README.md).
 
 The application-root `conftest.py` provides shared isolated fixtures to both test locations. Plugin-specific records and mock transports belong in that plugin's `tests/conftest.py`. Tests must not read `.env`, open the user's database, need a Plaid account or make live provider requests. Use `tmp_path` for compatibility fixtures and explicitly set `WHAB_HOME` when testing configuration. Make a regression test demonstrate an observable failure or invariant; avoid tests that merely reproduce implementation steps.
 
-Run all tests with `.venv/bin/python -m pytest`, or just one plugin with `.venv/bin/python -m pytest plugins/plaid/tests` (replace `plaid` with its folder name). CI discovers both the central and plugin-local suites and lints all plugin sources. Run these commands from the application directory (`whab/`).
+Run all tests with `.venv/bin/python -m pytest`, or just one plugin with `.venv/bin/python -m pytest plugins/ingestion/plaid/tests` (replace `ingestion/plaid` with its category and plugin ID). CI discovers both the central and plugin-local suites and lints all plugin sources. Run these commands from the application directory (`whab/`).
 
 Every plugin must maintain **100% Python statement and branch coverage** across its complete `src/` tree. Run `.venv/bin/python scripts/check_plugin_coverage.py` before submitting; it uses the full local/shared test suite and fails for any missing line, missing branch or unmeasured source file. It discovers source roots automatically, including independently distributed plugins. Use `--plugin plaid` to measure one plugin against the same suite. Keep new regressions with their plugin. Static type-only imports are outside runtime coverage; do not exclude runtime code or add coverage pragmas to meet the gate. Templates and browser assets remain covered by rendering, behavior and installed-wheel checks.
 

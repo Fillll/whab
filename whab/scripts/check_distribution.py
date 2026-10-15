@@ -97,7 +97,7 @@ def main():
         for name in ("pyproject.toml", "README.md", "LICENSE"):
             shutil.copy2(ROOT / name, source / name)
         example = base / "example"
-        shutil.copytree(ROOT / "plugins/example", example, ignore=ignore)
+        shutil.copytree(ROOT / "plugins/example/example", example, ignore=ignore)
         run(
             "-m",
             "pip",

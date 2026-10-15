@@ -4,6 +4,11 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.3.3 — 2026-10-14
+
+- Organize contributor plugins under singular category folders: `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`. Keep each plugin's implementation, assets, documentation and tests together under `plugins/<category>/<id>/`.
+- Preserve existing plugin IDs, Python packages, configuration and runtime routes. Update packaging, architecture checks and automatic 100% plugin coverage discovery for the categorized layout, including the independently installable example.
+
 ## 1.3.2 — 2026-10-14
 
 - License WHAB's own code, SDK, bundled plugins, documentation and assets under MIT, permitting commercial forks and proprietary extensions.

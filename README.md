@@ -22,13 +22,13 @@ Open [127.0.0.1:5173](http://127.0.0.1:5173) to explore fictional demo data, or 
 
 ```mermaid
 flowchart LR
-    Interfaces["Interface plugins<br/>Web · API · TUI · CLI<br/>Bank logos"] --- Core
+    Interface["Interface plugins<br/>Web · API · TUI · CLI<br/>Bank logos"] --- Core
     Ingestion["Ingestion plugins<br/>Plaid · Statements<br/>Manual entry · YNAB"] --- Core
     Automation["Automation plugins<br/>Smart categorization<br/>Rules · Random forest"] --- Core
 
     Core["Core<br/>Accounts · Transactions<br/>Categories · Budget"] --- Storage["Storage plugins · required<br/>At least one active"]
-    Core --- Insights["Insights plugins<br/>Sankey diagrams · Reports"]
-    Core --- Extensions["Extension plugins<br/>Mortgages · Loans<br/>Investments · Stocks"]
+    Core --- Insight["Insight plugins<br/>Sankey diagrams · Reports"]
+    Core --- Extension["Extension plugins<br/>Mortgages · Loans<br/>Investments · Stocks"]
 
     classDef domain fill:#fff6d6,stroke:#b83a36,stroke-width:2px
     class Core domain
@@ -36,7 +36,9 @@ flowchart LR
 
 Each surrounding box is a plugin family; connections show capability boundaries around the core, not code imports. At least one storage plugin must be active, and multiple storage plugins may be selected. Interactive use needs at least one usable interface. Bank logos enhance an interface. One plugin may supply several capabilities.
 
-The core validates every ledger change and owns financial rules. Ingestion submits normalized inputs, Insights reads snapshots, Extensions adds specialized models, and Automation suggests or applies configured actions through core commands. Random forest is one replaceable categorization implementation.
+The core validates every ledger change and owns financial rules. Ingestion submits normalized inputs, Insight reads snapshots, Extension adds specialized models, and Automation suggests or applies configured actions through core commands. Random forest is one replaceable categorization implementation.
+
+Contributor folders use singular category names under `whab/plugins/`: `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`. Each plugin owns `plugins/<category>/<id>/`; see [folder ownership and naming](whab/plugins/README.md). The example category contains teaching plugins rather than an additional runtime capability.
 
 This is a design proposal. The current app still owns its HTTP API, and SDK v1 does not yet support all of these capabilities. See the [target design](whab/docs/target-architecture.md) and [current implementation](whab/docs/architecture.md).
 

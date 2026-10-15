@@ -16,7 +16,7 @@
 | `whab.app` | Component construction, dependency injection, router assembly, assets and lifespan cleanup | Domain rules, host transport and public plugin contracts |
 | `whab.config` / `whab.__main__` | Runtime configuration and local launch command | Environment/configuration and application composition |
 
-Core packages live under `src/whab`. Each concrete plugin lives in `plugins/<id>/src/<package>/`, with its own `tests/` and `README.md` alongside. Web assets are package data under `whab_web`, with bank-specific resources under `whab_plaid`; all four bundled plugins travel in the application wheel. The example has its own separately installable distribution. The public `whab.plugins` package remains the SDK and host runtime, distinct from the contributor folders. See [CONTRIBUTING.md](../CONTRIBUTING.md) for development and test ownership.
+Core packages live under `src/whab`. Each concrete plugin lives in `plugins/<category>/<id>/src/<package>/`, with its own `tests/` and `README.md` alongside. Web assets are package data under `whab_web`, with bank-specific resources under `whab_plaid`; all four bundled plugins travel in the application wheel. The example has its own separately installable distribution. The public `whab.plugins` package remains the SDK and host runtime, distinct from the contributor folders. See [CONTRIBUTING.md](../CONTRIBUTING.md) for development and test ownership.
 
 `domain.budget.calculate_workspace` projects a plain ledger state into a monthly view without querying a database or provider. `ensure_assignment_allowed` takes an explicit as-of month. Domain modules must stay independent of web, storage, configuration, providers and plugin runtimes.
 
