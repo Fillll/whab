@@ -20,6 +20,13 @@ Open [127.0.0.1:5173](http://127.0.0.1:5173) to explore fictional demo data, or 
 
 **Proposed direction:** a minimal financial core for accounts, transactions, categories and budgets. Almost everything else is supplied by plugins. A small host handles plugin discovery, capability contracts and lifecycle outside the domain core.
 
+The proposed design combines two architecture patterns:
+
+- **[Microkernel (plugin architecture)](https://www.oreilly.com/library/view/fundamentals-of-software/9781492043447/ch12.html):** a small financial core, with a host managing replaceable plugins.
+- **[Hexagonal (ports and adapters)](https://alistair.cockburn.us/hexagonal-architecture):** financial rules stay independent of interfaces, storage and providers, which connect through defined contracts.
+
+The [client/server arrangement](#alternative-proposal-client-and-server) is an optional deployment of this design.
+
 ```mermaid
 flowchart LR
     Interface["Interface plugins<br/>Web · API · TUI · CLI<br/>Bank logos"] --- Core
