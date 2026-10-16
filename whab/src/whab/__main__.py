@@ -2,17 +2,19 @@
 
 import argparse
 import os
+import ssl
 
 import uvicorn
 
 from . import __version__
 from .config import Settings
+from .tls import validate_tls
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run WHAB on this computer.")
     parser.add_argument("--version", action="version", version=f"WHAB {__version__}")
-    parser.add_argument("--port", type=int, help="Local HTTP port (default: PORT or 5173)")
+    parser.add_argument("--port", type=int, help="Local HTTPS port (default: PORT or 5173)")
     parser.add_argument("--budget", help="Open a portable .whab budget file")
     parser.add_argument("--budget-password-env", metavar="VARIABLE", help="Read the budget password from this environment variable")
     parser.add_argument("--create", metavar="NAME", help="Create the --budget file with this budget name")
@@ -46,6 +48,10 @@ def main():
             from whab.budgets.session import BudgetSession
 
             initial = Settings.load()
+            try:
+                validate_tls(initial.tls_cert_file, initial.tls_key_file)
+            except ValueError as error:
+                parser.error(str(error))
             session = BudgetSession.create(initial.home, initial.plaid_env, args.create, initial.plugins, initial.storage, path=path)
             created = create_app(settings=initial, budget_session=session)
             created.state.store.close()
@@ -53,6 +59,10 @@ def main():
     if args.copy:
         os.environ["WHAB_BUDGET_COPIES"] = os.pathsep.join(str(Path(path).expanduser().resolve()) for path in args.copy)
     settings = Settings.load()
+    try:
+        validate_tls(settings.tls_cert_file, settings.tls_key_file)
+    except ValueError as error:
+        parser.error(str(error))
     uvicorn.run(
         "whab.app:create_app",
         factory=True,
@@ -61,6 +71,11 @@ def main():
         reload=args.reload,
         access_log=False,
         log_level="warning",
+        ssl_certfile=str(settings.tls_cert_file),
+        ssl_keyfile=str(settings.tls_key_file),
+        ssl_version=ssl.PROTOCOL_TLS_SERVER,
+        proxy_headers=False,
+        forwarded_allow_ips="",
     )
 
 

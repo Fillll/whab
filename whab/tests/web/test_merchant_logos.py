@@ -30,7 +30,7 @@ def client_for(store, home, fetch=None):
     return TestClient(
         create_app(store=store, settings=settings, plugins=PluginRegistry((ui, *optional)),
                    bank_services={"plaid": bank}),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     )
 
 

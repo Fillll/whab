@@ -28,7 +28,7 @@ def make_client(store, registry, home):
     )
     return TestClient(
         create_app(store=store, settings=settings, plugins=PluginRegistry((*registry._plugins, make_ui(home)))),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     )
 
 

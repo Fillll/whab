@@ -32,7 +32,7 @@ def client():
             settings=settings,
             plugins=PluginRegistry(),
         ),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     ) as client:
         yield client
     store.close()
@@ -98,6 +98,21 @@ def test_origin_host_and_chunked_body_limit(client):
         == 413
     )
     assert client.get("/api/status").headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("path", ["/", "/api/workspace?workspace=personal", "/api/plaid/webhook", "/remote/v1/budgets/default/queries/accounts?workspace=personal"])
+def test_http_is_rejected_even_with_forged_forwarded_headers(client, path):
+    response = client.get("http://127.0.0.1:5173" + path, headers={
+        "X-Forwarded-Proto": "https", "Forwarded": "proto=https;host=localhost",
+    })
+    assert response.status_code == 400 and response.json() == {"error": "HTTPS is required"}
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_local_browser_origins_require_https(client):
+    account = {"workspace": "personal", "name": "Cash", "type": "depository", "balance": 100}
+    assert client.post("/api/accounts", json=account, headers={"Origin": "http://127.0.0.1:5173"}).status_code == 403
+    assert client.post("/api/accounts", json=account, headers={"Origin": "https://127.0.0.1:5173"}).status_code == 200
 
 
 def test_review_and_manual_money_flow(client):

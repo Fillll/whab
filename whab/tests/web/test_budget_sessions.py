@@ -15,7 +15,7 @@ from whab.config import Settings
 from whab.domain.errors import StoreError
 from whab.plugins import PluginError
 
-BASE = "http://127.0.0.1:5173"
+BASE = "https://127.0.0.1:5173"
 ZIP = {"content-type": "application/zip"}
 
 
@@ -72,7 +72,27 @@ def new_budget(client, name):
     response = client.post("/api/budget/new", json={"name": name})
     assert response.status_code == 200, response.text
     assert "httponly" in response.headers["set-cookie"].lower()
+    assert "secure" in response.headers["set-cookie"].lower()
     return response.json()["id"]
+
+
+def test_http_cannot_activate_a_cookie_selected_runtime(tmp_path, monkeypatch):
+    from uuid import uuid4
+
+    configuration = settings(tmp_path)
+    host = BudgetHost(configuration)
+    budget_id = str(uuid4())
+    host.recent[budget_id] = {"id": budget_id, "name": "Saved", "path": str(tmp_path / "Saved.whab")}
+
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Plaintext requests must not activate saved budgets")
+
+    monkeypatch.setattr(host, "activate", forbidden)
+    with TestClient(create_app(settings=configuration, budget_host=host), base_url="http://127.0.0.1:5173") as client:
+        response = client.get("/api/workspace?workspace=personal", headers={
+            "Cookie": f"whab-budget={budget_id}", "X-Forwarded-Proto": "https",
+        })
+        assert response.status_code == 400 and response.json() == {"error": "HTTPS is required"}
 
 
 def activate(client, budget_id):

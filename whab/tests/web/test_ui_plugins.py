@@ -23,7 +23,7 @@ from fastapi.testclient import TestClient
 from whab.app import create_app
 from whab.config import Settings
 settings = Settings(Path(sys.argv[1]), 5173, "sandbox", "", "", "", False, "", "", (), ui="")
-with TestClient(create_app(settings=settings), base_url="http://127.0.0.1:5173") as client:
+with TestClient(create_app(settings=settings), base_url="https://127.0.0.1:5173") as client:
     assert client.get("/").status_code == 404
     assert client.get("/static/app.js").status_code == 404
     assert client.get("/api/workspace?workspace=demo").status_code == 200
@@ -54,7 +54,7 @@ def test_another_ui_supplies_its_views_templates_assets_and_keeps_host_guards(tm
     registry = PluginRegistry((Plugin("alternate", "Alternate UI", ui=ui),))
     with TestClient(
         create_app(store=store, settings=settings(tmp_path, "alternate"), plugins=registry),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     ) as client:
         for page in ("budget", "transactions", "insights", "accounts"):
             result = client.get(f"/?page={page}&workspace=demo&month=2026-10")
@@ -89,7 +89,7 @@ def test_ui_failure_is_sanitized_and_api_stays_usable(tmp_path, store, failure):
     registry = PluginRegistry((Plugin("broken", "Broken UI", ui=UserInterface(templates, static, builder)),))
     with TestClient(
         create_app(store=store, settings=settings(tmp_path, "broken"), plugins=registry),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     ) as client:
         response = client.get("/")
         assert response.status_code == 400

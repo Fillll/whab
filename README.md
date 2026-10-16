@@ -13,12 +13,12 @@ Requires **Python 3.14 or newer**. From the repository root:
 ```sh
 cd whab
 python3.14 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python scripts/install.py --dev
 .venv/bin/python scripts/setup.py
 .venv/bin/python -m whab
 ```
 
-Open [127.0.0.1:5173](http://127.0.0.1:5173) to explore fictional demo data, or switch to **My budget** and add a manual account. Plaid credentials are only needed for bank connections.
+Setup creates a local certificate authority and localhost certificate without changing your system's trust settings. [Trust the local CA explicitly](whab/docs/usage.md#local-https) before opening [127.0.0.1:5173](https://127.0.0.1:5173) to explore fictional demo data, or switch to **My budget** and add a manual account. WHAB requires HTTPS for every request; Plaid credentials are only needed for bank connections.
 
 ## Architecture
 
@@ -40,9 +40,9 @@ flowchart LR
 
 Each surrounding box is a plugin family. A plugin can provide several capabilities, and each budget chooses the features it uses. Interfaces present the budget, ingestion normalizes incoming data, insights read scoped snapshots, and automations and extensions work through validated financial operations. At least one storage plugin saves the budget; multiple storage destinations hold copies of that same budget.
 
-Plugin code is installed in WHAB. A portable `.whab` container owns its plugin manifest, settings and plugin data. A local budget carries its storage data; a remote budget can carry only connection information, with financial records staying on the server. Credentials stay with the machine by default; remote access credentials can optionally travel encrypted with a password. Bank-provider tokens stay on the machine or server. See the [architecture guide](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md) for the implemented contracts and capability boundaries.
+Plugin code is installed in WHAB. A portable `.whab` container owns its plugin manifest, settings and plugin data. A local budget carries its storage data; remote storage contributes connection information alongside the manifest and saved plugin state, with financial records staying on the server. Credentials stay with the machine by default; remote access credentials can optionally travel encrypted with a password. Bank-provider tokens stay on the machine or server. See the [architecture guide](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md) for the implemented contracts and capability boundaries.
 
-Concrete plugins live under `whab/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/plugins/README.md).
+The `whab` host/core wheel and its seven supported plugins have independent distributions, versions and changelogs. The `bundled` extra selects the supported plugin set when compatible host/plugin distributions are available in the chosen package index or local wheelhouse; the source installer above installs the checkout's local packages together without requiring those plugin releases to be published. Installation and enablement are separate: Web and SQLite are selected defaults, Plaid is optional and enabled by default, and the other supported plugins start disabled. The teaching example is separately installed and hidden from ordinary Settings. Concrete plugins live under `whab/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/plugins/README.md).
 
 ### Client/server deployment
 

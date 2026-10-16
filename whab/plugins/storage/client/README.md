@@ -1,19 +1,26 @@
 # Remote budget client
 
-Select `client` as the storage plugin to use a budget served by the `server`
+Distributed independently as `whab-client-plugin`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+
+For the original workspace or initial CLI creation, select `client` as the storage plugin to use a budget served by the `server`
 interface plugin. Configure these values on the client machine:
 
 ```dotenv
 WHAB_STORAGE=client
+# Bank ingestion stays on the server. Saved selections must exclude bank plugins too.
+WHAB_PLUGINS=
 CLIENT_URL=https://your-budget-server.example
 CLIENT_BUDGET_ID=your-budget-id
 CLIENT_TOKEN=your-private-token-with-at-least-32-characters
 ```
 
+An existing portable budget chooses storage through its manifest rather than `WHAB_STORAGE`; Settings' new-budget action creates SQLite budgets. The installed client is not automatically enabled by installing the supported set.
+
 `CLIENT_URL` is an HTTPS origin without credentials, a path, query or fragment.
 TLS certificates are verified, redirects are refused and environment proxies are
-disabled. A remote budget file contains only `connection.json`: its version,
-server origin and remote budget ID. Saving, opening and downloading that file
+disabled. The client's contribution is `plugins/client/connection.json`: its payload version,
+server origin and remote budget ID. The complete `.whab` container also has a required
+manifest and namespaced plugin settings/state or other retained payloads. Saving, opening and downloading that file
 does not fetch the ledger. Reads and changes go to the live server; its data can
 advance independently of the connection file. Explicit legacy snapshot exports
 remain available through `export_budget()`.

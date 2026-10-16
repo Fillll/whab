@@ -19,7 +19,7 @@ def settings(plugins=(), *, home=Path("unused-test-home"), ui=""):
 def client(store, tmp_path):
     with TestClient(
         create_app(store=store, settings=settings(home=tmp_path), plugins=PluginRegistry((plaid_plugin,))),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     ) as client:
         yield client
 
@@ -34,9 +34,21 @@ def test_missing_plaid_config_is_actionable_and_bad_webhook_is_rejected(client):
     assert response.status_code == 401
 
 
+@pytest.mark.parametrize("prefix", ["/api/plaid", "/api/banks/plaid"])
+def test_webhook_host_exception_never_allows_plaintext_transport(client, prefix):
+    response = client.post(
+        "http://127.0.0.1:5173" + prefix + "/webhook",
+        json={"item_id": "synthetic"},
+        headers={"Host": "hooks.example", "X-Forwarded-Proto": "https"},
+    )
+    assert response.status_code == 400 and response.json() == {"error": "HTTPS is required"}
+    # HTTPS still requires an authentic provider signature, even with a public Host.
+    assert client.post(prefix + "/webhook", json={}, headers={"Host": "hooks.example"}).status_code == 401
+
+
 def test_bundled_plaid_is_loaded_through_entry_point_and_keeps_legacy_routes(tmp_path):
     with TestClient(
-        create_app(settings=settings(("plaid",), home=tmp_path, ui="web")), base_url="http://127.0.0.1:5173"
+        create_app(settings=settings(("plaid",), home=tmp_path, ui="web")), base_url="https://127.0.0.1:5173"
     ) as client:
         descriptors = client.get("/api/plugins").json()["plugins"]
         assert descriptors[0]["id"] == "plaid"
@@ -65,7 +77,7 @@ def test_alternate_ui_can_embed_plaid_without_default_ui_helpers(tmp_path, store
     registry = PluginRegistry((Plugin("alternate", "Alternate UI", ui=ui), plaid_plugin))
     with TestClient(
         create_app(store=store, settings=settings(home=tmp_path, ui="alternate"), plugins=registry),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     ) as client:
         response = client.get("/?page=accounts&workspace=demo")
         assert response.status_code == 200

@@ -10,7 +10,12 @@
 | `whab.storage.bank` | Generic provider identities and scoped Item/import operations | Domain records and public storage protocols |
 | `whab_sqlite` | Bundled storage descriptor, SQLite upgrades, fictional seeding, coherent reads and transactional mutations | Domain rules; plugin SDK for its descriptor/context |
 | `whab_plaid` | Bundled plugin descriptor, provider mapping, token encryption, Link, synchronization, webhooks and provider UI | Domain records and public plugin contracts |
-| `whab_web` | Bundled visual descriptor, view models, icons, templates, styles and browser controls | Domain presentation inputs and public plugin SDK |
+| `whab_web` | Default visual descriptor, view models, icons, templates, styles and browser controls | Domain presentation inputs and public plugin SDK |
+| `whab_ynab` | Local YNAB archive parsing, import preview and controls | Domain import records and public plugin SDK |
+| `whab_bank_logos` | Curated institution lookup, public icons and cache | Public branding/settings contracts |
+| `whab_server` | HTTPS bearer-authorized API interface for public ledger operations | Public interface/service contracts |
+| `whab_client` | Remote storage adapter and portable connection payload | Public storage/remote protocol contracts |
+| `whab_example_plugin` | Separately installed developer teaching report/export | Public immutable report snapshots |
 | `whab.web` | Host ledger/page/plugin/bank routes, schemas, middleware, safe errors, CSV and scoped projections | Domain records, generic bank facade and public plugin SDK |
 | `whab.plugins` | Public API v1, kinds, selectors, UI/storage/bank protocols and reporting hooks | Python standard library and domain records/errors |
 | `whab.services` | Budget-scoped validated ledger commands, coherent queries, revisions and retry receipts | Domain records and storage protocols |
@@ -18,7 +23,7 @@
 | `whab.app` | Component construction, dependency injection, router assembly, assets and lifespan cleanup | Domain rules, host transport and public plugin contracts |
 | `whab.config` / `whab.__main__` | Runtime configuration and local launch command | Environment/configuration and application composition |
 
-Core packages live under `src/whab`. Each concrete plugin lives in `plugins/<category>/<id>/src/<package>/`, with its own `tests/` and `README.md` alongside. Web assets are package data under `whab_web`, bank-specific resources under `whab_plaid`, and local import controls under `whab_ynab`; all bundled plugins travel in the application wheel. The example has its own separately installable distribution. The public `whab.plugins` package remains the SDK and host runtime, distinct from the contributor folders. File parsers receive bytes only; guarded host routes validate results and delegate atomic migrations to the optional storage import capability. See [CONTRIBUTING.md](../CONTRIBUTING.md) for development and test ownership.
+Core packages live under `src/whab` and ship only in the host/core `whab` wheel. Each concrete plugin lives in `plugins/<category>/<id>/src/<package>/`, with its own `pyproject.toml`, `CHANGELOG.md`, `tests/` and `README.md` alongside. Web assets are package data in the independently distributed `whab_web` plugin, bank-specific resources in `whab_plaid`, and local import controls in `whab_ynab`. The host's `bundled` extra and `scripts/install.py` install the seven supported plugin distributions; they do not embed them in the host wheel. The teaching example is separately installed and hidden from ordinary Settings. There are no concrete Automation, Extension or production Insight plugins yet. The public `whab.plugins` package remains the SDK and host runtime, distinct from the contributor folders. File parsers receive bytes only; guarded host routes validate results and delegate atomic migrations to the optional storage import capability. See [CONTRIBUTING.md](../CONTRIBUTING.md) for development and test ownership.
 
 `domain.budget.calculate_workspace` projects a plain ledger state into a monthly view without querying a database or provider. `ensure_assignment_allowed` takes an explicit as-of month. Domain modules must stay independent of web, storage, configuration, providers and plugin runtimes.
 
@@ -28,7 +33,7 @@ Core packages live under `src/whab`. Each concrete plugin lives in `plugins/<cat
 
 ## Composition and runtime files
 
-`app.create_app` accepts injected settings, backend, plugin registry and bank services, or constructs the selected defaults. `WHAB_STORAGE` selects the required primary storage factory, defaulting to `sqlite`; the host loads its descriptor in addition to optional `WHAB_PLUGINS`. There is no silent fallback when a chosen backend is missing or fails. The storage factory receives `StorageContext(home, environment, config)` and returns a `StorageBackend`. Bank factories receive provider-scoped facades over that backend. Shutdown and startup-failure cleanup close created bank services before the owned backend; tests retain ownership of injected stores.
+`app.create_app` accepts injected settings, backend, plugin registry and bank services, or constructs the selected defaults. For the original workspace and initial CLI budget creation, `WHAB_STORAGE` selects the required primary storage factory, defaulting to `sqlite`. An opened portable budget takes storage and optional selections from its manifest; Settings creates new SQLite budgets. The host loads required storage alongside the budget's available optional plugins. There is no silent fallback when a chosen backend is missing or fails. The storage factory receives `StorageContext(home, environment, config)` and returns a `StorageBackend`. Bank factories receive provider-scoped facades over that backend. Shutdown and startup-failure cleanup close created bank services before the owned backend; tests retain ownership of injected stores.
 
 `WHAB_UI` selects one server-rendered visual descriptor, defaulting to `web`. `WHAB_UI=` selects headless mode: the root page and core static mount are absent, while guarded APIs remain. `UserInterface` supplies template/static directories and a `build_context` callable. The host owns Jinja transport and injects enabled plugin panels/outputs; the chosen interface owns the resulting visual layout. Trusted `Interface` factories can contribute transport routes using a scoped `InterfaceContext`; shared host access policy and cleanup still apply. The bundled `server` plugin uses this capability for the public remote command protocol. Server-rendered `UserInterface` remains independently selectable, and `WHAB_UI=` omits visual pages.
 
@@ -37,14 +42,29 @@ Configuration reads `.env` from `WHAB_HOME`, or from the process's launch direct
 ```text
 <runtime home>/
   .env
+  plugins.json
+  tls/
+    ca.crt
+    ca.key
+    server.crt
+    server.key
   data/
     whab-sandbox.sqlite
     whab-production.sqlite
+  budgets/
+    index-<environment>.json
+    <budget-id>/<environment>/
+      manifest.json
+      plugin-data.whab
+      source.json
+      data/whab-<environment>.sqlite
 ```
 
 The SQLite factory owns ledger selection and additive schema migrations. It reopens a single `data/*-{environment}.sqlite` file in place, validating the base schema for a noncanonical filename. It creates the canonical filename shown above only when no matching file exists. Multiple matches fail safely, even if one has the canonical filename. This preserves saved budgets and encrypted connections. Core configuration supplies a home/environment rather than choosing a concrete database file. Other storage plugins own their connection settings and migrations. Selecting a different backend does not automatically transfer the previous ledger. Runtime paths do not derive from the checkout or `site-packages`. Keep the existing home and encryption key when upgrading SQLite. The package and launch command are only `whab`.
 
-`src/whab/__init__.py::__version__` is the single version source for distribution metadata, CLI, FastAPI and About. `scripts/check_distribution.py` tests a wheel and example plugin from an unrelated temporary directory; source-checkout tests alone do not establish that the distribution includes its assets.
+`src/whab/__init__.py::__version__` is the host/core version source for its distribution metadata, CLI, FastAPI and About. Each concrete plugin's `pyproject.toml::project.version` and local dated `CHANGELOG.md` own its independent version history. A plugin-only material change updates that plugin alone; host/core/SDK changes update the app, and spanning changes update each affected owner. `scripts/check_distribution.py` tests the host, all seven supported plugin wheels and teaching example from an unrelated temporary directory; source-checkout tests alone do not establish that the distribution includes its assets.
+
+The launcher uses native TLS even for localhost. `WHAB_TLS_CERT_FILE` and `WHAB_TLS_KEY_FILE` are paired overrides, with relative paths resolved against the runtime home; defaults are `tls/server.crt` and `tls/server.key`. Setup provisions a private local CA and localhost certificate but never changes OS trust. Missing, invalid, expired or mismatched material fails launch. All incoming requests require HTTPS, and proxy headers are not trusted to bypass that requirement. See [local HTTPS and manual trust](usage.md#local-https).
 
 ## Portable budgets and copies
 
@@ -52,7 +72,7 @@ The SQLite factory owns ledger selection and additive schema migrations. It reop
 
 Containers carry data rather than executable plugin packages. Default exports omit credentials. Explicit opt-in can carry a password-encrypted remote access credential bound to its public target; bank-provider tokens and encryption keys remain local/server-only. Machine credentials are used only for an approved matching remote target. Container loading validates paths, sizes, manifest compatibility and plugin payloads before activation.
 
-An opened budget has an isolated runtime and plugin registry. The browser's HttpOnly, SameSite-strict budget cookie selects that runtime; the original local runtime remains accessible. Each budget retains separate demo and personal workspaces. The installation supplies executable packages and its visual entry point, while the selected budget supplies its optional feature configuration. Missing optional plugins are reported instead of being installed automatically.
+An opened budget has an isolated runtime and plugin registry. The browser's HttpOnly, SameSite-strict budget cookie selects that runtime; the original local runtime remains accessible. Each budget retains separate demo and personal workspaces. The installation supplies executable packages and its visual entry point, while the selected budget supplies its optional feature configuration. Missing optional packages in a portable budget are reported without blocking opening, and their manifest entries and data remain preserved. Required storage and selected UI must be installed and compatible; missing original-workspace selections, duplicate registrations and invalid descriptors fail explicitly. Packages are never installed automatically.
 
 Additional storage destinations save copies of the same portable budget. A failed destination is marked pending without undoing successful copies. Paths and credentials are local configuration rather than portable financial data. Ordinary SQLite runtime files remain supported without requiring existing users to convert their budgets first.
 
@@ -80,7 +100,7 @@ Access tokens use AES-GCM with the Item ID as authenticated associated data. The
 
 Synchronization starts from the stored cursor, accumulates every page and refreshes account snapshots before committing the batch. A pagination mutation restarts accumulation from the original cursor. SQLite applies accounts, added/modified/removed transactions and the new cursor in one transaction, checking the expected cursor and reading current user annotations inside that transaction. Validation or SQL failures leave the ledger and cursor unchanged. Matched pending-to-posted records preserve category edits, review state and notes; replay remains idempotent.
 
-Webhook verification checks the ES256 signature, the exact request-body digest and timestamp freshness before queueing a sync. The queue coalesces repeated notifications and schedules another pass for a notification received during an active sync. These controls preserve correctness for the local prototype; they do not make a local-only HTTP listener a hosted family service.
+Webhook verification checks the ES256 signature, the exact request-body digest and timestamp freshness before queueing a sync. The queue coalesces repeated notifications and schedules another pass for a notification received during an active sync. Registered webhook paths bypass local Host/origin checks so the provider can reach them; they still require HTTPS and successful provider signature verification. TLS encrypts transport, while signature verification authenticates the provider. These controls do not add a family login system.
 
 Sandbox is the default. Production requires explicit live enablement as well as valid credentials and provider access. A successful Sandbox test or Link flow is not proof of production institution coverage. HTTP errors and status responses use authored messages that omit provider secrets and private remote error details.
 
@@ -88,13 +108,13 @@ Sandbox is the default. Production requires explicit live enablement as well as 
 
 Host transport validates requests and enforces local access. The selected visual plugin owns Python presentation, templates and small browser interactions, while domain rules own budgeting decisions. The bundled Web plugin's `static/client.js` supplies shared HTTP/toast helpers. Plaid's controls, template and disconnect dialog belong to its integration assets. FastAPI routers validate schemas before calling protocols. Middleware restricts Host/Origin, requires JSON for mutations and caps streamed bodies. HTML/API responses are non-cacheable; Jinja escapes user and reporting-plugin text. CSV serialization protects headings and text cells from spreadsheet formulas.
 
-The default application binds to loopback and applies local Host/origin checks. The optional server interface adds a narrow HTTPS bearer-authenticated budget protocol; it does not turn the visual application into a multiuser household service. Keep provider credentials and bank operations on the server.
+The default application binds to loopback with native TLS and applies local Host/origin checks to ordinary routes. Only explicitly enabled `/remote/v1` protocol routes and registered bank webhooks bypass those local checks. Remote protocol routes require bearer authorization for available budgets; webhooks require provider signature verification. Every route still requires HTTPS, with no plaintext fallback or redirect and no trusted forwarded-header bypass. TLS encryption is separate from those authentication checks and supplies no family login system. Keep visual/private banking routes loopback-only and provider credentials on the server.
 
 ## Plugin boundary
 
-The reporting side of the public [`whab.plugins` API v1](plugins.md) provides frozen, typed snapshots scoped to one workspace and one month. `web.plugin_snapshot` constructs them from an explicit public-field allowlist. They include integer-cent balances, category figures and selected-month transactions; they omit Item records, tokens, settings, notes and arbitrary history. Each insight or export hook receives fresh immutable records.
+The reporting side of the public [`whab.plugins` API v1](plugins.md) provides frozen, typed snapshots scoped to one workspace and one month. `web.plugin_snapshot` constructs them from an explicit public-field allowlist. They include balances in integer currency minor units (legacy field names retain `_cents`), category figures and selected-month transactions; they omit Item records, tokens, settings, notes and arbitrary history. Each insight or export hook receives fresh immutable records.
 
-Installed packages register descriptors in `whab.plugins`. Capabilities determine kinds: `user_interface`, `storage`, `data_ingestion`, `reporting` and `branding`; one descriptor may advertise more than one capability. The selected storage and UI descriptors load alongside optional names. `WHAB_STORAGE` defaults to `sqlite`, `WHAB_UI` to `web`, and absent `WHAB_PLUGINS` to `plaid`. A blank optional list retains selected UI/storage; a blank UI setting runs headlessly. Missing, duplicate or incompatible selections cause an actionable startup error. Insights are bounded text, exports are validated tables, and ordinary reporting failures use sanitized messages.
+Installed packages register descriptors in `whab.plugins`. Capabilities determine kinds: `user_interface`, `storage`, `data_ingestion`, `reporting` and `branding`; one descriptor may advertise more than one capability. The selected storage and UI descriptors load alongside optional names. `WHAB_STORAGE` defaults to `sqlite`, `WHAB_UI` to `web`, and absent `WHAB_PLUGINS` to `plaid`. A blank optional list retains selected UI/storage; a blank UI setting runs headlessly. Missing required storage/UI, missing original-workspace selections, duplicate registrations or incompatible descriptors cause an actionable startup error. An opened portable budget reports unavailable optional packages and preserves their data instead of refusing to open. Insights are bounded text, exports are validated tables, and ordinary reporting failures use sanitized messages.
 
 Storage factories receive the resolved runtime home, environment and backend-prefixed configuration. They own all ledger persistence, schema upgrades and transactional behavior; reporting hooks never receive that context or backend. The public `StoreError` and `UNSET` sentinel keep error handling and omitted-field semantics consistent across implementations. A backend switch is a configuration change, not a migration service. Authors must implement the full storage protocol and test rollback, coherent reads, compatible reopen and resource cleanup.
 

@@ -14,7 +14,7 @@ def client(store, tmp_path):
     settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", ())
     with TestClient(
         create_app(store=store, settings=settings, plugins=PluginRegistry((web_plugin,))),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     ) as client:
         yield client
 
@@ -25,7 +25,7 @@ def client_for():
         settings = Settings(home, 5173, "sandbox", "", "", "", False, "", "", ())
         return TestClient(
             create_app(store=store, settings=settings, plugins=PluginRegistry((web_plugin, *optional))),
-            base_url="http://127.0.0.1:5173",
+            base_url="https://127.0.0.1:5173",
         )
 
     return make

@@ -1,0 +1,23 @@
+[project]
+name = "whab-ynab-plugin"
+version = "1.0.0"
+description = "Local YNAB ZIP import plugin for WHAB"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2,<3"]
+
+[project.entry-points."whab.plugins"]
+ynab = "whab_ynab.plugin:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["whab_ynab", "whab_ynab.*"]
+
+[tool.setuptools.package-data]
+whab_ynab = ["templates/*.html", "static/*.js"]
