@@ -73,7 +73,7 @@ Tests use fictional data and mocked services. CI checks Python 3.14 and 3.15 and
 - [Local setup and usage](docs/usage.md) — runtime files, plugin manager, Plaid, budgets and backups
 - [Budget and plugin model](docs/target-architecture.md) and [runtime architecture](docs/architecture.md)
 - [Plugin author guide](docs/plugins.md) and [folder ownership](plugins/README.md)
-- [Contributing](CONTRIBUTING.md) — checks, PR workflow, SemVer compatibility and pending branch protection
+- [Contributing](CONTRIBUTING.md) — checks, PR workflow, SemVer compatibility and branch protection
 
 ## License
 
