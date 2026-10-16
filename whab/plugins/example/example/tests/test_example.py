@@ -70,6 +70,34 @@ def test_example_empty_month_and_large_amounts_have_no_float_rounding():
     assert module.insights(snapshot)[0].value == "$19,999,999,999.98"
 
 
+def test_example_insights_exclude_off_budget_activity_and_export_keeps_it():
+    snapshot = BudgetSnapshot(
+        "personal", "2026-10",
+        (
+            AccountSnapshot("wallet", "Budget wallet", "depository", "checking", 10000),
+            AccountSnapshot("brokerage", "Investments", "investment", "brokerage", 100000),
+            AccountSnapshot(
+                "reserve", "Tracking savings", "depository", "savings", 50000,
+                on_budget=False,
+            ),
+        ), (),
+        (
+            TransactionSnapshot("purchase", "2026-10-01", "Shop", 2000, "wallet", None),
+            TransactionSnapshot("income", "2026-10-02", "Employer", -10000, "wallet", None),
+            TransactionSnapshot("fee", "2026-10-03", "Fund fee", 500, "brokerage", None),
+            TransactionSnapshot("dividend", "2026-10-04", "Dividend", -1500, "brokerage", None),
+            TransactionSnapshot("reserve-fee", "2026-10-05", "Reserve fee", 300, "reserve", None),
+            TransactionSnapshot("interest", "2026-10-06", "Interest", -700, "reserve", None),
+        ),
+    )
+    module = example_module()
+    assert [row.value for row in module.insights(snapshot)] == ["$20.00", "$100.00"]
+    assert "on-budget" in module.insights(snapshot)[0].detail
+    table = module.export(snapshot)
+    assert len(table.rows) == 6
+    assert {row[2] for row in table.rows} == {"Budget wallet", "Investments", "Tracking savings"}
+
+
 @pytest.mark.parametrize(
     ("currency", "net", "income"),
     [("EUR", "EUR 12.34", "EUR 56.78"), ("JPY", "JPY 1,234", "JPY 5,678"),

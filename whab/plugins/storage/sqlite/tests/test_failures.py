@@ -108,7 +108,7 @@ def test_missing_workspace_metadata_fails_without_leaving_a_read_transaction(sto
 
 def test_invalid_account_type_does_not_create_an_account(store):
     with pytest.raises(StoreError, match="Invalid account type"):
-        store.add_account("personal", {"name": "Fixture", "type": "loan", "balance": 0})
+        store.add_account("personal", {"name": "Fixture", "type": "unsupported", "balance": 0})
     assert store.accounts("personal") == []
 
 

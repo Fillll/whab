@@ -13,6 +13,7 @@ def sample_import():
         accounts=({
             "id": "cash", "name": "Checking", "institution": "", "type": "depository",
             "balance": 100000, "source": "fixture", "stale": False, "balanceUnknown": False,
+            "onBudget": True, "subtype": None,
         },),
         categories=({"id": "food", "name": "Food", "group": "Everyday", "target": 1000},),
         transactions=({
@@ -84,7 +85,7 @@ def test_record_ids_are_unique_within_each_kind(field):
     ("accounts", "id", None), ("accounts", "id", ""), ("accounts", "id", "x" * 201),
     ("accounts", "id", "cash\x00"), ("accounts", "name", "  "),
     ("accounts", "institution", None), ("accounts", "source", "x" * 65),
-    ("accounts", "type", []), ("accounts", "type", "investment"),
+    ("accounts", "type", []), ("accounts", "type", "unsupported"),
     ("accounts", "balance", True), ("accounts", "balance", 1.5),
     ("accounts", "balance", 1_000_000_000_001), ("accounts", "stale", 1),
     ("accounts", "balanceUnknown", None),
@@ -110,17 +111,36 @@ def test_invalid_scalar_fields_and_references_fail(field, key, value):
         data.validated_copy()
 
 
-@pytest.mark.parametrize("stale,unknown,valid", [
-    (False, False, False), (True, False, False), (False, True, False), (True, True, True),
+@pytest.mark.parametrize("kind,subtype", [
+    ("investment", "brokerage"), ("retirement", "roth_ira"), ("property", "home"),
+    ("loan", "mortgage"), ("deposit", "cd"), ("other", None),
 ])
-def test_unsupported_accounts_cannot_contribute_funding(stale, unknown, valid):
+def test_tracking_accounts_keep_known_balances_and_explicit_classification(kind, subtype):
     data = sample_import()
-    data.accounts[0].update(type="other", stale=stale, balanceUnknown=unknown)
-    if valid:
-        assert data.validated_copy().accounts[0]["type"] == "other"
-    else:
-        with pytest.raises(StoreError, match="stale and unknown"):
-            data.validated_copy()
+    data.accounts[0].update(type=kind, onBudget=False, subtype=subtype)
+    restored = data.validated_copy().accounts[0]
+    assert (restored["type"], restored["onBudget"], restored["subtype"]) == (kind, False, subtype)
+    assert restored["balance"] == 100000
+
+
+def test_legacy_workspace_accounts_receive_scope_and_subtype_defaults():
+    data = sample_import()
+    del data.accounts[0]["onBudget"]
+    del data.accounts[0]["subtype"]
+    assert data.validated_copy().accounts[0]["onBudget"] is True
+    data.accounts[0]["type"] = "investment"
+    assert data.validated_copy().accounts[0]["onBudget"] is False
+
+
+@pytest.mark.parametrize("changes", [
+    {"onBudget": "false"}, {"onBudget": 0}, {"subtype": "mortgage"},
+    {"subtype": []}, {"type": "investment", "onBudget": True},
+])
+def test_workspace_classification_rejects_invalid_explicit_values(changes):
+    data = sample_import()
+    data.accounts[0].update(changes)
+    with pytest.raises(StoreError):
+        data.validated_copy()
 
 
 def test_duplicate_assignments_and_unsafe_aggregate_totals_fail(monkeypatch):

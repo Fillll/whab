@@ -71,6 +71,8 @@
                   {% endif %}
                   {% if transaction.source=="manual" %}<span>Manual</span>
                   {% endif %}
+                  {% if transaction.accountId in accounts_by_id and not is_on_budget(accounts_by_id[transaction.accountId]) %}<span>Off-budget · excluded from budget</span>
+                  {% endif %}
                   {% if transaction.note %}<span>{{ transaction.note }}</span>
                   {% endif %}
                 </div>
@@ -109,5 +111,5 @@
   </div>
 {% endif %}
 <div class="table-footer">
-  <span id="transaction-count">{{ transactions|length }} transactions · {{ month_label(month) }}</span><span>Pending transactions are excluded from spending totals.</span>
+  <span id="transaction-count">{{ transactions|length }} transactions · {{ month_label(month) }}</span><span>Off-budget and pending transactions are excluded from budget spending totals.</span>
 </div>

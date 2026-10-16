@@ -42,6 +42,7 @@ for (const form of document.querySelectorAll('form[data-api]')) {
       for (const field of form.elements) {
         if (!field.name || field.disabled) continue;
         body[field.name] = field.hasAttribute('data-boolean') ? field.checked :
+          field.hasAttribute('data-boolean-value') ? field.value === 'true' :
           field.hasAttribute('data-cents') ? minorAmount(field.value, Number(form.elements.namedItem('currency')?.selectedOptions?.[0]?.dataset.minorUnits ?? field.dataset.minorUnits)) :
           field.hasAttribute('data-null') && !field.value ? null : field.value;
       }
@@ -65,6 +66,47 @@ for (const form of document.querySelectorAll('form[data-api]')) {
   });
   if (form.hasAttribute('data-auto')) form.addEventListener('change', () => form.requestSubmit());
 }
+
+function updateAccountFields(form) {
+  const scope = form.querySelector('[data-account-scope]');
+  const type = form.querySelector('[data-account-type]');
+  const subtype = form.querySelector('[data-account-subtype]');
+  for (const option of type.options) {
+    option.hidden = scope.value === 'true' && option.dataset.onBudget !== 'true';
+    option.disabled = option.hidden;
+  }
+  if (type.selectedOptions[0].disabled) type.value = [...type.options].find(option => !option.disabled).value;
+  for (const option of subtype.options) {
+    option.hidden = Boolean(option.value) && option.dataset.accountType !== type.value;
+    option.disabled = option.hidden;
+  }
+  if (subtype.selectedOptions[0].disabled) subtype.value = '';
+  subtype.closest('label').hidden = ![...subtype.options].some(option => option.value && !option.disabled);
+  const balanceLabel = form.querySelector('[data-account-balance-label]');
+  if (balanceLabel) {
+    const liability = type.selectedOptions[0].dataset.liability === 'true';
+    balanceLabel.textContent = liability ? 'Current amount owed' : 'Current balance';
+    form.querySelector('[data-account-balance-hint]').textContent = liability ?
+      'Enter the amount you owe as a positive number. It reduces your net worth.' :
+      'Enter the current account balance or the estimated value of this asset.';
+  }
+}
+for (const form of document.querySelectorAll('[data-account-form]')) {
+  form.querySelector('[data-account-scope]').addEventListener('change', () => updateAccountFields(form));
+  form.querySelector('[data-account-type]').addEventListener('change', () => updateAccountFields(form));
+  updateAccountFields(form);
+}
+for (const button of document.querySelectorAll('[data-edit-account]')) button.addEventListener('click', () => {
+  const form = document.querySelector('[data-account-classification]');
+  form.dataset.api = `/accounts/${encodeURIComponent(button.dataset.editAccount)}`;
+  form.querySelector('[data-account-edit-name]').textContent = button.dataset.accountName;
+  form.elements.onBudget.value = button.dataset.accountOnBudget;
+  updateAccountFields(form);
+  form.elements.type.value = button.dataset.accountType;
+  updateAccountFields(form);
+  form.elements.subtype.value = button.dataset.accountSubtype;
+  form.querySelector('.field-error').hidden = true;
+});
 
 for (const button of document.querySelectorAll('[data-dialog]')) button.addEventListener('click', () => document.getElementById(button.dataset.dialog).showModal());
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => button.closest('dialog').close());

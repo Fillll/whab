@@ -4,7 +4,7 @@
 
 A highly extensible budgeting app built with Python, with monthly envelopes and rollover, transaction review, spending analytics and manual accounts. Plugins supply replaceable interfaces, storage, imports, reports and additional workflows.
 
-See the [architecture and Mermaid diagrams](../README.md#architecture), [runtime architecture](docs/architecture.md) and [budget and plugin model](docs/target-architecture.md). Current host version: **2.0.0** ([changelog](CHANGELOG.md)).
+See the [architecture and Mermaid diagrams](../README.md#architecture), [runtime architecture](docs/architecture.md) and [budget and plugin model](docs/target-architecture.md). Current host version: **2.1.0** ([changelog](CHANGELOG.md)).
 
 The [client/server deployment option](../README.md#clientserver-deployment) uses the same architecture: a client plugin connects an interface to a server plugin exposing an API interface capability.
 
@@ -49,6 +49,7 @@ For a YNAB ZIP dump, enable **ynab** in the plugin manager, save, and restart. I
 
 ## Limits and data safety
 
+- **Budget and tracking accounts:** on-budget checking, savings, cash and credit accounts participate in envelopes. Off-budget investments, retirement accounts (IRA, Roth IRA, 401(k) and others), property, loans and fixed-term deposits (including CDs) contribute to assets, liabilities and net worth without funding or consuming envelopes. Choose the scope, type and detail when adding an account, or use **Accounts → Edit classification** for an existing account. Account totals stay separate by currency and exclude stale or unavailable balances. Loan and credit balances use a positive amount owed. Investment holdings, prices and automatic property valuations are not imported.
 - **HTTPS and local access:** WHAB binds to `127.0.0.1` with TLS and checks Host/origin for ordinary routes. Only enabled remote protocol routes and registered bank webhooks bypass those local checks: remote routes require bearer authorization and webhooks require provider signature verification. HTTPS encrypts transport for all routes; it does not supply a family login system.
 - **Multiple currencies:** accounts and child categories declare an ISO currency; each currency has separate balances, activity, rollover and allocations. There is no automatic conversion. Money uses integer currency minor units. Plaid and the bundled YNAB importer currently accept USD only.
 - **Two category levels:** parent groups organize child categories. Only children receive transactions, targets and allocations. Core dates use `YYYY-MM-DD`; USD money uses `$1,234.56` (other currencies use their ISO code and fixed minor-unit precision). A selected interface plugin can override presentation.

@@ -9,6 +9,25 @@
             aria-label="Close dialog">{{ icon('close', 20) }}</button>
   </div>
 {% endmacro %}
+{% macro account_classification() %}
+    <label>
+      Budget scope<select name="onBudget" data-boolean-value data-account-scope>
+      <option value="true">On-budget · everyday budgeting</option>
+      <option value="false">Off-budget · assets and debts</option>
+      </select>
+    </label>
+    <label>
+      Account type<select name="type" data-account-type>
+      {% for account_type, label in account_types.items() %}<option value="{{ account_type }}" data-on-budget="{{ 'true' if account_type in on_budget_account_types else 'false' }}" data-liability="{{ 'true' if is_liability({'type': account_type}) else 'false' }}"{% if account_type not in on_budget_account_types %} disabled hidden{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      Account detail<select name="subtype" data-null data-account-subtype>
+      <option value="">General / unspecified</option>
+      {% for account_type, choices in account_subtypes.items() %}{% for subtype, label in choices.items() %}<option value="{{ subtype }}" data-account-type="{{ account_type }}"{% if account_type!='depository' %} disabled hidden{% endif %}>{{ label }}</option>{% endfor %}{% endfor %}
+      </select>
+    </label>
+{% endmacro %}
 <dialog class="modal"
         id="category-dialog">{{ heading('New category', 'Make space for something you want to budget for.') }}
   <form class="modal-form" data-api="/categories">
@@ -42,7 +61,7 @@
 </dialog>
 <dialog class="modal"
         id="account-dialog">{{ heading('Add manual account', 'Track an account without a bank connection.') }}
-  <form class="modal-form" data-api="/accounts">
+  <form class="modal-form" data-api="/accounts" data-account-form>
     <input type="hidden" name="workspace" value="{{ workspace }}">
     <label>
       Account name<input name="name"
@@ -51,26 +70,33 @@
        placeholder="e.g. Cash wallet"
        autofocus>
     </label>
-    <label>
-      Account type<select name="type">
-      <option value="depository">Cash / checking / savings</option>
-      <option value="credit">Credit card</option>
-      </select>
-    </label>
+    {{ account_classification() }}
+    <p class="settings-notice">On-budget accounts participate in your budget. Off-budget accounts track net worth without affecting budget income or spending.</p>
     <label>
       Currency<select name="currency">
       {% for code, digits in currency_choices %}<option value="{{ code }}" data-minor-units="{{ digits }}"{% if code==currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
       </select>
     </label>
     <label>
-      Current balance / amount owed<input name="balance"
+      <span data-account-balance-label>Current balance</span><input name="balance"
        data-cents data-minor-units="{{ minor_units }}"
        inputmode="decimal"
        value="0"
        required>
     </label>
+    <p class="settings-notice" data-account-balance-hint>Enter the current account balance.</p>
     <p class="field-error" role="alert" hidden></p>
     <button class="button primary full-width">Add account</button>
+  </form>
+</dialog>
+<dialog class="modal" id="account-classification-dialog">{{ heading('Account classification', 'Choose how this account is used in WHAB.') }}
+  <form class="modal-form" data-api="/accounts" data-method="PATCH" data-account-form data-account-classification>
+    <input type="hidden" name="workspace" value="{{ workspace }}">
+    <p class="settings-notice"><strong data-account-edit-name></strong></p>
+    {{ account_classification() }}
+    <p class="settings-notice">Changing budget scope applies to all transactions in this account. Off-budget accounts stay in net worth and are excluded from budget income, spending and category activity.</p>
+    <p class="field-error" role="alert" hidden></p>
+    <button class="button primary full-width">Save classification</button>
   </form>
 </dialog>
 <dialog class="modal"

@@ -24,6 +24,8 @@ def test_adapter_normalizes_records_and_keeps_memo_flags_and_reconciliation():
     for account in imported.accounts:
         assert account["institution"] == "YNAB export"
         assert account["type"] == "other"
+        assert account["onBudget"] is False
+        assert account["subtype"] is None
         assert account["stale"] is account["balanceUnknown"] is True
         assert account["source"] == "ynab"
     category, = imported.categories

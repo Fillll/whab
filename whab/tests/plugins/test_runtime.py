@@ -69,6 +69,17 @@ def test_empty_configuration_does_not_discover_or_load_plugins(monkeypatch):
     assert installed.loaded == 0
 
 
+def test_snapshot_account_scope_defaults_and_explicit_overrides():
+    assert AccountSnapshot("a", "Cash", "depository", "", 0).on_budget is True
+    assert AccountSnapshot("b", "IRA", "retirement", "ira", 0).on_budget is False
+    snapshot = AccountSnapshot("c", "Tracking cash", "depository", "", 0, on_budget=False)
+    assert copy_snapshot(BudgetSnapshot("demo", "2026-10", (snapshot,), (), ())).accounts[0].on_budget is False
+    with pytest.raises(FrozenInstanceError):
+        snapshot.on_budget = True
+    with pytest.raises(ValueError):
+        AccountSnapshot("d", "Bad scope", "depository", "", 0, on_budget="true")
+
+
 def test_only_explicitly_enabled_group_is_loaded(snapshot):
     enabled = FakeEntryPoint(
         "one", Plugin("one", "Enabled", insights=lambda _: (Insight("A", "1"),))

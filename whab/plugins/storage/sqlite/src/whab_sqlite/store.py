@@ -13,6 +13,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from whab.domain import commands
+from whab.domain.accounts import ACCOUNT_TYPES, normalize_account
 from whab.domain.budget import calculate_workspace
 from whab.domain.categories import create_category, ensure_child_category, public_categories
 from whab.domain.dates import current_month
@@ -118,7 +119,7 @@ class Store:
                 "id": row["id"],
                 "name": row["name"],
                 "institution": row["institution"],
-                "type": row["type"],
+                "type": row["type"] if row["type"] in ACCOUNT_TYPES else "other",
                 "balance": row["balance"],
                 "currency": row["currency"],
                 "source": row["source"],
@@ -129,7 +130,9 @@ class Store:
                 account["itemId"] = row["item_id"]
             if row["mask"]:
                 account["mask"] = row["mask"]
-            state["accounts"][row["id"]] = account
+            if "on_budget" in row.keys():
+                account.update(onBudget=bool(row["on_budget"]), subtype=row["subtype"])
+            state["accounts"][row["id"]] = normalize_account(account)
         for row in self.db.execute(
             "SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,)
         ):
@@ -183,7 +186,7 @@ class Store:
             (workspace, state["budgetStartMonth"]),
         )
         self.db.executemany(
-            "INSERT INTO accounts(id,workspace,name,institution,type,balance,source,item_id,mask,active,balance_unknown,currency) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,institution=excluded.institution,type=excluded.type,balance=excluded.balance,source=excluded.source,item_id=excluded.item_id,mask=excluded.mask,active=excluded.active,balance_unknown=excluded.balance_unknown,currency=excluded.currency",
+            "INSERT INTO accounts(id,workspace,name,institution,type,balance,source,item_id,mask,active,balance_unknown,currency,on_budget,subtype) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,institution=excluded.institution,type=excluded.type,balance=excluded.balance,source=excluded.source,item_id=excluded.item_id,mask=excluded.mask,active=excluded.active,balance_unknown=excluded.balance_unknown,currency=excluded.currency,on_budget=excluded.on_budget,subtype=excluded.subtype",
             [
                 (
                     a["id"],
@@ -198,8 +201,10 @@ class Store:
                     int(not a.get("stale")),
                     int(a.get("balanceUnknown", False)),
                     a.get("currency", "USD"),
+                    int(a["onBudget"]),
+                    a["subtype"],
                 )
-                for a in state["accounts"].values()
+                for a in map(normalize_account, state["accounts"].values())
             ],
         )
         self.db.executemany(
@@ -459,6 +464,9 @@ class Store:
         account_id = str(uuid4())
         return self._mutate(workspace, lambda state: commands.add_account(state, account_id, account))
 
+    def update_account(self, workspace: str, account_id: str, changes: dict) -> None:
+        self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
+
     def add_category(self, workspace: str, category: dict) -> str:
         category_id = str(uuid4())
         if set(category) - {"name", "group", "target", "parentId", "currency"}:
@@ -603,6 +611,9 @@ class Store:
                     and previous_account.get("currency", "USD") != normalized_account["currency"]
                 ):
                     raise StoreError("An existing account currency cannot change.")
+                if previous_account:
+                    for field in ("type", "onBudget", "subtype"):
+                        normalized_account[field] = previous_account[field]
                 state["accounts"][normalized_account["id"]] = normalized_account
             for imported in changes.get("added", []) + changes.get("modified", []):
                 validate_imported_transaction(imported)

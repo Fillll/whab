@@ -1,5 +1,6 @@
 """Explicit allowlist between the ledger's private state and the public plugin API."""
 
+from whab.domain.accounts import is_on_budget
 from whab.domain.budget import select_currency
 from whab.plugins import AccountSnapshot, BudgetSnapshot, CategorySnapshot, TransactionSnapshot
 
@@ -20,6 +21,7 @@ def build_snapshot(workspace, data):
                 balance_cents=a["balance"],
                 stale=bool(a.get("stale")),
                 balance_unknown=bool(a.get("balanceUnknown")),
+                on_budget=is_on_budget(a),
             )
             for a in data["accounts"]
         ),

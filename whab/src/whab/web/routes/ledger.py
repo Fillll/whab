@@ -13,6 +13,7 @@ from whab.domain.transactions import UNSET
 from whab.web.csv import safe_cell
 from whab.web.schemas import (
     AccountBody,
+    AccountClassificationBody,
     AssignmentBody,
     CategoryBody,
     ReviewBody,
@@ -113,5 +114,13 @@ def create_router(store):
     def account(body: AccountBody):
         account_id = store.add_account(body.workspace, body.model_dump(exclude={"workspace"}))
         return {"ok": True, "accountId": account_id}
+
+    @router.patch("/api/accounts/{account_id}")
+    def classify_account(account_id: str, body: AccountClassificationBody):
+        store.update_account(
+            body.workspace, account_id,
+            body.model_dump(exclude={"workspace"}, exclude_unset=True),
+        )
+        return {"ok": True}
 
     return router

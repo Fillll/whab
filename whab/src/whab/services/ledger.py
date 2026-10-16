@@ -13,6 +13,7 @@ from json import dumps
 from threading import RLock
 from uuid import uuid4
 
+from whab.domain.accounts import normalize_account
 from whab.domain.errors import StoreError
 from whab.domain.money import cents, currency_code
 from whab.domain.portable import validate_portable_budget
@@ -116,7 +117,8 @@ class LedgerService:
     @staticmethod
     def _validate(operation: str, payload: dict) -> dict:
         fields = {
-            "add_account": ({"name", "type", "balance"}, {"currency"}),
+            "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype"}),
+            "update_account": ({"accountId"}, {"type", "onBudget", "subtype"}),
             "add_category": ({"name", "target"}, {"group", "parentId", "currency"}),
             "add_transaction": (
                 {"accountId", "date", "merchant", "amount", "categoryId"}, {"note"},
@@ -144,10 +146,17 @@ class LedgerService:
         for name in ("target", "assigned"):
             if name in payload and payload[name] < 0:
                 raise StoreError("Targets and assignments cannot be negative.")
-        if operation == "add_account" and (
-            type(payload["type"]) is not str or payload["type"] not in {"depository", "credit"}
-        ):
-            raise StoreError("Invalid account type.")
+        if operation == "add_account":
+            normalize_account(payload)
+        if operation == "update_account":
+            if not payload.keys() & {"type", "onBudget", "subtype"}:
+                raise StoreError("No account changes provided.")
+            if "type" in payload:
+                normalize_account(payload)
+            if "onBudget" in payload and type(payload["onBudget"]) is not bool:
+                raise StoreError("Invalid account budget scope.")
+            if "subtype" in payload and payload["subtype"] is not None and type(payload["subtype"]) is not str:
+                raise StoreError("Invalid account subtype.")
         if operation == "add_transaction":
             validate_date(payload["date"])
             if not "1900-01-01" <= payload["date"] <= "2200-12-31":
@@ -186,6 +195,14 @@ class LedgerService:
                 raise RevisionConflict("Budget changed. Refresh before making this change.")
             if operation in {"add_account", "add_category", "add_transaction"}:
                 data = getattr(self._store, operation)(workspace, payload)
+            elif operation == "update_account":
+                update = getattr(self._store, "update_account", None)
+                if not callable(update):
+                    raise StoreError("This storage plugin does not support account classification changes.")
+                data = update(
+                    workspace, payload["accountId"],
+                    {key: value for key, value in payload.items() if key != "accountId"},
+                )
             elif operation == "edit_transaction":
                 data = self._store.edit_transaction(
                     workspace, payload["transactionId"],
@@ -225,6 +242,9 @@ class LedgerService:
 
     def add_account(self, workspace, account):
         return self._local_command("add_account", workspace, account)
+
+    def update_account(self, workspace, account_id, changes):
+        return self._local_command("update_account", workspace, {**changes, "accountId": account_id})
 
     def add_category(self, workspace, category):
         return self._local_command("add_category", workspace, category)

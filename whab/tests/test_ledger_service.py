@@ -72,7 +72,12 @@ def test_concurrent_writers_cannot_both_use_a_revision(store):
     ("add_account", {"name": "Cash"}),
     ("add_account", {"name": "Cash", "type": "credit", "balance": 0, "token": "no"}),
     ("add_account", {"name": "Cash", "type": [], "balance": 0}),
-    ("add_account", {"name": "Cash", "type": "investment", "balance": 0}),
+    ("add_account", {"name": "Cash", "type": "invalid", "balance": 0}),
+    ("add_account", {"name": "IRA", "type": "retirement", "balance": 0, "onBudget": True}),
+    ("add_account", {"name": "IRA", "type": "retirement", "balance": 0, "onBudget": "false"}),
+    ("update_account", {"accountId": "a"}),
+    ("update_account", {"accountId": "a", "onBudget": None}),
+    ("update_account", {"accountId": "a", "subtype": []}),
     ("add_account", {"name": "Cash", "type": "credit", "balance": True}),
     ("add_account", {"name": "Cash", "type": "credit", "balance": 0, "currency": "xyz"}),
     ("add_category", {"name": "Food", "target": -1}),
@@ -127,6 +132,31 @@ def test_external_ingestion_shares_revision_boundary(store):
     }))
     assert result in {row["id"] for row in service.accounts("personal")}
     assert service.revision != revision and saved == [True]
+
+
+def test_account_classification_uses_shared_revision_and_idempotency(store):
+    service = LedgerService(store)
+    account = service.add_account("personal", {
+        "name": "Brokerage", "type": "investment", "balance": 50000, "subtype": "brokerage",
+    })
+    revision = service.revision
+    payload = {"accountId": account, "type": "retirement", "subtype": "roth_ira", "onBudget": False}
+    response = service.command(
+        "update_account", "personal", payload, request_id="classify", expected_revision=revision,
+    )
+    assert service.command(
+        "update_account", "personal", payload, request_id="classify", expected_revision=revision,
+    ) == response
+    record = service.accounts("personal")[0]
+    assert (record["type"], record["subtype"], record["onBudget"]) == ("retirement", "roth_ira", False)
+    service.update_account("personal", account, {"type": "depository", "subtype": "savings", "onBudget": True})
+    assert service.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 50000
+
+
+def test_older_storage_can_open_without_optional_account_update():
+    service = LedgerService(SimpleNamespace())
+    with pytest.raises(StoreError, match="does not support account classification"):
+        service.update_account("personal", "a", {"onBudget": False})
 
 
 def test_shared_lock_invalidation_does_not_checkpoint(store):

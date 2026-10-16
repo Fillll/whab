@@ -4,6 +4,7 @@ No imported income is added to balance snapshots. Pre-budget history remains
 analytics data; stale cash and unknown credit balances cannot create funding.
 """
 
+from .accounts import account_summary, is_liability, is_on_budget, normalize_account
 from .categories import category_tree, ensure_child_category, public_categories
 from .dates import shift_month
 from .errors import StoreError
@@ -18,8 +19,12 @@ def _calculate_currency(state: dict, month: str) -> dict:
         public_transaction(t) for t in state["transactions"].values() if not t.get("deleted")
     ]
     transactions.sort(key=lambda t: (t["date"], t["id"]), reverse=True)
-    cleared = [t for t in transactions if not t["pending"] and not t["isTransfer"]]
+    cleared = [
+        t for t in transactions if not t["pending"] and not t["isTransfer"]
+        and is_on_budget(state["accounts"][t["accountId"]])
+    ]
     accounts = list(state["accounts"].values())
+    budget_accounts = [a for a in accounts if is_on_budget(a)]
 
     def income_for(rows):
         return -sum(
@@ -61,16 +66,17 @@ def _calculate_currency(state: dict, month: str) -> dict:
     later = [t for t in transactions if not t["pending"] and t["date"][:7] > month]
 
     def balance_at_month(account):
-        return account["balance"] + (-1 if account["type"] == "credit" else 1) * sum(
+        return account["balance"] + (-1 if is_liability(account) else 1) * sum(
             t["amount"] for t in later if t["accountId"] == account["id"]
         )
 
     cash = sum(
-        balance_at_month(a) for a in accounts if a["type"] == "depository" and not a.get("stale")
+        balance_at_month(a) for a in budget_accounts
+        if a["type"] == "depository" and not a.get("stale") and not a.get("balanceUnknown")
     )
-    debt = sum(max(0, balance_at_month(a)) for a in accounts if a["type"] == "credit")
+    debt = sum(max(0, balance_at_month(a)) for a in budget_accounts if a["type"] == "credit")
     ready = cash - debt - sum(max(0, row["available"]) for row in budget)
-    if any(a.get("balanceUnknown") and a["type"] == "credit" for a in accounts):
+    if any(a.get("balanceUnknown") and a["type"] == "credit" for a in budget_accounts):
         ready = min(0, ready)
     summary = {
         "income": income_for(active),
@@ -94,6 +100,7 @@ def _calculate_currency(state: dict, month: str) -> dict:
         "transactions": [t for t in transactions if t["date"].startswith(month)],
         "budget": budget,
         "summary": summary,
+        "accountSummary": account_summary(accounts),
         "trend": trend,
     }
 
@@ -125,7 +132,7 @@ def calculate_workspace(state: dict, month: str) -> dict:
     """Project each currency independently; never add or convert unlike money."""
     validate_month(month)
     accounts = {
-        key: {**row, "currency": currency_code(row.get("currency", "USD"))}
+        key: normalize_account({**row, "currency": currency_code(row.get("currency", "USD"))})
         for key, row in state["accounts"].items()
     }
     categories = {row["id"]: row for row in public_categories(state["categories"])}
@@ -184,6 +191,7 @@ def calculate_workspace(state: dict, month: str) -> dict:
             {**b, "currency": currency} for currency, p in projections.items() for b in p["budget"]
         ],
         "summariesByCurrency": {c: p["summary"] for c, p in projections.items()},
+        "accountSummariesByCurrency": {c: p["accountSummary"] for c, p in projections.items()},
         "trendsByCurrency": {c: p["trend"] for c, p in projections.items()},
     }
 
@@ -202,6 +210,9 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
         "currencyMinorUnits": currency_minor_units(currency),
         "currencies": sorted({*data.get("currencies", ["USD"]), currency}),
         "accounts": accounts,
+        "accountSummary": data.get("accountSummariesByCurrency", {}).get(
+            currency, account_summary(accounts)
+        ),
         "categories": categories,
         "categoryGroups": category_tree(categories),
         "transactions": [t for t in data["transactions"] if t["accountId"] in account_ids],

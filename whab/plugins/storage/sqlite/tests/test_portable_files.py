@@ -179,6 +179,8 @@ def test_row_counts_are_bounded_before_loading_ledger(store, payload):
 @pytest.mark.parametrize("statement,parameters", [
     ("UPDATE accounts SET active=?", (2,)),
     ("UPDATE accounts SET balance_unknown=?", ("yes",)),
+    ("UPDATE accounts SET on_budget=?", (2,)),
+    ("UPDATE accounts SET on_budget=?", ("yes",)),
     ("UPDATE transactions SET pending=?", (2,)),
     ("UPDATE transactions SET reviewed=?", ("yes",)),
 ])

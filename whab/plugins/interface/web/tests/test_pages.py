@@ -125,6 +125,65 @@ def test_empty_selected_currency_remains_selected_when_switching_workspaces(clie
     assert 'name="currency" value="EUR"' in text
 
 
+def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification(client):
+    accounts = {}
+    for name, kind, subtype, balance, on_budget in (
+        ("Everyday cash", "depository", "checking", 50000, True),
+        ("Long term investments", "investment", "brokerage", 250000, False),
+        ("Retirement reserve", "retirement", "401k", 350000, False),
+        ("Home financing", "loan", "mortgage", 100000, False),
+        ("Fixed deposit", "deposit", "cd", 200000, False),
+    ):
+        response = client.post("/api/accounts", json={
+            "workspace": "personal", "name": name, "type": kind, "subtype": subtype,
+            "balance": balance, "onBudget": on_budget,
+        })
+        assert response.status_code == 200
+        accounts[name] = response.json()["accountId"]
+    text = client.get("/?page=accounts&workspace=personal&month=2026-10").text
+    assert 'aria-label="On-budget accounts"' in text
+    assert 'aria-label="Off-budget accounts"' in text
+    assert 'aria-label="Account totals in USD"' in text
+    assert '<dt>Assets</dt><dd>$8,500.00</dd>' in text
+    assert '<dt>Liabilities</dt><dd>$1,000.00</dd>' in text
+    assert '<dt>Net worth</dt><dd>$7,500.00</dd>' in text
+    assert 'On-budget cash balances · USD</span><strong>$500.00' in text
+    assert '401(k)' in text and 'Brokerage' in text and 'Mortgage' in text
+    assert 'Certificate of deposit (CD)' in text
+    assert 'name="onBudget" data-boolean-value' in text
+    assert 'data-edit-account="' + accounts["Long term investments"] + '"' in text
+    assert 'data-account-subtype="brokerage"' in text
+    assert 'Changing budget scope applies to all transactions' in text
+    assert 'data-on-budget="false" data-liability="true" disabled hidden>Loan' in text
+    assert client.patch("/api/accounts/" + accounts["Everyday cash"], json={
+        "workspace": "personal", "type": "depository", "onBudget": False,
+        "subtype": "savings",
+    }).status_code == 200
+    text = client.get("/?page=accounts&workspace=personal&month=2026-10").text
+    assert 'data-account-on-budget="false" data-account-subtype="savings"' in text
+    assert 'On-budget cash balances · USD</span><strong>$0.00' in text
+    assert '<dt>Net worth</dt><dd>$7,500.00</dd>' in text
+
+
+def test_off_budget_transactions_remain_visible_and_marked_excluded(client):
+    response = client.post("/api/accounts", json={
+        "workspace": "personal", "name": "Investment reserve", "type": "investment",
+        "subtype": "brokerage", "balance": 100000, "onBudget": False,
+    })
+    assert response.status_code == 200
+    assert client.post("/api/transactions", json={
+        "workspace": "personal", "accountId": response.json()["accountId"],
+        "date": "2026-10-05", "merchant": "Investment fee", "amount": 500,
+        "categoryId": None,
+    }).status_code == 200
+    text = client.get("/?page=transactions&workspace=personal&month=2026-10").text
+    assert "Investment fee" in text
+    assert "Off-budget · excluded from budget" in text
+    insights = client.get("/?page=insights&workspace=personal&month=2026-10").text
+    assert "Investment fee" not in insights
+    assert "Insights use on-budget accounts" in insights
+
+
 def test_portable_budget_name_labels_personal_pages_and_preserves_demo(client):
     import re
 

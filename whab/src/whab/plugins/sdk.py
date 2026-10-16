@@ -10,6 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Protocol, TypeAlias
 
+from whab.domain.accounts import is_on_budget
 from whab.domain.categories import category_group_id, validate_child_category
 from whab.domain.file_imports import WorkspaceImport
 from whab.domain.imports import ImportedAccount, SyncChanges
@@ -61,6 +62,7 @@ class AccountSnapshot:
     balance_cents: int
     balance_unknown: bool = False
     stale: bool = False
+    on_budget: bool | None = None
 
     def __post_init__(self) -> None:
         _identifier(self.id, "Account ID")
@@ -70,6 +72,9 @@ class AccountSnapshot:
         _integer(self.balance_cents, "Account balance")
         _boolean(self.balance_unknown, "Unknown balance")
         _boolean(self.stale, "Stale balance")
+        if self.on_budget is None:
+            object.__setattr__(self, "on_budget", is_on_budget({"type": self.type}))
+        _boolean(self.on_budget, "Account budget scope")
 
 
 @dataclass(frozen=True, slots=True)

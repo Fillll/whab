@@ -6,11 +6,16 @@ from urllib.parse import urlencode
 from whab import __version__
 from whab.domain.dates import today
 from whab.plugins import (
+    ACCOUNT_SUBTYPES,
+    ACCOUNT_TYPES,
+    ON_BUDGET_ACCOUNT_TYPES,
     SUPPORTED_CURRENCIES,
     currency_code,
     currency_minor_units,
     format_date,
     format_money,
+    is_liability,
+    is_on_budget,
 )
 
 from .icons import category_icon, icon
@@ -71,12 +76,17 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
             }
         )
     transactions = sorted(data["transactions"], key=lambda t: t["date"], reverse=True)
+    accounts_by_id = {a["id"]: a for a in data["accounts"]}
     spending = defaultdict(int)
     payees = defaultdict(int)
     purchases = 0
     uncategorized = 0
     for transaction in transactions:
-        if transaction["pending"] or transaction.get("isTransfer"):
+        account = accounts_by_id.get(transaction.get("accountId"))
+        if (
+            transaction["pending"] or transaction.get("isTransfer")
+            or (account is not None and not is_on_budget(account))
+        ):
             continue
         if transaction["amount"] > 0:
             purchases += 1
@@ -150,13 +160,40 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "selected": selected,
         "selected_budget": budgets.get(selected["id"]) if selected else None,
         "transactions": transactions,
-        "accounts_by_id": {a["id"]: a for a in data["accounts"]},
+        "accounts_by_id": accounts_by_id,
+        "account_groups": [
+            {
+                "label": "On-budget", "on_budget": True,
+                "description": "Checking, savings and credit accounts used for everyday budgeting.",
+                "accounts": [a for a in data["accounts"] if is_on_budget(a)],
+            },
+            {
+                "label": "Off-budget", "on_budget": False,
+                "description": (
+                    "Investments, retirement, property, loans and deposits tracked in your net worth. "
+                    "Their balances and transactions stay outside your budget."
+                ),
+                "accounts": [a for a in data["accounts"] if not is_on_budget(a)],
+            },
+        ],
+        "account_types": ACCOUNT_TYPES,
+        "on_budget_account_types": ON_BUDGET_ACCOUNT_TYPES,
+        "account_subtypes": ACCOUNT_SUBTYPES,
+        "account_summary": data.get(
+            "accountSummary", {"assets": 0, "liabilities": 0, "netWorth": 0}
+        ),
+        "account_label": lambda account: ACCOUNT_SUBTYPES.get(account["type"], {}).get(
+            account.get("subtype"), ACCOUNT_TYPES.get(account["type"], account["type"])
+        ),
+        "is_liability": is_liability,
+        "is_on_budget": is_on_budget,
         "manual_accounts": [a for a in data["accounts"] if a["source"] in {"manual", "demo"}],
         "to_review": sum(not t["reviewed"] and not t["pending"] for t in transactions),
         "cash_balance": sum(
             a["balance"]
             for a in data["accounts"]
-            if a["type"] == "depository" and not a.get("stale") and not a.get("balanceUnknown")
+            if a["type"] == "depository" and is_on_budget(a)
+            and not a.get("stale") and not a.get("balanceUnknown")
         ),
         "spending": spending_rows,
         "payees": sorted(

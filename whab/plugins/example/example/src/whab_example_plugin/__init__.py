@@ -4,7 +4,11 @@ from whab.plugins import BudgetSnapshot, ExportTable, Insight, Plugin, format_mo
 
 
 def insights(snapshot: BudgetSnapshot) -> tuple[Insight, ...]:
-    cleared = tuple(row for row in snapshot.transactions if not row.pending and not row.is_transfer)
+    budget_accounts = {account.id for account in snapshot.accounts if account.on_budget}
+    cleared = tuple(
+        row for row in snapshot.transactions
+        if row.account_id in budget_accounts and not row.pending and not row.is_transfer
+    )
     spending = sum(row.amount_cents for row in cleared if row.amount_cents > 0)
     refunds = -sum(
         row.amount_cents for row in cleared if row.amount_cents < 0 and row.category_id is not None
@@ -16,12 +20,12 @@ def insights(snapshot: BudgetSnapshot) -> tuple[Insight, ...]:
         Insight(
             "Net spending",
             format_money(spending - refunds, snapshot.currency),
-            f"{snapshot.month}: cleared purchases less categorized refunds; pending and transfers excluded.",
+            f"{snapshot.month}: on-budget purchases less categorized refunds; pending and transfers excluded.",
         ),
         Insight(
             "Income",
             format_money(income, snapshot.currency),
-            "Uncategorized cleared inflows. This is transaction analytics, not extra assignable cash.",
+            "Uncategorized cleared on-budget inflows. This is transaction analytics, not extra assignable cash.",
         ),
     )
 
