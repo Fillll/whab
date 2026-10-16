@@ -1,5 +1,10 @@
 # Web interface plugin changelog
 
+## 1.3.0 — 2026-10-16
+
+- Add Light and Dark appearance options in Settings → Plugins → WHAB web → Options, with the compass logo's red and yellow accents. Apply changes immediately and remember the choice in this browser.
+- Use warm light and charcoal dark surfaces with accessible action, selection and status colors. Restore the appearance before first paint and version browser assets with the web plugin's own version.
+
 ## 1.2.0 — 2026-10-16
 
 - Replace the single-month budget layout with an Actual-inspired dark workspace: three aligned monthly summaries and a continuous category table with Assigned, Activity and Available columns.

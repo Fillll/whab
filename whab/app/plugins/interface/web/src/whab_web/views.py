@@ -1,6 +1,7 @@
 """Web presentation helpers over already-calculated public ledger views."""
 
 from collections import defaultdict
+from importlib.metadata import version as package_version
 from urllib.parse import quote, urlencode
 
 from whab import __version__
@@ -20,6 +21,8 @@ from whab.plugins import (
 )
 
 from .icons import category_icon, icon
+
+WEB_ASSET_VERSION = package_version("whab-web-plugin")
 
 
 def money_input(value, currency="USD"):
@@ -188,6 +191,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
 
     return {
         "version": __version__,
+        "web_asset_version": WEB_ASSET_VERSION,
         "data": data,
         "status": status,
         "items": items,

@@ -263,6 +263,17 @@
     <div><dt>Runtime</dt><dd>{{ 'Running' if plugin.active else 'Not running' }}</dd></div>
   </dl>
   {% if plugin.reason %}<p class="settings-notice">{{ plugin.reason }}</p>{% endif %}
+  {% if plugin.id == 'web' and plugin.active %}
+  <fieldset class="appearance-settings">
+    <legend>Appearance</legend>
+    <p class="settings-notice">Choose how WHAB web looks in this browser.</p>
+    <div class="appearance-options">
+      <label class="appearance-choice"><input type="radio" name="web-appearance" value="light" data-appearance-choice><span><strong>Light</strong><small>Warm surfaces, red and yellow accents</small></span></label>
+      <label class="appearance-choice"><input type="radio" name="web-appearance" value="dark" data-appearance-choice><span><strong>Dark</strong><small>Charcoal surfaces, red and yellow accents</small></span></label>
+    </div>
+    <p class="settings-notice" data-appearance-status role="status" aria-live="polite">Changes apply immediately and are remembered in this browser.</p>
+  </fieldset>
+  {% endif %}
   <section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings>{% if not plugin.active %}<p class="settings-notice">{% if plugin.enabled %}Restart WHAB to view this plugin’s settings.{% else %}Enable this plugin, save your selection, and restart WHAB to view its settings.{% endif %}</p>{% endif %}</section>
   <p class="settings-notice" role="status" data-plugin-settings-status></p>
   <p class="field-error" role="alert" data-plugin-settings-error hidden></p>

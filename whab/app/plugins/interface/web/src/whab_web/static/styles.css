@@ -1,33 +1,95 @@
 :root {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color-scheme: dark;
   color: var(--ink);
   background: var(--page);
   font-synthesis: none;
   font-weight: 400;
-  --action: #efc565;
-  --action-hover: #f6d58b;
-  --ink: #dce7f0;
-  --text-secondary: #b3c5d5;
-  --muted: #9eb3c6;
-  --quiet: #7993aa;
-  --page: #0b1421;
-  --sidebar: #11263a;
-  --line: #344d63;
-  --surface: #142c42;
-  --field: #102236;
-  --current: #20394f;
-  --table-heading: #263f55;
-  --table-group: #2c465c;
-  --accent: #efc56516;
-  --accent-border: #efc56555;
-  --yellow-surface: #efc56514;
-  --yellow-ink: #efc565;
-  --success: #65d9b0;
-  --success-surface: #65d9b014;
-  --success-progress: #65d9b0;
-  --danger: #ff9297;
-  --danger-surface: #ff929714;
+  --brand-red: #c52f36;
+  --brand-yellow: #ffd338;
+  --action-fill: var(--brand-red);
+  --action-hover: #ab252c;
+  --action-ink: #fff;
+  --selection: var(--brand-yellow);
+  --selection-ink: #28231f;
+}
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --action: #f58b8e;
+  --ink: #f4f0e8;
+  --text-secondary: #d5cbbf;
+  --muted: #c0b5a8;
+  --quiet: #b0a596;
+  --page: #191715;
+  --sidebar: #211e1b;
+  --line: #4c443b;
+  --surface: #25221f;
+  --field: #201d1a;
+  --current: #322d27;
+  --table-heading: #39322b;
+  --table-group: #302a24;
+  --row-hover: #40372d;
+  --accent: #ffd33816;
+  --accent-border: #a38327;
+  --accent-ink: #ffd338;
+  --focus: #ffd338;
+  --yellow-surface: #ffd33812;
+  --yellow-ink: #ffd338;
+  --success: #8fd3ae;
+  --success-surface: #8fd3ae16;
+  --success-progress: #8fd3ae;
+  --danger: #ff9a9e;
+  --danger-surface: #ff9a9e14;
+  --chart-line: #f58b8e;
+  --summary-footer: #ffffff04;
+  --input-hover: #ffffff05;
+  --control-border: #8f8171;
+  --input-hover-border: #8f8171;
+  --inspector-border: #756552;
+  --shadow-soft: #0d080520;
+  --shadow-toast: #0d080560;
+  --shadow-modal: #0d0805aa;
+  --shadow-inspector: #0d0805aa;
+  --backdrop: #0d080590;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+  --action: #c52f36;
+  --ink: #28231f;
+  --text-secondary: #524a42;
+  --muted: #6b6156;
+  --quiet: #6e6357;
+  --page: #faf8f2;
+  --sidebar: #f2eee5;
+  --line: #cfc7ba;
+  --surface: #fff;
+  --field: #fffdf8;
+  --current: #f4efe3;
+  --table-heading: #eae3d5;
+  --table-group: #f0ebe0;
+  --row-hover: #eee5d3;
+  --accent: #fff1be;
+  --accent-border: #a67c12;
+  --accent-ink: #755600;
+  --focus: #947000;
+  --yellow-surface: #fff5d0;
+  --yellow-ink: #806000;
+  --success: #26734b;
+  --success-surface: #26734b12;
+  --success-progress: #26734b;
+  --danger: #b4232f;
+  --danger-surface: #b4232f0d;
+  --chart-line: #c52f36;
+  --summary-footer: #28231f04;
+  --input-hover: #28231f05;
+  --control-border: #8e8170;
+  --input-hover-border: #8e8170;
+  --inspector-border: #b4a58e;
+  --shadow-soft: #38281912;
+  --shadow-toast: #38281920;
+  --shadow-modal: #38281930;
+  --shadow-inspector: #38281930;
+  --backdrop: #20180f66;
 }
 * {
   box-sizing: border-box;
@@ -73,7 +135,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--action);
+  outline: 2px solid var(--focus);
 }
 button {
   border: 0;
@@ -81,7 +143,7 @@ button {
 }
 input,
 select {
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   border-radius: 7px;
   background: var(--field);
   color: var(--ink);
@@ -89,7 +151,7 @@ select {
   padding: 9px 11px;
 }
 input[type='checkbox'] {
-  accent-color: var(--action);
+  accent-color: var(--action-fill);
   min-height: 0;
   width: 16px;
   height: 16px;
@@ -199,11 +261,11 @@ strong {
 }
 .nav-item.active {
   background: var(--accent);
-  color: var(--action);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 .nav-item.active svg {
-  color: var(--action);
+  color: var(--accent-ink);
 }
 .nav-count {
   margin-left: auto;
@@ -454,9 +516,9 @@ strong {
   transform: translateY(-1px);
 }
 .button.primary {
-  background: var(--action);
-  color: var(--page);
-  border: 1px solid var(--action);
+  background: var(--action-fill);
+  color: var(--action-ink);
+  border: 1px solid var(--action-fill);
 }
 .button.primary:hover {
   background: var(--action-hover);
@@ -638,11 +700,11 @@ strong {
   align-items: center;
   margin-top: 8px;
   margin-bottom: 11px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   border-radius: 6px;
   background: var(--field);
   overflow: hidden;
-  box-shadow: 0 1px 2px #030a1320;
+  box-shadow: 0 1px 2px var(--shadow-soft);
 }
 .money-input > span {
   padding-left: 11px;
@@ -730,7 +792,7 @@ strong {
   line-height: 1.6;
   padding: 12px 16px;
   border-radius: 9px;
-  box-shadow: 0 6px 24px #030a1360;
+  box-shadow: 0 6px 24px var(--shadow-toast);
   animation: toast-enter 0.2s ease-out;
 }
 .toast button {
@@ -750,7 +812,7 @@ strong {
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   border-radius: 7px;
   background: var(--field);
   padding-left: 11px;
@@ -794,7 +856,7 @@ strong {
 .filter-button.selected {
   background: var(--accent);
   border-color: var(--accent-border);
-  color: var(--action);
+  color: var(--accent-ink);
 }
 .transactions-table {
   width: 100%;
@@ -1000,7 +1062,7 @@ strong {
 .chart-legend > span {
   width: 6px;
   height: 6px;
-  background: var(--action);
+  background: var(--chart-line);
   border-radius: 50%;
 }
 .spend-chart {
@@ -1049,7 +1111,7 @@ strong {
 }
 .spend-bar > span {
   display: block;
-  background: var(--action);
+  background: var(--chart-line);
   height: 100%;
   border-radius: 5px;
   transition: width 0.4s ease;
@@ -1393,12 +1455,12 @@ strong {
   color: var(--ink);
   width: 430px;
   max-width: calc(100vw - 30px);
-  box-shadow: 0 24px 100px #030a13aa;
+  box-shadow: 0 24px 100px var(--shadow-modal);
   max-height: calc(100dvh - 40px);
   overflow: auto;
 }
 .modal::backdrop {
-  background: #030a1390;
+  background: var(--backdrop);
   backdrop-filter: blur(3px);
 }
 .modal[open] {
@@ -1587,6 +1649,82 @@ strong {
   display: flex;
   justify-content: flex-end;
   margin-top: 18px;
+}
+.appearance-settings {
+  min-width: 0;
+  margin: 24px 0 0;
+  padding: 18px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.appearance-settings legend {
+  padding: 0 9px 0 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.appearance-settings .settings-notice {
+  margin: 0 0 14px;
+}
+.appearance-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.appearance-choice {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 5px 10px;
+  min-width: 0;
+  padding: 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--field);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.appearance-choice:hover {
+  border-color: var(--input-hover-border);
+}
+.appearance-choice:has(input:checked) {
+  border-color: var(--accent-border);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+.appearance-choice input[type='radio'] {
+  grid-row: 1 / span 2;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--focus);
+  cursor: pointer;
+}
+.appearance-choice > span,
+.appearance-choice > strong,
+.appearance-choice > small {
+  grid-column: 2;
+  min-width: 0;
+}
+.appearance-choice strong {
+  display: block;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 16px;
+}
+.appearance-choice small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+@media (max-width: 380px) {
+  .appearance-options {
+    grid-template-columns: 1fr;
+  }
 }
 .settings-menu > button {
   display: flex;
@@ -2505,7 +2643,7 @@ strong {
   border-radius: 5px;
 }
 .nav-item.active {
-  box-shadow: inset 2px 0 var(--action);
+  box-shadow: inset 2px 0 var(--selection);
 }
 .sidebar-accounts {
   margin-top: 26px;
@@ -2586,7 +2724,7 @@ strong {
   padding: 0 14px 20px;
 }
 .button.primary {
-  color: var(--page);
+  color: var(--action-ink);
 }
 .modal {
   background: var(--surface);
@@ -2647,11 +2785,11 @@ strong {
 }
 .month-link.in-range {
   background: var(--accent);
-  color: var(--action);
+  color: var(--accent-ink);
 }
 .month-link.is-selected {
-  background: var(--action);
-  color: var(--page);
+  background: var(--selection);
+  color: var(--selection-ink);
   font-weight: 650;
 }
 .budget-toolbar > .button {
@@ -2733,7 +2871,7 @@ strong {
   content: '';
   inset: 0 0 auto;
   height: 2px;
-  background: var(--action);
+  background: var(--selection);
 }
 .budget-month-heading {
   display: flex;
@@ -2780,7 +2918,7 @@ strong {
   gap: 4px;
   border-top: 1px solid var(--line);
   padding: 10px 13px 12px;
-  background: #ffffff03;
+  background: var(--summary-footer);
 }
 .budget-summary-lines > div {
   display: flex;
@@ -2868,10 +3006,10 @@ strong {
 }
 .budget-category-row:hover td,
 .budget-category-row:focus-within td {
-  background: #2a445b;
+  background: var(--row-hover);
 }
 .budget-category-row.selected td:first-child {
-  box-shadow: inset 2px 0 var(--action);
+  box-shadow: inset 2px 0 var(--selection);
 }
 .budget-category-link {
   display: flex;
@@ -2905,8 +3043,8 @@ strong {
   transition: background 0.12s, border-color 0.12s;
 }
 .budget-assignment input[data-cents]:hover {
-  border-color: #8aa1b855;
-  background: #ffffff05;
+  border-color: var(--input-hover-border);
+  background: var(--input-hover);
 }
 .budget-assignment input[data-cents]:focus {
   border-color: var(--action);
@@ -2933,8 +3071,8 @@ strong {
   z-index: 3;
   padding: 5px 8px;
   border-radius: 3px;
-  background: var(--action);
-  color: var(--page);
+  background: var(--action-fill);
+  color: var(--action-ink);
   font-size: 10px;
   opacity: 0;
   pointer-events: none;
@@ -2993,10 +3131,10 @@ strong {
   overflow: auto;
   margin: 0;
   padding: 0;
-  border-color: #526b80;
+  border-color: var(--inspector-border);
   border-radius: 7px;
   background: var(--surface);
-  box-shadow: 0 15px 45px #020a16aa;
+  box-shadow: 0 15px 45px var(--shadow-inspector);
 }
 .budget-planner .inspector-head {
   padding: 18px 46px 18px 18px;

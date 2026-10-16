@@ -34,13 +34,13 @@
        viewBox="0 0 880 230"
        role="img"
        aria-label="Monthly spending over six months">
-    <defs><linearGradient id="spend-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--brand-red)" stop-opacity=".13" /><stop offset="100%" stop-color="var(--brand-red)" stop-opacity="0" /></linearGradient></defs>
+    <defs><linearGradient id="spend-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--chart-line)" stop-opacity=".13" /><stop offset="100%" stop-color="var(--chart-line)" stop-opacity="0" /></linearGradient></defs>
     {% for tick in chart_ticks %}<line x1="112" x2="864" y1="{{ tick.y }}" y2="{{ tick.y }}" stroke="var(--line)" stroke-dasharray="4 5" /><text x="100" y="{{ tick.y+4 }}" text-anchor="end">{{ money(tick.amount) }}</text>
     {% endfor %}
     {% if points %}
       <path d="{{ chart_path }} L{{ points[-1].x }},192 L112,192 Z" fill="url(#spend-fill)" />
-      <path d="{{ chart_path }}" fill="none" stroke="var(--brand-red)" stroke-width="2.5" stroke-linejoin="round" />
-      {% for point in points %}<circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" fill="var(--page)" stroke="var(--brand-red)" stroke-width="2"><title>{{ month_label(point.month) }}: {{ money(point.spent) }}</title></circle><text x="{{ point.x }}" y="219" text-anchor="middle">{{ month_label(point.month,true) }}</text>
+      <path d="{{ chart_path }}" fill="none" stroke="var(--chart-line)" stroke-width="2.5" stroke-linejoin="round" />
+      {% for point in points %}<circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" fill="var(--page)" stroke="var(--chart-line)" stroke-width="2"><title>{{ month_label(point.month) }}: {{ money(point.spent) }}</title></circle><text x="{{ point.x }}" y="219" text-anchor="middle">{{ month_label(point.month,true) }}</text>
       {% endfor %}
     {% endif %}
   </svg>

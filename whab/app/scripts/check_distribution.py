@@ -71,7 +71,7 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
         response = client.get("/", params={"page": page, "workspace": "demo"})
         assert response.status_code == 200, page
         assert f"WHAB · {whab.__version__}" in response.text
-    for asset in ("styles.css", "app.js", "favicon.svg", "logo.svg"):
+    for asset in ("styles.css", "theme.js", "app.js", "favicon.svg", "logo.svg"):
         assert client.get("/static/" + asset).status_code == 200, asset
     assert client.get("/plugins/plaid/static/connect.js").status_code == 200
     assert client.get("/imports/ynab/static/import.js").status_code == 200
