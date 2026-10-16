@@ -1,6 +1,10 @@
-# WHAB — We Have A Budget
+<p align="center">
+  <img src="whab/plugins/interface/web/src/whab_web/static/logo.svg" alt="WHAB logo" width="128" height="128">
+</p>
+<h1 align="center">WHAB</h1>
+<p align="center"><strong>We Have A Budget</strong></p>
 
-A local budgeting app with monthly envelopes and rollover, transaction review, spending analytics, manual accounts, CSV exports, and optional Plaid bank imports. Built with Python, FastAPI and Jinja; no Node.js build is required.
+A highly extensible budgeting app built with Python. Plan with monthly envelopes and rollover, review transactions, explore spending analytics, and track manual accounts, with optional CSV exports and bank imports. Choose plugins to keep your setup as simple or as capable as you need.
 
 ## Quick start
 
@@ -18,70 +22,59 @@ Open [127.0.0.1:5173](http://127.0.0.1:5173) to explore fictional demo data, or 
 
 ## Architecture
 
-**Proposed direction:** a minimal financial core for accounts, transactions, categories and budgets. Almost everything else is supplied by plugins. A small host handles plugin discovery, capability contracts and lifecycle outside the domain core.
-
-The proposed design combines two architecture patterns:
-
-- **[Microkernel (plugin architecture)](https://www.oreilly.com/library/view/fundamentals-of-software/9781492043447/ch12.html):** a small financial core, with a host managing replaceable plugins.
-- **[Hexagonal (ports and adapters)](https://alistair.cockburn.us/hexagonal-architecture):** financial rules stay independent of interfaces, storage and providers, which connect through defined contracts.
-
-The [client/server arrangement](#alternative-proposal-client-and-server) is an optional deployment of this design.
+WHAB uses a **plugin architecture with a hexagonal financial core**. The core owns accounts, transactions, categories and budgets; replaceable plugins connect through defined contracts. A small host handles plugin discovery, configuration and lifecycle outside the financial rules.
 
 ```mermaid
 flowchart LR
-    Interface["Interface plugins<br/>Web · API · TUI · CLI<br/>Bank logos"] --- Core
-    Ingestion["Ingestion plugins<br/>Plaid · Statements<br/>Manual entry · YNAB"] --- Core
-    Automation["Automation plugins<br/>Smart categorization<br/>Rules · Random forest"] --- Core
+    Interface["Interface plugins<br/>Presentation and access"] --- Core
+    Ingestion["Ingestion plugins<br/>Imports and data entry"] --- Core
+    Automation["Automation plugins<br/>Rules and suggestions"] --- Core
 
-    Core["Core<br/>Accounts · Transactions<br/>Categories · Budget"] --- Storage["Storage plugins · required<br/>At least one active"]
-    Core --- Insight["Insight plugins<br/>Sankey diagrams · Reports"]
-    Core --- Extension["Extension plugins<br/>Mortgages · Loans<br/>Investments · Stocks"]
+    Core["Financial core<br/>Accounts · Transactions<br/>Categories · Budget"] --- Storage["Storage plugins<br/>Save the budget"]
+    Core --- Insight["Insight plugins<br/>Reports and exports"]
+    Core --- Extension["Extension plugins<br/>Specialized models"]
 
     classDef domain fill:#fff6d6,stroke:#b83a36,stroke-width:2px
     class Core domain
 ```
 
-Each surrounding box is a plugin family; connections show capability boundaries around the core, not code imports. At least one storage plugin must be active, and multiple storage plugins may be selected. Interactive use needs at least one usable interface. Bank logos enhance an interface. One plugin may supply several capabilities.
+Each surrounding box is a plugin family. A plugin can provide several capabilities, and each budget chooses the features it uses. Interfaces present the budget, ingestion normalizes incoming data, insights read scoped snapshots, and automations and extensions work through validated financial operations. At least one storage plugin saves the budget; multiple storage destinations hold copies of that same budget.
 
-The core validates every ledger change and owns financial rules. Ingestion submits normalized inputs, Insight reads snapshots, Extension adds specialized models, and Automation suggests or applies configured actions through core commands. Random forest is one replaceable categorization implementation.
+Plugin code is installed in WHAB. The budget owns its enabled plugins, settings and saved plugin state, so opening a portable budget restores its feature setup. Credentials and device-specific connections stay with the machine or server. See the [architecture guide](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md) for the implemented contracts and capability boundaries.
 
-Contributor folders use singular category names under `whab/plugins/`: `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`. Each plugin owns `plugins/<category>/<id>/`; see [folder ownership and naming](whab/plugins/README.md). The example category contains teaching plugins rather than an additional runtime capability.
+Concrete plugins live under `whab/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/plugins/README.md).
 
-This is a design proposal. The current app still owns its HTTP API, and SDK v1 does not yet support all of these capabilities. See the [target design](whab/docs/target-architecture.md) and [current implementation](whab/docs/architecture.md).
+### Client/server deployment
 
-### Alternative proposal: client and server
-
-Two WHAB instances could separate the interface from persistent storage. The **client** runs an interface and selects a remote storage plugin that forwards ledger reads and changes to the other instance's API. The **server** runs headlessly, with an **API interface plugin** as its only interface, and uses a storage plugin such as SQLite to keep the authoritative ledger.
+The same architecture supports separating presentation from persistence. A **client plugin** connects an interface to a remote budget; a **server plugin** provides an API interface through which the server's financial core validates budget operations.
 
 ```mermaid
 flowchart LR
     subgraph Client["WHAB instance · client"]
-        UI["Interface plugin<br/>Web · TUI · CLI"] --> ClientCore["Financial core"]
-        ClientCore --> Remote["Remote storage plugin"]
+        UI["Interface plugin"] --> ClientCore["Financial core"]
+        ClientCore --> Remote["Client plugin<br/>Remote storage capability"]
     end
-    subgraph Server["WHAB instance · server · no visual UI"]
-        API["API interface plugin"] --> ServerCore["Authoritative financial core"]
-        ServerCore --> Store["Persistent storage plugin<br/>e.g. SQLite"]
+    subgraph Server["WHAB instance · server"]
+        API["Server plugin<br/>API interface capability"] --> ServerCore["Authoritative financial core"]
+        ServerCore --> Store["Persistent storage plugin"]
     end
-    Remote <-->|Authenticated HTTPS API| API
+    Remote <-->|Authenticated connection| API
 ```
 
-The server validates every change before saving it. Bank ingestion and credentials stay on the server; the client uses scoped ledger operations. This proposal requires a remote storage plugin, a defined remote API contract, authentication and authorization. Headless mode (`WHAB_UI=`) exists today with a host-owned API, but this client/server deployment is **not implemented**; the current app remains local only. See the [client/server design proposal](whab/docs/target-architecture.md#clientserver-deployment-proposal) for ownership and consistency requirements.
+A plugin's primary category describes its role; its capabilities can include connection controls, interface contributions and storage. The budget describes its features, while the deployment selects where each capability runs. Bank ingestion and credentials stay on the server; clients use scoped ledger operations. See [deployment boundaries](whab/docs/target-architecture.md#clientserver-deployment) for ownership and the remote contract.
 
 ## Guides
 
 - [Application setup and configuration](whab/README.md)
-- [Local usage, Plaid setup, budgets and backups](whab/docs/usage.md)
-- [Target architecture](whab/docs/target-architecture.md) and [current implementation](whab/docs/architecture.md)
+- [Usage, bank imports, portable budgets and backups](whab/docs/usage.md)
+- [Architecture](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md)
 - [Plugin API](whab/docs/plugins.md) and [plugin folders](whab/plugins/README.md)
 - [Contributing and checks](whab/CONTRIBUTING.md) · [Changelog](whab/CHANGELOG.md)
 
-## Limits and privacy
+## Privacy and control
 
-WHAB is a **local, USD-only prototype** without family authentication. Keep it bound to localhost. Plaid defaults to Sandbox; live connections require explicit configuration. Investment holdings, splits, manual/import reconciliation and a full credit-card payment model are not implemented.
-
-Keep `.env`, `plugins.json` and financial data out of Git. Preserve the existing runtime home and token encryption key when upgrading; see the [backup guidance](whab/docs/usage.md#local-access-and-private-files).
+Your budget, your setup. WHAB can run completely locally in an isolated environment. Enable plugins when you need their capabilities, choose which services they connect to, and disable them when you no longer need them. This keeps your environment minimal, understandable and under your control. Plugins run as trusted Python code, so choose the code and connections you enable deliberately.
 
 ## License
 
-[MIT](LICENSE). Third-party dependencies, services and institution logos retain their own licenses or terms.
+[MIT](LICENSE). Third-party dependencies, services and assets retain their own licenses or terms.

@@ -6,6 +6,7 @@ from whab.domain.formatting import format_date, format_money
 from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
 from whab.domain.money import SUPPORTED_CURRENCIES, currency_code, currency_minor_units
 from whab.domain.transactions import UNSET
+from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
 
 from .runtime import PluginError, PluginRegistry, copy_snapshot, load_plugins
 from .sdk import (
@@ -19,6 +20,7 @@ from .sdk import (
     BankService,
     BankStore,
     BankUI,
+    BudgetContext,
     BudgetSnapshot,
     CategorySnapshot,
     ExportCell,
@@ -27,6 +29,8 @@ from .sdk import (
     FileImport,
     Insight,
     InsightsHook,
+    Interface,
+    InterfaceContext,
     LogoImage,
     MerchantLogos,
     Plugin,
@@ -53,6 +57,9 @@ __all__ = [
     "API_VERSION",
     "ENTRYPOINT_GROUP",
     "UNSET",
+    "LedgerService",
+    "RequestConflict",
+    "RevisionConflict",
     "AccountSnapshot",
     "BankContext",
     "BankError",
@@ -61,6 +68,7 @@ __all__ = [
     "BankService",
     "BankStore",
     "BankUI",
+    "BudgetContext",
     "BudgetSnapshot",
     "CategorySnapshot",
     "ExportCell",
@@ -68,6 +76,8 @@ __all__ = [
     "ExportTable",
     "FileImport",
     "Insight",
+    "Interface",
+    "InterfaceContext",
     "InsightsHook",
     "LogoImage",
     "MerchantLogos",

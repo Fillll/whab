@@ -3,6 +3,7 @@
 import inspect
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
+from dataclasses import replace
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -10,9 +11,18 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader, PrefixLoader
 
 from whab import __version__
+from whab.budgets.host import BudgetDispatch, BudgetHost
+from whab.budgets.session import BudgetSession, TrackedStorage
 from whab.config import Settings
-from whab.plugins import BankContext, PluginError, StorageContext, load_plugins
-from whab.plugins.management import PluginManager
+from whab.plugins import (
+    BankContext,
+    InterfaceContext,
+    LedgerService,
+    PluginError,
+    StorageContext,
+    load_plugins,
+)
+from whab.plugins.management import PluginManager, installed_entrypoints
 from whab.plugins.storage import close_storage, open_storage
 from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
@@ -24,9 +34,34 @@ from whab.web.routes.pages import create_router as pages_router
 from whab.web.routes.plugins import create_router as plugins_router
 
 
-def create_app(store=None, settings=None, plugins=None, bank_services=None):
+def plugin_config(settings, session, plugin_id):
+    """Portable public settings plus machine-local credentials for one plugin."""
+    if plugin_id == "client":
+        # A data file must never choose the destination of this machine's bearer
+        # credential. Bind the URL, credential and remote budget together locally.
+        return settings.plugin_configuration(plugin_id)
+    prefix = plugin_id.upper().replace("-", "_") + "_"
+    record = session.plugin_record(plugin_id) if session else None
+    public = {
+        key: value for key, value in record["settings"].items()
+        if key.startswith(prefix) and type(value) is str
+        and not any(word in key.upper() for word in ("TOKEN", "SECRET", "KEY", "PASSWORD", "AUTHORIZATION"))
+    } if record else {}
+    return {**public, **settings.plugin_configuration(plugin_id)}
+
+
+def create_app(store=None, settings=None, plugins=None, bank_services=None, *, budget_session=None, budget_host=None, _child=False):
     settings = settings or Settings.load()
+    if budget_session is None and settings.budget_path:
+        budget_session = BudgetSession.open(settings.home, settings.plaid_env, settings.budget_path)
+    if budget_session:
+        installed = {entry.name for entry in installed_entrypoints()}
+        budget_session.missing_plugins = [name for name in budget_session.selection if name not in installed]
+        settings = replace(settings, storage=budget_session.manifest["storage"], plugins=tuple(name for name in budget_session.selection if name in installed))
+    budget_host = budget_host or BudgetHost(settings)
     plugins = plugins if plugins is not None else load_plugins(settings.enabled_plugins())
+    if budget_session:
+        plugins = plugins.bind_budget(budget_session.context)
     ui_plugin = plugins.ui_plugin(settings.ui) if settings.ui else None
     ui = ui_plugin.ui if ui_plugin else None
     if not ui and any(description.has_ui for description in plugins.describe()):
@@ -41,6 +76,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
             plugin_id=ui_plugin.id,
         )
     descriptors = plugins.bank_plugins()
+    if settings.storage == "client" and descriptors:
+        raise PluginError("Bank ingestion belongs on the server. Disable bank plugins in a client budget.", code="invalid_configuration")
     for plugin in descriptors:
         if ui and plugin.bank_ui and (
             not (plugin.bank_ui.templates / "accounts.html").is_file()
@@ -69,12 +106,22 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
         store = open_storage(
             plugins.storage_plugin(settings.storage),
             StorageContext(
-                home=settings.home,
+                home=budget_session.storage_home if budget_session else settings.home,
                 environment=settings.plaid_env,
-                config=settings.storage_configuration(),
+                config=plugin_config(settings, budget_session, settings.storage),
+                budget=budget_session.context(settings.storage) if budget_session else None,
             ),
         )
     try:
+        if budget_session:
+            budget_session.bind(store)
+            for path in settings.copy_paths:
+                target = path.resolve()
+                if not any(item["path"] == str(target) for item in budget_session.destinations):
+                    budget_session.add_copy(path.stem, str(target))
+        store = TrackedStorage(store, budget_session)
+        service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
+        store.on_mutation = service.invalidate_revision
         bank_stores = {plugin.id: BankStore(store, plugin.id) for plugin in descriptors}
     except Exception:
         if owned_store:
@@ -97,6 +144,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
                                 config=settings.bank_configuration(plugin.id),
                                 environment=settings.plaid_env,
                                 encryption_key=settings.encryption_key,
+                                budget=budget_session.context(plugin.id) if budget_session else None,
                             )
                         )
                         service = banks[plugin.id]
@@ -124,19 +172,25 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
                             code="bank_startup_failed",
                             plugin_id=plugin.id,
                         ) from None
+            if not _child:
+                await budget_host.remember_current()
             yield
         finally:
             # Close every service even if another plugin's cleanup raises.
             try:
-                for bank in reversed(tuple(banks.values())):
-                    try:
-                        await bank.close()
-                    except Exception:
-                        pass
+                if not _child:
+                    await budget_host.close()
             finally:
-                banks.clear()
-                if owned_store:
-                    close_storage(store)
+                try:
+                    for bank in reversed(tuple(banks.values())):
+                        try:
+                            await bank.close()
+                        except Exception:
+                            pass
+                finally:
+                    banks.clear()
+                    if owned_store:
+                        close_storage(store)
 
     app = FastAPI(
         title="WHAB",
@@ -186,10 +240,11 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
             f"/api/plugins/{plugin.id}/import/{action}"
             for plugin in import_descriptors
             for action in ("preview", "commit")
-        },
+        } | {"/api/budget/open"},
+        remote=bool(plugins.interface_plugins()),
     )
     install_error_handlers(app)
-    app.include_router(ledger_router(store))
+    app.include_router(ledger_router(service))
     app.include_router(file_imports_router(store, plugins))
     for plugin in descriptors:
         app.include_router(banks_router(plugin.id, banks, bank_stores[plugin.id]))
@@ -197,18 +252,37 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None):
             app.include_router(
                 banks_router(plugin.id, banks, bank_stores[plugin.id], prefix="/api/plaid")
             )
-    plugin_manager = PluginManager(settings, plugins)
+    plugin_manager = PluginManager(settings, plugins, budget_session=budget_session)
     app.include_router(plugins_router(store, plugins, plugin_manager))
     app.include_router(
         pages_router(
             store, banks, bank_stores, plugins, templates, settings.plaid_env, ui,
             plugin_manager=plugin_manager,
+            budget_name=budget_session.name if budget_session else "My budget",
         )
     )
-    app.state.store = store
+    app.state.store = store.store
+    app.state.tracked_store = store
     app.state.banks = banks
     app.state.plugins = plugins
     app.state.plugin_manager = plugin_manager
     app.state.storage_plugin = settings.storage if owned_store else None
     app.state.ui_plugin = ui_plugin.id if ui_plugin else None
+    app.state.ledger_service = service
+    app.state.budget_session = budget_session
+    app.include_router(budget_host.router(store, settings, budget_session))
+    for plugin in plugins.interface_plugins():
+        try:
+            app.include_router(plugin.interface.factory(InterfaceContext(
+                service=service, config=plugin_config(settings, budget_session, plugin.id),
+                environment=settings.plaid_env, budget_id=service.budget_id,
+                budget=budget_session.context(plugin.id) if budget_session else None,
+            )))
+        except Exception:
+            if owned_store:
+                close_storage(store)
+            raise PluginError("Interface plugin could not start. Check its configuration.", code="interface_startup_failed", plugin_id=plugin.id) from None
+    if not _child:
+        budget_host.register(app, budget_session)
+        app.add_middleware(BudgetDispatch, host=budget_host)
     return app

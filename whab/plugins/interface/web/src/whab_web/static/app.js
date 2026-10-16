@@ -118,6 +118,123 @@ if (pluginSelection) {
 }
 
 
+const budgetDialog = document.getElementById('budgets-dialog');
+async function loadBudgetControls() {
+  const error = budgetDialog.querySelector('[data-budget-load-error]');
+  error.hidden = true;
+  try {
+    const [budget, catalog] = await Promise.all([api('/budget'), api('/budgets')]);
+    budgetDialog.querySelector('[data-budget-name]').textContent = budget.name;
+    budgetDialog.querySelector('[data-budget-save]').hidden = !budget.portable;
+    budgetDialog.querySelector('[data-budget-copy]').hidden = !budget.portable;
+    const pending = budget.copies.filter(copy => copy.status === 'pending');
+    const missing = budget.missingPlugins || [];
+    const copies = budgetDialog.querySelector('[data-budget-copies]');
+    copies.replaceChildren();
+    for (const copy of budget.copies) {
+      const row = document.createElement('li');
+      const name = document.createElement('span');
+      name.textContent = copy.name;
+      const status = document.createElement('small');
+      status.textContent = copy.status === 'pending' ? 'Waiting to sync' : 'Saved';
+      row.append(name, status);
+      copies.append(row);
+    }
+    budgetDialog.querySelector('[data-budget-status]').textContent = [
+      pending.length ? `${pending.length} saved ${pending.length === 1 ? 'copy is' : 'copies are'} waiting to sync.` : 'All saved copies are up to date.',
+      missing.length ? `Install compatible plugins to restore all features: ${missing.join(', ')}.` : '',
+    ].filter(Boolean).join(' ');
+    const select = budgetDialog.querySelector('[data-available-budgets]');
+    select.replaceChildren();
+    for (const entry of catalog.budgets) {
+      const option = document.createElement('option');
+      option.value = entry.id;
+      option.textContent = entry.name;
+      option.selected = entry.active;
+      select.append(option);
+    }
+    budgetDialog.querySelector('[data-budget-switch]').hidden = catalog.budgets.length < 2;
+  } catch (failure) {
+    budgetDialog.querySelector('[data-budget-name]').textContent = 'Unavailable';
+    error.textContent = failure.message;
+    error.hidden = false;
+  }
+}
+for (const button of document.querySelectorAll('[data-dialog="budgets-dialog"]')) button.addEventListener('click', loadBudgetControls);
+if (location.hash === '#budgets') loadBudgetControls();
+budgetDialog.querySelector('[data-budget-save]').addEventListener('click', async event => {
+  const button = event.currentTarget;
+  const error = budgetDialog.querySelector('[data-budget-load-error]');
+  button.disabled = true;
+  error.hidden = true;
+  try {
+    await api('/budget/save', {});
+    await loadBudgetControls();
+  } catch (failure) {
+    error.textContent = failure.message;
+    error.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+function budgetForm(selector, action) {
+  const form = document.querySelector(selector);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (form.dataset.busy) return;
+    const error = form.querySelector('.field-error');
+    const submit = form.querySelector('button[type="submit"]');
+    form.dataset.busy = 'true';
+    submit.disabled = true;
+    error.hidden = true;
+    try {
+      await action(form);
+      location.assign('/?workspace=personal');
+    } catch (failure) {
+      error.textContent = failure.message;
+      error.hidden = false;
+      delete form.dataset.busy;
+      submit.disabled = false;
+    }
+  });
+}
+const copyForm = document.querySelector('[data-budget-copy]');
+copyForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (copyForm.dataset.busy) return;
+  const error = copyForm.querySelector('.field-error');
+  const submit = copyForm.querySelector('button[type="submit"]');
+  copyForm.dataset.busy = 'true';
+  submit.disabled = true;
+  error.hidden = true;
+  try {
+    await api('/budget/copies', {name: copyForm.elements.name.value.trim(), path: copyForm.elements.path.value.trim()});
+    copyForm.reset();
+    await loadBudgetControls();
+    notify('Saved copy added.');
+  } catch (failure) {
+    error.textContent = failure.message;
+    error.hidden = false;
+  } finally {
+    delete copyForm.dataset.busy;
+    submit.disabled = false;
+  }
+});
+budgetForm('[data-budget-new]', form => api('/budget/new', {name: form.elements.name.value.trim()}));
+budgetForm('[data-budget-switch]', form => api(`/budgets/${encodeURIComponent(form.elements.budget.value)}/activate`, {}));
+budgetForm('[data-budget-open]', async form => {
+  const file = form.elements.budget.files[0];
+  if (!file) throw new Error('Choose a WHAB budget file.');
+  if (file.size > 50 * 1024 * 1024) throw new Error('Choose a budget file smaller than 50 MiB.');
+  const path = form.elements.as_copy.checked ? '/api/budget/open?as_copy=true' : '/api/budget/open';
+  const response = await fetch(path, {
+    method: 'POST', body: file, headers: {'Content-Type': 'application/zip'},
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'The budget could not be opened.');
+});
+
 const pluginCategory = document.querySelector('[data-plugin-category-filter]');
 if (pluginCategory) pluginCategory.addEventListener('change', () => {
   let visible = 0;

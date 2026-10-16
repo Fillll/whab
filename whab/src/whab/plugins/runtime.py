@@ -71,6 +71,22 @@ class PluginRegistry:
         """Return immutable loaded descriptors for composition without invoking hooks."""
         return self._plugins
 
+    def bind_budget(self, context_factory):
+        """Create budget-specific hook closures without sharing state across budgets."""
+        bound = []
+        for plugin in self._plugins:
+            if plugin.bind is None:
+                bound.append(plugin)
+                continue
+            try:
+                resolved = plugin.bind(context_factory(plugin.id))
+                if type(resolved) is not Plugin or resolved.id != plugin.id or resolved.api_version != plugin.api_version or resolved.bind is not None:
+                    raise ValueError("Invalid bound plugin")
+            except Exception:
+                raise PluginError("Plugin could not open its budget settings. Check its compatibility.", code="budget_plugin_startup_failed", plugin_id=plugin.id) from None
+            bound.append(resolved)
+        return PluginRegistry(tuple(bound))
+
     def describe(self) -> tuple[PluginDescription, ...]:
         return tuple(
             PluginDescription(
@@ -89,7 +105,7 @@ class PluginRegistry:
                 kinds=tuple(
                     name
                     for name, enabled in (
-                        ("user_interface", plugin.ui is not None),
+                        ("user_interface", plugin.ui is not None or plugin.interface is not None),
                         ("storage", plugin.storage is not None),
                         ("data_ingestion", plugin.bank is not None or plugin.file_import is not None),
                         ("reporting", plugin.insights is not None or plugin.export is not None),
@@ -104,6 +120,10 @@ class PluginRegistry:
     def bank_plugins(self) -> tuple[Plugin, ...]:
         """Return enabled descriptors; the host supplies scoped contexts and owns lifecycle."""
         return tuple(plugin for plugin in self._plugins if plugin.bank is not None)
+
+    def interface_plugins(self) -> tuple[Plugin, ...]:
+        """Transport interfaces may coexist with the selected visual interface."""
+        return tuple(plugin for plugin in self._plugins if plugin.interface is not None)
 
     def file_import_plugins(self) -> tuple[Plugin, ...]:
         """Return enabled parsers without calling them or giving them ledger access."""

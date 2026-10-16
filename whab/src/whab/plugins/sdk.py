@@ -281,6 +281,7 @@ class StorageContext:
     home: Path
     environment: str
     config: Mapping[str, str] = field(repr=False)
+    budget: BudgetContext | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.home, Path):
@@ -295,6 +296,38 @@ class StorageContext:
 
 
 StorageFactory: TypeAlias = Callable[[StorageContext], StorageBackend]
+
+
+@dataclass(frozen=True, slots=True)
+class BudgetContext:
+    """One plugin's portable settings/state, scoped to the opened budget."""
+
+    budget_id: str
+    settings: Mapping[str, object]
+    state: Mapping[str, object]
+    save_state: Callable[[dict], None] = field(repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class InterfaceContext:
+    """A scoped command service and plugin configuration; never a banking store."""
+
+    service: object
+    config: Mapping[str, str]
+    environment: str
+    budget_id: str
+    budget: BudgetContext | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Interface:
+    """Trusted transport factory. The host owns shared access guards and lifecycle."""
+
+    factory: Callable[[InterfaceContext], object]
+
+    def __post_init__(self):
+        if not callable(self.factory):
+            raise ValueError("Interface factory must be callable.")
 
 
 class UIContextBuilder(Protocol):
@@ -367,6 +400,7 @@ class BankContext:
     config: Mapping[str, str] = field(repr=False)
     environment: str
     encryption_key: str = field(repr=False)
+    budget: BudgetContext | None = None
 
     def __post_init__(self) -> None:
         if type(self.environment) is not str or self.environment not in {"sandbox", "production"}:
@@ -576,11 +610,17 @@ class Plugin:
     file_import: FileImport | None = None
     settings: PluginSettings | None = None
     merchant_logos: MerchantLogos | None = None
+    interface: Interface | None = None
+    bind: Callable[[BudgetContext], Plugin] | None = None
 
     def __post_init__(self) -> None:
         if not valid_plugin_name(self.id):
             raise ValueError("Plugin ID must be a lowercase slug of at most 64 characters.")
         _text(self.display_name, "Plugin display name", limit=120, empty=False)
+        if self.interface is not None and type(self.interface) is not Interface:
+            raise ValueError("Plugin interface must be an Interface descriptor or None.")
+        if self.bind is not None and not callable(self.bind):
+            raise ValueError("Plugin budget binder must be callable or None.")
         if type(self.api_version) is not int:
             raise ValueError("Plugin API version must be an integer.")
         if self.insights is not None and not callable(self.insights):
@@ -625,6 +665,8 @@ class Plugin:
             and self.ui is None
             and self.bank_logos is None
             and self.file_import is None
+            and self.interface is None
+            and self.bind is None
         ):
             raise ValueError(
                 "Plugin must provide a reporting, bank, storage, user interface, or branding capability."

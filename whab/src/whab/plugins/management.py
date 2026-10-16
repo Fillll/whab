@@ -14,6 +14,8 @@ _BUNDLED_METADATA = {
     ("plaid", "whab_plaid.plugin:plugin"): ("ingestion", "Plaid"),
     ("ynab", "whab_ynab.plugin:plugin"): ("ingestion", "Import from YNAB ZIP file"),
     ("sqlite", "whab_sqlite.plugin:plugin"): ("storage", "SQLite"),
+    ("client", "whab_client.plugin:plugin"): ("storage", "Remote budget client"),
+    ("server", "whab_server.plugin:plugin"): ("interface", "Budget API server"),
     ("example", "whab_example_plugin:plugin"): ("example", "Month totals example"),
 }
 
@@ -31,7 +33,7 @@ def plugin_category(name, entries, description):
     if known:
         return known[0]
     if description:
-        if description.has_ui or description.has_bank_logos:
+        if description.has_ui or description.has_bank_logos or "user_interface" in description.kinds:
             return "interface"
         if description.has_storage:
             return "storage"
@@ -70,11 +72,15 @@ def package_details(entry):
 class PluginManager:
     """The running registry stays fixed; explicit saves configure the next startup."""
 
-    def __init__(self, settings, plugins):
+    def __init__(self, settings, plugins, budget_session=None):
         self.settings = settings
         self.plugins = plugins
+        self.budget_session = budget_session
         self.required = tuple(dict.fromkeys(name for name in (settings.storage, settings.ui) if name))
         self._lock = Lock()
+
+    def _read_selection(self):
+        return self.budget_session.selection if self.budget_session else read_selection(self.settings.home)
 
     def projection(self):
         """Safe template/API data; a bad file can be repaired through an explicit save."""
@@ -83,7 +89,7 @@ class PluginManager:
         configured = tuple(name for name in self.settings.plugins if name not in self.required)
         errors = []
         try:
-            saved = read_selection(self.settings.home)
+            saved = self._read_selection()
             if saved is not None:
                 configured = tuple(name for name in saved if name not in self.required)
         except PluginError as error:
@@ -147,7 +153,10 @@ class PluginManager:
                 code="required_plugin",
             )
         with self._lock:
-            optional = load_plugins(selection, installed_entrypoints())
+            # Preserve unavailable optional requirements carried by an opened budget;
+            # they must not prevent configuring the installed capabilities.
+            unavailable = set(self.budget_session.missing_plugins) if self.budget_session else set()
+            optional = load_plugins(tuple(name for name in selection if name not in unavailable), installed_entrypoints())
             # Reuse already validated mandatory descriptors. In particular, do not
             # reimport custom/injected UI or storage code to toggle a bank/report.
             required = tuple(
@@ -187,5 +196,8 @@ class PluginManager:
                             code="missing_resources",
                             plugin_id=plugin.id,
                         )
-            write_selection(self.settings.home, selection)
+            if self.budget_session:
+                self.budget_session.save_selection(selection)
+            else:
+                write_selection(self.settings.home, selection)
         return self.projection()
