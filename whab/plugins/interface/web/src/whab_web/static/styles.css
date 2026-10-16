@@ -171,42 +171,6 @@ strong {
   color: var(--muted);
   margin-top: 6px;
 }
-.workspace-switch {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 9px;
-  margin: 0 9px 32px;
-  background: var(--surface);
-}
-.workspace-avatar {
-  border-radius: 6px;
-  background: var(--accent);
-  color: var(--brand-red);
-  display: grid;
-  place-items: center;
-  width: 25px;
-  height: 25px;
-  font-weight: 600;
-  font-size: 10px;
-  flex-shrink: 0;
-}
-.workspace-switch select {
-  border: 0;
-  padding: 0;
-  background: none;
-  min-height: 24px;
-  appearance: none;
-  flex: 1;
-  min-width: 0;
-  font-size: 12px;
-  font-weight: 600;
-}
-.workspace-switch > svg {
-  pointer-events: none;
-}
 .nav-label {
   color: var(--muted);
   letter-spacing: 1.2px;
@@ -1689,7 +1653,28 @@ strong {
   color: var(--text-secondary);
 }
 .plugin-list {
-  margin-top: 15px;
+  margin-top: 24px;
+}
+.plugin-category-group + .plugin-category-group {
+  margin-top: 26px;
+}
+.plugin-category-group > h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+}
+.plugin-category-group > h4 > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+.plugin-category-group .plugin-row:last-child {
+  border-bottom: 0;
 }
 .plugin-row {
   display: grid;
@@ -1773,6 +1758,7 @@ strong {
   border-bottom: 1px solid var(--line);
   color: var(--text-secondary);
   text-align: left;
+  transition: color 0.15s;
 }
 .settings-menu strong {
   display: block;
@@ -1802,6 +1788,47 @@ strong {
   margin-bottom: 18px;
   color: var(--text-secondary);
   font-size: 11px;
+}
+.budget-choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.budget-choice:hover {
+  background: var(--surface);
+}
+.budget-choice[aria-current] .budget-choice-icon {
+  color: var(--brand-red);
+}
+.budget-choice-icon,
+.budget-choice > svg {
+  flex-shrink: 0;
+}
+.budget-choice-copy {
+  flex: 1;
+  min-width: 0;
+}
+.budget-choice strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.budget-choice small {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+}
+.budget-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--brand-red);
+  font-size: 10px;
 }
 .plugin-list-heading {
   display: flex;
@@ -2206,7 +2233,6 @@ strong {
   .brand > span:last-child {
     display: none;
   }
-  .workspace-switch,
   .nav-label,
   .sidebar-accounts,
   .nav-item > span,
@@ -2486,6 +2512,28 @@ strong {
   .settings-modal {
     padding: 18px;
   }
+  .budget-choice {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 18px 0;
+  }
+  .budget-current {
+    flex-basis: 100%;
+    margin-left: 30px;
+  }
+  .plugin-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .plugin-controls {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 25px;
+  }
+  .plugin-category-filter {
+    gap: 6px;
+  }
   .app-shell > main {
     margin-left: 57px;
   }
@@ -2624,8 +2672,8 @@ strong {
   margin: -11px 0 22px;
 }
 
-[hidden]{display:none!important}.mobile-workspace{display:none}a.text-link:hover{text-decoration:underline}.nav-item svg{flex-shrink:0}.page-content form{margin-block-end:0}.transactions-table form{margin:0}.field-error[hidden]{display:none}.demo-ribbon>a{font-size:10px;white-space:nowrap}
-@media(max-width:760px){.mobile-workspace{display:block;border:0;background:transparent;font-size:9px;padding:0;min-height:24px;max-width:90px}.topbar-right{gap:8px}.demo-ribbon>a{font-size:9px}}
+[hidden]{display:none!important}a.text-link:hover{text-decoration:underline}.nav-item svg{flex-shrink:0}.page-content form{margin-block-end:0}.transactions-table form{margin:0}.field-error[hidden]{display:none}.demo-ribbon>a{font-size:10px;white-space:nowrap}
+@media(max-width:760px){.topbar-right{gap:8px}.demo-ribbon>a{font-size:9px}}
 
 /* Optional plugin reports use the same typography and spacing as core insights. */
 .plugin-section { margin-top: 36px; padding-top: 26px; border-top: 1px solid var(--line); }

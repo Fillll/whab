@@ -122,13 +122,28 @@
 </form>
 </dialog>
 {% set manager = plugin_management|default({'plugins': [], 'restart_required': false, 'error': none}) %}
-{% set plugin_categories = {'interface': 'Interfaces', 'ingestion': 'Ingestion', 'insight': 'Insights', 'storage': 'Storage', 'automation': 'Automation', 'extension': 'Extensions', 'example': 'Examples'} %}
+{% set plugin_categories = {'automation': 'Automation', 'extension': 'Extensions', 'ingestion': 'Ingestion', 'insight': 'Insights', 'interface': 'Interfaces', 'storage': 'Storage'} %}
+{% set visible_plugins = manager.plugins|rejectattr('category', 'equalto', 'example')|rejectattr('id', 'equalto', 'example')|list %}
 {% macro plugin_status(plugin) %}{% if plugin.required %}Required{% elif plugin.active and plugin.enabled %}Enabled{% elif plugin.active %}Will disable after restart{% elif plugin.enabled %}Will enable after restart{% else %}Disabled{% endif %}{% endmacro %}
 <dialog class="modal settings-modal" id="settings-dialog" aria-label="Settings">
   {{ heading('Settings', 'Manage this local workspace.') }}
   <nav class="settings-menu" aria-label="Settings sections">
+    <button type="button" data-dialog="budgets-dialog">{{ icon('budget', 18) }}<span><strong>Budgets</strong><small>Current budget · {{ 'Demo budget' if workspace=='demo' else 'My budget' }}</small></span>{{ icon('chevron-right', 16) }}</button>
     <button type="button" data-dialog="plugins-dialog">{{ icon('settings', 18) }}<span><strong>Plugins</strong><small>Installed plugins and their options</small></span>{{ icon('chevron-right', 16) }}</button>
     <button type="button" data-dialog="about-dialog">{{ icon('help', 18) }}<span><strong>About this prototype</strong><small>WHAB · {{ version }}</small></span>{{ icon('chevron-right', 16) }}</button>
+  </nav>
+</dialog>
+<dialog class="modal settings-modal" id="budgets-dialog" aria-label="Budgets">
+  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
+  {{ heading('Budgets', 'Choose the budget you want to work with.') }}
+  <nav class="budget-list" aria-label="Available budgets">
+    {% for key, label, description in [('personal', 'My budget', 'Your accounts and budget'), ('demo', 'Demo budget', 'Fictional data to explore WHAB')] %}
+    <a class="budget-choice" href="{{ url(workspace=key, category=none) }}"{% if workspace==key %} aria-current="true"{% endif %}>
+      <span class="budget-choice-icon">{{ icon('wallet' if key=='personal' else 'sparkles', 20) }}</span>
+      <span class="budget-choice-copy"><strong>{{ label }}</strong><small>{{ description }}</small></span>
+      {% if workspace==key %}<span class="budget-current">{{ icon('check', 14) }}Current budget</span>{% else %}{{ icon('chevron-right', 16) }}{% endif %}
+    </a>
+    {% endfor %}
   </nav>
 </dialog>
 <dialog class="modal settings-modal" id="plugins-dialog" aria-label="Plugins">
@@ -142,16 +157,26 @@
     <p class="settings-notice">Saved selections apply when you restart WHAB. Open a plugin’s options to manage its settings.</p>
     {% if manager.error %}<p class="field-error" role="alert">{{ manager.error }}</p>{% endif %}
     <form data-plugin-selection>
+      {% for plugin in manager.plugins if (plugin.category=='example' or plugin.id=='example') and plugin.enabled and plugin.manageable and not plugin.required %}<input type="hidden" name="plugin" value="{{ plugin.id }}">{% endfor %}
       <div class="plugin-list">
-        {% for plugin in manager.plugins %}
-          <div class="plugin-row" data-plugin-category="{{ plugin.category|default('extension') }}">
+        {% for category, label in plugin_categories.items() %}
+        {% set category_plugins = visible_plugins|selectattr('category', 'equalto', category)|sort(attribute='display_name')|list %}
+        {% if category_plugins %}
+        <section class="plugin-category-group" data-plugin-category="{{ category }}" aria-labelledby="plugin-category-{{ category }}">
+          <h4 id="plugin-category-{{ category }}">{{ label }}<span>{{ category_plugins|length }}</span></h4>
+        {% for plugin in category_plugins %}
+          <div class="plugin-row">
             <label class="plugin-toggle">
               <input type="checkbox" value="{{ plugin.id }}"{% if not plugin.required %} name="plugin"{% endif %}{% if plugin.enabled %} checked{% endif %}{% if plugin.required or (not plugin.manageable and not plugin.enabled) %} disabled{% endif %}>
-              <span><strong>{{ plugin.display_name }}</strong><small class="plugin-meta">{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</small><small class="plugin-meta">{{ plugin_categories.get(plugin.category|default('extension'), 'Extensions') }}</small>{% if plugin.reason %}<small class="plugin-meta">{{ plugin.reason }}</small>{% endif %}</span>
+              <span><strong>{{ plugin.display_name }}</strong><small class="plugin-meta">{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</small>{% if plugin.reason %}<small class="plugin-meta">{{ plugin.reason }}</small>{% endif %}</span>
             </label>
             <div class="plugin-controls"><span class="plugin-state">{{ plugin_status(plugin) }}</span><button class="button plugin-options" type="button" data-dialog="plugin-options-{{ plugin.id }}" data-plugin-options aria-label="Options for {{ plugin.display_name }}">Options{{ icon('chevron-right', 14) }}</button></div>
           </div>
-        {% else %}<p class="settings-notice">No installed plugins were found.</p>{% endfor %}
+        {% endfor %}
+        </section>
+        {% endif %}
+        {% endfor %}
+        {% if not visible_plugins %}<p class="settings-notice">No installed plugins were found.</p>{% endif %}
         <p class="settings-notice" data-plugin-category-empty hidden>No installed plugins in this category.</p>
       </div>
       <p class="plugin-restart-notice" role="status"{% if not manager.restart_required %} hidden{% endif %}>Restart WHAB to apply your saved plugin selection. Running plugins stay active until then.</p>
@@ -160,7 +185,7 @@
     </form>
   </section>
 </dialog>
-{% for plugin in manager.plugins %}
+{% for plugin in visible_plugins %}
 <dialog class="modal settings-modal" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} options" data-plugin-id="{{ plugin.id }}" data-plugin-active="{{ 'true' if plugin.active else 'false' }}">
   <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Installed plugins</button>
   {{ heading(plugin.display_name, 'Plugin options') }}

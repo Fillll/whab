@@ -17,7 +17,7 @@ python3.14 -m venv .venv
 .venv/bin/python -m whab
 ```
 
-Open [127.0.0.1:5173](http://127.0.0.1:5173). Explore fictional data in the demo workspace, or switch to **My budget** and add a manual account. No Plaid credentials are needed for manual budgeting. Use `--reload` while developing or `--port 5174` for another local port.
+Open [127.0.0.1:5173](http://127.0.0.1:5173). Explore fictional data in the demo workspace, or choose **Settings → Budgets → My budget** and add a manual account. Settings shows the current budget. No Plaid credentials are needed for manual budgeting. Use `--reload` while developing or `--port 5174` for another local port.
 
 Setup creates a private `.env` and token encryption key if missing. Runtime files live in the launch directory, or the absolute directory set by `WHAB_HOME`. Keep the existing runtime home, data and encryption key together when upgrading, and restart after configuration changes. See [runtime setup](docs/usage.md#runtime-setup) for upgrades and saved-data compatibility.
 
@@ -33,7 +33,7 @@ The core owns budgeting rules, HTTP access checks and plugin contracts. Concrete
 | `WHAB_UI` | `web` | Visual interface; an empty value runs APIs headlessly |
 | `WHAB_PLUGINS` | `plaid` | Optional extensions when no saved `plugins.json` exists |
 
-Use **Settings → Plugins → Installed** to enable or disable installed optional plugins, save, and restart. Its saved selection takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/example/README.md) is separately installable. Choose **All categories** or a category to browse installed plugins, then open **Options** for plugin details and controls. Bank logos options include **Flush cache**; successful logos stay cached locally for 365 days across restarts and refresh on the next image request after expiry. Plugins run as trusted server code.
+Use **Settings → Plugins → Installed** to enable or disable installed optional plugins, save, and restart. Its saved selection takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/example/README.md) is separately installable and hidden from Settings. Valid existing example selections are preserved when saving other plugins; unavailable example registrations are dropped so they cannot block saving. Categories and plugin names are alphabetized, with distinct category headings. Choose **All categories** or a category to browse installed plugins, then open **Options** for plugin details and controls. Bank logos options include **Flush cache**; successful logos stay cached locally for 365 days across restarts and refresh on the next image request after expiry. Plugins run as trusted server code.
 
 For bank imports, follow the [Plaid Sandbox guide](docs/usage.md#connect-plaid-sandbox). Keep `WHAB_ENV=sandbox` and `ALLOW_LIVE_PLAID=false` for test data. Production access requires deliberate configuration and institution access; a successful Sandbox flow does not establish live access.
 

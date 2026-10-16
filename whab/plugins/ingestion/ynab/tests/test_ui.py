@@ -34,7 +34,7 @@ def test_selected_import_renders_only_on_personal_accounts_and_serves_its_assets
     with client_for(store, tmp_path, web_plugin, ynab_plugin) as client:
         response = client.get("/?page=accounts&workspace=personal")
         assert response.status_code == 200
-        assert "Import from YNAB export" in response.text
+        assert "Import from YNAB ZIP file" in response.text
         assert 'data-file-import="ynab"' in response.text
         assert "I confirm this export uses US dollars (USD)." in response.text
         assert "Import into empty budget" in response.text

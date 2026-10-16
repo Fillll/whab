@@ -9,7 +9,7 @@ from .views import build_context
 resources = Path(__file__).parent
 plugin = Plugin(
     id="web",
-    display_name="WHAB Web",
+    display_name="WHAB web",
     ui=UserInterface(
         templates=resources / "templates",
         static=resources / "static",

@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.7.1 — 2026-10-15
+
+- Move budget selection into Settings → Budgets, with the current budget shown in Settings and beside the selected budget. Remove the desktop and mobile budget dropdowns; preserve page, month and currency when switching budgets.
+- Group installed plugins under distinct alphabetical category headings and sort their names alphabetically. Hide example plugins from the Settings list while preserving valid existing example selections.
+- Use sentence case and acronym spelling for WHAB web and Import from YNAB ZIP file. Show friendly bundled names for disabled plugins without loading their code.
+
 ## 1.7.0 — 2026-10-14
 
 - Show Plaid-supplied merchant logos beside transaction payees as part of the existing Plaid plugin. Import only the supplied artwork reference, with no merchant guessing, external lookup service or additional plugin selection. Keep names visible when artwork is absent or fails.
