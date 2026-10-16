@@ -26,7 +26,7 @@ jobs:
       ALLOW_LIVE_PLAID: "false"
     defaults:
       run:
-        working-directory: whab
+        working-directory: whab/app
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,13 +38,41 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: |
-            whab/pyproject.toml
-            whab/plugins/**/pyproject.toml
+            whab/app/pyproject.toml
+            whab/app/plugins/**/pyproject.toml
       - name: Install dependencies
         run: python scripts/install.py --dev --example
       - name: Test and require 100% plugin statement and branch coverage
         run: python scripts/check_plugin_coverage.py
       - name: Lint Python
         run: python -m ruff check src scripts tests plugins conftest.py
+      - name: Lint launcher Python
+        run: python -m ruff check --config pyproject.toml ../launchers/macos/manager ../launchers/macos/tests ../launchers/macos/scripts
       - name: Verify independently versioned application and plugin wheels
         run: python scripts/check_distribution.py
+
+  macos-launcher:
+    name: macOS launcher
+    runs-on: macos-latest
+    timeout-minutes: 15
+    env:
+      CLANG_MODULE_CACHE_PATH: /tmp/whab-launcher-clang-cache
+      SWIFT_MODULECACHE_PATH: /tmp/whab-launcher-swift-cache
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Test launcher lifecycle manager
+        run: python -m unittest discover -s whab/launchers/macos/tests -p 'test_*.py'
+      - name: Test bundle source boundaries
+        run: python whab/launchers/macos/scripts/test_build.py
+      - name: Test native launcher
+        run: swift test --package-path whab/launchers/macos --scratch-path /tmp/whab-launcher-swift --disable-sandbox
+      - name: Build native application shell
+        # Distribution builds additionally bundle a relocatable Python and local wheels.
+        run: python whab/launchers/macos/scripts/build.py --skip-runtime --output /tmp/WHAB.app

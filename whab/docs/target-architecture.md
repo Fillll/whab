@@ -39,7 +39,7 @@ The categories describe a plugin's primary role. Capabilities determine what it 
 | Automation | Suggest or apply configured actions while preserving user decisions |
 | Extension | Add specialized models and workflows around the financial core |
 
-Contributor folders use `storage`, `interface`, `ingestion`, `insight`, `automation` and `extension`. The additional `example` category holds teaching plugins. Each plugin owns `plugins/<category>/<id>/`, including its implementation, documentation and tests; see [folder ownership and naming](../plugins/README.md).
+Contributor folders use `storage`, `interface`, `ingestion`, `insight`, `automation` and `extension`. The additional `example` category holds teaching plugins. Each plugin owns `whab/app/plugins/<category>/<id>/`, including its implementation, documentation and tests; see [folder ownership and naming](../app/plugins/README.md).
 
 At least one storage capability must be available. Multiple storage destinations mean copies of the same budget, rather than separate ledgers. The save outcome must distinguish a committed copy from a destination still awaiting synchronization; an unavailable destination must never silently discard a successful save. Interactive use requires a usable interface. A presentation enhancement alone does not provide an entry point.
 
@@ -64,4 +64,4 @@ Insights read scoped, immutable snapshots. Specialized state belongs to the exte
 
 Installed plugins are trusted Python code. Scoped contracts reduce accidental access and coupling; they do not create an operating-system sandbox. Users retain control over which code and external connections they enable.
 
-Existing ledgers, encrypted connections, environment isolation and atomic synchronization remain compatibility requirements. SDK additions follow the [SemVer policy](../CONTRIBUTING.md#pull-requests-and-releases); the documented public records and operations remain the authority for plugin authors.
+Existing ledgers, encrypted connections, environment isolation and atomic synchronization remain compatibility requirements. SDK additions follow the [SemVer policy](../app/CONTRIBUTING.md#pull-requests-and-releases); the documented public records and operations remain the authority for plugin authors.
