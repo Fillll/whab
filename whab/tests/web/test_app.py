@@ -115,6 +115,36 @@ def test_local_browser_origins_require_https(client):
     assert client.post("/api/accounts", json=account, headers={"Origin": "https://127.0.0.1:5173"}).status_code == 200
 
 
+def test_account_scope_roundtrip_and_classification_history(client):
+    account_id = client.post("/api/accounts", json={
+        "workspace": "personal", "name": "IRA", "type": "retirement", "subtype": "roth_ira",
+        "balance": 100000,
+    }).json()["accountId"]
+    data = client.get("/api/workspace?workspace=personal&month=2026-10").json()
+    record = next(row for row in data["accounts"] if row["id"] == account_id)
+    assert record["onBudget"] is False
+    assert data["summary"]["readyToAssign"] == 0
+    assert data["accountSummary"]["netWorth"] == 100000
+    assert client.patch("/api/accounts/" + account_id, json={
+        "workspace": "personal", "type": "depository", "subtype": "savings", "onBudget": True,
+    }).status_code == 200
+    data = client.get("/api/workspace?workspace=personal&month=2026-10").json()
+    assert data["summary"]["readyToAssign"] == 100000
+    assert data["accountSummary"]["netWorth"] == 100000
+    for payload in (
+        {}, {"onBudget": None}, {"onBudget": "false"}, {"type": "property", "onBudget": True},
+        {"type": "loan", "subtype": "roth_ira"}, {"balance": 0}, {"type": None},
+    ):
+        assert client.patch("/api/accounts/" + account_id, json={"workspace": "personal", **payload}).status_code == 400
+    assert client.patch("/api/accounts/missing", json={"workspace": "personal", "onBudget": False}).status_code == 400
+    assert client.post("/api/accounts", json={
+        "workspace": "personal", "name": "Bad", "type": "loan", "balance": 0, "onBudget": True,
+    }).status_code == 400
+    assert client.post("/api/accounts", json={
+        "workspace": "personal", "name": "Bad", "type": "depository", "balance": 0, "onBudget": None,
+    }).status_code == 400
+
+
 def test_review_and_manual_money_flow(client):
     account_id = client.post(
         "/api/accounts",

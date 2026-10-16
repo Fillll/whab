@@ -92,6 +92,36 @@ def test_initial_revision_and_uncertain_retry_identity():
     assert calls[0]["expected_revision"] == "r1"
 
 
+def test_account_classification_command_preserves_payload_scope_revision_and_retry_identity():
+    import json
+
+    calls = []
+
+    def handler(request):
+        if request.method == "GET":
+            return httpx.Response(200, json=body({}, revision="original"))
+        calls.append(json.loads(request.content))
+        if len(calls) == 1:
+            raise httpx.ReadTimeout("Uncertain response")
+        return httpx.Response(200, json=body(None, revision="classified"))
+
+    remote = make(handler)
+    changes = {"type": "retirement", "onBudget": False, "subtype": "roth_ira"}
+    try:
+        with pytest.raises(StoreError, match="result is unknown"):
+            remote.update_account("personal", "saved-account", changes)
+        assert remote.update_account("personal", "saved-account", changes) is None
+        assert calls[0] == calls[1]
+        assert calls[0]["operation"] == "update_account"
+        assert calls[0]["workspace"] == "personal"
+        assert calls[0]["payload"] == {**changes, "accountId": "saved-account"}
+        assert calls[0]["expected_revision"] == "original"
+        assert remote._revision == "classified"
+        assert changes == {"type": "retirement", "onBudget": False, "subtype": "roth_ira"}
+    finally:
+        remote.close()
+
+
 def test_query_connection_failure():
     def handler(request):
         raise httpx.ConnectError("private-address")

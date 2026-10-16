@@ -6,6 +6,7 @@ from dataclasses import replace
 import pytest
 from whab_sqlite import Store
 
+from whab.domain.accounts import normalize_account
 from whab.domain.errors import StoreError
 from whab.domain.file_imports import WorkspaceImport
 
@@ -62,7 +63,7 @@ def test_import_preserves_snapshot_money_history_annotations_and_demo(store):
     }
     state = store.state("personal")
     assert tuple(state["accounts"].values()) == tuple(
-        {**record, "currency": data.currency} for record in data.accounts
+        normalize_account({**record, "currency": data.currency}) for record in data.accounts
     )
     assert tuple(state["categories"].values()) == tuple(
         {**record, "currency": data.currency} for record in data.categories

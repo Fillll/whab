@@ -5,6 +5,7 @@ atomically. These commands validate references, money and user annotations befor
 changing state, so the same financial behavior applies to every persistence adapter.
 """
 
+from .accounts import ON_BUDGET_ACCOUNT_TYPES, is_liability, is_on_budget, normalize_account
 from .budget import ensure_assignment_allowed
 from .categories import ensure_child_category
 from .errors import StoreError
@@ -14,23 +15,42 @@ from .validation import validate_date, validate_label, validate_month
 
 
 def add_account(state: dict, account_id: str, account: dict) -> str:
-    """Add a manual cash or credit account using an adapter-supplied identifier."""
+    """Add a manual budget or tracking account using an adapter-supplied identifier."""
     name = validate_label(account["name"])
     kind, balance = account["type"], cents(account["balance"])
     currency = currency_code(account.get("currency", "USD"))
-    if kind not in {"depository", "credit"}:
-        raise StoreError("Invalid account type.")
-    state["accounts"][account_id] = {
+    state["accounts"][account_id] = normalize_account({
         "id": account_id,
         "name": name,
         "institution": "Manual account",
         "type": kind,
+        **{key: account[key] for key in ("onBudget", "subtype") if key in account},
         "balance": balance,
         "currency": currency,
         "source": "manual",
         "stale": False,
-    }
+    })
     return account_id
+
+
+def update_account(state: dict, account_id: str, changes: dict) -> None:
+    """Reclassify existing history without changing balances or transactions."""
+    account = state["accounts"].get(account_id)
+    if account is None:
+        raise StoreError("Account not found.")
+    if type(changes) is not dict or not changes or changes.keys() - {"type", "onBudget", "subtype"}:
+        raise StoreError("Invalid account classification fields.")
+    candidate = {**account, **changes}
+    if "type" in changes and changes["type"] != account["type"]:
+        if "subtype" not in changes:
+            candidate["subtype"] = None
+        if "onBudget" not in changes:
+            candidate["onBudget"] = (
+                is_on_budget(account)
+                if type(changes["type"]) is str and changes["type"] in ON_BUDGET_ACCOUNT_TYPES
+                else False
+            )
+    state["accounts"][account_id] = normalize_account(candidate)
 
 
 def add_transaction(
@@ -57,7 +77,7 @@ def add_transaction(
             raise StoreError("Category currency must match the account currency.")
     if transaction_id in state["transactions"]:
         raise StoreError("Transaction already exists.")
-    balance = cents(account["balance"] + (amount if account["type"] == "credit" else -amount))
+    balance = cents(account["balance"] + (amount if is_liability(account) else -amount))
     state["transactions"][transaction_id] = {
         "id": transaction_id,
         "accountId": account["id"],

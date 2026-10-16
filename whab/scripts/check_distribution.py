@@ -77,6 +77,19 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     assert client.get("/imports/ynab/static/import.js").status_code == 200
     personal = client.get("/?workspace=personal&page=accounts")
     assert personal.status_code == 200 and 'data-file-import="ynab"' in personal.text
+    tracking = client.post('/api/accounts', json={
+        'workspace': 'personal', 'name': 'Fictional brokerage', 'type': 'investment',
+        'subtype': 'brokerage', 'balance': 12300,
+    })
+    assert tracking.status_code == 200
+    tracking_id = tracking.json()['accountId']
+    view = client.get('/api/workspace?workspace=personal').json()
+    assert view['summary']['readyToAssign'] == 0
+    assert view['accountSummary']['netWorth'] == 12300
+    assert client.patch('/api/accounts/' + tracking_id, json={
+        'workspace': 'personal', 'type': 'retirement', 'subtype': '401k', 'onBudget': False,
+    }).status_code == 200
+    assert '401(k)' in client.get('/?workspace=personal&page=accounts').text
     assert any(p["id"] == "ynab" and p["has_file_import"] for p in client.get("/api/plugins").json()["plugins"])
     assert client.get("/api/plugins/bank-logos/bank-logos/unknown").status_code == 404
     assert client.get("/api/plugins/plaid/merchant-logos/unknown").status_code == 404
@@ -200,8 +213,9 @@ def main():
             }
         assert set(expected) == {"whab", "web", "sqlite", "plaid", "bank-logos", "ynab", "server", "client", "example"}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
+        account_scope_plugins = {"client", "plaid", "sqlite", "web", "ynab"}
         assert set(optional) == {
-            f'{record["distribution"]}>=1.0.0,<2'
+            f'{record["distribution"]}>={"1.1.0" if identifier in account_scope_plugins else "1.0.0"},<2'
             for identifier, record in expected.items() if identifier not in {"whab", "example"}
         }
         run(

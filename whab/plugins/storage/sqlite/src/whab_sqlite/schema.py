@@ -23,6 +23,8 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
             "currency": "TEXT NOT NULL DEFAULT 'USD'",
             "active": "INTEGER NOT NULL DEFAULT 1",
             "balance_unknown": "INTEGER NOT NULL DEFAULT 0",
+            "on_budget": "INTEGER NOT NULL DEFAULT 1",
+            "subtype": "TEXT",
         },
         "transactions": {
             "inferred_transfer": "INTEGER NOT NULL DEFAULT 0",
@@ -36,11 +38,20 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
         present = {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}
         for name, declaration in columns.items():
             if name not in present:
-                db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
-                if name == "inferred_transfer":
-                    db.execute(
-                        "UPDATE transactions SET inferred_transfer=is_transfer WHERE source='plaid' AND category_edited=0"
-                    )
+                db.execute("SAVEPOINT migrate_column")
+                try:
+                    db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+                    if name == "on_budget":
+                        db.execute("UPDATE accounts SET on_budget=0 WHERE type NOT IN ('depository','credit')")
+                    if name == "inferred_transfer":
+                        db.execute(
+                            "UPDATE transactions SET inferred_transfer=is_transfer WHERE source='plaid' AND category_edited=0"
+                        )
+                    db.execute("RELEASE migrate_column")
+                except BaseException:
+                    db.execute("ROLLBACK TO migrate_column")
+                    db.execute("RELEASE migrate_column")
+                    raise
     validate_month(selected_month)
     db.execute(
         "UPDATE meta SET budget_start_month=CASE WHEN workspace='demo' THEN COALESCE((SELECT MIN(substr(date,1,7)) FROM transactions WHERE workspace='demo'),?) ELSE COALESCE((SELECT MIN(month) FROM budget WHERE workspace='personal'),?) END WHERE budget_start_month IS NULL",

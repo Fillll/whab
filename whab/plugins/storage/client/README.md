@@ -25,6 +25,12 @@ does not fetch the ledger. Reads and changes go to the live server; its data can
 advance independently of the connection file. Explicit legacy snapshot exports
 remain available through `export_budget()`.
 
+Account creation and `update_account()` forward core on-budget/off-budget scope,
+account types and optional subtypes to WHAB 2.1 or newer. Classification changes
+use the same revision checks and retry identity as other ledger commands; the
+server validates their financial rules and preserves saved classification during
+bank refreshes.
+
 Credentials normally stay on this machine. A machine token is used only with
 the matching device-configured `CLIENT_URL` and `CLIENT_BUDGET_ID`; opening an
 imported connection cannot redirect that token. The host may also supply

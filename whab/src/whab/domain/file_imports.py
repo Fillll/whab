@@ -6,6 +6,7 @@ validates and copies them again while holding its write lock before committing.
 
 from dataclasses import dataclass
 
+from .accounts import normalize_account
 from .categories import validate_child_category
 from .errors import StoreError
 from .money import MAX_SAFE_INTEGER, cents, currency_code
@@ -36,12 +37,17 @@ def _text(value: object, *, limit: int = 200, empty: bool = False) -> None:
         raise StoreError("Invalid workspace import text.")
 
 
-def _records(records: object, fields: set[str], limit: int) -> tuple[dict, ...]:
+def _records(
+    records: object, fields: set[str], limit: int, *, optional: frozenset[str] = frozenset(),
+) -> tuple[dict, ...]:
     if type(records) is not tuple or len(records) > limit:
         raise StoreError("Invalid workspace import record collection.")
     result = []
     for record in records:
-        if type(record) is not dict or record.keys() != fields:
+        if (
+            type(record) is not dict or not fields <= record.keys()
+            or not record.keys() <= fields | optional
+        ):
             raise StoreError("Invalid workspace import record fields.")
         result.append(record.copy())
     return tuple(result)
@@ -73,7 +79,9 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
         data.accounts,
         {"id", "name", "institution", "type", "balance", "source", "stale", "balanceUnknown"},
         1000,
+        optional=frozenset({"onBudget", "subtype"}),
     )
+    accounts = tuple(normalize_account(account) for account in accounts)
     categories = _records(data.categories, {"id", "name", "group", "target"}, 10000)
     transactions = _records(
         data.transactions,
@@ -95,10 +103,6 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
         _text(account["type"], limit=64)
         _text(account["source"], limit=64)
         _booleans(account, ("stale", "balanceUnknown"))
-        if account["type"] not in {"depository", "credit", "other"}:
-            raise StoreError("Invalid workspace import account type.")
-        if account["type"] == "other" and not (account["stale"] and account["balanceUnknown"]):
-            raise StoreError("Unsupported accounts must have stale and unknown balances.")
         total += abs(cents(account["balance"]))
     for category in categories:
         validate_child_category(category)

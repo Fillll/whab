@@ -1,9 +1,10 @@
 <div class="page-title-row">
   <div>
-    <div class="eyebrow">CONNECTED ACCOUNTS</div>
+    <div class="eyebrow">YOUR FINANCIAL PICTURE</div>
     <h1>Your financial accounts</h1>
-    <p>Bring your balances and transactions together.</p>
+    <p>Budget with everyday accounts and track your other assets and debts.</p>
   </div>
+  <button class="button primary" data-dialog="account-dialog">{{ icon('plus', 16) }}Add manual account</button>
 </div>
 {% for bank in bank_panels %}
   {% with status=bank.status, items=bank['items'] %}
@@ -13,33 +14,41 @@
 {% for importer in import_panels %}
   {% include importer.template %}
 {% endfor %}
-<div class="section-title accounts-heading">
-  <h2>{{ 'Sample accounts' if workspace=='demo' else 'Accounts' }} <span>{{ data.accounts|length }}</span></h2>
-  <button class="text-link"
-          data-dialog="account-dialog">{{ icon('plus', 14) }}Add manual account</button>
-</div>
 {% if data.accounts %}
+  <dl class="account-summary" aria-label="Account totals in {{ currency }}">
+    <div><dt>Assets</dt><dd>{{ money(account_summary.assets) }}</dd></div>
+    <div><dt>Liabilities</dt><dd>{{ money(account_summary.liabilities) }}</dd></div>
+    <div><dt>Net worth</dt><dd>{{ money(account_summary.netWorth) }}</dd></div>
+  </dl>
+  <p class="account-summary-note">{{ currency }} only · Current known balances. Stale and unavailable snapshots are excluded from totals.</p>
+  {% for group in account_groups %}
+  <section class="account-group" aria-label="{{ group.label }} accounts">
+  <div class="section-title accounts-heading"><h2>{{ group.label }} accounts <span>{{ group.accounts|length }}</span></h2></div>
+  <p class="account-group-description">{{ group.description }}</p>
   <div class="account-list">
-    {% for account in data.accounts %}
+    {% for account in group.accounts %}
       <div class="account-row">
         <span class="bank-mark" aria-hidden="true"><span>{{ account.institution[:1] }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo src="{{ logos[account.id] }}" alt="" width="39" height="39" decoding="async" hidden>{% endif %}</span>
         <div class="account-description">
           <strong>{{ account.name }}</strong><span>{{ account.institution }}
             {% if account.mask %} · ••{{ account.mask }}
-            {% endif %} · {{ 'Credit card' if account.type=='credit' else 'Loan' if account.type=='loan' else 'Cash account' if account.type=='depository' else account.type }}
+            {% endif %} · {{ account_label(account) }}
             {% if account.stale %} · Stale snapshot
             {% endif %}
           </span>
+          <button class="text-link account-edit" data-dialog="account-classification-dialog" data-edit-account="{{ account.id }}" data-account-name="{{ account.name }}" data-account-type="{{ account.type }}" data-account-on-budget="{{ 'true' if is_on_budget(account) else 'false' }}" data-account-subtype="{{ account.subtype or '' }}" aria-label="Edit classification for {{ account.name }}">Edit classification</button>
         </div>
         <span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' and account.source in bank_source_ids else account.source|capitalize }}</span>
         <div class="account-balance">
-          <strong>{{ 'Unavailable' if account.balanceUnknown else money(account.balance) }}</strong><small>{{ 'Owed' if account.type in ['credit','loan'] else 'Balance' }}</small>
+          <strong>{{ 'Unavailable' if account.balanceUnknown else money(account.balance) }}</strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small>
         </div>
       </div>
-    {% endfor %}
+    {% else %}<p class="empty-inline">No {{ group.label|lower }} accounts yet.</p>{% endfor %}
   </div>
+  </section>
+  {% endfor %}
   <div class="accounts-total">
-    <span>Cash account balances</span><strong>{{ money(cash_balance) }}</strong>
+    <span>On-budget cash balances · {{ currency }}</span><strong>{{ money(cash_balance) }}</strong>
   </div>
 {% else %}
   <div class="empty-state">

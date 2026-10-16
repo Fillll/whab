@@ -1,5 +1,10 @@
 # HTTPS remote budget client plugin changelog
 
+## 1.1.0 — 2026-10-16
+
+- Forward account budget scope, asset/liability types and subtype changes through the revision-checked remote command protocol.
+- Require WHAB 2.1 for the account classification command and core account fields.
+
 ## 1.0.0 — 2026-10-15
 
 - Introduce independent packaging and version ownership for the existing `client` plugin, compatible with WHAB 2.x. Earlier changes shipped inside the application distribution and were not independent plugin releases.

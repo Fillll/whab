@@ -7,6 +7,7 @@ Money stays in the original currency's integer minor units without conversion.
 
 import re
 
+from .accounts import ACCOUNT_TYPES, normalize_account
 from .categories import validate_child_category
 from .errors import StoreError
 from .money import MAX_SAFE_INTEGER, currency_code, minor_units
@@ -15,7 +16,9 @@ from .validation import validate_date, validate_month
 ACCOUNT_FIELDS = frozenset({
     "id", "name", "institution", "type", "balance", "currency", "source", "stale",
     "balanceUnknown",
+    "onBudget", "subtype",
 })
+_LEGACY_ACCOUNT_FIELDS = ACCOUNT_FIELDS - {"onBudget", "subtype"}
 CATEGORY_FIELDS = frozenset({"id", "name", "group", "target", "currency"})
 TRANSACTION_FIELDS = frozenset({
     "id", "accountId", "date", "merchant", "merchantLogo", "amount", "categoryId",
@@ -40,12 +43,17 @@ def _text(value: object, *, limit: int = 200, empty: bool = False) -> None:
         raise StoreError("Portable budget text must contain valid Unicode characters.") from None
 
 
-def _records(value: object, fields: frozenset[str], limit: int) -> list[dict]:
+def _records(
+    value: object, fields: frozenset[str], limit: int, *, optional: frozenset[str] = frozenset(),
+) -> list[dict]:
     if type(value) is not list or len(value) > limit:
         raise StoreError("Invalid portable budget collection.")
     result = []
     for record in value:
-        if type(record) is not dict or record.keys() != fields:
+        if (
+            type(record) is not dict or not fields <= record.keys()
+            or not record.keys() <= fields | optional
+        ):
             raise StoreError("Invalid portable budget record fields.")
         result.append(record.copy())
     return result
@@ -75,7 +83,17 @@ def validate_portable_budget(data: object) -> dict:
         raise StoreError("Unsupported portable budget version.")
     _text(data["budgetStartMonth"], limit=7)
     validate_month(data["budgetStartMonth"])
-    accounts = _records(data["accounts"], ACCOUNT_FIELDS, 1000)
+    accounts = _records(
+        data["accounts"], _LEGACY_ACCOUNT_FIELDS, 1000,
+        optional=frozenset({"onBudget", "subtype"}),
+    )
+    for index, account in enumerate(accounts):
+        _text(account["type"])
+        # Original v1 snapshots retained raw provider account types. An unknown
+        # legacy type must remain readable without becoming budget funding.
+        if not {"onBudget", "subtype"} & account.keys() and account["type"] not in ACCOUNT_TYPES:
+            account["type"] = "other"
+        accounts[index] = normalize_account(account)
     categories = _records(data["categories"], CATEGORY_FIELDS, 10000)
     transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000)
     assignments = _records(data["assignments"], ASSIGNMENT_FIELDS, 250000)

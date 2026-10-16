@@ -184,6 +184,9 @@ class RemoteStore:
     def add_account(self, workspace, account):
         return self._command("add_account", workspace, account)
 
+    def update_account(self, workspace, account_id, changes):
+        return self._command("update_account", workspace, {**changes, "accountId": account_id})
+
     def add_category(self, workspace, category):
         return self._command("add_category", workspace, category)
 

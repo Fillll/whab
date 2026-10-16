@@ -17,6 +17,7 @@ def budget():
             "id": "cash", "name": "Checking", "institution": "", "type": "depository",
             "balance": 10000, "currency": "JPY", "source": "manual", "stale": False,
             "balanceUnknown": False,
+            "onBudget": True, "subtype": None,
         }],
         "categories": [{
             "id": "food", "name": "Food", "group": "Everyday", "target": 100,
@@ -41,6 +42,53 @@ def test_exact_independent_json_records_preserve_history_tombstones_and_negative
         assert restored[key][0] is not data[key][0]
     data["transactions"][0]["note"] = "Changed afterward"
     assert restored["transactions"][0]["note"] == "Original memo"
+
+
+@pytest.mark.parametrize("kind,on_budget,subtype", [
+    ("depository", True, "checking"), ("depository", False, "savings"),
+    ("investment", False, "brokerage"), ("retirement", False, "401k"),
+    ("property", False, "vehicle"), ("loan", False, "student_loan"), ("deposit", False, "cd"),
+])
+def test_portable_preserves_account_scope_and_asset_classification(kind, on_budget, subtype):
+    data = budget()
+    data["accounts"][0].update(type=kind, onBudget=on_budget, subtype=subtype)
+    assert validate_portable_budget(data) == data
+
+
+@pytest.mark.parametrize("kind,expected", [("depository", True), ("credit", True), ("loan", False)])
+def test_legacy_v1_accounts_receive_safe_scope_defaults(kind, expected):
+    data = budget()
+    account = data["accounts"][0]
+    account.update(type=kind)
+    del account["onBudget"]
+    del account["subtype"]
+    restored = validate_portable_budget(data)["accounts"][0]
+    assert restored["onBudget"] is expected
+    assert restored["subtype"] is None
+
+
+def test_unknown_legacy_provider_types_remain_readable_as_unclassified_tracking_accounts():
+    data = budget()
+    account = data["accounts"][0]
+    account.update(type="provider_future_type")
+    del account["onBudget"]
+    del account["subtype"]
+    restored = validate_portable_budget(data)["accounts"][0]
+    assert (restored["type"], restored["onBudget"], restored["subtype"]) == ("other", False, None)
+    account["type"] = []
+    with pytest.raises(StoreError):
+        validate_portable_budget(data)
+
+
+@pytest.mark.parametrize("changes", [
+    {"onBudget": None}, {"onBudget": 0}, {"onBudget": "false"},
+    {"subtype": []}, {"subtype": "mortgage"}, {"type": "investment", "onBudget": True},
+])
+def test_portable_rejects_invalid_explicit_account_classification(changes):
+    data = budget()
+    data["accounts"][0].update(changes)
+    with pytest.raises(StoreError):
+        validate_portable_budget(data)
 
 
 @pytest.mark.parametrize("collection,field", [

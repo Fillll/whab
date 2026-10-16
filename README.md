@@ -4,7 +4,7 @@
 <h1 align="center">WHAB</h1>
 <p align="center"><strong>We Have A Budget</strong></p>
 
-A highly extensible budgeting app built with Python. Plan with monthly envelopes and rollover, review transactions, explore spending analytics, and track manual accounts, with optional CSV exports and bank imports. Choose plugins to keep your setup as simple or as capable as you need.
+A highly extensible budgeting app built with Python. Plan with monthly envelopes and rollover, review transactions, explore spending analytics, and track on-budget accounts alongside off-budget assets and debts, with optional CSV exports and bank imports. Choose plugins to keep your setup as simple or as capable as you need.
 
 ## Quick start
 

@@ -42,7 +42,7 @@ def export_files(store, workspace):
         clean.close()
 
 
-def _validate_rows(connection):
+def _validate_rows(connection, *, legacy_accounts):
     meta = connection.execute("SELECT workspace FROM meta").fetchall()
     if len(meta) != 1 or meta[0][0] != "personal":
         raise StoreError("SQLite budget images must contain exactly one personal ledger.")
@@ -61,7 +61,7 @@ def _validate_rows(connection):
     ):
         raise StoreError("SQLite budget images cannot contain banking connections or credentials.")
     for table, columns in (
-        ("accounts", "active,balance_unknown"),
+        ("accounts", "active,balance_unknown" if legacy_accounts else "active,balance_unknown,on_budget"),
         ("transactions", "pending,reviewed,is_transfer,category_edited,deleted,inferred_transfer"),
     ):
         for row in connection.execute(f"SELECT {columns} FROM {table}"):
@@ -82,18 +82,27 @@ def read_files(files):
     reader = Store(":memory:", month="2026-10")
     try:
         expected_schema = _schema(reader.db)
+        # Earlier format-1 images predate account scope. Keep their exact trusted
+        # schema allowlisted and infer defaults while reading their data only.
+        legacy_schema = [
+            (*row[:3], row[3].replace(
+                ", on_budget INTEGER NOT NULL DEFAULT 1, subtype TEXT", ""
+            )) if row[1] == "accounts" else row
+            for row in expected_schema
+        ]
         reader.db.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
         reader.db.execute("PRAGMA trusted_schema=OFF")
         reader.db.execute("PRAGMA query_only=ON")
         reader.db.deserialize(raw)
+        actual_schema = _schema(reader.db)
         if (
             reader.db.execute("PRAGMA user_version").fetchone()[0] != _FORMAT_VERSION
-            or _schema(reader.db) != expected_schema
+            or actual_schema not in (expected_schema, legacy_schema)
         ):
             raise StoreError("This SQLite budget has an unsupported database schema.")
         if [row[0] for row in reader.db.execute("PRAGMA quick_check")] != ["ok"]:
             raise StoreError("This SQLite budget database is damaged.")
-        _validate_rows(reader.db)
+        _validate_rows(reader.db, legacy_accounts=actual_schema == legacy_schema)
         return reader.export_budget()
     except sqlite3.Error:
         raise StoreError("This SQLite budget database is invalid or damaged.") from None

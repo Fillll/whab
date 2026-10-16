@@ -7,6 +7,7 @@ while user annotations are merged only after the repository locks its ledger.
 import re
 from typing import NotRequired, TypedDict
 
+from .accounts import ACCOUNT_TYPES, normalize_account
 from .errors import StoreError
 from .money import cents, currency_code
 from .validation import validate_date
@@ -21,6 +22,8 @@ class ImportedAccount(TypedDict):
     currency: str
     source: str
     itemId: str
+    onBudget: NotRequired[bool]
+    subtype: NotRequired[str | None]
     mask: NotRequired[str]
     stale: NotRequired[bool]
     balanceUnknown: NotRequired[bool]
@@ -103,7 +106,7 @@ def imported_account(record: ImportedAccount) -> dict:
         _boolean(record.get("balanceUnknown", False))
     except (KeyError, TypeError):
         raise StoreError("Invalid normalized bank record.") from None
-    return {
+    account = {
         "id": record["id"],
         "name": record["name"],
         "institution": record["institution"],
@@ -116,6 +119,14 @@ def imported_account(record: ImportedAccount) -> dict:
         "stale": record.get("stale", False),
         "balanceUnknown": record.get("balanceUnknown", False),
     }
+    # An unfamiliar provider account type is still useful for tracking history,
+    # but cannot implicitly become spendable budget funding.
+    if account["type"] not in ACCOUNT_TYPES:
+        account["type"] = "other"
+    for field in ("onBudget", "subtype"):
+        if field in record:
+            account[field] = record[field]
+    return normalize_account(account)
 
 
 def annotated_transaction(record: ImportedTransaction, annotations: dict) -> dict:

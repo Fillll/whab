@@ -49,6 +49,7 @@ def workspace_import(raw: bytes) -> WorkspaceImport:
         accounts=tuple({
             "id": row.id, "name": row.name, "institution": "YNAB export",
             "type": "other", "balance": row.balance_cents, "source": "ynab",
+            "onBudget": False, "subtype": None,
             "stale": True, "balanceUnknown": True,
         } for row in dump.accounts),
         categories=tuple({
@@ -60,7 +61,7 @@ def workspace_import(raw: bytes) -> WorkspaceImport:
         } for row in dump.assignments),
         budget_start_month=min(months),
         warnings=(*dump.warnings,
-            "Accounts have no exported type or verified balance snapshot. They are imported as unclassified, unavailable balances and provide no budget funding.",
+            "Accounts have no exported type, budget scope or verified balance snapshot. They are imported as unclassified off-budget accounts with unavailable balances and provide no budget funding.",
             "Monthly assignments are preserved. WHAB recalculates activity and availability using its own rules; YNAB credit-card payment envelopes and rollover totals may differ.",
             "YNAB flags and clearing status are retained in transaction notes. Uncleared rows are imported as unreviewed, posted transactions.",
             "Payee labels longer than 200 characters are shortened for display and preserved in full in transaction notes.",

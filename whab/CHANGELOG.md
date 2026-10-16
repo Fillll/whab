@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.1.0 — 2026-10-16
+
+- Add core on-budget and off-budget accounts. Only on-budget cash and credit accounts fund envelopes and contribute to budget activity, income and spending trends. Track investments, retirement accounts, property, loans and fixed-term deposits separately in currency-specific assets, liabilities and net worth.
+- Add validated account types and subtypes, including brokerage, IRA, Roth IRA, 401(k), home, vehicle, mortgage, car loan, student loan and CD. Reclassify existing accounts through the shared ledger service and local API without changing balances or transaction history.
+- Preserve account scope through compatible saved-ledger migrations, portable imports/exports and bank refreshes. Expose scope in immutable plugin snapshots and keep account classification changes optional for existing storage plugins.
+
 ## 2.0.0 — 2026-10-15
 
 - Require HTTPS for the local interface, APIs, remote commands and provider webhooks. Remove plaintext HTTP launch and OAuth redirect support. Set up device-local certificates with explicit trust instructions, allow configured certificates, and fail instead of falling back to HTTP. Existing HTTP URLs and deployments must migrate before upgrading.

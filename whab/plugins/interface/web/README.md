@@ -8,6 +8,10 @@ Templates and static files must ship in the wheel. Use demo data for browser che
 
 Transactions display merchant artwork supplied by the enabled Plaid plugin through a local image route. The payee name and notes remain visible; artwork loads independently and falls back to the merchant's initial on failure. Transactions without supplied artwork keep their text-only presentation.
 
+Accounts and the sidebar separate **On-budget** everyday accounts from **Off-budget** assets and debts. On-budget checking, savings and credit accounts participate in budget income and spending. Off-budget investments, retirement accounts, property, loans and deposits (including CDs) contribute to net worth while their transactions remain available for review. Assets, liabilities and net worth use current known balances in the selected currency; stale and unavailable snapshots are excluded. Currencies are never combined.
+
+**Add manual account** offers budget scope, account type and relevant account details, such as brokerage, Roth IRA, 401(k), home, mortgage or CD. Enter liabilities as the positive amount owed. **Edit classification** changes an existing account's scope, type and detail; its scope applies to every transaction in that account and updates budget totals accordingly.
+
 From the application directory, run `.venv/bin/python -m pytest plugins/interface/web/tests`. See [plugin contribution rules](../../README.md) for all checks and packaging.
 
 Settings contains **Budgets**, **Plugins**, and **About this prototype**. The Budgets entry shows the current budget and retains separate personal/demo workspace choices. Workspace switching preserves the page, month and currency and clears the previous category selection. The portable budget panel creates, opens and switches `.whab` containers, manages saved copies and displays pending-save status. A remote connection container leaves financial records on the server. The same Settings controls work on desktop and mobile.

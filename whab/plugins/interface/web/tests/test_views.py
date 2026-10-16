@@ -45,6 +45,51 @@ def test_exact_currency_amount_inputs():
     assert shift_month("2026-12", 1) == "2027-01"
 
 
+def test_tracking_accounts_stay_visible_without_entering_budget_insights():
+    accounts = [
+        {"id": "checking", "type": "depository", "source": "manual", "balance": 10000},
+        {"id": "cd", "type": "depository", "source": "manual", "balance": 20000,
+         "onBudget": False},
+        {"id": "ira", "type": "retirement", "subtype": "roth_ira", "source": "manual",
+         "balance": 30000},
+        {"id": "loan", "type": "loan", "subtype": "mortgage", "source": "bank",
+         "balance": 5000},
+        {"id": "stale", "type": "depository", "source": "manual", "balance": 6000,
+         "stale": True},
+        {"id": "unknown", "type": "depository", "source": "manual", "balance": 0,
+         "balanceUnknown": True},
+    ]
+    transactions = [
+        {"id": account["id"], "accountId": account["id"], "date": "2026-10-01",
+         "merchant": account["id"], "amount": 100, "pending": False,
+         "reviewed": False, "categoryId": None}
+        for account in accounts[:4]
+    ]
+    summary = {"assets": 60000, "liabilities": 5000, "netWorth": 55000}
+    data = {
+        "categories": [], "budget": [], "accounts": accounts,
+        "trend": [{"month": "2026-10", "spent": 100}],
+        "summary": {"spent": 100}, "transactions": transactions,
+        "accountSummary": summary,
+    }
+    context = build_context(data, {}, [], workspace="personal", page="accounts", month="2026-10")
+    assert len(context["transactions"]) == 4
+    assert context["purchases"] == 1
+    assert context["uncategorized"] == 100
+    assert context["payees"] == [("checking", 100)]
+    assert context["cash_balance"] == 10000
+    assert [a["id"] for a in context["account_groups"][0]["accounts"]] == [
+        "checking", "stale", "unknown",
+    ]
+    assert [a["id"] for a in context["account_groups"][1]["accounts"]] == ["cd", "ira", "loan"]
+    assert context["account_summary"] == summary
+    assert context["account_label"](accounts[0]) == "Cash / checking / savings"
+    assert context["account_label"](accounts[2]) == "Roth IRA"
+    assert context["is_liability"](accounts[3])
+    assert context["on_budget_account_types"] == {"depository", "credit"}
+    assert context["account_subtypes"]["deposit"]["cd"] == "Certificate of deposit (CD)"
+
+
 def test_explicit_parent_categories_and_currency_bound_context():
     child = {"id": "food", "name": "Food", "parentId": "living", "currency": "JPY"}
     budget = {"categoryId": "food", "assigned": 1000, "spent": 250, "available": 750}

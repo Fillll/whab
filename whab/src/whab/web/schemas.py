@@ -12,8 +12,10 @@ from pydantic import (
     StrictInt,
     StringConstraints,
     field_validator,
+    model_validator,
 )
 
+from whab.domain.accounts import normalize_account
 from whab.domain.money import currency_code
 
 Workspace = Literal["demo", "personal"]
@@ -86,10 +88,39 @@ class CategoryBody(Body):
 class AccountBody(Body):
     workspace: Workspace
     name: Label
-    type: Literal["depository", "credit"]
+    type: str
     balance: Cents
     currency: str = "USD"
+    onBudget: StrictBool | None = None
+    subtype: str | None = None
     _currency = field_validator("currency")(currency_code)
+
+    @model_validator(mode="after")
+    def classification(self):
+        record = self.model_dump(exclude={"workspace"})
+        if "onBudget" not in self.model_fields_set:
+            record.pop("onBudget")
+        normalized = normalize_account(record)
+        self.onBudget = normalized["onBudget"]
+        return self
+
+
+class AccountClassificationBody(Body):
+    workspace: Workspace
+    type: str | None = None
+    onBudget: StrictBool | None = None
+    subtype: str | None = None
+
+    @model_validator(mode="after")
+    def classification(self):
+        changes = self.model_fields_set - {"workspace"}
+        if not changes:
+            raise ValueError("No account changes provided")
+        if "type" in changes:
+            normalize_account(self.model_dump(include=changes))
+        if "onBudget" in changes and self.onBudget is None:
+            raise ValueError("Invalid account budget scope")
+        return self
 
 
 class PluginSelectionBody(Body):
