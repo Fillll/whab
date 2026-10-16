@@ -1,0 +1,292 @@
+{% macro heading(title, subtitle) %}
+  <div class="modal-heading">
+    <div>
+      <h2>{{ title }}</h2>
+      <p>{{ subtitle }}</p>
+    </div>
+    <button class="icon-button"
+            data-close-dialog
+            aria-label="Close dialog">{{ icon('close', 20) }}</button>
+  </div>
+{% endmacro %}
+{% macro account_classification() %}
+    <label>
+      Budget scope<select name="onBudget" data-boolean-value data-account-scope>
+      <option value="true">On-budget · everyday budgeting</option>
+      <option value="false">Off-budget · assets and debts</option>
+      </select>
+    </label>
+    <label>
+      Account type<select name="type" data-account-type>
+      {% for account_type, label in account_types.items() %}<option value="{{ account_type }}" data-on-budget="{{ 'true' if account_type in on_budget_account_types else 'false' }}" data-liability="{{ 'true' if is_liability({'type': account_type}) else 'false' }}"{% if account_type not in on_budget_account_types %} disabled hidden{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      Account detail<select name="subtype" data-null data-account-subtype>
+      <option value="">General / unspecified</option>
+      {% for account_type, choices in account_subtypes.items() %}{% for subtype, label in choices.items() %}<option value="{{ subtype }}" data-account-type="{{ account_type }}"{% if account_type!='depository' %} disabled hidden{% endif %}>{{ label }}</option>{% endfor %}{% endfor %}
+      </select>
+    </label>
+{% endmacro %}
+<dialog class="modal"
+        id="category-dialog">{{ heading('New category', 'Make space for something you want to budget for.') }}
+  <form class="modal-form" data-api="/categories">
+    <input type="hidden" name="workspace" value="{{ workspace }}">
+    <input type="hidden" name="currency" value="{{ currency }}">
+    <label>
+      Child category name<input name="name"
+       required
+       maxlength="80"
+       placeholder="e.g. School supplies"
+       autofocus>
+    </label>
+    <label>
+      Parent category<input name="group"
+       required
+       maxlength="80"
+       list="category-groups"
+       value="Everyday">
+      <datalist id="category-groups">
+        {% for group in groups %}
+          <option value="{{ group.name }}">
+        {% endfor %}
+      </datalist>
+    </label>
+    <label>
+      Monthly target ({{ currency }})<input name="target" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" value="{{ money_input(0) }}" required>
+    </label>
+    <p class="field-error" role="alert" hidden></p>
+    <button class="button primary full-width">Create category</button>
+  </form>
+</dialog>
+<dialog class="modal"
+        id="account-dialog">{{ heading('Add manual account', 'Track an account without a bank connection.') }}
+  <form class="modal-form" data-api="/accounts" data-account-form>
+    <input type="hidden" name="workspace" value="{{ workspace }}">
+    <label>
+      Account name<input name="name"
+       required
+       maxlength="100"
+       placeholder="e.g. Cash wallet"
+       autofocus>
+    </label>
+    {{ account_classification() }}
+    <p class="settings-notice">On-budget accounts participate in your budget. Off-budget accounts track net worth without affecting budget income or spending.</p>
+    <label>
+      Currency<select name="currency">
+      {% for code, digits in currency_choices %}<option value="{{ code }}" data-minor-units="{{ digits }}"{% if code==currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      <span data-account-balance-label>Current balance</span><input name="balance"
+       data-cents data-minor-units="{{ minor_units }}"
+       inputmode="decimal"
+       value="0"
+       required>
+    </label>
+    <p class="settings-notice" data-account-balance-hint>Enter the current account balance.</p>
+    <p class="field-error" role="alert" hidden></p>
+    <button class="button primary full-width">Add account</button>
+  </form>
+</dialog>
+<dialog class="modal" id="account-classification-dialog">{{ heading('Account classification', 'Choose how this account is used in WHAB.') }}
+  <form class="modal-form" data-api="/accounts" data-method="PATCH" data-account-form data-account-classification>
+    <input type="hidden" name="workspace" value="{{ workspace }}">
+    <p class="settings-notice"><strong data-account-edit-name></strong></p>
+    {{ account_classification() }}
+    <p class="settings-notice">Changing budget scope applies to all transactions in this account. Off-budget accounts stay in net worth and are excluded from budget income, spending and category activity.</p>
+    <p class="field-error" role="alert" hidden></p>
+    <button class="button primary full-width">Save classification</button>
+  </form>
+</dialog>
+<dialog class="modal"
+        id="transaction-dialog">{{ heading('Add transaction', 'Record spending or income in a manual account.') }}
+  <form class="modal-form" data-api="/transactions">
+    <input type="hidden" name="workspace" value="{{ workspace }}">
+    <label>
+      Payee<input name="merchant"
+       required
+       maxlength="120"
+       placeholder="Who was it with?"
+       autofocus>
+    </label>
+    <div class="form-columns">
+      <label>
+        Amount ({{ currency }})<input name="amount" data-cents data-minor-units="{{ minor_units }}" required inputmode="decimal">
+      </label>
+      <label>
+        Type<select name="_kind">
+        <option value="expense">Expense</option>
+        <option value="income">Inflow / refund</option>
+        </select>
+      </label>
+    </div>
+    <div class="form-columns">
+      <label>
+        Date (YYYY-MM-DD)<input name="date" type="text" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" placeholder="YYYY-MM-DD" value="{{ today }}" required>
+      </label>
+      <label>
+        Account<select name="accountId" required>
+      {% for account in manual_accounts %}<option value="{{ account.id }}">{{ account.name }}</option>
+    {% endfor %}
+    </select>
+  </label>
+</div>
+<label>
+  Category<select name="categoryId" data-null>
+  <option value="">Income / uncategorized</option>
+{% for group in groups %}<optgroup label="{{ group.name }}">
+  {% for row in group.rows %}<option value="{{ row.category.id }}">{{ row.category.name }}</option>{% endfor %}
+</optgroup>{% endfor %}
+</select>
+</label>
+<label>
+  Note<input name="note" maxlength="300" placeholder="Optional">
+</label>
+<p class="field-error" role="alert" hidden></p>
+<button class="button primary full-width">Save transaction</button>
+</form>
+</dialog>
+{% set manager = plugin_management|default({'plugins': [], 'restart_required': false, 'error': none}) %}
+{% set plugin_categories = {'automation': 'Automation', 'extension': 'Extensions', 'ingestion': 'Ingestion', 'insight': 'Insights', 'interface': 'Interfaces', 'storage': 'Storage'} %}
+{% set visible_plugins = manager.plugins|rejectattr('category', 'equalto', 'example')|rejectattr('id', 'equalto', 'example')|list %}
+{% macro plugin_status(plugin) %}{% if plugin.required %}Required{% elif plugin.active and plugin.enabled %}Enabled{% elif plugin.active %}Will disable after restart{% elif plugin.enabled %}Will enable after restart{% else %}Disabled{% endif %}{% endmacro %}
+<dialog class="modal settings-modal" id="settings-dialog" aria-label="Settings">
+  {{ heading('Settings', 'Manage this local workspace.') }}
+  <nav class="settings-menu" aria-label="Settings sections">
+    <button type="button" data-dialog="budgets-dialog">{{ icon('budget', 18) }}<span><strong>Budgets</strong><small>Current budget · {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }}</small></span>{{ icon('chevron-right', 16) }}</button>
+    <button type="button" data-dialog="plugins-dialog">{{ icon('settings', 18) }}<span><strong>Plugins</strong><small>Installed plugins and their options</small></span>{{ icon('chevron-right', 16) }}</button>
+    <button type="button" data-dialog="about-dialog">{{ icon('help', 18) }}<span><strong>About this prototype</strong><small>WHAB · {{ version }}</small></span>{{ icon('chevron-right', 16) }}</button>
+  </nav>
+</dialog>
+<dialog class="modal settings-modal" id="budgets-dialog" aria-label="Budgets">
+  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
+  {{ heading('Budgets', 'Choose the budget you want to work with.') }}
+  <nav class="budget-list" aria-label="Available budgets">
+    {% for key, label, description in [('personal', budget_name|default('My budget'), 'Your accounts and budget'), ('demo', 'Demo budget', 'Fictional data to explore WHAB')] %}
+    <a class="budget-choice" href="{{ url(workspace=key, category=none) }}"{% if workspace==key %} aria-current="true"{% endif %}>
+      <span class="budget-choice-icon">{{ icon('wallet' if key=='personal' else 'sparkles', 20) }}</span>
+      <span class="budget-choice-copy"><strong>{{ label }}</strong><small>{{ description }}</small></span>
+      {% if workspace==key %}<span class="budget-current">{{ icon('check', 14) }}Current budget</span>{% else %}{{ icon('chevron-right', 16) }}{% endif %}
+    </a>
+    {% endfor %}
+  </nav>
+  <section class="budget-bundle" aria-labelledby="portable-budget-title">
+    <h3 id="portable-budget-title">Portable budget</h3>
+    <p class="settings-notice">Current budget: <strong data-budget-name>Loading…</strong></p>
+    <p class="settings-notice" data-budget-status role="status"></p>
+    <ul class="budget-copy-status" data-budget-copies aria-label="Saved copies"></ul>
+    <p class="field-error" data-budget-load-error role="alert" hidden></p>
+    <div class="budget-bundle-actions"><a class="button" href="/api/budget/export" download>Download budget</a><button class="button" type="button" data-budget-save hidden>Save copies</button></div>
+    <form class="modal-form budget-bundle-form" data-budget-export hidden>
+      <label class="budget-copy-option"><input type="checkbox" name="include_credentials"><span>Include remote access credential</span></label>
+      <label>Password for remote access credential<input type="password" name="password" minlength="12" maxlength="1024" autocomplete="new-password" disabled></label>
+      <p class="settings-notice">Optional. The password protects the included remote credential, not the rest of the budget. Bank-provider tokens are never included.</p>
+      <p class="field-error" role="alert" hidden></p>
+      <button class="button" type="submit">Export budget</button>
+    </form>
+    <form class="modal-form budget-bundle-form" data-budget-copy hidden>
+      <label>Saved copy name<input name="name" required maxlength="100" placeholder="e.g. External drive"></label>
+      <label>Save location on this device<input name="path" required maxlength="4096" placeholder="/absolute/path/Backup.whab"></label>
+      <p class="settings-notice">Choose a new file location. This copy stays linked to the same budget.</p>
+      <p class="field-error" role="alert" hidden></p>
+      <button class="button" type="submit">Add saved copy</button>
+    </form>
+    <form class="modal-form budget-bundle-form" data-budget-switch hidden>
+      <label>Open budget<select name="budget" data-available-budgets required aria-label="Saved budget"></select></label>
+      <label>Budget password (optional)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
+      <p class="field-error" role="alert" hidden></p>
+      <button class="button" type="submit">Switch budget</button>
+    </form>
+    <form class="modal-form budget-bundle-form" data-budget-new>
+      <label>New budget name<input name="name" required maxlength="100" placeholder="e.g. Household"></label>
+      <p class="field-error" role="alert" hidden></p>
+      <button class="button" type="submit">Create budget</button>
+    </form>
+    <form class="modal-form budget-bundle-form" data-budget-open>
+      <label>Open a budget file<input type="file" name="budget" accept=".whab,application/zip" required></label>
+      <label>Budget password (optional)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
+      <label class="budget-copy-option"><input type="checkbox" name="as_copy"><span>Open as a separate budget</span></label>
+      <p class="settings-notice">The container restores its plugin setup and data. Remote connections leave financial records on the server. Enter a password only for an included remote credential.</p>
+      <p class="field-error" role="alert" hidden></p>
+      <button class="button primary" type="submit">Open budget</button>
+    </form>
+  </section>
+</dialog>
+<dialog class="modal settings-modal" id="plugins-dialog" aria-label="Plugins">
+  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
+  {{ heading('Plugins', 'Choose the plugins for this budget.') }}
+  <section class="plugin-manager" aria-labelledby="plugin-manager-title">
+    <div class="plugin-list-heading">
+      <h3 id="plugin-manager-title">Installed</h3>
+      <label class="plugin-category-filter">Category<select data-plugin-category-filter aria-label="Plugin category"><option value="all" selected>All categories</option>{% for category, label in plugin_categories.items() %}<option value="{{ category }}">{{ label }}</option>{% endfor %}</select></label>
+    </div>
+    <p class="settings-notice">Saved selections apply when you restart WHAB. Open a plugin’s options to manage its settings.</p>
+    {% if manager.error %}<p class="field-error" role="alert">{{ manager.error }}</p>{% endif %}
+    <form data-plugin-selection>
+      {% for plugin in manager.plugins if (plugin.category=='example' or plugin.id=='example') and plugin.enabled and plugin.manageable and not plugin.required %}<input type="hidden" name="plugin" value="{{ plugin.id }}">{% endfor %}
+      <div class="plugin-list">
+        {% for category, label in plugin_categories.items() %}
+        {% set category_plugins = visible_plugins|selectattr('category', 'equalto', category)|sort(attribute='display_name')|list %}
+        {% if category_plugins %}
+        <section class="plugin-category-group" data-plugin-category="{{ category }}" aria-labelledby="plugin-category-{{ category }}">
+          <h4 id="plugin-category-{{ category }}">{{ label }}<span>{{ category_plugins|length }}</span></h4>
+        {% for plugin in category_plugins %}
+          <div class="plugin-row">
+            <label class="plugin-toggle">
+              <input type="checkbox" value="{{ plugin.id }}"{% if not plugin.required %} name="plugin"{% endif %}{% if plugin.enabled %} checked{% endif %}{% if plugin.required or (not plugin.manageable and not plugin.enabled) %} disabled{% endif %}>
+              <span><strong>{{ plugin.display_name }}</strong><small class="plugin-meta">{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</small>{% if plugin.reason %}<small class="plugin-meta">{{ plugin.reason }}</small>{% endif %}</span>
+            </label>
+            <div class="plugin-controls"><span class="plugin-state">{{ plugin_status(plugin) }}</span><button class="button plugin-options" type="button" data-dialog="plugin-options-{{ plugin.id }}" data-plugin-options aria-label="Options for {{ plugin.display_name }}">Options{{ icon('chevron-right', 14) }}</button></div>
+          </div>
+        {% endfor %}
+        </section>
+        {% endif %}
+        {% endfor %}
+        {% if not visible_plugins %}<p class="settings-notice">No installed plugins were found.</p>{% endif %}
+        <p class="settings-notice" data-plugin-category-empty hidden>No installed plugins in this category.</p>
+      </div>
+      <p class="plugin-restart-notice" role="status"{% if not manager.restart_required %} hidden{% endif %}>Restart WHAB to apply your saved plugin selection. Running plugins stay active until then.</p>
+      <p class="field-error" role="alert" hidden></p>
+      <div class="settings-actions"><button class="button primary" type="submit">Save plugin selection</button></div>
+    </form>
+  </section>
+</dialog>
+{% for plugin in visible_plugins %}
+<dialog class="modal settings-modal" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} options" data-plugin-id="{{ plugin.id }}" data-plugin-active="{{ 'true' if plugin.active else 'false' }}">
+  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Installed plugins</button>
+  {{ heading(plugin.display_name, 'Plugin options') }}
+  <dl class="plugin-details">
+    <div><dt>Category</dt><dd>{{ plugin_categories.get(plugin.category|default('extension'), 'Extensions') }}</dd></div>
+    <div><dt>Plugin</dt><dd>{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</dd></div>
+    <div><dt>Selection</dt><dd>{{ plugin_status(plugin) }}</dd></div>
+    <div><dt>Runtime</dt><dd>{{ 'Running' if plugin.active else 'Not running' }}</dd></div>
+  </dl>
+  {% if plugin.reason %}<p class="settings-notice">{{ plugin.reason }}</p>{% endif %}
+  {% if plugin.id == 'web' and plugin.active %}
+  <fieldset class="appearance-settings">
+    <legend>Appearance</legend>
+    <p class="settings-notice">Choose how WHAB web looks in this browser.</p>
+    <div class="appearance-options">
+      <label class="appearance-choice"><input type="radio" name="web-appearance" value="light" data-appearance-choice><span><strong>Light</strong><small>Warm surfaces, red and yellow accents</small></span></label>
+      <label class="appearance-choice"><input type="radio" name="web-appearance" value="dark" data-appearance-choice><span><strong>Dark</strong><small>Charcoal surfaces, red and yellow accents</small></span></label>
+    </div>
+    <p class="settings-notice" data-appearance-status role="status" aria-live="polite">Changes apply immediately and are remembered in this browser.</p>
+  </fieldset>
+  {% endif %}
+  <section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings>{% if not plugin.active %}<p class="settings-notice">{% if plugin.enabled %}Restart WHAB to view this plugin’s settings.{% else %}Enable this plugin, save your selection, and restart WHAB to view its settings.{% endif %}</p>{% endif %}</section>
+  <p class="settings-notice" role="status" data-plugin-settings-status></p>
+  <p class="field-error" role="alert" data-plugin-settings-error hidden></p>
+</dialog>
+{% endfor %}
+<dialog class="modal"
+        id="about-dialog">{{ heading('We Have A Budget', 'WHAB · ' ~ version) }}
+  <div class="about-copy">
+    <p>A place to categorize spending, review your habits, and plan each month.</p>
+    <p>This app runs on your computer. Python handles pages, budget calculations, storage, and enabled bank providers. Small browser modules handle controls and provider connection flows.</p>
+    <p>Shared family logins, investments imports, splits, recurring bills, and the full credit-card payment budget model are planned.</p>
+    <p>Balances are imported snapshots. Category planning conservatively reserves card debt; reconcile against your accounts before relying on allocations.</p>
+    <p>Demo, Sandbox, and production data are isolated. Sandbox connections contain test data.</p>
+  </div>
+  <button class="button primary full-width" data-close-dialog>Back to settings</button>
+</dialog>

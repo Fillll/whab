@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="whab/plugins/interface/web/src/whab_web/static/logo.svg" alt="WHAB logo" width="128" height="128">
+  <img src="whab/app/plugins/interface/web/src/whab_web/static/logo.svg" alt="WHAB logo" width="128" height="128">
 </p>
 <h1 align="center">WHAB</h1>
 <p align="center"><strong>We Have A Budget</strong></p>
@@ -8,10 +8,12 @@ A highly extensible budgeting app built with Python. Plan with monthly envelopes
 
 ## Quick start
 
-Requires **Python 3.14 or newer**. From the repository root:
+The [macOS launcher](whab/launchers/macos/README.md) provides a native companion for local installation, launch and updates. The product is organized as [`whab/app/`, `whab/launchers/` and `whab/docs/`](whab/README.md).
+
+Source development requires **Python 3.14 or newer**. [Existing checkouts must retain their runtime home when adopting the new layout](whab/README.md#existing-development-checkouts). From the repository root:
 
 ```sh
-cd whab
+cd whab/app
 python3.14 -m venv .venv
 .venv/bin/python scripts/install.py --dev
 .venv/bin/python scripts/setup.py
@@ -42,7 +44,7 @@ Each surrounding box is a plugin family. A plugin can provide several capabiliti
 
 Plugin code is installed in WHAB. A portable `.whab` container owns its plugin manifest, settings and plugin data. A local budget carries its storage data; remote storage contributes connection information alongside the manifest and saved plugin state, with financial records staying on the server. Credentials stay with the machine by default; remote access credentials can optionally travel encrypted with a password. Bank-provider tokens stay on the machine or server. See the [architecture guide](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md) for the implemented contracts and capability boundaries.
 
-The `whab` host/core wheel and its seven supported plugins have independent distributions, versions and changelogs. The `bundled` extra selects the supported plugin set when compatible host/plugin distributions are available in the chosen package index or local wheelhouse; the source installer above installs the checkout's local packages together without requiring those plugin releases to be published. Installation and enablement are separate: Web and SQLite are selected defaults, Plaid is optional and enabled by default, and the other supported plugins start disabled. The teaching example is separately installed and hidden from ordinary Settings. Concrete plugins live under `whab/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/plugins/README.md).
+The `whab` host/core wheel and its seven supported plugins have independent distributions, versions and changelogs. The `bundled` extra selects the supported plugin set when compatible host/plugin distributions are available in the chosen package index or local wheelhouse; the source installer above installs the checkout's local packages together without requiring those plugin releases to be published. Installation and enablement are separate: Web and SQLite are selected defaults, Plaid is optional and enabled by default, and the other supported plugins start disabled. The teaching example is separately installed and hidden from ordinary Settings. Concrete plugins live under `whab/app/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/app/plugins/README.md).
 
 ### Client/server deployment
 
@@ -65,11 +67,11 @@ A plugin's primary category describes its role; its capabilities can include con
 
 ## Guides
 
-- [Application setup and configuration](whab/README.md)
+- [Application setup and configuration](whab/app/README.md)
 - [Usage, bank imports, portable budgets and backups](whab/docs/usage.md)
 - [Architecture](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md)
-- [Plugin API](whab/docs/plugins.md) and [plugin folders](whab/plugins/README.md)
-- [Contributing and checks](whab/CONTRIBUTING.md) · [Changelog](whab/CHANGELOG.md)
+- [Plugin API](whab/docs/plugins.md) and [plugin folders](whab/app/plugins/README.md)
+- [Contributing and checks](whab/app/CONTRIBUTING.md) · [Changelog](whab/app/CHANGELOG.md)
 
 ## Privacy and control
 
