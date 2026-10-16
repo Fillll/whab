@@ -12,11 +12,12 @@ from whab.domain.errors import StoreError
 from whab.plugins import API_VERSION, BudgetContext
 from whab.plugins.sdk import valid_plugin_name
 
+from .container import decode_container, encode_container, validate_file_name
+from .credentials import encrypt_credentials
 from .document import (
     MAX_BUNDLE_BYTES,
     MAX_MANIFEST_BYTES,
     atomic_write,
-    decode_bundle,
     digest,
     encode_bundle,
     new_manifest,
@@ -25,8 +26,17 @@ from .document import (
 )
 
 
-def content_digest(manifest, ledger):
-    return digest(json.dumps([manifest, ledger], sort_keys=True, separators=(",", ":")).encode())
+def content_digest(manifest, ledger, credential_blob=None):
+    if type(ledger) is dict and all(type(value) is bytes for value in ledger.values()):
+        ledger = {name: digest(value) for name, value in sorted(ledger.items())}
+    content = [manifest, ledger]
+    if credential_blob is not None:
+        content.append({"credential": digest(credential_blob)})
+    return digest(json.dumps(content, sort_keys=True, separators=(",", ":")).encode())
+
+
+def container_digest(container):
+    return content_digest(container.manifest, container.legacy_ledger if container.legacy_ledger is not None else container.files, container.credential_blob)
 
 
 def _read_bytes(path, limit=MAX_BUNDLE_BYTES):
@@ -62,12 +72,19 @@ def _read_source(path):
 
 
 class BudgetSession:
-    def __init__(self, home, environment, manifest, *, path=None, ledger=None):
+    def __init__(self, home, environment, manifest, *, path=None, ledger=None, files=None,
+                 credentials=None, credential_blob=None, password=None):
         self.home = Path(home)
         self.environment = environment
         self.manifest = validate_manifest(manifest)
         self.path = Path(path).expanduser().resolve() if path else None
         self.ledger = ledger
+        self.files = dict(files or {})
+        self.credentials = credentials or {}
+        self.credential_blob = credential_blob
+        self.password = password
+        self.storage_config = {}
+        self._has_payload = files is not None
         self.storage_home = self.home / "budgets" / self.id / environment
         self.lock = RLock()
         self.store = None
@@ -76,8 +93,8 @@ class BudgetSession:
         self.status = "saved"
         self._file_digest = digest(_read_bytes(self.path)) if self.path and self.path.exists() else None
         self._source = _read_source(self.storage_home / "source.json")
-        if self.ledger is not None and self._source is not None:
-            incoming = content_digest(self.manifest, self.ledger)
+        if (self.ledger is not None or self._has_payload) and self._source is not None:
+            incoming = content_digest(self.manifest, self.ledger if self.ledger is not None else self.files, self.credential_blob)
             if incoming not in (self._source["content"], self._source.get("pending")):
                 raise StoreError("This budget differs from the copy already opened on this device. Export the recovered budget before opening a different revision.")
             saved_manifest = self.storage_home / "manifest.json"
@@ -89,17 +106,25 @@ class BudgetSession:
                     self.manifest = recovered
                 except (ValueError, OSError):
                     raise StoreError("The budget's saved plugin setup is unreadable.") from None
+            saved_files = self.storage_home / "plugin-data.whab"
+            if "restorePending" not in self._source and saved_files.exists():
+                recovered = decode_container(_read_bytes(saved_files))
+                if recovered.manifest["id"] != self.id or recovered.manifest["storage"] != self.manifest["storage"]:
+                    raise StoreError("The budget's saved plugin files are unreadable.")
+                self.files = recovered.files
         self._load_copies()
 
     @classmethod
-    def open(cls, home, environment, path):
+    def open(cls, home, environment, path, password=None):
         try:
             with Path(path).expanduser().open("rb") as source:
                 raw = source.read(MAX_BUNDLE_BYTES + 1)
-            manifest, ledger = decode_bundle(raw)
+            container = decode_container(raw, password=password)
         except OSError:
             raise StoreError("The budget file could not be opened. Check its location and permissions.") from None
-        return cls(home, environment, manifest, path=path, ledger=ledger)
+        return cls(home, environment, container.manifest, path=path, ledger=container.legacy_ledger,
+                   files=container.files if container.legacy_ledger is None else None,
+                   credentials=container.credentials, credential_blob=container.credential_blob, password=password)
 
     @classmethod
     def create(cls, home, environment, name, plugins=(), storage="sqlite", path=None):
@@ -162,6 +187,20 @@ class BudgetSession:
     def bind(self, store):
         """Restore only into a new isolated backend; never replace an existing ledger."""
         self.store = store
+        if self.ledger is None and self._has_payload:
+            prepare = getattr(store, "prepare_budget_files", None)
+            if not callable(prepare):
+                raise StoreError("This storage plugin cannot open its saved budget files.")
+            existing = self._source is not None and "restorePending" not in self._source
+            if not existing:
+                incoming = content_digest(self.manifest, self.files, self.credential_blob)
+                initial = {"content": incoming, "restorePending": incoming}
+                try:
+                    atomic_write(self.storage_home / "source.json", json.dumps(initial).encode())
+                except OSError:
+                    raise StoreError("The budget's recovery record could not be saved; its files were not restored.") from None
+                self._source = initial
+            prepare("personal", self.files_for(self.manifest["storage"]), existing=existing)
         if self.ledger is not None and (self._source is None or "restorePending" in self._source):
             incoming = content_digest(self.manifest, self.ledger)
             restore = getattr(store, "restore_budget", None)
@@ -252,12 +291,77 @@ class BudgetSession:
             MappingProxyType(copy.deepcopy(record["settings"])),
             MappingProxyType(copy.deepcopy(record["state"])),
             lambda value: self.save_plugin_data(plugin_id, state=value),
+            lambda name: self.read_file(plugin_id, name),
+            lambda name, raw: self.write_file(plugin_id, name, raw),
+            lambda name: self.delete_file(plugin_id, name),
         )
 
-    def bundle(self):
+    def files_for(self, plugin_id):
+        if not valid_plugin_name(plugin_id):
+            raise StoreError("Invalid plugin ID.")
+        prefix = f"plugins/{plugin_id}/"
+        return {key[len(prefix):]: value for key, value in self.files.items() if key.startswith(prefix)}
+
+    def _file_key(self, plugin_id, name):
+        if self.plugin_record(plugin_id) is None or type(name) is not str or name in {"settings.json", "state.json"}:
+            raise StoreError("Choose a data file within this plugin's budget namespace.")
+        return validate_file_name(f"plugins/{plugin_id}/{name}")
+
+    def read_file(self, plugin_id, name):
+        with self.lock:
+            return self.files.get(self._file_key(plugin_id, name))
+
+    def _save_files(self, files):
+        raw = encode_container(self.manifest, files)
+        try:
+            atomic_write(self.storage_home / "plugin-data.whab", raw)
+        except OSError:
+            raise StoreError("The plugin file could not be saved; its previous contents are unchanged.") from None
+        self.files = files
+        self.checkpoint()
+
+    def write_file(self, plugin_id, name, raw):
+        with self.lock:
+            if plugin_id == self.manifest["storage"]:
+                raise StoreError("Storage payload files are managed by the storage backend.")
+            if type(raw) is not bytes:
+                raise StoreError("Plugin files must contain bytes.")
+            key = self._file_key(plugin_id, name)
+            self._save_files({**self.files, key: raw})
+
+    def delete_file(self, plugin_id, name):
+        with self.lock:
+            if plugin_id == self.manifest["storage"]:
+                raise StoreError("Storage payload files are managed by the storage backend.")
+            key = self._file_key(plugin_id, name)
+            self._save_files({name: raw for name, raw in self.files.items() if name != key})
+
+    def bundle(self, *, include_credentials=False, password=None, preserve_credentials=False):
+        export_files = getattr(self.store, "export_budget_files", None)
+        if callable(export_files):
+            with self.lock:
+                plugin_id = self.manifest["storage"]
+                prefix = f"plugins/{plugin_id}/"
+                files = {key: value for key, value in self.files.items() if not key.startswith(prefix)}
+                payload = export_files("personal")
+                if type(payload) is not dict:
+                    raise StoreError("This storage plugin returned invalid budget files.")
+                files.update({prefix + name: raw for name, raw in payload.items()})
+                blob = self.credential_blob if preserve_credentials else None
+                if include_credentials:
+                    if plugin_id != "client":
+                        raise StoreError("Only remote client credentials can be included in this budget file.")
+                    profile = {key: value for key, value in self.storage_config.items()
+                               if key in {"CLIENT_URL", "CLIENT_TOKEN", "CLIENT_BUDGET_ID"}}
+                    blob = encrypt_credentials(self.id, {plugin_id: profile}, password)
+                raw = encode_container(self.manifest, files, credential_blob=blob)
+                self.files = files
+                return raw
         export = getattr(self.store, "export_budget", None)
         if not callable(export):
             raise StoreError("This storage plugin cannot export a portable budget.")
+        if include_credentials or self.files:
+            raise StoreError("This storage plugin does not support plugin-owned budget files.")
         return encode_bundle(self.manifest, export("personal"))
 
     def checkpoint(self):
@@ -265,10 +369,12 @@ class BudgetSession:
             return
         with self.lock:
             try:
-                raw = self.bundle()
-                manifest, ledger = decode_bundle(raw)
-                candidate = content_digest(manifest, ledger)
+                raw = self.bundle(preserve_credentials=True)
+                container = decode_container(raw, password=self.password)
+                candidate = container_digest(container)
                 atomic_write(self.storage_home / "manifest.json", json.dumps(self.manifest).encode())
+                if container.legacy_ledger is None:
+                    atomic_write(self.storage_home / "plugin-data.whab", encode_container(self.manifest, self.files))
                 source = {"content": self._source["content"] if self._source else None, "pending": candidate}
                 # Journal before replacing files, so either revision can reopen after interruption.
                 atomic_write(self.storage_home / "source.json", json.dumps(source).encode())
@@ -282,7 +388,7 @@ class BudgetSession:
             try:
                 existing = _read_bytes(self.path) if self.path.exists() else None
                 if self._file_digest is None and existing is not None:
-                    if content_digest(*decode_bundle(existing)) != candidate:
+                    if container_digest(decode_container(existing, password=self.password)) != candidate:
                         raise StoreError("Another revision occupies this budget file location.")
                     # An interrupted first save can leave an identical file without
                     # a known byte digest. Adopt it without replacing its contents.
@@ -318,10 +424,10 @@ class BudgetSession:
         path = Path(destination["path"])
         if not path.exists():
             return None
-        manifest, ledger = decode_bundle(_read_bytes(path))
-        if manifest["id"] != self.id:
+        container = decode_container(_read_bytes(path), password=self.password)
+        if container.manifest["id"] != self.id:
             raise StoreError("Another budget occupies this destination.")
-        current = content_digest(manifest, ledger)
+        current = container_digest(container)
         if current not in (destination.get("content"), destination.get("pending"), candidate):
             raise StoreError("This budget copy changed elsewhere. Preserve both revisions before replacing it.")
         return current

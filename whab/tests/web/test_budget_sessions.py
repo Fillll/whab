@@ -6,8 +6,9 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.budgets.helpers import decode_budget as decode_bundle
 from whab.app import create_app
-from whab.budgets.document import decode_bundle, encode_bundle
+from whab.budgets.document import encode_bundle
 from whab.budgets.host import BudgetHost
 from whab.budgets.session import BudgetSession
 from whab.config import Settings

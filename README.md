@@ -40,7 +40,7 @@ flowchart LR
 
 Each surrounding box is a plugin family. A plugin can provide several capabilities, and each budget chooses the features it uses. Interfaces present the budget, ingestion normalizes incoming data, insights read scoped snapshots, and automations and extensions work through validated financial operations. At least one storage plugin saves the budget; multiple storage destinations hold copies of that same budget.
 
-Plugin code is installed in WHAB. The budget owns its enabled plugins, settings and saved plugin state, so opening a portable budget restores its feature setup. Credentials and device-specific connections stay with the machine or server. See the [architecture guide](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md) for the implemented contracts and capability boundaries.
+Plugin code is installed in WHAB. A portable `.whab` container owns its plugin manifest, settings and plugin data. A local budget carries its storage data; a remote budget can carry only connection information, with financial records staying on the server. Credentials stay with the machine by default; remote access credentials can optionally travel encrypted with a password. Bank-provider tokens stay on the machine or server. See the [architecture guide](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md) for the implemented contracts and capability boundaries.
 
 Concrete plugins live under `whab/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/plugins/README.md).
 

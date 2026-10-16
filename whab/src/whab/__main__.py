@@ -14,6 +14,7 @@ def main():
     parser.add_argument("--version", action="version", version=f"WHAB {__version__}")
     parser.add_argument("--port", type=int, help="Local HTTP port (default: PORT or 5173)")
     parser.add_argument("--budget", help="Open a portable .whab budget file")
+    parser.add_argument("--budget-password-env", metavar="VARIABLE", help="Read the budget password from this environment variable")
     parser.add_argument("--create", metavar="NAME", help="Create the --budget file with this budget name")
     parser.add_argument("--copy", action="append", default=[], metavar="FILE", help="Also save the opened budget to this unused file location")
     parser.add_argument(
@@ -22,6 +23,12 @@ def main():
     args = parser.parse_args()
     if (args.create is not None or args.copy) and not args.budget:
         parser.error("Use --budget FILE with --create or --copy.")
+    if args.budget_password_env is not None:
+        if not args.budget:
+            parser.error("Use --budget FILE with --budget-password-env.")
+        if not args.budget_password_env or args.budget_password_env not in os.environ:
+            parser.error("The named budget password environment variable is not set.")
+        os.environ["WHAB_BUDGET_PASSWORD_ENV"] = args.budget_password_env
     if args.port is not None and not 1024 <= args.port <= 65535:
         parser.error("Port must be between 1024 and 65535.")
     if args.port is not None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from collections.abc import Mapping
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -420,6 +421,30 @@ class Store:
             state["budgetStartMonth"] = restored["budgetStartMonth"]
 
         self._mutate(workspace, operation)
+
+    def export_budget_files(self, workspace: str = "personal") -> dict[str, bytes]:
+        """Return the SQLite-owned data payload for a plugin budget container."""
+        from .portable import export_files
+
+        return export_files(self, workspace)
+
+    def restore_budget_files(self, workspace: str, files: Mapping[str, bytes]) -> None:
+        """Validate a SQLite image as data before an empty-ledger atomic restore."""
+        from .portable import read_files
+
+        if workspace != "personal":
+            raise StoreError("Portable budgets require the personal workspace.")
+        self.restore_budget(workspace, read_files(files))
+
+    def prepare_budget_files(
+        self, workspace: str, files: Mapping[str, bytes], *, existing: bool = False,
+    ) -> None:
+        """Prepare an opaque payload without replacing an authoritative live cache."""
+        from .portable import prepare_files
+
+        if workspace != "personal" or type(existing) is not bool:
+            raise StoreError("Budget preparation requires the personal workspace and a boolean cache flag.")
+        prepare_files(self, files, existing=existing)
 
     def categories(self, workspace: str) -> list[dict]:
         return public_categories(self.state(workspace)["categories"])

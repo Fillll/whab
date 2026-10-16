@@ -4,7 +4,9 @@ import inspect
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from dataclasses import replace
+from urllib.parse import urlsplit
 
+import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -50,10 +52,57 @@ def plugin_config(settings, session, plugin_id):
     return {**public, **settings.plugin_configuration(plugin_id)}
 
 
+def _approved_profile(profile, public):
+    """Compare connection identities without changing a credential's origin."""
+    resolved = dict(profile)
+    for key, expected in public.items():
+        actual = profile.get(key)
+        if key.endswith("_URL") and expected.startswith("https://"):
+            try:
+                if type(actual) is not str or any(character.isspace() for character in actual):
+                    return None
+                parsed = urlsplit(actual)
+                if (
+                    parsed.scheme != "https" or not parsed.hostname or parsed.username is not None
+                    or parsed.password is not None or parsed.path not in {"", "/"}
+                    or parsed.query or parsed.fragment
+                ):
+                    return None
+                parsed.port
+                actual = str(httpx.URL(actual).copy_with(path=""))
+            except (ValueError, httpx.InvalidURL):
+                return None
+        if actual != expected:
+            return None
+        resolved[key] = expected
+    return resolved
+
+
+def storage_config(settings, session, plugin):
+    """Bind a data-only connection to one complete approved credential profile."""
+    device = settings.storage_configuration()
+    if not session or plugin.budget_connection is None:
+        return plugin_config(settings, session, plugin.id)
+    files = session.files_for(plugin.id)
+    if not files:
+        return device
+    public = dict(plugin.budget_connection(files))
+    credentials = session.credentials.get(plugin.id)
+    if credentials is not None:
+        resolved = _approved_profile(credentials, public)
+        if resolved is None:
+            raise PluginError("The unlocked credentials belong to a different server or budget.", code="invalid_configuration", plugin_id=plugin.id)
+        return resolved
+    resolved = _approved_profile(device, public)
+    if resolved is None:
+        raise PluginError("Configure credentials for this exact server and budget, or unlock credentials included in the budget file.", code="invalid_configuration", plugin_id=plugin.id)
+    return resolved
+
+
 def create_app(store=None, settings=None, plugins=None, bank_services=None, *, budget_session=None, budget_host=None, _child=False):
     settings = settings or Settings.load()
     if budget_session is None and settings.budget_path:
-        budget_session = BudgetSession.open(settings.home, settings.plaid_env, settings.budget_path)
+        budget_session = BudgetSession.open(settings.home, settings.plaid_env, settings.budget_path, password=settings.budget_password)
     if budget_session:
         installed = {entry.name for entry in installed_entrypoints()}
         budget_session.missing_plugins = [name for name in budget_session.selection if name not in installed]
@@ -102,13 +151,17 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             )
     plugins.configure_logo_caches(settings.home)
     owned_store = store is None
+    selected_storage = plugins.storage_plugin(settings.storage) if owned_store else None
+    resolved_config = storage_config(settings, budget_session, selected_storage) if owned_store else {}
+    if budget_session:
+        budget_session.storage_config = resolved_config
     if owned_store:
         store = open_storage(
-            plugins.storage_plugin(settings.storage),
+            selected_storage,
             StorageContext(
                 home=budget_session.storage_home if budget_session else settings.home,
                 environment=settings.plaid_env,
-                config=plugin_config(settings, budget_session, settings.storage),
+                config=resolved_config,
                 budget=budget_session.context(settings.storage) if budget_session else None,
             ),
         )
@@ -270,7 +323,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.state.ui_plugin = ui_plugin.id if ui_plugin else None
     app.state.ledger_service = service
     app.state.budget_session = budget_session
-    app.include_router(budget_host.router(store, settings, budget_session))
+    app.include_router(budget_host.router(store, settings, budget_session, storage_config=resolved_config))
     for plugin in plugins.interface_plugins():
         try:
             app.include_router(plugin.interface.factory(InterfaceContext(

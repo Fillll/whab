@@ -125,6 +125,7 @@ async function loadBudgetControls() {
   try {
     const [budget, catalog] = await Promise.all([api('/budget'), api('/budgets')]);
     budgetDialog.querySelector('[data-budget-name]').textContent = budget.name;
+    budgetDialog.querySelector('[data-budget-export]').hidden = budget.storage !== 'client';
     budgetDialog.querySelector('[data-budget-save]').hidden = !budget.portable;
     budgetDialog.querySelector('[data-budget-copy]').hidden = !budget.portable;
     const pending = budget.copies.filter(copy => copy.status === 'pending');
@@ -178,6 +179,58 @@ budgetDialog.querySelector('[data-budget-save]').addEventListener('click', async
   }
 });
 
+function budgetPasswordHeaders(password) {
+  if (!password) return {};
+  const bytes = new TextEncoder().encode(password);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return {'X-Budget-Password': btoa(binary), 'X-Budget-Password-Encoding': 'base64'};
+}
+
+const exportForm = document.querySelector('[data-budget-export]');
+exportForm.elements.include_credentials.addEventListener('change', () => {
+  const included = exportForm.elements.include_credentials.checked;
+  exportForm.elements.password.disabled = !included;
+  exportForm.elements.password.required = included;
+});
+exportForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (exportForm.dataset.busy) return;
+  const error = exportForm.querySelector('.field-error');
+  const submit = exportForm.querySelector('button[type="submit"]');
+  exportForm.dataset.busy = 'true';
+  submit.disabled = true;
+  error.hidden = true;
+  try {
+    const included = exportForm.elements.include_credentials.checked;
+    const password = exportForm.elements.password.value;
+    if (included && Array.from(password).length < 12) throw new Error('Use a password of at least 12 characters.');
+    const response = await fetch(`/api/budget/export${included ? '?include_credentials=true' : ''}`, {
+      headers: included ? budgetPasswordHeaders(password) : {},
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || 'The budget could not be exported.');
+    }
+    const url = URL.createObjectURL(await response.blob());
+    const download = document.createElement('a');
+    download.href = url;
+    download.download = 'budget.whab';
+    download.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    exportForm.reset();
+    exportForm.elements.password.disabled = true;
+    exportForm.elements.password.required = false;
+    notify('Budget exported.');
+  } catch (failure) {
+    error.textContent = failure.message;
+    error.hidden = false;
+  } finally {
+    delete exportForm.dataset.busy;
+    submit.disabled = false;
+  }
+});
+
 function budgetForm(selector, action) {
   const form = document.querySelector(selector);
   form.addEventListener('submit', async event => {
@@ -222,14 +275,22 @@ copyForm.addEventListener('submit', async event => {
   }
 });
 budgetForm('[data-budget-new]', form => api('/budget/new', {name: form.elements.name.value.trim()}));
-budgetForm('[data-budget-switch]', form => api(`/budgets/${encodeURIComponent(form.elements.budget.value)}/activate`, {}));
+budgetForm('[data-budget-switch]', async form => {
+  const response = await fetch(`/api/budgets/${encodeURIComponent(form.elements.budget.value)}/activate`, {
+    method: 'POST', body: '{}',
+    headers: {'Content-Type': 'application/json', ...budgetPasswordHeaders(form.elements.password.value)},
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'The budget could not be opened.');
+});
 budgetForm('[data-budget-open]', async form => {
   const file = form.elements.budget.files[0];
   if (!file) throw new Error('Choose a WHAB budget file.');
   if (file.size > 50 * 1024 * 1024) throw new Error('Choose a budget file smaller than 50 MiB.');
   const path = form.elements.as_copy.checked ? '/api/budget/open?as_copy=true' : '/api/budget/open';
   const response = await fetch(path, {
-    method: 'POST', body: file, headers: {'Content-Type': 'application/zip'},
+    method: 'POST', body: file,
+    headers: {'Content-Type': 'application/zip', ...budgetPasswordHeaders(form.elements.password.value)},
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'The budget could not be opened.');

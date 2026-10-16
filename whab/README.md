@@ -4,7 +4,7 @@
 
 A highly extensible budgeting app built with Python, with monthly envelopes and rollover, transaction review, spending analytics and manual accounts. Plugins supply replaceable interfaces, storage, imports, reports and additional workflows.
 
-See the [architecture and Mermaid diagrams](../README.md#architecture), [runtime architecture](docs/architecture.md) and [budget and plugin model](docs/target-architecture.md). Current version: **1.8.0** ([changelog](CHANGELOG.md)).
+See the [architecture and Mermaid diagrams](../README.md#architecture), [runtime architecture](docs/architecture.md) and [budget and plugin model](docs/target-architecture.md). Current version: **1.9.0** ([changelog](CHANGELOG.md)).
 
 The [client/server deployment option](../README.md#clientserver-deployment) uses the same architecture: a client plugin connects an interface to a server plugin exposing an API interface capability.
 
@@ -36,7 +36,7 @@ The core owns budgeting rules, HTTP access checks and plugin contracts. Concrete
 | `WHAB_UI` | `web` | Visual interface; an empty value runs APIs headlessly |
 | `WHAB_PLUGINS` | `plaid` | Optional extensions when no saved `plugins.json` exists |
 
-Use **Settings → Budgets** to create or open a portable `.whab` budget, switch between opened budgets, or download the active budget. A portable budget carries its ledger, selected plugins, settings and saved plugin state; credentials remain with the device. See [portable budgets](docs/usage.md#portable-budgets) for command-line opening and additional saved copies.
+Use **Settings → Budgets** to create or open a portable `.whab` budget, switch between opened budgets, or download the active budget. A portable budget carries a required manifest and plugin-owned data: local SQLite budgets include their database, while remote budgets include connection information without downloading financial records. Credentials remain with the device by default; optional password-protected export can include the remote access credential. Bank-provider tokens are never included. See [portable budgets](docs/usage.md#portable-budgets) for command-line opening and additional saved copies.
 
 Use **Settings → Plugins → Installed** to enable or disable installed optional plugins for the active budget, save, and restart. Portable budgets save their own selections. The original local workspace keeps its saved `plugins.json` selection, which takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/example/README.md) is separately installable and hidden from Settings. Valid existing example selections are preserved when saving other plugins; unavailable example registrations are dropped so they cannot block saving. Categories and plugin names are alphabetized, with distinct category headings. Choose **All categories** or a category to browse installed plugins, then open **Options** for plugin details and controls. Bank logos options include **Flush cache**; successful logos stay cached locally for 365 days across restarts and refresh on the next image request after expiry. Plugins run as trusted server code.
 

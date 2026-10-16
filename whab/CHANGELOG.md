@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.9.0 — 2026-10-15
+
+- Make `.whab` an extensible container with a required manifest and plugin-owned files. Local SQLite budgets carry a sanitized database; remote budgets carry connection information without downloading a ledger snapshot. Continue opening the previous JSON ledger format.
+- Let plugins read, write and preserve their own budget files, including files for disabled or unavailable plugins. Retain isolated runtime caches, conflict checks and recovery journals.
+- Support explicitly including remote API credentials in a password-encrypted section, with passwords supplied through Settings or a named environment variable. Bind credentials to their remote target and exclude bank-provider tokens from portable files.
+
 ## 1.8.0 — 2026-10-15
 
 - Add portable `.whab` budgets with a data-only ledger and plugin manifest. Create, open, download and switch budgets in Settings; restore plugin selections, public settings and saved state independently for each budget. Keep installed plugin code and connection credentials on the owning machine or server.

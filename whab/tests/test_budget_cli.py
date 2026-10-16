@@ -5,17 +5,22 @@ import sys
 
 import pytest
 
+from tests.budgets.helpers import decode_budget as decode_bundle
 from whab import __main__ as cli
 from whab.app import create_app
-from whab.budgets.document import decode_bundle
 from whab.config import Settings
 
 
 @pytest.fixture
 def launch(monkeypatch, tmp_path):
+    # main() deliberately updates these directly for the child server process.
+    # Register their original values even when absent so teardown owns mutations.
+    for key in ("WHAB_BUDGET", "WHAB_BUDGET_COPIES", "WHAB_BUDGET_PASSWORD_ENV", "PORT"):
+        monkeypatch.setenv(key, os.environ.get(key, ""))
     for key in (
         "WHAB_BUDGET", "WHAB_BUDGET_COPIES", "PLAID_ENV", "PORT",
         "PLAID_CLIENT_ID", "PLAID_SECRET", "TOKEN_ENCRYPTION_KEY",
+        "WHAB_BUDGET_PASSWORD_ENV", "FIXTURE_BUDGET_PASSWORD",
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("WHAB_HOME", str(tmp_path / "runtime"))
@@ -143,3 +148,37 @@ def test_empty_create_name_fails_before_any_files_are_created(launch, tmp_path, 
     assert "nonempty name" in capsys.readouterr().err
     assert not path.exists() and not (tmp_path / "runtime").exists()
     assert not calls
+
+
+def test_budget_password_comes_from_named_environment_variable_and_is_not_in_repr(launch, tmp_path, monkeypatch):
+    invoke, calls = launch
+    secret = "synthetic secret budget password"
+    monkeypatch.setenv("FIXTURE_BUDGET_PASSWORD", secret)
+    invoke("--budget", tmp_path / "Reference.whab", "--budget-password-env", "FIXTURE_BUDGET_PASSWORD")
+    settings = calls[-1][2]
+    assert settings.budget_password == secret
+    assert secret not in repr(settings)
+    assert os.environ["WHAB_BUDGET_PASSWORD_ENV"] == "FIXTURE_BUDGET_PASSWORD"
+
+
+def test_budget_password_environment_is_not_read_without_explicit_selection(launch, monkeypatch):
+    _, _calls = launch
+    monkeypatch.setenv("FIXTURE_BUDGET_PASSWORD", "synthetic unused password")
+    assert Settings.load().budget_password is None
+
+
+@pytest.mark.parametrize("arguments", [
+    ("--budget-password-env", "FIXTURE_BUDGET_PASSWORD"),
+    ("--budget", "Reference.whab", "--budget-password-env", "FIXTURE_BUDGET_PASSWORD"),
+])
+def test_password_flag_requires_explicit_budget_and_existing_variable(launch, arguments):
+    invoke, calls = launch
+    with pytest.raises(SystemExit) as error:
+        invoke(*arguments)
+    assert error.value.code == 2 and calls == []
+
+
+def test_missing_explicit_password_environment_variable_is_actionable(launch, monkeypatch):
+    monkeypatch.setenv("WHAB_BUDGET_PASSWORD_ENV", "FIXTURE_BUDGET_PASSWORD")
+    with pytest.raises(ValueError, match="not set"):
+        Settings.load()
