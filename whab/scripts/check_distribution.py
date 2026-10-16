@@ -82,9 +82,11 @@ with TestClient(app, base_url="http://127.0.0.1:5173") as client:
     assert created.status_code == 200
     assert client.get("/api/budget").json()["name"] == "Installed wheel budget"
     assert client.get("/?workspace=personal").status_code == 200
-    from whab.budgets.document import decode_bundle
-    manifest, ledger = decode_bundle(client.get("/api/budget/export").content)
-    assert manifest["name"] == "Installed wheel budget" and ledger["accounts"] == []
+    from whab.budgets.container import decode_container
+    container = decode_container(client.get("/api/budget/export").content)
+    assert container.manifest["name"] == "Installed wheel budget"
+    assert container.legacy_ledger is None
+    assert container.files["plugins/sqlite/budget.sqlite"].startswith(b"SQLite format 3")
     assert client.post("/api/budgets/default/activate", json={}).status_code == 200
 assert (settings.home / "data" / "whab-sandbox.sqlite").is_file()
 print("Installed wheels: MIT licenses, pages, assets, version, runtime home and plugin entry point passed.")

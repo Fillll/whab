@@ -152,6 +152,13 @@
     <ul class="budget-copy-status" data-budget-copies aria-label="Saved copies"></ul>
     <p class="field-error" data-budget-load-error role="alert" hidden></p>
     <div class="budget-bundle-actions"><a class="button" href="/api/budget/export" download>Download budget</a><button class="button" type="button" data-budget-save hidden>Save copies</button></div>
+    <form class="modal-form budget-bundle-form" data-budget-export hidden>
+      <label class="budget-copy-option"><input type="checkbox" name="include_credentials"><span>Include remote access credential</span></label>
+      <label>Password for remote access credential<input type="password" name="password" minlength="12" maxlength="1024" autocomplete="new-password" disabled></label>
+      <p class="settings-notice">Optional. The password protects the included remote credential, not the rest of the budget. Bank-provider tokens are never included.</p>
+      <p class="field-error" role="alert" hidden></p>
+      <button class="button" type="submit">Export budget</button>
+    </form>
     <form class="modal-form budget-bundle-form" data-budget-copy hidden>
       <label>Saved copy name<input name="name" required maxlength="100" placeholder="e.g. External drive"></label>
       <label>Save location on this device<input name="path" required maxlength="4096" placeholder="/absolute/path/Backup.whab"></label>
@@ -161,6 +168,7 @@
     </form>
     <form class="modal-form budget-bundle-form" data-budget-switch hidden>
       <label>Open budget<select name="budget" data-available-budgets required aria-label="Saved budget"></select></label>
+      <label>Budget password (optional)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
       <p class="field-error" role="alert" hidden></p>
       <button class="button" type="submit">Switch budget</button>
     </form>
@@ -171,8 +179,9 @@
     </form>
     <form class="modal-form budget-bundle-form" data-budget-open>
       <label>Open a budget file<input type="file" name="budget" accept=".whab,application/zip" required></label>
+      <label>Budget password (optional)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
       <label class="budget-copy-option"><input type="checkbox" name="as_copy"><span>Open as a separate budget</span></label>
-      <p class="settings-notice">Your ledger, plugin selection and saved plugin data travel together. Credentials stay on this device.</p>
+      <p class="settings-notice">The container restores its plugin setup and data. Remote connections leave financial records on the server. Enter a password only for an included remote credential.</p>
       <p class="field-error" role="alert" hidden></p>
       <button class="button primary" type="submit">Open budget</button>
     </form>

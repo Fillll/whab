@@ -15,10 +15,12 @@ Plugin code is installed once in the WHAB environment. A budget records which of
 | Owner | Responsibilities |
 | --- | --- |
 | WHAB installation | Installed executable plugin packages and available capabilities |
-| Budget | Identity, ledger, selected features, plugin settings and saved state |
-| Machine or server | Credentials, encryption keys, device paths and connection settings |
+| Budget | Identity, selected features, settings and plugin-owned payloads |
+| Machine or server | Credentials by default, encryption keys, approved remote targets and device paths |
 
-A portable `.whab` bundle carries the budget and its plugin manifest. It describes the setup without embedding executable Python or provider credentials. Moving a budget to another installation can require installing compatible plugins and reconnecting credentials. Opening a bundle must validate its format, data and plugin requirements before using it.
+A portable `.whab` container always includes `manifest.json`. Version 2 lets each plugin own files under `plugins/<id>/`, such as `plugins/sqlite/budget.sqlite` or `plugins/client/connection.json`. The host preserves unknown and disabled plugins’ files without interpreting them. There is no mandatory financial snapshot: local storage carries its data, while a remote connection container can leave all financial records on the server. Version 1 bundles containing a manifest and ledger JSON remain readable.
+
+Plugin code stays installed in WHAB. Containers carry data, never executable plugin packages. Credentials remain device-local by default. An explicit password-protected export can include the remote access credential, while bank-provider tokens and token encryption keys stay on the machine/server. Public connection information identifies the remote URL and budget; using a machine credential requires an approved match to that target. Opening validates container paths, sizes, plugin requirements and the owning plugin’s payload before activation.
 
 The installation also supplies services needed before a budget is open. A selected interface presents budget selection; a server listener starts once for the installation and exposes only budgets available to it. Budget-owned selection does not imply that every plugin runs in every process.
 
@@ -48,7 +50,7 @@ Client/server is a deployment option within the same architecture. A server plug
 - **Client instance:** presents the budget and forwards scoped reads and commands through the client plugin. Local calculations can provide previews; committed server state is authoritative.
 - **Server instance:** validates operations through the financial core and persists the budget. Bank ingestion, synchronization cursors and encrypted provider credentials stay here.
 
-The budget describes its features without requiring them all to execute on the client. A server-owned ingestion plugin can expose controls to a client interface while retaining provider access and secrets on the server. Connection configuration belongs to the device; the portable budget contains no bank tokens or encryption keys.
+The budget describes its features without requiring them all to execute on the client. Bank ingestion and credentials stay on the server; clients use scoped ledger operations. A client container can carry its public remote URL and budget identity, plus an optional password-encrypted remote access credential. It does not automatically carry a copy of the remote financial ledger, bank-provider tokens or encryption keys.
 
 The bundled `server` and `client` plugins use the versioned `/remote/v1` public ledger contract, rather than exposing the privileged `StorageBackend` protocol. The server requires HTTPS and a machine/server bearer credential for budgets explicitly enabled with the server plugin. Commands include an expected revision and request ID; stale revisions fail explicitly, and retries of the same request return the original result while its receipt remains available. A failed connection never silently switches to an unrelated local ledger. See the [SDK guide](plugins.md#remote-interface-and-client) for configuration and retry limits.
 

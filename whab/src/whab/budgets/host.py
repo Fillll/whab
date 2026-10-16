@@ -1,6 +1,8 @@
 """One application hosts isolated budgets and their plugin runtimes."""
 
 import asyncio
+import base64
+import binascii
 import copy
 import json
 from dataclasses import replace
@@ -15,10 +17,37 @@ from starlette.concurrency import run_in_threadpool
 
 from whab.domain.errors import StoreError
 
-from .document import atomic_write, decode_bundle, encode_bundle
-from .session import BudgetSession, content_digest
+from .container import decode_container, encode_container
+from .credentials import encrypt_credentials
+from .document import atomic_write, encode_bundle
+from .session import BudgetSession, container_digest
 
 COOKIE = "whab-budget"
+
+
+def request_password(request):
+    """Read an explicitly supplied password without putting it in a URL or body."""
+    value = request.headers.get("x-budget-password")
+    encoding = request.headers.get("x-budget-password-encoding")
+    if value is None:
+        if encoding is not None:
+            raise StoreError("Supply a budget password with its encoding header.")
+        return None
+    try:
+        if len(value) > 8192:
+            raise ValueError
+        if encoding == "base64":
+            password = base64.b64decode(value, validate=True).decode("utf-8")
+        elif encoding is None:
+            value.encode("ascii")
+            password = value
+        else:
+            raise ValueError
+        if len(password.encode("utf-8")) > 4096:
+            raise ValueError
+        return password
+    except (ValueError, UnicodeError, binascii.Error):
+        raise StoreError("Use a valid ASCII password header or UTF-8 password encoded as base64.") from None
 
 
 class NameBody(BaseModel):
@@ -118,11 +147,11 @@ class BudgetHost:
             if failure:
                 raise failure
 
-    async def open(self, raw=None, name=None, as_copy=False):
+    async def open(self, raw=None, name=None, as_copy=False, password=None):
         async with self._open_lock:
-            return await self._open(raw=raw, name=name, as_copy=as_copy)
+            return await self._open(raw=raw, name=name, as_copy=as_copy, password=password)
 
-    async def activate(self, budget_id):
+    async def activate(self, budget_id, password=None):
         async with self._open_lock:
             if budget_id in self.applications:
                 _, session = self.applications[budget_id]
@@ -134,33 +163,48 @@ class BudgetHost:
                 raise HTTPException(404, "Open this budget file before selecting it.")
             session = await run_in_threadpool(
                 BudgetSession.open, self.settings.home, self.settings.plaid_env, entry["path"],
+                password=password,
             )
             if session.id != budget_id:
                 raise StoreError("The saved budget file now contains a different budget. Open the intended file explicitly.")
             await self._start(session)
 
-    async def _open(self, raw=None, name=None, as_copy=False):
+    async def _open(self, raw=None, name=None, as_copy=False, password=None):
         if raw is not None:
-            manifest, ledger = await run_in_threadpool(decode_bundle, raw)
+            container = await run_in_threadpool(decode_container, raw, password=password)
+            manifest = container.manifest
             if as_copy:
                 manifest["id"] = str(uuid4())
-                raw = await run_in_threadpool(encode_bundle, manifest, ledger)
+                if container.legacy_ledger is not None:
+                    raw = await run_in_threadpool(encode_bundle, manifest, container.legacy_ledger)
+                else:
+                    credential_blob = await run_in_threadpool(encrypt_credentials, manifest["id"], container.credentials, password) if container.credential_blob is not None else None
+                    raw = await run_in_threadpool(encode_container, manifest, container.files, credential_blob)
+                container = await run_in_threadpool(decode_container, raw, password=password)
             budget_id = manifest["id"]
             if budget_id in self.applications:
                 _, current = self.applications[budget_id]
-                current_manifest, current_ledger = await run_in_threadpool(
-                    lambda: decode_bundle(current.bundle()),
+                current_container = await run_in_threadpool(
+                    lambda: decode_container(current.bundle(preserve_credentials=True), password=current.password),
                 )
-                if content_digest(manifest, ledger) != content_digest(current_manifest, current_ledger):
+                if container_digest(container) != container_digest(current_container):
                     raise StoreError("A different revision of this budget is already open. Open this file as a separate budget to keep both revisions.")
                 return current
             path = self.settings.home / "budgets" / budget_id / self.settings.plaid_env / "opened.whab"
             if path.exists():
-                previous_manifest, previous_ledger = decode_bundle(path.read_bytes())
-                if content_digest(manifest, ledger) != content_digest(previous_manifest, previous_ledger):
+                try:
+                    previous = decode_container(path.read_bytes(), password=password)
+                except StoreError:
+                    raise StoreError("The saved budget could not be verified as this credential revision. Open this file as a separate budget to keep both revisions.") from None
+                if container_digest(container) != container_digest(previous):
                     raise StoreError("A different saved revision of this budget is already on this device. Open this file as a separate budget to keep both revisions.")
             await run_in_threadpool(atomic_write, path, raw)
-            session = BudgetSession(self.settings.home, self.settings.plaid_env, manifest, path=path, ledger=ledger)
+            session = BudgetSession(
+                self.settings.home, self.settings.plaid_env, manifest, path=path,
+                ledger=container.legacy_ledger, files=container.files,
+                credentials=container.credentials, credential_blob=container.credential_blob,
+                password=password,
+            )
         else:
             session = BudgetSession.create(
                 self.settings.home, self.settings.plaid_env, name,
@@ -194,7 +238,7 @@ class BudgetHost:
             entry for entry in entries.values()
         ]}
 
-    def router(self, store, settings, session):
+    def router(self, store, settings, session, storage_config=None):
         router = APIRouter()
         current_id = session.id if session else "default"
 
@@ -226,23 +270,25 @@ class BudgetHost:
 
         @router.post("/api/budget/open")
         async def open_budget(request: Request, as_copy: bool = False):
-            opened = await self.open(raw=await request.body(), as_copy=as_copy)
+            opened = await self.open(raw=await request.body(), as_copy=as_copy, password=request_password(request))
             return activate(opened.id)
 
         @router.post("/api/budgets/{budget_id}/activate")
-        async def select(budget_id: str):
-            await self.activate(budget_id)
+        async def select(budget_id: str, request: Request):
+            await self.activate(budget_id, password=request_password(request))
             return activate(budget_id)
 
         @router.get("/api/budget/export")
-        def export():
+        def export(request: Request, include_credentials: bool = False):
             document = session
             if document is None:
                 if self._legacy_export is None:
                     self._legacy_export = BudgetSession.create(settings.home, settings.plaid_env, "My budget", settings.plugins, settings.storage)
                 document = self._legacy_export
                 document.store = store
-            return Response(document.bundle(), media_type="application/zip", headers={"Content-Disposition": 'attachment; filename="budget.whab"'})
+                document.storage_config = storage_config or {}
+            raw = document.bundle(include_credentials=include_credentials, password=request_password(request))
+            return Response(raw, media_type="application/zip", headers={"Content-Disposition": 'attachment; filename="budget.whab"'})
 
         @router.post("/api/budget/save")
         def save():

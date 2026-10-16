@@ -4,12 +4,17 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+import httpx
 import pytest
+from whab_client.plugin import RemoteStore
 from whab_sqlite import Store
 
+from tests.budgets.helpers import decode_budget, encode_sqlite_budget
 from whab.budgets import session as module
-from whab.budgets.document import decode_bundle, encode_bundle, new_manifest
-from whab.budgets.session import BudgetSession, TrackedStorage, content_digest
+from whab.budgets.container import decode_container, encode_container
+from whab.budgets.credentials import encrypt_credentials
+from whab.budgets.document import encode_bundle, new_manifest
+from whab.budgets.session import BudgetSession, TrackedStorage, container_digest
 from whab.domain.errors import StoreError
 
 
@@ -50,7 +55,7 @@ def test_new_session_saves_ledger_and_keeps_runtime_credentials_and_paths_off_bu
     tracked.add_account("personal", {"name": "Wallet", "type": "depository", "balance": 10})
     store.save_item("private-item", "synthetic-secret-token", "Fixture Bank")
     session.checkpoint()
-    manifest, ledger = decode_bundle(session.path.read_bytes())
+    manifest, ledger = decode_budget(session.path.read_bytes())
     assert manifest == session.manifest
     assert ledger == store.export_budget()
     assert session.status == "saved"
@@ -72,7 +77,7 @@ def test_open_initializes_only_personal_ledger_and_preserves_demo(tmp_path, inco
         assert store.export_budget() == ledger
         assert store.state("demo") == demo
         assert session.ledger is None
-        assert decode_bundle(path.read_bytes()) == (manifest, ledger)
+        assert decode_budget(path.read_bytes()) == (manifest, ledger)
     finally:
         store.close()
 
@@ -113,7 +118,7 @@ def test_primary_first_publication_preserves_concurrently_created_file_and_local
         recovered = BudgetSession.open(session.home, "sandbox", recovered_path)
         recovered.bind(store)
         assert recovered.status == "saved"
-        assert decode_bundle(recovered_path.read_bytes())[1] == store.export_budget()
+        assert decode_budget(recovered_path.read_bytes())[1] == store.export_budget()
         assert path.read_bytes() == external
     finally:
         store.close()
@@ -127,7 +132,8 @@ def test_primary_without_expected_digest_only_adopts_matching_content(tmp_path, 
     manifest = deepcopy(session.manifest)
     if not matching:
         manifest["name"] = "An externally created revision"
-    appeared = encode_bundle(manifest, store.export_budget())
+    files = {f"plugins/sqlite/{name}": raw for name, raw in store.export_budget_files().items()}
+    appeared = encode_container(manifest, files)
     path.write_bytes(appeared)
     try:
         session.bind(store)
@@ -150,7 +156,7 @@ def test_plugin_selection_preserves_disabled_plugin_settings_and_state(opened):
     session.save_selection(("plaid",))
     assert session.selection == ("plaid",)
     assert session.plugin_record("plaid")["state"] == {"seen": ["first"]}
-    assert decode_bundle(session.path.read_bytes())[0] == session.manifest
+    assert decode_budget(session.path.read_bytes())[0] == session.manifest
 
 
 @pytest.mark.parametrize("selection", ["plaid", None, ("../bad",), [None], ["Bad Plugin"]])
@@ -222,6 +228,164 @@ def test_budget_context_is_detached_and_state_callback_persists_to_own_budget_on
         first.plugin_record("../bad")
 
 
+def test_plugin_context_files_are_scoped_and_roundtrip_as_opaque_bytes(opened):
+    session, store = opened
+    first = session.context("plaid")
+    second = session.context("reports")
+    first.write_file("nested/cache.bin", b"\x00\xffplaid-data")
+    second.write_file("nested/cache.bin", b"report-data")
+    assert first.read_file("nested/cache.bin") == b"\x00\xffplaid-data"
+    assert second.read_file("nested/cache.bin") == b"report-data"
+    assert first.read_file("missing.bin") is None
+    assert session.files_for("plaid") == {"nested/cache.bin": b"\x00\xffplaid-data"}
+    container = decode_container(session.path.read_bytes())
+    assert container.legacy_ledger is None
+    assert container.files["plugins/plaid/nested/cache.bin"] == b"\x00\xffplaid-data"
+    reopened = BudgetSession.open(session.home, "sandbox", session.path)
+    reopened.bind(store)
+    assert reopened.context("plaid").read_file("nested/cache.bin") == b"\x00\xffplaid-data"
+    reopened.context("plaid").delete_file("nested/cache.bin")
+    assert reopened.context("plaid").read_file("nested/cache.bin") is None
+    assert reopened.context("reports").read_file("nested/cache.bin") == b"report-data"
+    assert "plugins/plaid/nested/cache.bin" not in decode_container(session.path.read_bytes()).files
+
+
+def test_disabled_and_uninstalled_plugin_files_are_preserved_without_executing_plugins(opened):
+    session, store = opened
+    session.save_selection(("uninstalled",))
+    session.missing_plugins = ["uninstalled"]
+    disabled = b"\x00disabled plugin binary\xff"
+    unknown = b"opaque data for an uninstalled plugin"
+    session.write_file("reports", "model.weights", disabled)
+    session.write_file("uninstalled", "custom.format", unknown)
+    assert session.plugin_record("reports")["enabled"] is False
+    reopened = BudgetSession.open(session.home, "sandbox", session.path)
+    reopened.bind(store)
+    assert reopened.files_for("reports") == {"model.weights": disabled}
+    assert reopened.files_for("uninstalled") == {"custom.format": unknown}
+    reopened.save_selection(())
+    reopened.checkpoint()
+    decoded = decode_container(reopened.bundle())
+    assert decoded.files["plugins/reports/model.weights"] == disabled
+    assert decoded.files["plugins/uninstalled/custom.format"] == unknown
+
+
+@pytest.mark.parametrize("name", ["", "../escape", "/absolute", "nested/../../escape", "x\\y", "settings.json", "state.json"])
+def test_plugin_file_paths_cannot_escape_scope_or_replace_metadata(opened, name):
+    session, _ = opened
+    before = dict(session.files)
+    raw = session.path.read_bytes()
+    with pytest.raises(StoreError):
+        session.context("plaid").write_file(name, b"invalid")
+    assert session.files == before
+    assert session.path.read_bytes() == raw
+
+
+def test_plugin_files_require_known_plugin_and_exact_bytes(opened):
+    session, _ = opened
+    with pytest.raises(StoreError, match="bytes"):
+        session.write_file("plaid", "data", "not bytes")
+    with pytest.raises(StoreError, match="namespace"):
+        session.write_file("unlisted", "data", b"not owned")
+    with pytest.raises(StoreError, match="Invalid plugin ID"):
+        session.files_for("../escape")
+
+
+@pytest.mark.parametrize("operation", ["write", "delete"])
+def test_selected_storage_file_mutations_fail_explicitly_without_discarding_data(opened, operation):
+    session, store = opened
+    context = session.context("sqlite")
+    before_files = dict(session.files)
+    before_ledger = store.state("personal")
+    before_archive = session.path.read_bytes()
+    before_local = (session.storage_home / "plugin-data.whab").read_bytes()
+    assert context.read_file("budget.sqlite") == before_files["plugins/sqlite/budget.sqlite"]
+    with pytest.raises(StoreError, match="Storage payload files are managed by the storage backend"):
+        if operation == "write":
+            context.write_file("custom.bin", b"must not disappear silently")
+        else:
+            context.delete_file("budget.sqlite")
+    assert session.files == before_files
+    assert store.state("personal") == before_ledger
+    assert session.path.read_bytes() == before_archive
+    assert (session.storage_home / "plugin-data.whab").read_bytes() == before_local
+    assert session.status == "saved"
+
+
+@pytest.mark.parametrize("operation", ["write", "delete"])
+def test_failed_plugin_file_persistence_preserves_memory_and_previous_saved_bytes(opened, monkeypatch, operation):
+    session, _ = opened
+    session.write_file("plaid", "data.bin", b"original")
+    before = dict(session.files)
+    original_archive = session.path.read_bytes()
+    original_saved = (session.storage_home / "plugin-data.whab").read_bytes()
+    atomic_write = module.atomic_write
+
+    def fail_files(path, raw):
+        if Path(path).name == "plugin-data.whab":
+            raise OSError("File storage unavailable")
+        return atomic_write(path, raw)
+
+    monkeypatch.setattr(module, "atomic_write", fail_files)
+    with pytest.raises(StoreError, match="previous contents are unchanged"):
+        if operation == "write":
+            session.write_file("plaid", "data.bin", b"replacement")
+        else:
+            session.delete_file("plaid", "data.bin")
+    assert session.files == before
+    assert session.path.read_bytes() == original_archive
+    assert (session.storage_home / "plugin-data.whab").read_bytes() == original_saved
+
+
+def test_plugin_files_recover_if_primary_save_is_interrupted(opened, monkeypatch):
+    session, store = opened
+    original = module.atomic_write
+
+    def fail_primary(path, raw):
+        if Path(path) == session.path:
+            raise OSError("Primary unavailable")
+        return original(path, raw)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(module, "atomic_write", fail_primary)
+        session.write_file("reports", "history.cache", b"durably saved plugin data")
+    assert session.status == "pending"
+    reopened = BudgetSession.open(session.home, "sandbox", session.path)
+    assert reopened.read_file("reports", "history.cache") == b"durably saved plugin data"
+    reopened.bind(store)
+    assert reopened.status == "saved"
+    assert decode_container(session.path.read_bytes()).files["plugins/reports/history.cache"] == b"durably saved plugin data"
+
+
+def test_binary_session_export_omits_private_bank_tokens(opened):
+    session, store = opened
+    tracked = TrackedStorage(store, session)
+    tracked.save_item("item", "synthetic-private-session-bank-token", "Fixture")
+    tracked.apply_sync("item", {"added": [], "modified": [], "removed": []},
+                       "synthetic-private-session-cursor", [{
+                           "id": "provider-account", "name": "Fixture checking", "institution": "Fixture",
+                           "type": "depository", "balance": 10000, "currency": "USD", "source": "plaid",
+                           "itemId": "item", "mask": "1234",
+                       }])
+    raw = session.bundle()
+    assert decode_container(raw).legacy_ledger is None
+    assert b"synthetic-private-session-bank-token" not in raw
+    assert b"synthetic-private-session-bank-token" not in session.files["plugins/sqlite/budget.sqlite"]
+    before = store.get_item("item")
+    reopened = BudgetSession.open(session.home, "sandbox", session.path)
+    reopened.bind(store)
+    assert store.get_item("item") == before
+
+
+def test_binary_payload_requires_backend_file_lifecycle_capability(opened):
+    session, _ = opened
+    raw = session.path.read_bytes()
+    reopened = BudgetSession.open(session.home, "sandbox", session.path)
+    with pytest.raises(StoreError, match="cannot open its saved budget files"):
+        reopened.bind(object())
+    assert session.path.read_bytes() == raw
+
+
 def test_projection_exposes_copy_status_without_paths_or_mutable_manifest_references(opened, tmp_path):
     session, _ = opened
     session.missing_plugins = ["uninstalled"]
@@ -242,13 +406,13 @@ def test_copy_destinations_are_device_local_persisted_and_updated_after_committe
     target = tmp_path / "backup.whab"
     session.add_copy("  Backup  ", str(target))
     TrackedStorage(store, session).add_account("personal", {"name": "Cash", "type": "depository", "balance": 1})
-    assert decode_bundle(target.read_bytes()) == decode_bundle(session.path.read_bytes())
+    assert decode_budget(target.read_bytes()) == decode_budget(session.path.read_bytes())
     assert session.destinations[0]["name"] == "Backup"
-    assert "copies" not in decode_bundle(target.read_bytes())[0]
+    assert "copies" not in decode_budget(target.read_bytes())[0]
     reopened = BudgetSession.open(session.home, "sandbox", session.path)
     assert reopened.destinations == [{
         "name": "Backup", "path": str(target), "status": "pending",
-        "content": content_digest(*decode_bundle(target.read_bytes())),
+        "content": container_digest(decode_container(target.read_bytes())),
     }]
 
 
@@ -271,7 +435,7 @@ def test_copy_failure_is_visible_and_retries_without_rolling_back_committed_ledg
     assert session.destinations[0]["status"] == "pending"
     session.checkpoint()
     assert session.destinations[0]["status"] == "saved"
-    assert decode_bundle(target.read_bytes())[1] == store.export_budget()
+    assert decode_budget(target.read_bytes())[1] == store.export_budget()
 
 
 def test_copy_does_not_overwrite_another_budget_or_invalid_file(opened, tmp_path):
@@ -291,29 +455,72 @@ def test_same_budget_copy_edited_elsewhere_is_preserved_across_restart(opened, t
     tracked.add_account("personal", {"name": "Checking", "type": "depository", "balance": 10000})
     target = tmp_path / "backup.whab"
     session.add_copy("Backup", str(target))
-    manifest, ledger = decode_bundle(target.read_bytes())
+    manifest, ledger = decode_budget(target.read_bytes())
     ledger["accounts"][0]["balance"] = 9000
-    edited_elsewhere = encode_bundle(manifest, ledger)
+    edited_elsewhere = encode_sqlite_budget(manifest, ledger)
     target.write_bytes(edited_elsewhere)
     tracked.add_category("personal", {"name": "Local category", "group": "Local"})
     assert session.status == "saved"
     assert session.destinations[0]["status"] == "pending"
     assert target.read_bytes() == edited_elsewhere
-    assert decode_bundle(session.path.read_bytes())[1]["accounts"][0]["balance"] == 10000
+    assert decode_budget(session.path.read_bytes())[1]["accounts"][0]["balance"] == 10000
     reopened = BudgetSession.open(session.home, "sandbox", session.path)
     reopened.bind(store)
     assert reopened.destinations[0]["status"] == "pending"
     assert target.read_bytes() == edited_elsewhere
 
 
+def test_copy_with_rotated_encrypted_credentials_is_preserved_across_restart_without_ledger_queries(tmp_path):
+    password = "synthetic fixture password"
+    url, remote_id = "https://fixture.example", "fixture-budget"
+    manifest = new_manifest("Remote fixture", storage="client")
+    connection = json.dumps({"formatVersion": 1, "url": url, "budgetId": remote_id}).encode()
+    files = {"plugins/client/connection.json": connection}
+    first = {"CLIENT_URL": url, "CLIENT_BUDGET_ID": remote_id, "CLIENT_TOKEN": "a" * 32}
+    rotated = {**first, "CLIENT_TOKEN": "b" * 32}
+    first_blob = encrypt_credentials(manifest["id"], {"client": first}, password)
+    rotated_blob = encrypt_credentials(manifest["id"], {"client": rotated}, password)
+    primary = tmp_path / "remote.whab"
+    primary.write_bytes(encode_container(manifest, files, credential_blob=first_blob))
+    requests = []
+
+    def reject_network(request):
+        requests.append(request)
+        raise AssertionError("Portable remote references must not fetch their ledgers")
+
+    remote = RemoteStore(url, first["CLIENT_TOKEN"], remote_id, transport=httpx.MockTransport(reject_network))
+    try:
+        session = BudgetSession.open(tmp_path / "runtime", "sandbox", primary, password=password)
+        session.storage_config = first
+        session.bind(remote)
+        assert session.status == "saved"
+        backup = tmp_path / "remote-backup.whab"
+        session.add_copy("Backup", str(backup))
+        assert session.destinations[0]["status"] == "saved"
+        changed = encode_container(manifest, files, credential_blob=rotated_blob)
+        backup.write_bytes(changed)
+        session.checkpoint()
+        assert session.status == "saved"
+        assert session.destinations[0]["status"] == "pending"
+        assert backup.read_bytes() == changed
+        assert decode_container(primary.read_bytes(), password=password).credential_blob == first_blob
+        reopened = BudgetSession.open(session.home, "sandbox", primary, password=password)
+        reopened.bind(remote)
+        assert reopened.destinations[0]["status"] == "pending"
+        assert backup.read_bytes() == changed
+        assert requests == []
+    finally:
+        remote.close()
+
+
 @pytest.mark.parametrize("matching", [False, True])
 def test_legacy_untracked_copy_is_adopted_only_when_it_matches_current_budget(opened, tmp_path, matching):
     session, store = opened
     target = tmp_path / "legacy.whab"
-    manifest, ledger = decode_bundle(session.path.read_bytes())
+    manifest, ledger = decode_budget(session.path.read_bytes())
     if not matching:
         manifest["name"] = "Changed on another device"
-    raw = encode_bundle(manifest, ledger)
+    raw = encode_sqlite_budget(manifest, ledger)
     target.write_bytes(raw)
     (session.storage_home / "copies.json").write_text(json.dumps([{"name": "Legacy", "path": str(target)}]))
     reopened = BudgetSession.open(session.home, "sandbox", session.path)
@@ -344,12 +551,12 @@ def test_copy_replacement_recovers_persisted_pending_digest_after_finalization_f
     assert session.destinations[0]["status"] == "pending"
     saved = json.loads((session.storage_home / "copies.json").read_text())[0]
     assert saved["content"] == previous
-    assert saved["pending"] == content_digest(*decode_bundle(target.read_bytes()))
+    assert saved["pending"] == container_digest(decode_container(target.read_bytes()))
     reopened = BudgetSession.open(session.home, "sandbox", session.path)
     reopened.bind(store)
     assert reopened.destinations[0]["status"] == "saved"
     assert "pending" not in reopened.destinations[0]
-    assert decode_bundle(target.read_bytes())[1] == store.export_budget()
+    assert decode_budget(target.read_bytes())[1] == store.export_budget()
 
 
 def test_interrupted_pending_copy_can_advance_to_newer_committed_revision(opened, tmp_path, monkeypatch):
@@ -369,7 +576,7 @@ def test_interrupted_pending_copy_can_advance_to_newer_committed_revision(opened
     assert session.destinations[0]["status"] == "pending"
     TrackedStorage(store, session).add_account("personal", {"name": "Newer", "type": "depository", "balance": 2})
     assert session.destinations[0]["status"] == "saved"
-    assert len(decode_bundle(target.read_bytes())[1]["accounts"]) == 2
+    assert len(decode_budget(target.read_bytes())[1]["accounts"]) == 2
 
 
 def test_copy_journal_failure_prevents_target_replacement(opened, tmp_path, monkeypatch):
@@ -503,7 +710,7 @@ def test_interrupted_primary_save_recovers_committed_ledger_and_disabled_plugin_
     assert reopened.plugin_record("plaid")["state"] == {"retained": [1]}
     reopened.bind(store)
     assert reopened.status == "saved"
-    assert account in decode_bundle(session.path.read_bytes())[1]["accounts"][0]["id"]
+    assert account in decode_budget(session.path.read_bytes())[1]["accounts"][0]["id"]
 
 
 def test_initial_restore_commit_recovers_if_first_checkpoint_journal_write_fails(tmp_path, incoming, monkeypatch):
@@ -596,7 +803,7 @@ def test_replaced_primary_recovers_when_final_source_marker_write_fails(opened, 
     reopened = BudgetSession.open(session.home, "sandbox", session.path)
     reopened.bind(store)
     assert reopened.status == "saved"
-    assert decode_bundle(session.path.read_bytes())[1] == store.export_budget()
+    assert decode_budget(session.path.read_bytes())[1] == store.export_budget()
 
 
 def test_missing_local_database_is_rehydrated_without_erasing_portable_original(opened):
@@ -611,29 +818,37 @@ def test_missing_local_database_is_rehydrated_without_erasing_portable_original(
         reopened.bind(fresh)
         assert fresh.accounts("personal")[0]["id"] == account
         assert fresh.export_budget() == store.export_budget()
-        assert decode_bundle(session.path.read_bytes()) == decode_bundle(raw)
+        assert decode_budget(session.path.read_bytes()) == decode_budget(raw)
     finally:
         fresh.close()
 
 
-def test_remote_ledger_disappearance_cannot_replace_saved_nonempty_budget(opened):
-    session, store = opened
-    TrackedStorage(store, session).add_account("personal", {
-        "name": "Keep this account", "type": "depository", "balance": 9876,
-    })
-    raw = session.path.read_bytes()
+def test_legacy_remote_ledger_disappearance_cannot_replace_saved_nonempty_budget(tmp_path, incoming):
+    path, _, _ = incoming
+    session = BudgetSession.open(tmp_path / "runtime", "sandbox", path)
+    store = database(session)
     fresh = Store(":memory:", month="2026-10")
+
+    class LegacyBackend:
+        def export_budget(self, workspace):
+            return store.export_budget(workspace)
+
+        def restore_budget(self, workspace, data):
+            return store.restore_budget(workspace, data)
 
     class EmptyRemote:
         def export_budget(self, workspace):
             return fresh.export_budget(workspace)
 
     try:
+        session.bind(LegacyBackend())
+        raw = path.read_bytes()
         reopened = BudgetSession.open(session.home, "sandbox", session.path)
         with pytest.raises(StoreError, match="local ledger is empty"):
             reopened.bind(EmptyRemote())
         assert session.path.read_bytes() == raw
     finally:
+        store.close()
         fresh.close()
 
 
@@ -657,7 +872,7 @@ def test_initial_restore_is_not_started_if_recovery_record_cannot_be_saved(tmp_p
 
 def test_external_revision_is_preserved_and_never_silently_overwrites_local_work(opened):
     session, store = opened
-    manifest, ledger = decode_bundle(session.path.read_bytes())
+    manifest, ledger = decode_budget(session.path.read_bytes())
     manifest["name"] = "Edited externally"
     external = encode_bundle(manifest, ledger)
     session.path.write_bytes(external)
@@ -744,7 +959,7 @@ def test_new_budget_never_adopts_permission_to_overwrite_existing_target(tmp_pat
     session.bind(store)
     assert session.status == "pending"
     assert target.read_bytes() == b"An unrelated file appeared before budget initialization"
-    assert decode_bundle(session.bundle())[0]["name"] == "New budget"
+    assert decode_budget(session.bundle())[0]["name"] == "New budget"
 
 
 def test_export_only_remote_storage_attaches_matching_ledger_without_restore(tmp_path, incoming):
@@ -760,7 +975,7 @@ def test_export_only_remote_storage_attaches_matching_ledger_without_restore(tmp
     session = BudgetSession.open(tmp_path / "runtime", "sandbox", path)
     session.bind(RemoteLedger())
     assert session.status == "saved"
-    assert decode_bundle(path.read_bytes())[1] == ledger
+    assert decode_budget(path.read_bytes())[1] == ledger
 
 
 def test_export_only_remote_storage_rejects_mismatched_ledger(tmp_path, incoming):

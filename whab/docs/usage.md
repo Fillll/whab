@@ -38,19 +38,23 @@ The GitHub repository is [Fillll/whab](https://github.com/Fillll/whab), and the 
 
 ## Portable budgets
 
-A `.whab` file is a portable budget bundle: its ledger, identity, enabled plugins, plugin settings and saved plugin state travel together. Plugin packages are installed in WHAB; opening a budget does not install Python code. Credentials, token encryption keys and device-specific connections remain in the local runtime home.
+A `.whab` file is a portable container with a required plugin manifest and plugin-owned data. A local SQLite budget includes its database. A remote budget can contain only its connection information, leaving financial records on the server; opening or saving that connection does not automatically download a financial snapshot. Plugin code is installed in WHAB, outside the container.
 
-Open **Settings → Budgets** to see the current budget and the status of its saved copies. **Download budget** exports its portable file. Enter a name under **New budget name** to start a separate budget, or choose an existing `.whab` file under **Open a budget file**. The file is validated before activation. For a conflicting revision, select **Open as a separate budget** to preserve its ledger, plugins and saved state under a new budget identity; this leaves the existing budget intact and does not merge changes. Previously opened budgets remain available in **Open budget**, and switching restores the selected budget's feature setup. **My budget** and **Demo budget** remain separate workspaces inside the active budget.
+Open **Settings → Budgets** to see the active budget and its saved copies. **Download budget** exports the default container with credentials kept on this device. Enter a name under **New budget name** to create a budget, or choose a `.whab` file under **Open a budget file**. If its remote access credential is password-protected, enter the **Budget password** before opening. A conflicting revision can be preserved using **Open as a separate budget**: the contents get a new budget identity without overwriting or merging the existing budget. Previously opened budgets remain available in **Open budget**. **My budget** and **Demo budget** remain separate workspaces inside the active budget.
 
-The command line can open a bundle directly:
+The container remembers its selected plugins, settings and saved plugin data. Disabled or unavailable plugins’ payload files are retained. Version 2 uses namespaced files such as `plugins/sqlite/budget.sqlite` and `plugins/client/connection.json`; existing version 1 manifest/ledger JSON bundles remain supported. Installing missing plugin packages is a separate step.
+
+To transfer a remote access credential, use the additional export form, select **Include remote access credential**, enter a password, then choose **Export budget**. Use a password of 12–1,024 characters; the recipient enters it when opening or switching to that file. This option protects the remote credential; it does not encrypt all financial/plugin data in the container. Bank-provider tokens and token encryption keys are never carried. Without this option, configure credentials on the destination device and approve the matching remote URL and budget identity.
+
+Open a container from the command line:
 
 ```sh
 .venv/bin/python -m whab --budget /absolute/path/Household.whab
 ```
 
-`WHAB_BUDGET` is the equivalent environment setting for an existing bundle. Use `--create Household` with a new `--budget` path to create a budget named Household. Add `--copy /absolute/path/Backup.whab` to save another copy of the same budget. Multiple destinations are copies, not separate financial ledgers. Successful saves are retained if another destination is unavailable; the budget status shows copies awaiting synchronization. In Settings, enter a **Saved copy name** and an absolute **Save location on this device**, then choose **Add saved copy**. Use **Save copies** to retry pending destinations after restoring access.
+`WHAB_BUDGET` is the equivalent environment setting. Use `--create Household` with a new `--budget` path to create a budget named Household. Add `--copy /absolute/path/Backup.whab` for another saved copy. To unlock a password-protected remote credential, set a private environment variable and pass its name with `--budget-password-env VARIABLE_NAME`; the password itself stays out of command arguments.
 
-Bundles contain allowlisted financial records and a versioned plugin manifest, never executable code or bank connection tokens. A moved budget can require installing compatible plugins and reconnecting a bank on the destination machine. Existing imported transactions remain available without an active bank connection. Treat `.whab` files as private financial documents and store their copies accordingly.
+Multiple destinations are copies of the same container. Successful saves are retained when another destination is unavailable; the status shows pending copies. In Settings, enter a **Saved copy name** and an absolute **Save location on this device**, then choose **Add saved copy**. Use **Save copies** to retry pending destinations after restoring access. Local financial data remains private even when the container contains no credentials, so store its copies accordingly.
 
 ## Settings and plugin manager
 

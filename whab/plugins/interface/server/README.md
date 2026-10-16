@@ -19,7 +19,8 @@ receipts are retained in memory. Restarting the service rotates its revision;
 clients must refresh and inspect uncertain changes after restart. This rejects
 ambiguous retries rather than accepting duplicate writes.
 
-Tokens and HTTPS provide access to one configured budget; multi-user roles,
-public account registration and automatic certificate provisioning are outside
-this plugin's contract. Keep the token in machine configuration, not the portable
-budget bundle.
+The machine/server token authorizes budgets configured with this server plugin;
+multi-user roles, public account registration and automatic certificate
+provisioning are outside this contract. Server configuration stays on the machine.
+A client can deliberately export its remote access credential in a
+password-protected container; bank-provider tokens are never carried.

@@ -12,10 +12,20 @@ CLIENT_TOKEN=your-private-token-with-at-least-32-characters
 
 `CLIENT_URL` is an HTTPS origin without credentials, a path, query or fragment.
 TLS certificates are verified, redirects are refused and environment proxies are
-disabled. The token stays in machine configuration and is sent only to the
-configured origin. Client startup must disable bank ingestion plugins: banks
-remain connected on the server, while this plugin exposes public ledger data,
-manual commands and credential-free portable exports.
+disabled. A remote budget file contains only `connection.json`: its version,
+server origin and remote budget ID. Saving, opening and downloading that file
+does not fetch the ledger. Reads and changes go to the live server; its data can
+advance independently of the connection file. Explicit legacy snapshot exports
+remain available through `export_budget()`.
+
+Credentials normally stay on this machine. A machine token is used only with
+the matching device-configured `CLIENT_URL` and `CLIENT_BUDGET_ID`; opening an
+imported connection cannot redirect that token. The host may also supply
+credentials explicitly unlocked from an optional password-encrypted budget
+package bound to this exact origin and budget. `connection.json` never contains
+a token, and the client adapter never changes a credential's target from file
+contents. Client startup must disable bank ingestion plugins: bank connections
+remain on the server.
 
 A lost command response leaves its request ID, payload and original revision
 pending. Retry the same change to confirm its original result. A different change

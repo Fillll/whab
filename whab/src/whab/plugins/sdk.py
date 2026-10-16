@@ -300,12 +300,15 @@ StorageFactory: TypeAlias = Callable[[StorageContext], StorageBackend]
 
 @dataclass(frozen=True, slots=True)
 class BudgetContext:
-    """One plugin's portable settings/state, scoped to the opened budget."""
+    """One plugin's portable settings, state and data files, scoped to its budget."""
 
     budget_id: str
     settings: Mapping[str, object]
     state: Mapping[str, object]
     save_state: Callable[[dict], None] = field(repr=False)
+    read_file: Callable[[str], bytes | None] | None = field(default=None, repr=False)
+    write_file: Callable[[str, bytes], None] | None = field(default=None, repr=False)
+    delete_file: Callable[[str], None] | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -612,6 +615,7 @@ class Plugin:
     merchant_logos: MerchantLogos | None = None
     interface: Interface | None = None
     bind: Callable[[BudgetContext], Plugin] | None = None
+    budget_connection: Callable[[Mapping[str, bytes]], Mapping[str, str]] | None = None
 
     def __post_init__(self) -> None:
         if not valid_plugin_name(self.id):
@@ -621,6 +625,8 @@ class Plugin:
             raise ValueError("Plugin interface must be an Interface descriptor or None.")
         if self.bind is not None and not callable(self.bind):
             raise ValueError("Plugin budget binder must be callable or None.")
+        if self.budget_connection is not None and not callable(self.budget_connection):
+            raise ValueError("Plugin budget connection reader must be callable or None.")
         if type(self.api_version) is not int:
             raise ValueError("Plugin API version must be an integer.")
         if self.insights is not None and not callable(self.insights):

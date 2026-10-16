@@ -29,6 +29,7 @@ class Settings:
     ui: str = "web"
     budget_path: Path | None = None
     copy_paths: tuple[Path, ...] = ()
+    budget_password: str | None = field(default=None, repr=False)
 
     @classmethod
     def load(cls):
@@ -50,6 +51,9 @@ class Settings:
         saved = None if os.getenv("WHAB_BUDGET") else read_selection(home)
         if saved is not None:
             optional = saved
+        password_variable = os.getenv("WHAB_BUDGET_PASSWORD_ENV")
+        if password_variable and password_variable not in os.environ:
+            raise ValueError("The named budget password environment variable is not set.")
         return cls(
             home=home,
             port=port,
@@ -65,6 +69,7 @@ class Settings:
             ui=os.getenv("WHAB_UI", "web").strip(),
             budget_path=Path(os.environ["WHAB_BUDGET"]).expanduser().resolve() if os.getenv("WHAB_BUDGET") else None,
             copy_paths=tuple(Path(path) for path in os.getenv("WHAB_BUDGET_COPIES", "").split(os.pathsep) if path),
+            budget_password=os.environ[password_variable] if password_variable else None,
         )
 
     def enabled_plugins(self):
