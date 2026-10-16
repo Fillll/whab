@@ -86,16 +86,18 @@ Use a feature branch and pull request for every change to `main`. Describe the c
 
 Every material change includes a SemVer bump in `src/whab/__init__.py` and a dated entry in `CHANGELOG.md` in the same PR. Use a patch for compatible fixes or maintenance, a minor for compatible features, and a major for breaking the documented compatibility contract. Runtime and dependency support changes require a version bump too. Small documentation-only changes may wait for the next version bump.
 
-The package version, `python -m whab --version`, FastAPI metadata and About dialog derive from that one version source. Review the final diff and pass CI before squash merging. The sole maintainer has authorized routine review and merging without another confirmation; no second-person approval is required because GitHub cannot approve a PR through its author's account. Create an immutable `vX.Y.Z` tag and GitHub release on the merged commit only when the user explicitly requests a release; version bumps and merges do not require publishing one. Do not reuse or move an existing release tag.
+The package version, `python -m whab --version`, FastAPI metadata and About dialog derive from that one version source. Review the final diff and pass CI before requesting a squash merge. Final approval and merging belong to the human maintainer @Fillll. Agents must not approve or merge a PR unless @Fillll explicitly delegates that action for that specific PR. Create an immutable `vX.Y.Z` tag and GitHub release on the merged commit only when the user explicitly requests a release; version bumps and merges do not require publishing one. Do not reuse or move an existing release tag.
 
 ## Branch protection
 
-**Branch protection is pending.** GitHub rejected protection for this private repository on the current account plan; the maintainer chose to leave enforcement pending. [Private repository protection requires Pro or an eligible organization plan](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches). The PR workflow is a project convention until Pro is enabled. `.github/main-protection.json` records the intended rule: require PRs and passing CI, apply it to administrators, prevent force pushes/deletion, and require resolved conversations and linear history. After enabling Pro, apply it with:
+The repository is public, and two active rulesets protect `main`:
 
-```sh
-gh api --method PUT repos/Fillll/whab/branches/main/protection \
-  --input ../.github/main-protection.json
-```
+- [Main safeguards](https://github.com/Fillll/whab/rules/25219005) requires a pull request, passing `CI (Python 3.14)` and `CI (Python 3.15)` checks from GitHub Actions, and an up-to-date branch. It also requires resolved conversations and squash merges with linear history, and blocks force pushes and branch deletion. There are no bypass actors, including the maintainer.
+- [Owner approval and merge gate](https://github.com/Fillll/whab/rules/25219007) allows only @Fillll to merge into `main` through a pull request. It requires one approving review from the code owner and dismisses stale approvals after new reviewable commits. [CODEOWNERS](../.github/CODEOWNERS) designates @Fillll as the owner of every path. Only @Fillll can bypass this gate, and only through a pull request; direct pushes remain blocked.
+
+GitHub does not allow authors to approve their own pull requests. For PRs authored as @Fillll, the human maintainer uses the PR-only owner exception to make the final merge decision; all Main safeguards still apply. Rulesets identify GitHub accounts, so tools authenticated as @Fillll have the same technical permissions and must follow the human approval requirement above.
+
+The reproducible ruleset configurations are [main-safeguards.json](../.github/main-safeguards.json) and [owner-gate.json](../.github/owner-gate.json).
 
 ## Reporting sensitive bugs
 
