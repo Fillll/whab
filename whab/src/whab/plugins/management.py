@@ -8,22 +8,28 @@ from .runtime import PluginError, PluginRegistry, load_plugins
 from .sdk import ENTRYPOINT_GROUP, valid_plugin_name
 
 # Registration identity is package metadata, so disabled plugins remain unloaded.
-_BUNDLED_CATEGORIES = {
-    ("bank-logos", "whab_bank_logos.plugin:plugin"): "interface",
-    ("web", "whab_web.plugin:plugin"): "interface",
-    ("plaid", "whab_plaid.plugin:plugin"): "ingestion",
-    ("ynab", "whab_ynab.plugin:plugin"): "ingestion",
-    ("sqlite", "whab_sqlite.plugin:plugin"): "storage",
-    ("example", "whab_example_plugin:plugin"): "example",
+_BUNDLED_METADATA = {
+    ("bank-logos", "whab_bank_logos.plugin:plugin"): ("interface", "Bank logos"),
+    ("web", "whab_web.plugin:plugin"): ("interface", "WHAB web"),
+    ("plaid", "whab_plaid.plugin:plugin"): ("ingestion", "Plaid"),
+    ("ynab", "whab_ynab.plugin:plugin"): ("ingestion", "Import from YNAB ZIP file"),
+    ("sqlite", "whab_sqlite.plugin:plugin"): ("storage", "SQLite"),
+    ("example", "whab_example_plugin:plugin"): ("example", "Month totals example"),
 }
+
+
+def bundled_metadata(name, entries):
+    """Resolve only unambiguous bundled registration identities."""
+    if len(entries) == 1:
+        return _BUNDLED_METADATA.get((name, getattr(entries[0], "value", None)))
+    return None
 
 
 def plugin_category(name, entries, description):
     """Use known registration metadata or active capabilities, never disabled imports."""
-    if len(entries) == 1:
-        identity = (name, getattr(entries[0], "value", None))
-        if identity in _BUNDLED_CATEGORIES:
-            return _BUNDLED_CATEGORIES[identity]
+    known = bundled_metadata(name, entries)
+    if known:
+        return known[0]
     if description:
         if description.has_ui or description.has_bank_logos:
             return "interface"
@@ -109,9 +115,11 @@ class PluginManager:
             elif description and (description.has_storage or description.has_ui):
                 reason = "Storage and user interfaces are selected with WHAB_STORAGE and WHAB_UI."
             distribution, version = package_details(matches[0]) if len(matches) == 1 else ("", "")
+            known = bundled_metadata(name, matches)
+            display_name = known[1] if known else name
             catalog.append({
                 "id": name,
-                "display_name": description.display_name if description else name,
+                "display_name": description.display_name if description else display_name,
                 "kinds": list(description.kinds) if description else [],
                 "category": plugin_category(name, matches, description),
                 "distribution": distribution,

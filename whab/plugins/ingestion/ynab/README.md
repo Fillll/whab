@@ -1,8 +1,8 @@
-# YNAB export importer
+# Import from YNAB ZIP file
 
 Optional plugin ID: `ynab`; Python package: `whab_ynab`. It ships with WHAB and is disabled by default. It reads a local YNAB ZIP containing one Budget and one Register table, recognized by their English column headers. Both TSV and CSV, UTF-8 and BOM-marked UTF-16 are supported. No YNAB account, API token or network request is needed.
 
-Enable **ynab** through Settings → Plugin manager, save, and restart. Open **My budget → Accounts**, choose the ZIP (at most 10 MiB), confirm that its monetary values use USD, and preview. Review the counts and warnings before clicking **Import into empty budget**. With no saved plugin selection, `WHAB_PLUGINS=ynab` enables it on startup.
+Enable **Import from YNAB ZIP file** through Settings → Plugins, save, and restart. Open **My budget → Accounts**, choose the ZIP (at most 10 MiB), confirm that its monetary values use USD, and preview. Review the counts and warnings before clicking **Import into empty budget**. With no saved plugin selection, `WHAB_PLUGINS=ynab` enables it on startup.
 
 Import requires an empty personal budget: no accounts, transactions, assignments, bank connections, or customized categories. Existing financial data is never replaced or merged. Use a fresh `WHAB_HOME` when evaluating a migration alongside an established budget. Preview only reads the ZIP and destination availability; it does not persist uploaded records. Commit reparses and validates the same SHA-256 fingerprint, and SQLite saves the complete import and receipt in one transaction. Retrying the identical archive returns its original counts without duplicating rows or overwriting subsequent edits. A different archive cannot update that migrated budget.
 

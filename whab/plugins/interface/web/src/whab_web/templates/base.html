@@ -16,8 +16,6 @@
     <div class="app-shell">
       <aside class="sidebar">
         <a class="brand" href="{{ url('budget') }}" aria-label="WHAB home"><img class="brand-symbol" src="/static/logo.svg?v={{ version }}" alt="" width="40" height="40"><span><strong>WHAB</strong><small>We Have A Budget</small></span></a>
-        <div class="workspace-switch"><span class="workspace-avatar">WH</span><select aria-label="Budget workspace" data-navigation="workspace"><option value="demo" {% if workspace=='demo' %}selected {% endif %}>Demo budget</option><option value="personal" {% if workspace=='personal' %}selected {% endif %}>My budget</option></select>{{ icon('chevron-down', 14) }}
-        </div>
         <div class="nav-label">WORKSPACE</div>
         <nav aria-label="Main navigation">
           {% for key,label in nav %}<a class="nav-item {% if page==key %}active {% endif %}"
@@ -51,9 +49,7 @@
     </div>
     <div class="topbar-right"><select aria-label="Budget currency" data-navigation="currency">
       {% for code in currencies %}<option value="{{ code }}"{% if code==currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
-      </select><select class="mobile-workspace"
-        aria-label="Mobile budget workspace"
-        data-navigation="workspace"><option value="demo" {% if workspace=='demo' %}selected {% endif %}>Demo</option><option value="personal" {% if workspace=='personal' %}selected {% endif %}>My budget</option></select><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' if status.environment=='sandbox' else 'Live data' }}</span>
+      </select><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' if status.environment=='sandbox' else 'Live data' }}</span>
     </div>
   </header>
   {% if workspace=="demo" %}

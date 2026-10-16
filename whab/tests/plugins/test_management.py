@@ -25,6 +25,7 @@ class Entry:
     descriptor: object
     group: str = ENTRYPOINT_GROUP
     loaded: int = 0
+    value: str = ""
 
     def load(self):
         self.loaded += 1
@@ -73,6 +74,50 @@ def test_discovery_lists_inactive_plugins_without_importing_or_exposing_settings
     assert not (tmp_path / "plugins.json").exists()
     assert "fixture-secret" not in json.dumps(state)
     assert "fixture-key" not in json.dumps(state)
+
+
+def test_disabled_bundled_plugins_keep_canonical_names_without_importing(tmp_path, monkeypatch):
+    registrations = (
+        ("bank-logos", "whab_bank_logos.plugin:plugin", "Bank logos", "interface"),
+        ("web", "whab_web.plugin:plugin", "WHAB web", "interface"),
+        ("plaid", "whab_plaid.plugin:plugin", "Plaid", "ingestion"),
+        ("ynab", "whab_ynab.plugin:plugin", "Import from YNAB ZIP file", "ingestion"),
+        ("sqlite", "whab_sqlite.plugin:plugin", "SQLite", "storage"),
+        ("example", "whab_example_plugin:plugin", "Month totals example", "example"),
+    )
+    entries = tuple(
+        Entry(name, RuntimeError("Disabled plugins must not be imported"), value=value)
+        for name, value, _, _ in registrations
+    )
+    monkeypatch.setattr("whab.plugins.management.metadata.entry_points", lambda **kwargs: entries)
+    instance = PluginManager(settings(tmp_path, ui=""), PluginRegistry())
+    rows = {row["id"]: row for row in instance.projection()["plugins"]}
+    for name, _, display_name, category in registrations:
+        assert rows[name]["display_name"] == display_name
+        assert rows[name]["category"] == category
+        assert not rows[name]["active"]
+        assert rows[name]["kinds"] == []
+    assert all(entry.loaded == 0 for entry in entries)
+
+
+def test_bundled_names_require_exact_unambiguous_identity_and_preserve_active_names(tmp_path, monkeypatch):
+    active = Plugin("plaid", "Active provider name", bank=forbidden)
+    entries = (
+        Entry("plaid", active, value="whab_plaid.plugin:plugin"),
+        Entry("web", RuntimeError("do not import"), value="third_party.plugin:plugin"),
+        Entry("ynab", RuntimeError("do not import"), value="whab_ynab.plugin:plugin"),
+        Entry("ynab", RuntimeError("do not import"), value="another.plugin:plugin"),
+        Entry("custom", RuntimeError("do not import"), value="whab_web.plugin:plugin"),
+    )
+    monkeypatch.setattr("whab.plugins.management.metadata.entry_points", lambda **kwargs: entries)
+    instance = PluginManager(settings(tmp_path, ui=""), PluginRegistry((active,)))
+    rows = {row["id"]: row for row in instance.projection()["plugins"]}
+    assert rows["plaid"]["display_name"] == "Active provider name"
+    for name in ("web", "ynab", "custom"):
+        assert rows[name]["display_name"] == name
+        assert rows[name]["category"] == "extension"
+    assert rows["sqlite"]["display_name"] == "sqlite"  # Missing metadata stays unknown.
+    assert all(entry.loaded == 0 for entry in entries)
 
 
 def test_save_enables_next_start_without_running_code_or_mutating_registry(tmp_path, installed):

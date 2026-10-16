@@ -77,10 +77,11 @@ document.querySelector('[data-dismiss-toast]').addEventListener('click', () => {
 
 const pluginSelection = document.querySelector('[data-plugin-selection]');
 if (pluginSelection) {
-  const initialSelection = new Set([...pluginSelection.querySelectorAll('input[name="plugin"]:checked')].map(input => input.value));
+  const selectedPlugins = () => new FormData(pluginSelection).getAll('plugin');
+  const initialSelection = new Set(selectedPlugins());
   const pending = pluginSelection.querySelector('.plugin-restart-notice');
   pluginSelection.addEventListener('change', () => {
-    const selection = new Set([...pluginSelection.querySelectorAll('input[name="plugin"]:checked')].map(input => input.value));
+    const selection = new Set(selectedPlugins());
     const changed = selection.size !== initialSelection.size || [...selection].some(id => !initialSelection.has(id));
     if (changed) {
       pending.textContent = 'You have unsaved plugin changes. Save your selection, then restart WHAB to apply it.';
@@ -100,7 +101,7 @@ if (pluginSelection) {
       pluginSelection.dataset.busy = 'true';
       error.hidden = true;
       submit.disabled = true;
-      const plugins = [...pluginSelection.querySelectorAll('input[name="plugin"]:checked')].map(input => input.value);
+      const plugins = selectedPlugins();
       await api('/plugins/management', {plugins}, 'PUT');
       location.hash = 'plugins';
       location.reload();
@@ -111,7 +112,8 @@ if (pluginSelection) {
       submit.disabled = false;
     }
   });
-  if (['#settings', '#plugins'].includes(location.hash)) document.getElementById('settings-dialog').showModal();
+  if (['#settings', '#budgets', '#plugins'].includes(location.hash)) document.getElementById('settings-dialog').showModal();
+  if (location.hash === '#budgets') document.getElementById('budgets-dialog').showModal();
   if (location.hash === '#plugins') document.getElementById('plugins-dialog').showModal();
 }
 
@@ -119,9 +121,9 @@ if (pluginSelection) {
 const pluginCategory = document.querySelector('[data-plugin-category-filter]');
 if (pluginCategory) pluginCategory.addEventListener('change', () => {
   let visible = 0;
-  for (const row of pluginSelection.querySelectorAll('[data-plugin-category]')) {
-    row.hidden = pluginCategory.value !== 'all' && row.dataset.pluginCategory !== pluginCategory.value;
-    if (!row.hidden) visible += 1;
+  for (const group of pluginSelection.querySelectorAll('[data-plugin-category]')) {
+    group.hidden = pluginCategory.value !== 'all' && group.dataset.pluginCategory !== pluginCategory.value;
+    if (!group.hidden) visible += 1;
   }
   pluginSelection.querySelector('[data-plugin-category-empty]').hidden = visible > 0;
 });

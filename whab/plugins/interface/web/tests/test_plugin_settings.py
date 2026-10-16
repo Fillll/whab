@@ -1,6 +1,7 @@
 """Plugin settings are discoverable, escaped and separate from pending selection."""
 
 import re
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -50,7 +51,7 @@ def test_settings_links_to_installed_plugins_with_all_categories_as_default(clie
     for category, label in (
         ("interface", "Interfaces"), ("ingestion", "Ingestion"), ("insight", "Insights"),
         ("storage", "Storage"), ("automation", "Automation"),
-        ("extension", "Extensions"), ("example", "Examples"),
+        ("extension", "Extensions"),
     ):
         assert f'<option value="{category}">{label}</option>' in installed
     assert 'data-plugin-category="interface"' in installed
@@ -61,6 +62,68 @@ def test_settings_links_to_installed_plugins_with_all_categories_as_default(clie
     assert 'data-dialog="plugin-options-report" data-plugin-options' in installed
     assert 'data-plugin-category-empty hidden' in installed
     assert 'data-close-dialog' in installed and '>Settings</button>' in installed
+
+
+@pytest.mark.parametrize(("workspace", "label"), [("demo", "Demo budget"), ("personal", "My budget")])
+def test_budget_selection_lives_in_settings_and_preserves_page_context(client, workspace, label):
+    from html import unescape
+
+    response = client.get(
+        f"/?workspace={workspace}&page=transactions&month=2026-09&currency=EUR&category=old-category"
+    )
+    assert response.status_code == 200
+    text = response.text
+    settings = dialog(text, "settings-dialog")
+    assert re.findall(r'data-dialog="([^"]+)"', settings) == [
+        "budgets-dialog", "plugins-dialog", "about-dialog",
+    ]
+    assert f"Current budget · {label}" in settings
+    budgets = dialog(text, "budgets-dialog")
+    choices = re.findall(r'<a class="budget-choice" href="([^"]+)"([^>]*)>', budgets)
+    assert len(choices) == 2
+    for href, attributes in choices:
+        query = parse_qs(urlparse(unescape(href)).query)
+        assert query["page"] == ["transactions"]
+        assert query["month"] == ["2026-09"]
+        assert query["currency"] == ["EUR"]
+        assert "category" not in query
+        assert ('aria-current="true"' in attributes) == (query["workspace"] == [workspace])
+        switched = client.get(unescape(href))
+        assert switched.status_code == 200
+        next_label = "Demo budget" if query["workspace"] == ["demo"] else "My budget"
+        assert f"Current budget · {next_label}" in dialog(switched.text, "settings-dialog")
+    assert 'class="workspace-switch"' not in text
+    assert 'class="mobile-workspace"' not in text
+    assert 'data-navigation="workspace"' not in text
+
+
+def test_plugin_categories_and_names_are_sorted_and_examples_are_hidden(client, monkeypatch):
+    text = render(
+        client, monkeypatch,
+        plugin("sqlite", category="storage", display_name="SQLite"),
+        plugin("web", category="interface", display_name="WHAB web"),
+        plugin("plaid", category="ingestion", display_name="Plaid"),
+        plugin("bank-logos", category="interface", display_name="Bank logos"),
+        plugin("ynab", category="ingestion", display_name="Import from YNAB ZIP file"),
+        plugin("example", category="extension", enabled=True),
+        plugin("another-example", category="example"),
+        plugin("unavailable-example", category="example", enabled=True, manageable=False),
+    )
+    installed = dialog(text, "plugins-dialog")
+    assert re.findall(r'data-plugin-category="([^"]+)"', installed) == [
+        "ingestion", "interface", "storage",
+    ]
+    assert re.findall(r'<strong>([^<]+)</strong>', installed) == [
+        "Import from YNAB ZIP file", "Plaid", "Bank logos", "WHAB web", "SQLite",
+    ]
+    assert '<h4 id="plugin-category-interface">Interfaces<span>2</span></h4>' in installed
+    assert 'value="example">Examples' not in installed
+    assert 'data-dialog="plugin-options-example"' not in text
+    assert 'id="plugin-options-example"' not in text
+    assert 'id="plugin-options-another-example"' not in text
+    # Saving a visible selection must not silently disable an already selected example.
+    assert '<input type="hidden" name="plugin" value="example">' in installed
+    assert 'value="unavailable-example"' not in installed
 
 
 @pytest.mark.parametrize(("changes", "selection", "runtime", "guidance"), [
@@ -104,6 +167,6 @@ def test_metadata_and_errors_are_escaped_and_disabled_selection_is_locked(client
 
 
 def test_empty_installed_list_explains_what_is_available(client, monkeypatch):
-    text = render(client, monkeypatch)
+    text = render(client, monkeypatch, plugin("example", category="example"))
     assert "No installed plugins were found." in dialog(text, "plugins-dialog")
     assert "data-plugin-options" not in text
