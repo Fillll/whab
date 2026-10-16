@@ -38,6 +38,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        let applicationMenu = NSMenu()
+        let applicationItem = NSMenuItem(title: "WHAB", action: nil, keyEquivalent: "")
+        let applicationSubmenu = NSMenu(title: "WHAB")
+        applicationSubmenu.addItem(withTitle: "WHAB settings…", action: #selector(showWindow), keyEquivalent: ",").target = self
+        applicationSubmenu.addItem(.separator())
+        applicationSubmenu.addItem(withTitle: "Quit launcher", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q").target = NSApp
+        applicationItem.submenu = applicationSubmenu
+        applicationMenu.addItem(applicationItem)
+        let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
+        let windowSubmenu = NSMenu(title: "Window")
+        windowSubmenu.addItem(withTitle: "Close window", action: #selector(closeWindow), keyEquivalent: "w").target = self
+        windowItem.submenu = windowSubmenu
+        applicationMenu.addItem(windowItem)
+        NSApp.mainMenu = applicationMenu
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "WHAB"
         statusItem.button?.image = NSImage(systemSymbolName: "chart.pie.fill", accessibilityDescription: "WHAB")
@@ -181,6 +195,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
+
+    @objc private func closeWindow() { window.performClose(nil) }
 
     private func refreshMenu() {
         let menu = NSMenu()
