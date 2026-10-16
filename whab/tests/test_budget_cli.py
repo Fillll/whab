@@ -35,6 +35,8 @@ def launch(monkeypatch, tmp_path):
         calls.append((target, options, Settings.load()))
 
     monkeypatch.setattr(cli.uvicorn, "run", no_listener)
+    # These cases test budget argument behavior; real TLS validation has its own tests.
+    monkeypatch.setattr(cli, "validate_tls", lambda *_: None)
 
     def invoke(*arguments):
         monkeypatch.setattr(sys, "argv", ["whab", *map(str, arguments)])

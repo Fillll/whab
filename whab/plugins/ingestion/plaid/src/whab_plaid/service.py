@@ -173,16 +173,11 @@ class PlaidService:
         redirect = self.env.get("PLAID_REDIRECT_URI")
         if redirect:
             url = urlparse(redirect)
-            sandbox_local = (
-                self.config["environment"] == "sandbox"
-                and url.scheme == "http"
-                and url.hostname in {"localhost", "127.0.0.1"}
-            )
             if (
                 not url.hostname
                 or url.username
                 or url.password
-                or (url.scheme != "https" and not sandbox_local)
+                or url.scheme != "https"
             ):
                 raise PlaidError("Invalid redirect URI.")
             payload["redirect_uri"] = redirect

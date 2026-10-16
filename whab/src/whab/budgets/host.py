@@ -244,13 +244,13 @@ class BudgetHost:
 
         def activate(budget_id):
             response = JSONResponse({"id": budget_id, "opened": True})
-            response.set_cookie(COOKIE, budget_id, httponly=True, samesite="strict")
+            response.set_cookie(COOKIE, budget_id, httponly=True, samesite="strict", secure=True)
             return response
 
         @router.get("/budget-recovery")
         def recover():
             response = RedirectResponse("/", status_code=303)
-            response.delete_cookie(COOKIE, httponly=True, samesite="strict")
+            response.delete_cookie(COOKIE, httponly=True, samesite="strict", secure=True)
             return response
 
         @router.get("/api/budgets")
@@ -333,7 +333,7 @@ class BudgetDispatch:
         except ValueError:
             return False
         origin = headers.get(b"origin")
-        origins = {f"http://{host}:{self.host.settings.port}".encode() for host in ("localhost", "127.0.0.1")}
+        origins = {f"https://{host}:{self.host.settings.port}".encode() for host in ("localhost", "127.0.0.1")}
         return (
             hostname in {"localhost", "127.0.0.1"}
             and (origin is None or origin in origins)
@@ -356,6 +356,11 @@ class BudgetDispatch:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
+            # Reject before cookie dispatch can activate a saved runtime or route remotely.
+            if scope.get("scheme") != "https":
+                response = JSONResponse({"error": "HTTPS is required"}, status_code=400, headers={"Cache-Control": "no-store"})
+                await response(scope, receive, send)
+                return
             prefix = "/remote/v1/budgets/"
             if scope["path"].startswith(prefix):
                 budget_id = scope["path"][len(prefix):].partition("/")[0]

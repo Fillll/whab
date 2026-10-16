@@ -7,6 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from whab.plugins.configuration import read_selection
+from whab.tls import tls_paths
 
 # Runtime files belong to the working directory, never to site-packages or src/.
 # WHAB_HOME supports launching an installed wheel from elsewhere.
@@ -30,6 +31,8 @@ class Settings:
     budget_path: Path | None = None
     copy_paths: tuple[Path, ...] = ()
     budget_password: str | None = field(default=None, repr=False)
+    tls_cert_file: Path | None = None
+    tls_key_file: Path | None = None
 
     @classmethod
     def load(cls):
@@ -54,6 +57,9 @@ class Settings:
         password_variable = os.getenv("WHAB_BUDGET_PASSWORD_ENV")
         if password_variable and password_variable not in os.environ:
             raise ValueError("The named budget password environment variable is not set.")
+        cert_file, key_file = tls_paths(
+            home, os.getenv("WHAB_TLS_CERT_FILE"), os.getenv("WHAB_TLS_KEY_FILE"),
+        )
         return cls(
             home=home,
             port=port,
@@ -70,6 +76,8 @@ class Settings:
             budget_path=Path(os.environ["WHAB_BUDGET"]).expanduser().resolve() if os.getenv("WHAB_BUDGET") else None,
             copy_paths=tuple(Path(path) for path in os.getenv("WHAB_BUDGET_COPIES", "").split(os.pathsep) if path),
             budget_password=os.environ[password_variable] if password_variable else None,
+            tls_cert_file=cert_file,
+            tls_key_file=key_file,
         )
 
     def enabled_plugins(self):

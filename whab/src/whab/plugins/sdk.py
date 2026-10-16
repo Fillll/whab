@@ -675,7 +675,8 @@ class Plugin:
             and self.bind is None
         ):
             raise ValueError(
-                "Plugin must provide a reporting, bank, storage, user interface, or branding capability."
+                "Plugin must provide a reporting, bank, file import, storage, visual interface, "
+                "transport interface, branding capability, or budget binder."
             )
 
 

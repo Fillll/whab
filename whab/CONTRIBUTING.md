@@ -4,20 +4,19 @@ Start with [README.md](README.md) for setup, supported behavior and limitations,
 
 ## Development environment
 
-WHAB supports Python 3.14 and newer; CI exercises Python 3.14 and 3.15. From the checkout:
+WHAB supports Python 3.14 and newer; CI exercises Python 3.14 and 3.15. Run all application commands below from the application directory (`whab/`):
 
 ```sh
-cd whab
 python3.14 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python scripts/install.py --dev
 .venv/bin/python -m whab --version
 ```
 
-The editable install is required for the `src/` layout. There is no Node build or React runtime. The bundled visual interface's templates and static files belong to the installed `whab_web` package.
+The source installer installs the host and all seven supported plugins as editable local distributions; add `--example` for the teaching plugin. For wheel installations, `pip install 'whab[bundled]'` selects the supported set when compatible distributions are available in the chosen package index or local wheelhouse; this does not imply these releases have been published. The host alone contains the core and SDK and needs installed storage/UI plugins for the default launch. There is no Node build or React runtime. The bundled visual interface's templates and static files belong to the installed `whab_web` package.
 
-When upgrading an older checkout, obsolete root-level distribution metadata directories can mask the current entry points. Remove stale root-level `*.egg-info/` directories if present, then rerun the editable install. The current layout generates its metadata under `src/`.
+When upgrading an older checkout, rerun `.venv/bin/python scripts/install.py --dev`. After a successful combined install, the helper removes only verified obsolete generated `whab/whab.egg-info` metadata that could mask current registrations; it preserves current per-distribution metadata. No manual metadata deletion is needed for the standard upgrade.
 
-Runtime configuration lives under `WHAB_HOME`, or the launch directory when that setting is absent. Run from the application directory (`whab/`) for its local `.env` and `data/`, or set `WHAB_HOME` to an existing runtime home, including an older checkout root. Preserve that home's configuration, data and encryption key together. The app reads that directory's `.env` and passes its home/environment to the selected storage plugin. `WHAB_STORAGE=sqlite` is the default; its factory reopens a single `data/*-{environment}.sqlite` file in place, validating the base schema for a noncanonical filename. It creates `data/whab-{environment}.sqlite` only when no matching file exists. Multiple matches fail safely, even if one has the canonical filename. `WHAB_PLUGINS=` disables optional bank/report plugins. `WHAB_UI=web` selects the visual interface; `WHAB_UI=` runs headlessly with APIs and storage. Changing storage does not migrate data between backends. For experiments, use a fresh temporary home and fictional data. Never copy private credentials or a household database into test fixtures.
+Runtime configuration lives under `WHAB_HOME`, or the launch directory when that setting is absent. Run from the application directory (`whab/`) for its local `.env` and `data/`, or set `WHAB_HOME` to an existing runtime home, including an older checkout root. Preserve that home's configuration, data and encryption key together. The app reads that directory's `.env` and passes its home/environment to the selected storage plugin. `WHAB_STORAGE=sqlite` is the default for the original workspace and new command-line budgets; an existing portable budget selects storage from its manifest and Settings creates new SQLite budgets. For the original workspace, its factory reopens a single `data/*-{environment}.sqlite` file in place, validating the base schema for a noncanonical filename. It creates `data/whab-{environment}.sqlite` only when no matching file exists. Multiple matches fail safely, even if one has the canonical filename. For the original workspace without `plugins.json`, `WHAB_PLUGINS=` disables optional bank/report plugins; portable budgets use their saved manifest. `WHAB_UI=web` selects the visual interface; `WHAB_UI=` runs headlessly with APIs and storage. Changing storage does not migrate data between backends. Every listener requires TLS; run `scripts/setup.py` to provision local certificates, then [trust its CA explicitly](docs/usage.md#local-https). Setup never changes OS trust, and the launcher rejects missing or invalid TLS material. For experiments, use a fresh temporary home and fictional data. Never copy private credentials or a household database into test fixtures.
 
 ## Tests and checks
 
@@ -35,7 +34,7 @@ For packaging or plugin changes, also run:
 .venv/bin/python scripts/check_distribution.py
 ```
 
-That script builds the application and example plugin, installs their wheels into a temporary target, and checks pages, packaged assets, version metadata, runtime paths and entry-point loading from an unrelated directory. It uses fictional data and does not connect a financial institution. Building may require downloading build dependencies.
+That script builds the host, all seven supported plugins and the teaching example, installs their independent wheels into a temporary target, and checks pages, packaged assets, version metadata, runtime paths and entry-point loading from an unrelated directory. It uses fictional data and does not connect a financial institution. Building may require downloading build dependencies.
 
 Tests are grouped by the contract they verify:
 
@@ -46,6 +45,9 @@ Tests are grouped by the contract they verify:
 | `plugins/ingestion/plaid/tests/` | Mocked Plaid pagination, update mode, token encryption, signed webhooks and connection UI |
 | `plugins/interface/web/tests/` | Bundled Web rendering, escaping and visual fallbacks |
 | `plugins/interface/bank-logos/tests/` | Curated institution lookup and bounded mocked icon requests |
+| `plugins/ingestion/ynab/tests/` | Local archive parsing, migration preview/import and import controls |
+| `plugins/interface/server/tests/` | HTTPS bearer authorization, remote routes, revisions and retries |
+| `plugins/storage/client/tests/` | Remote commands, connection payloads and credential-target binding |
 | `plugins/example/example/tests/` | Example reporting/export implementation |
 | `tests/storage/` | Shared provider-scoping and bank-facade contracts |
 | `tests/web/` | Host HTTP validation, local access checks, CSV, selection and plugin routes |
@@ -53,7 +55,7 @@ Tests are grouped by the contract they verify:
 | `tests/test_cli.py` | Application launch and version contract |
 | `tests/test_architecture.py` | Pure domain boundaries and core independence from concrete storage/bank implementations |
 
-Keep an existing plugin's source, assets, documentation and implementation tests in its own `plugins/<category>/<id>/` folder. Keep shared API contracts and interactions between plugins in `tests/`; a host-contract change may require edits there too. New bundled plugins need maintainer registration in the application `pyproject.toml`; independently distributed plugins own their entry point in their own `pyproject.toml`, as shown by `plugins/example/example/`. See [plugin folder ownership](plugins/README.md).
+Keep an existing plugin's source, assets, documentation and implementation tests in its own `plugins/<category>/<id>/` folder. Keep shared API contracts and interactions between plugins in `tests/`; a host-contract change may require edits there too. Every concrete plugin owns its entry point, package data, dependency compatibility range and version in its own `pyproject.toml`, together with a local dated `CHANGELOG.md`. Changes to the supported default set also need maintainer wiring in the host's `bundled` extra. The source installer discovers plugin `pyproject.toml` files automatically and includes the teaching example only with `--example`; concrete packages never move into the host wheel. See [plugin folder ownership](plugins/README.md).
 
 The application-root `conftest.py` provides shared isolated fixtures to both test locations. Plugin-specific records and mock transports belong in that plugin's `tests/conftest.py`. Tests must not read `.env`, open the user's database, need a Plaid account or make live provider requests. Use `tmp_path` for compatibility fixtures and explicitly set `WHAB_HOME` when testing configuration. Make a regression test demonstrate an observable failure or invariant; avoid tests that merely reproduce implementation steps.
 
@@ -67,7 +69,7 @@ Browser checks should use demo or Sandbox data. Verify the particular flow affec
 
 Keep money and envelope rules in `whab.domain`; they must not import web, storage, interfaces, configuration, provider or plugin runtimes. Keep SQLite transactions, additive schema upgrades and demo seeding in `whab_sqlite`, provider HTTP and normalization in `whab_plaid`, and visual presentation/assets in `whab_web`. The `whab.web` package owns transport, request schemas, middleware and safe projections. `whab.storage.bank` scopes providers over the SDK's `StorageBackend` protocol. App, host web and generic plugin-runtime code must not import concrete storage, bank or visual implementations. Assemble selected descriptors/factories in `whab.app.create_app` with injectable backends/services for tests.
 
-External extensions use the documented [`whab.plugins` API v1](docs/plugins.md). Descriptors advertise user-interface, storage, data-ingestion and reporting capabilities. Reports receive immutable snapshots; bank factories receive a privileged scoped store; storage factories return a complete backend; server-rendered UI descriptors provide trusted resources and a presentation builder. The bundled Web, SQLite and Plaid plugins use those same boundaries. Storage must preserve cents, isolation, annotations, budgeting and atomic imports/cursors. Do not silently fall back when a selected plugin fails. Arbitrary imports, native UI runtimes and general mutation hooks are not provided. Enabled Python plugins are trusted code, not sandboxed code.
+External extensions use the documented [`whab.plugins` API v1](docs/plugins.md). Descriptors support visual `ui`, transport `interface`, `storage`, `bank`, `file_import`, `insights`, `export` and `bank_logos` capabilities, with optional `bind`, `settings` and bank-owned `merchant_logos` hooks. Computed kinds are `user_interface` (including transport interfaces), `storage`, `data_ingestion`, `reporting` and `branding`. Reports receive immutable snapshots; bank factories receive a privileged scoped store; storage factories return a complete backend; server-rendered UI descriptors provide trusted resources and a presentation builder. The bundled Web, SQLite and Plaid plugins use those same boundaries. Storage must preserve integer currency minor units, isolation, annotations, budgeting and atomic imports/cursors. Do not silently fall back when a selected plugin fails. Arbitrary imports, native UI runtimes and general mutation hooks are not provided. Enabled Python plugins are trusted code, not sandboxed code.
 
 Preserve these invariants when changing the corresponding layer:
 
@@ -76,7 +78,7 @@ Preserve these invariants when changing the corresponding layer:
 - Preserve `budgetStartMonth`, category overrides, notes and review state. Pending-to-posted matches must retain annotations, and all synchronization changes and their cursor must commit together.
 - Preserve compatible SQLite ledgers in place and retain encrypted-token compatibility. New Plaid Link tokens use `whab-local-household`, and browser OAuth keys use `whab`; finish in-progress Link flows before upgrading. The package and launch command are only `whab`.
 - Keep credentials on the server. Public responses, plugin snapshots, CSV files and exception messages must exclude tokens and configuration secrets.
-- Keep HTTP access local, validate request bodies, escape user and plugin text, and protect CSV headers and text cells from spreadsheet formulas. Authentication and authorization are prerequisites for shared network deployment.
+- Require HTTPS everywhere, including localhost and webhooks, and retain loopback Host/origin checks for ordinary routes. Only explicitly enabled remote protocol routes and registered signed webhooks bypass those local checks; the former require bearer authorization and the latter provider signature verification. TLS is transport encryption, not user authentication. Validate request bodies, escape user and plugin text, and protect CSV headers and text cells from spreadsheet formulas.
 
 ## Pull requests and releases
 
@@ -84,9 +86,9 @@ WHAB follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html): p
 
 Use a feature branch and pull request for every change to `main`. Describe the concrete problem, resulting behavior and relevant validation. Include a fixture-based regression for a behavior fix and update the owning documentation when a contract or limitation changes. Do not commit `.env`, databases, private exports, generated build files or unrelated workspace changes; stage source paths explicitly.
 
-Every material change includes a SemVer bump in `src/whab/__init__.py` and a dated entry in `CHANGELOG.md` in the same PR. Use a patch for compatible fixes or maintenance, a minor for compatible features, and a major for breaking the documented compatibility contract. Runtime and dependency support changes require a version bump too. Small documentation-only changes may wait for the next version bump.
+Version the owner of the material change in the same PR. Host/core/public-SDK changes bump `src/whab/__init__.py::__version__` and add a dated entry to the application `CHANGELOG.md`. Each independently packaged plugin instead owns `plugins/<category>/<id>/pyproject.toml::project.version` and its local `CHANGELOG.md`; a plugin-only change does not bump the app or change the app changelog. Changes spanning owners update each affected owner. Apply SemVer separately to each distribution: patch for compatible fixes or maintenance, minor for compatible features, major for a breaking documented contract. Runtime and dependency support changes require the owning distribution's version bump. Small documentation-only changes may wait for its next version bump.
 
-The package version, `python -m whab --version`, FastAPI metadata and About dialog derive from that one version source. Review the final diff and pass CI before requesting a squash merge. Final approval and merging belong to the human maintainer @Fillll. Agents must not approve or merge a PR unless @Fillll explicitly delegates that action for that specific PR. Create an immutable `vX.Y.Z` tag and GitHub release on the merged commit only when the user explicitly requests a release; version bumps and merges do not require publishing one. Do not reuse or move an existing release tag.
+The host package version, `python -m whab --version`, FastAPI metadata and About dialog derive from the host version source; installed plugin versions come from their own distribution metadata. Review the final diff and pass CI before requesting a squash merge. Final approval and merging belong to the human maintainer @Fillll. Agents must not approve or merge a PR unless @Fillll explicitly delegates that action for that specific PR. Create an immutable `vX.Y.Z` tag and GitHub release on the merged commit only when the user explicitly requests a release; version bumps and merges do not require publishing one. Do not reuse or move an existing release tag.
 
 ## Branch protection
 

@@ -1,0 +1,20 @@
+[project]
+name = "whab-server-plugin"
+version = "1.0.0"
+description = "Remote budget server plugin for WHAB"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2,<3", "fastapi==0.143.0", "pydantic>=2,<3"]
+
+[project.entry-points."whab.plugins"]
+server = "whab_server.plugin:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["whab_server", "whab_server.*"]

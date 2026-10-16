@@ -15,7 +15,7 @@ def settings(home, storage="sqlite", plugins=()):
 def test_default_storage_selection_reopens_existing_database(tmp_path):
     # Real installed entry points select SQLite, with all runtime files in tmp_path.
     app = create_app(settings=settings(tmp_path))
-    with TestClient(app, base_url="http://127.0.0.1:5173") as client:
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
         assert app.state.storage_plugin == "sqlite"
         selected = client.get("/api/plugins").json()["plugins"]
         assert [entry["id"] for entry in selected] == ["sqlite"]
@@ -36,7 +36,7 @@ def test_default_storage_selection_reopens_existing_database(tmp_path):
     previous_path = tmp_path / "data" / "previous-sandbox.sqlite"
     canonical_path.rename(previous_path)
     reopened_app = create_app(settings=settings(tmp_path))
-    with TestClient(reopened_app, base_url="http://127.0.0.1:5173") as client:
+    with TestClient(reopened_app, base_url="https://127.0.0.1:5173") as client:
         saved = client.get("/api/workspace?workspace=personal").json()["accounts"]
         assert len(saved) == 1
         assert (saved[0]["id"], saved[0]["name"], saved[0]["balance"]) == (
@@ -50,7 +50,7 @@ def test_default_storage_selection_reopens_existing_database(tmp_path):
 
 def test_explicit_sqlite_registry_constructs_backend_through_storage_factory(tmp_path):
     app = create_app(settings=settings(tmp_path), plugins=PluginRegistry((sqlite_plugin,)))
-    with TestClient(app, base_url="http://127.0.0.1:5173") as client:
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
         assert client.get("/api/workspace?workspace=demo").status_code == 200
         assert app.state.storage_plugin == "sqlite"
     assert (tmp_path / "data" / "whab-sandbox.sqlite").is_file()

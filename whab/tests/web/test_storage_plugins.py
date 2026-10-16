@@ -204,7 +204,7 @@ try:
     app = namespace['create_app'](
         settings=namespace['settings'](Path(sys.argv[2]), 'memory'), plugins=registry,
     )
-    with namespace['TestClient'](app, base_url='http://127.0.0.1:5173') as client:
+    with namespace['TestClient'](app, base_url='https://127.0.0.1:5173') as client:
         assert client.get('/api/workspace?workspace=personal').status_code == 200
     assert backend.closed
 finally:
@@ -257,7 +257,7 @@ def test_alternate_backend_owns_lifecycle_routes_and_scoped_banks(
         )
     )
     app = create_app(settings=settings(tmp_path, "memory"), plugins=registry)
-    with TestClient(app, base_url="http://127.0.0.1:5173") as client:
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
         assert app.state.store is backend
         assert app.state.storage_plugin == "memory"
         assert contexts[0].home == tmp_path
@@ -397,7 +397,7 @@ def test_bank_startup_failure_closes_owned_storage(tmp_path):
     )
     app = create_app(settings=settings(tmp_path, "memory"), plugins=registry)
     with pytest.raises(PluginError) as captured:
-        with TestClient(app, base_url="http://127.0.0.1:5173"):
+        with TestClient(app, base_url="https://127.0.0.1:5173"):
             pass
     assert captured.value.code == "bank_startup_failed"
     assert "FIXTURE_BANK_SECRET" not in str(captured.value)
@@ -412,7 +412,7 @@ def test_injected_storage_bypasses_factory_and_remains_open(tmp_path):
 
     registry = PluginRegistry((Plugin("sqlite", "Selected storage", storage=fail),))
     app = create_app(store=backend, settings=settings(tmp_path), plugins=registry)
-    with TestClient(app, base_url="http://127.0.0.1:5173") as client:
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
         assert app.state.storage_plugin is None
         assert client.get("/api/workspace?workspace=personal").status_code == 200
     assert backend.closed is False

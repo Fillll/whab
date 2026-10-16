@@ -55,10 +55,12 @@ class RequestBodyLimit:
 def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote=False):
     webhook_paths = frozenset(webhook_paths)
     file_import_paths = frozenset(file_import_paths)
-    origins = {f"http://{host}:{port}" for host in ("localhost", "127.0.0.1")}
+    origins = {f"https://{host}:{port}" for host in ("localhost", "127.0.0.1")}
 
     @app.middleware("http")
     async def local_access(request, call_next):
+        if request.url.scheme != "https":
+            return JSONResponse({"error": "HTTPS is required"}, status_code=400, headers={"Cache-Control": "no-store"})
         webhook = request.url.path in webhook_paths
         remote_request = remote and (request.url.path == "/remote/v1" or request.url.path.startswith("/remote/v1/"))
         if not webhook and not remote_request:

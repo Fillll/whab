@@ -5,6 +5,8 @@ Each plugin belongs to one category and owns one folder containing its Python im
 ```text
 plugins/<category>/<id>/
   README.md
+  CHANGELOG.md           # Dated history for this distribution
+  pyproject.toml         # Version, dependencies, entry point and package data
   src/<python_package>/
     __init__.py
     plugin.py
@@ -23,7 +25,7 @@ Category folders use singular names:
 
 | Category | Primary responsibility |
 | --- | --- |
-| [`interface/`](interface/README.md) | User-facing presentation, visual interfaces and branding |
+| [`interface/`](interface/README.md) | Visual presentation, API interfaces and branding |
 | [`ingestion/`](ingestion/README.md) | Bringing external data into WHAB |
 | [`insight/`](insight/README.md) | Reports, analysis and exports |
 | [`storage/`](storage/README.md) | Persistence and backend migrations |
@@ -42,7 +44,9 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | `ingestion/ynab/` | `ynab` | `whab_ynab` | Local YNAB ZIP parsing, migration preview and import controls |
 | `interface/web/` | `web` | `whab_web` | View models, icons, templates and browser assets |
 | `interface/bank-logos/` | `bank-logos` | `whab_bank_logos` | Curated institution lookup and public icon fetching |
-| `example/example/` | `example` | `whab_example_plugin` | Independently installable reporting/export example |
+| `interface/server/` | `server` | `whab_server` | HTTPS bearer-authorized public ledger API interface |
+| `storage/client/` | `client` | `whab_client` | Remote storage and portable connection payload |
+| `example/example/` | `example` | `whab_example_plugin` | Separately installed developer teaching report/export |
 
 ## Test ownership
 
@@ -64,12 +68,27 @@ Every plugin must have **100% Python statement and branch coverage**. The covera
 
 ## Packaging and contracts
 
-The bundled plugins ship in the same `whab` wheel, so the normal app installation still supplies its default storage and interface. Each has its own Python namespace and is loaded through a `whab.plugins` entry point. Adding a bundled plugin requires maintainer wiring in the application `pyproject.toml`: register its entry point and source root, plus package data when it has assets. Refresh an editable installation after moving packages or changing registrations:
+The `whab` distribution contains only the host/core and public SDK. All seven supported plugins are independent distributions; each owns its `pyproject.toml` entry point, package data, dependency compatibility range and `project.version`. Their initial independent version is 1.0.0. The teaching example is an eighth separate distribution.
+
+| Plugin ID | Distribution | Default enablement |
+| --- | --- | --- |
+| `web` | `whab-web-plugin` | Selected visual interface |
+| `sqlite` | `whab-sqlite-plugin` | Selected storage for the original workspace |
+| `plaid` | `whab-plaid-plugin` | Optional, enabled unless overridden |
+| `bank-logos` | `whab-bank-logos-plugin` | Disabled |
+| `ynab` | `whab-ynab-plugin` | Disabled |
+| `server` | `whab-server-plugin` | Disabled |
+| `client` | `whab-client-plugin` | Not selected; choose as storage for a remote connection |
+| `example` | `whab-example-plugin` | Separately installed, hidden developer teaching plugin |
+
+From the application directory (`whab/`), install or refresh the complete local supported set:
 
 ```sh
-.venv/bin/python -m pip install --no-deps -e .
+.venv/bin/python scripts/install.py --dev
 ```
 
-An independently distributed plugin owns a `pyproject.toml` in its own folder. `example/example/` demonstrates this; install it with `.venv/bin/python -m pip install -e plugins/example/example`. Installing a plugin does not automatically enable it.
+Add `--example` to install the teaching package too; omit `--dev` when development dependencies are unnecessary. The helper supplies all local package paths together, so unpublished local plugin packages do not need to resolve from a package index. When compatible host/plugin distributions are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the seven supported plugins; the source helper works directly from this checkout without requiring those releases to be published. A single plugin can be installed from its own folder, such as `.venv/bin/python -m pip install -e plugins/interface/bank-logos`. Installing a package does not enable it; see the [developer-only example activation](../docs/plugins.md#install-the-working-example).
+
+A material plugin-only change bumps that plugin's `pyproject.toml::project.version` and adds a dated entry to its own `CHANGELOG.md`. It does not bump the application or change the application changelog. Host/core/public-SDK changes update the application version/changelog; spanning changes update each affected owner. Apply SemVer within each distribution. Adding a plugin to the supported default set requires maintainer wiring in the host's `bundled` extra. The source installer automatically discovers concrete plugin `pyproject.toml` files and includes the teaching example only with `--example`; do not add concrete source roots or entry points to the host wheel.
 
 Use the public `whab.plugins` SDK and core domain records. Concrete plugin modules are implementation details; plugins must not import each other's implementation or host internals. The `src/whab/plugins/` package owns the SDK/runtime and is distinct from these contributor folders. See [the plugin API](../docs/plugins.md) and [contribution rules](../CONTRIBUTING.md).

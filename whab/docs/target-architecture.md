@@ -10,7 +10,7 @@ The core depends on no HTTP framework, interface, database, bank provider or plu
 
 ## Installation and budget ownership
 
-Plugin code is installed once in the WHAB environment. A budget records which of those plugins it uses, along with compatible API requirements, settings and plugin-owned saved state. Opening a budget restores that selection; disabling a plugin preserves its saved state so it can be enabled again.
+Plugin code is installed once in the WHAB environment. The host/core and seven supported plugin distributions have independent versions and changelogs; the host's `bundled` extra and source installer install the supported set together. The teaching example is separate and hidden from ordinary Settings. No concrete Automation, Extension or production Insight plugin ships yet. A budget records which of those plugins it uses, along with compatible API requirements, settings and plugin-owned saved state. Opening a budget restores that selection; disabling a plugin preserves its saved state so it can be enabled again.
 
 | Owner | Responsibilities |
 | --- | --- |
@@ -21,6 +21,8 @@ Plugin code is installed once in the WHAB environment. A budget records which of
 A portable `.whab` container always includes `manifest.json`. Version 2 lets each plugin own files under `plugins/<id>/`, such as `plugins/sqlite/budget.sqlite` or `plugins/client/connection.json`. The host preserves unknown and disabled plugins’ files without interpreting them. There is no mandatory financial snapshot: local storage carries its data, while a remote connection container can leave all financial records on the server. Version 1 bundles containing a manifest and ledger JSON remain readable.
 
 Plugin code stays installed in WHAB. Containers carry data, never executable plugin packages. Credentials remain device-local by default. An explicit password-protected export can include the remote access credential, while bank-provider tokens and token encryption keys stay on the machine/server. Public connection information identifies the remote URL and budget; using a machine credential requires an approved match to that target. Opening validates container paths, sizes, plugin requirements and the owning plugin’s payload before activation.
+
+An opened container's manifest selects its primary storage and optional plugins; `WHAB_STORAGE` applies to the original workspace and initial CLI creation, and Settings creates new SQLite budgets. Missing optional packages are reported while preserving their entries/data; required storage and selected UI failures remain explicit.
 
 The installation also supplies services needed before a budget is open. A selected interface presents budget selection; a server listener starts once for the installation and exposes only budgets available to it. Budget-owned selection does not imply that every plugin runs in every process.
 
@@ -52,7 +54,7 @@ Client/server is a deployment option within the same architecture. A server plug
 
 The budget describes its features without requiring them all to execute on the client. Bank ingestion and credentials stay on the server; clients use scoped ledger operations. A client container can carry its public remote URL and budget identity, plus an optional password-encrypted remote access credential. It does not automatically carry a copy of the remote financial ledger, bank-provider tokens or encryption keys.
 
-The bundled `server` and `client` plugins use the versioned `/remote/v1` public ledger contract, rather than exposing the privileged `StorageBackend` protocol. The server requires HTTPS and a machine/server bearer credential for budgets explicitly enabled with the server plugin. Commands include an expected revision and request ID; stale revisions fail explicitly, and retries of the same request return the original result while its receipt remains available. A failed connection never silently switches to an unrelated local ledger. See the [SDK guide](plugins.md#remote-interface-and-client) for configuration and retry limits.
+The bundled `server` and `client` plugins use the versioned `/remote/v1` public ledger contract, rather than exposing the privileged `StorageBackend` protocol. Every WHAB route, including localhost and webhooks, requires HTTPS. Ordinary routes retain loopback Host/origin checks. Only enabled remote protocol routes and registered signed bank webhooks bypass those local checks; the server requires a machine/server bearer credential for budgets explicitly enabled with the server plugin. Commands include an expected revision and request ID; stale revisions fail explicitly, and retries of the same request return the original result while its receipt remains available. Webhook signature verification authenticates provider deliveries independently of TLS encryption. Local setup provisions a CA/certificate without changing OS trust; the user must [trust the CA explicitly](usage.md#local-https). A failed connection never silently switches to an unrelated local ledger. See the [SDK guide](plugins.md#remote-interface-and-client) for configuration and retry limits.
 
 ## Data and lifecycle boundaries
 

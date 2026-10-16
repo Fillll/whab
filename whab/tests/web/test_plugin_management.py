@@ -14,7 +14,7 @@ def client(tmp_path, store):
     settings = Settings(tmp_path, 5173, "sandbox", "", "FICTIONAL_SECRET", "", False, "", "", (), ui="")
     with TestClient(
         create_app(store=store, settings=settings, plugins=PluginRegistry((sqlite_plugin,))),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     ) as client:
         yield client
 
@@ -65,7 +65,7 @@ def test_headless_management_keeps_ledger_and_never_loads_an_inactive_ui(tmp_pat
     settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
     with TestClient(
         create_app(store=store, settings=settings, plugins=PluginRegistry((sqlite_plugin,))),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     ) as client:
         assert client.get("/").status_code == 404
         state = client.get("/api/plugins/management").json()

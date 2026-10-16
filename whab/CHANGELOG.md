@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.0.0 — 2026-10-15
+
+- Require HTTPS for the local interface, APIs, remote commands and provider webhooks. Remove plaintext HTTP launch and OAuth redirect support. Set up device-local certificates with explicit trust instructions, allow configured certificates, and fail instead of falling back to HTTP. Existing HTTP URLs and deployments must migrate before upgrading.
+- Package the application core separately from independently versioned plugin distributions. Preserve plugin IDs and the public API v1 contracts; install the default plugin set with the source installer or the bundled extra. Plugin-only changes now update their owning version and dated changelog, independently of application releases.
+- Align the operating, architecture, plugin-author and contributor guides with portable storage selection, unavailable optional plugins, container payload ownership, currency minor units and the supported plugin inventory. Keep teaching examples outside ordinary Settings and document developer activation.
+
 ## 1.9.0 — 2026-10-15
 
 - Make `.whab` an extensible container with a required manifest and plugin-owned files. Local SQLite budgets carry a sanitized database; remote budgets carry connection information without downloading a ledger snapshot. Continue opening the previous JSON ledger format.

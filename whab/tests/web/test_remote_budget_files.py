@@ -17,7 +17,7 @@ from whab.budgets.credentials import encrypt_credentials
 from whab.budgets.document import new_manifest
 from whab.config import Settings
 
-BASE = "http://127.0.0.1:5173"
+BASE = "https://127.0.0.1:5173"
 ZIP = {"content-type": "application/zip"}
 TOKEN = "synthetic-bound-device-token-" + "x" * 32
 PASSWORD = "synthetic password for budgets"

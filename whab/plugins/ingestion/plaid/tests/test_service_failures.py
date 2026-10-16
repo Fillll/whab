@@ -110,8 +110,8 @@ def test_missing_and_disconnected_connections_cannot_supply_a_token(store, plaid
 @pytest.mark.parametrize(
     ("environment", "redirect"),
     [
-        ("sandbox", "http://localhost/callback"),
-        ("sandbox", "http://127.0.0.1/callback"),
+        ("sandbox", "https://localhost/callback"),
+        ("sandbox", "https://127.0.0.1/callback"),
         ("production", "https://app.example/callback"),
     ],
 )
@@ -157,6 +157,8 @@ def test_new_link_includes_valid_urls_without_reusing_an_access_token(
         ("PLAID_WEBHOOK_URL", "https://user:pass@hooks.example/", "Webhook URL must use HTTPS"),
         ("PLAID_WEBHOOK_URL", "https:///missing-host", "Webhook URL must use HTTPS"),
         ("PLAID_REDIRECT_URI", "http://app.example/callback", "Invalid redirect URI"),
+        ("PLAID_REDIRECT_URI", "http://localhost/callback", "Invalid redirect URI"),
+        ("PLAID_REDIRECT_URI", "http://127.0.0.1/callback", "Invalid redirect URI"),
         ("PLAID_REDIRECT_URI", "https://user:pass@app.example/callback", "Invalid redirect URI"),
         ("PLAID_REDIRECT_URI", "https:///missing-host", "Invalid redirect URI"),
     ],

@@ -26,7 +26,7 @@ def client_for(store, home, *optional):
     config = Settings(home, 5173, "sandbox", "FICTIONAL_CLIENT", "FICTIONAL_SECRET", "FICTIONAL_KEY", False, "", "", (), ui="")
     return TestClient(
         create_app(store=store, settings=config, plugins=PluginRegistry(optional)),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     )
 
 

@@ -34,7 +34,7 @@ def client_for(store, home, parser=lambda raw: payload(), enabled=True):
     settings = Settings(home, 5173, "sandbox", "", "", "", False, "", "", ui="")
     plugins = PluginRegistry((Plugin("dump", "Dump", file_import=FileImport(parser)),) if enabled else ())
     return TestClient(create_app(store=store, settings=settings, plugins=plugins),
-                      base_url="http://127.0.0.1:5173")
+                      base_url="https://127.0.0.1:5173")
 
 
 def test_preview_is_read_only_and_confirmed_commit_preserves_annotations_on_retry(store, tmp_path):

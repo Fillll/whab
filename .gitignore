@@ -8,6 +8,9 @@ data/
 # Private portable-budget runtime files and saved archives.
 /budgets/
 /whab/budgets/
+# Private local HTTPS certificates, CA keys and server keys.
+/tls/
+/whab/tls/
 *.whab
 .whab-*
 work/

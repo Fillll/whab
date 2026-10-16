@@ -26,7 +26,7 @@ def settings(home, ui="web"):
 def client_for(store, home, *plugins, ui="web"):
     return TestClient(
         create_app(store=store, settings=settings(home, ui), plugins=PluginRegistry(plugins)),
-        base_url="http://127.0.0.1:5173",
+        base_url="https://127.0.0.1:5173",
     )
 
 

@@ -26,7 +26,7 @@ from fastapi.testclient import TestClient
 from whab.app import create_app
 from whab.config import Settings
 settings = Settings(Path(sys.argv[1]), 5173, "sandbox", "", "", "", False, "", "", ())
-with TestClient(create_app(settings=settings), base_url="http://127.0.0.1:5173") as client:
+with TestClient(create_app(settings=settings), base_url="https://127.0.0.1:5173") as client:
     for page in ("budget", "transactions", "insights", "accounts"):
         assert client.get("/?page=" + page).status_code == 200
     assert [p["id"] for p in client.get("/api/plugins").json()["plugins"]] == ["sqlite", "web"]
@@ -79,7 +79,7 @@ def test_another_bank_uses_same_lifecycle_routes_and_scoped_store():
     try:
         with TestClient(
             create_app(store=store, settings=settings(ui=""), plugins=plugins),
-            base_url="http://127.0.0.1:5173",
+            base_url="https://127.0.0.1:5173",
         ) as client:
             assert events == ["started"]
             assert contexts[0].environment == "sandbox"

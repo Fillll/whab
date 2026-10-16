@@ -17,41 +17,27 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest==9.1.1", "pytest-cov==7.1.0", "coverage==7.16.2", "ruff==0.17.0"]
+bundled = [
+  "whab-bank-logos-plugin>=1.0.0,<2",
+  "whab-client-plugin>=1.0.0,<2",
+  "whab-plaid-plugin>=1.0.0,<2",
+  "whab-server-plugin>=1.0.0,<2",
+  "whab-sqlite-plugin>=1.0.0,<2",
+  "whab-web-plugin>=1.0.0,<2",
+  "whab-ynab-plugin>=1.0.0,<2",
+]
 
 [project.urls]
 Repository = "https://github.com/Fillll/whab"
 Issues = "https://github.com/Fillll/whab/issues"
-
-[project.entry-points."whab.plugins"]
-bank-logos = "whab_bank_logos.plugin:plugin"
-client = "whab_client.plugin:plugin"
-plaid = "whab_plaid.plugin:plugin"
-sqlite = "whab_sqlite.plugin:plugin"
-server = "whab_server.plugin:plugin"
-web = "whab_web.plugin:plugin"
-ynab = "whab_ynab.plugin:plugin"
 
 [build-system]
 requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = [
-  "src",
-  "plugins/interface/web/src",
-  "plugins/storage/sqlite/src",
-  "plugins/ingestion/plaid/src",
-  "plugins/interface/bank-logos/src",
-  "plugins/ingestion/ynab/src",
-  "plugins/interface/server/src",
-  "plugins/storage/client/src",
-]
-include = ["whab*"]
-
-[tool.setuptools.package-data]
-"whab_web" = ["templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]
-"whab_plaid" = ["templates/*.html", "static/*.js"]
-"whab_ynab" = ["templates/*.html", "static/*.js"]
+where = ["src"]
+include = ["whab", "whab.*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "whab.__version__"}
