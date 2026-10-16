@@ -1,118 +1,95 @@
-<div class="page-title-row">
-  <div>
-    <div class="eyebrow">YOUR MONTHLY PLAN</div>
-    <div class="month-heading">
-      <h1>{{ month_label(month) }}</h1>
-      <div class="month-controls">
-        <a class="icon-button"
-           href="{{ url(month=shift_month(month,-1)) }}"
-           aria-label="Previous month">{{ icon('chevron-left', 18) }}</a><a class="icon-button"
-   href="{{ url(month=shift_month(month,1)) }}"
-   aria-label="Next month">{{ icon('chevron-right', 18) }}</a>
-      </div>
-    </div>
-    <p>Give your money a place to go.</p>
+<div class="budget-planner">
+  <div class="budget-toolbar">
+    <nav class="month-strip" aria-label="Budget month">
+      {% if shift_month(month,-1)!=month %}<a class="icon-button" href="{{ url(month=shift_month(month,-1)) }}" aria-label="Previous month">{{ icon('chevron-left', 17) }}</a>{% endif %}
+      {% for strip_month in month_strip %}
+        {% if loop.first or strip_month[:4]!=month_strip[loop.index0-1][:4] %}<span class="month-strip-year">{{ strip_month[:4] }}</span>{% endif %}
+        <a class="month-link {% if strip_month==month %}is-selected {% elif strip_month in period_months %}in-range {% endif %}" href="{{ url(month=strip_month) }}" aria-label="{{ month_label(strip_month) }}"{% if strip_month==month %} aria-current="date"{% endif %}>{{ month_label(strip_month,true) }}</a>
+      {% endfor %}
+      {% if shift_month(month,1)!=month %}<a class="icon-button" href="{{ url(month=shift_month(month,1)) }}" aria-label="Next month">{{ icon('chevron-right', 17) }}</a>{% endif %}
+    </nav>
+    <a class="button secondary budget-today" href="{{ url(month=today[:7]) }}">This month</a>
   </div>
-  <button class="button secondary"
-          data-dialog="category-dialog">{{ icon('plus', 16) }}New category</button>
-</div>
-<div class="budget-summary">
-  <div class="ready-summary"><span class="summary-label">TO ASSIGN {{ icon('help', 13) }}</span><strong class="{% if data.summary.readyToAssign<0 %}negative {% endif %}">{{ money(data.summary.readyToAssign) }}</strong><span class="summary-foot">
-    {% if data.summary.readyToAssign==0 %}{{ icon('check-circle', 13) }}Every dollar has a job
-    {% elif data.summary.readyToAssign<0 %}Adjust allocations to cover the shortfall
-    {% else %}Available for your categories
-    {% endif %}
-    </span>
-  </div>
-  <div class="summary-stat">
-    <span class="summary-label">ASSIGNED</span><strong>{{ money(data.summary.assigned) }}</strong><span class="summary-foot">Allocated this month</span>
-  </div>
-  <div class="summary-stat">
-    <span class="summary-label">SPENT</span><strong>{{ money(data.summary.spent) }}</strong><span class="summary-foot">Posted activity this month</span>
-  </div>
-  <div class="summary-stat">
-    <span class="summary-label">AVAILABLE</span><strong>{{ money(data.summary.available) }}</strong><span class="summary-foot">Including category rollover</span>
-  </div>
-</div>
-<div class="budget-start-note">
-  {% if month<data.budgetStartMonth %}Your budget begins {{ month_label(data.budgetStartMonth) }}. Earlier spending is available in Insights.
-  {% else %}Planning from {{ month_label(data.budgetStartMonth) }} · Card debt is reserved from cash before assigning.
-  {% endif %}
-</div>
-<div class="budget-workspace">
-  <section class="budget-table-section" aria-label="Monthly category budget">
-    <div class="table-toolbar">
-      <h2>Categories <span>{{ data.categories|length }}</span></h2>
-      <span class="subtle-label">{{ month_label(month,true) }}</span>
-    </div>
-    <div class="table-scroll">
-      <table class="budget-table">
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Assigned</th>
-            <th>Activity</th>
-            <th>Available</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for group in groups %}
-            <tr class="group-row">
-              <td>
-                <button data-toggle-group="{{ loop.index }}"
-                        aria-expanded="true">{{ icon('chevron-down', 14) }}{{ group.name }}</button>
-              </td>
-              <td>{{ money(group.assigned) }}</td>
-              <td>{{ money(-group.spent) }}</td>
-              <td>{{ money(group.available) }}</td>
+  <div class="budget-workspace{% if selected %} has-inspector{% endif %}">
+    <section class="budget-table-section" aria-label="Monthly category budget">
+      <div class="budget-matrix-scroll">
+        <table class="budget-matrix" aria-label="Category budget across {{ periods|length }} {{ 'month' if periods|length==1 else 'months' }}">
+          <colgroup><col class="budget-category-col">{% for period in periods %}<col><col><col>{% endfor %}</colgroup>
+          <thead>
+            <tr class="budget-summaries">
+              <th class="budget-intro"><h1>Budget</h1><p>{{ data.categories|length }} categories<br>All amounts in {{ currency }}</p></th>
+              {% for period in periods %}
+                <th colspan="3" scope="colgroup" class="budget-month-summary-cell">
+                  <section class="budget-month-summary{% if period.month==month %} is-selected{% endif %}" aria-label="{{ month_label(period.month) }} summary">
+                    <div class="budget-month-heading"><span class="budget-month-name">{{ month_label(period.month).split(' ')[0] }}<small>{{ period.month[:4] }}</small></span>{{ icon('budget', 16) }}</div>
+                    <div class="budget-ready"><span class="budget-ready-label">To assign</span><strong class="budget-ready-value{% if period.summary.readyToAssign<0 %} negative{% endif %}">{{ money(period.summary.readyToAssign) }}</strong></div>
+                    <div class="budget-summary-lines">
+                      <div><span>Assigned</span><strong>{{ money(period.summary.assigned) }}</strong></div>
+                      <div><span>Spent</span><strong>{{ money(period.summary.spent) }}</strong></div>
+                      <div><span>Available</span><strong>{{ money(period.summary.available) }}</strong></div>
+                    </div>
+                  </section>
+                </th>
+              {% endfor %}
             </tr>
-            {% set group_index = loop.index %}
-            {% for row in group.rows %}
-              <tr data-group="{{ group_index }}"
-                  class="category-row {% if selected and selected.id==row.category.id %}selected {% endif %}">
-                <td>
-                  <a class="category-name" href="{{ url(category=row.category.id) }}"><span class="category-icon">{{ icon(category_icon(row.category.name),15) }}</span><span><strong>{{ row.category.name }}</strong><span class="category-progress"><span style="width:{{ [100, [0,(row.assigned+row.carryover)/row.target*100 if row.target else 100]|max]|min }}%"></span></span></span></a>
-                </td>
-                <td>
-                  <a class="money-button"
-                     href="{{ url(category=row.category.id) }}"
-                     aria-label="Assign money to {{ row.category.name }}">{{ money(row.assigned) }}</a>
-                </td>
-                <td class="activity-number">{{ money(-row.spent) if row.spent else '—' }}</td>
-                <td><span class="available-pill {% if row.available<0 %}overspent {% elif row.available==0 %}zero {% endif %}">{{ money(row.available) }}</span>
-                </td>
+            <tr class="budget-columns">
+              <th scope="col">Category</th>
+              {% for period in periods %}
+                <th scope="col" class="month-start{% if period.month==month %} selected-month{% endif %}"><span>Assigned</span><strong>{{ money_number(period.summary.assigned) }}</strong></th>
+                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}><span>Activity</span><strong>{{ money_number(-period.summary.spent) }}</strong></th>
+                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}><span>Available</span><strong>{{ money_number(period.summary.available) }}</strong></th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for group in groups %}
+              {% set group_index = loop.index %}
+              <tr class="budget-group-row">
+                <td><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}{{ group.name }}</button></td>
+                {% for total in group.periods %}
+                  <td class="month-start">{{ money_number(total.assigned) }}</td>
+                  <td>{{ money_number(-total.spent) }}</td>
+                  <td{% if total.available<0 %} class="negative"{% endif %}>{{ money_number(total.available) }}</td>
+                {% endfor %}
               </tr>
+              {% for row in group.rows %}
+                <tr class="budget-category-row{% if selected and selected.id==row.category.id %} selected{% endif %}" data-budget-group-member="{{ group_index }}">
+                  <td><a class="budget-category-link" href="{{ url(category=row.category.id) }}">{{ row.category.name }}</a></td>
+                  {% for cell in row.periods %}
+                    <td class="month-start{% if cell.month==month %} selected-month{% endif %}">
+                      <form class="budget-assignment" data-api="/budget/{{ category_path(row.category.id) }}" data-method="PUT" data-inline-assignment>
+                        <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ cell.month }}">
+                        <input type="text" name="assigned" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" autocomplete="off" spellcheck="false" value="{{ money_input(cell.assigned) }}" aria-label="Assigned to {{ row.category.name }} in {{ month_label(cell.month) }}"{% if cell.month<data.budgetStartMonth %} disabled{% endif %} required>
+                        <button class="budget-assignment-save" type="submit" aria-label="Save assignment to {{ row.category.name }} in {{ month_label(cell.month) }}"{% if cell.month<data.budgetStartMonth %} disabled{% endif %}>{{ icon('check', 12) }}</button>
+                        <p class="field-error" role="alert" hidden></p>
+                      </form>
+                    </td>
+                    <td class="budget-money{% if cell.month==month %} selected-month{% endif %}{% if not cell.spent %} zero{% endif %}">{{ money_number(-cell.spent) }}</td>
+                    <td class="{% if cell.month==month %}selected-month {% endif %}{% if cell.available<0 %}negative{% elif not cell.available %}zero{% endif %}"><a class="budget-money" href="{{ url(category=row.category.id,month=cell.month) }}" aria-label="Details for {{ row.category.name }} in {{ month_label(cell.month) }}">{{ money_number(cell.available) }}</a></td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
             {% endfor %}
-          {% endfor %}
-          {% if uncategorized and month>=data.budgetStartMonth %}
-            <tr class="category-row">
-              <td>
-                <a class="category-name" href="{{ url('transactions') }}"><span class="category-icon">{{ icon('tag', 15) }}</span><strong>Uncategorized</strong></a>
-              </td>
-              <td>—</td>
-              <td class="activity-number">{{ money(-uncategorized) }}</td>
-              <td>
-                <a class="text-link" href="{{ url('transactions') }}">Review</a>
-              </td>
-            </tr>
-          {% endif %}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td>Total</td>
-            <td>{{ money(data.summary.assigned) }}</td>
-            <td>{{ money(-data.summary.spent) if month>=data.budgetStartMonth else '—' }}</td>
-            <td>{{ money(data.summary.available) }}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  </section>
+            {% if periods|selectattr('uncategorized')|list %}
+              <tr class="budget-category-row budget-uncategorized">
+                <td><a class="budget-category-link" href="{{ url('transactions') }}">Uncategorized</a></td>
+                {% for period in periods %}
+                  <td class="month-start">—</td><td class="budget-money">{{ money_number(-period.uncategorized) if period.month>=data.budgetStartMonth else '—' }}</td><td><a class="text-link" href="{{ url('transactions',month=period.month) }}">Review</a></td>
+                {% endfor %}
+              </tr>
+            {% endif %}
+          </tbody>
+          <tfoot><tr class="budget-total-row"><td>Total</td>{% for period in periods %}<td class="month-start">{{ money_number(period.summary.assigned) }}</td><td>{{ money_number(-period.summary.spent) }}</td><td>{{ money_number(period.summary.available) }}</td>{% endfor %}</tr></tfoot>
+        </table>
+      </div>
+      <div class="budget-table-footer"><button class="button secondary" data-dialog="category-dialog">{{ icon('plus', 15) }}Add category</button><span>All amounts in {{ currency }}</span></div>
+    </section>
   {% if selected %}
     {% set row = selected_budget %}
     {% set funded = row.assigned+row.carryover %}
     {% set progress = [100,[0,funded/row.target*100 if row.target else 100]|max]|min %}
-    <aside class="category-inspector">
+    <aside class="category-inspector" aria-label="Category details">
+      <a class="inspector-close icon-button" href="{{ url(category=none) }}" aria-label="Close category details">{{ icon('close', 17) }}</a>
       <div class="inspector-head">
         <span class="inspector-icon">{{ icon(category_icon(selected.name),20) }}</span>
         <div>
@@ -136,7 +113,7 @@
         <small>{{ 'No target set' if not row.target else 'Your target is fully funded' if funded>=row.target else money(row.target-funded)+' more to reach your target' }}</small>
       </div>
       <form class="assign-form"
-            data-api="/budget/{{ selected.id|urlencode }}"
+            data-api="/budget/{{ category_path(selected.id) }}"
             data-method="PUT">
         <input type="hidden"
                name="workspace"
@@ -171,7 +148,12 @@
       </div>
     </aside>
   {% endif %}
-</div>
-<div class="budget-footnote">
-  {{ icon('shield', 14) }}<span>Allocations stay in WHAB. Budgeting never moves money between accounts.</span>
+
+  </div>
+  <div class="budget-start-note">
+    {% if month<data.budgetStartMonth %}Your budget begins {{ month_label(data.budgetStartMonth) }}. Earlier spending is available in Insights.
+    {% else %}Planning from {{ month_label(data.budgetStartMonth) }} · Card debt is reserved from cash before assigning.
+    {% endif %}
+  </div>
+  <div class="budget-footnote">{{ icon('shield', 14) }}<span>Allocations stay in WHAB. Budgeting never moves money between accounts.</span></div>
 </div>

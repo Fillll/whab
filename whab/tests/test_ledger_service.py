@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from whab.domain.budget import select_currency
 from whab.domain.errors import StoreError
 from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
 
@@ -205,3 +206,106 @@ def test_query_and_assignment_month_range_matches_every_public_interface(store, 
     with pytest.raises(StoreError):
         service.assign("personal", "groceries", month, 0)
     assert service.revision == revision and store.export_budget() == before
+
+
+def test_workspace_periods_share_core_rollover_refunds_debt_and_currency_rules(store, monkeypatch):
+    monkeypatch.setattr("whab_sqlite.store.current_month", lambda: "2026-10")
+    service = LedgerService(store)
+    cash = service.add_account("personal", {"name": "Cash", "type": "depository", "balance": 100000})
+    service.add_account("personal", {"name": "Card", "type": "credit", "balance": 20000})
+    service.add_account("personal", {
+        "name": "Euro cash", "type": "depository", "balance": 50000, "currency": "EUR",
+    })
+    euro_category = service.add_category("personal", {
+        "name": "Euro food", "group": "Euro living", "target": 0, "currency": "EUR",
+    })
+    service.assign("personal", "groceries", "2026-10", 20000)
+    service.assign("personal", "groceries", "2026-11", 30000)
+    service.assign("personal", euro_category, "2026-10", 8000)
+    for date, amount in (("2026-10-10", 7000), ("2026-11-10", -500)):
+        service.add_transaction("personal", {
+            "accountId": cash, "date": date, "merchant": "Fixture grocer", "amount": amount,
+            "categoryId": "groceries",
+        })
+    before, revision = store.export_budget(), service.revision
+    periods = service.workspace_periods("personal", "2026-10", 3)
+    assert [period["month"] for period in periods] == ["2026-10", "2026-11", "2026-12"]
+    assert periods == [service.workspace("personal", period["month"]) for period in periods]
+    usd = [select_currency(period, "USD") for period in periods]
+    grocery_rows = [next(row for row in period["budget"] if row["categoryId"] == "groceries") for period in usd]
+    assert [(row["carryover"], row["assigned"], row["spent"], row["available"]) for row in grocery_rows] == [
+        (0, 20000, 7000, 13000), (13000, 30000, -500, 43500), (43500, 0, 0, 43500),
+    ]
+    assert [period["summary"]["readyToAssign"] for period in usd] == [60000, 30000, 30000]
+    eur = [select_currency(period, "EUR") for period in periods]
+    assert [period["summary"]["readyToAssign"] for period in eur] == [42000, 42000, 42000]
+    assert all({row["currency"] for row in period["accounts"]} == {"EUR"} for period in eur)
+    # Reading another month does not weaken the command's future reservation rule.
+    with pytest.raises(StoreError, match="exceeds available money"):
+        service.assign("personal", "groceries", "2026-10", 50001)
+    assert service.revision == revision and store.export_budget() == before
+
+
+def test_workspace_periods_hold_shared_lock_and_sanitize_each_projection():
+    class Lock:
+        held = False
+        entries = 0
+
+        def __enter__(self):
+            assert not self.held
+            self.held = True
+            self.entries += 1
+
+        def __exit__(self, *args):
+            self.held = False
+
+    lock = Lock()
+    months = []
+    private = {"access_token": "private", "safe": [{"cursor": "private", "name": "safe"}]}
+
+    def workspace(scope, month):
+        assert scope == "personal" and lock.held
+        months.append(month)
+        return {"month": month, "nested": private}
+
+    service = LedgerService(SimpleNamespace(workspace=workspace), lock=lock)
+    assert service.workspace_periods("personal", "2026-12", 3) == [
+        {"month": month, "nested": {"safe": [{"name": "safe"}]}}
+        for month in ("2026-12", "2027-01", "2027-02")
+    ]
+    assert months == ["2026-12", "2027-01", "2027-02"]
+    assert lock.entries == 1 and not lock.held
+    assert private["access_token"] == "private" and private["safe"][0]["cursor"] == "private"
+
+
+@pytest.mark.parametrize("workspace,month,count", [
+    ("other", "2026-10", 3),
+    ([], "2026-10", 3),
+    ("personal", None, 3),
+    ("personal", True, 3),
+    ("personal", "2026-13", 3),
+    ("personal", "1899-12", 3),
+    ("personal", "2201-01", 3),
+    ("personal", "2026-10", True),
+    ("personal", "2026-10", 0),
+    ("personal", "2026-10", -1),
+    ("personal", "2026-10", 13),
+    ("personal", "2026-10", 3.0),
+    ("personal", "2026-10", "3"),
+    ("personal", "2026-10", None),
+])
+def test_invalid_workspace_period_requests_never_dispatch(workspace, month, count):
+    service = LedgerService(SimpleNamespace(workspace=lambda *args: pytest.fail("Invalid read dispatched")))
+    with pytest.raises(StoreError):
+        service.workspace_periods(workspace, month, count)
+
+
+@pytest.mark.parametrize("month,count,expected", [
+    ("1900-01", 12, [f"1900-{number:02d}" for number in range(1, 13)]),
+    ("2199-12", 3, ["2199-12", "2200-01", "2200-02"]),
+    ("2200-11", 12, ["2200-11", "2200-12"]),
+    ("2200-12", 3, ["2200-12"]),
+])
+def test_workspace_periods_clamp_at_the_last_supported_month(store, month, count, expected):
+    periods = LedgerService(store).workspace_periods("personal", month, count)
+    assert [period["month"] for period in periods] == expected

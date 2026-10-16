@@ -147,6 +147,7 @@ def test_storage_backend_protocol_is_database_independent_and_preserves_public_s
 
 def test_user_interface_descriptor_is_frozen_and_matches_view_builder_signature(tmp_path):
     interface = UserInterface(tmp_path / "templates", tmp_path / "static", build_context)
+    assert interface.budget_months == 1
     descriptor = Plugin("frontend", "Example UI", ui=interface)
     registry = load_plugins(("frontend",), (FakeEntryPoint("frontend", descriptor),))
     selected = registry.ui_plugin("frontend")
@@ -201,6 +202,17 @@ def test_interface_selection_errors_are_distinct_and_sanitized():
 def test_user_interface_rejects_invalid_resource_or_builder_types(templates, static, builder):
     with pytest.raises(ValueError):
         UserInterface(templates, static, builder)
+
+
+@pytest.mark.parametrize("months", [True, False, None, "3", 3.0, 0, -1, 13])
+def test_user_interface_rejects_invalid_budget_month_count(tmp_path, months):
+    with pytest.raises(ValueError, match="budget months"):
+        UserInterface(tmp_path, tmp_path, build_context, budget_months=months)
+
+
+@pytest.mark.parametrize("months", [1, 3, 12])
+def test_user_interface_accepts_bounded_budget_month_count(tmp_path, months):
+    assert UserInterface(tmp_path, tmp_path, build_context, budget_months=months).budget_months == months
 
 
 def test_capability_kinds_are_ordered_and_reporting_is_one_kind_for_both_hooks(tmp_path):

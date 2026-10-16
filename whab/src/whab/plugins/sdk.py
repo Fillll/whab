@@ -356,17 +356,24 @@ class UIContextBuilder(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class UserInterface:
-    """Trusted visual resources and view-model builder; never an HTTP router factory."""
+    """Trusted visual resources and view-model builder; never an HTTP router factory.
+
+    A budget_months value above one requests a data["periods"] list of consecutive
+    core projections on budget pages. The default retains the single-month shape.
+    """
 
     templates: Path
     static: Path
     build_context: UIContextBuilder
+    budget_months: int = 1
 
     def __post_init__(self) -> None:
         if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
             raise ValueError("User interface resources must be pathlib.Path directories.")
         if not callable(self.build_context):
             raise ValueError("User interface context builder must be callable.")
+        if type(self.budget_months) is not int or not 1 <= self.budget_months <= 12:
+            raise ValueError("User interface budget months must be an integer between 1 and 12.")
 
 
 class BankStore(Protocol):

@@ -37,6 +37,8 @@ Core packages live under `src/whab` and ship only in the host/core `whab` wheel.
 
 `WHAB_UI` selects one server-rendered visual descriptor, defaulting to `web`. `WHAB_UI=` selects headless mode: the root page and core static mount are absent, while guarded APIs remain. `UserInterface` supplies template/static directories and a `build_context` callable. The host owns Jinja transport and injects enabled plugin panels/outputs; the chosen interface owns the resulting visual layout. Trusted `Interface` factories can contribute transport routes using a scoped `InterfaceContext`; shared host access policy and cleanup still apply. The bundled `server` plugin uses this capability for the public remote command protocol. Server-rendered `UserInterface` remains independently selectable, and `WHAB_UI=` omits visual pages.
 
+The optional `UserInterface.budget_months` requests 1–12 consecutive core workspace projections for budget pages; its default of 1 preserves existing interfaces. `LedgerService.workspace_periods` obtains those public projections under its shared local command lock using the unchanged storage query contract. The host selects each period's currency before supplying `data['periods']` to a multi-month interface. The web plugin requests three periods and owns their layout, month labels, colors and editing controls. It does not own rollover, card reserves, available funding or assignment validation.
+
 Configuration reads `.env` from `WHAB_HOME`, or from the process's launch directory when no home is set. Environment values override `.env` values. `WHAB_ENV` selects Sandbox or production, with the legacy `PLAID_ENV` setting as its fallback. SQLite files follow that environment:
 
 ```text

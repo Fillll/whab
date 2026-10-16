@@ -32,10 +32,32 @@ function minorAmount(value, digits) {
   return Number(result);
 }
 
+const inlineAssignments = [...document.querySelectorAll('form[data-inline-assignment]')];
+let assignmentBusy = false;
+let assignmentNavigation;
+const pendingAssignmentControls = new Map();
+
+function lockAssignments(locked) {
+  assignmentBusy = locked;
+  for (const form of inlineAssignments) form.querySelector('[data-cents]').readOnly = locked;
+}
+
+// Finish the assignment before following a month/category link that blurred it.
+document.addEventListener('click', event => {
+  if (!assignmentBusy || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  const link = event.target.closest('a[href]');
+  if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+  event.preventDefault();
+  assignmentNavigation = link.href;
+});
+
 for (const form of document.querySelectorAll('form[data-api]')) {
+  const inline = form.hasAttribute('data-inline-assignment');
+  const amount = inline ? form.querySelector('[data-cents]') : null;
+  const originalAmount = amount?.value;
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (form.dataset.busy) return;
+    if (form.dataset.busy || inline && (assignmentBusy || amount.value.trim() === originalAmount)) return;
     const error = form.querySelector('.field-error');
     try {
       const body = {};
@@ -50,8 +72,15 @@ for (const form of document.querySelectorAll('form[data-api]')) {
       delete body._kind;
       form.dataset.busy = 'true';
       if (error) error.hidden = true;
+      if (inline) {
+        lockAssignments(true);
+        form.setAttribute('aria-busy', 'true');
+        amount.removeAttribute('aria-invalid');
+      }
       await api(form.dataset.api, body, form.dataset.method || 'POST');
-      if (body.currency) {
+      if (inline && assignmentNavigation) {
+        location.assign(assignmentNavigation);
+      } else if (body.currency) {
         const url = new URL(location.href);
         url.searchParams.set('currency', body.currency);
         location.assign(url);
@@ -62,9 +91,34 @@ for (const form of document.querySelectorAll('form[data-api]')) {
         error.hidden = false;
       } else notify(failure.message);
       delete form.dataset.busy;
+      if (inline) {
+        lockAssignments(false);
+        assignmentNavigation = undefined;
+        for (const [control, value] of pendingAssignmentControls) control.value = value;
+        pendingAssignmentControls.clear();
+        form.removeAttribute('aria-busy');
+        amount.setAttribute('aria-invalid', 'true');
+      }
     }
   });
   if (form.hasAttribute('data-auto')) form.addEventListener('change', () => form.requestSubmit());
+  if (inline) {
+    amount.addEventListener('focus', () => amount.select());
+    amount.addEventListener('blur', () => form.requestSubmit());
+    amount.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        form.requestSubmit();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        amount.value = originalAmount;
+        amount.removeAttribute('aria-invalid');
+        const error = form.querySelector('.field-error');
+        if (error) error.hidden = true;
+        amount.blur();
+      }
+    });
+  }
 }
 
 function updateAccountFields(form) {
@@ -422,23 +476,28 @@ for (const button of document.querySelectorAll('[data-plugin-options]')) button.
   }
 });
 
-for (const input of document.querySelectorAll('[data-navigation]')) input.addEventListener('change', () => {
-  if (!input.checkValidity()) {
-    input.reportValidity();
-    return;
-  }
-  const url = new URL(location.href);
-  url.hash = '';
-  url.searchParams.set(input.dataset.navigation, input.value);
-  if (input.dataset.navigation === 'workspace') url.searchParams.delete('category');
-  location.assign(url);
-});
-for (const button of document.querySelectorAll('[data-toggle-group]')) button.addEventListener('click', () => {
+for (const input of document.querySelectorAll('[data-navigation]')) {
+  const initialValue = input.value;
+  input.addEventListener('change', () => {
+    if (!input.checkValidity()) {
+      input.reportValidity();
+      return;
+    }
+    const url = new URL(location.href);
+    url.hash = '';
+    url.searchParams.set(input.dataset.navigation, input.value);
+    if (input.dataset.navigation === 'workspace') url.searchParams.delete('category');
+    if (assignmentBusy) {
+      assignmentNavigation = url.href;
+      pendingAssignmentControls.set(input, initialValue);
+    } else location.assign(url);
+  });
+}
+for (const button of document.querySelectorAll('[data-budget-group]')) button.addEventListener('click', () => {
   const expanded = button.getAttribute('aria-expanded') === 'true';
   button.setAttribute('aria-expanded', String(!expanded));
-  button.querySelector('svg').classList.toggle('collapsed', expanded);
-  for (const row of document.querySelectorAll('[data-group]'))
-    if (row.dataset.group === button.dataset.toggleGroup) row.hidden = expanded;
+  for (const row of document.querySelectorAll('[data-budget-group-member]'))
+    if (row.dataset.budgetGroupMember === button.dataset.budgetGroup) row.hidden = expanded;
 });
 for (const time of document.querySelectorAll('[data-local-time]')) time.textContent = new Date(time.dateTime).toISOString().slice(0, 10);
 
