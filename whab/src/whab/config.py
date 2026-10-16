@@ -27,6 +27,8 @@ class Settings:
     plugins: tuple[str, ...] = ("plaid",)
     storage: str = "sqlite"
     ui: str = "web"
+    budget_path: Path | None = None
+    copy_paths: tuple[Path, ...] = ()
 
     @classmethod
     def load(cls):
@@ -43,7 +45,9 @@ class Settings:
             for name in os.getenv("WHAB_PLUGINS", "plaid").split(",")
             if name.strip()
         )
-        saved = read_selection(home)
+        # A portable budget has its own manifest; an unrelated legacy selection
+        # must not prevent that budget from opening.
+        saved = None if os.getenv("WHAB_BUDGET") else read_selection(home)
         if saved is not None:
             optional = saved
         return cls(
@@ -59,6 +63,8 @@ class Settings:
             plugins=optional,
             storage=os.getenv("WHAB_STORAGE", "sqlite").strip(),
             ui=os.getenv("WHAB_UI", "web").strip(),
+            budget_path=Path(os.environ["WHAB_BUDGET"]).expanduser().resolve() if os.getenv("WHAB_BUDGET") else None,
+            copy_paths=tuple(Path(path) for path in os.getenv("WHAB_BUDGET_COPIES", "").split(os.pathsep) if path),
         )
 
     def enabled_plugins(self):
@@ -78,6 +84,11 @@ class Settings:
         """Only the selected provider's environment namespace enters its factory."""
         if plugin_id == "plaid":
             return self.plaid_environment()
+        prefix = plugin_id.upper().replace("-", "_") + "_"
+        return {key: value for key, value in os.environ.items() if key.startswith(prefix)}
+
+    def plugin_configuration(self, plugin_id):
+        """Device-local credentials are supplied only to the plugin that owns them."""
         prefix = plugin_id.upper().replace("-", "_") + "_"
         return {key: value for key, value in os.environ.items() if key.startswith(prefix)}
 

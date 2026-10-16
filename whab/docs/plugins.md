@@ -2,7 +2,7 @@
 
 WHAB provides **user-interface**, **storage**, **data-ingestion**, **reporting** and **branding** plugin capabilities under API v1. WHAB 1.2 adds a host-owned manager for optional plugin selections; WHAB 1.3 adds optional bank-logo branding. Plugins are installed Python packages registered through `whab.plugins` entry points. Web, SQLite, Plaid and Bank logos are bundled descriptors using those same contracts. Reports receive immutable snapshots; storage and bank factories receive separate privileged contexts.
 
-The [target architecture](target-architecture.md) proposes broader capability families. This guide describes implemented API v1 contracts; the proposal does not add or rename SDK hooks.
+The [budget and plugin model](target-architecture.md) groups capabilities by responsibility. This guide defines the executable API v1 contracts; category names do not add or rename SDK hooks.
 
 ## Trust and enablement
 
@@ -12,11 +12,49 @@ CI requires 100% Python statement and branch coverage for each plugin's entire s
 
 **Installed Python plugins are trusted code running in WHAB's server process, not a security sandbox.** Reports receive no backend, settings or credentials. Bank factories receive scoped persistence/configuration and an encryption key. Storage factories own the full ledger and backend credentials; visual descriptors provide trusted templates, scripts and presentation code. Python can independently access files/network or import internals with WHAB's privileges. Select only reviewed code. These interfaces limit host-supplied capabilities and accidental mutation, not malicious code.
 
-Installation alone does not select an additional package. The host loads the required `WHAB_STORAGE` descriptor (`sqlite` by default), selected `WHAB_UI` descriptor (`web` by default), and optional names saved in the runtime home's `plugins.json`. Without a saved selection, `WHAB_PLUGINS` supplies optional names (`plaid` when absent); `WHAB_PLUGINS=` disables optional banks/reports/branding while retaining storage and selected UI. `WHAB_UI=` is headless: APIs/storage remain without the root page or core visual assets. Restart after changing settings. Names are lowercase slugs of at most 64 characters.
+Installation alone does not select an additional package. The host loads the required `WHAB_STORAGE` descriptor (`sqlite` by default), selected `WHAB_UI` descriptor (`web` by default), and the active budget’s optional selection. For the original local workspace, optional names are saved in the runtime home’s `plugins.json`. Without a saved selection, `WHAB_PLUGINS` supplies optional names (`plaid` when absent); `WHAB_PLUGINS=` disables optional banks/reports/branding while retaining storage and selected UI. `WHAB_UI=` is headless: APIs/storage remain without the root page or core visual assets. Restart after changing settings. Names are lowercase slugs of at most 64 characters.
 
-Select storage and visual implementations through their dedicated settings. Exactly one backend is required; at most one visual interface may be selected. Missing selections, incompatible capabilities and multiple enabled storage/UI descriptors fail with actionable errors. The host deduplicates a selected name also present in the optional list; repeated optional names remain invalid. A standalone `load_plugins(())` loads nothing, but app composition adds required storage and selected UI before discovery.
+Select the primary storage and visual implementations through their dedicated settings. One primary backend is required; at most one server-rendered visual interface may be selected, alongside trusted transport interfaces. Missing selections, incompatible capabilities and multiple enabled storage/UI descriptors fail with actionable errors. The host deduplicates a selected name also present in the optional list; repeated optional names remain invalid. A standalone `load_plugins(())` loads nothing, but app composition adds required storage and selected UI before discovery.
 
-An enabled name must match exactly one entry point and its descriptor ID. A duplicate setting name, duplicate installed entry point, missing package, invalid descriptor, or unsupported API version prevents startup with an actionable message. WHAB resolves all configured names before importing any plugin; it never silently chooses one of two installed packages claiming the same name. Ordinary import or hook exceptions are reported through fixed messages without their original exception text or traceback in WHAB's public responses/logging. Arbitrary plugin code can still produce its own logs or hang, so this is error handling rather than sandboxing.
+An available enabled name must match exactly one entry point and its descriptor ID. A duplicate setting name, duplicate installed entry point, invalid descriptor, or unsupported API version prevents startup with an actionable message. Required storage/interface packages must be installed. Portable budgets report unavailable optional packages while retaining their manifest entries; the original local selection continues to fail explicitly for missing selected packages. WHAB resolves all configured names before importing any plugin; it never silently chooses one of two installed packages claiming the same name. Ordinary import or hook exceptions are reported through fixed messages without their original exception text or traceback in WHAB's public responses/logging. Arbitrary plugin code can still produce its own logs or hang, so this is error handling rather than sandboxing.
+
+## Budget ownership
+
+Executable Python packages are installed in the WHAB environment. A portable budget owns its selected optional plugin IDs, API compatibility requirements, settings and saved plugin state. Opening that budget loads the available compatible capabilities; disabling one preserves its saved data. Missing optional packages are reported so a budget can be opened without silently installing code. Required storage must be available.
+
+The versioned `.whab` archive contains `manifest.json` and `ledger.json`. Its manifest records the budget identity/name, primary storage ID and plugin entries with `id`, `enabled`, `apiVersion`, `settings` and `state`. Settings and state contain bounded JSON values, with credentials kept in machine/server configuration. The portable ledger has an exact allowlist, validates currencies and references, and excludes bank Item/token records. Imported account snapshots without their original local connections are retained as stale data.
+
+A descriptor can supply `bind(context: BudgetContext) -> Plugin` to construct hooks for one opened budget. The host calls the binder once per runtime before selecting capabilities. Return a descriptor with the same ID and API version and no further binder; ordinary descriptors continue to work unchanged. Each budget gets its own closures:
+
+```python
+from whab.plugins import Insight, Plugin
+
+
+def bind_budget(context):
+    label = context.settings.get("label", "Transactions this month")
+
+    def insights(snapshot):
+        return (Insight(label, str(len(snapshot.transactions))),)
+
+    return Plugin("month-summary", "Month summary", insights=insights)
+
+
+plugin = Plugin("month-summary", "Month summary", bind=bind_budget)
+```
+
+`context.settings` and `context.state` are independent copies scoped to this plugin and budget. Use `context.save_state({...})` to persist updated portable state. Runtime closures and Python objects are not serialized, and saving configuration or enabling/disabling plugins takes effect when the budget runtime restarts.
+
+Host endpoints support budget management:
+
+- `GET /api/budget` describes the current budget and copy/plugin status.
+- `GET /api/budget/export` downloads a `.whab` file.
+- `POST /api/budget/open` accepts a raw `application/zip` bundle up to 50 MiB, validates it and activates it in the browser session. `?as_copy=true` gives the imported contents a new budget identity, preserving a conflicting revision separately without merging.
+- `POST /api/budget/new` accepts JSON `{"name": "Household"}` and activates a new budget.
+- `GET /api/budgets` lists opened budgets; `POST /api/budgets/{id}/activate` switches the active session.
+- `POST /api/budget/copies` adds a device-local destination with JSON `{"name": "Backup", "path": "/absolute/path/Backup.whab"}`. `POST /api/budget/save` retries saves.
+- `GET /api/budget/plugins/{id}` reads that plugin’s portable manifest entry. `PUT` updates its `settings` and/or `state` as bounded JSON objects.
+
+The session cookie identifies the active budget without carrying its financial data. These operations keep existing local access and request-validation guards. Data-only bundles never install packages or execute bundled code.
 
 ## Manage optional selections
 
@@ -24,7 +62,7 @@ The bundled Web UI's **Settings → Plugins → Installed** lists installed regi
 
 **Save plugin selection** loads and validates the proposed descriptors without calling storage/bank factories or reporting hooks. It rejects missing or ambiguous registrations, incompatible descriptors, and attempts to change the selected storage or interface. Saving leaves the running registry, provider services, connections and ledger unchanged; changes apply after restart. An imported bank's history and saved connections remain when its plugin is disabled.
 
-The host stores at most 100 unique optional IDs in an atomic `plugins.json` replacement in the runtime home (`WHAB_HOME`, or the launch directory). The file uses `{"version": 1, "plugins": ["plaid", "example"]}` and contains no credentials or ledger records. Its optional selection takes precedence over `WHAB_PLUGINS`, including an explicitly empty saved list. Removing this file restores environment defaults on the next start. Invalid or unreadable saved settings cause an actionable startup error; repair the file, or explicitly save a replacement while WHAB is still running.
+For portable budgets, the host stores the optional selection in that budget’s manifest, preserving disabled entries and their settings/state. The original local workspace stores at most 100 unique optional IDs in an atomic `plugins.json` replacement in the runtime home (`WHAB_HOME`, or the launch directory). The file uses `{"version": 1, "plugins": ["plaid", "example"]}` and contains no credentials or ledger records. Its optional selection takes precedence over `WHAB_PLUGINS`, including an explicitly empty saved list. Removing this file restores environment defaults on the next start. Invalid or unreadable saved settings cause an actionable startup error; repair the file, or explicitly save a replacement while WHAB is still running.
 
 Host-owned endpoints expose this behavior to custom interfaces and headless clients:
 
@@ -54,7 +92,7 @@ To disable optional extensions, uncheck them in Settings, save, and restart. Wit
 
 ## Public SDK
 
-Import public types from `whab.plugins`; concrete database, visual/transport internals and global configuration are outside the stable SDK. Descriptors may provide `ui`, `storage`, `bank`, `file_import`, `insights`, `export` and `bank_logos`, plus optional `settings` (WHAB 1.6+) and bank-owned `merchant_logos` (WHAB 1.7+). Their computed `kinds` are `user_interface`, `storage`, `data_ingestion`, `reporting` and `branding`; one descriptor may have multiple kinds. At least one capability is required. Data ingestion includes bank connection/sync and, from WHAB 1.4, bounded local file imports.
+Import public types from `whab.plugins`; concrete database, visual/transport internals and global configuration are outside the stable SDK. Descriptors may provide `ui`, `interface`, `storage`, `bank`, `file_import`, `insights`, `export` and `bank_logos`, plus optional `settings` (WHAB 1.6+) and bank-owned `merchant_logos` (WHAB 1.7+). Their computed `kinds` are `user_interface`, `storage`, `data_ingestion`, `reporting` and `branding`; one descriptor may have multiple kinds. At least one capability is required. Data ingestion includes bank connection/sync and, from WHAB 1.4, bounded local file imports.
 
 Frozen report records use immutable tuples and exact primitives. Every hook receives fresh records from a whitelisted snapshot, protecting against accidental mutation. Storage, visual and bank capabilities are described below.
 
@@ -406,9 +444,21 @@ import_workspace(workspace, plugin_id, fingerprint, data: WorkspaceImport) -> di
 
 Preview reports availability without mutation. Commit returns `{"counts": {"accounts": ..., "categories": ..., "transactions": ..., "assignments": ...}, "alreadyImported": bool}`. SQLite allows only a pristine personal workspace, replacing untouched seed categories; financial records, assignments, customized categories and even disconnected bank connection records block the migration. It revalidates under the write lock, committing all data, budget start and a receipt atomically. A receipt for the identical plugin/fingerprint makes retries harmless and preserves later edits. Any different subsequent archive is refused. Other backends can keep working without this capability and report imports unavailable. See the [YNAB importer](../plugins/ingestion/ynab/README.md) for its format-specific limits.
 
+## Remote interface and client
+
+`Interface(factory)` is a trusted transport capability separate from the server-rendered `UserInterface`. The host calls its factory with `InterfaceContext(service, config, environment, budget_id, budget=None)`. The `service` provides scoped public ledger queries and validated commands; it is not a bank store. `config` contains the plugin's machine-specific configuration. A `BudgetContext(budget_id, settings, state, save_state)` provides portable plugin-owned values where the host supplies it. Save state as bounded JSON; keep connection credentials in the machine configuration.
+
+The bundled `server` descriptor belongs to Interface and contributes `/remote/v1`. It requires `SERVER_TOKEN` with at least 32 characters and accepts HTTPS only. Its machine/server credential authorizes budgets explicitly configured with the server plugin; this is not a per-household account system. The bundled `client` descriptor belongs to Storage, with `CLIENT_URL` (an HTTPS origin), `CLIENT_TOKEN` and `CLIENT_BUDGET_ID`. Select `WHAB_STORAGE=client` for a client instance and disable local bank plugins there; bank connections run on the server. Configure the URL, token and remote budget ID together on the machine. A portable budget cannot redirect a device credential to a different server; connection hints in its settings are not used as client credentials or destinations.
+
+The remote public protocol exposes accounts, categories, transactions, workspace projections and portable ledger snapshots. Commands support manual accounts/categories/transactions, transaction edits and allocations. A command includes `operation`, `workspace`, `payload`, `request_id` and `expected_revision`. Unknown operations/fields fail validation. Responses include `budgetId`, `revision` and `data`; the client verifies budget identity. Bank tokens, Item operations and synchronization cursors are outside this protocol.
+
+The server serializes public operations per budget. A stale revision returns a conflict requiring refresh and review. It retains at most 1,024 in-memory request receipts so a retry with the same ID and body can return the committed result; reusing the ID for different content fails. Revisions change on server restart, preventing a stale retry from silently replaying when receipts are lost. If a response is lost, the client preserves the pending command and requires retrying that same change before a different mutation. It reports explicit failures and never falls back to another ledger.
+
+The local visual application remains loopback-only with its existing access checks. Only the enabled remote protocol path bypasses local Host/origin checks; the plugin itself requires HTTPS and bearer authorization. A TLS reverse proxy on a trusted loopback connection can supply the HTTPS scheme using Uvicorn’s trusted forwarded-header handling. Configuring that deployment and controlling access to it remain host responsibilities; enabling a server capability alone does not provide a household login system.
+
 ## Extension scope
 
-This release supports selected server-rendered interfaces, required storage backends, bank-service factories with scoped normalized imports and optional merchant artwork, bounded local file imports, reports, and optional bank-logo branding. UI/storage selection does not create native runtimes or cross-backend migration. Plugins have no arbitrary route-registration hook; family authentication is not implemented. Plaid is the bundled bank provider, not proof of institution access. Every backend/provider must preserve monetary rules, isolation, encrypted credentials, annotations and atomic checkpoints.
+This release supports selected server-rendered interfaces, required storage backends, bank-service factories with scoped normalized imports and optional merchant artwork, bounded local file imports, reports, and optional bank-logo branding. UI/storage selection does not create native runtimes or general cross-backend migration. The trusted `Interface` hook supplies scoped transport routes; family login authentication is not implemented. Plaid is the bundled bank provider, not proof of institution access. Every backend/provider must preserve monetary rules, isolation, encrypted credentials, annotations and atomic checkpoints.
 
 ## Core category and currency projections
 

@@ -15,7 +15,8 @@ from whab.web.schemas import Workspace, valid_month
 
 
 def create_router(
-    store, banks, bank_stores, plugins, templates, environment, ui, plugin_manager=None
+    store, banks, bank_stores, plugins, templates, environment, ui, plugin_manager=None,
+    budget_name="My budget",
 ):
     router = APIRouter()
 
@@ -70,6 +71,7 @@ def create_router(
         context.update(
             data=data, status=status, workspace=workspace, page=page, month=month,
             version=__version__,
+            budget_name=budget_name,
         )
         from whab.web.bank_status import public_bank_status
 

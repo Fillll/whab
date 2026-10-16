@@ -1,10 +1,12 @@
-# WHAB — We Have A Budget
+# WHAB
 
-A local Python budgeting app with monthly envelopes and rollover, transaction review, spending analytics, manual accounts, CSV export, and optional Plaid Transactions and YNAB export imports. FastAPI serves Jinja pages with a small browser script; no Node.js build is required.
+**We Have A Budget**
 
-See the [proposed architecture and Mermaid diagram](../README.md#architecture) and [current implementation](docs/architecture.md). Current version: **1.7.0** ([changelog](CHANGELOG.md)).
+A highly extensible budgeting app built with Python, with monthly envelopes and rollover, transaction review, spending analytics and manual accounts. Plugins supply replaceable interfaces, storage, imports, reports and additional workflows.
 
-An additional [client/server proposal and diagram](../README.md#alternative-proposal-client-and-server) pairs a WHAB client running an interface and remote storage with a headless WHAB server providing an API interface plugin and persistent ledger. This deployment is not implemented.
+See the [architecture and Mermaid diagrams](../README.md#architecture), [runtime architecture](docs/architecture.md) and [budget and plugin model](docs/target-architecture.md). Current version: **1.8.0** ([changelog](CHANGELOG.md)).
+
+The [client/server deployment option](../README.md#clientserver-deployment) uses the same architecture: a client plugin connects an interface to a server plugin exposing an API interface capability.
 
 ## Run locally
 
@@ -27,13 +29,16 @@ The core owns budgeting rules, HTTP access checks and plugin contracts. Concrete
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `WHAB_HOME` | Launch directory | Location of `.env`, `plugins.json` and data |
+| `WHAB_HOME` | Launch directory | Location of private device configuration and runtime data |
+| `WHAB_BUDGET` | Unset | Portable `.whab` file to open; also available as `--budget` |
 | `WHAB_ENV` | `sandbox` | Sandbox or production data; `PLAID_ENV` is the legacy fallback |
-| `WHAB_STORAGE` | `sqlite` | Exactly one required storage backend |
+| `WHAB_STORAGE` | `sqlite` | Required primary storage backend |
 | `WHAB_UI` | `web` | Visual interface; an empty value runs APIs headlessly |
 | `WHAB_PLUGINS` | `plaid` | Optional extensions when no saved `plugins.json` exists |
 
-Use **Settings → Plugins → Installed** to enable or disable installed optional plugins, save, and restart. Its saved selection takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/example/README.md) is separately installable and hidden from Settings. Valid existing example selections are preserved when saving other plugins; unavailable example registrations are dropped so they cannot block saving. Categories and plugin names are alphabetized, with distinct category headings. Choose **All categories** or a category to browse installed plugins, then open **Options** for plugin details and controls. Bank logos options include **Flush cache**; successful logos stay cached locally for 365 days across restarts and refresh on the next image request after expiry. Plugins run as trusted server code.
+Use **Settings → Budgets** to create or open a portable `.whab` budget, switch between opened budgets, or download the active budget. A portable budget carries its ledger, selected plugins, settings and saved plugin state; credentials remain with the device. See [portable budgets](docs/usage.md#portable-budgets) for command-line opening and additional saved copies.
+
+Use **Settings → Plugins → Installed** to enable or disable installed optional plugins for the active budget, save, and restart. Portable budgets save their own selections. The original local workspace keeps its saved `plugins.json` selection, which takes precedence over `WHAB_PLUGINS`. Disabling a bank plugin retains imported history and saved connections. Bank logos are bundled but disabled by default; the [example report plugin](plugins/example/example/README.md) is separately installable and hidden from Settings. Valid existing example selections are preserved when saving other plugins; unavailable example registrations are dropped so they cannot block saving. Categories and plugin names are alphabetized, with distinct category headings. Choose **All categories** or a category to browse installed plugins, then open **Options** for plugin details and controls. Bank logos options include **Flush cache**; successful logos stay cached locally for 365 days across restarts and refresh on the next image request after expiry. Plugins run as trusted server code.
 
 For bank imports, follow the [Plaid Sandbox guide](docs/usage.md#connect-plaid-sandbox). Keep `WHAB_ENV=sandbox` and `ALLOW_LIVE_PLAID=false` for test data. Production access requires deliberate configuration and institution access; a successful Sandbox flow does not establish live access.
 
@@ -43,7 +48,7 @@ For a YNAB ZIP dump, enable **ynab** in the plugin manager, save, and restart. I
 
 ## Limits and data safety
 
-- **Local only:** WHAB binds to `127.0.0.1` and checks Host/origin, but has no family authentication or authorization. Shared deployment needs both.
+- **Default local access:** WHAB binds to `127.0.0.1` and checks Host/origin. The optional server/client pair exposes scoped remote budget commands over authenticated HTTPS; the visual app has no family login system.
 - **Multiple currencies:** accounts and child categories declare an ISO currency; each currency has separate balances, activity, rollover and allocations. There is no automatic conversion. Money uses integer currency minor units. Plaid and the bundled YNAB importer currently accept USD only.
 - **Two category levels:** parent groups organize child categories. Only children receive transactions, targets and allocations. Core dates use `YYYY-MM-DD`; USD money uses `$1,234.56` (other currencies use their ISO code and fixed minor-unit precision). A selected interface plugin can override presentation.
 - **Initial budgeting model:** credit-card handling conservatively reserves debt. Payment categories, splits, manual/import reconciliation, editable transfer matching, merchant rules, recurring bills and goals editing are not implemented.
@@ -66,7 +71,7 @@ Run checks from this directory:
 Tests use fictional data and mocked services. CI checks Python 3.14 and 3.15 and requires 100% Python statement and branch coverage for every plugin.
 
 - [Local setup and usage](docs/usage.md) — runtime files, plugin manager, Plaid, budgets and backups
-- [Target architecture](docs/target-architecture.md) and [current implementation](docs/architecture.md)
+- [Budget and plugin model](docs/target-architecture.md) and [runtime architecture](docs/architecture.md)
 - [Plugin author guide](docs/plugins.md) and [folder ownership](plugins/README.md)
 - [Contributing](CONTRIBUTING.md) — checks, PR workflow, SemVer compatibility and pending branch protection
 

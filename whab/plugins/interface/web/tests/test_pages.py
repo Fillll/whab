@@ -123,3 +123,21 @@ def test_empty_selected_currency_remains_selected_when_switching_workspaces(clie
     assert 'EUR 0.00' in text
     assert 'currency=EUR' in text
     assert 'name="currency" value="EUR"' in text
+
+
+def test_portable_budget_name_labels_personal_pages_and_preserves_demo(client):
+    import re
+
+    name = "Household & travel"
+    response = client.post("/api/budget/new", json={"name": name})
+    assert response.status_code == 200
+    personal = client.get("/?workspace=personal").text
+    breadcrumb = re.search(r'<div class="breadcrumb">(.*?)</div>', personal, re.S)[1]
+    assert "Household &amp; travel" in breadcrumb
+    assert "Current budget · Household &amp; travel" in personal
+    assert 'data-budget-copy hidden' in personal
+    assert 'aria-label="Saved copies"' in personal
+    demo = client.get("/?workspace=demo").text
+    breadcrumb = re.search(r'<div class="breadcrumb">(.*?)</div>', demo, re.S)[1]
+    assert "Demo budget" in breadcrumb and "Household" not in breadcrumb
+    assert "Current budget · Demo budget" in demo

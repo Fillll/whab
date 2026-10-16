@@ -1,7 +1,7 @@
 [project]
 name = "whab"
 dynamic = ["version"]
-description = "We Have A Budget — a local Python and SQLite budgeting app"
+description = "We Have A Budget — an extensible Python budgeting app"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
@@ -24,8 +24,10 @@ Issues = "https://github.com/Fillll/whab/issues"
 
 [project.entry-points."whab.plugins"]
 bank-logos = "whab_bank_logos.plugin:plugin"
+client = "whab_client.plugin:plugin"
 plaid = "whab_plaid.plugin:plugin"
 sqlite = "whab_sqlite.plugin:plugin"
+server = "whab_server.plugin:plugin"
 web = "whab_web.plugin:plugin"
 ynab = "whab_ynab.plugin:plugin"
 
@@ -41,6 +43,8 @@ where = [
   "plugins/ingestion/plaid/src",
   "plugins/interface/bank-logos/src",
   "plugins/ingestion/ynab/src",
+  "plugins/interface/server/src",
+  "plugins/storage/client/src",
 ]
 include = ["whab*"]
 

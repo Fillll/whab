@@ -45,7 +45,7 @@
 <main>
   <header class="topbar">
     <div class="breadcrumb">
-      {{ 'Demo budget' if workspace=='demo' else 'My budget' }} {{ icon('chevron-right', 14) }}<span>{{ page|capitalize }}</span>
+      {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }} {{ icon('chevron-right', 14) }}<span>{{ page|capitalize }}</span>
     </div>
     <div class="topbar-right"><select aria-label="Budget currency" data-navigation="currency">
       {% for code in currencies %}<option value="{{ code }}"{% if code==currency %} selected{% endif %}>{{ code }}</option>{% endfor %}

@@ -11,7 +11,8 @@ from threading import RLock
 from typing import Any, Callable
 from uuid import uuid4
 
-from whab.domain.budget import calculate_workspace, ensure_assignment_allowed
+from whab.domain import commands
+from whab.domain.budget import calculate_workspace
 from whab.domain.categories import create_category, ensure_child_category, public_categories
 from whab.domain.dates import current_month
 from whab.domain.errors import StoreError
@@ -24,9 +25,14 @@ from whab.domain.imports import (
     imported_account,
     validate_imported_transaction,
 )
-from whab.domain.money import cents, currency_code
+from whab.domain.portable import (
+    ACCOUNT_FIELDS,
+    CATEGORY_FIELDS,
+    TRANSACTION_FIELDS,
+    validate_portable_budget,
+)
 from whab.domain.transactions import UNSET, transaction_rows
-from whab.domain.validation import validate_date, validate_label, validate_month
+from whab.domain.validation import validate_label
 
 from .schema import initialize_schema
 from .seeding import build_initial_state
@@ -361,6 +367,60 @@ class Store:
     def accounts(self, workspace: str) -> list[dict]:
         return list(self.state(workspace)["accounts"].values())
 
+    def export_budget(self, workspace: str = "personal") -> dict:
+        """Export one coherent ledger, excluding every provider connection field."""
+        state = self.state(workspace)
+        return validate_portable_budget({
+            "formatVersion": 1,
+            "budgetStartMonth": state["budgetStartMonth"],
+            "accounts": [
+                {key: record[key] for key in ACCOUNT_FIELDS}
+                for record in state["accounts"].values()
+            ],
+            "categories": [
+                {key: record[key] for key in CATEGORY_FIELDS}
+                for record in state["categories"].values()
+            ],
+            "transactions": [
+                {key: record[key] for key in TRANSACTION_FIELDS}
+                for record in state["transactions"].values()
+            ],
+            "assignments": [
+                {"month": month, "categoryId": category, "assigned": assigned}
+                for month, rows in state["budget"].items()
+                for category, assigned in rows.items()
+            ],
+        })
+
+    def restore_budget(self, workspace: str, data: dict) -> None:
+        """Explicitly initialize a pristine personal ledger; never replace saved data."""
+        if workspace != "personal":
+            raise StoreError("Portable budgets require the personal workspace.")
+
+        def operation(state):
+            restored = validate_portable_budget(data)
+            receipt = self._workspace_import_receipt(state, "portable-budget", "restore")
+            if receipt is not None:
+                raise StoreError("Portable budgets require an empty personal workspace.")
+            self.db.execute("DELETE FROM categories WHERE workspace=?", (workspace,))
+            state["accounts"] = {
+                record["id"]: {
+                    **record,
+                    "stale": record["stale"] or record["source"] not in {"manual", "demo"},
+                }
+                for record in restored["accounts"]
+            }
+            state["categories"] = {record["id"]: record for record in restored["categories"]}
+            state["transactions"] = {record["id"]: record for record in restored["transactions"]}
+            state["budget"] = {}
+            for assignment in restored["assignments"]:
+                state["budget"].setdefault(assignment["month"], {})[assignment["categoryId"]] = (
+                    assignment["assigned"]
+                )
+            state["budgetStartMonth"] = restored["budgetStartMonth"]
+
+        self._mutate(workspace, operation)
+
     def categories(self, workspace: str) -> list[dict]:
         return public_categories(self.state(workspace)["categories"])
 
@@ -372,26 +432,7 @@ class Store:
 
     def add_account(self, workspace: str, account: dict) -> str:
         account_id = str(uuid4())
-        name = validate_label(account["name"])
-        kind, balance = account["type"], cents(account["balance"])
-        currency = currency_code(account.get("currency", "USD"))
-        if kind not in {"depository", "credit"}:
-            raise StoreError("Invalid account type.")
-
-        def operation(state):
-            state["accounts"][account_id] = {
-                "id": account_id,
-                "name": name,
-                "institution": "Manual account",
-                "type": kind,
-                "balance": balance,
-                "currency": currency,
-                "source": "manual",
-                "stale": False,
-            }
-            return account_id
-
-        return self._mutate(workspace, operation)
+        return self._mutate(workspace, lambda state: commands.add_account(state, account_id, account))
 
     def add_category(self, workspace: str, category: dict) -> str:
         category_id = str(uuid4())
@@ -414,51 +455,9 @@ class Store:
 
     def add_transaction(self, workspace: str, transaction: dict, source: str = "manual") -> str:
         transaction_id = transaction.get("id") or str(uuid4())
-        amount = cents(transaction["amount"])
-        validate_date(transaction["date"])
-        merchant = validate_label(transaction["merchant"])
-        note = transaction.get("note", "")
-        if not isinstance(note, str) or len(note) > 1000:
-            raise StoreError("Invalid note.")
-
-        def operation(state):
-            account = state["accounts"].get(transaction["accountId"])
-            if not account:
-                raise StoreError("Account not found.")
-            if source == "manual" and account["source"] not in {"manual", "demo"}:
-                raise StoreError(
-                    "Use a manual account for manual entries; bank imports cannot yet reconcile them."
-                )
-            category = transaction.get("categoryId")
-            if category is not None:
-                child = ensure_child_category(state["categories"], category)
-                if child.get("currency", "USD") != account.get("currency", "USD"):
-                    raise StoreError("Category currency must match the account currency.")
-            if transaction_id in state["transactions"]:
-                raise StoreError("Transaction already exists.")
-            state["transactions"][transaction_id] = {
-                "id": transaction_id,
-                "accountId": account["id"],
-                "date": transaction["date"],
-                "merchant": merchant,
-                "merchantLogo": None,
-                "amount": amount,
-                "categoryId": category,
-                "pending": False,
-                "reviewed": source == "demo",
-                "source": source,
-                "note": note,
-                "isTransfer": False,
-                "inferredTransfer": False,
-                "categoryEdited": source == "manual",
-                "deleted": False,
-            }
-            account["balance"] = cents(
-                account["balance"] + (amount if account["type"] == "credit" else -amount)
-            )
-            return transaction_id
-
-        return self._mutate(workspace, operation)
+        return self._mutate(
+            workspace, lambda state: commands.add_transaction(state, transaction_id, transaction, source),
+        )
 
     def edit_transaction(
         self,
@@ -467,41 +466,15 @@ class Store:
         category_id: Any = UNSET,
         reviewed: bool | None = None,
     ) -> None:
-        def operation(state):
-            transaction = state["transactions"].get(transaction_id)
-            if not transaction or transaction.get("deleted"):
-                raise StoreError("Transaction not found.")
-            if category_id is not UNSET:
-                if category_id is not None:
-                    child = ensure_child_category(state["categories"], category_id)
-                    account = state["accounts"][transaction["accountId"]]
-                    if child.get("currency", "USD") != account.get("currency", "USD"):
-                        raise StoreError("Category currency must match the account currency.")
-                transaction.update(
-                    categoryId=category_id,
-                    categoryEdited=True,
-                    isTransfer=False
-                    if category_id is not None
-                    else transaction.get("inferredTransfer", False),
-                )
-            if reviewed is not None:
-                if not isinstance(reviewed, bool):
-                    raise StoreError("Invalid review status.")
-                transaction["reviewed"] = reviewed
-
-        self._mutate(workspace, operation)
+        self._mutate(
+            workspace, lambda state: commands.edit_transaction(state, transaction_id, category_id, reviewed),
+        )
 
     def assign(self, workspace: str, category_id: str, month: str, assigned: int) -> None:
-        validate_month(month)
-        cents(assigned)
-        if assigned < 0:
-            raise StoreError("Assignment cannot be negative.")
-
-        def operation(state):
-            ensure_assignment_allowed(state, category_id, month, assigned, current_month())
-            state["budget"].setdefault(month, {})[category_id] = assigned
-
-        self._mutate(workspace, operation)
+        self._mutate(
+            workspace,
+            lambda state: commands.assign(state, category_id, month, assigned, as_of_month=current_month()),
+        )
 
     def items(self) -> list[dict]:
         return [

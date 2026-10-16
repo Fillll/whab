@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 1.8.0 — 2026-10-15
+
+- Add portable `.whab` budgets with a data-only ledger and plugin manifest. Create, open, download and switch budgets in Settings; restore plugin selections, public settings and saved state independently for each budget. Keep installed plugin code and connection credentials on the owning machine or server.
+- Save an opened budget to additional file destinations, report pending copies, and retain a local recovery journal across interrupted saves. Preserve ledger history, currencies, annotations and allocations while excluding banking credentials from portable files.
+- Add a shared validated ledger command/query service and a transport interface contract. Bundle optional HTTPS server and remote client plugins with scoped bearer access, revision conflicts and bounded retry protection; keep ingestion and banking tokens on the server.
+- Preserve the existing runtime home, SQLite ledgers, encrypted connections and default local launch. Refresh the main README with centered branding, Python and extensibility emphasis, deployment options and user-controlled privacy.
+
 ## 1.7.1 — 2026-10-15
 
 - Move budget selection into Settings → Budgets, with the current budget shown in Settings and beside the selected budget. Remove the desktop and mobile budget dropdowns; preserve page, month and currency when switching budgets.

@@ -1830,6 +1830,49 @@ strong {
   color: var(--brand-red);
   font-size: 10px;
 }
+.budget-bundle {
+  margin-top: 28px;
+}
+.budget-bundle > h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.budget-copy-status {
+  margin-top: 12px;
+  list-style: none;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.budget-copy-status > li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+}
+.budget-copy-status small {
+  color: var(--muted);
+}
+.budget-bundle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.budget-bundle-form {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.modal-form .budget-copy-option {
+  flex-direction: row;
+  align-items: center;
+}
+.modal-form .budget-copy-option > input {
+  width: auto;
+}
+.budget-bundle-form > .settings-notice {
+  margin-bottom: 12px;
+}
 .plugin-list-heading {
   display: flex;
   align-items: center;

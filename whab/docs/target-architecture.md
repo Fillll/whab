@@ -1,74 +1,63 @@
-# Proposed plugin architecture
+# Budget and plugin model
 
-This is a design proposal. The [current implementation](architecture.md) and [public SDK v1](plugins.md) remain the implemented contracts. See the [Mermaid overview](../../README.md#architecture) for the proposed capability map.
+WHAB combines a plugin host with a hexagonal financial core. The [architecture guide](architecture.md) describes runtime composition and the [SDK guide](plugins.md) defines executable contracts. The [README diagram](../../README.md#architecture) groups plugins by their responsibilities.
 
 ## Minimal financial core
 
-The domain core owns four concepts: **accounts, transactions, categories and budgets**. It defines their relationships, validated commands and queries, and financial rules such as integer money, category allocation, rollover and budget calculations. Those rules remain authoritative across every interface and plugin.
+The domain core owns four concepts: **accounts, transactions, categories and budgets**. It defines their relationships and financial rules, including integer money, compatible currencies, allocations, rollover and budget calculations. Financial correctness applies regardless of the interface or persistence implementation.
 
-The core has no dependency on HTTP, a particular interface, database, bank, report, machine-learning model or plugin runtime. Plugins depend on its contracts. Ledger changes always pass through core validation; moving capabilities out of core must not make financial correctness optional.
+The core depends on no HTTP framework, interface, database, bank provider or plugin runtime. Plugins connect through public contracts. A small host loads selected capabilities, supplies their contexts, manages configuration and lifecycle, and assembles the application outside the domain core.
 
-A small host sits outside the domain core. It loads plugins, resolves required capabilities and declared dependencies, supplies scoped contexts, manages configuration and lifecycle, and assembles the selected application. Transport-specific concerns belong to interface adapters. Shared access policy must apply consistently across those adapters.
+## Installation and budget ownership
+
+Plugin code is installed once in the WHAB environment. A budget records which of those plugins it uses, along with compatible API requirements, settings and plugin-owned saved state. Opening a budget restores that selection; disabling a plugin preserves its saved state so it can be enabled again.
+
+| Owner | Responsibilities |
+| --- | --- |
+| WHAB installation | Installed executable plugin packages and available capabilities |
+| Budget | Identity, ledger, selected features, plugin settings and saved state |
+| Machine or server | Credentials, encryption keys, device paths and connection settings |
+
+A portable `.whab` bundle carries the budget and its plugin manifest. It describes the setup without embedding executable Python or provider credentials. Moving a budget to another installation can require installing compatible plugins and reconnecting credentials. Opening a bundle must validate its format, data and plugin requirements before using it.
+
+The installation also supplies services needed before a budget is open. A selected interface presents budget selection; a server listener starts once for the installation and exposes only budgets available to it. Budget-owned selection does not imply that every plugin runs in every process.
 
 ## Capability families
 
-These are plugin capability families, not mutually exclusive package types. A plugin may provide several: Plaid can supply ingestion and connection controls; a mortgage extension can supply a model, reports and interface panels.
+The categories describe a plugin's primary role. Capabilities determine what it can contribute; one package can provide several.
 
-| Family | Examples | Selection rule |
-| --- | --- | --- |
-| Storage | SQLite or another backend | At least one storage plugin must be active; multiple storage plugins may be selected |
-| Interface | Web, API, TUI, CLI; bank-logo enhancement | Multiple interfaces may coexist; interactive use requires at least one usable interface |
-| Ingestion | Plaid, bank statements, manual entry, YNAB import | Zero or more; at least one is needed to enter or import new financial records |
-| Insight | Sankey diagrams, reports, exports | Zero or more; read scoped snapshots |
-| Extension | Mortgages, loans, investments, stocks | Zero or more; add specialized models and workflows |
-| Automation | Rules and smart categorization, including random forest | Zero or more; propose or apply configured actions through core commands |
+| Family | Responsibility |
+| --- | --- |
+| Storage | Persist the budget and provide coherent reads and transactional changes |
+| Interface | Present a budget or expose operations to another application |
+| Ingestion | Normalize imported records and user input into validated financial data |
+| Insight | Read scoped snapshots to produce reports, visualizations or exports |
+| Automation | Suggest or apply configured actions while preserving user decisions |
+| Extension | Add specialized models and workflows around the financial core |
 
-Requirements name capabilities rather than specific packages. Missing required capabilities or incompatible dependencies must fail at startup with an actionable error. When multiple storage plugins are active, their data ownership, routing and consistency guarantees must be explicit in the storage contract. A background-only profile may run without a user interface.
+Contributor folders use `storage`, `interface`, `ingestion`, `insight`, `automation` and `extension`. The additional `example` category holds teaching plugins. Each plugin owns `plugins/<category>/<id>/`, including its implementation, documentation and tests; see [folder ownership and naming](../plugins/README.md).
 
-Contributor folders use the matching singular categories `storage`, `interface`, `ingestion`, `insight`, `extension` and `automation`. The additional `example` category holds teaching plugins and does not define a runtime capability. Each plugin has one primary category even when it provides several capabilities; see [folder ownership and naming](../plugins/README.md).
+At least one storage capability must be available. Multiple storage destinations mean copies of the same budget, rather than separate ledgers. The save outcome must distinguish a committed copy from a destination still awaiting synchronization; an unavailable destination must never silently discard a successful save. Interactive use requires a usable interface. A presentation enhancement alone does not provide an entry point.
 
-## Interface
+The public SDK defines the concrete hooks supplied by a plugin. A capability family does not imply that every possible plugin in that family ships with WHAB. Shared domain rules remain in core; plugin-specific behavior and persistence belong to their owner.
 
-Web, API, TUI and CLI are peers. HTTP transport belongs to the API interface rather than the financial core. A Web interface may call core services locally or depend on an API capability; it does not make the API mandatory for every other interface.
+## Client/server deployment
 
-Bank logos and similar presentation enhancements also belong under Interface. They augment another interface and do not satisfy the requirement for a usable interactive entry point by themselves. Optional interface contributions need fallbacks when an enhancement is disabled.
+Client/server is a deployment option within the same architecture. A server plugin supplies an **API interface capability**; a client plugin supplies **remote storage** and any connection controls it needs. Their primary categories are Interface and Storage respectively, while their descriptors can contribute several capabilities.
 
-## Client/server deployment proposal
+- **Client instance:** presents the budget and forwards scoped reads and commands through the client plugin. Local calculations can provide previews; committed server state is authoritative.
+- **Server instance:** validates operations through the financial core and persists the budget. Bank ingestion, synchronization cursors and encrypted provider credentials stay here.
 
-As an alternative to one local instance, two WHAB instances could divide interface and persistence responsibilities. The [README diagram](../../README.md#alternative-proposal-client-and-server) shows the client selecting a remote storage plugin and the server exposing only an API interface plugin, with no visual interface. The API belongs to the Interface plugin family alongside Web, TUI and CLI.
+The budget describes its features without requiring them all to execute on the client. A server-owned ingestion plugin can expose controls to a client interface while retaining provider access and secrets on the server. Connection configuration belongs to the device; the portable budget contains no bank tokens or encryption keys.
 
-- **Client instance:** runs an interface and the financial core, with a remote storage adapter as its selected storage plugin. The adapter translates ledger reads and changes into authenticated API requests to the server. Interface calculations can provide previews, but the server's validation and committed state remain authoritative.
-- **Server instance:** runs an API interface plugin, financial core and a persistent storage plugin such as SQLite. It owns the canonical ledger, migrations, bank ingestion, synchronization cursors and encrypted provider credentials. Provider access tokens and encryption keys stay on this instance.
+The bundled `server` and `client` plugins use the versioned `/remote/v1` public ledger contract, rather than exposing the privileged `StorageBackend` protocol. The server requires HTTPS and a machine/server bearer credential for budgets explicitly enabled with the server plugin. Commands include an expected revision and request ID; stale revisions fail explicitly, and retries of the same request return the original result while its receipt remains available. A failed connection never silently switches to an unrelated local ledger. See the [SDK guide](plugins.md#remote-interface-and-client) for configuration and retry limits.
 
-The remote contract needs scoped public queries and validated domain commands. It must not expose a database or the full privileged `StorageBackend` protocol over HTTP: internal bank-store operations and token records are not client capabilities. Ingestion remains on the server so normalized records and synchronization cursors can commit atomically under the existing storage guarantees.
+## Data and lifecycle boundaries
 
-Before implementation, define:
+Ingestion owns parsing and provider communication. Storage validates normalized records and commits imported data with its checkpoint atomically. Replays preserve annotations and cannot duplicate financial records. File import parsers receive bytes rather than a database or bank credentials.
 
-- Authentication, household/workspace authorization and encrypted transport, applied to every remote operation. Headless mode alone does not make a network deployment safe.
-- Atomic mutations, coherent reads, conflict detection and retry/idempotency rules, so concurrent clients or a timed-out request cannot silently lose or duplicate changes.
-- API version negotiation and compatible plugin capabilities, including how server-owned ingestion workflows are invoked and presented by the client.
-- Explicit connection failures and recovery. The client must not silently switch to a local ledger; offline writes, caching, replication and automatic data migration are outside this proposal.
+Insights read scoped, immutable snapshots. Specialized state belongs to the extension that understands it; plugins must not write into another plugin's private schema. Automations preserve explicit user edits and submit financial changes through validated operations. Where several capabilities act on the same records, ordering and conflict handling must be explicit.
 
-The current app already supports `WHAB_UI=` for headless host-owned APIs with storage, but it has no remote storage plugin or authenticated network deployment contract. This future topology requires new remote contracts beyond SDK v1. Until those contracts exist, keep the current application bound to localhost.
+Installed plugins are trusted Python code. Scoped contracts reduce accidental access and coupling; they do not create an operating-system sandbox. Users retain control over which code and external connections they enable.
 
-## Ingestion
-
-Each ingestion plugin translates its source into normalized core records or commands. Plaid owns provider communication and synchronization; statement readers own parsing; manual entry owns input workflows; YNAB import owns source mapping. Interface controls for those workflows are optional contributions from the same package.
-
-The core validates the resulting changes, identities and references before persistence. Imports need atomic batches and checkpoints, replay protection and preservation of user annotations. A full YNAB migration also needs explicit mapping for categories and budget history; it is broader than transaction import alone.
-
-## Insight, Extension and Automation
-
-Insight reads scoped snapshots and returns visualizations, reports or exports without changing the ledger. A Sankey plugin supplies the data and visualization contribution; each interface decides how to display supported outputs.
-
-Extension owns specialized models such as amortization schedules, loans, investment positions and stock holdings. These reference core accounts and transactions without adding mortgage or market-specific rules to the minimal core. Extension plugins need explicit persistence and migration contracts, including atomicity when specialized state and ledger changes must commit together. They must not write into another plugin's private database schema.
-
-Automation is a clearer family name than “Logic,” because financial logic remains in core. Categorization rules and a random-forest model are interchangeable implementations. They consume scoped inputs and produce suggestions, confidence and proposed actions. Accepted suggestions or configured automatic actions use core commands and preserve explicit user edits. Ordering and conflict resolution must be explicit when several automations handle the same transaction.
-
-## Implementation boundary
-
-The current application already has selected SQLite and Web plugins, optional Plaid and YNAB file ingestion, reporting/export hooks and optional bank-logo branding. Its descriptors currently expose `storage`, `user_interface`, `data_ingestion`, `reporting` and `branding` kinds.
-
-The proposed families are a design vocabulary, not new SDK names. API-as-interface, multiple interface runtimes, general statement/manual ingestion contracts, rich visual insights, extension persistence and Automation require further design and implementation. The current API remains host-owned and manual entry remains in the existing ledger routes. SDK v1 provides bank synchronization and bounded file-import contracts; the YNAB adapter currently migrates history and assignments into an empty personal budget, with source metadata and reconciliation limits explained in its preview.
-
-Moving those capabilities must preserve saved ledgers, encrypted connections, isolation and atomic imports. Existing documented interfaces and SDK contracts remain subject to the [compatibility policy](../CONTRIBUTING.md#pull-requests-and-releases); this proposal does not itself change them.
+Existing ledgers, encrypted connections, environment isolation and atomic synchronization remain compatibility requirements. SDK additions follow the [SemVer policy](../CONTRIBUTING.md#pull-requests-and-releases); the documented public records and operations remain the authority for plugin authors.

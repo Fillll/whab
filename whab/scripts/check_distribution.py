@@ -28,6 +28,9 @@ from fastapi.testclient import TestClient
 target = Path(sys.argv[1]).resolve()
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__
+assert {"server", "client"} <= {entry.name for entry in metadata.entry_points(group="whab.plugins")}
+assert load_plugins(("server",)).interface_plugins()[0].id == "server"
+assert load_plugins(("client",)).storage_plugin("client").id == "client"
 for name in ("whab", "whab-example-plugin"):
     distribution = metadata.distribution(name)
     assert distribution.metadata["License-Expression"] == "MIT", name
@@ -75,6 +78,14 @@ with TestClient(app, base_url="http://127.0.0.1:5173") as client:
     export = client.get("/api/plugins/example/export?workspace=demo")
     assert export.status_code == 200
     assert "text/csv" in export.headers["content-type"]
+    created = client.post("/api/budget/new", json={"name": "Installed wheel budget"})
+    assert created.status_code == 200
+    assert client.get("/api/budget").json()["name"] == "Installed wheel budget"
+    assert client.get("/?workspace=personal").status_code == 200
+    from whab.budgets.document import decode_bundle
+    manifest, ledger = decode_bundle(client.get("/api/budget/export").content)
+    assert manifest["name"] == "Installed wheel budget" and ledger["accounts"] == []
+    assert client.post("/api/budgets/default/activate", json={}).status_code == 200
 assert (settings.home / "data" / "whab-sandbox.sqlite").is_file()
 print("Installed wheels: MIT licenses, pages, assets, version, runtime home and plugin entry point passed.")
 """
@@ -88,7 +99,7 @@ def main():
     env = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith(("WHAB_", "PLAID_"))
+        if not key.startswith(("WHAB_", "PLAID_", "SERVER_", "CLIENT_"))
         and key not in {"TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID", "PORT", "PYTHONPATH"}
     }
     env.update(

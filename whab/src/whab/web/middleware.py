@@ -16,13 +16,13 @@ class RequestBodyLimit:
     async def __call__(self, scope, receive, send):
         if (
             scope["type"] != "http"
-            or not scope["path"].startswith("/api/")
+            or not scope["path"].startswith(("/api/", "/remote/"))
             or scope["method"] in {"GET", "HEAD", "OPTIONS"}
         ):
             await self.app(scope, receive, send)
             return
         limit = (
-            10 * 1024 * 1024 if scope["path"] in self.file_import_paths
+            (50 * 1024 * 1024 if scope["path"] == "/api/budget/open" else 10 * 1024 * 1024) if scope["path"] in self.file_import_paths
             else 128 * 1024 if scope["path"] in self.webhook_paths else 32 * 1024
         )
         chunks = []
@@ -52,7 +52,7 @@ class RequestBodyLimit:
         await self.app(scope, replay, send)
 
 
-def install_middleware(app, port, webhook_paths=(), file_import_paths=()):
+def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote=False):
     webhook_paths = frozenset(webhook_paths)
     file_import_paths = frozenset(file_import_paths)
     origins = {f"http://{host}:{port}" for host in ("localhost", "127.0.0.1")}
@@ -60,7 +60,8 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=()):
     @app.middleware("http")
     async def local_access(request, call_next):
         webhook = request.url.path in webhook_paths
-        if not webhook:
+        remote_request = remote and (request.url.path == "/remote/v1" or request.url.path.startswith("/remote/v1/"))
+        if not webhook and not remote_request:
             try:
                 host = urlsplit("http://" + request.headers.get("host", "")).hostname
             except ValueError:
@@ -72,7 +73,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=()):
                 "sec-fetch-site"
             ) == "cross-site":
                 return JSONResponse({"error": "Cross-origin access is blocked"}, status_code=403)
-        if request.url.path.startswith("/api/") and request.method not in {
+        if request.url.path.startswith(("/api/", "/remote/")) and request.method not in {
             "GET",
             "HEAD",
             "OPTIONS",
@@ -84,7 +85,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=()):
                 and request.headers.get("content-type", "").split(";")[0] != content_type
             ):
                 return JSONResponse({"error": f"Use {content_type}"}, status_code=415)
-            limit = 10 * 1024 * 1024 if file_import else 128 * 1024 if webhook else 32 * 1024
+            limit = (50 * 1024 * 1024 if request.url.path == "/api/budget/open" else 10 * 1024 * 1024) if file_import else 128 * 1024 if webhook else 32 * 1024
             try:
                 if int(request.headers.get("content-length", "0")) > limit:
                     return JSONResponse({"error": "Request too large"}, status_code=413)
@@ -94,7 +95,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=()):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        if request.url.path.startswith("/api/") or request.url.path == "/":
+        if request.url.path.startswith(("/api/", "/remote/")) or request.url.path == "/":
             response.headers["Cache-Control"] = "no-store"
         return response
 
