@@ -10,13 +10,14 @@ from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.plugins import PluginError
 from whab.plugins.sdk import valid_merchant_logo_key
+from whab.services.ledger import LedgerService
 from whab.web.plugin_snapshot import build_snapshot
 from whab.web.schemas import Workspace, valid_month
 
 
 def create_router(
     store, banks, bank_stores, plugins, templates, environment, ui, plugin_manager=None,
-    budget_name="My budget",
+    budget_name="My budget", service=None,
 ):
     router = APIRouter()
 
@@ -36,6 +37,8 @@ def create_router(
     if ui is None:
         return router
 
+    service = service if service is not None else LedgerService(store, lock=getattr(store, "lock", None))
+
     @router.get("/", response_class=HTMLResponse)
     def index(
         request: Request,
@@ -50,7 +53,14 @@ def create_router(
             valid_month(month)
         except ValueError as error:
             raise HTTPException(400, "Invalid month") from error
-        data = select_currency(store.workspace(workspace, month), currency)
+        if page == "budget" and ui.budget_months > 1:
+            periods = [
+                select_currency(period, currency)
+                for period in service.workspace_periods(workspace, month, ui.budget_months)
+            ]
+            data = {**periods[0], "periods": periods}
+        else:
+            data = select_currency(service.workspace(workspace, month), currency)
         status = public_status()
         try:
             context = ui.build_context(

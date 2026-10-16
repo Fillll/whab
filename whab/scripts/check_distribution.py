@@ -214,8 +214,10 @@ def main():
         assert set(expected) == {"whab", "web", "sqlite", "plaid", "bank-logos", "ynab", "server", "client", "example"}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         account_scope_plugins = {"client", "plaid", "sqlite", "web", "ynab"}
+        minimum_versions = {identifier: "1.1.0" for identifier in account_scope_plugins}
+        minimum_versions["web"] = "1.2.0"
         assert set(optional) == {
-            f'{record["distribution"]}>={"1.1.0" if identifier in account_scope_plugins else "1.0.0"},<2'
+            f'{record["distribution"]}>={minimum_versions.get(identifier, "1.0.0")},<2'
             for identifier, record in expected.items() if identifier not in {"whab", "example"}
         }
         run(

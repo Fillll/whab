@@ -4,6 +4,11 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.2.0 — 2026-10-16
+
+- Let visual interface plugins request up to twelve consecutive core-calculated budget periods through the optional `UserInterface.budget_months` setting. Keep existing single-month interfaces and storage contracts compatible.
+- Read period projections through the shared ledger service, preserving existing currency isolation, rollover, credit reserves, historical restrictions and assignment validation. Budgeting rules remain in core; presentation remains owned by the selected interface plugin.
+
 ## 2.1.0 — 2026-10-16
 
 - Add core on-budget and off-budget accounts. Only on-budget cash and credit accounts fund envelopes and contribute to budget activity, income and spending trends. Track investments, retirement accounts, property, loans and fixed-term deposits separately in currency-specific assets, liabilities and net worth.

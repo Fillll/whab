@@ -4,7 +4,7 @@
 
 A highly extensible budgeting app built with Python, with monthly envelopes and rollover, transaction review, spending analytics and manual accounts. Plugins supply replaceable interfaces, storage, imports, reports and additional workflows.
 
-See the [architecture and Mermaid diagrams](../README.md#architecture), [runtime architecture](docs/architecture.md) and [budget and plugin model](docs/target-architecture.md). Current host version: **2.1.0** ([changelog](CHANGELOG.md)).
+See the [architecture and Mermaid diagrams](../README.md#architecture), [runtime architecture](docs/architecture.md) and [budget and plugin model](docs/target-architecture.md). Current host version: **2.2.0** ([changelog](CHANGELOG.md)).
 
 The [client/server deployment option](../README.md#clientserver-deployment) uses the same architecture: a client plugin connects an interface to a server plugin exposing an API interface capability.
 
@@ -22,6 +22,8 @@ python3.14 -m venv .venv
 Setup generates a local CA and localhost certificate without changing OS trust. [Trust that CA explicitly](docs/usage.md#local-https), then open [127.0.0.1:5173](https://127.0.0.1:5173). Explore fictional data in the demo workspace, or choose **Settings → Budgets → My budget** and add a manual account. Settings shows the current budget. No Plaid credentials are needed for manual budgeting. Use `--reload` while developing or `--port 5174` for another local port.
 
 Setup creates private runtime configuration, a token encryption key and TLS material if missing. Every request requires HTTPS; there is no HTTP fallback. Runtime files live in the launch directory, or the absolute directory set by `WHAB_HOME`. Keep the existing runtime home, data and encryption key together when upgrading, and restart after configuration changes. See [runtime setup](docs/usage.md#runtime-setup) for upgrades and saved-data compatibility.
+
+The web budget shows three consecutive months in one category table, with monthly **To assign** summaries and **Assigned**, **Activity** and **Available** columns. Use the month strip to move the window, collapse category groups, and edit an assignment directly in its month. Settings stays at the bottom left. The web plugin owns this skin; core owns every month's financial projection and validates every assignment.
 
 ## Configuration and plugins
 

@@ -43,6 +43,9 @@ def test_client_server_commands_export_and_concurrent_conflict(store):
     assert client.transactions("personal", "2026-10")[0]["reviewed"] is True
     assert client.export_budget() == store.export_budget()
     assert "token" not in str(client.workspace("personal", "2026-10"))
+    periods = LedgerService(client).workspace_periods("personal", "2026-10", 3)
+    assert [period["month"] for period in periods] == ["2026-10", "2026-11", "2026-12"]
+    assert periods == [service.workspace("personal", period["month"]) for period in periods]
 
     # Another interface changed this budget after the client's last read.
     service.add_account("personal", {"name": "Other", "type": "depository", "balance": 0})

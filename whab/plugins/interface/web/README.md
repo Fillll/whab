@@ -6,6 +6,10 @@ Distributed independently as `whab-web-plugin`. Its version and dependency compa
 
 Templates and static files must ship in the wheel. Use demo data for browser checks and preserve escaping and visual fallbacks.
 
+The budget workspace uses a dark navy skin with three consecutive months aligned over one category table. Each month shows its core-calculated **To assign**, **Assigned**, **Spent** and **Available** summary, with **Assigned**, **Activity** and **Available** columns below. The month strip moves the visible window; category groups collapse together across months. Select a category to open its details, or edit its assigned amount directly in the appropriate month. Assignments before the budget start month remain disabled, and every save goes through core validation, including future funding limits. Settings remains anchored at the bottom left on desktop and mobile.
+
+The descriptor requests `budget_months=3` from WHAB 2.2 or newer. The host supplies selected-currency public projections in `data['periods']`; the plugin only arranges and formats them. Rollover, spending, card reserves, available money and funding rules are not calculated in browser JavaScript or duplicated in the skin. Storage plugins continue to implement the existing single-month query contract.
+
 Transactions display merchant artwork supplied by the enabled Plaid plugin through a local image route. The payee name and notes remain visible; artwork loads independently and falls back to the merchant's initial on failure. Transactions without supplied artwork keep their text-only presentation.
 
 Accounts and the sidebar separate **On-budget** everyday accounts from **Off-budget** assets and debts. On-budget checking, savings and credit accounts participate in budget income and spending. Off-budget investments, retirement accounts, property, loans and deposits (including CDs) contribute to net worth while their transactions remain available for review. Assets, liabilities and net worth use current known balances in the selected currency; stale and unavailable snapshots are excluded. Currencies are never combined.

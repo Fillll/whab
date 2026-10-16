@@ -1,9 +1,10 @@
 """Web presentation helpers over already-calculated public ledger views."""
 
 from collections import defaultdict
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from whab import __version__
+from whab.domain.dates import shift_month as period_shift
 from whab.domain.dates import today
 from whab.plugins import (
     ACCOUNT_SUBTYPES,
@@ -29,25 +30,60 @@ def money_input(value, currency="USD"):
     return f"{sign}{whole}.{fraction:0{digits}d}" if digits else f"{sign}{whole}"
 
 
+def money_number(value, currency="USD"):
+    """Display exact, grouped minor units beneath a shared currency heading."""
+    digits = currency_minor_units(currency)
+    whole, fraction = divmod(abs(value), 10**digits)
+    sign = "-" if value < 0 else ""
+    return f"{sign}{whole:,}.{fraction:0{digits}d}" if digits else f"{sign}{whole:,}"
+
+
 def month_label(month, short=False):
-    """Months are periods, displayed numerically without locale-dependent labels."""
-    return month
+    """The web skin gives core ISO periods readable month names."""
+    names = (
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    )
+    year, number = month.split("-")
+    name = names[int(number) - 1]
+    return name[:3] if short else f"{name} {year}"
 
 
 def shift_month(month, step):
-    year, number = map(int, month.split("-"))
-    index = year * 12 + number - 1 + step
-    return f"{index // 12:04d}-{index % 12 + 1:02d}"
+    """Keep skin navigation links within the core's supported calendar."""
+    return min("2200-12", max("1900-01", period_shift(month, step)))
+
+
+def uncategorized_spending(data):
+    """Sum the displayed cleared purchases that have no category to review."""
+    accounts = {account["id"]: account for account in data["accounts"]}
+    return sum(
+        transaction["amount"]
+        for transaction in data["transactions"]
+        if not transaction["pending"] and not transaction.get("isTransfer")
+        and transaction["amount"] > 0 and not transaction["categoryId"]
+        and (
+            transaction.get("accountId") not in accounts
+            or is_on_budget(accounts[transaction["accountId"]])
+        )
+    )
 
 
 def build_context(data, status, items, *, workspace, page, month, selected=None):
     categories = data["categories"]
     currency = currency_code(data.get("currency", "USD"))
     budgets = {row["categoryId"]: row for row in data["budget"]}
-    selected = next((c for c in categories if c["id"] == selected), None) or next(
-        (c for c in categories if c["name"].lower() == "groceries"),
-        categories[0] if categories else None,
-    )
+    selected = next((c for c in categories if c["id"] == selected), None)
+    periods = [
+        {
+            **period, "month": period.get("month", month),
+            "uncategorized": uncategorized_spending(period),
+        }
+        for period in data.get("periods", [data])
+    ]
+    period_budgets = [
+        {row["categoryId"]: row for row in period["budget"]} for period in periods
+    ]
     category_groups = data.get("categoryGroups")
     if category_groups is None:
         category_groups = [
@@ -61,7 +97,16 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
     category_names = {}
     category_parents = {}
     for group in category_groups:
-        rows = [{"category": c, **budgets[c["id"]]} for c in group["children"]]
+        rows = [
+            {
+                "category": c, **budgets[c["id"]],
+                "periods": [
+                    {"month": period["month"], **projection[c["id"]]}
+                    for period, projection in zip(periods, period_budgets, strict=True)
+                ],
+            }
+            for c in group["children"]
+        ]
         for child in group["children"]:
             category_names[child["id"]] = f"{group['name']} / {child['name']}"
             category_parents[child["id"]] = group["name"]
@@ -73,6 +118,16 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
                     field: sum(r[field] for r in rows)
                     for field in ("assigned", "spent", "available")
                 },
+                "periods": [
+                    {
+                        "month": period["month"],
+                        **{
+                            field: sum(row["periods"][index][field] for row in rows)
+                            for field in ("assigned", "spent", "available")
+                        },
+                    }
+                    for index, period in enumerate(periods)
+                ],
             }
         )
     transactions = sorted(data["transactions"], key=lambda t: t["date"], reverse=True)
@@ -80,7 +135,6 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
     spending = defaultdict(int)
     payees = defaultdict(int)
     purchases = 0
-    uncategorized = 0
     for transaction in transactions:
         account = accounts_by_id.get(transaction.get("accountId"))
         if (
@@ -94,13 +148,11 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
             spending[transaction["categoryId"]] += transaction["amount"]
         if transaction["amount"] > 0 or transaction["categoryId"]:
             payees[transaction["merchant"]] += transaction["amount"]
-        if transaction["amount"] > 0 and not transaction["categoryId"]:
-            uncategorized += transaction["amount"]
     spending_rows = [
         {"category": c, "spent": spending[c["id"]]} for c in categories if spending[c["id"]] > 0
     ]
     spending_rows.sort(key=lambda row: row["spent"], reverse=True)
-    previous = next((t for t in data["trend"] if t["month"] == shift_month(month, -1)), None)
+    previous = next((t for t in data["trend"] if t["month"] == period_shift(month, -1)), None)
     change = (
         (data["summary"]["spent"] - previous["spent"]) / previous["spent"] * 100
         if previous and previous["spent"] > 0
@@ -150,11 +202,16 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "minor_units": currency_minor_units(currency),
         "money": lambda value: format_money(value, currency),
         "money_input": lambda value: money_input(value, currency),
+        "money_number": lambda value: money_number(value, currency),
         "month_label": month_label,
         "shift_month": shift_month,
         "icon": icon,
         "category_icon": category_icon,
         "groups": groups,
+        "periods": periods,
+        "month_strip": list(dict.fromkeys(shift_month(month, step) for step in range(-3, 6))),
+        "period_months": [period["month"] for period in periods],
+        "category_path": lambda identifier: quote(identifier, safe=""),
         "category_names": category_names,
         "category_parents": category_parents,
         "selected": selected,
@@ -210,7 +267,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
             {"y": 192 - index * 170 / 4, "amount": maximum * index // 4}
             for index in range(5)
         ],
-        "uncategorized": uncategorized,
+        "uncategorized": uncategorized_spending(data),
         "today": today(),
         "client_context": {
             "workspace": workspace, "page": page, "month": month, "currency": currency,

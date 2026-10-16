@@ -14,6 +14,7 @@ from threading import RLock
 from uuid import uuid4
 
 from whab.domain.accounts import normalize_account
+from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
 from whab.domain.money import cents, currency_code
 from whab.domain.portable import validate_portable_budget
@@ -232,6 +233,25 @@ class LedgerService:
 
     def workspace(self, workspace, month=None):
         return self.query("workspace", workspace, month)["data"]
+
+    def workspace_periods(self, workspace: str, month: str, count: int) -> list[dict]:
+        """Read consecutive core projections under the budget's shared command lock.
+
+        Backends retain the single-month workspace contract. Each projection
+        therefore uses the same financial rules for local and remote storage.
+        """
+        self._workspace(workspace)
+        _month(month)
+        if type(count) is not int or not 1 <= count <= 12:
+            raise StoreError("Period count must be an integer between 1 and 12.")
+        year, number = map(int, month.split("-"))
+        remaining = (2200 - year) * 12 + (12 - number) + 1
+        count = min(count, remaining)
+        with self._lock:
+            return [
+                _public(self._store.workspace(workspace, shift_month(month, offset)))
+                for offset in range(count)
+            ]
 
     def _local_command(self, operation, workspace, payload):
         with self._lock:

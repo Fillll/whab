@@ -142,6 +142,8 @@ Categories have exactly two levels: a parent group and a child category. Create 
 
 Core formats are fixed and locale-independent: dates `YYYY-MM-DD`, monthly periods `YYYY-MM`, and USD `$1,234.56` (negative `-$1,234.56`). Other currencies use a code, such as `EUR 1,234.56`, `JPY 1,234` or `KWD 1,234.567`, with ISO minor-unit precision. The selected UI plugin can override presentation; there are no locale-format settings in core.
 
+The bundled web interface names months and shows three consecutive budget months side by side. Use the month strip or arrows to move the window. Each month has a **To assign** summary above **Assigned**, **Activity** and **Available** columns; amounts stay in the selected currency. Edit an **Assigned** field in the intended month and submit it to save through core validation. Category headings collapse across all visible months, and selecting a category opens its details. The table remains accessible on narrow screens, and Settings stays at the bottom left. At the end of the supported month range (`2200-12`), fewer months are shown.
+
 Category available money equals carried-over money plus assigned money minus cleared categorized activity; categorized refunds add back to the category. Analytics retain imported historical spending.
 
 The personal budget starts in its initialization month. Pre-budget imports remain available for analytics and do not create old envelope deficits. Earlier months cannot receive assignments. The demo begins earlier to demonstrate rollover.

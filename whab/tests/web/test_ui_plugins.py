@@ -61,11 +61,58 @@ def test_another_ui_supplies_its_views_templates_assets_and_keeps_host_guards(tm
             assert result.status_code == 200
             assert "Alternative UI &lt;script&gt;fictional&lt;/script&gt; 2026-10" in result.text
             assert seen[-1][1]["workspace"] == "demo"
+            assert "periods" not in seen[-1][0]
         assert client.get("/static/custom.css").status_code == 200
         assert client.get("/static/app.js").status_code == 404
         assert client.get("/api/workspace?workspace=demo").status_code == 200
         assert client.get("/", headers={"host": "foreign.example"}).status_code == 403
         assert client.get("/").headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("month,expected", [
+    ("2026-12", ["2026-12", "2027-01", "2027-02"]),
+    ("2200-11", ["2200-11", "2200-12"]),
+    ("2200-12", ["2200-12"]),
+])
+def test_multi_month_ui_receives_currency_scoped_core_periods_only_for_budget(tmp_path, store, month, expected):
+    templates, static = tmp_path / "templates", tmp_path / "static"
+    templates.mkdir()
+    static.mkdir()
+    (templates / "base.html").write_text("Alternate budget {{ month }} {{ data.currency }}")
+    store.add_account("personal", {
+        "name": "Euro cash", "type": "depository", "balance": 50000, "currency": "EUR",
+    })
+    euro_category = store.add_category("personal", {
+        "name": "Euro food", "group": "Euro living", "target": 0, "currency": "EUR",
+    })
+    seen = []
+
+    def build(data, status, items, **options):
+        seen.append(data)
+        return {}
+
+    ui = UserInterface(templates, static, build, budget_months=3)
+    registry = PluginRegistry((Plugin("alternate", "Alternate UI", ui=ui),))
+    with TestClient(
+        create_app(store=store, settings=settings(tmp_path, "alternate"), plugins=registry),
+        base_url="https://127.0.0.1:5173",
+    ) as client:
+        result = client.get(f"/?page=budget&workspace=personal&month={month}&currency=EUR")
+        assert result.status_code == 200
+        assert f"Alternate budget {month} EUR" in result.text
+        data = seen[-1]
+        assert [period["month"] for period in data["periods"]] == expected
+        service = client.app.state.ledger_service
+        for period in data["periods"]:
+            assert "periods" not in period
+            assert period["currency"] == "EUR"
+            assert {row["currency"] for row in period["accounts"]} == {"EUR"}
+            assert {row["id"] for row in period["categories"]} == {euro_category}
+            assert period["summary"] == service.workspace("personal", period["month"])["summariesByCurrency"]["EUR"]
+        assert {key: value for key, value in data.items() if key != "periods"} == data["periods"][0]
+        for page in ("transactions", "insights", "accounts"):
+            assert client.get(f"/?page={page}&workspace=personal&month={month}&currency=EUR").status_code == 200
+            assert "periods" not in seen[-1]
 
 
 def test_missing_ui_fails_instead_of_falling_back(tmp_path, store):

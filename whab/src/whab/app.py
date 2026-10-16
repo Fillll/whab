@@ -312,6 +312,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             store, banks, bank_stores, plugins, templates, settings.plaid_env, ui,
             plugin_manager=plugin_manager,
             budget_name=budget_session.name if budget_session else "My budget",
+            service=service,
         )
     )
     app.state.store = store.store
