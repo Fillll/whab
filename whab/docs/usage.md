@@ -129,7 +129,9 @@ This is an initial planning model, not the complete YNAB credit-card payment sys
 
 The default Python server binds to `127.0.0.1`. Local API access checks the Host and browser origin. The optional server/client plugins use a separate HTTPS bearer-authenticated public ledger protocol; they do not provide a family login system for the visual app. Network deployment needs secure transport and deliberate access configuration. See the [remote plugin contract](plugins.md#remote-interface-and-client).
 
-`.env`, `plugins.json`, `data/`, `work/`, and `.venv/` are ignored by Git. Database files contain private financial data even though Plaid tokens are encrypted. Back up the database and the encryption key separately before relying on the app. Stop WHAB before copying the database, or use SQLite's backup API while it is running. Do not replace the encryption key after linking accounts without a migration: existing tokens will no longer decrypt.
+`.env`, `plugins.json`, `data/`, `work/`, and `.venv/` are ignored by Git. The runtime `budgets/` directories at the repository root and under `whab/` are also ignored, along with saved `.whab` files and temporary `.whab-*` files or directories anywhere in the checkout. Runtime budget files include financial data, budget names and saved copy paths. These rules preserve the tracked application code under `whab/src/whab/budgets/` and its tests.
+
+Database files and portable budgets contain private financial data even though Plaid tokens are encrypted. Back up the database and the encryption key separately before relying on the app. Stop WHAB before copying the database, or use SQLite's backup API while it is running. Do not replace the encryption key after linking accounts without a migration: existing tokens will no longer decrypt.
 
 Default SQLite files:
 

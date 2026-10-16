@@ -5,6 +5,11 @@ build/
 .env.*
 !.env.example
 data/
+# Private portable-budget runtime files and saved archives.
+/budgets/
+/whab/budgets/
+*.whab
+.whab-*
 work/
 *.log
 .DS_Store
