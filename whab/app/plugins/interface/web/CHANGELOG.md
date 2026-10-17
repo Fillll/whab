@@ -1,5 +1,9 @@
 # Web interface plugin changelog
 
+## 1.5.2 — 2026-10-16
+
+- Place the status dot and app version on one sidebar footer row, with an icon-only Settings button aligned to the right. Preserve its accessible name and compact-screen touch target.
+
 ## 1.5.1 — 2026-10-16
 
 - Show the running WHAB application's version below Settings in the sidebar.
