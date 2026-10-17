@@ -97,6 +97,24 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     assert 'data-navigation="workspace"' not in text
 
 
+@pytest.mark.parametrize("workspace", ["personal", "demo"])
+def test_new_budget_is_a_primary_action_with_a_dedicated_creation_dialog(client, workspace):
+    text = client.get(f"/?workspace={workspace}").text
+    budgets = dialog(text, "budgets-dialog")
+    assert re.search(r'<button class="button primary"[^>]*data-dialog="new-budget-dialog"', budgets)
+    assert budgets.index('data-dialog="new-budget-dialog"') < budgets.index('class="budget-list"')
+    assert budgets.index("data-budget-switch") < budgets.index('class="budget-bundle"')
+    assert "data-budget-new" not in budgets
+    creation = dialog(text, "new-budget-dialog")
+    assert 'aria-label="New budget"' in creation
+    assert 'class="modal-form" data-budget-new' in creation
+    assert 'Budget name<input name="name" required maxlength="100"' in creation
+    assert "autofocus" in creation
+    assert 'data-close-dialog>Cancel</button>' in creation
+    assert '<button class="button primary" type="submit">Create budget</button>' in creation
+    assert 'role="alert" hidden' in creation
+
+
 def test_plugin_categories_and_names_are_sorted_and_examples_are_hidden(client, monkeypatch):
     text = render(
         client, monkeypatch,

@@ -162,6 +162,9 @@
 <dialog class="modal settings-modal" id="budgets-dialog" aria-label="Budgets">
   <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
   {{ heading('Budgets', 'Choose the budget you want to work with.') }}
+  <div class="budget-bundle-actions budget-create-action">
+    <button class="button primary" type="button" data-dialog="new-budget-dialog">{{ icon('plus', 16) }}New budget</button>
+  </div>
   <nav class="budget-list" aria-label="Available budgets">
     {% for key, label, description in [('personal', budget_name|default('My budget'), 'Your accounts and budget'), ('demo', 'Demo budget', 'Fictional data to explore WHAB')] %}
     <a class="budget-choice" href="{{ url(workspace=key, category=none) }}"{% if workspace==key %} aria-current="true"{% endif %}>
@@ -171,12 +174,18 @@
     </a>
     {% endfor %}
   </nav>
+  <p class="field-error" data-budget-load-error role="alert" hidden></p>
+  <form class="modal-form budget-bundle-form" data-budget-switch hidden>
+    <label>Open budget<select name="budget" data-available-budgets required aria-label="Saved budget"></select></label>
+    <label>Budget password (optional)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
+    <p class="field-error" role="alert" hidden></p>
+    <button class="button" type="submit">Switch budget</button>
+  </form>
   <section class="budget-bundle" aria-labelledby="portable-budget-title">
     <h3 id="portable-budget-title">Portable budget</h3>
     <p class="settings-notice">Current budget: <strong data-budget-name>Loading…</strong></p>
     <p class="settings-notice" data-budget-status role="status"></p>
     <ul class="budget-copy-status" data-budget-copies aria-label="Saved copies"></ul>
-    <p class="field-error" data-budget-load-error role="alert" hidden></p>
     <div class="budget-bundle-actions"><a class="button" href="/api/budget/export" download>Download budget</a><button class="button" type="button" data-budget-save hidden>Save copies</button></div>
     <form class="modal-form budget-bundle-form" data-budget-export hidden>
       <label class="budget-copy-option"><input type="checkbox" name="include_credentials"><span>Include remote access credential</span></label>
@@ -192,17 +201,6 @@
       <p class="field-error" role="alert" hidden></p>
       <button class="button" type="submit">Add saved copy</button>
     </form>
-    <form class="modal-form budget-bundle-form" data-budget-switch hidden>
-      <label>Open budget<select name="budget" data-available-budgets required aria-label="Saved budget"></select></label>
-      <label>Budget password (optional)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
-      <p class="field-error" role="alert" hidden></p>
-      <button class="button" type="submit">Switch budget</button>
-    </form>
-    <form class="modal-form budget-bundle-form" data-budget-new>
-      <label>New budget name<input name="name" required maxlength="100" placeholder="e.g. Household"></label>
-      <p class="field-error" role="alert" hidden></p>
-      <button class="button" type="submit">Create budget</button>
-    </form>
     <form class="modal-form budget-bundle-form" data-budget-open>
       <label>Open a budget file<input type="file" name="budget" accept=".whab,application/zip" required></label>
       <label>Budget password (optional)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
@@ -212,6 +210,17 @@
       <button class="button primary" type="submit">Open budget</button>
     </form>
   </section>
+</dialog>
+<dialog class="modal" id="new-budget-dialog" aria-label="New budget">
+  {{ heading('New budget', 'Start fresh with separate accounts and transactions.') }}
+  <form class="modal-form" data-budget-new>
+    <label>Budget name<input name="name" required maxlength="100" placeholder="e.g. Household" autofocus></label>
+    <p class="field-error" role="alert" hidden></p>
+    <div class="modal-actions">
+      <button class="button" type="button" data-close-dialog>Cancel</button>
+      <button class="button primary" type="submit">Create budget</button>
+    </div>
+  </form>
 </dialog>
 <dialog class="modal settings-modal" id="plugins-dialog" aria-label="Plugins">
   <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>

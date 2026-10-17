@@ -164,9 +164,14 @@ for (const button of document.querySelectorAll('[data-edit-account]')) button.ad
 
 for (const button of document.querySelectorAll('[data-dialog]')) button.addEventListener('click', () => document.getElementById(button.dataset.dialog).showModal());
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => button.closest('dialog').close());
-for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('click', event => {
-  if (event.target === dialog) dialog.close();
-});
+for (const dialog of document.querySelectorAll('dialog')) {
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog && !dialog.querySelector('[data-budget-new][data-busy]')) dialog.close();
+  });
+  dialog.addEventListener('cancel', event => {
+    if (dialog.querySelector('[data-budget-new][data-busy]')) event.preventDefault();
+  });
+}
 document.querySelector('[data-dismiss-toast]').addEventListener('click', () => {
   toast.hidden = true;
 });
@@ -334,8 +339,9 @@ function budgetForm(selector, action) {
     if (form.dataset.busy) return;
     const error = form.querySelector('.field-error');
     const submit = form.querySelector('button[type="submit"]');
+    const buttons = form.hasAttribute('data-budget-new') ? form.closest('dialog').querySelectorAll('button') : [submit];
     form.dataset.busy = 'true';
-    submit.disabled = true;
+    for (const button of buttons) button.disabled = true;
     error.hidden = true;
     try {
       await action(form);
@@ -344,7 +350,7 @@ function budgetForm(selector, action) {
       error.textContent = failure.message;
       error.hidden = false;
       delete form.dataset.busy;
-      submit.disabled = false;
+      for (const button of buttons) button.disabled = false;
     }
   });
 }
