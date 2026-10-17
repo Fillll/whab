@@ -166,10 +166,10 @@ for (const button of document.querySelectorAll('[data-dialog]')) button.addEvent
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => button.closest('dialog').close());
 for (const dialog of document.querySelectorAll('dialog')) {
   dialog.addEventListener('click', event => {
-    if (event.target === dialog && !dialog.querySelector('[data-budget-new][data-busy]')) dialog.close();
+    if (event.target === dialog && !dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy]')) dialog.close();
   });
   dialog.addEventListener('cancel', event => {
-    if (dialog.querySelector('[data-budget-new][data-busy]')) event.preventDefault();
+    if (dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy]')) event.preventDefault();
   });
 }
 document.querySelector('[data-dismiss-toast]').addEventListener('click', () => {
@@ -220,6 +220,25 @@ if (pluginSelection) {
 
 
 const budgetDialog = document.getElementById('budgets-dialog');
+function budgetChoice(entry, workspace, current, description) {
+  const row = settingsText('div', '', 'budget-choice');
+  if (current) row.setAttribute('aria-current', 'true');
+  const label = settingsText('label', '', 'budget-choice-select');
+  const radio = document.createElement('input');
+  Object.assign(radio, {type: 'radio', name: 'budget', value: `${entry.id}:${workspace}`, required: true, checked: current});
+  radio.dataset.budgetId = entry.id;
+  radio.dataset.workspace = workspace;
+  const copy = settingsText('span', '', 'budget-choice-copy');
+  copy.append(settingsText('strong', entry.name), settingsText('small', current ? 'Current budget' : description, current ? 'budget-current' : ''));
+  label.append(radio, copy);
+  const download = settingsText('button', 'Download', 'button secondary');
+  download.type = 'button';
+  download.setAttribute('aria-label', `Download ${entry.name}`);
+  Object.assign(download.dataset, {budgetDownload: '', budgetId: entry.id, workspace, name: entry.name});
+  row.append(label, download);
+  return row;
+}
+
 async function loadBudgetControls() {
   const error = budgetDialog.querySelector('[data-budget-load-error]');
   error.hidden = true;
@@ -229,6 +248,7 @@ async function loadBudgetControls() {
     budgetDialog.querySelector('[data-budget-export]').hidden = budget.storage !== 'client';
     budgetDialog.querySelector('[data-budget-save]').hidden = !budget.portable;
     budgetDialog.querySelector('[data-budget-copy]').hidden = !budget.portable;
+    budgetDialog.querySelector('[data-budget-advanced]').hidden = !budget.portable && budget.storage !== 'client' && !budget.missingPlugins?.length;
     const pending = budget.copies.filter(copy => copy.status === 'pending');
     const missing = budget.missingPlugins || [];
     const copies = budgetDialog.querySelector('[data-budget-copies]');
@@ -246,16 +266,13 @@ async function loadBudgetControls() {
       pending.length ? `${pending.length} saved ${pending.length === 1 ? 'copy is' : 'copies are'} waiting to sync.` : 'All saved copies are up to date.',
       missing.length ? `Install compatible plugins to restore all features: ${missing.join(', ')}.` : '',
     ].filter(Boolean).join(' ');
-    const select = budgetDialog.querySelector('[data-available-budgets]');
-    select.replaceChildren();
-    for (const entry of catalog.budgets) {
-      const option = document.createElement('option');
-      option.value = entry.id;
-      option.textContent = entry.name;
-      option.selected = entry.active;
-      select.append(option);
-    }
-    budgetDialog.querySelector('[data-budget-switch]').hidden = catalog.budgets.length < 2;
+    const list = budgetDialog.querySelector('[data-available-budgets]');
+    list.replaceChildren(settingsText('legend', 'Available budgets'));
+    const entries = [...catalog.budgets].sort((a, b) => Number(b.id === 'default') - Number(a.id === 'default'));
+    entries.forEach((entry, index) => {
+      list.append(budgetChoice(entry, 'personal', entry.active && budgetDialog.dataset.workspace === 'personal', 'Saved on this device'));
+      if (index === 0) list.append(budgetChoice({id: budget.id, name: 'Demo budget'}, 'demo', budgetDialog.dataset.workspace === 'demo', 'Fictional data to explore WHAB'));
+    });
   } catch (failure) {
     budgetDialog.querySelector('[data-budget-name]').textContent = 'Unavailable';
     error.textContent = failure.message;
@@ -288,6 +305,40 @@ function budgetPasswordHeaders(password) {
   return {'X-Budget-Password': btoa(binary), 'X-Budget-Password-Encoding': 'base64'};
 }
 
+async function downloadBudget(path, password, name) {
+  const response = await fetch(path, {headers: budgetPasswordHeaders(password)});
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.error || 'The budget could not be downloaded.');
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const download = document.createElement('a');
+  download.href = url;
+  download.download = `${name.replace(/[\\/:*?"<>|]/g, '-').trim() || 'budget'}.whab`;
+  download.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+budgetDialog.addEventListener('click', async event => {
+  const button = event.target.closest('[data-budget-download]');
+  if (!button || button.disabled || budgetDialog.dataset.navigating) return;
+  const form = budgetDialog.querySelector('[data-budget-switch]');
+  const error = form.querySelector('.field-error');
+  button.disabled = true;
+  button.textContent = 'Downloading…';
+  error.hidden = true;
+  try {
+    await downloadBudget(`/api/budgets/${encodeURIComponent(button.dataset.budgetId)}/export?workspace=${button.dataset.workspace}`, form.elements.password.value, button.dataset.name);
+    notify(`${button.dataset.name} downloaded.`);
+  } catch (failure) {
+    error.textContent = failure.message;
+    error.hidden = false;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Download';
+  }
+});
+
 const exportForm = document.querySelector('[data-budget-export]');
 exportForm.elements.include_credentials.addEventListener('change', () => {
   const included = exportForm.elements.include_credentials.checked;
@@ -306,19 +357,7 @@ exportForm.addEventListener('submit', async event => {
     const included = exportForm.elements.include_credentials.checked;
     const password = exportForm.elements.password.value;
     if (included && Array.from(password).length < 12) throw new Error('Use a password of at least 12 characters.');
-    const response = await fetch(`/api/budget/export${included ? '?include_credentials=true' : ''}`, {
-      headers: included ? budgetPasswordHeaders(password) : {},
-    });
-    if (!response.ok) {
-      const result = await response.json().catch(() => ({}));
-      throw new Error(result.error || 'The budget could not be exported.');
-    }
-    const url = URL.createObjectURL(await response.blob());
-    const download = document.createElement('a');
-    download.href = url;
-    download.download = 'budget.whab';
-    download.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    await downloadBudget(`/api/budget/export${included ? '?include_credentials=true' : ''}`, included ? password : '', 'budget');
     exportForm.reset();
     exportForm.elements.password.disabled = true;
     exportForm.elements.password.required = false;
@@ -336,20 +375,23 @@ function budgetForm(selector, action) {
   const form = document.querySelector(selector);
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (form.dataset.busy) return;
+    if (form.dataset.busy || budgetDialog.dataset.navigating) return;
     const error = form.querySelector('.field-error');
-    const submit = form.querySelector('button[type="submit"]');
-    const buttons = form.hasAttribute('data-budget-new') ? form.closest('dialog').querySelectorAll('button') : [submit];
+    const buttons = budgetDialog.querySelectorAll('button');
+    budgetDialog.dataset.navigating = 'true';
     form.dataset.busy = 'true';
     for (const button of buttons) button.disabled = true;
     error.hidden = true;
     try {
-      await action(form);
-      location.assign('/?workspace=personal');
+      const destination = await action(form);
+      budgetDialog.close();
+      document.getElementById('settings-dialog').close();
+      location.assign(typeof destination === 'string' ? destination : '/?workspace=personal');
     } catch (failure) {
       error.textContent = failure.message;
       error.hidden = false;
       delete form.dataset.busy;
+      delete budgetDialog.dataset.navigating;
       for (const button of buttons) button.disabled = false;
     }
   });
@@ -378,12 +420,15 @@ copyForm.addEventListener('submit', async event => {
 });
 budgetForm('[data-budget-new]', form => api('/budget/new', {name: form.elements.name.value.trim()}));
 budgetForm('[data-budget-switch]', async form => {
-  const response = await fetch(`/api/budgets/${encodeURIComponent(form.elements.budget.value)}/activate`, {
+  const selected = form.querySelector('[name="budget"]:checked');
+  if (!selected) throw new Error('Choose a budget.');
+  const response = await fetch(`/api/budgets/${encodeURIComponent(selected.dataset.budgetId)}/activate`, {
     method: 'POST', body: '{}',
     headers: {'Content-Type': 'application/json', ...budgetPasswordHeaders(form.elements.password.value)},
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'The budget could not be opened.');
+  return selected.dataset.workspace === 'demo' ? form.dataset.demoUrl : form.dataset.personalUrl;
 });
 budgetForm('[data-budget-open]', async form => {
   const file = form.elements.budget.files[0];

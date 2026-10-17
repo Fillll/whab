@@ -1766,28 +1766,56 @@ strong {
   color: var(--text-secondary);
   font-size: 11px;
 }
+.budget-list {
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+}
+.budget-list > legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .budget-choice {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 20px 8px;
+  gap: 16px;
+  padding: 15px 0;
   border-bottom: 1px solid var(--line);
   color: var(--text-secondary);
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s;
 }
 .budget-choice:hover {
-  background: var(--surface);
+  background: var(--field);
 }
-.budget-choice[aria-current] .budget-choice-icon {
-  color: var(--action);
+.modal-form .budget-choice-select {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  min-width: 0;
+  gap: 12px;
+  margin: 0;
+  cursor: pointer;
 }
-.budget-choice-icon,
-.budget-choice > svg {
+.modal-form .budget-choice-select > input {
   flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--action);
+  cursor: pointer;
 }
 .budget-choice-copy {
   flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .budget-choice strong {
   display: block;
@@ -1800,19 +1828,36 @@ strong {
   margin-top: 5px;
   font-size: 11px;
 }
-.budget-current {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.budget-choice .budget-current {
   color: var(--action);
-  font-size: 10px;
+  font-size: 11px;
 }
-.budget-bundle {
+.budget-choice > .button {
+  flex-shrink: 0;
+}
+.budget-section,
+.budget-advanced {
   margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
 }
-.budget-bundle > h3 {
-  font-size: 14px;
+.budget-section > h3 {
+  margin: 0 0 18px;
+  font-size: 15px;
   font-weight: 600;
+}
+#budgets-dialog > .modal-form,
+.budget-section > .modal-form {
+  margin-top: 0;
+}
+#budgets-dialog .modal-form > .button {
+  align-self: flex-start;
+}
+.budget-advanced > summary {
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
 }
 .budget-copy-status {
   margin-top: 12px;
@@ -1834,9 +1879,6 @@ strong {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 16px;
-}
-.budget-create-action {
-  margin: 0 0 12px;
 }
 .budget-bundle-form {
   margin-top: 24px;
@@ -2438,13 +2480,11 @@ strong {
     padding: 18px;
   }
   .budget-choice {
-    flex-wrap: wrap;
     gap: 10px;
-    padding: 18px 0;
+    padding: 14px 0;
   }
-  .budget-current {
-    flex-basis: 100%;
-    margin-left: 30px;
+  .budget-choice > .button {
+    padding: 9px;
   }
   .plugin-row {
     grid-template-columns: minmax(0, 1fr);

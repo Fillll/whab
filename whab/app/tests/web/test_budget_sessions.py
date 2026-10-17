@@ -347,6 +347,163 @@ def test_recent_budget_is_listed_and_lazily_reopened_after_restart(tmp_path):
         assert set(host.applications) == {"default", budget_id}
 
 
+def test_catalog_download_exports_requested_budget_without_selecting_it(tmp_path):
+    with TestClient(create_app(settings=settings(tmp_path)), base_url=BASE) as client:
+        add_account(client, "Original wallet")
+        first = new_budget(client, "First household")
+        add_account(client, "First wallet")
+        second = new_budget(client, "Second household")
+        add_account(client, "Second wallet")
+        catalog = client.get("/api/budgets").json()
+
+        for budget_id, expected_name in ((first, "First wallet"), ("default", "Original wallet")):
+            response = client.get(f"/api/budgets/{budget_id}/export")
+            assert response.status_code == 200, response.text
+            assert "set-cookie" not in response.headers
+            _, ledger = decode_bundle(response.content)
+            assert {row["name"] for row in ledger["accounts"]} == {expected_name}
+            assert client.get("/api/budget").json()["id"] == second
+            assert client.get("/api/budgets").json() == catalog
+            assert account_names(client) == {"Second wallet"}
+
+
+def test_catalog_download_reopens_saved_budget_without_changing_selection(tmp_path):
+    with TestClient(create_app(settings=settings(tmp_path)), base_url=BASE) as client:
+        budget_id = new_budget(client, "Saved household")
+        add_account(client, "Saved wallet")
+    configuration = settings(tmp_path)
+    host = BudgetHost(configuration)
+    with TestClient(create_app(settings=configuration, budget_host=host), base_url=BASE) as client:
+        assert set(host.applications) == {"default"}
+        response = client.get(f"/api/budgets/{budget_id}/export")
+        assert response.status_code == 200, response.text
+        assert "set-cookie" not in response.headers
+        manifest, ledger = decode_bundle(response.content)
+        assert manifest["id"] == budget_id
+        assert {row["name"] for row in ledger["accounts"]} == {"Saved wallet"}
+        assert client.get("/api/budget").json()["id"] == "default"
+        assert set(host.applications) == {"default", budget_id}
+        assert account_names(client) == set()
+
+
+def test_concurrent_catalog_downloads_share_one_reopened_runtime(tmp_path):
+    with TestClient(create_app(settings=settings(tmp_path)), base_url=BASE) as client:
+        budget_id = new_budget(client, "Saved household")
+        add_account(client, "Saved wallet")
+    configuration = settings(tmp_path)
+    host = BudgetHost(configuration)
+    with TestClient(create_app(settings=configuration, budget_host=host), base_url=BASE) as client:
+        def download(_):
+            return client.get(f"/api/budgets/{budget_id}/export")
+
+        with ThreadPoolExecutor(2) as pool:
+            responses = list(pool.map(download, range(2)))
+        for response in responses:
+            assert response.status_code == 200, response.text
+            assert "set-cookie" not in response.headers
+            manifest, ledger = decode_bundle(response.content)
+            assert manifest["id"] == budget_id
+            assert {row["name"] for row in ledger["accounts"]} == {"Saved wallet"}
+        assert len(host.contexts) == 1 and set(host.applications) == {"default", budget_id}
+        assert client.get("/api/budget").json()["id"] == "default"
+
+
+def test_concurrent_original_workspace_downloads_keep_one_export_identity(tmp_path, monkeypatch):
+    from threading import Event
+
+    entered = Event()
+    release = Event()
+    create = BudgetSession.create
+    identities = []
+
+    def create_export(*args, **kwargs):
+        entered.set()
+        assert release.wait(5)
+        session = create(*args, **kwargs)
+        identities.append(session.id)
+        return session
+
+    with TestClient(create_app(settings=settings(tmp_path)), base_url=BASE) as client:
+        monkeypatch.setattr(BudgetSession, "create", create_export)
+        with ThreadPoolExecutor(2) as pool:
+            first = pool.submit(client.get, "/api/budgets/default/export")
+            assert entered.wait(5)
+            second = pool.submit(client.get, "/api/budgets/default/export")
+            release.set()
+            responses = [first.result(), second.result()]
+        assert len(identities) == 1
+        for response in responses:
+            assert response.status_code == 200, response.text
+            assert decode_bundle(response.content)[0]["id"] == identities[0]
+
+
+@pytest.mark.parametrize("targeted", [False, True])
+def test_demo_download_is_a_separate_budget_with_only_demo_ledger(tmp_path, targeted):
+    configuration = settings(tmp_path, ("bank-logos",))
+    host = BudgetHost(configuration)
+    app = create_app(settings=configuration, budget_host=host)
+    with TestClient(app, base_url=BASE) as client:
+        budget_id = new_budget(client, "Private household")
+        add_account(client, "Private wallet")
+        assert client.put("/api/budget/plugins/bank-logos", json={
+            "state": {"privateMarker": "personal plugin state"},
+        }).status_code == 200
+        assert client.post("/api/accounts", json={
+            "workspace": "demo", "name": "Source demo wallet", "type": "depository", "balance": 2000,
+        }).status_code == 200
+        personal = client.get("/api/budget/export").content
+        current_id = new_budget(client, "Other household") if targeted else budget_id
+        route = f"/api/budgets/{budget_id}/export" if targeted else "/api/budget/export"
+        response = client.get(route, params={"workspace": "demo"})
+        assert response.status_code == 200, response.text
+        assert "set-cookie" not in response.headers
+        manifest, ledger = decode_bundle(response.content)
+        assert manifest["id"] != budget_id and manifest["name"] == "Demo budget"
+        assert manifest["storage"] == "sqlite"
+        assert {plugin["id"] for plugin in manifest["plugins"]} == {"sqlite"}
+        demo = host.applications[budget_id][0].state.store.export_budget("demo")
+        assert ledger == demo and ledger["accounts"] and ledger["transactions"] and ledger["assignments"]
+        assert "Private wallet" not in {row["name"] for row in ledger["accounts"]}
+        assert client.get(f"/api/budgets/{budget_id}/export").content == personal
+        assert client.get("/api/budget").json()["id"] == current_id
+        rejected = client.get(route, params={"workspace": "demo", "include_credentials": "true"})
+        assert rejected.status_code == 400 and "cannot include" in rejected.text
+        assert "set-cookie" not in rejected.headers
+    with TestClient(create_app(settings=settings(tmp_path / "demo-import")), base_url=BASE) as client:
+        opened = client.post("/api/budget/open", content=response.content, headers=ZIP)
+        assert opened.status_code == 200, opened.text
+        assert opened.json()["id"] == manifest["id"]
+        assert account_names(client) == {row["name"] for row in ledger["accounts"]}
+
+
+def test_catalog_download_rejects_unknown_budget_and_workspace(tmp_path):
+    with TestClient(create_app(settings=settings(tmp_path)), base_url=BASE) as client:
+        for url, status in (("/api/budgets/unknown/export", 404), ("/api/budgets/default/export?workspace=unknown", 400)):
+            response = client.get(url)
+            assert response.status_code == status
+            assert "set-cookie" not in response.headers
+        assert client.get("/api/budget").json()["id"] == "default"
+
+
+@pytest.mark.parametrize("url,headers,status", [
+    ("http://127.0.0.1:5173", {}, 400),
+    ("https://public.example", {}, 403),
+    (BASE, {"Origin": "https://untrusted.example"}, 403),
+])
+def test_catalog_download_keeps_local_https_guards_before_opening_budget(tmp_path, monkeypatch, url, headers, status):
+    configuration = settings(tmp_path)
+    host = BudgetHost(configuration)
+
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Unguarded download requests must not open budget runtimes")
+
+    monkeypatch.setattr(host, "activate", forbidden)
+    with TestClient(create_app(settings=configuration, budget_host=host), base_url=BASE) as client:
+        response = client.get(url + "/api/budgets/unopened/export", headers=headers)
+        assert response.status_code == status
+        assert "set-cookie" not in response.headers
+
+
 def test_missing_recent_file_surfaces_error_without_substituting_budget(tmp_path):
     configuration = settings(tmp_path)
     host = BudgetHost(configuration)

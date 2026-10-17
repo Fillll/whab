@@ -7,6 +7,7 @@ import copy
 import json
 from dataclasses import replace
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
@@ -19,7 +20,7 @@ from whab.domain.errors import StoreError
 
 from .container import decode_container, encode_container
 from .credentials import encrypt_credentials
-from .document import atomic_write, encode_bundle
+from .document import atomic_write, encode_bundle, new_manifest
 from .session import BudgetSession, container_digest
 
 COOKIE = "whab-budget"
@@ -72,6 +73,7 @@ class BudgetHost:
         self.contexts = []
         self.default_id = "default"
         self._legacy_export = None
+        self._exports = {}
         self._open_lock = asyncio.Lock()
         self._recent_path = settings.home / "budgets" / f"index-{settings.plaid_env}.json"
         self.recent = self._read_recent()
@@ -242,6 +244,34 @@ class BudgetHost:
         router = APIRouter()
         current_id = session.id if session else "default"
 
+        def bundle_bytes(workspace, include_credentials, password):
+            if workspace == "demo":
+                if include_credentials:
+                    raise StoreError("Demo budget downloads cannot include connection credentials.")
+                snapshot = getattr(store, "export_budget", None)
+                if not callable(snapshot):
+                    raise StoreError("This storage plugin cannot export the demo budget.")
+                # Demo is a separate ledger, not the active portable budget's
+                # identity, plugin data or remote connection reference.
+                return encode_bundle(new_manifest("Demo budget"), snapshot("demo"))
+            document = session
+            if document is None:
+                if self._legacy_export is None:
+                    self._legacy_export = BudgetSession.create(settings.home, settings.plaid_env, "My budget", settings.plugins, settings.storage)
+                document = self._legacy_export
+                document.store = store
+                document.storage_config = storage_config or {}
+            return document.bundle(include_credentials=include_credentials, password=password)
+
+        def export_bytes(workspace, include_credentials, password):
+            with store.lock:
+                return bundle_bytes(workspace, include_credentials, password)
+
+        self._exports[current_id] = export_bytes
+
+        def download(raw):
+            return Response(raw, media_type="application/zip", headers={"Content-Disposition": 'attachment; filename="budget.whab"'})
+
         def activate(budget_id):
             response = JSONResponse({"id": budget_id, "opened": True})
             response.set_cookie(COOKIE, budget_id, httponly=True, samesite="strict", secure=True)
@@ -279,16 +309,16 @@ class BudgetHost:
             return activate(budget_id)
 
         @router.get("/api/budget/export")
-        def export(request: Request, include_credentials: bool = False):
-            document = session
-            if document is None:
-                if self._legacy_export is None:
-                    self._legacy_export = BudgetSession.create(settings.home, settings.plaid_env, "My budget", settings.plugins, settings.storage)
-                document = self._legacy_export
-                document.store = store
-                document.storage_config = storage_config or {}
-            raw = document.bundle(include_credentials=include_credentials, password=request_password(request))
-            return Response(raw, media_type="application/zip", headers={"Content-Disposition": 'attachment; filename="budget.whab"'})
+        def export(request: Request, include_credentials: bool = False, workspace: Literal["personal", "demo"] = "personal"):
+            return download(export_bytes(workspace, include_credentials, request_password(request)))
+
+        @router.get("/api/budgets/{budget_id}/export")
+        async def export_budget(budget_id: str, request: Request, include_credentials: bool = False, workspace: Literal["personal", "demo"] = "personal"):
+            password = request_password(request)
+            if budget_id not in self.applications:
+                await self.activate(budget_id, password=password)
+            raw = await run_in_threadpool(self._exports[budget_id], workspace, include_credentials, password)
+            return download(raw)
 
         @router.post("/api/budget/save")
         def save():

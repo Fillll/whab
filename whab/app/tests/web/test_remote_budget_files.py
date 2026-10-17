@@ -15,6 +15,7 @@ from whab.app import create_app
 from whab.budgets.container import decode_container, encode_container
 from whab.budgets.credentials import encrypt_credentials
 from whab.budgets.document import new_manifest
+from whab.budgets.host import BudgetHost
 from whab.config import Settings
 
 BASE = "https://127.0.0.1:5173"
@@ -231,6 +232,33 @@ def test_recent_encrypted_reference_requires_unlock_after_restart(tmp_path, remo
         response = client.post(f"/api/budgets/{budget_id}/activate", json={}, headers=password_headers())
         assert response.status_code == 200, response.text
         assert client.get("/api/budget").json()["id"] == budget_id
+        assert requests == []
+
+
+def test_catalog_download_unlocks_saved_connection_without_selecting_or_fetching_ledger(tmp_path, remote):
+    requests, _ = remote
+    raw = remote_file(password=PASSWORD)
+    budget_id = decode_container(raw, PASSWORD).manifest["id"]
+    with TestClient(create_app(settings=configuration(tmp_path)), base_url=BASE) as client:
+        assert client.post("/api/budget/open", content=raw, headers={**ZIP, **password_headers()}).status_code == 200
+    host = BudgetHost(configuration(tmp_path))
+    with TestClient(create_app(settings=configuration(tmp_path), budget_host=host), base_url=BASE) as client:
+        route = f"/api/budgets/{budget_id}/export"
+        for headers in ({}, password_headers("incorrect password")):
+            response = client.get(route, headers=headers)
+            assert response.status_code == 400 and "set-cookie" not in response.headers
+            assert set(host.applications) == {"default"}
+        response = client.get(route, headers=password_headers())
+        assert response.status_code == 200, response.text
+        assert "set-cookie" not in response.headers
+        exported = decode_container(response.content)
+        assert exported.manifest["id"] == budget_id and exported.credential_blob is None
+        assert exported.files == decode_container(raw, PASSWORD).files
+        included = client.get(route, params={"include_credentials": "true"}, headers=password_headers())
+        assert included.status_code == 200, included.text
+        assert decode_container(included.content, PASSWORD).credentials == {"client": PROFILE}
+        assert "set-cookie" not in included.headers
+        assert client.get("/api/budget").json()["id"] == "default"
         assert requests == []
 
 

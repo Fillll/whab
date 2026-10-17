@@ -4,6 +4,11 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.4.0 — 2026-10-16
+
+- Download any known budget without changing the browser's selected budget, including password-protected saved connections after restart.
+- Export the demo ledger as its own portable budget, with a separate identity and no personal ledger, plugin state or connection credentials.
+
 ## 2.3.0 — 2026-10-16
 
 - Organize the product under `whab/app`, `whab/launchers` and `whab/docs`, keeping installed code and private runtime homes separate.

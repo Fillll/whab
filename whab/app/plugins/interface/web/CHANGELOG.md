@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.5.0 — 2026-10-16
+
+- List every saved budget alongside Demo budget with a single current selection and a Download action for each row. Downloads preserve the selected budget; demo downloads contain only fictional data.
+- Place Create new budget and Open existing budget in separate sections of the same dialog. Red Open selected budget, Create budget and Open budget actions leave Settings only after success; password and file errors stay in the dialog.
+- Keep saved-copy and encrypted remote-credential controls under Saved copies and export options. Require host 2.4 for targeted downloads.
+
 ## 1.4.0 — 2026-10-16
 
 - Add a prominent **New budget** action in Settings → Budgets with a dedicated name form, Create budget and Cancel controls. Open the new personal workspace after successful creation through the existing core budget API.
