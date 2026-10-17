@@ -235,7 +235,8 @@ def test_recent_encrypted_reference_requires_unlock_after_restart(tmp_path, remo
         assert requests == []
 
 
-def test_catalog_download_unlocks_saved_connection_without_selecting_or_fetching_ledger(tmp_path, remote):
+@pytest.mark.parametrize("scoped", [False, True])
+def test_catalog_download_unlocks_saved_connection_without_selecting_or_fetching_ledger(tmp_path, remote, scoped):
     requests, _ = remote
     raw = remote_file(password=PASSWORD)
     budget_id = decode_container(raw, PASSWORD).manifest["id"]
@@ -243,7 +244,8 @@ def test_catalog_download_unlocks_saved_connection_without_selecting_or_fetching
         assert client.post("/api/budget/open", content=raw, headers={**ZIP, **password_headers()}).status_code == 200
     host = BudgetHost(configuration(tmp_path))
     with TestClient(create_app(settings=configuration(tmp_path), budget_host=host), base_url=BASE) as client:
-        route = f"/api/budgets/{budget_id}/export"
+        prefix = f"/budgets/{budget_id}" if scoped else ""
+        route = f"{prefix}/api/budgets/{budget_id}/export"
         for headers in ({}, password_headers("incorrect password")):
             response = client.get(route, headers=headers)
             assert response.status_code == 400 and "set-cookie" not in response.headers

@@ -103,7 +103,7 @@
       </section>
     {% endfor %}
     {% for plugin in plugins if plugin.has_export %}
-      <a class="text-link plugin-download" href="/api/plugins/{{ plugin.id }}/export?workspace={{ workspace }}&amp;month={{ month }}&amp;currency={{ currency }}">Download {{ plugin.display_name }} CSV {{ icon('download', 15) }}</a>
+      <a class="text-link plugin-download" href="{{ api_prefix }}/plugins/{{ plugin.id }}/export?workspace={{ workspace }}&amp;month={{ month }}&amp;currency={{ currency|lower }}">Download {{ plugin.display_name }} CSV {{ icon('download', 15) }}</a>
     {% endfor %}
   </section>
 {% endif %}

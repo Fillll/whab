@@ -20,11 +20,11 @@ dev = ["pytest==9.1.1", "pytest-cov==7.1.0", "coverage==7.16.2", "ruff==0.17.0"]
 bundled = [
   "whab-bank-logos-plugin>=1.0.0,<2",
   "whab-client-plugin>=1.1.0,<2",
-  "whab-plaid-plugin>=1.1.0,<2",
+  "whab-plaid-plugin>=1.1.1,<2",
   "whab-server-plugin>=1.0.0,<2",
   "whab-sqlite-plugin>=1.1.0,<2",
-  "whab-web-plugin>=1.2.0,<2",
-  "whab-ynab-plugin>=1.1.0,<2",
+  "whab-web-plugin>=1.6.0,<2",
+  "whab-ynab-plugin>=1.1.1,<2",
 ]
 
 [project.urls]

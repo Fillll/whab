@@ -68,14 +68,15 @@ app = create_app(settings=settings, plugins=registry)
 assert app.version == whab.__version__
 with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     for page in ("budget", "transactions", "insights", "accounts"):
-        response = client.get("/", params={"page": page, "workspace": "demo"})
+        response = client.get(f"/budgets/demo/{page}/current-month/usd")
         assert response.status_code == 200, page
         assert f"WHAB · {whab.__version__}" in response.text
-    for asset in ("styles.css", "theme.js", "app.js", "favicon.svg", "logo.svg"):
-        assert client.get("/static/" + asset).status_code == 200, asset
-    assert client.get("/plugins/plaid/static/connect.js").status_code == 200
-    assert client.get("/imports/ynab/static/import.js").status_code == 200
-    personal = client.get("/?workspace=personal&page=accounts")
+    for asset in ("styles.css", "theme.js", "app.js", "client.js", "favicon.svg", "logo.svg"):
+        assert client.get("/budgets/demo/static/" + asset).status_code == 200, asset
+    assert client.get("/budgets/home/plugins/plaid/static/connect.js").status_code == 200
+    assert client.get("/budgets/home/plugins/plaid/static/oauth.js").status_code == 200
+    assert client.get("/budgets/home/imports/ynab/static/import.js").status_code == 200
+    personal = client.get("/budgets/home/accounts/current-month/usd")
     assert personal.status_code == 200 and 'data-file-import="ynab"' in personal.text
     tracking = client.post('/api/accounts', json={
         'workspace': 'personal', 'name': 'Fictional brokerage', 'type': 'investment',
@@ -89,7 +90,7 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     assert client.patch('/api/accounts/' + tracking_id, json={
         'workspace': 'personal', 'type': 'retirement', 'subtype': '401k', 'onBudget': False,
     }).status_code == 200
-    assert '401(k)' in client.get('/?workspace=personal&page=accounts').text
+    assert '401(k)' in client.get('/budgets/home/accounts/current-month/usd').text
     assert any(p["id"] == "ynab" and p["has_file_import"] for p in client.get("/api/plugins").json()["plugins"])
     assert client.get("/api/plugins/bank-logos/bank-logos/unknown").status_code == 404
     assert client.get("/api/plugins/plaid/merchant-logos/unknown").status_code == 404
@@ -114,7 +115,7 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     created = client.post("/api/budget/new", json={"name": "Installed wheel budget"})
     assert created.status_code == 200
     assert client.get("/api/budget").json()["name"] == "Installed wheel budget"
-    assert client.get("/?workspace=personal").status_code == 200
+    assert client.get(created.json()["url"]).status_code == 200
     from whab.budgets.container import decode_container
     container = decode_container(client.get("/api/budget/export").content)
     assert container.manifest["name"] == "Installed wheel budget"
@@ -213,11 +214,8 @@ def main():
             }
         assert set(expected) == {"whab", "web", "sqlite", "plaid", "bank-logos", "ynab", "server", "client", "example"}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
-        account_scope_plugins = {"client", "plaid", "sqlite", "web", "ynab"}
-        minimum_versions = {identifier: "1.1.0" for identifier in account_scope_plugins}
-        minimum_versions["web"] = "1.2.0"
         assert set(optional) == {
-            f'{record["distribution"]}>={minimum_versions.get(identifier, "1.0.0")},<2'
+            f'{record["distribution"]}>={record["version"]},<2'
             for identifier, record in expected.items() if identifier not in {"whab", "example"}
         }
         run(

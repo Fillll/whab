@@ -1,10 +1,20 @@
 # Web interface plugin changelog
 
+## 1.6.0 — 2026-10-16
+
+- List every saved budget alongside the single Demo budget destination with a current selection and a Download action for each row. Downloads address their own budget independently of other tabs; demo downloads contain only fictional data.
+- Place Create new budget and Open existing budget in separate sections of the same dialog. Red Open selected budget, Create budget and Open budget actions leave Settings only after success; password and file errors stay in the dialog.
+- Keep saved-copy and encrypted remote-credential controls under Saved copies and export options. Require host 2.6 for targeted downloads and preserve canonical lowercase navigation.
+
+## 1.5.1 — 2026-10-16
+
+- Show the running WHAB application's version below Settings in the sidebar.
+
 ## 1.5.0 — 2026-10-16
 
-- List every saved budget alongside Demo budget with a single current selection and a Download action for each row. Downloads preserve the selected budget; demo downloads contain only fictional data.
-- Place Create new budget and Open existing budget in separate sections of the same dialog. Red Open selected budget, Create budget and Open budget actions leave Settings only after success; password and file errors stay in the dialog.
-- Keep saved-copy and encrypted remote-credential controls under Saved copies and export options. Require host 2.4 for targeted downloads.
+- Navigate with lowercase budget, page, month and currency path segments. Preserve `current-month` when changing page or currency and select a fixed month when using the month arrows.
+- Present Demo Budget as one separate sample destination alongside My Budget and named budgets. Remove the personal/demo workspace segment and keep stable budget identities independent of display names.
+- Scope browser requests, plugin controls and downloads to the address's budget. Require WHAB 2.5 or newer for its canonical routing context.
 
 ## 1.4.0 — 2026-10-16
 

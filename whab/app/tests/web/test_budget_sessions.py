@@ -148,7 +148,7 @@ def test_create_from_demo_activates_empty_personal_budget_without_copying_either
         assert demo["accounts"] and demo["transactions"] and demo["summary"]["assigned"] > 0
 
         response = client.post("/api/budget/new?workspace=demo", json={"name": "  Vacances été 家庭  "}, headers={
-            "Referer": BASE + "/?workspace=demo",
+            "Referer": BASE + "/budgets/demo/budget/current-month/usd",
         })
         assert response.status_code == 200, response.text
         budget_id = response.json()["id"]

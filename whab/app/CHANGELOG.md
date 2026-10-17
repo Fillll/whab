@@ -4,10 +4,16 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
-## 2.4.0 — 2026-10-16
+## 2.6.0 — 2026-10-16
 
 - Download any known budget without changing the browser's selected budget, including password-protected saved connections after restart.
 - Export the demo ledger as its own portable budget, with a separate identity and no personal ledger, plugin state or connection credentials.
+
+## 2.5.0 — 2026-10-16
+
+- Give browser views stable, lowercase addresses: `/budgets/<budget-key>/<page>/<month>/<currency>`. Use `home` for the original budget, each saved budget's permanent ID for named budgets, and `demo` for the single fictional sample budget. Budget names can change without changing their addresses.
+- Resolve budget-scoped pages, APIs, assets and downloads from the address independently of the browser's selected-budget cookie, keeping simultaneously open budgets isolated. Preserve existing unscoped API integrations and uppercase ISO currency values in API payloads and storage.
+- Support dynamic `current-month` and explicit `yyyy-mm` view periods. The root address opens the initial demo or selected saved budget; old query-style page addresses are no longer supported.
 
 ## 2.3.0 — 2026-10-16
 

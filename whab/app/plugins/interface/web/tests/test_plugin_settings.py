@@ -2,7 +2,7 @@
 
 import re
 from html.parser import HTMLParser
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 import pytest
 
@@ -41,7 +41,7 @@ class Tags(HTMLParser):
 def render(client, monkeypatch, *plugins, restart_required=False, error=None):
     state = {"plugins": list(plugins), "restart_required": restart_required, "error": error}
     monkeypatch.setattr("whab.plugins.management.PluginManager.projection", lambda _: state)
-    response = client.get("/?workspace=demo")
+    response = client.get("/budgets/demo/budget/current-month/usd")
     assert response.status_code == 200
     return response.text
 
@@ -78,7 +78,7 @@ def test_settings_links_to_installed_plugins_with_all_categories_as_default(clie
 @pytest.mark.parametrize(("workspace", "label"), [("demo", "Demo budget"), ("personal", "My budget")])
 def test_budget_selection_lives_in_settings_and_preserves_page_context(client, workspace, label):
     response = client.get(
-        f"/?workspace={workspace}&page=transactions&month=2026-09&currency=EUR&category=old-category"
+        f"/budgets/{workspace.replace('personal', 'home')}/transactions/2026-09/eur?category=old-category"
     )
     assert response.status_code == 200
     text = response.text
@@ -92,12 +92,10 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     attributes = next(attrs for tag, attrs in Tags(switch).tags if tag == "form")
     for destination in ("personal", "demo"):
         href = attributes[f"data-{destination}-url"]
-        query = parse_qs(urlparse(href).query)
-        assert query["page"] == ["transactions"]
-        assert query["month"] == ["2026-09"]
-        assert query["currency"] == ["EUR"]
-        assert query["workspace"] == [destination]
-        assert "category" not in query
+        address = urlparse(href)
+        key = "home" if destination == "personal" else "demo"
+        assert address.path == f"/budgets/{key}/transactions/2026-09/eur"
+        assert address.query == ""
         switched = client.get(href)
         assert switched.status_code == 200
         next_label = "Demo budget" if destination == "demo" else "My budget"
@@ -140,7 +138,7 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
 
 @pytest.mark.parametrize("workspace", ["personal", "demo"])
 def test_budget_creation_and_file_opening_are_inline_actions_that_leave_the_modal(client, workspace):
-    text = client.get(f"/?workspace={workspace}").text
+    text = client.get(f"/budgets/{workspace.replace('personal', 'home')}/budget/current-month/usd").text
     budgets = dialog(text, "budgets-dialog")
     assert "new-budget-dialog" not in text
     assert budgets.index("data-budget-switch") < budgets.index("Create new budget")

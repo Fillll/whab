@@ -93,11 +93,34 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
                     return JSONResponse({"error": "Request too large"}, status_code=413)
             except ValueError:
                 return JSONResponse({"error": "Invalid request"}, status_code=400)
+        workspace = request.scope.get("whab.workspace")
+        if workspace and request.url.path.startswith("/api/"):
+            if any(value != workspace for value in request.query_params.getlist("workspace")):
+                return JSONResponse({"error": "Workspace does not match this budget address"}, status_code=400)
+            if request.method not in {"GET", "HEAD", "OPTIONS"} and request.headers.get("content-type", "").split(";")[0] == "application/json":
+                try:
+                    body = await request.json()
+                except ValueError:
+                    return JSONResponse({"error": "Use valid JSON"}, status_code=400)
+                if isinstance(body, dict) and "workspace" in body and body["workspace"] != workspace:
+                    return JSONResponse({"error": "Workspace does not match this budget address"}, status_code=400)
+            if workspace == "demo":
+                path = request.url.path
+                personal_only = (
+                    path.startswith(("/api/banks/", "/api/plaid/", "/api/budget/plugins/"))
+                    or "/import/" in path
+                    or path in {"/api/budget/save", "/api/budget/copies"}
+                    or (request.method not in {"GET", "HEAD", "OPTIONS"} and (
+                        path == "/api/plugins/management" or "/settings/actions/" in path
+                    ))
+                )
+                if personal_only:
+                    return JSONResponse({"error": "This operation requires your own budget"}, status_code=403)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        if request.url.path.startswith(("/api/", "/remote/")) or request.url.path == "/":
+        if request.url.path.startswith(("/api/", "/remote/")) or request.url.path == "/" or request.url.path.startswith("/budgets/"):
             response.headers["Cache-Control"] = "no-store"
         return response
 

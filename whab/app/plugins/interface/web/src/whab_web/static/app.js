@@ -1,5 +1,5 @@
 /* WHAB controls. Business rules live in Python; bank UI is loaded by enabled plugins. */
-import {api, notify} from '/static/client.js';
+import {api, apiUrl, notify, pageUrl} from './client.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -81,8 +81,7 @@ for (const form of document.querySelectorAll('form[data-api]')) {
       if (inline && assignmentNavigation) {
         location.assign(assignmentNavigation);
       } else if (body.currency) {
-        const url = new URL(location.href);
-        url.searchParams.set('currency', body.currency);
+        const url = pageUrl({currency: body.currency});
         location.assign(url);
       } else location.reload();
     } catch (failure) {
@@ -195,7 +194,7 @@ if (pluginSelection) {
   pending.dataset.restartRequired = String(!pending.hidden);
   pluginSelection.addEventListener('submit', async event => {
     event.preventDefault();
-    if (pluginSelection.dataset.busy) return;
+    if (pluginSelection.dataset.busy || pluginSelection.hasAttribute('data-read-only')) return;
     const error = pluginSelection.querySelector('.field-error');
     const submit = pluginSelection.querySelector('button[type="submit"]');
     try {
@@ -245,10 +244,11 @@ async function loadBudgetControls() {
   try {
     const [budget, catalog] = await Promise.all([api('/budget'), api('/budgets')]);
     budgetDialog.querySelector('[data-budget-name]').textContent = budget.name;
-    budgetDialog.querySelector('[data-budget-export]').hidden = budget.storage !== 'client';
-    budgetDialog.querySelector('[data-budget-save]').hidden = !budget.portable;
-    budgetDialog.querySelector('[data-budget-copy]').hidden = !budget.portable;
-    budgetDialog.querySelector('[data-budget-advanced]').hidden = !budget.portable && budget.storage !== 'client' && !budget.missingPlugins?.length;
+    const personal = budgetDialog.dataset.workspace === 'personal';
+    budgetDialog.querySelector('[data-budget-export]').hidden = !personal || budget.storage !== 'client';
+    budgetDialog.querySelector('[data-budget-save]').hidden = !personal || !budget.portable;
+    budgetDialog.querySelector('[data-budget-copy]').hidden = !personal || !budget.portable;
+    budgetDialog.querySelector('[data-budget-advanced]').hidden = !personal || (!budget.portable && budget.storage !== 'client' && !budget.missingPlugins?.length);
     const pending = budget.copies.filter(copy => copy.status === 'pending');
     const missing = budget.missingPlugins || [];
     const copies = budgetDialog.querySelector('[data-budget-copies]');
@@ -268,11 +268,12 @@ async function loadBudgetControls() {
     ].filter(Boolean).join(' ');
     const list = budgetDialog.querySelector('[data-available-budgets]');
     list.replaceChildren(settingsText('legend', 'Available budgets'));
-    const entries = [...catalog.budgets].sort((a, b) => Number(b.id === 'default') - Number(a.id === 'default'));
-    entries.forEach((entry, index) => {
-      list.append(budgetChoice(entry, 'personal', entry.active && budgetDialog.dataset.workspace === 'personal', 'Saved on this device'));
-      if (index === 0) list.append(budgetChoice({id: budget.id, name: 'Demo budget'}, 'demo', budgetDialog.dataset.workspace === 'demo', 'Fictional data to explore WHAB'));
-    });
+    const order = entry => entry.id === 'default' ? 0 : entry.id === 'demo' ? 1 : 2;
+    const entries = [...catalog.budgets].sort((a, b) => order(a) - order(b));
+    for (const entry of entries) {
+      const workspace = entry.id === 'demo' ? 'demo' : 'personal';
+      list.append(budgetChoice(entry, workspace, entry.active, workspace === 'demo' ? 'Fictional data to explore WHAB' : 'Saved on this device'));
+    }
   } catch (failure) {
     budgetDialog.querySelector('[data-budget-name]').textContent = 'Unavailable';
     error.textContent = failure.message;
@@ -328,7 +329,9 @@ budgetDialog.addEventListener('click', async event => {
   button.textContent = 'Downloading…';
   error.hidden = true;
   try {
-    await downloadBudget(`/api/budgets/${encodeURIComponent(button.dataset.budgetId)}/export?workspace=${button.dataset.workspace}`, form.elements.password.value, button.dataset.name);
+    const key = button.dataset.budgetId === 'default' ? 'home' : encodeURIComponent(button.dataset.budgetId);
+    const path = button.dataset.workspace === 'demo' ? '/budgets/demo/api/budget/export' : `/budgets/${key}/api/budgets/${encodeURIComponent(button.dataset.budgetId)}/export`;
+    await downloadBudget(path, form.elements.password.value, button.dataset.name);
     notify(`${button.dataset.name} downloaded.`);
   } catch (failure) {
     error.textContent = failure.message;
@@ -357,7 +360,7 @@ exportForm.addEventListener('submit', async event => {
     const included = exportForm.elements.include_credentials.checked;
     const password = exportForm.elements.password.value;
     if (included && Array.from(password).length < 12) throw new Error('Use a password of at least 12 characters.');
-    await downloadBudget(`/api/budget/export${included ? '?include_credentials=true' : ''}`, included ? password : '', 'budget');
+    await downloadBudget(apiUrl(`/budget/export${included ? '?include_credentials=true' : ''}`), included ? password : '', 'budget');
     exportForm.reset();
     exportForm.elements.password.disabled = true;
     exportForm.elements.password.required = false;
@@ -383,10 +386,10 @@ function budgetForm(selector, action) {
     for (const button of buttons) button.disabled = true;
     error.hidden = true;
     try {
-      const destination = await action(form);
+      const result = await action(form);
       budgetDialog.close();
       document.getElementById('settings-dialog').close();
-      location.assign(typeof destination === 'string' ? destination : '/?workspace=personal');
+      location.assign(result.url);
     } catch (failure) {
       error.textContent = failure.message;
       error.hidden = false;
@@ -422,25 +425,30 @@ budgetForm('[data-budget-new]', form => api('/budget/new', {name: form.elements.
 budgetForm('[data-budget-switch]', async form => {
   const selected = form.querySelector('[name="budget"]:checked');
   if (!selected) throw new Error('Choose a budget.');
-  const response = await fetch(`/api/budgets/${encodeURIComponent(selected.dataset.budgetId)}/activate`, {
+  if (selected.dataset.workspace === 'demo') return {url: form.dataset.demoUrl};
+  const response = await fetch(apiUrl(`/budgets/${encodeURIComponent(selected.dataset.budgetId)}/activate`), {
     method: 'POST', body: '{}',
     headers: {'Content-Type': 'application/json', ...budgetPasswordHeaders(form.elements.password.value)},
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'The budget could not be opened.');
-  return selected.dataset.workspace === 'demo' ? form.dataset.demoUrl : form.dataset.personalUrl;
+  const destination = new URL(form.dataset.personalUrl, location.href);
+  const target = new URL(result.url, location.href);
+  destination.pathname = destination.pathname.replace(/^\/budgets\/[^/]+/, target.pathname.split('/').slice(0, 3).join('/'));
+  return {url: destination.href};
 });
 budgetForm('[data-budget-open]', async form => {
   const file = form.elements.budget.files[0];
   if (!file) throw new Error('Choose a WHAB budget file.');
   if (file.size > 50 * 1024 * 1024) throw new Error('Choose a budget file smaller than 50 MiB.');
-  const path = form.elements.as_copy.checked ? '/api/budget/open?as_copy=true' : '/api/budget/open';
-  const response = await fetch(path, {
+  const path = form.elements.as_copy.checked ? '/budget/open?as_copy=true' : '/budget/open';
+  const response = await fetch(apiUrl(path), {
     method: 'POST', body: file,
     headers: {'Content-Type': 'application/zip', ...budgetPasswordHeaders(form.elements.password.value)},
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'The budget could not be opened.');
+  return result;
 });
 
 const pluginCategory = document.querySelector('[data-plugin-category-filter]');
@@ -461,6 +469,7 @@ function settingsText(tag, value, className) {
 }
 
 function renderPluginSettings(dialog, settings) {
+  const readOnly = dialog.dataset.pluginReadOnly === 'true';
   const content = dialog.querySelector('[data-plugin-settings]');
   content.replaceChildren();
   const insights = document.createElement('dl');
@@ -478,8 +487,9 @@ function renderPluginSettings(dialog, settings) {
     row.append(settingsText('p', action.description, 'settings-notice'));
     const button = settingsText('button', action.label, 'button');
     button.type = 'button';
+    button.disabled = readOnly;
     button.addEventListener('click', async () => {
-      if (dialog.dataset.busy) return;
+      if (dialog.dataset.busy || readOnly) return;
       const error = dialog.querySelector('[data-plugin-settings-error]');
       const status = dialog.querySelector('[data-plugin-settings-status]');
       dialog.dataset.busy = 'true';
@@ -496,7 +506,7 @@ function renderPluginSettings(dialog, settings) {
         error.hidden = false;
       } finally {
         delete dialog.dataset.busy;
-        for (const control of content.querySelectorAll('button')) control.disabled = false;
+        for (const control of content.querySelectorAll('button')) control.disabled = readOnly;
       }
     });
     row.append(button);
@@ -534,10 +544,7 @@ for (const input of document.querySelectorAll('[data-navigation]')) {
       input.reportValidity();
       return;
     }
-    const url = new URL(location.href);
-    url.hash = '';
-    url.searchParams.set(input.dataset.navigation, input.value);
-    if (input.dataset.navigation === 'workspace') url.searchParams.delete('category');
+    const url = pageUrl({[input.dataset.navigation]: input.value});
     if (assignmentBusy) {
       assignmentNavigation = url.href;
       pendingAssignmentControls.set(input, initialValue);
@@ -575,11 +582,4 @@ if (search) {
     reviewFilter.classList.toggle('selected', pressed);
     filterTransactions();
   });
-}
-
-if (!location.search.includes('oauth_state_id') && ['#budget', '#transactions', '#insights', '#accounts'].includes(location.hash)) {
-  const url = new URL(location.href);
-  url.searchParams.set('page', location.hash.slice(1));
-  url.hash = '';
-  location.replace(url);
 }
