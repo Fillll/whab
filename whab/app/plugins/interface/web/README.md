@@ -6,7 +6,7 @@ Distributed independently as `whab-web-plugin`. Its version and dependency compa
 
 Templates and static files must ship in the wheel. Use demo data for browser checks and preserve escaping and visual fallbacks.
 
-The sidebar shows the running WHAB application's version below Settings, using the host version supplied with the page.
+The sidebar footer shows a green status dot and the running WHAB application's version, using the host version supplied with the page. An icon-only Settings button sits at the far right of the same row, with a Settings tooltip and accessible name. Compact screens retain the Settings button while hiding the status dot and version.
 
 Browser views use `/budgets/<budget-key>/<page>/<month>/<currency>`; every path segment is lowercase. The original budget is `home`, named budgets use their permanent IDs, and the single sample budget is `demo`. Display names do not determine keys. Pages are `budget`, `transactions`, `insights` and `accounts`. `current-month` follows the calendar on each load; an explicit `2026-10` stays fixed. Page and currency links preserve the month token, while month arrows select an explicit month. Category selections may use query parameters. The root opens the initial demo or selected saved budget; an explicit `--budget` or `WHAB_BUDGET` launch opens its permanent-ID address without a cookie and starts only that selected runtime. `home` is available on ordinary local launches, and demo uses the startup runtime's sample data. Old query-style view addresses are not supported. See [budget addresses](../../../../docs/usage.md#budget-addresses).
 

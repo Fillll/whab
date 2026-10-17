@@ -6,6 +6,10 @@
 - Place Create new budget and Open existing budget in separate sections of the same dialog. Red Open selected budget, Create budget and Open budget actions leave Settings only after success; password and file errors stay in the dialog.
 - Keep saved-copy and encrypted remote-credential controls under Saved copies and export options. Require host 2.6 for targeted downloads and preserve canonical lowercase navigation.
 
+## 1.5.2 — 2026-10-16
+
+- Place the status dot and app version on one sidebar footer row, with an icon-only Settings button aligned to the right. Preserve its accessible name and compact-screen touch target.
+
 ## 1.5.1 — 2026-10-16
 
 - Show the running WHAB application's version below Settings in the sidebar.
