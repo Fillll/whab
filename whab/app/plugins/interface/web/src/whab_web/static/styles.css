@@ -1835,6 +1835,9 @@ strong {
   gap: 10px;
   margin-top: 16px;
 }
+.budget-create-action {
+  margin: 0 0 12px;
+}
 .budget-bundle-form {
   margin-top: 24px;
   padding-top: 20px;

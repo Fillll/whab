@@ -132,6 +132,60 @@ def test_two_budgets_isolate_ledger_plugin_selection_and_legacy_state(tmp_path):
         assert len(budgets) == 3 and next(row for row in budgets if row["active"])["id"] == "default"
 
 
+def test_create_from_demo_activates_empty_personal_budget_without_copying_either_ledger(tmp_path):
+    with TestClient(create_app(settings=settings(tmp_path)), base_url=BASE) as client:
+        account = add_account(client, "Original wallet")
+        month = client.get("/api/workspace?workspace=personal").json()["budgetStartMonth"]
+        assert client.put("/api/budget/groceries", json={
+            "workspace": "personal", "month": month, "assigned": 5000,
+        }).status_code == 200
+        assert client.post("/api/transactions", json={
+            "workspace": "personal", "accountId": account, "date": month + "-01",
+            "merchant": "Original purchase", "amount": 1000, "categoryId": "groceries",
+        }).status_code == 200
+        original = client.get("/api/workspace", params={"workspace": "personal", "month": month}).json()
+        demo = client.get("/api/workspace", params={"workspace": "demo", "month": month}).json()
+        assert demo["accounts"] and demo["transactions"] and demo["summary"]["assigned"] > 0
+
+        response = client.post("/api/budget/new?workspace=demo", json={"name": "  Vacances été 家庭  "}, headers={
+            "Referer": BASE + "/?workspace=demo",
+        })
+        assert response.status_code == 200, response.text
+        budget_id = response.json()["id"]
+        current = client.get("/api/budget").json()
+        assert current["id"] == budget_id and current["name"] == "Vacances été 家庭"
+        budgets = client.get("/api/budgets").json()["budgets"]
+        assert next(row for row in budgets if row["active"])["id"] == budget_id
+        personal = client.get("/api/workspace", params={"workspace": "personal", "month": month}).json()
+        assert personal["accounts"] == [] and personal["transactions"] == []
+        assert all(personal["summary"][key] == 0 for key in ("readyToAssign", "assigned", "spent", "available"))
+        _, ledger = decode_bundle(client.get("/api/budget/export").content)
+        assert ledger["accounts"] == [] and ledger["transactions"] == [] and ledger["assignments"] == []
+
+        activate(client, "default")
+        assert client.get("/api/workspace", params={"workspace": "personal", "month": month}).json() == original
+        assert client.get("/api/workspace", params={"workspace": "demo", "month": month}).json() == demo
+
+
+@pytest.mark.parametrize("name", ["", "   ", "bad\x00name", "x" * 101, None, 7])
+def test_invalid_creation_name_preserves_active_budget_and_registers_nothing(tmp_path, name):
+    configuration = settings(tmp_path)
+    host = BudgetHost(configuration)
+    with TestClient(create_app(settings=configuration, budget_host=host), base_url=BASE) as client:
+        budget_id = new_budget(client, "Existing household")
+        add_account(client, "Saved wallet")
+        budgets = client.get("/api/budgets").json()
+        paths = set((tmp_path / "budgets").rglob("*"))
+        response = client.post("/api/budget/new", json={"name": name})
+        assert response.status_code == 400
+        assert "set-cookie" not in response.headers
+        assert client.get("/api/budget").json()["id"] == budget_id
+        assert client.get("/api/budgets").json() == budgets
+        assert account_names(client) == {"Saved wallet"}
+        assert set(host.applications) == {"default", budget_id} and len(host.contexts) == 1
+        assert set((tmp_path / "budgets").rglob("*")) == paths
+
+
 def test_export_upload_restores_ledger_plugin_data_and_disabled_selection(tmp_path):
     with TestClient(create_app(settings=settings(tmp_path / "source", ("bank-logos",))), base_url=BASE) as client:
         budget_id = new_budget(client, "Portable household")

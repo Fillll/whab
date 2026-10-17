@@ -1,5 +1,10 @@
 # Web interface plugin changelog
 
+## 1.4.0 — 2026-10-16
+
+- Add a prominent **New budget** action in Settings → Budgets with a dedicated name form, Create budget and Cancel controls. Open the new personal workspace after successful creation through the existing core budget API.
+- Move saved-budget switching above portable-file controls and keep exports and saved copies in a separate lower section.
+
 ## 1.3.0 — 2026-10-16
 
 - Add Light and Dark appearance options in Settings → Plugins → WHAB web → Options, with the compass logo's red and yellow accents. Apply changes immediately and remember the choice in this browser.
