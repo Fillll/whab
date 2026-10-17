@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.7.0 — 2026-10-17
+
+PR: [#41](https://github.com/Fillll/whab/pull/41)
+
+- Add currency-scoped monthly summary fields for outstanding category overspending carried into the month and assignments for exactly the following month. Preserve existing available-money calculations and assignment funding checks.
+- Require web plugin 1.7 or newer in the bundled installation for the revised monthly budget layout.
+
 ## 2.6.1 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)

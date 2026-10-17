@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.7.0 — 2026-10-17
+
+PR: [#41](https://github.com/Fillll/whab/pull/41)
+
+- Show Available, Assigned and Spent above the larger To assign amount, and remove the decorative four-square icon from month headings.
+- Add Income, Previous overspending, Assigned for next month and Assigned this month rows above Spending categories. Preserve the editable category grid and show dashes for historical planning or totals unavailable from an older remote server.
+- Require WHAB 2.7 for the new core monthly projection fields.
+
 ## 1.6.1 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)
