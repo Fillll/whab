@@ -4,8 +4,8 @@ from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
-from whab_web.plugin import plugin as web_plugin
-from whab_ynab.plugin import plugin as ynab_plugin
+from whab_plugin_web.plugin import plugin as web_plugin
+from whab_plugin_ynab.plugin import plugin as ynab_plugin
 
 from whab.app import create_app
 from whab.config import Settings

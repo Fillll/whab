@@ -78,12 +78,12 @@ def test_discovery_lists_inactive_plugins_without_importing_or_exposing_settings
 
 def test_disabled_bundled_plugins_keep_canonical_names_without_importing(tmp_path, monkeypatch):
     registrations = (
-        ("bank-logos", "whab_bank_logos.plugin:plugin", "Bank logos", "interface"),
-        ("web", "whab_web.plugin:plugin", "WHAB web", "interface"),
-        ("plaid", "whab_plaid.plugin:plugin", "Plaid", "ingestion"),
-        ("ynab", "whab_ynab.plugin:plugin", "Import from YNAB ZIP file", "ingestion"),
-        ("sqlite", "whab_sqlite.plugin:plugin", "SQLite", "storage"),
-        ("example", "whab_example_plugin:plugin", "Month totals example", "example"),
+        ("bank-logos", "whab_plugin_bank_logos.plugin:plugin", "Bank logos", "interface"),
+        ("web", "whab_plugin_web.plugin:plugin", "WHAB web", "interface"),
+        ("plaid", "whab_plugin_plaid.plugin:plugin", "Plaid", "ingestion"),
+        ("ynab", "whab_plugin_ynab.plugin:plugin", "Import from YNAB ZIP file", "ingestion"),
+        ("sqlite", "whab_plugin_sqlite.plugin:plugin", "SQLite", "storage"),
+        ("example", "whab_plugin_example:plugin", "Month totals example", "example"),
     )
     entries = tuple(
         Entry(name, RuntimeError("Disabled plugins must not be imported"), value=value)
@@ -103,11 +103,11 @@ def test_disabled_bundled_plugins_keep_canonical_names_without_importing(tmp_pat
 def test_bundled_names_require_exact_unambiguous_identity_and_preserve_active_names(tmp_path, monkeypatch):
     active = Plugin("plaid", "Active provider name", bank=forbidden)
     entries = (
-        Entry("plaid", active, value="whab_plaid.plugin:plugin"),
+        Entry("plaid", active, value="whab_plugin_plaid.plugin:plugin"),
         Entry("web", RuntimeError("do not import"), value="third_party.plugin:plugin"),
-        Entry("ynab", RuntimeError("do not import"), value="whab_ynab.plugin:plugin"),
+        Entry("ynab", RuntimeError("do not import"), value="whab_plugin_ynab.plugin:plugin"),
         Entry("ynab", RuntimeError("do not import"), value="another.plugin:plugin"),
-        Entry("custom", RuntimeError("do not import"), value="whab_web.plugin:plugin"),
+        Entry("custom", RuntimeError("do not import"), value="whab_plugin_web.plugin:plugin"),
     )
     monkeypatch.setattr("whab.plugins.management.metadata.entry_points", lambda **kwargs: entries)
     instance = PluginManager(settings(tmp_path, ui=""), PluginRegistry((active,)))

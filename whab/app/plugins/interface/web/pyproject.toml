@@ -1,6 +1,6 @@
 [project]
-name = "whab-web-plugin"
-version = "1.6.0"
+name = "whab_plugin_web"
+version = "1.6.1"
 description = "Web interface plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -9,7 +9,7 @@ license-files = ["LICENSE"]
 dependencies = ["whab>=2.6,<3", "MarkupSafe>=2,<4"]
 
 [project.entry-points."whab.plugins"]
-web = "whab_web.plugin:plugin"
+web = "whab_plugin_web.plugin:plugin"
 
 [build-system]
 requires = ["setuptools>=77.0.3"]
@@ -17,7 +17,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["whab_web", "whab_web.*"]
+include = ["whab_plugin_web", "whab_plugin_web.*"]
 
 [tool.setuptools.package-data]
-whab_web = ["templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]
+whab_plugin_web = ["templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]

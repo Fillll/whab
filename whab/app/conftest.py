@@ -6,7 +6,7 @@ import pytest
 @pytest.fixture
 def store():
     # Import only when a test requests the reference backend.
-    from whab_sqlite import Store
+    from whab_plugin_sqlite import Store
 
     ledger = Store(":memory:", month="2026-10")
     yield ledger

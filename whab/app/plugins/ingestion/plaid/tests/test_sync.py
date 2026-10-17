@@ -5,7 +5,7 @@ import json
 
 import httpx
 import pytest
-from whab_plaid.service import PlaidError, PlaidService
+from whab_plugin_plaid.service import PlaidError, PlaidService
 
 
 def test_pagination_restarts_original_cursor_and_saves_all_pages(

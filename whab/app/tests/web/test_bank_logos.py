@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from whab_sqlite.plugin import plugin as sqlite_plugin
+from whab_plugin_sqlite.plugin import plugin as sqlite_plugin
 
 from tests.support.bank_logos import LOGO_PATH, PNG
 from tests.support.bank_logos import imported_store as imported_store

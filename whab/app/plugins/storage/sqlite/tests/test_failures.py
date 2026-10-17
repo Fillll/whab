@@ -3,9 +3,9 @@
 import sqlite3
 
 import pytest
-import whab_sqlite
-from whab_sqlite import Store
-from whab_sqlite.schema import initialize_schema
+import whab_plugin_sqlite
+from whab_plugin_sqlite import Store
+from whab_plugin_sqlite.schema import initialize_schema
 
 from whab.domain.categories import category_group_id
 from whab.domain.errors import StoreError
@@ -31,7 +31,7 @@ def manual_transaction(account_id, **extra):
 
 def test_unknown_lazy_export_raises_attribute_error():
     with pytest.raises(AttributeError, match="has no attribute 'MissingBackend'"):
-        getattr(whab_sqlite, "MissingBackend")
+        getattr(whab_plugin_sqlite, "MissingBackend")
 
 
 def test_failed_household_seeding_rolls_back_then_can_be_retried(tmp_path, monkeypatch):

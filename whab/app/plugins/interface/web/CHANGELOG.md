@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.6.1 — 2026-10-16
+
+PR: [#40](https://github.com/Fillll/whab/pull/40)
+
+- Rename the independent distribution and Python package to `whab_plugin_web` under the shared `whab_plugin_<name>` convention. Preserve the plugin ID and its existing saved data and settings.
+
 ## 1.6.0 — 2026-10-16
 
 PR: [#35](https://github.com/Fillll/whab/pull/35)

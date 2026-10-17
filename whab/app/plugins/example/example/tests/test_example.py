@@ -11,9 +11,9 @@ from whab.plugins import AccountSnapshot, BudgetSnapshot, TransactionSnapshot
 def example_module():
     source = (
         Path(__file__).resolve().parents[1]
-        / "src/whab_example_plugin/__init__.py"
+        / "src/whab_plugin_example/__init__.py"
     )
-    spec = util.spec_from_file_location("whab_example_plugin_fixture", source)
+    spec = util.spec_from_file_location("whab_plugin_example_fixture", source)
     module = util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

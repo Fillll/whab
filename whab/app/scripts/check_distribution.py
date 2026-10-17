@@ -28,13 +28,14 @@ import whab
 from whab.app import create_app
 from whab.config import Settings
 from whab.plugins import load_plugins
-from whab_plaid.logos import logo_key
+from whab_plugin_plaid.logos import logo_key
 from fastapi.testclient import TestClient
 
 target = Path(sys.argv[1]).resolve()
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]
 assert not metadata.distribution("whab").entry_points
+assert {entry.name for entry in metadata.entry_points(group="whab.plugins")} == set(expected) - {"whab"}
 for identifier, record in expected.items():
     assert metadata.version(record["distribution"]) == record["version"], identifier
     if identifier == "whab":
@@ -204,6 +205,9 @@ def main():
             entrypoints = metadata["entry-points"]["whab.plugins"]
             assert len(entrypoints) == 1, project
             identifier, entrypoint = next(iter(entrypoints.items()))
+            package_name = "whab_plugin_" + identifier.replace("-", "_")
+            assert metadata["name"] == package_name, project
+            assert entrypoint.split(":", 1)[0].split(".", 1)[0] == package_name, project
             destination = base / "plugins" / identifier
             shutil.copytree(project.parent, destination, ignore=plugin_ignore)
             copied[identifier] = destination

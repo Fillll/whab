@@ -1,8 +1,8 @@
 # Import from YNAB ZIP file
 
-Distributed independently as `whab-ynab-plugin`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_ynab`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
-Optional plugin ID: `ynab`; Python package: `whab_ynab`. It is installed by WHAB's supported-set installer/extra and is disabled by default. It reads a local YNAB ZIP containing one Budget and one Register table, recognized by their English column headers. Both TSV and CSV, UTF-8 and BOM-marked UTF-16 are supported. No YNAB account, API token or network request is needed.
+Optional plugin ID: `ynab`; Python package: `whab_plugin_ynab`. It is installed by WHAB's supported-set installer/extra and is disabled by default. It reads a local YNAB ZIP containing one Budget and one Register table, recognized by their English column headers. Both TSV and CSV, UTF-8 and BOM-marked UTF-16 are supported. No YNAB account, API token or network request is needed.
 
 Enable **Import from YNAB ZIP file** through Settings → Plugins, save, and restart. Open **My budget → Accounts**, choose the ZIP (at most 10 MiB), confirm that its monetary values use USD, and preview. Review the counts and warnings before clicking **Import into empty budget**. With no saved plugin selection, `WHAB_PLUGINS=ynab` enables it on startup.
 

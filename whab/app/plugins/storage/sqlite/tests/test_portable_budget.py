@@ -4,7 +4,7 @@ import json
 import sqlite3
 
 import pytest
-from whab_sqlite import Store
+from whab_plugin_sqlite import Store
 
 from whab.domain.errors import StoreError
 
@@ -111,7 +111,7 @@ def test_restore_refuses_existing_or_previously_imported_data(store, existing):
 
 
 def test_invalid_snapshot_is_validated_inside_transaction_and_cannot_change_saved_data(store, monkeypatch):
-    import whab_sqlite.store as module
+    import whab_plugin_sqlite.store as module
 
     validate = module.validate_portable_budget
     observed = []

@@ -2,7 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from whab_sqlite.plugin import plugin as sqlite_plugin
+from whab_plugin_sqlite.plugin import plugin as sqlite_plugin
 
 from whab.app import create_app
 from whab.config import Settings

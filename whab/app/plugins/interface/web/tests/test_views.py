@@ -1,7 +1,7 @@
 """Presentation totals include cleared uncategorized purchases without counting transfers."""
 
 import pytest
-from whab_web.views import build_context
+from whab_plugin_web.views import build_context
 
 
 def test_uncategorized_spending_counts_only_cleared_purchases():
@@ -33,7 +33,7 @@ def test_uncategorized_spending_counts_only_cleared_purchases():
 
 
 def test_exact_currency_amount_inputs():
-    from whab_web.views import money_input, money_number, month_label, shift_month
+    from whab_plugin_web.views import money_input, money_number, month_label, shift_month
 
     assert money_input(123456) == "1234.56"
     assert money_input(-123456) == "-1234.56"
@@ -172,7 +172,7 @@ def test_periods_preserve_core_values_without_recalculating_budget_rules():
     ("Health", "plus"), ("Fun", "sparkles"), ("Other", "tag"),
 ])
 def test_category_inspector_icons(name, expected):
-    from whab_web.icons import category_icon
+    from whab_plugin_web.icons import category_icon
 
     assert category_icon(name) == expected
 

@@ -6,8 +6,8 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from whab_client.plugin import RemoteStore
-from whab_server.plugin import create_interface
+from whab_plugin_client.plugin import RemoteStore
+from whab_plugin_server.plugin import create_interface
 
 from whab.plugins import LedgerService, StoreError
 

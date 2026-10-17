@@ -4,7 +4,7 @@ import sqlite3
 from dataclasses import replace
 
 import pytest
-from whab_sqlite import Store
+from whab_plugin_sqlite import Store
 
 from whab.domain.categories import category_group_id
 from whab.domain.errors import StoreError

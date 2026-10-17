@@ -1,6 +1,6 @@
 [project]
-name = "whab-plaid-plugin"
-version = "1.1.1"
+name = "whab_plugin_plaid"
+version = "1.1.2"
 description = "Plaid bank ingestion plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -9,7 +9,7 @@ license-files = ["LICENSE"]
 dependencies = ["whab>=2.5,<3", "httpx==0.28.1", "cryptography==50.0.2"]
 
 [project.entry-points."whab.plugins"]
-plaid = "whab_plaid.plugin:plugin"
+plaid = "whab_plugin_plaid.plugin:plugin"
 
 [build-system]
 requires = ["setuptools>=77.0.3"]
@@ -17,7 +17,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["whab_plaid", "whab_plaid.*"]
+include = ["whab_plugin_plaid", "whab_plugin_plaid.*"]
 
 [tool.setuptools.package-data]
-whab_plaid = ["templates/*.html", "static/*.js"]
+whab_plugin_plaid = ["templates/*.html", "static/*.js"]

@@ -7,8 +7,8 @@ import sys
 from contextlib import closing
 
 import pytest
-from whab_sqlite import Store
-from whab_sqlite.plugin import plugin
+from whab_plugin_sqlite import Store
+from whab_plugin_sqlite.plugin import plugin
 
 from whab.domain.dates import current_month
 from whab.domain.errors import StoreError
@@ -39,7 +39,7 @@ def audit_import(name, globals=None, locals=None, fromlist=(), level=0):
 builtins.__import__ = audit_import
 try:
     from whab.storage.bank import BankStore
-    from whab_sqlite.plugin import plugin
+    from whab_plugin_sqlite.plugin import plugin
     assert plugin.id == 'sqlite'
     assert callable(plugin.storage)
     assert plugin.bank is None
@@ -49,9 +49,9 @@ finally:
     builtins.__import__ = original_import
 
 print(json.dumps({
-    'backend': 'whab_sqlite.store' in sys.modules,
-    'schema': 'whab_sqlite.schema' in sys.modules,
-    'seeding': 'whab_sqlite.seeding' in sys.modules,
+    'backend': 'whab_plugin_sqlite.store' in sys.modules,
+    'schema': 'whab_plugin_sqlite.schema' in sys.modules,
+    'seeding': 'whab_plugin_sqlite.seeding' in sys.modules,
     'driver_imports': sqlite_imports,
 }))
 """,

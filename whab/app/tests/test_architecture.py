@@ -86,7 +86,7 @@ def test_plugins_use_public_host_contracts_and_do_not_import_each_other(package)
 
 @pytest.mark.parametrize("module", ["store", "schema", "seeding"])
 def test_sqlite_ledger_modules_remain_independent_of_host_and_sdk(module):
-    path = ROOT / "plugins" / "storage" / "sqlite" / "src" / "whab_sqlite" / f"{module}.py"
+    path = ROOT / "plugins" / "storage" / "sqlite" / "src" / "whab_plugin_sqlite" / f"{module}.py"
     assert path.is_file()
     assert not any(
         name == "whab.plugins" or name.startswith("whab.plugins.")

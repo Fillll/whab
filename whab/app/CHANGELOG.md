@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.6.1 — 2026-10-16
+
+PR: [#40](https://github.com/Fillll/whab/pull/40)
+
+- Standardize every supported and example plugin's Python package and distribution as `whab_plugin_<name>`, and update bundled dependency requirements and plugin management metadata. Saved plugin IDs, settings, routes and portable budgets keep their existing identities.
+- Upgrade source installations by installing replacement packages before removing obsolete official distribution registrations, preserving existing plugin selections and preventing duplicate discovery.
+
 ## 2.6.0 — 2026-10-16
 
 PR: [#35](https://github.com/Fillll/whab/pull/35)

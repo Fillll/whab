@@ -1,8 +1,8 @@
 # Bank logos plugin
 
-Distributed independently as `whab-bank-logos-plugin`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_bank_logos`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
-`src/whab_bank_logos/` owns curated institution-name resolution, bounded public icon fetching and its cache. Keep its helpers and mocked provider tests in this folder. The host owns image-route validation and supplies the plugin cache directory through the public branding contract.
+`src/whab_plugin_bank_logos/` owns curated institution-name resolution, bounded public icon fetching and its cache. Keep its helpers and mocked provider tests in this folder. The host owns image-route validation and supplies the plugin cache directory through the public branding contract.
 
 Successful logos stay cached for **1 year (365 days)** from download. The next image request after expiry fetches a fresh logo. Saved logos survive application restarts in `WHAB_HOME/cache/plugins/bank-logos/`; cache loading accepts only curated keys, bounded files and validated raster images. At most one download per key runs at a time. Failed requests are cached in memory for 5 minutes and retried after that interval.
 

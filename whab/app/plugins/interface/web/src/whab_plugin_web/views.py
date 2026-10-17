@@ -22,7 +22,7 @@ from whab.plugins import (
 
 from .icons import category_icon, icon
 
-WEB_ASSET_VERSION = package_version("whab-web-plugin")
+WEB_ASSET_VERSION = package_version("whab_plugin_web")
 
 
 def money_input(value, currency="USD"):

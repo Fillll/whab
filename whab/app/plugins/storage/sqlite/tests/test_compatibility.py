@@ -2,8 +2,8 @@
 
 import sqlite3
 
-from whab_sqlite import Store
-from whab_sqlite.plugin import plugin
+from whab_plugin_sqlite import Store
+from whab_plugin_sqlite.plugin import plugin
 
 from whab.config import Settings
 from whab.domain.categories import category_group_id
@@ -36,7 +36,7 @@ def test_node_schema_and_encrypted_fixture_remain_usable(
     )
     original.commit()
     original.close()
-    monkeypatch.setattr("whab_sqlite.store.current_month", lambda: "2026-11")
+    monkeypatch.setattr("whab_plugin_sqlite.store.current_month", lambda: "2026-11")
     reopened = plugin.storage(StorageContext(tmp_path, "sandbox", {}))
     try:
         assert reopened.get_item("fixture-item")["cursor"] == "legacy-cursor"

@@ -30,7 +30,7 @@ with TestClient(create_app(settings=settings), base_url="https://127.0.0.1:5173"
     assert client.get("/api/export?workspace=demo").status_code == 200
     plugins = client.get("/api/plugins").json()["plugins"]
     assert [(p["id"], p["kinds"]) for p in plugins] == [("sqlite", ["storage"])]
-assert not any(name.startswith(("whab_web", "whab_plaid")) for name in sys.modules)
+assert not any(name.startswith(("whab_plugin_web", "whab_plugin_plaid")) for name in sys.modules)
 """
     subprocess.run(
         [sys.executable, "-I", "-c", script, str(tmp_path)],

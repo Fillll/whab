@@ -1,5 +1,11 @@
 # Example report and export plugin changelog
 
+## 1.3.1 — 2026-10-16
+
+PR: [#40](https://github.com/Fillll/whab/pull/40)
+
+- Rename the independent distribution and Python package to `whab_plugin_example` under the shared `whab_plugin_<name>` convention. Preserve the plugin ID and its existing saved data and settings.
+
 ## 1.3.0 — 2026-10-16
 
 PR: [#31](https://github.com/Fillll/whab/pull/31)

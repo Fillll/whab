@@ -1,6 +1,6 @@
 """Test-only inspection of SQLite payloads; production container code stays opaque."""
 
-from whab_sqlite import Store
+from whab_plugin_sqlite import Store
 
 from whab.budgets.container import decode_container, encode_container
 

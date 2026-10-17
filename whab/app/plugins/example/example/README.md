@@ -1,8 +1,8 @@
 # Example report and export plugin
 
-Distributed independently as `whab-example-plugin`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_example`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
-This folder is an independently distributed plugin, with its own `pyproject.toml`, source and tests. `src/whab_example_plugin/` uses the public SDK to produce Insights and CSV exports from immutable snapshots.
+This folder is an independently distributed plugin, with its own `pyproject.toml`, source and tests. `src/whab_plugin_example/` uses the public SDK to produce Insights and CSV exports from immutable snapshots.
 
 The example is developer-only and hidden from ordinary Settings, including Options. From the application directory (`whab/app/`), install it alongside the host and supported plugins:
 

@@ -4,13 +4,13 @@ import importlib
 
 import httpx
 import pytest
-from whab_plaid.logos import fetch, logo_key
-from whab_plaid.mapping import normalize_transaction
-from whab_plaid.plugin import plugin
+from whab_plugin_plaid.logos import fetch, logo_key
+from whab_plugin_plaid.mapping import normalize_transaction
+from whab_plugin_plaid.plugin import plugin
 
 from whab.plugins import LogoImage
 
-provider = importlib.import_module("whab_plaid.logos")
+provider = importlib.import_module("whab_plugin_plaid.logos")
 PNG = b"\x89PNG\r\n\x1a\nfixture"
 URL = "https://plaid-merchant-logos.plaid.com/fixture_123-Ab.png"
 KEY = "merchant-fixture_123-Ab"

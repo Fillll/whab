@@ -5,9 +5,9 @@ import importlib
 
 import httpx
 import pytest
-from whab_bank_logos.plugin import fetch_logo, plugin, resolve
+from whab_plugin_bank_logos.plugin import fetch_logo, plugin, resolve
 
-provider = importlib.import_module("whab_bank_logos.plugin")
+provider = importlib.import_module("whab_plugin_bank_logos.plugin")
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="
 )

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from whab_plaid.plugin import plugin as plaid_plugin
+from whab_plugin_plaid.plugin import plugin as plaid_plugin
 
 from whab.app import create_app
 from whab.config import Settings

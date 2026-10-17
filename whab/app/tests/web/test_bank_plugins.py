@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from whab_sqlite import Store
+from whab_plugin_sqlite import Store
 
 from whab.app import create_app
 from whab.config import Settings
@@ -35,7 +35,7 @@ with TestClient(create_app(settings=settings), base_url="https://127.0.0.1:5173"
     assert client.get("/plugins/plaid/static/connect.js").status_code == 404
     assert client.get("/api/status").json()["enabled"] is False
     assert client.post("/api/accounts", json={"workspace":"personal","name":"Cash","type":"depository","balance":100}).status_code == 200
-assert not any(name.startswith("whab_plaid") for name in sys.modules)
+assert not any(name.startswith("whab_plugin_plaid") for name in sys.modules)
 """
     subprocess.run([sys.executable, "-I", "-c", script, str(tmp_path)], check=True, capture_output=True, text=True)
 

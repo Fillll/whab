@@ -3,8 +3,8 @@
 import re
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from whab_web.plugin import resources
-from whab_web.views import build_context
+from whab_plugin_web.plugin import resources
+from whab_plugin_web.views import build_context
 
 LOGO_PATH = "/api/plugins/plaid/merchant-logos/fictional-merchant"
 

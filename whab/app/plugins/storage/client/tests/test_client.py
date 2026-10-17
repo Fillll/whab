@@ -4,7 +4,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from whab_client.plugin import RemoteStore, create_storage, plugin
+from whab_plugin_client.plugin import RemoteStore, create_storage, plugin
 
 from whab.plugins import StorageContext, StoreError
 

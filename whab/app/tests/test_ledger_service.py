@@ -209,7 +209,7 @@ def test_query_and_assignment_month_range_matches_every_public_interface(store, 
 
 
 def test_workspace_periods_share_core_rollover_refunds_debt_and_currency_rules(store, monkeypatch):
-    monkeypatch.setattr("whab_sqlite.store.current_month", lambda: "2026-10")
+    monkeypatch.setattr("whab_plugin_sqlite.store.current_month", lambda: "2026-10")
     service = LedgerService(store)
     cash = service.add_account("personal", {"name": "Cash", "type": "depository", "balance": 100000})
     service.add_account("personal", {"name": "Card", "type": "credit", "balance": 20000})

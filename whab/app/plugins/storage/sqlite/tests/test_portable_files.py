@@ -5,7 +5,7 @@ from copy import deepcopy
 from types import MappingProxyType
 
 import pytest
-from whab_sqlite import Store
+from whab_plugin_sqlite import Store
 
 from whab.domain.errors import StoreError
 from whab.domain.file_imports import WorkspaceImport
@@ -112,7 +112,7 @@ def test_wrong_payload_keys_types_headers_and_damaged_images_are_rejected(store,
 
 
 def test_database_image_size_is_bounded_on_export_and_read(store, monkeypatch):
-    from whab_sqlite import portable
+    from whab_plugin_sqlite import portable
 
     files = store.export_budget_files()
     monkeypatch.setattr(portable, "MAX_DATABASE_BYTES", 100)
