@@ -71,7 +71,7 @@ def test_artwork_errors_return_sanitized_404_without_breaking_pages(store, tmp_p
     with client_for(store, tmp_path, fetch) as client:
         response = client.get(PATH)
         assert response.status_code == 404 and "PRIVATE_FIXTURE_ERROR" not in response.text
-        assert client.get("/?page=transactions&workspace=demo&month=2026-10").status_code == 200
+        assert client.get("/budgets/demo/transactions/2026-10/usd").status_code == 200
 
 
 def test_page_projects_only_enabled_providers_public_keys_and_never_fetches(imported_store, tmp_path):
@@ -86,14 +86,14 @@ def test_page_projects_only_enabled_providers_public_keys_and_never_fetches(impo
         "next-fixture-cursor",
     )
     with client_for(imported_store, tmp_path, lambda _: pytest.fail("Page must not fetch artwork")) as client:
-        page = client.get("/?page=transactions&workspace=personal&month=2026-10")
+        page = client.get("/budgets/home/transactions/2026-10/usd")
         assert page.status_code == 200 and PATH in page.text
         assert "fictional-purchase" in page.text
         assert "plaid.com" not in page.text
-        assert PATH not in client.get("/?page=transactions&workspace=demo&month=2026-10").text
-        assert PATH not in client.get("/?page=transactions&workspace=personal&month=2026-09").text
+        assert PATH not in client.get("/budgets/demo/transactions/2026-10/usd").text
+        assert PATH not in client.get("/budgets/home/transactions/2026-09/usd").text
         transaction = next(t for t in client.get("/api/workspace?workspace=personal&month=2026-10").json()["transactions"] if t["id"] == "fictional-purchase")
         assert transaction["merchantLogo"] == "merchant-Fixture_123"
     with client_for(imported_store, tmp_path) as client:
-        assert PATH not in client.get("/?page=transactions&workspace=personal&month=2026-10").text
+        assert PATH not in client.get("/budgets/home/transactions/2026-10/usd").text
         assert client.get(PATH).status_code == 404

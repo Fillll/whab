@@ -1,7 +1,19 @@
 /* WHAB Plaid Link controls. */
 // A provider must not depend on the selected visual plugin's JavaScript modules.
+const budgetUrl = location.pathname.split('/').slice(0, 3).join('/');
+const apiPrefix = `${budgetUrl}/api`;
+
+function accountsUrl() {
+  const url = new URL(location.href);
+  const segments = url.pathname.split('/');
+  segments[3] = 'accounts';
+  url.pathname = segments.join('/');
+  url.search = '';
+  url.hash = '';
+  return url;
+}
 async function api(path, body, method = 'POST') {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${apiPrefix}${path}`, {
     method: body === undefined ? 'GET' : method,
     ...(body === undefined ? {} : {body: JSON.stringify(body)}),
     headers: {'Content-Type': 'application/json'},
@@ -47,8 +59,9 @@ async function connect(itemId, resumeToken) {
     button.disabled = true;
   });
   const clearSession = () => {
-    sessionStorage.removeItem('whab-link-token');
-    sessionStorage.removeItem('whab-link-item');
+    try {
+      for (const key of ['whab-link-token', 'whab-link-item', 'whab-link-budget', 'whab-link-return-url', 'whab-link-redirect-uri']) sessionStorage.removeItem(key);
+    } catch { /* Storage may be unavailable. */ }
   };
   const unlock = () => {
     linking = false;
@@ -57,6 +70,21 @@ async function connect(itemId, resumeToken) {
     });
   };
   try {
+    let receivedRedirectUri;
+    if (resumeToken) {
+      if (sessionStorage.getItem('whab-link-budget') !== budgetUrl) {
+        throw new Error('This bank connection belongs to a different budget. Open its Accounts page and connect again.');
+      }
+      receivedRedirectUri = sessionStorage.getItem('whab-link-redirect-uri') || location.href;
+      const redirect = new URL(receivedRedirectUri);
+      if (redirect.origin !== location.origin || !redirect.searchParams.has('oauth_state_id') || redirect.hash) {
+        throw new Error('The bank connection session expired. Open Accounts and connect again.');
+      }
+    } else {
+      sessionStorage.setItem('whab-link-budget', budgetUrl);
+      sessionStorage.setItem('whab-link-return-url', accountsUrl().pathname);
+      sessionStorage.removeItem('whab-link-redirect-uri');
+    }
     const token = resumeToken || (await api('/plaid/link-token', itemId ? {
       itemId
     } : {})).link_token;
@@ -67,7 +95,7 @@ async function connect(itemId, resumeToken) {
     const handler = window.Plaid.create({
       token,
       ...(resumeToken ? {
-        receivedRedirectUri: location.href
+        receivedRedirectUri
       } : {}),
       onSuccess: async (publicToken, metadata) => {
         try {
@@ -87,11 +115,11 @@ async function connect(itemId, resumeToken) {
             itemId
           } : {});
           clearSession();
-          location.assign('/?page=accounts&workspace=personal');
+          location.assign(accountsUrl());
         } catch (failure) {
           clearSession();
           sessionStorage.setItem('whab-notice', failure.message);
-          location.assign('/?page=accounts&workspace=personal');
+          location.assign(accountsUrl());
         } finally {
           setTimeout(() => handler.destroy(), 0);
         }
@@ -139,7 +167,7 @@ document.getElementById('plaid-confirm-disconnect')?.addEventListener('click', a
 });
 
 
-if (location.search.includes('oauth_state_id')) {
+if (new URL(location.href).searchParams.has('oauth_state_id')) {
   const token = sessionStorage.getItem('whab-link-token');
   if (token) connect(sessionStorage.getItem('whab-link-item') || undefined, token);
   else notify('The bank connection session expired. Open Accounts and connect again.');

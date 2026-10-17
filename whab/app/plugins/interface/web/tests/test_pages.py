@@ -6,7 +6,7 @@ from whab.plugins import Insight, Plugin
 
 def test_all_pages_render_and_escape_user_content(client):
     for page in ("budget", "transactions", "insights", "accounts"):
-        response = client.get("/", params={"page": page, "workspace": "demo", "month": "2026-10"})
+        response = client.get(f"/budgets/demo/{page}/2026-10/usd")
         assert response.status_code == 200
         assert "Sample data" in response.text
         assert "/static/app.js" in response.text
@@ -22,7 +22,7 @@ def test_all_pages_render_and_escape_user_content(client):
         ).status_code
         == 200
     )
-    text = client.get("/?page=accounts&workspace=personal").text
+    text = client.get("/budgets/home/accounts/current-month/usd").text
     assert name not in text
     assert "&lt;script&gt;" in text
     assert "Sandbox mode" in text
@@ -41,7 +41,7 @@ def test_extension_insights_render_and_escape_content(store, tmp_path, client_fo
         Plugin("test", "Test report", insights=insights),
         Plugin("broken", "Broken report", insights=fail),
     ) as client:
-        response = client.get("/?page=insights&workspace=demo&month=2026-10")
+        response = client.get("/budgets/demo/insights/2026-10/usd")
         assert response.status_code == 200
         assert 'class="plugin-metrics"' in response.text
         assert "&lt;script&gt;value&lt;/script&gt;" in response.text
@@ -53,7 +53,7 @@ def test_extension_insights_render_and_escape_content(store, tmp_path, client_fo
 def test_default_formats_and_only_children_in_category_choices(client):
     import re
 
-    text = client.get("/?page=transactions&workspace=demo&month=2026-10").text
+    text = client.get("/budgets/demo/transactions/2026-10/usd").text
     assert re.search(r'class="date-cell">2026-10-\d{2}</td>', text)
     assert 'Date (YYYY-MM-DD)' in text
     assert 'name="date" type="text" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"' in text
@@ -101,16 +101,16 @@ def test_pages_keep_currency_totals_and_categories_separate(client):
         ).status_code == 200
 
     for currency, money, amount_input in (("USD", "$734.56", "0.00"), ("JPY", "JPY 1,745", "0"), ("KWD", "KWD 3.567", "0.000")):
-        text = client.get(f"/?page=budget&workspace=personal&month=2026-10&currency={currency}").text
+        text = client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text
         assert money in text
         assert f'{currency} food' in text and f'{currency} wallet' in text
         assert f'value="{amount_input}"' in text
-        assert f'currency={currency}' in text
+        assert f'/2026-10/{currency.lower()}' in text
         assert '<option value="JPY"' in text and '<option value="KWD"' in text
         for other in accounts.keys() - {currency}:
             assert f'{other} wallet' not in text and f'{other} food' not in text
         transactions = client.get(
-            f"/?page=transactions&workspace=personal&month=2026-10&currency={currency}"
+            f"/budgets/home/transactions/2026-10/{currency.lower()}"
         ).text
         assert f"{currency} market" in transactions
         assert '<optgroup label="Living">' in transactions
@@ -118,10 +118,10 @@ def test_pages_keep_currency_totals_and_categories_separate(client):
 
 
 def test_empty_selected_currency_remains_selected_when_switching_workspaces(client):
-    text = client.get("/?page=budget&workspace=demo&month=2026-10&currency=EUR").text
+    text = client.get("/budgets/demo/budget/2026-10/eur").text
     assert '<option value="EUR" selected>EUR</option>' in text
     assert 'EUR 0.00' in text
-    assert 'currency=EUR' in text
+    assert '/2026-10/eur' in text
     assert 'name="currency" value="EUR"' in text
 
 
@@ -140,7 +140,7 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
         })
         assert response.status_code == 200
         accounts[name] = response.json()["accountId"]
-    text = client.get("/?page=accounts&workspace=personal&month=2026-10").text
+    text = client.get("/budgets/home/accounts/2026-10/usd").text
     assert 'aria-label="On-budget accounts"' in text
     assert 'aria-label="Off-budget accounts"' in text
     assert 'aria-label="Account totals in USD"' in text
@@ -159,7 +159,7 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
         "workspace": "personal", "type": "depository", "onBudget": False,
         "subtype": "savings",
     }).status_code == 200
-    text = client.get("/?page=accounts&workspace=personal&month=2026-10").text
+    text = client.get("/budgets/home/accounts/2026-10/usd").text
     assert 'data-account-on-budget="false" data-account-subtype="savings"' in text
     assert 'On-budget cash balances · USD</span><strong>$0.00' in text
     assert '<dt>Net worth</dt><dd>$7,500.00</dd>' in text
@@ -176,10 +176,10 @@ def test_off_budget_transactions_remain_visible_and_marked_excluded(client):
         "date": "2026-10-05", "merchant": "Investment fee", "amount": 500,
         "categoryId": None,
     }).status_code == 200
-    text = client.get("/?page=transactions&workspace=personal&month=2026-10").text
+    text = client.get("/budgets/home/transactions/2026-10/usd").text
     assert "Investment fee" in text
     assert "Off-budget · excluded from budget" in text
-    insights = client.get("/?page=insights&workspace=personal&month=2026-10").text
+    insights = client.get("/budgets/home/insights/2026-10/usd").text
     assert "Investment fee" not in insights
     assert "Insights use on-budget accounts" in insights
 
@@ -190,13 +190,13 @@ def test_portable_budget_name_labels_personal_pages_and_preserves_demo(client):
     name = "Household & travel"
     response = client.post("/api/budget/new", json={"name": name})
     assert response.status_code == 200
-    personal = client.get("/?workspace=personal").text
+    personal = client.get(response.json()["url"]).text
     breadcrumb = re.search(r'<div class="breadcrumb">(.*?)</div>', personal, re.S)[1]
     assert "Household &amp; travel" in breadcrumb
     assert "Current budget · Household &amp; travel" in personal
     assert 'data-budget-copy hidden' in personal
     assert 'aria-label="Saved copies"' in personal
-    demo = client.get("/?workspace=demo").text
+    demo = client.get("/budgets/demo/budget/current-month/usd").text
     breadcrumb = re.search(r'<div class="breadcrumb">(.*?)</div>', demo, re.S)[1]
     assert "Demo budget" in breadcrumb and "Household" not in breadcrumb
     assert "Current budget · Demo budget" in demo

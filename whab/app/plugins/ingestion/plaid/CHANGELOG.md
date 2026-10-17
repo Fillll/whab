@@ -1,5 +1,9 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.1.1 — 2026-10-16
+
+- Keep browser connection, synchronization and disconnect requests scoped to the budget in the current canonical address, including OAuth continuation. Require WHAB 2.5 or newer for budget-aware browser routing.
+
 ## 1.1.0 — 2026-10-16
 
 - Classify imported accounts using WHAB's core budget scope and asset types. Checking, savings and credit default on-budget; investments, retirement, loans and CDs default off-budget.

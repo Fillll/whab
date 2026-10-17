@@ -6,6 +6,7 @@ Detailed operating guidance for WHAB. Start with the [quick start](../app/README
 
 - [Runtime setup](#runtime-setup)
 - [Local HTTPS](#local-https)
+- [Budget addresses](#budget-addresses)
 - [Portable budgets](#portable-budgets)
 - [Settings and plugin manager](#settings-and-plugin-manager)
 - [Connect Plaid Sandbox](#connect-plaid-sandbox)
@@ -29,7 +30,7 @@ python3.14 -m venv .venv
 
 When upgrading from an older Python version, stop WHAB and recreate `.venv` with Python 3.14 or newer, then reinstall the app and any additional plugins. Preserve the existing runtime home, including `.env`, `data/`, `budgets/` and `tls/`, with its token encryption key and credentials.
 
-After [trusting the local CA](#local-https), open https://127.0.0.1:5173. The demo workspace contains fictional data. Switch to **My budget** for your own accounts. A manual account works immediately without Plaid.
+After [trusting the local CA](#local-https), open https://127.0.0.1:5173. **Demo Budget** contains fictional data. Open **My Budget** for your own accounts. A manual account works immediately without Plaid.
 
 The setup script uses `WHAB_HOME` when set, otherwise the application directory (`whab/app/`). It creates a private `.env` and random 32-byte token encryption key when the file is missing, plus local TLS material when not already present. It preserves existing credentials and encryption keys, and migrates the earlier local API port to 5173. After changing `.env`, restart the server. For new source setups, launching from `whab/app/` uses that directory's `.env` and `data/`. Existing checkouts retain their ignored files under the previous `whab/` location; set `WHAB_HOME` to that directory's absolute path before setup or launch, and [recreate the development environment](../README.md#existing-development-checkouts). To reuse runtime files kept elsewhere, including an older checkout root, set `WHAB_HOME` to the absolute directory containing those files before launching; the default is the working directory. Keep an existing runtime home and encryption key together when upgrading. Code and installed assets never determine the data location. `WHAB_ENV` selects `sandbox` or `production`; existing `PLAID_ENV` remains the fallback for upgrades. Use `.venv/bin/python -m whab --reload` while developing, or `--port 5174` to choose another local port.
 
@@ -53,11 +54,36 @@ curl --cacert /absolute/path/to/runtime/tls/ca.crt https://127.0.0.1:5173/api/pl
 
 To use an existing certificate, set **both** `WHAB_TLS_CERT_FILE` and `WHAB_TLS_KEY_FILE`. Absolute paths are accepted; relative paths resolve under `WHAB_HOME` or the launch directory. Without overrides the defaults are `tls/server.crt` and `tls/server.key`. The certificate must cover the hostname used by the client and chain to a CA that client trusts. Keep the private key readable only by its owner. A remote client additionally needs a certificate trusted for its configured HTTPS server origin; the generated localhost certificate does not cover a public hostname.
 
+## Budget addresses
+
+Browser addresses identify the saved budget and selected view:
+
+```text
+/budgets/<budget-key>/<page>/<month>/<currency>
+```
+
+Every segment is lowercase, including the currency code. Visible budget names and ISO currency labels keep their ordinary capitalization. API payloads and stored currencies continue to use uppercase ISO codes such as `USD`; lowercase is the browser address policy.
+
+| View | Address |
+| --- | --- |
+| Original budget, current month | `/budgets/home/budget/current-month/usd` |
+| Original budget, fixed month | `/budgets/home/transactions/2026-10/eur` |
+| Fictional sample budget | `/budgets/demo/accounts/current-month/usd` |
+| Named budget | `/budgets/123e4567-e89b-42d3-a456-426614174000/budget/current-month/usd` |
+
+`home` identifies the original local budget, displayed as **My Budget**, during an ordinary local launch. A created or opened named budget uses its permanent budget ID. Renaming the displayed budget does not change that key. `demo` identifies one separate **Demo Budget** backed by the startup runtime's fictional data. There is no `personal` or workspace segment, and choosing demo does not select a second dataset inside each real budget. The page is `budget`, `transactions`, `insights` or `accounts`.
+
+`current-month` resolves to the current calendar month whenever the page loads. A bookmark with it follows the calendar; `2026-10` remains October 2026. On the Budget page the month is the first of the three displayed months. Page and currency changes retain `current-month`; moving the month arrows selects an explicit month. Optional view selections, such as a category, may remain query parameters.
+
+The clean root address `/` opens the initial demo view or the selected saved budget. When launched with `--budget` or `WHAB_BUDGET`, it opens that budget's permanent-ID address even without a browser selection cookie. That launch starts the selected portable runtime; it does not also open the original local budget at `home`. Its one Demo Budget uses the startup runtime's sample data. Old `/?page=...&workspace=...&month=...&currency=...` view addresses are no longer supported and are not redirected. Use the canonical address shown in the browser for bookmarks. Plaid's OAuth continuation parameter remains supported for an in-progress connection.
+
+Each open tab uses the budget in its address for reads, changes, plugin assets and downloads. Switching a budget in another tab does not retarget that tab's financial operations. Existing unscoped local API integrations remain available; they retain their documented session and workspace behavior.
+
 ## Portable budgets
 
 A `.whab` file is a portable container with a required plugin manifest and plugin-owned data. A local SQLite budget includes its database. Remote storage contributes its connection information alongside the manifest and saved plugin state, leaving financial records on the server; opening or saving that connection does not automatically download a financial snapshot. Plugin code is installed in WHAB, outside the container.
 
-Open **Settings → Budgets → New budget**, enter a name, then choose **Create budget**. The new budget opens a fresh personal workspace under the entered name; existing budgets remain available in **Open budget**. Choose **Cancel** to return without creating one. Budget creation and isolation belong to the core, and the web plugin provides this Settings flow. Personal and **Demo budget** workspaces remain separate inside each active budget.
+Open **Settings → Budgets → New budget**, enter a name, then choose **Create budget**. The new budget opens a fresh dataset under the entered name; existing budgets remain available in **Open budget**. Choose **Cancel** to return without creating one. Budget creation and isolation belong to the core, and the web plugin provides this Settings flow. **My Budget**, named budgets and the single **Demo Budget** appear as separate destinations. Internal storage continues to isolate demo and personal records.
 
 The Budgets screen also opens `.whab` files under **Open a budget file**. If a file's remote access credential is password-protected, enter the **Budget password** before opening. A conflicting revision can be preserved using **Open as a separate budget**: the contents get a new budget identity without overwriting or merging the existing budget. **Download budget** exports the active container with credentials kept on this device. Export and saved-copy controls appear below budget creation and switching.
 
@@ -77,7 +103,7 @@ Multiple destinations are copies of the same container. Successful saves are ret
 
 ## Settings and plugin manager
 
-Open the gear beside **Local workspace** to find **Budgets**, **Plugins**, and **About this prototype**. **Budgets** shows the current budget; open it to choose **New budget**, switch a saved budget through **Open budget**, or choose **My budget** or **Demo budget**, with a check beside the current workspace. Workspace switching keeps the page, month and currency while clearing the previous category selection. Budget selection lives in Settings on desktop and mobile. The top bar shows the budget name, currency and data mode.
+Open Settings at the bottom left to find **Budgets**, **Plugins**, and **About this prototype**. **Budgets** shows the current budget; open it to choose **New budget**, switch a saved budget through **Open budget**, or choose **My Budget** or **Demo Budget**, with a check beside the current budget. Switching budgets keeps the page, month and currency while clearing the previous category selection. Budget selection lives in Settings on desktop and mobile. The top bar shows the budget name, currency and data mode.
 
 Open **Plugins → Installed** to see installed plugin packages and their running and saved states for the active budget. Categories and plugin names are alphabetical, with separate category headings. Teaching example plugins are hidden from Settings, including Options; use the [developer setup](plugins.md#install-the-working-example) to activate or remove them. Saving other choices preserves valid existing example selections. **All categories** is the default view; choose a category to narrow the list. Each row has a selection checkbox and **Options**, which opens that plugin’s details and available controls. Inactive plugins show enable/restart guidance without executing their settings hooks. Plugins without custom controls still have a details page. Enable or disable optional bank/report/branding plugins, then choose **Save plugin selection**. Changes apply after restarting WHAB. Select the installation's interface through `WHAB_UI` and the original workspace's storage through `WHAB_STORAGE`; existing portable budgets use the storage in their manifest, and Settings creates new SQLite budgets. Storage is required, and an empty `WHAB_UI` runs headlessly.
 

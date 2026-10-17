@@ -1,6 +1,21 @@
 /* Shared local HTTP and feedback helpers. No provider integration runs here. */
 
+const context = JSON.parse(document.getElementById('whab-context').textContent);
 const toast = document.getElementById('toast');
+
+export function apiUrl(path) {
+  return `${context.apiPrefix}${path}`;
+}
+
+export function pageUrl(overrides = {}) {
+  const url = new URL(location.href);
+  const page = overrides.page ?? context.page;
+  const month = overrides.month ?? context.monthToken;
+  const currency = overrides.currency ?? context.currency;
+  url.pathname = `${context.budgetUrl}/${page}/${month}/${currency}`.toLowerCase();
+  url.hash = '';
+  return url;
+}
 let toastTimer;
 
 export function notify(message) {
@@ -13,7 +28,7 @@ export function notify(message) {
 }
 
 export async function api(path, body, method = 'POST') {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(apiUrl(path), {
     method: body === undefined ? 'GET' : method,
     ...(body === undefined ? {} : {
       body: JSON.stringify(body)

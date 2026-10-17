@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 from importlib.metadata import version as package_version
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 
 from whab import __version__
 from whab.domain.dates import shift_month as period_shift
@@ -182,13 +182,6 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         ("accounts", "Accounts"),
     ]
 
-    def url(next_page=page, **overrides):
-        values = {
-            "page": next_page, "workspace": workspace, "month": month,
-            "currency": currency, **overrides,
-        }
-        return "/?" + urlencode({key: value for key, value in values.items() if value is not None})
-
     return {
         "version": __version__,
         "web_asset_version": WEB_ASSET_VERSION,
@@ -199,7 +192,6 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "page": page,
         "month": month,
         "nav": nav,
-        "url": url,
         "currency": currency,
         "currencies": data.get("currencies", [currency]),
         "currency_choices": [(code, currency_minor_units(code)) for code in SUPPORTED_CURRENCIES],

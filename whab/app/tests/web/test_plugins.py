@@ -59,9 +59,9 @@ def test_plugin_gets_only_selected_workspace_month_without_connection_secrets(tm
     try:
         with make_client(store, registry, tmp_path) as client:
             # Hooks do not run on unrelated pages.
-            assert client.get("/?page=budget&workspace=personal").status_code == 200
+            assert client.get("/budgets/home/budget/current-month/usd").status_code == 200
             assert not seen
-            response = client.get("/?page=insights&workspace=personal&month=2026-10")
+            response = client.get("/budgets/home/insights/2026-10/usd")
             assert response.status_code == 200
             snapshot = seen[-1]
             assert snapshot.workspace == "personal"
@@ -69,7 +69,7 @@ def test_plugin_gets_only_selected_workspace_month_without_connection_secrets(tm
             assert [t.date for t in snapshot.transactions] == ["2026-10-20"]
             assert "token" not in str(asdict(snapshot))
             assert "Fake institution" not in str(asdict(snapshot))
-            response = client.get("/?page=insights&workspace=demo&month=2026-10")
+            response = client.get("/budgets/demo/insights/2026-10/usd")
             assert response.status_code == 200
             assert all(a.id != account for a in seen[-1].accounts)
     finally:
@@ -114,13 +114,13 @@ def test_plugin_failures_do_not_expose_exception_or_break_core_pages(tmp_path):
     registry = PluginRegistry((Plugin("broken", "Broken report", insights=fail, export=fail),))
     try:
         with make_client(store, registry, tmp_path) as client:
-            page = client.get("/?page=insights&workspace=demo&month=2026-10")
+            page = client.get("/budgets/demo/insights/2026-10/usd")
             assert page.status_code == 200
             assert "could not be generated" in page.text
             assert "FICTIONAL_SECRET" not in page.text
             export = client.get("/api/plugins/broken/export?workspace=demo&month=2026-10")
             assert export.status_code == 400
             assert "FICTIONAL_SECRET" not in export.text
-            assert client.get("/?page=budget").status_code == 200
+            assert client.get("/budgets/demo/budget/current-month/usd").status_code == 200
     finally:
         store.close()

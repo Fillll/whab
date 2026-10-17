@@ -1,4 +1,6 @@
 /* Archive bytes stay in this page; the host parses and validates every import. */
+const budgetUrl = location.pathname.split('/').slice(0, 3).join('/');
+const apiPrefix = `${budgetUrl}/api`;
 for (const panel of document.querySelectorAll('[data-file-import]')) {
   const form = panel.querySelector('[data-import-form]');
   const archive = panel.querySelector('[data-import-file]');
@@ -39,7 +41,7 @@ for (const panel of document.querySelectorAll('[data-file-import]')) {
   async function request(action, file, fingerprint) {
     let response;
     try {
-      response = await fetch(`/api/plugins/${encodeURIComponent(panel.dataset.fileImport)}/import/${action}`, {
+      response = await fetch(`${apiPrefix}/plugins/${encodeURIComponent(panel.dataset.fileImport)}/import/${action}`, {
         method: 'POST',
         body: file,
         headers: {

@@ -1,7 +1,7 @@
 """Plugin settings are discoverable, escaped and separate from pending selection."""
 
 import re
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 import pytest
 
@@ -30,7 +30,7 @@ def dialog(text, identifier):
 def render(client, monkeypatch, *plugins, restart_required=False, error=None):
     state = {"plugins": list(plugins), "restart_required": restart_required, "error": error}
     monkeypatch.setattr("whab.plugins.management.PluginManager.projection", lambda _: state)
-    response = client.get("/?workspace=demo")
+    response = client.get("/budgets/demo/budget/current-month/usd")
     assert response.status_code == 200
     return response.text
 
@@ -69,7 +69,7 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     from html import unescape
 
     response = client.get(
-        f"/?workspace={workspace}&page=transactions&month=2026-09&currency=EUR&category=old-category"
+        f"/budgets/{workspace.replace('personal', 'home')}/transactions/2026-09/eur?category=old-category"
     )
     assert response.status_code == 200
     text = response.text
@@ -82,15 +82,15 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     choices = re.findall(r'<a class="budget-choice" href="([^"]+)"([^>]*)>', budgets)
     assert len(choices) == 2
     for href, attributes in choices:
-        query = parse_qs(urlparse(unescape(href)).query)
-        assert query["page"] == ["transactions"]
-        assert query["month"] == ["2026-09"]
-        assert query["currency"] == ["EUR"]
-        assert "category" not in query
-        assert ('aria-current="true"' in attributes) == (query["workspace"] == [workspace])
+        address = urlparse(unescape(href))
+        key = address.path.split("/")[2]
+        assert address.path == f"/budgets/{key}/transactions/2026-09/eur"
+        assert key in {"home", "demo"}
+        assert address.query == ""
+        assert ('aria-current="true"' in attributes) == (key == workspace.replace("personal", "home"))
         switched = client.get(unescape(href))
         assert switched.status_code == 200
-        next_label = "Demo budget" if query["workspace"] == ["demo"] else "My budget"
+        next_label = "Demo budget" if key == "demo" else "My budget"
         assert f"Current budget · {next_label}" in dialog(switched.text, "settings-dialog")
     assert 'class="workspace-switch"' not in text
     assert 'class="mobile-workspace"' not in text
@@ -99,7 +99,7 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
 
 @pytest.mark.parametrize("workspace", ["personal", "demo"])
 def test_new_budget_is_a_primary_action_with_a_dedicated_creation_dialog(client, workspace):
-    text = client.get(f"/?workspace={workspace}").text
+    text = client.get(f"/budgets/{workspace.replace('personal', 'home')}/budget/current-month/usd").text
     budgets = dialog(text, "budgets-dialog")
     assert re.search(r'<button class="button primary"[^>]*data-dialog="new-budget-dialog"', budgets)
     assert budgets.index('data-dialog="new-budget-dialog"') < budgets.index('class="budget-list"')

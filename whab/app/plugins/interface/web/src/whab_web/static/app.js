@@ -1,5 +1,5 @@
 /* WHAB controls. Business rules live in Python; bank UI is loaded by enabled plugins. */
-import {api, notify} from '/static/client.js';
+import {api, apiUrl, notify, pageUrl} from './client.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -81,8 +81,7 @@ for (const form of document.querySelectorAll('form[data-api]')) {
       if (inline && assignmentNavigation) {
         location.assign(assignmentNavigation);
       } else if (body.currency) {
-        const url = new URL(location.href);
-        url.searchParams.set('currency', body.currency);
+        const url = pageUrl({currency: body.currency});
         location.assign(url);
       } else location.reload();
     } catch (failure) {
@@ -195,7 +194,7 @@ if (pluginSelection) {
   pending.dataset.restartRequired = String(!pending.hidden);
   pluginSelection.addEventListener('submit', async event => {
     event.preventDefault();
-    if (pluginSelection.dataset.busy) return;
+    if (pluginSelection.dataset.busy || pluginSelection.hasAttribute('data-read-only')) return;
     const error = pluginSelection.querySelector('.field-error');
     const submit = pluginSelection.querySelector('button[type="submit"]');
     try {
@@ -306,7 +305,7 @@ exportForm.addEventListener('submit', async event => {
     const included = exportForm.elements.include_credentials.checked;
     const password = exportForm.elements.password.value;
     if (included && Array.from(password).length < 12) throw new Error('Use a password of at least 12 characters.');
-    const response = await fetch(`/api/budget/export${included ? '?include_credentials=true' : ''}`, {
+    const response = await fetch(apiUrl(`/budget/export${included ? '?include_credentials=true' : ''}`), {
       headers: included ? budgetPasswordHeaders(password) : {},
     });
     if (!response.ok) {
@@ -344,8 +343,8 @@ function budgetForm(selector, action) {
     for (const button of buttons) button.disabled = true;
     error.hidden = true;
     try {
-      await action(form);
-      location.assign('/?workspace=personal');
+      const result = await action(form);
+      location.assign(result.url);
     } catch (failure) {
       error.textContent = failure.message;
       error.hidden = false;
@@ -378,24 +377,26 @@ copyForm.addEventListener('submit', async event => {
 });
 budgetForm('[data-budget-new]', form => api('/budget/new', {name: form.elements.name.value.trim()}));
 budgetForm('[data-budget-switch]', async form => {
-  const response = await fetch(`/api/budgets/${encodeURIComponent(form.elements.budget.value)}/activate`, {
+  const response = await fetch(apiUrl(`/budgets/${encodeURIComponent(form.elements.budget.value)}/activate`), {
     method: 'POST', body: '{}',
     headers: {'Content-Type': 'application/json', ...budgetPasswordHeaders(form.elements.password.value)},
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'The budget could not be opened.');
+  return result;
 });
 budgetForm('[data-budget-open]', async form => {
   const file = form.elements.budget.files[0];
   if (!file) throw new Error('Choose a WHAB budget file.');
   if (file.size > 50 * 1024 * 1024) throw new Error('Choose a budget file smaller than 50 MiB.');
-  const path = form.elements.as_copy.checked ? '/api/budget/open?as_copy=true' : '/api/budget/open';
-  const response = await fetch(path, {
+  const path = form.elements.as_copy.checked ? '/budget/open?as_copy=true' : '/budget/open';
+  const response = await fetch(apiUrl(path), {
     method: 'POST', body: file,
     headers: {'Content-Type': 'application/zip', ...budgetPasswordHeaders(form.elements.password.value)},
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'The budget could not be opened.');
+  return result;
 });
 
 const pluginCategory = document.querySelector('[data-plugin-category-filter]');
@@ -416,6 +417,7 @@ function settingsText(tag, value, className) {
 }
 
 function renderPluginSettings(dialog, settings) {
+  const readOnly = dialog.dataset.pluginReadOnly === 'true';
   const content = dialog.querySelector('[data-plugin-settings]');
   content.replaceChildren();
   const insights = document.createElement('dl');
@@ -433,8 +435,9 @@ function renderPluginSettings(dialog, settings) {
     row.append(settingsText('p', action.description, 'settings-notice'));
     const button = settingsText('button', action.label, 'button');
     button.type = 'button';
+    button.disabled = readOnly;
     button.addEventListener('click', async () => {
-      if (dialog.dataset.busy) return;
+      if (dialog.dataset.busy || readOnly) return;
       const error = dialog.querySelector('[data-plugin-settings-error]');
       const status = dialog.querySelector('[data-plugin-settings-status]');
       dialog.dataset.busy = 'true';
@@ -451,7 +454,7 @@ function renderPluginSettings(dialog, settings) {
         error.hidden = false;
       } finally {
         delete dialog.dataset.busy;
-        for (const control of content.querySelectorAll('button')) control.disabled = false;
+        for (const control of content.querySelectorAll('button')) control.disabled = readOnly;
       }
     });
     row.append(button);
@@ -489,10 +492,7 @@ for (const input of document.querySelectorAll('[data-navigation]')) {
       input.reportValidity();
       return;
     }
-    const url = new URL(location.href);
-    url.hash = '';
-    url.searchParams.set(input.dataset.navigation, input.value);
-    if (input.dataset.navigation === 'workspace') url.searchParams.delete('category');
+    const url = pageUrl({[input.dataset.navigation]: input.value});
     if (assignmentBusy) {
       assignmentNavigation = url.href;
       pendingAssignmentControls.set(input, initialValue);
@@ -530,11 +530,4 @@ if (search) {
     reviewFilter.classList.toggle('selected', pressed);
     filterTransactions();
   });
-}
-
-if (!location.search.includes('oauth_state_id') && ['#budget', '#transactions', '#insights', '#accounts'].includes(location.hash)) {
-  const url = new URL(location.href);
-  url.searchParams.set('page', location.hash.slice(1));
-  url.hash = '';
-  location.replace(url);
 }

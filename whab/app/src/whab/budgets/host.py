@@ -7,7 +7,7 @@ import copy
 import json
 from dataclasses import replace
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Request
@@ -16,6 +16,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from whab.domain.errors import StoreError
+from whab.domain.money import currency_code
+from whab.web.navigation import PAGES, budget_key, page_url
+from whab.web.schemas import valid_month
 
 from .container import decode_container, encode_container
 from .credentials import encrypt_credentials
@@ -243,7 +246,7 @@ class BudgetHost:
         current_id = session.id if session else "default"
 
         def activate(budget_id):
-            response = JSONResponse({"id": budget_id, "opened": True})
+            response = JSONResponse({"id": budget_id, "opened": True, "url": page_url(budget_key(budget_id))})
             response.set_cookie(COOKIE, budget_id, httponly=True, samesite="strict", secure=True)
             return response
 
@@ -254,11 +257,20 @@ class BudgetHost:
             return response
 
         @router.get("/api/budgets")
-        def list_budgets():
-            return self.list(current_id)
+        def list_budgets(request: Request):
+            result = self.list(current_id)
+            if "whab.budget_key" in request.scope:
+                key = request.scope["whab.budget_key"]
+                for entry in result["budgets"]:
+                    entry["url"] = page_url(budget_key(entry["id"]))
+                    entry["active"] = budget_key(entry["id"]) == key
+                result["budgets"].append({"id": "demo", "name": "Demo budget", "active": key == "demo", "url": page_url("demo")})
+            return result
 
         @router.get("/api/budget")
-        def current():
+        def current(request: Request):
+            if request.scope.get("whab.budget_key") == "demo":
+                return {"id": "demo", "name": "Demo budget", "portable": False, "storage": settings.storage, "copies": [], "plugins": [], "missingPlugins": []}
             if session:
                 return session.projection()
             return {"id": "default", "name": "My budget", "portable": False, "storage": settings.storage, "copies": [], "plugins": list(settings.plugins), "missingPlugins": []}
@@ -275,6 +287,8 @@ class BudgetHost:
 
         @router.post("/api/budgets/{budget_id}/activate")
         async def select(budget_id: str, request: Request):
+            if budget_id == "demo":
+                return JSONResponse({"id": "demo", "opened": True, "url": page_url("demo")})
             await self.activate(budget_id, password=request_password(request))
             return activate(budget_id)
 
@@ -345,7 +359,7 @@ class BudgetDispatch:
         message = "This budget is unavailable. Select or reopen its file before continuing."
         response = (
             JSONResponse({"error": message}, status_code=409)
-            if scope["path"].startswith("/api/")
+            if scope["path"].startswith("/api/") or "/api/" in scope["path"]
             else HTMLResponse(
                 f'<h1>Budget unavailable</h1><p>{message}</p>'
                 '<a href="/budget-recovery">Return to the startup budget</a>', status_code=409,
@@ -354,12 +368,84 @@ class BudgetDispatch:
         response.headers["Cache-Control"] = "no-store"
         await response(scope, receive, send)
 
+    async def _scoped(self, scope, receive, send):
+        # Scoped routes are always local, even if their tail resembles a public
+        # webhook. Check this before opening any saved budget runtime.
+        if not self._local(scope):
+            await JSONResponse({"error": "Local access only"}, status_code=403)(scope, receive, send)
+            return
+        parts = scope["path"].split("/")
+        key = parts[2] if len(parts) > 2 else ""
+        tail = "/" + "/".join(parts[3:])
+        try:
+            if key not in {"home", "demo"} and str(UUID(key)) != key:
+                raise ValueError
+            if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/")):
+                if tail.endswith("/webhook"):
+                    raise ValueError
+            else:
+                if len(parts) != 6 or parts[3] not in PAGES or parts[5] != parts[5].lower():
+                    raise ValueError
+                if parts[4] != "current-month":
+                    valid_month(parts[4])
+                currency_code(parts[5].upper())
+        except (ValueError, StoreError):
+            await JSONResponse({"error": "Budget address not found"}, status_code=404)(scope, receive, send)
+            return
+        identifier = self.host.default_id if key == "demo" else "default" if key == "home" else key
+        entry = self.host.applications.get(identifier)
+        if entry is None:
+            if identifier not in self.host.recent:
+                await JSONResponse({"error": "Budget not found"}, status_code=404)(scope, receive, send)
+                return
+            try:
+                await self.host.activate(identifier)
+            except (StoreError, HTTPException):
+                await self._unavailable(scope, receive, send)
+                return
+            entry = self.host.applications[identifier]
+        scoped = dict(scope)
+        scoped["whab.budget_key"] = key
+        scoped["whab.workspace"] = "demo" if key == "demo" else "personal"
+        scoped["whab.personal_key"] = budget_key(self.host.default_id)
+        if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/")):
+            scoped["path"] = tail
+            scoped["raw_path"] = tail.encode("utf-8")
+            if tail.startswith("/api/"):
+                query = parse_qsl(scope.get("query_string", b"").decode("utf-8"), keep_blank_values=True)
+                # ISO currency values remain uppercase inside the API contract.
+                query = [(name, value.upper() if name == "currency" else value) for name, value in query]
+                if not any(name == "workspace" for name, _ in query):
+                    query.append(("workspace", scoped["whab.workspace"]))
+                scoped["query_string"] = urlencode(query).encode()
+        target = self.app if identifier == self.host.default_id else entry[0]
+        await target(scoped, receive, send)
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
             # Reject before cookie dispatch can activate a saved runtime or route remotely.
             if scope.get("scheme") != "https":
                 response = JSONResponse({"error": "HTTPS is required"}, status_code=400, headers={"Cache-Control": "no-store"})
                 await response(scope, receive, send)
+                return
+            if scope["path"] == "/" and any(
+                name == "oauth_state_id"
+                for name, _ in parse_qsl(scope.get("query_string", b"").decode("utf-8"))
+            ):
+                # The per-tab continuation bridge selects the originating budget.
+                # A shared or stale cookie must never activate a different runtime.
+                target = self.app
+                for identifier, (application, _) in self.host.applications.items():
+                    if application.state.ui_plugin and any(
+                        plugin.id == "plaid" and plugin.bank_ui
+                        for plugin in application.state.plugins.bank_plugins()
+                    ):
+                        target = self.app if identifier == self.host.default_id else application
+                        break
+                await target(scope, receive, send)
+                return
+            if scope["path"].startswith("/budgets/"):
+                await self._scoped(scope, receive, send)
                 return
             prefix = "/remote/v1/budgets/"
             if scope["path"].startswith(prefix):

@@ -69,7 +69,7 @@ def test_logo_route_revalidates_plugin_image_bounds_and_type(store, tmp_path, da
         result = client.get(LOGO_PATH)
         assert result.status_code == 404 and "private-fixture-error" not in result.text
         assert result.headers["x-content-type-options"] == "nosniff"
-        assert client.get("/?page=budget&workspace=demo").status_code == 200
+        assert client.get("/budgets/demo/budget/current-month/usd").status_code == 200
 
 
 @pytest.mark.parametrize("failure", ["unknown", "exception"])
@@ -88,7 +88,7 @@ def test_unavailable_fetch_is_cached_without_breaking_budget(imported_store, tmp
             result = client.get(LOGO_PATH)
             assert result.status_code == 404 and "PRIVATE_FIXTURE_PROVIDER_ERROR" not in result.text
         assert fetched == ["chase"]
-        assert client.get("/?page=budget&workspace=personal&month=2026-10").status_code == 200
+        assert client.get("/budgets/home/budget/2026-10/usd").status_code == 200
 
 
 def test_saved_logo_selection_waits_for_restart(imported_store, tmp_path, monkeypatch):
@@ -106,6 +106,6 @@ def test_saved_logo_selection_waits_for_restart(imported_store, tmp_path, monkey
         assert saved.json()["configured"] == ["logos"] and saved.json()["restart_required"]
         assert client.get("/api/plugins").json() == before
         assert client.get(LOGO_PATH).status_code == 404
-        page = client.get("/?page=accounts&workspace=personal&month=2026-10")
+        page = client.get("/budgets/home/accounts/2026-10/usd")
         assert page.status_code == 200 and "data-bank-logo" not in page.text
         assert calls == [] and (tmp_path / "plugins.json").is_file()

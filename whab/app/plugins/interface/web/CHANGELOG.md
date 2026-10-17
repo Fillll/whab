@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.5.0 — 2026-10-16
+
+- Navigate with lowercase budget, page, month and currency path segments. Preserve `current-month` when changing page or currency and select a fixed month when using the month arrows.
+- Present Demo Budget as one separate sample destination alongside My Budget and named budgets. Remove the personal/demo workspace segment and keep stable budget identities independent of display names.
+- Scope browser requests, plugin controls and downloads to the address's budget. Require WHAB 2.5 or newer for its canonical routing context.
+
 ## 1.4.0 — 2026-10-16
 
 - Add a prominent **New budget** action in Settings → Budgets with a dedicated name form, Create budget and Cancel controls. Open the new personal workspace after successful creation through the existing core budget API.
