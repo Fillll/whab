@@ -6,10 +6,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 2.6.0 — 2026-10-16
 
+PR: [#35](https://github.com/Fillll/whab/pull/35)
+
 - Download any known budget without changing the browser's selected budget, including password-protected saved connections after restart.
 - Export the demo ledger as its own portable budget, with a separate identity and no personal ledger, plugin state or connection credentials.
 
 ## 2.5.0 — 2026-10-16
+
+PR: [#36](https://github.com/Fillll/whab/pull/36)
 
 - Give browser views stable, lowercase addresses: `/budgets/<budget-key>/<page>/<month>/<currency>`. Use `home` for the original budget, each saved budget's permanent ID for named budgets, and `demo` for the single fictional sample budget. Budget names can change without changing their addresses.
 - Resolve budget-scoped pages, APIs, assets and downloads from the address independently of the browser's selected-budget cookie, keeping simultaneously open budgets isolated. Preserve existing unscoped API integrations and uppercase ISO currency values in API payloads and storage.
@@ -17,15 +21,21 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 2.3.0 — 2026-10-16
 
+PR: [#33](https://github.com/Fillll/whab/pull/33)
+
 - Organize the product under `whab/app`, `whab/launchers` and `whab/docs`, keeping installed code and private runtime homes separate.
 - Add a local HTTPS readiness endpoint with application, version, build and managed-instance identity for the macOS launcher. Readiness does not read or expose financial records or banking configuration.
 
 ## 2.2.0 — 2026-10-16
 
+PR: [#32](https://github.com/Fillll/whab/pull/32)
+
 - Let visual interface plugins request up to twelve consecutive core-calculated budget periods through the optional `UserInterface.budget_months` setting. Keep existing single-month interfaces and storage contracts compatible.
 - Read period projections through the shared ledger service, preserving existing currency isolation, rollover, credit reserves, historical restrictions and assignment validation. Budgeting rules remain in core; presentation remains owned by the selected interface plugin.
 
 ## 2.1.0 — 2026-10-16
+
+PR: [#31](https://github.com/Fillll/whab/pull/31)
 
 - Add core on-budget and off-budget accounts. Only on-budget cash and credit accounts fund envelopes and contribute to budget activity, income and spending trends. Track investments, retirement accounts, property, loans and fixed-term deposits separately in currency-specific assets, liabilities and net worth.
 - Add validated account types and subtypes, including brokerage, IRA, Roth IRA, 401(k), home, vehicle, mortgage, car loan, student loan and CD. Reclassify existing accounts through the shared ledger service and local API without changing balances or transaction history.
@@ -33,17 +43,23 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 2.0.0 — 2026-10-15
 
+PR: [#30](https://github.com/Fillll/whab/pull/30)
+
 - Require HTTPS for the local interface, APIs, remote commands and provider webhooks. Remove plaintext HTTP launch and OAuth redirect support. Set up device-local certificates with explicit trust instructions, allow configured certificates, and fail instead of falling back to HTTP. Existing HTTP URLs and deployments must migrate before upgrading.
 - Package the application core separately from independently versioned plugin distributions. Preserve plugin IDs and the public API v1 contracts; install the default plugin set with the source installer or the bundled extra. Plugin-only changes now update their owning version and dated changelog, independently of application releases.
 - Align the operating, architecture, plugin-author and contributor guides with portable storage selection, unavailable optional plugins, container payload ownership, currency minor units and the supported plugin inventory. Keep teaching examples outside ordinary Settings and document developer activation.
 
 ## 1.9.0 — 2026-10-15
 
+PR: [#27](https://github.com/Fillll/whab/pull/27)
+
 - Make `.whab` an extensible container with a required manifest and plugin-owned files. Local SQLite budgets carry a sanitized database; remote budgets carry connection information without downloading a ledger snapshot. Continue opening the previous JSON ledger format.
 - Let plugins read, write and preserve their own budget files, including files for disabled or unavailable plugins. Retain isolated runtime caches, conflict checks and recovery journals.
 - Support explicitly including remote API credentials in a password-encrypted section, with passwords supplied through Settings or a named environment variable. Bind credentials to their remote target and exclude bank-provider tokens from portable files.
 
 ## 1.8.0 — 2026-10-15
+
+PR: [#26](https://github.com/Fillll/whab/pull/26)
 
 - Add portable `.whab` budgets with a data-only ledger and plugin manifest. Create, open, download and switch budgets in Settings; restore plugin selections, public settings and saved state independently for each budget. Keep installed plugin code and connection credentials on the owning machine or server.
 - Save an opened budget to additional file destinations, report pending copies, and retain a local recovery journal across interrupted saves. Preserve ledger history, currencies, annotations and allocations while excluding banking credentials from portable files.
@@ -52,11 +68,15 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 1.7.1 — 2026-10-15
 
+PR: [#25](https://github.com/Fillll/whab/pull/25)
+
 - Move budget selection into Settings → Budgets, with the current budget shown in Settings and beside the selected budget. Remove the desktop and mobile budget dropdowns; preserve page, month and currency when switching budgets.
 - Group installed plugins under distinct alphabetical category headings and sort their names alphabetically. Hide example plugins from the Settings list while preserving valid existing example selections.
 - Use sentence case and acronym spelling for WHAB web and Import from YNAB ZIP file. Show friendly bundled names for disabled plugins without loading their code.
 
 ## 1.7.0 — 2026-10-14
+
+PR: [#23](https://github.com/Fillll/whab/pull/23)
 
 - Show Plaid-supplied merchant logos beside transaction payees as part of the existing Plaid plugin. Import only the supplied artwork reference, with no merchant guessing, external lookup service or additional plugin selection. Keep names visible when artwork is absent or fails.
 - Add an optional API v1 merchant-artwork capability for bank providers, guarded local image serving and a bounded in-memory cache. Plaid downloads only PNGs from its public logo CDNs, without banking credentials, redirects or transaction data.
@@ -64,11 +84,15 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 1.6.0 — 2026-10-14
 
+PR: [#21](https://github.com/Fillll/whab/pull/21)
+
 - Add Settings → Plugins → Installed with an All categories view, category filtering, selection checkboxes and an Options page for every installed plugin. Keep required storage/interface selections locked and apply optional selection changes after restart.
 - Add an optional API v1 settings capability with validated plain-text details and declared actions, served through guarded host endpoints. Disabled plugin settings do not execute code.
 - Keep successful Bank logos images for 365 days in a bounded local disk cache that survives restarts. Refresh on the first image request after expiry; keep failed requests cached for five minutes. Add a Flush cache button in Bank logos options to clear saved images and transient misses immediately.
 
 ## 1.5.0 — 2026-10-14
+
+PR: [#20](https://github.com/Fillll/whab/pull/20)
 
 - Make the two-level category hierarchy a core contract. Parent groups organize child categories; transactions, category targets and envelope assignments accept children only. Existing child IDs, allocations and annotations remain intact.
 - Support accounts and child categories in multiple ISO currencies within one budget. Keep cash, debt, rollover, activity, trends and funding separate by currency, without exchange rates or conversion. Transactions inherit account currency and reject mismatched category assignments.
@@ -77,11 +101,15 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 1.4.0 — 2026-10-14
 
+PR: [#19](https://github.com/Fillll/whab/pull/19)
+
 - Add the optional YNAB export plugin, with bounded ZIP/TSV/CSV parsing, USD confirmation, a read-only preview, and an explicit atomic import into an empty personal budget. Preserve categories, register rows, memos, clearing status, flags and monthly assignments; repeat imports of the identical archive do not duplicate data or overwrite edits.
 - Add an API v1 file-import capability that receives file bytes without credentials or ledger access. The host owns local-only upload routes and storage commits; SQLite implements the optional migration method with transactional receipts.
 - Keep exported accounts unclassified and outside budget funding because YNAB dumps omit account types and verified balance snapshots. Explain differences in credit-card envelopes, targets and recomputed activity/availability before import. Existing financial workspaces are never merged or replaced by this importer.
 
 ## 1.3.4 — 2026-10-14
+
+PR: [#18](https://github.com/Fillll/whab/pull/18)
 
 - Use WHAB throughout maintained source and documentation, including new SQLite filenames, Plaid Link session keys and the Link household identifier.
 - Reopen a single existing SQLite ledger for the selected environment in place, preserving budgets, encrypted connections and journal files. Reject ambiguous or unrecognized saved ledgers instead of starting an empty budget or modifying an unrelated database.
@@ -89,15 +117,21 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 1.3.3 — 2026-10-14
 
+PR: [#17](https://github.com/Fillll/whab/pull/17)
+
 - Organize contributor plugins under singular category folders: `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`. Keep each plugin's implementation, assets, documentation and tests together under `plugins/<category>/<id>/`.
 - Preserve existing plugin IDs, Python packages, configuration and runtime routes. Update packaging, architecture checks and automatic 100% plugin coverage discovery for the categorized layout, including the independently installable example.
 
 ## 1.3.2 — 2026-10-14
 
+PR: [#13](https://github.com/Fillll/whab/pull/13)
+
 - License WHAB's own code, SDK, bundled plugins, documentation and assets under MIT, permitting commercial forks and proprietary extensions.
 - Include MIT license metadata and license files in the application and independently packaged example plugin; bump the example to 1.0.2 and verify both installed distributions carry the license.
 
 ## 1.3.1 — 2026-10-14
+
+PR: [#12](https://github.com/Fillll/whab/pull/12)
 
 - Group each bundled plugin's implementation, assets, documentation and tests in its own `plugins/<id>/` contributor folder. Keep the public `whab.plugins` SDK and host contracts in core.
 - Run plugin-local and central tests together, and include every bundled plugin's source and assets in the application wheel. Keep the example report plugin independently installable under `plugins/example/`.
@@ -105,11 +139,15 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 1.3.0 — 2026-10-13
 
+PR: [#12](https://github.com/Fillll/whab/pull/12)
+
 - Add an optional Bank logos plugin using Icon Horse's public institution icons, disabled by default and selectable through Settings → Plugin manager.
 - Show bank logos in the sidebar and Accounts page, with existing icons or initials when a bank is unknown or its logo is unavailable.
 - Add an API v1 branding capability with local institution resolution, host-served bounded raster images, and a bounded success/failure cache. Only curated public bank domains reach the icon source; bank credentials and financial records remain local.
 
 ## 1.2.0 — 2026-10-13
+
+PR: [#9](https://github.com/Fillll/whab/pull/9)
 
 - Add Settings beside Local workspace and move About this prototype into it; remove the top-right About control.
 - Add a plugin manager for installed optional plugins. Save a validated selection for the next app restart while keeping the active storage and interface required.
@@ -118,16 +156,22 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 1.1.2 — 2026-10-13
 
+PR: [#8](https://github.com/Fillll/whab/pull/8)
+
 - Adopt a flat yellow eight-point compass on a red background for the bundled Web UI, sidebar branding, and favicon.
 - Refresh the Web UI with warm neutral surfaces, red controls and navigation, yellow accents, and distinct financial status colors.
 - Version stylesheet and logo URLs and verify the new logo asset in installed-wheel checks.
 
 ## 1.1.1 — 2026-10-12
 
+PR: [#7](https://github.com/Fillll/whab/pull/7)
+
 - Raise the minimum Python version to 3.14 for WHAB and its example plugin. Align package metadata, Ruff, setup instructions, CI, and pending branch-protection checks; retain CI coverage for Python 3.14 and 3.15.
 - Bump the independently versioned example plugin to 1.0.1 for its runtime support change.
 
 ## 1.1.0 — 2026-10-12
+
+PR: [#5](https://github.com/Fillll/whab/pull/5)
 
 - Adopt a `src/whab` layout with separate domain rules, storage adapters, bank integrations, web presentation, and application composition.
 - Add Python package plugins through the versioned `whab.plugins` API: selected storage backends, optional bank providers, immutable workspace/month reporting snapshots, Insights reports, and safe CSV exports.
@@ -140,17 +184,23 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 1.0.2 — 2026-10-12
 
+PR: [#4](https://github.com/Fillll/whab/pull/4)
+
 - Rename the app to WHAB — We Have A Budget, and the private GitHub repository to Fillll/whab.
 - Update the Python package, UI, favicon, Plaid display name, exports, documentation, and CI paths.
 - Preserve existing databases, encrypted connections, and browser OAuth state. Use only `python -m whab` for launching the renamed app.
 
 ## 1.0.1 — 2026-10-12
 
-- Raise the minimum supported Python version to 3.13; older versions are no longer supported. Align packaging, Ruff, and setup instructions, and test Python 3.13, 3.14, and 3.15 in CI.
-- Show the release version in About using the same version source as packaging, the CLI, and FastAPI.
-- Require a version bump and changelog entry for each material change, including runtime support changes.
+PRs: [#2](https://github.com/Fillll/whab/pull/2), [#3](https://github.com/Fillll/whab/pull/3)
+
+- Raise the minimum supported Python version to 3.13; older versions are no longer supported. Align packaging, Ruff, and setup instructions, and test Python 3.13, 3.14, and 3.15 in CI. ([#2](https://github.com/Fillll/whab/pull/2))
+- Show the release version in About using the same version source as packaging, the CLI, and FastAPI. ([#3](https://github.com/Fillll/whab/pull/3))
+- Require a version bump and changelog entry for each material change, including runtime support changes. ([#3](https://github.com/Fillll/whab/pull/3))
 
 ## 1.0.0 — 2026-10-12
+
+PR: [#1](https://github.com/Fillll/whab/pull/1)
 
 First versioned release of the local Python and SQLite app.
 

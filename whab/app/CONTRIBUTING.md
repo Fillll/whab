@@ -24,6 +24,7 @@ Run these checks before submitting code:
 
 ```sh
 .venv/bin/python -m pytest
+.venv/bin/python scripts/check_changelog_prs.py
 .venv/bin/python scripts/check_plugin_coverage.py
 .venv/bin/python -m ruff check src scripts tests plugins conftest.py
 ```
@@ -89,6 +90,18 @@ Use a feature branch and pull request for every change to `main`. Describe the c
 Version the owner of the material change in the same PR. Host/core/public-SDK changes bump `src/whab/__init__.py::__version__` and add a dated entry to the application `CHANGELOG.md`. Each independently packaged plugin instead owns `plugins/<category>/<id>/pyproject.toml::project.version` and its local `CHANGELOG.md`; a plugin-only change does not bump the app or change the app changelog. Changes spanning owners update each affected owner. Apply SemVer separately to each distribution: patch for compatible fixes or maintenance, minor for compatible features, major for a breaking documented contract. Runtime and dependency support changes require the owning distribution's version bump. Small documentation-only changes may wait for its next version bump.
 
 The host package version, `python -m whab --version`, FastAPI metadata and About dialog derive from the host version source; installed plugin versions come from their own distribution metadata. Review the final diff and pass CI before requesting a squash merge. Final approval and merging belong to the human maintainer @Fillll. Agents must not approve or merge a PR unless @Fillll explicitly delegates that action for that specific PR. Create an immutable `vX.Y.Z` tag and GitHub release on the merged commit only when the user explicitly requests a release; version bumps and merges do not require publishing one. Do not reuse or move an existing release tag.
+
+### Changelog PR links
+
+Every populated version or **Unreleased** section in every `CHANGELOG.md` must link the pull request(s) that introduced the recorded changes. This applies repository-wide: host/core, supported and example plugins, platform launchers, and future components. Changelog updates go through the same feature-branch and PR workflow as other changes.
+
+For a section introduced by one PR, put a shared reference immediately below the heading, for example `PR: [#38](https://github.com/Fillll/whab/pull/38)`. That reference applies to all changes in the section. When a section combines changes from multiple PRs, list those PRs and also attach the appropriate link to each change bullet so its origin is clear. Use full links to this repository's pull requests; issue links, bare numbers and placeholders are insufficient.
+
+Open a draft PR to obtain its number and URL before finalizing a new changelog entry, then push the real reference to that PR. An empty **Unreleased** section may stay empty. Once it contains a change it needs a PR reference; retain those references when moving changes into a versioned section. Verify the final links before merging.
+
+Historical entries cite the PRs that introduced their recorded changes, rather than the PR that later adds links or corrects the changelog. Preserve the original version, date and release description during provenance backfills. Documentation and contribution-tooling maintenance alone do not require inventing a new application or plugin version.
+
+Run `.venv/bin/python scripts/check_changelog_prs.py` from `whab/app/`. CI checks all tracked changelogs for a PR link in each populated section, without network access. This verifies link structure and scope; authors and reviewers must verify that the linked PR exists and actually introduced the described change.
 
 ## Branch protection
 

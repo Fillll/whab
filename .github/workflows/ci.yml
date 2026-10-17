@@ -42,6 +42,8 @@ jobs:
             whab/app/plugins/**/pyproject.toml
       - name: Install dependencies
         run: python scripts/install.py --dev --example
+      - name: Require originating PR links in all changelogs
+        run: python scripts/check_changelog_prs.py
       - name: Test and require 100% plugin statement and branch coverage
         run: python scripts/check_plugin_coverage.py
       - name: Lint Python
