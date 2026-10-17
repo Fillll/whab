@@ -4,6 +4,11 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.6.0 — 2026-10-16
+
+- Download any known budget without changing the browser's selected budget, including password-protected saved connections after restart.
+- Export the demo ledger as its own portable budget, with a separate identity and no personal ledger, plugin state or connection credentials.
+
 ## 2.5.0 — 2026-10-16
 
 - Give browser views stable, lowercase addresses: `/budgets/<budget-key>/<page>/<month>/<currency>`. Use `home` for the original budget, each saved budget's permanent ID for named budgets, and `demo` for the single fictional sample budget. Budget names can change without changing their addresses.

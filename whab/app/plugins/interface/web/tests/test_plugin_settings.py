@@ -1,6 +1,7 @@
 """Plugin settings are discoverable, escaped and separate from pending selection."""
 
 import re
+from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 import pytest
@@ -25,6 +26,16 @@ def plugin(identifier, **changes):
 
 def dialog(text, identifier):
     return re.search(rf'<dialog\b[^>]*\bid="{identifier}".*?</dialog>', text, re.S)[0]
+
+
+class Tags(HTMLParser):
+    def __init__(self, text):
+        super().__init__()
+        self.tags = []
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        self.tags.append((tag, dict(attrs)))
 
 
 def render(client, monkeypatch, *plugins, restart_required=False, error=None):
@@ -66,8 +77,6 @@ def test_settings_links_to_installed_plugins_with_all_categories_as_default(clie
 
 @pytest.mark.parametrize(("workspace", "label"), [("demo", "Demo budget"), ("personal", "My budget")])
 def test_budget_selection_lives_in_settings_and_preserves_page_context(client, workspace, label):
-    from html import unescape
-
     response = client.get(
         f"/budgets/{workspace.replace('personal', 'home')}/transactions/2026-09/eur?category=old-category"
     )
@@ -79,40 +88,79 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     ]
     assert f"Current budget · {label}" in settings
     budgets = dialog(text, "budgets-dialog")
-    choices = re.findall(r'<a class="budget-choice" href="([^"]+)"([^>]*)>', budgets)
-    assert len(choices) == 2
-    for href, attributes in choices:
-        address = urlparse(unescape(href))
-        key = address.path.split("/")[2]
+    switch = re.search(r'<form\b[^>]*\bdata-budget-switch\b.*?</form>', budgets, re.S)[0]
+    attributes = next(attrs for tag, attrs in Tags(switch).tags if tag == "form")
+    for destination in ("personal", "demo"):
+        href = attributes[f"data-{destination}-url"]
+        address = urlparse(href)
+        key = "home" if destination == "personal" else "demo"
         assert address.path == f"/budgets/{key}/transactions/2026-09/eur"
-        assert key in {"home", "demo"}
         assert address.query == ""
-        assert ('aria-current="true"' in attributes) == (key == workspace.replace("personal", "home"))
-        switched = client.get(unescape(href))
+        switched = client.get(href)
         assert switched.status_code == 200
-        next_label = "Demo budget" if key == "demo" else "My budget"
+        next_label = "Demo budget" if destination == "demo" else "My budget"
         assert f"Current budget · {next_label}" in dialog(switched.text, "settings-dialog")
+    fieldset = re.search(r'<fieldset\b[^>]*\bdata-available-budgets\b.*?</fieldset>', switch, re.S)[0]
+    assert 'class="budget-list"' in fieldset
+    choices = [attrs for tag, attrs in Tags(fieldset).tags if tag == "input"]
+    assert len(choices) == 2
+    assert [choice["data-workspace"] for choice in choices] == ["personal", "demo"]
+    for choice in choices:
+        assert choice["type"] == "radio" and choice["name"] == "budget"
+        assert choice["data-budget-id"]
+        assert choice["value"] == f'{choice["data-budget-id"]}:{choice["data-workspace"]}'
+        assert ("checked" in choice) == (choice["data-workspace"] == workspace)
+    assert budgets.count('class="budget-current"') == 1
+    labels = re.findall(r'<label\b[^>]*\bclass="budget-choice-select".*?</label>', fieldset, re.S)
+    assert len(labels) == 2
+    for row_label in labels:
+        assert len([tag for tag, _ in Tags(row_label).tags if tag == "input"]) == 1
+        assert "data-budget-download" not in row_label
+    downloads = [attrs for tag, attrs in Tags(fieldset).tags if tag == "button"]
+    assert len(downloads) == 2
+    for download, name, destination in zip(
+        downloads, ("My budget", "Demo budget"), ("personal", "demo"), strict=True,
+    ):
+        assert download["type"] == "button"
+        assert download["class"] == "button secondary"
+        assert "data-budget-download" in download
+        assert download["data-budget-id"] == choices[0]["data-budget-id"]
+        assert download["data-workspace"] == destination
+        assert download["data-name"] == name
+        assert download["aria-label"] == f"Download {name}"
+    assert 'type="password" name="password"' in switch
+    assert '<button class="button primary" type="submit">Open selected budget</button>' in switch
+    assert "<select" not in switch
     assert 'class="workspace-switch"' not in text
     assert 'class="mobile-workspace"' not in text
     assert 'data-navigation="workspace"' not in text
 
 
 @pytest.mark.parametrize("workspace", ["personal", "demo"])
-def test_new_budget_is_a_primary_action_with_a_dedicated_creation_dialog(client, workspace):
+def test_budget_creation_and_file_opening_are_inline_actions_that_leave_the_modal(client, workspace):
     text = client.get(f"/budgets/{workspace.replace('personal', 'home')}/budget/current-month/usd").text
     budgets = dialog(text, "budgets-dialog")
-    assert re.search(r'<button class="button primary"[^>]*data-dialog="new-budget-dialog"', budgets)
-    assert budgets.index('data-dialog="new-budget-dialog"') < budgets.index('class="budget-list"')
-    assert budgets.index("data-budget-switch") < budgets.index('class="budget-bundle"')
-    assert "data-budget-new" not in budgets
-    creation = dialog(text, "new-budget-dialog")
-    assert 'aria-label="New budget"' in creation
+    assert "new-budget-dialog" not in text
+    assert budgets.index("data-budget-switch") < budgets.index("Create new budget")
+    assert budgets.index("Create new budget") < budgets.index("data-budget-new")
+    assert budgets.index("data-budget-new") < budgets.index("Open existing budget")
+    assert budgets.index("Open existing budget") < budgets.index("data-budget-open")
+    assert budgets.index("data-budget-open") < budgets.index('class="budget-advanced"')
+    creation = re.search(r'<form\b[^>]*\bdata-budget-new\b.*?</form>', budgets, re.S)[0]
     assert 'class="modal-form" data-budget-new' in creation
-    assert 'Budget name<input name="name" required maxlength="100"' in creation
-    assert "autofocus" in creation
-    assert 'data-close-dialog>Cancel</button>' in creation
-    assert '<button class="button primary" type="submit">Create budget</button>' in creation
+    assert 'New budget name<input name="name" required maxlength="100"' in creation
+    assert re.search(r'<button class="button primary" type="submit">Create (?:new )?budget</button>', creation)
     assert 'role="alert" hidden' in creation
+    opening = re.search(r'<form\b[^>]*\bdata-budget-open\b.*?</form>', budgets, re.S)[0]
+    opening_inputs = {attrs["name"]: attrs for tag, attrs in Tags(opening).tags if tag == "input"}
+    assert opening_inputs["budget"]["type"] == "file"
+    assert opening_inputs["budget"]["accept"] == ".whab,application/zip"
+    assert "required" in opening_inputs["budget"]
+    assert opening_inputs["password"]["type"] == "password"
+    assert opening_inputs["as_copy"]["type"] == "checkbox"
+    assert "Open as a separate budget" in opening
+    assert '<button class="button primary" type="submit">Open budget</button>' in opening
+    assert 'role="alert" hidden' in opening
 
 
 def test_plugin_categories_and_names_are_sorted_and_examples_are_hidden(client, monkeypatch):

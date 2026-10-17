@@ -53,7 +53,8 @@ A storage descriptor can provide `budget_connection(files) -> Mapping[str, str]`
 Host endpoints support budget management:
 
 - `GET /api/budget` describes the current budget and copy/plugin status.
-- `GET /api/budget/export` downloads the default `.whab` container with credentials kept on the device. `?include_credentials=true` explicitly includes an encrypted remote client credential and requires a password header.
+- `GET /api/budget/export` downloads the current `.whab` container with credentials kept on the device. `?include_credentials=true` explicitly includes an encrypted remote client credential and requires a password header.
+- `GET /api/budgets/{id}/export` downloads a known budget without changing the browser's selected budget. An unopened encrypted connection requires the password header. Both export routes accept `workspace=demo` to download only the demo ledger as an independent SQLite-compatible budget with a new identity; demo exports omit personal plugin data and reject credential inclusion. Browser downloads use the addressed budget scope: `/budgets/<key>/api/budgets/{id}/export` for a real budget and `/budgets/demo/api/budget/export` for the single demo destination.
 - `POST /api/budget/open` accepts a raw `application/zip` bundle up to 50 MiB, validates it and activates it in the browser session. Supply the password header to unlock an included remote credential. `?as_copy=true` gives the imported contents a new budget identity, preserving a conflicting revision separately without merging.
 - `POST /api/budget/new` accepts JSON `{"name": "Household"}` and activates a new budget.
 - `GET /api/budgets` lists opened/recent budgets; `POST /api/budgets/{id}/activate` switches the active session, accepting the same password header when reopening an encrypted connection.

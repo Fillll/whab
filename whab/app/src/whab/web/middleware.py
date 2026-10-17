@@ -109,7 +109,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
                 personal_only = (
                     path.startswith(("/api/banks/", "/api/plaid/", "/api/budget/plugins/"))
                     or "/import/" in path
-                    or path in {"/api/budget/export", "/api/budget/save", "/api/budget/copies"}
+                    or path in {"/api/budget/save", "/api/budget/copies"}
                     or (request.method not in {"GET", "HEAD", "OPTIONS"} and (
                         path == "/api/plugins/management" or "/settings/actions/" in path
                     ))

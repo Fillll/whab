@@ -124,7 +124,7 @@ def create_router(
         context.update(
             data=data, status=status, workspace=workspace, page=page, month=month,
             version=__version__,
-            budget_name=budget_name,
+            budget_name=budget_name, budget_id=service.budget_id,
         )
         from whab.web.bank_status import public_bank_status
 

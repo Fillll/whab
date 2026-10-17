@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.budgets.helpers import decode_budget
 from whab.app import create_app
 from whab.budgets.container import decode_container
 from whab.budgets.host import BudgetHost
@@ -126,7 +127,7 @@ def test_route_dataset_rejects_conflicting_query_and_body_workspace(tmp_path, ke
         assert client.get("/api/workspace?workspace=personal").json() == before
 
 
-def test_demo_is_global_and_cannot_export_or_use_personal_only_operations(tmp_path):
+def test_demo_is_global_and_cannot_use_personal_only_operations(tmp_path):
     with TestClient(create_app(settings=settings(tmp_path, ("plaid", "ynab"))), base_url=BASE) as client:
         original_demo = accounts(client, "demo", "demo")
         assert original_demo
@@ -138,7 +139,6 @@ def test_demo_is_global_and_cannot_export_or_use_personal_only_operations(tmp_pa
         assert add_account(client, "demo", "Sample fixture wallet", "demo").status_code == 200
         assert "Sample fixture wallet" in accounts(client, "demo", "demo")
         assert accounts(client, created["id"]) == {"Private fixture wallet"}
-        assert client.get(scoped("demo", "budget/export")).status_code == 403
         for operation in ("banks/plaid/link-token", "budget/save", "budget/copies"):
             assert client.post(scoped("demo", operation), json={}).status_code == 403
         assert client.put(scoped("demo", "plugins/management"), json={"plugins": []}).status_code == 403
@@ -303,3 +303,62 @@ def test_explicit_startup_budget_landing_uses_its_stable_key_and_keeps_demo_avai
         breadcrumb = re.search(r'<div class="breadcrumb">(.*?)</div>', demo.text, re.S)[1]
         assert "Startup household" not in breadcrumb
         assert f'href="/budgets/{startup.id}/budget/current-month/usd"' in demo.text
+
+
+@pytest.mark.parametrize("target_key", ["home", "portable"])
+def test_catalog_download_address_owns_target_and_ignores_other_tab_cookie(tmp_path, target_key):
+    with TestClient(create_app(settings=settings(tmp_path)), base_url=BASE) as client:
+        assert add_account(client, "home", "Original wallet").status_code == 200
+        first = create_budget(client, "Household")
+        assert add_account(client, first["id"], "Household wallet").status_code == 200
+        second = create_budget(client, "Other tab")
+        assert add_account(client, second["id"], "Other tab wallet").status_code == 200
+        key = "home" if target_key == "home" else first["id"]
+        identifier = "default" if target_key == "home" else first["id"]
+        catalog = client.get(scoped(second["id"], "budgets")).json()
+        response = client.get(scoped(key, f"budgets/{identifier}/export"))
+        assert response.status_code == 200, response.text
+        assert "set-cookie" not in response.headers
+        manifest, ledger = decode_budget(response.content)
+        expected_name = "Original wallet" if key == "home" else "Household wallet"
+        assert {account["name"] for account in ledger["accounts"]} == {expected_name}
+        assert manifest["name"] == ("My budget" if key == "home" else "Household")
+        assert client.get("/api/budget").json()["id"] == second["id"]
+        assert client.get(scoped(second["id"], "budgets")).json() == catalog
+        mismatched = client.get(scoped(key, f'budgets/{second["id"]}/export'))
+        assert mismatched.status_code == 400 and "set-cookie" not in mismatched.headers
+        assert client.get("/api/budget").json()["id"] == second["id"]
+
+
+def test_demo_download_exports_only_global_sample_ledger_without_selecting_it(tmp_path):
+    configuration = settings(tmp_path, ("bank-logos",))
+    host = BudgetHost(configuration)
+    with TestClient(create_app(settings=configuration, budget_host=host), base_url=BASE) as client:
+        private = create_budget(client, "Private household")
+        identifier = private["id"]
+        assert add_account(client, identifier, "Private wallet").status_code == 200
+        assert add_account(client, "demo", "Global demo wallet", "demo").status_code == 200
+        # A portable runtime's own sample ledger is not the global demo destination.
+        assert add_account(client, identifier, "Local sample wallet", "demo").status_code == 400
+        assert client.post("/api/accounts", json={
+            "workspace": "demo", "name": "Other sample wallet", "type": "depository", "balance": 2000,
+        }).status_code == 200
+        assert client.put(scoped(identifier, "budget/plugins/bank-logos"), json={
+            "state": {"privateMarker": "personal plugin state"},
+        }).status_code == 200
+        response = client.get(scoped("demo", "budget/export"))
+        assert response.status_code == 200, response.text
+        assert "set-cookie" not in response.headers
+        manifest, ledger = decode_budget(response.content)
+        assert manifest["name"] == "Demo budget" and manifest["id"] != identifier
+        assert manifest["storage"] == "sqlite"
+        assert {plugin["id"] for plugin in manifest["plugins"]} == {"sqlite"}
+        assert ledger == host.applications[host.default_id][0].state.store.export_budget("demo")
+        names = {account["name"] for account in ledger["accounts"]}
+        assert "Global demo wallet" in names
+        assert "Private wallet" not in names and "Other sample wallet" not in names
+        assert client.get("/api/budget").json()["id"] == identifier
+        for query, expected_status in (({"workspace": "personal"}, 400), ({"include_credentials": "true"}, 400)):
+            rejected = client.get(scoped("demo", "budget/export"), params=query)
+            assert rejected.status_code == expected_status and "set-cookie" not in rejected.headers
+        assert client.get(scoped("demo", f"budgets/{identifier}/export")).status_code == 400
