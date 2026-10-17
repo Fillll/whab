@@ -2,5 +2,7 @@
 
 ## 1.0.0 — 2026-10-15
 
+PR: [#30](https://github.com/Fillll/whab/pull/30)
+
 - Introduce independent packaging and version ownership for the existing `bank-logos` plugin, compatible with WHAB 2.x. Earlier changes shipped inside the application distribution and were not independent plugin releases.
 - Preserve its plugin ID, Python package, entry point and existing behavior.
