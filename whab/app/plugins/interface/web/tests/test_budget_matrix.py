@@ -33,7 +33,11 @@ def test_three_month_matrix_uses_core_summaries_and_category_values(client):
     assert 'data-dialog="category-dialog"' in text
     assert 'class="sidebar-bottom"' in text
     assert text.index('class="sidebar-bottom"') < text.index('aria-label="Settings"')
-    assert 'class="settings-label">Settings</span>' in text
+    footer = re.search(r'<div class="sidebar-bottom">(.*?)</aside>', text, re.S)[1]
+    assert footer.index('class="local-status-dot"') < footer.index('class="local-status-label"')
+    assert footer.index('class="local-status-label"') < footer.index('aria-label="Settings"')
+    settings = re.search(r'<button class="settings-trigger"[^>]*>(.*?)</button>', footer, re.S)[1]
+    assert "<svg" in settings and not re.sub(r"<[^>]*>", "", settings).strip()
     forms = assignment_forms(text)
     for month, label in (("2026-10", "October"), ("2026-11", "November"), ("2026-12", "December")):
         data = client.get(f"/api/workspace?workspace=demo&month={month}").json()

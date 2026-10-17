@@ -2677,7 +2677,7 @@ strong {
   flex-shrink: 0;
 }
 .local-status {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin: 0 6px;
   padding-top: 12px;
   gap: 7px;
@@ -2685,12 +2685,11 @@ strong {
 .settings-trigger {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 9px;
-  width: 100%;
-  min-height: 38px;
-  padding: 0 4px;
-  font-size: 12px;
+  justify-content: center;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  margin-left: auto;
 }
 .local-status-dot {
   margin-left: 6px;
@@ -3253,6 +3252,7 @@ strong {
     min-height: 44px;
     justify-content: center;
     padding: 0;
+    margin-left: 0;
   }
   .app-shell > main {
     margin-left: 62px;
