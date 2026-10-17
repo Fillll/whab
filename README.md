@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="whab/app/plugins/interface/web/src/whab_web/static/logo.svg" alt="WHAB logo" width="128" height="128">
+  <img src="whab/app/plugins/interface/web/src/whab_plugin_web/static/logo.svg" alt="WHAB logo" width="128" height="128">
 </p>
 <h1 align="center">WHAB</h1>
 <p align="center"><strong>We Have A Budget</strong></p>

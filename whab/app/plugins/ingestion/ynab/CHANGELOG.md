@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.1.2 — 2026-10-16
+
+PR: [#40](https://github.com/Fillll/whab/pull/40)
+
+- Rename the independent distribution and Python package to `whab_plugin_ynab` under the shared `whab_plugin_<name>` convention. Preserve the plugin ID and its existing saved data and settings.
+
 ## 1.1.1 — 2026-10-16
 
 PR: [#36](https://github.com/Fillll/whab/pull/36)

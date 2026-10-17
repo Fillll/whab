@@ -1,8 +1,8 @@
 # Plaid bank plugin
 
-Distributed independently as `whab-plaid-plugin`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_plaid`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
-`src/whab_plaid/` owns the descriptor, payload normalization, encrypted tokens, Link, synchronization, signed webhooks, templates and connection script. Keep supporting modules, assets and mocked provider tests in this folder.
+`src/whab_plugin_plaid/` owns the descriptor, payload normalization, encrypted tokens, Link, synchronization, signed webhooks, templates and connection script. Keep supporting modules, assets and mocked provider tests in this folder.
 
 WHAB requires HTTPS for local pages, bank endpoints, OAuth redirects in every environment and webhook delivery. Registered webhook paths bypass localhost Host/origin checks, but must pass Plaid signature/timestamp/body-hash verification; TLS encryption does not replace provider authentication. See [TLS setup](../../../../docs/usage.md#local-https).
 

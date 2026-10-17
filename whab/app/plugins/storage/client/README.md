@@ -1,6 +1,6 @@
 # Remote budget client
 
-Distributed independently as `whab-client-plugin`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_client`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
 For the original workspace or initial CLI creation, select `client` as the storage plugin to use a budget served by the `server`
 interface plugin. Configure these values on the client machine:

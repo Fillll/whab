@@ -8,6 +8,8 @@ The [budget and plugin model](target-architecture.md) groups capabilities by res
 
 Application source paths in this guide are relative to `whab/app/`. Each concrete implementation lives in `plugins/<category>/<id>/` and owns its source package, assets, README, tests, `pyproject.toml` and dated `CHANGELOG.md`. The complete [plugin inventory](../app/plugins/README.md#categories-and-names) includes seven supported packages plus the separately installed teaching example. The `bundled` extra selects the supported set when compatible distributions are available in the chosen package index or local wheelhouse; source checkouts use `.venv/bin/python scripts/install.py --dev` from `whab/app/`. The host wheel contains no concrete plugin package or entry point. A material plugin-only change bumps that plugin's `project.version` and local changelog; only host/core/SDK changes bump the app, with spanning changes updating each affected owner. Keep implementation tests beside their plugin and shared SDK/host contracts in `tests/`. See [folder ownership and test commands](../app/plugins/README.md). The public `whab.plugins` SDK stays in core under `src/whab/plugins/`.
 
+Every plugin uses `whab_plugin_<id>` for both its Python package and declared distribution, with ID hyphens converted to underscores. For example, `sqlite` uses `whab_plugin_sqlite` and `bank-logos` uses `whab_plugin_bank_logos`; the teaching example uses `whab_plugin_example`. Runtime IDs and readable display names remain independent of package names. Packaging tools may normalize distribution underscores to hyphens when displaying metadata. When upgrading from the former `whab-<id>-plugin` names, use the source installer or follow the [wheel-environment migration instructions](../app/CONTRIBUTING.md#development-environment) to avoid duplicate entry points.
+
 CI requires 100% Python statement and branch coverage for each plugin's entire source tree. The application command `.venv/bin/python scripts/check_plugin_coverage.py` discovers all plugin source roots, includes unimported files, and measures the complete local/shared suite. New behavior needs regression tests in its owning plugin folder; do not suppress runtime coverage gaps.
 
 **Installed Python plugins are trusted code running in WHAB's server process, not a security sandbox.** Reporting hooks receive snapshots rather than backend or credentials; budget binders can read their own portable settings and state. Bank factories receive scoped persistence/configuration and an encryption key. Storage factories own the full ledger and backend credentials; visual descriptors provide trusted templates, scripts and presentation code. Python can independently access files/network or import internals with WHAB's privileges. Select only reviewed code. These interfaces limit host-supplied capabilities and accidental mutation, not malicious code.
@@ -104,7 +106,7 @@ curl --cacert /absolute/path/to/runtime/tls/ca.crt \
 
 Keep any other intended optional IDs in that request; it replaces the optional list. For an already opened portable budget, append `--cookie 'whab-budget=<budget-id>'` using its ID from `GET /api/budgets` so the request targets that budget; do not include private browser-session values in documentation or commits. Remove `example` through the same API and restart to disable it. Ordinary Settings saves preserve valid hidden example selections rather than presenting a new user-facing control.
 
-The example shows cleared net spending and income. Pending transactions and transfers are excluded from these totals; categorized inflows count as refunds, while uncategorized inflows count as income. Imported income is analytics only and does not increase assignable cash. Its CSV export includes all selected-month transactions with pending/transfer flags and integer currency minor units plus a currency column. Example 1.2.0 declares `whab>=1.5.0,<3` and `api_version=1`; its version belongs to its own distribution, not the host.
+The example shows cleared net spending and income. Pending transactions and transfers are excluded from these totals; categorized inflows count as refunds, while uncategorized inflows count as income. Imported income is analytics only and does not increase assignable cash. Its CSV export includes all selected-month transactions with pending/transfer flags and integer currency minor units plus a currency column. The example declares `whab>=2.1,<3` and `api_version=1`; its version belongs to its own distribution, not the host.
 
 ## Public SDK
 
@@ -188,15 +190,18 @@ plugin = Plugin(
 A descriptor must supply at least one of `ui`, `interface`, `storage`, `bank`, `file_import`, `insights`, `export` or `bank_logos`, or a `bind` callback that returns budget-specific capabilities. `settings` alone is insufficient, and `merchant_logos` supplements a bank capability. The entry point resolves directly to the `Plugin` object, not a factory. Register it in the package's `pyproject.toml`:
 
 ```toml
+[project]
+name = "whab_plugin_my_summary"
+
 [project.entry-points."whab.plugins"]
-my-summary = "my_package:plugin"
+my-summary = "whab_plugin_my_summary:plugin"
 ```
 
 After installing the package, select **plaid** and **my-summary** in Settings, save, and restart. With no saved selection, use `WHAB_PLUGINS=plaid,my-summary` instead. Multiple environment names use commas; configured order controls insight panel order, and Settings saves its displayed order. Your package should declare a compatible WHAB dependency, for example `whab>=1.1.0,<3` for this API; using the new host management endpoints requires WHAB 1.2 or newer.
 
 ## Storage backends
 
-The bundled SQLite descriptor is registered as `sqlite = "whab_sqlite.plugin:plugin"`. Host code imports `StorageBackend` rather than a concrete store or database driver. The SQLite descriptor opens its backend only when the selected factory runs.
+The bundled SQLite descriptor is registered as `sqlite = "whab_plugin_sqlite.plugin:plugin"`. Host code imports `StorageBackend` rather than a concrete store or database driver. The SQLite descriptor opens its backend only when the selected factory runs.
 
 ```python
 from whab.plugins import Plugin, StorageBackend, StorageContext
@@ -246,7 +251,7 @@ The host closes owned backends after bank cleanup on shutdown/startup failure; t
 
 ## User interfaces
 
-The bundled visual descriptor is `web = "whab_web.plugin:plugin"`. It owns view models, icons, Jinja templates, styles and browser controls. Host code retains HTTP transport, validation, access middleware and business-service dispatch.
+The bundled visual descriptor is `web = "whab_plugin_web.plugin:plugin"`. It owns view models, icons, Jinja templates, styles and browser controls. Host code retains HTTP transport, validation, access middleware and business-service dispatch.
 
 ```python
 from pathlib import Path
@@ -284,7 +289,7 @@ Bank scripts announce feedback through a cancelable document event, `whab:notice
 
 ## Privileged bank capability
 
-The supported Plaid integration is registered by its independent `whab-plaid-plugin` wheel as `plaid = "whab_plaid.plugin:plugin"`. It uses the same discovery, descriptor validation, enablement, scoped persistence, UI mounting, and service lifecycle as external bank plugins. The app's composition does not instantiate Plaid independently. Explicitly disabling it prevents its entry point from loading and removes its connection UI, assets, and provider routes, while manual budgeting remains available. Two installed entry points claiming `plaid` fail startup rather than allowing an external package to shadow the bundled integration.
+The supported Plaid integration is registered by its independent `whab_plugin_plaid` wheel as `plaid = "whab_plugin_plaid.plugin:plugin"`. It uses the same discovery, descriptor validation, enablement, scoped persistence, UI mounting, and service lifecycle as external bank plugins. The app's composition does not instantiate Plaid independently. Explicitly disabling it prevents its entry point from loading and removes its connection UI, assets, and provider routes, while manual budgeting remains available. Two installed entry points claiming `plaid` fail startup rather than allowing an external package to shadow the bundled integration.
 
 A bank plugin supplies a synchronous factory:
 
@@ -366,7 +371,7 @@ Plaid maps only its supplied top-level `logo_url` to keys such as `merchant-walm
 
 ## Bank-logo branding (WHAB 1.3+)
 
-Optional branding is independent of the selected UI and bank-ingestion services. The bundled descriptor is registered as `bank-logos = "whab_bank_logos.plugin:plugin"` and is disabled by default. Enable it through Settings and restart, or select `WHAB_PLUGINS=plaid,bank-logos` when there is no saved selection. See README for its source, coverage and privacy behavior.
+Optional branding is independent of the selected UI and bank-ingestion services. The bundled descriptor is registered as `bank-logos = "whab_plugin_bank_logos.plugin:plugin"` and is disabled by default. Enable it through Settings and restart, or select `WHAB_PLUGINS=plaid,bank-logos` when there is no saved selection. See README for its source, coverage and privacy behavior.
 
 ```python
 from whab.plugins import BankLogos, LogoImage, Plugin

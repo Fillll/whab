@@ -1,6 +1,6 @@
 # Remote budget server
 
-Distributed independently as `whab-server-plugin`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_server`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
 The `server` interface plugin exposes a budget's public ledger operations at
 `/remote/v1/budgets/{budget_id}`. Enable it with the budget's optional plugins and

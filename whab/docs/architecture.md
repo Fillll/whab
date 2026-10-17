@@ -8,14 +8,14 @@
 | --- | --- | --- |
 | `whab.domain` | Integer money, calendar validation, normalized import records, public transaction projections and envelope calculations | Python standard library and other domain modules |
 | `whab.storage.bank` | Generic provider identities and scoped Item/import operations | Domain records and public storage protocols |
-| `whab_sqlite` | Bundled storage descriptor, SQLite upgrades, fictional seeding, coherent reads and transactional mutations | Domain rules; plugin SDK for its descriptor/context |
-| `whab_plaid` | Bundled plugin descriptor, provider mapping, token encryption, Link, synchronization, webhooks and provider UI | Domain records and public plugin contracts |
-| `whab_web` | Default visual descriptor, view models, icons, templates, styles and browser controls | Domain presentation inputs and public plugin SDK |
-| `whab_ynab` | Local YNAB archive parsing, import preview and controls | Domain import records and public plugin SDK |
-| `whab_bank_logos` | Curated institution lookup, public icons and cache | Public branding/settings contracts |
-| `whab_server` | HTTPS bearer-authorized API interface for public ledger operations | Public interface/service contracts |
-| `whab_client` | Remote storage adapter and portable connection payload | Public storage/remote protocol contracts |
-| `whab_example_plugin` | Separately installed developer teaching report/export | Public immutable report snapshots |
+| `whab_plugin_sqlite` | Bundled storage descriptor, SQLite upgrades, fictional seeding, coherent reads and transactional mutations | Domain rules; plugin SDK for its descriptor/context |
+| `whab_plugin_plaid` | Bundled plugin descriptor, provider mapping, token encryption, Link, synchronization, webhooks and provider UI | Domain records and public plugin contracts |
+| `whab_plugin_web` | Default visual descriptor, view models, icons, templates, styles and browser controls | Domain presentation inputs and public plugin SDK |
+| `whab_plugin_ynab` | Local YNAB archive parsing, import preview and controls | Domain import records and public plugin SDK |
+| `whab_plugin_bank_logos` | Curated institution lookup, public icons and cache | Public branding/settings contracts |
+| `whab_plugin_server` | HTTPS bearer-authorized API interface for public ledger operations | Public interface/service contracts |
+| `whab_plugin_client` | Remote storage adapter and portable connection payload | Public storage/remote protocol contracts |
+| `whab_plugin_example` | Separately installed developer teaching report/export | Public immutable report snapshots |
 | `whab.web` | Host ledger/page/plugin/bank routes, schemas, middleware, safe errors, CSV and scoped projections | Domain records, generic bank facade and public plugin SDK |
 | `whab.plugins` | Public API v1, kinds, selectors, UI/storage/bank protocols and reporting hooks | Python standard library and domain records/errors |
 | `whab.services` | Budget-scoped validated ledger commands, coherent queries, revisions and retry receipts | Domain records and storage protocols |
@@ -23,7 +23,7 @@
 | `whab.app` | Component construction, dependency injection, router assembly, assets and lifespan cleanup | Domain rules, host transport and public plugin contracts |
 | `whab.config` / `whab.__main__` | Runtime configuration and local launch command | Environment/configuration and application composition |
 
-Application source paths in this guide are relative to `whab/app/`. Native platform launchers live alongside it in `whab/launchers/` and manage installation and process lifecycle through the application CLI; financial rules and data access stay in the application. Core packages live under `src/whab` and ship only in the host/core `whab` wheel. Each concrete plugin lives in `plugins/<category>/<id>/src/<package>/`, with its own `pyproject.toml`, `CHANGELOG.md`, `tests/` and `README.md` alongside. Web assets are package data in the independently distributed `whab_web` plugin, bank-specific resources in `whab_plaid`, and local import controls in `whab_ynab`. The host's `bundled` extra and `scripts/install.py` install the seven supported plugin distributions; they do not embed them in the host wheel. The teaching example is separately installed and hidden from ordinary Settings. There are no concrete Automation, Extension or production Insight plugins yet. The public `whab.plugins` package remains the SDK and host runtime, distinct from the contributor folders. File parsers receive bytes only; guarded host routes validate results and delegate atomic migrations to the optional storage import capability. See [CONTRIBUTING.md](../app/CONTRIBUTING.md) for development and test ownership.
+Application source paths in this guide are relative to `whab/app/`. Native platform launchers live alongside it in `whab/launchers/` and manage installation and process lifecycle through the application CLI; financial rules and data access stay in the application. Core packages live under `src/whab` and ship only in the host/core `whab` wheel. Each concrete plugin lives in `plugins/<category>/<id>/src/<package>/`, with its own `pyproject.toml`, `CHANGELOG.md`, `tests/` and `README.md` alongside. Web assets are package data in the independently distributed `whab_plugin_web` plugin, bank-specific resources in `whab_plugin_plaid`, and local import controls in `whab_plugin_ynab`. The host's `bundled` extra and `scripts/install.py` install the seven supported plugin distributions; they do not embed them in the host wheel. The teaching example is separately installed and hidden from ordinary Settings. There are no concrete Automation, Extension or production Insight plugins yet. The public `whab.plugins` package remains the SDK and host runtime, distinct from the contributor folders. File parsers receive bytes only; guarded host routes validate results and delegate atomic migrations to the optional storage import capability. See [CONTRIBUTING.md](../app/CONTRIBUTING.md) for development and test ownership.
 
 `domain.budget.calculate_workspace` projects a plain ledger state into a monthly view without querying a database or provider. `ensure_assignment_allowed` takes an explicit as-of month. Domain modules must stay independent of web, storage, configuration, providers and plugin runtimes.
 
