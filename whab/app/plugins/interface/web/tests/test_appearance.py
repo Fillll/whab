@@ -99,6 +99,8 @@ def test_theme_bootstrap_precedes_styles_and_uses_web_plugin_asset_version(clien
     for attrs in (script, stylesheet):
         assert parse_qs(urlparse(attrs.get("src", attrs.get("href"))).query) == {"v": [plugin_version]}
     assert "WHAB · 98.7.6" in response.text
+    sidebar = re.search(r'<aside class="sidebar">(.*?)</aside>', response.text, re.S)[1]
+    assert '<span class="local-status-label">WHAB v98.7.6</span>' in sidebar
 
     asset = client.get(script["src"])
     assert asset.status_code == 200
