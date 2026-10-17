@@ -1,6 +1,6 @@
 [project]
-name = "whab-bank-logos-plugin"
-version = "1.0.0"
+name = "whab_plugin_bank_logos"
+version = "1.0.1"
 description = "Public bank artwork plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -9,7 +9,7 @@ license-files = ["LICENSE"]
 dependencies = ["whab>=2,<3", "httpx==0.28.1"]
 
 [project.entry-points."whab.plugins"]
-bank-logos = "whab_bank_logos.plugin:plugin"
+bank-logos = "whab_plugin_bank_logos.plugin:plugin"
 
 [build-system]
 requires = ["setuptools>=77.0.3"]
@@ -17,4 +17,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["whab_bank_logos", "whab_bank_logos.*"]
+include = ["whab_plugin_bank_logos", "whab_plugin_bank_logos.*"]

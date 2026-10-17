@@ -10,7 +10,7 @@ import pytest
 
 from whab.plugins import LogoImage
 
-provider = importlib.import_module("whab_bank_logos.plugin")
+provider = importlib.import_module("whab_plugin_bank_logos.plugin")
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="
 )

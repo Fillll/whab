@@ -5,7 +5,7 @@ import io
 from dataclasses import asdict
 
 from fastapi.testclient import TestClient
-from whab_sqlite import Store
+from whab_plugin_sqlite import Store
 
 from tests.support.ui import make_ui
 from whab.app import create_app

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import httpx
 import pytest
-from whab_client.plugin import RemoteStore
-from whab_sqlite import Store
+from whab_plugin_client.plugin import RemoteStore
+from whab_plugin_sqlite import Store
 
 from tests.budgets.helpers import decode_budget, encode_sqlite_budget
 from whab.budgets import session as module

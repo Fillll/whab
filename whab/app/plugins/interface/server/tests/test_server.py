@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from whab_server.plugin import create_interface, plugin
+from whab_plugin_server.plugin import create_interface, plugin
 
 from whab.domain.errors import StoreError
 from whab.services.ledger import LedgerService

@@ -1,7 +1,7 @@
 """Provider normalization preserves safe account and category fallbacks."""
 
 import pytest
-from whab_plaid.mapping import normalize_account, suggest_category, transfer_category
+from whab_plugin_plaid.mapping import normalize_account, suggest_category, transfer_category
 
 from whab.domain.errors import StoreError
 

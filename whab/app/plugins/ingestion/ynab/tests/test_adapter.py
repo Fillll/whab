@@ -2,7 +2,7 @@
 
 import pytest
 from test_parser import archive, budget, transaction
-from whab_ynab.plugin import plugin, workspace_import
+from whab_plugin_ynab.plugin import plugin, workspace_import
 
 from whab.plugins import StoreError
 

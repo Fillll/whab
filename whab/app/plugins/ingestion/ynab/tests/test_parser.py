@@ -7,8 +7,8 @@ import zipfile
 from dataclasses import FrozenInstanceError
 
 import pytest
-from whab_ynab import parser
-from whab_ynab.parser import BUDGET_HEADERS, REGISTER_HEADERS, parse_dump
+from whab_plugin_ynab import parser
+from whab_plugin_ynab.parser import BUDGET_HEADERS, REGISTER_HEADERS, parse_dump
 
 from whab.domain.errors import StoreError
 

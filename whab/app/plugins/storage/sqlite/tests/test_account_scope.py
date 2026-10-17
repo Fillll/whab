@@ -4,8 +4,8 @@ import sqlite3
 from copy import deepcopy
 
 import pytest
-from whab_sqlite import Store
-from whab_sqlite.schema import initialize_schema
+from whab_plugin_sqlite import Store
+from whab_plugin_sqlite.schema import initialize_schema
 
 from whab.domain.errors import StoreError
 

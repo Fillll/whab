@@ -6,7 +6,7 @@ from types import MappingProxyType
 
 import httpx
 import pytest
-from whab_client.plugin import RemoteStore, connection_configuration, create_storage, plugin
+from whab_plugin_client.plugin import RemoteStore, connection_configuration, create_storage, plugin
 
 from whab.plugins import StorageContext, StoreError
 

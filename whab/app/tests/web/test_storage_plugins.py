@@ -211,9 +211,9 @@ finally:
     builtins.__import__ = original_import
 
 print(json.dumps({
-    'backend': 'whab_sqlite.store' in sys.modules,
-    'schema': 'whab_sqlite.schema' in sys.modules,
-    'seeding': 'whab_sqlite.seeding' in sys.modules,
+    'backend': 'whab_plugin_sqlite.store' in sys.modules,
+    'schema': 'whab_plugin_sqlite.schema' in sys.modules,
+    'seeding': 'whab_plugin_sqlite.seeding' in sys.modules,
     'driver_imports': sqlite_imports,
 }))
 """,

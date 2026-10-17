@@ -6,8 +6,8 @@ import json
 
 import httpx
 import pytest
-import whab_plaid.service as provider
-from whab_plaid.service import (
+import whab_plugin_plaid.service as provider
+from whab_plugin_plaid.service import (
     PlaidError,
     PlaidRemoteError,
     PlaidService,

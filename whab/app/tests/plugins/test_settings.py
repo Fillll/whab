@@ -209,9 +209,9 @@ def test_cache_owners_receive_only_their_path_and_control_fetch_expiry(tmp_path)
 
 def test_installed_categories_use_entrypoint_metadata_without_importing_disabled_code(tmp_path, monkeypatch):
     entries = tuple(EntryPoint(name, target, "whab.plugins") for name, target in (
-        ("bank-logos", "whab_bank_logos.plugin:plugin"), ("web", "whab_web.plugin:plugin"),
-        ("plaid", "whab_plaid.plugin:plugin"), ("ynab", "whab_ynab.plugin:plugin"),
-        ("sqlite", "whab_sqlite.plugin:plugin"), ("example", "whab_example_plugin:plugin"),
+        ("bank-logos", "whab_plugin_bank_logos.plugin:plugin"), ("web", "whab_plugin_web.plugin:plugin"),
+        ("plaid", "whab_plugin_plaid.plugin:plugin"), ("ynab", "whab_plugin_ynab.plugin:plugin"),
+        ("sqlite", "whab_plugin_sqlite.plugin:plugin"), ("example", "whab_plugin_example:plugin"),
         ("unknown", "does_not_exist:plugin"), ("bank-logos", "does_not_exist:plugin"),
     ))
     monkeypatch.setattr("whab.plugins.management.installed_entrypoints", lambda: entries)

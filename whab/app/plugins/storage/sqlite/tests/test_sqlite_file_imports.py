@@ -4,7 +4,7 @@ import sqlite3
 from dataclasses import replace
 
 import pytest
-from whab_sqlite import Store
+from whab_plugin_sqlite import Store
 
 from whab.domain.accounts import normalize_account
 from whab.domain.errors import StoreError
@@ -185,7 +185,7 @@ def test_receipt_identifiers_are_validated(store, plugin_id, fingerprint):
 
 
 def test_payload_is_validated_inside_the_write_transaction(store, monkeypatch):
-    import whab_sqlite.store as module
+    import whab_plugin_sqlite.store as module
 
     validate = module.validate_workspace_import
     validated = []

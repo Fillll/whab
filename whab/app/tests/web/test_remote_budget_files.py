@@ -9,7 +9,7 @@ from dataclasses import replace
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from whab_client import plugin as client_plugin
+from whab_plugin_client import plugin as client_plugin
 
 from whab.app import create_app
 from whab.budgets.container import decode_container, encode_container

@@ -3,7 +3,7 @@
 from copy import deepcopy
 
 import pytest
-from whab_sqlite import Store
+from whab_plugin_sqlite import Store
 
 from whab.domain.errors import StoreError
 from whab.storage.bank import BankStore

@@ -15,7 +15,7 @@ class BundleSourceBoundaryTests(unittest.TestCase):
             ".env.example", "pyproject.toml", "LICENSE", "README.md", "scripts/setup.py",
             "scripts/install.py", "src/whab/__init__.py",
             "plugins/interface/web/pyproject.toml", "plugins/interface/web/README.md",
-            "plugins/interface/web/src/whab_web_plugin/templates/base.html",
+            "plugins/interface/web/src/whab_plugin_web/templates/base.html",
         ):
             with self.subTest(path=path):
                 self.assertTrue(build.source_allowed(Path(path)))
@@ -27,7 +27,7 @@ class BundleSourceBoundaryTests(unittest.TestCase):
             ".venv/lib/python3.14/site-packages/private.py", "tests/private_fixture.py",
             "plugins/ingestion/plaid/.env", "plugins/ingestion/plaid/tests/private.py",
             "src/whab/__pycache__/app.pyc", "src/whab/private.key",
-            "plugins/ingestion/plaid/src/whab_plaid_plugin/.env.local",
+            "plugins/ingestion/plaid/src/whab_plugin_plaid/.env.local",
             "src/whab.egg-info/PKG-INFO",
         ):
             with self.subTest(path=path):

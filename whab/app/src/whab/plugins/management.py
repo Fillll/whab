@@ -9,14 +9,14 @@ from .sdk import ENTRYPOINT_GROUP, valid_plugin_name
 
 # Registration identity is package metadata, so disabled plugins remain unloaded.
 _BUNDLED_METADATA = {
-    ("bank-logos", "whab_bank_logos.plugin:plugin"): ("interface", "Bank logos"),
-    ("web", "whab_web.plugin:plugin"): ("interface", "WHAB web"),
-    ("plaid", "whab_plaid.plugin:plugin"): ("ingestion", "Plaid"),
-    ("ynab", "whab_ynab.plugin:plugin"): ("ingestion", "Import from YNAB ZIP file"),
-    ("sqlite", "whab_sqlite.plugin:plugin"): ("storage", "SQLite"),
-    ("client", "whab_client.plugin:plugin"): ("storage", "Remote budget client"),
-    ("server", "whab_server.plugin:plugin"): ("interface", "Budget API server"),
-    ("example", "whab_example_plugin:plugin"): ("example", "Month totals example"),
+    ("bank-logos", "whab_plugin_bank_logos.plugin:plugin"): ("interface", "Bank logos"),
+    ("web", "whab_plugin_web.plugin:plugin"): ("interface", "WHAB web"),
+    ("plaid", "whab_plugin_plaid.plugin:plugin"): ("ingestion", "Plaid"),
+    ("ynab", "whab_plugin_ynab.plugin:plugin"): ("ingestion", "Import from YNAB ZIP file"),
+    ("sqlite", "whab_plugin_sqlite.plugin:plugin"): ("storage", "SQLite"),
+    ("client", "whab_plugin_client.plugin:plugin"): ("storage", "Remote budget client"),
+    ("server", "whab_plugin_server.plugin:plugin"): ("interface", "Budget API server"),
+    ("example", "whab_plugin_example:plugin"): ("example", "Month totals example"),
 }
 
 

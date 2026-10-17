@@ -1,7 +1,7 @@
 """Workspace and envelope behavior through isolated SQLite ledgers."""
 
 import pytest
-from whab_sqlite import Store
+from whab_plugin_sqlite import Store
 
 from whab.domain.errors import StoreError
 

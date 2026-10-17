@@ -2,7 +2,7 @@
 
 import httpx
 import pytest
-from whab_plaid.service import encrypt_token
+from whab_plugin_plaid.service import encrypt_token
 
 
 @pytest.fixture
@@ -83,7 +83,7 @@ def plaid_client():
 @pytest.fixture
 def apply_plaid_sync(store):
     """Translate synthetic provider payloads into the generic ledger import contract."""
-    from whab_plaid.mapping import normalize_account, normalize_changes
+    from whab_plugin_plaid.mapping import normalize_account, normalize_changes
 
     def apply(item_id, changes, cursor, accounts, **options):
         return store.apply_sync(

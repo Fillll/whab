@@ -49,8 +49,8 @@ def test_plugin_rejects_untyped_import_descriptor_and_revalidates_frozen_bypass(
 
 
 def test_plugin_manager_checks_import_ui_before_saving_without_calling_parser(tmp_path, monkeypatch):
-    from whab_sqlite.plugin import plugin as sqlite_plugin
-    from whab_web.plugin import plugin as web_plugin
+    from whab_plugin_sqlite.plugin import plugin as sqlite_plugin
+    from whab_plugin_web.plugin import plugin as web_plugin
 
     def forbidden(raw):
         pytest.fail("Selection must never execute a file parser")

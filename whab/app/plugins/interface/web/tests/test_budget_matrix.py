@@ -3,7 +3,7 @@
 import re
 from html import unescape
 
-from whab_web.views import money_input, shift_month
+from whab_plugin_web.views import money_input, shift_month
 
 from whab.plugins import format_money
 

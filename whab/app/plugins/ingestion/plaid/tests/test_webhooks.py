@@ -7,11 +7,11 @@ import json
 
 import httpx
 import pytest
-import whab_plaid.service as provider
+import whab_plugin_plaid.service as provider
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
-from whab_plaid.service import PlaidService
+from whab_plugin_plaid.service import PlaidService
 
 
 def url64(data):
