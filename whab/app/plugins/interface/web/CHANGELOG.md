@@ -1,5 +1,9 @@
 # Web interface plugin changelog
 
+## 1.5.1 — 2026-10-16
+
+- Show the running WHAB application's version below Settings in the sidebar.
+
 ## 1.5.0 — 2026-10-16
 
 - Navigate with lowercase budget, page, month and currency path segments. Preserve `current-month` when changing page or currency and select a fixed month when using the month arrows.
