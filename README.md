@@ -20,7 +20,7 @@ python3.14 -m venv .venv
 .venv/bin/python -m whab
 ```
 
-Setup creates a local certificate authority and localhost certificate without changing your system's trust settings. [Trust the local CA explicitly](whab/docs/usage.md#local-https) before opening [127.0.0.1:5173](https://127.0.0.1:5173) to explore fictional demo data, or switch to **My budget** and add a manual account. WHAB requires HTTPS for every request; Plaid credentials are only needed for bank connections.
+Setup creates a local certificate authority and localhost certificate without changing your system's trust settings. [Trust the local CA explicitly](whab/docs/usage.md#local-https) before opening [127.0.0.1:5173](https://127.0.0.1:5173) to explore fictional **Demo Budget** data, or open **My Budget** and add a manual account. Browser addresses identify the budget, page, month and currency using lowercase paths; see [budget addresses](whab/docs/usage.md#budget-addresses). WHAB requires HTTPS for every request; Plaid credentials are only needed for bank connections.
 
 ## Architecture
 

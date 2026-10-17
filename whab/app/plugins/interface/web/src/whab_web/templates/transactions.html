@@ -6,7 +6,7 @@
     <p>Review spending and put it in the right category.</p>
   </div>
   <div class="button-group"><a class="button secondary"
-   href="/api/export?workspace={{ workspace }}&amp;currency={{ currency }}"
+   href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}"
    download>{{ icon('download', 16) }}Export</a><button class="button primary"
         data-dialog="transaction-dialog"
         {% if not manual_accounts %}disabled title="Add a manual account in Accounts first" {% endif %}>{{ icon('plus', 16) }}Add transaction</button>

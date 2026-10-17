@@ -25,7 +25,7 @@ def assignment_forms(text):
 
 
 def test_three_month_matrix_uses_core_summaries_and_category_values(client):
-    text = client.get("/?workspace=demo&page=budget&month=2026-10").text
+    text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert 'aria-label="Category budget across 3 months"' in text
     assert 'class="category-inspector"' not in text
     assert 'class="budget-group-toggle"' in text
@@ -62,14 +62,14 @@ def test_future_assignment_uses_its_own_period_and_core_validation(client):
     }).status_code == 200
     data = client.get("/api/workspace?workspace=personal&month=2026-10").json()
     category = data["categories"][0]["id"]
-    text = client.get("/?workspace=personal&page=budget&month=2026-10").text
+    text = client.get("/budgets/home/budget/2026-10/usd").text
     form = next(form for form in assignment_forms(text) if form["month"] == "2026-11")
     assert form["api"] == f"/budget/{category}"
     response = client.put("/api" + form["api"], json={
         "workspace": form["workspace"], "month": form["month"], "assigned": 12345,
     })
     assert response.status_code == 200
-    refreshed = client.get("/?workspace=personal&page=budget&month=2026-10").text
+    refreshed = client.get("/budgets/home/budget/2026-10/usd").text
     assert {
         saved["month"]: saved["value"] for saved in assignment_forms(refreshed)
         if saved["api"] == form["api"]
@@ -83,32 +83,32 @@ def test_future_assignment_uses_its_own_period_and_core_validation(client):
 
 
 def test_inspector_requires_explicit_category_and_retains_selected_period(client):
-    text = client.get("/?workspace=demo&page=budget&month=2026-10&category=missing").text
+    text = client.get("/budgets/demo/budget/2026-10/usd?category=missing").text
     assert 'class="category-inspector"' not in text
-    text = client.get("/?workspace=demo&page=budget&month=2026-11&category=groceries").text
+    text = client.get("/budgets/demo/budget/2026-11/usd?category=groceries").text
     assert 'aria-label="Category details"' in text
     assert 'aria-label="Close category details"' in text
     assert "Monthly target" in text and "Update assignment" in text
     inspector = re.search(r'<aside class="category-inspector"(.*?)</aside>', text, re.S)[1]
     assert 'value="2026-11"' in inspector
-    assert 'href="/?page=budget&amp;workspace=demo&amp;month=2026-11&amp;currency=USD"' in inspector
+    assert 'href="/budgets/demo/budget/2026-11/usd"' in inspector
     assert "category=groceries&amp;" not in inspector
-    assert 'month=2026-12&amp;currency=USD&amp;category=groceries' in text
+    assert '/2026-12/usd?category=groceries' in text
 
 
 def test_historical_cells_are_disabled_and_navigation_stays_within_core_bounds(client):
     data = client.get("/api/workspace?workspace=demo&month=2026-10").json()
     start = data["budgetStartMonth"]
     earlier = shift_month(start, -1)
-    text = client.get(f"/?workspace=demo&page=budget&month={earlier}").text
+    text = client.get(f"/budgets/demo/budget/{earlier}/usd").text
     forms = assignment_forms(text)
     assert forms and all(form["disabled"] == (form["month"] < start) for form in forms)
     assert "Your budget begins" in text
     for boundary, absent in (("1900-01", "Previous month"), ("2200-12", "Next month")):
-        response = client.get(f"/?workspace=demo&page=budget&month={boundary}")
+        response = client.get(f"/budgets/demo/budget/{boundary}/usd")
         assert response.status_code == 200
         assert f'aria-label="{absent}"' not in response.text
-        months = re.findall(r'href="[^"]*month=(\d{4}-\d{2})', response.text)
+        months = re.findall(r'href="/budgets/demo/budget/(\d{4}-\d{2})/usd', response.text)
         assert months and all("1900-01" <= month <= "2200-12" for month in months)
     assert 'aria-label="Category budget across 1 month"' in response.text
 
@@ -127,8 +127,8 @@ def test_budget_labels_are_escaped_and_uncategorized_activity_is_period_specific
         "date": "2026-11-05", "merchant": "Future purchase", "amount": 12345,
         "categoryId": None,
     }).status_code == 200
-    text = client.get("/?workspace=personal&page=budget&month=2026-10").text
+    text = client.get("/budgets/home/budget/2026-10/usd").text
     assert category_name not in text and "&lt;script&gt;" in text
     assert "&lt;Living&gt;" in text
     row = re.search(r'<tr class="budget-category-row budget-uncategorized">(.*?)</tr>', text, re.S)[1]
-    assert "-123.45" in row and "month=2026-11" in row
+    assert "-123.45" in row and "/2026-11/usd" in row

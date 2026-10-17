@@ -57,7 +57,7 @@ def test_bundled_plaid_is_loaded_through_entry_point_and_keeps_legacy_routes(tmp
             assert client.get(prefix + "/items").json() == {"items": []}
             assert client.post(prefix + "/link-token", json={}).status_code == 400
             assert client.post(prefix + "/webhook", json={}).status_code == 401
-        page = client.get("/?page=accounts&workspace=personal")
+        page = client.get("/budgets/home/accounts/current-month/usd")
         assert "Finish Plaid setup" in page.text
         assert "/plugins/plaid/static/connect.js" in page.text
         assert client.get("/plugins/plaid/static/connect.js").status_code == 200
@@ -79,9 +79,40 @@ def test_alternate_ui_can_embed_plaid_without_default_ui_helpers(tmp_path, store
         create_app(store=store, settings=settings(home=tmp_path, ui="alternate"), plugins=registry),
         base_url="https://127.0.0.1:5173",
     ) as client:
-        response = client.get("/?page=accounts&workspace=demo")
+        response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
         assert "Finish Plaid setup" in response.text
         assert "/plugins/plaid/static/connect.js" in response.text
         assert client.get("/plugins/plaid/static/connect.js").status_code == 200
         assert client.get("/static/client.js").status_code == 404
+
+
+def test_demo_pages_do_not_load_personal_bank_controls_or_connection_scripts(tmp_path):
+    with TestClient(
+        create_app(settings=settings(("plaid",), home=tmp_path, ui="web")), base_url="https://127.0.0.1:5173"
+    ) as client:
+        response = client.get("/budgets/demo/accounts/current-month/usd")
+        assert response.status_code == 200
+        assert "Finish Plaid setup" not in response.text
+        assert "data-plaid-connect" not in response.text
+        assert "/plugins/plaid/static/connect.js" not in response.text
+
+
+def test_oauth_callback_uses_provider_asset_with_an_alternate_visual_interface(tmp_path, store):
+    templates, static = tmp_path / "templates", tmp_path / "static"
+    templates.mkdir()
+    static.mkdir()
+    (templates / "base.html").write_text("Alternate visual interface")
+    alternate = Plugin("alternate", "Alternate UI", ui=UserInterface(templates, static, lambda *a, **k: {}))
+    registry = PluginRegistry((alternate, plaid_plugin))
+    with TestClient(
+        create_app(store=store, settings=settings(home=tmp_path, ui="alternate"), plugins=registry),
+        base_url="https://127.0.0.1:5173",
+    ) as client:
+        state = "synthetic-private-state"
+        response = client.get("/", params={"oauth_state_id": state})
+        assert response.status_code == 200
+        assert '/budgets/home/plugins/plaid/static/oauth.js' in response.text
+        assert state not in response.text
+        assert client.get('/budgets/home/plugins/plaid/static/oauth.js').status_code == 200
+        assert client.get('/budgets/home/static/oauth.js').status_code == 404

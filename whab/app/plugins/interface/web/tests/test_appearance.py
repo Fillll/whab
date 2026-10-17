@@ -35,7 +35,7 @@ def render_plugins(client, monkeypatch, *, web_active=True, web_enabled=True):
                       required=False, manageable=True, reason=None)
     state = {"plugins": plugins, "restart_required": False, "error": None}
     monkeypatch.setattr("whab.plugins.management.PluginManager.projection", lambda _: state)
-    response = client.get("/?workspace=demo")
+    response = client.get("/budgets/demo/budget/current-month/usd")
     assert response.status_code == 200
     return response.text
 
@@ -81,13 +81,13 @@ def test_inactive_web_does_not_offer_appearance_controls(client, monkeypatch, en
 def test_theme_bootstrap_precedes_styles_and_uses_web_plugin_asset_version(client, monkeypatch, page):
     # A host-only version change must not masquerade as the web plugin version.
     monkeypatch.setattr("whab.web.routes.pages.__version__", "98.7.6")
-    response = client.get(f"/?workspace=demo&page={page}")
+    response = client.get(f"/budgets/demo/{page}/current-month/usd")
     assert response.status_code == 200
     head = response.text.split("</head>", 1)[0]
     tags = Tags(head).tags
     script_index, script = next(
         (index, attrs) for index, (tag, attrs) in enumerate(tags)
-        if tag == "script" and urlparse(attrs.get("src", "")).path == "/static/theme.js"
+        if tag == "script" and urlparse(attrs.get("src", "")).path == "/budgets/demo/static/theme.js"
     )
     style_index, stylesheet = next(
         (index, attrs) for index, (tag, attrs) in enumerate(tags)

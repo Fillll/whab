@@ -28,7 +28,7 @@ from whab.config import Settings
 settings = Settings(Path(sys.argv[1]), 5173, "sandbox", "", "", "", False, "", "", ())
 with TestClient(create_app(settings=settings), base_url="https://127.0.0.1:5173") as client:
     for page in ("budget", "transactions", "insights", "accounts"):
-        assert client.get("/?page=" + page).status_code == 200
+        assert client.get("/budgets/demo/" + page + "/current-month/usd").status_code == 200
     assert [p["id"] for p in client.get("/api/plugins").json()["plugins"]] == ["sqlite", "web"]
     assert client.post("/api/plaid/link-token", json={}).status_code == 404
     assert client.post("/api/banks/plaid/link-token", json={}).status_code == 404

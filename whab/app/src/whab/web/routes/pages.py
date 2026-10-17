@@ -3,7 +3,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from whab import __version__
 from whab.domain.budget import select_currency
@@ -11,8 +11,9 @@ from whab.domain.dates import current_month
 from whab.plugins import PluginError
 from whab.plugins.sdk import valid_merchant_logo_key
 from whab.services.ledger import LedgerService
+from whab.web.navigation import budget_key, page_url
 from whab.web.plugin_snapshot import build_snapshot
-from whab.web.schemas import Workspace, valid_month
+from whab.web.schemas import valid_month
 
 
 def create_router(
@@ -39,16 +40,39 @@ def create_router(
 
     service = service if service is not None else LedgerService(store, lock=getattr(store, "lock", None))
 
-    @router.get("/", response_class=HTMLResponse)
+    @router.get("/")
+    def landing(request: Request):
+        if any(key in request.query_params for key in ("page", "workspace", "month", "currency")):
+            raise HTTPException(400, "Open a canonical /budgets/ address.")
+        key = budget_key(service.budget_id) if service.budget_id != "default" or request.cookies.get("whab-budget") else "demo"
+        target = page_url(key)
+        if "oauth_state_id" in request.query_params:
+            if not any(p.id == "plaid" and p.bank_ui for p in plugins.bank_plugins()):
+                raise HTTPException(400, "Bank OAuth continuation is unavailable.")
+            # Provider state is opaque and case-sensitive, unlike routing values.
+            prefix = "/budgets/" + budget_key(service.budget_id)
+            return HTMLResponse(
+                '<!doctype html><html lang="en"><meta charset="utf-8">'
+                '<title>Continue bank connection</title>'
+                '<p id="oauth-status">Returning to the budget that started this connection…</p>'
+                f'<script src="{prefix}/plugins/plaid/static/oauth.js"></script></html>'
+            )
+        return RedirectResponse(target, status_code=303)
+
+    @router.get("/budgets/{key}/{page}/{month_token}/{currency}", response_class=HTMLResponse)
     def index(
         request: Request,
-        workspace: Workspace = "demo",
-        page: Literal["budget", "transactions", "insights", "accounts"] = "budget",
-        month: str | None = None,
+        key: str,
+        page: Literal["budget", "transactions", "insights", "accounts"],
+        month_token: str,
+        currency: str,
         category: str | None = None,
-        currency: str = "USD",
     ):
-        month = month or current_month()
+        if any(name in request.query_params for name in ("page", "workspace", "month", "currency")):
+            raise HTTPException(400, "Routing values belong in the address path.")
+        workspace = "demo" if key == "demo" else "personal"
+        month = current_month() if month_token == "current-month" else month_token
+        currency = currency.upper()
         try:
             valid_month(month)
         except ValueError as error:
@@ -78,6 +102,25 @@ def create_router(
             raise PluginError(
                 "The selected user interface could not render this page.", code="ui_render_failed"
             ) from None
+        personal_key = request.scope.get("whab.personal_key", budget_key(service.budget_id))
+        asset_prefix = f"/budgets/{key}"
+        api_prefix = asset_prefix + "/api"
+
+        def url(next_page=page, **overrides):
+            target_workspace = overrides.pop("workspace", workspace)
+            target_key = key if target_workspace == workspace else ("demo" if target_workspace == "demo" else personal_key)
+            return page_url(
+                target_key, next_page, overrides.pop("month", month_token),
+                overrides.pop("currency", currency), **overrides,
+            )
+
+        context["url"] = url
+        context["asset_prefix"] = asset_prefix
+        context["api_prefix"] = api_prefix
+        context.setdefault("client_context", {}).update(
+            budgetKey=key, budgetUrl=asset_prefix, apiPrefix=api_prefix,
+            personalBudgetKey=personal_key, monthToken=month_token, page=page,
+        )
         context.update(
             data=data, status=status, workspace=workspace, page=page, month=month,
             version=__version__,
@@ -92,13 +135,13 @@ def create_router(
                 "items": bank_stores[p.id].items() if workspace == "personal" else [],
             }
             for p in plugins.bank_plugins()
-            if p.bank_ui and p.id in banks
+            if p.bank_ui and p.id in banks and workspace == "personal"
         ]
         context["bank_source_ids"] = tuple(p.id for p in plugins.bank_plugins())
         context["plugin_scripts"] = [
-            f"/plugins/{p.id}/static/connect.js?v={context['version']}"
+            f"{asset_prefix}/plugins/{p.id}/static/connect.js?v={context['version']}"
             for p in plugins.bank_plugins()
-            if p.bank_ui and p.id in banks
+            if p.bank_ui and p.id in banks and workspace == "personal"
         ]
         context["import_panels"] = [
             {
@@ -110,7 +153,7 @@ def create_router(
             if p.file_import.templates is not None and workspace == "personal" and page == "accounts"
         ]
         context["plugin_scripts"].extend(
-            f"/imports/{panel['id']}/static/import.js?v={context['version']}"
+            f"{asset_prefix}/imports/{panel['id']}/static/import.js?v={context['version']}"
             for panel in context["import_panels"]
         )
         context["plugins"] = plugins.describe()
@@ -120,7 +163,7 @@ def create_router(
             for name in dict.fromkeys(account.get("institution", "") for account in data["accounts"])
         }
         context["account_logos"] = {
-            account["id"]: f"/api/plugins/{logo[0]}/bank-logos/{logo[1]}"
+            account["id"]: f"{api_prefix}/plugins/{logo[0]}/bank-logos/{logo[1]}"
             for account in data["accounts"]
             if (logo := institution_logos.get(account.get("institution", ""))) is not None
         }
@@ -129,7 +172,7 @@ def create_router(
         }
         context["merchant_logos"] = {
             transaction["id"]: (
-                f"/api/plugins/{transaction['source']}/merchant-logos/{transaction['merchantLogo']}"
+                f"{api_prefix}/plugins/{transaction['source']}/merchant-logos/{transaction['merchantLogo']}"
             )
             for transaction in data["transactions"]
             if transaction.get("source") in merchant_providers

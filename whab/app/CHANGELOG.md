@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.5.0 — 2026-10-16
+
+- Give browser views stable, lowercase addresses: `/budgets/<budget-key>/<page>/<month>/<currency>`. Use `home` for the original budget, each saved budget's permanent ID for named budgets, and `demo` for the single fictional sample budget. Budget names can change without changing their addresses.
+- Resolve budget-scoped pages, APIs, assets and downloads from the address independently of the browser's selected-budget cookie, keeping simultaneously open budgets isolated. Preserve existing unscoped API integrations and uppercase ISO currency values in API payloads and storage.
+- Support dynamic `current-month` and explicit `yyyy-mm` view periods. The root address opens the initial demo or selected saved budget; old query-style page addresses are no longer supported.
+
 ## 2.3.0 — 2026-10-16
 
 - Organize the product under `whab/app`, `whab/launchers` and `whab/docs`, keeping installed code and private runtime homes separate.

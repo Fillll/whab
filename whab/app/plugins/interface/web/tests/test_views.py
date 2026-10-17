@@ -126,8 +126,6 @@ def test_explicit_parent_categories_and_currency_bound_context():
     assert context["date_label"]("2026-10-01") == "2026-10-01"
     assert ("KWD", 3) in context["currency_choices"]
     assert context["client_context"]["currency"] == "JPY"
-    assert "currency=JPY" in context["url"]("transactions")
-    assert "currency=EUR" in context["url"](currency="EUR")
     assert all(isinstance(tick["amount"], int) for tick in context["chart_ticks"])
 
 
@@ -165,9 +163,6 @@ def test_periods_preserve_core_values_without_recalculating_budget_rules():
     assert all(period["summary"]["readyToAssign"] == 4321 for period in context["periods"])
     assert context["money_number"](123456) == "1,234.56"
     assert context["category_path"](child["id"]) == "food%2F%20%26%3F%22"
-    assert context["url"](category=None, month="2027-01") == (
-        "/?page=budget&workspace=demo&month=2027-01&currency=USD"
-    )
     assert "uncategorized" not in projections[0]
 
 

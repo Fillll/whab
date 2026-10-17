@@ -32,7 +32,7 @@ def client_for(store, home, *plugins, ui="web"):
 
 def test_selected_import_renders_only_on_personal_accounts_and_serves_its_assets(store, tmp_path):
     with client_for(store, tmp_path, web_plugin, ynab_plugin) as client:
-        response = client.get("/?page=accounts&workspace=personal")
+        response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
         assert "Import from YNAB ZIP file" in response.text
         assert 'data-file-import="ynab"' in response.text
@@ -43,7 +43,7 @@ def test_selected_import_renders_only_on_personal_accounts_and_serves_its_assets
         assert asset.status_code == 200
         assert "X-Import-Fingerprint" in asset.text
         for workspace, page in (("demo", "accounts"), ("personal", "budget"), ("personal", "transactions")):
-            response = client.get(f"/?page={page}&workspace={workspace}")
+            response = client.get(f"/budgets/{workspace.replace('personal', 'home')}/{page}/current-month/usd")
             assert response.status_code == 200
             assert "data-file-import" not in response.text
             assert "/imports/ynab/static/import.js" not in response.text
@@ -51,7 +51,7 @@ def test_selected_import_renders_only_on_personal_accounts_and_serves_its_assets
 
 def test_inactive_import_has_no_form_or_public_assets(store, tmp_path):
     with client_for(store, tmp_path, web_plugin) as client:
-        response = client.get("/?page=accounts&workspace=personal")
+        response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
         assert "data-file-import" not in response.text
         assert client.get("/imports/ynab/static/import.js").status_code == 404
@@ -67,7 +67,7 @@ def test_alternate_ui_can_embed_import_without_bundled_interface_helpers(store, 
     )
     alternate = Plugin("alternate", "Alternate UI", ui=UserInterface(templates, static, lambda *a, **k: {}))
     with client_for(store, tmp_path, alternate, ynab_plugin, ui="alternate") as client:
-        response = client.get("/?page=accounts&workspace=personal")
+        response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
         assert "data-file-import" in response.text
         assert "/imports/ynab/static/import.js" in response.text
@@ -78,7 +78,7 @@ def test_alternate_ui_can_embed_import_without_bundled_interface_helpers(store, 
 def test_import_without_ui_resources_keeps_pages_usable(store, tmp_path):
     api_only = replace(ynab_plugin, file_import=FileImport(ynab_plugin.file_import.parse))
     with client_for(store, tmp_path, web_plugin, api_only) as client:
-        response = client.get("/?page=accounts&workspace=personal")
+        response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
         assert "data-file-import" not in response.text
         assert client.get("/imports/ynab/static/import.js").status_code == 404
@@ -119,6 +119,6 @@ def test_imported_accounts_are_not_labelled_as_sandbox_bank_accounts(store, tmp_
         categories=(), transactions=(), assignments=(), budget_start_month="2026-10",
     ))
     with client_for(store, tmp_path, web_plugin, ynab_plugin) as client:
-        response = client.get("/?page=accounts&workspace=personal")
+        response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
         assert "Test account" not in response.text

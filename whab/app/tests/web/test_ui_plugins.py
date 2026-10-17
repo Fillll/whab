@@ -57,7 +57,7 @@ def test_another_ui_supplies_its_views_templates_assets_and_keeps_host_guards(tm
         base_url="https://127.0.0.1:5173",
     ) as client:
         for page in ("budget", "transactions", "insights", "accounts"):
-            result = client.get(f"/?page={page}&workspace=demo&month=2026-10")
+            result = client.get(f"/budgets/demo/{page}/2026-10/usd")
             assert result.status_code == 200
             assert "Alternative UI &lt;script&gt;fictional&lt;/script&gt; 2026-10" in result.text
             assert seen[-1][1]["workspace"] == "demo"
@@ -97,7 +97,7 @@ def test_multi_month_ui_receives_currency_scoped_core_periods_only_for_budget(tm
         create_app(store=store, settings=settings(tmp_path, "alternate"), plugins=registry),
         base_url="https://127.0.0.1:5173",
     ) as client:
-        result = client.get(f"/?page=budget&workspace=personal&month={month}&currency=EUR")
+        result = client.get(f"/budgets/home/budget/{month}/eur")
         assert result.status_code == 200
         assert f"Alternate budget {month} EUR" in result.text
         data = seen[-1]
@@ -111,7 +111,7 @@ def test_multi_month_ui_receives_currency_scoped_core_periods_only_for_budget(tm
             assert period["summary"] == service.workspace("personal", period["month"])["summariesByCurrency"]["EUR"]
         assert {key: value for key, value in data.items() if key != "periods"} == data["periods"][0]
         for page in ("transactions", "insights", "accounts"):
-            assert client.get(f"/?page={page}&workspace=personal&month={month}&currency=EUR").status_code == 200
+            assert client.get(f"/budgets/home/{page}/{month}/eur").status_code == 200
             assert "periods" not in seen[-1]
 
 

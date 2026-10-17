@@ -181,12 +181,13 @@
     <p class="field-error" role="alert" hidden></p>
     <button class="button" type="submit">Switch budget</button>
   </form>
-  <section class="budget-bundle" aria-labelledby="portable-budget-title">
+  {% if workspace=='demo' %}<p class="settings-notice">Open your own budget to export it or manage saved copies. <a class="text-link" href="{{ url(workspace='personal', category=none) }}">Open my budget</a></p>{% endif %}
+  <section class="budget-bundle" aria-labelledby="portable-budget-title"{% if workspace=='demo' %} hidden{% endif %}>
     <h3 id="portable-budget-title">Portable budget</h3>
     <p class="settings-notice">Current budget: <strong data-budget-name>Loading…</strong></p>
     <p class="settings-notice" data-budget-status role="status"></p>
     <ul class="budget-copy-status" data-budget-copies aria-label="Saved copies"></ul>
-    <div class="budget-bundle-actions"><a class="button" href="/api/budget/export" download>Download budget</a><button class="button" type="button" data-budget-save hidden>Save copies</button></div>
+    <div class="budget-bundle-actions"><a class="button" href="{{ api_prefix }}/budget/export" download>Download budget</a><button class="button" type="button" data-budget-save hidden>Save copies</button></div>
     <form class="modal-form budget-bundle-form" data-budget-export hidden>
       <label class="budget-copy-option"><input type="checkbox" name="include_credentials"><span>Include remote access credential</span></label>
       <label>Password for remote access credential<input type="password" name="password" minlength="12" maxlength="1024" autocomplete="new-password" disabled></label>
@@ -201,6 +202,7 @@
       <p class="field-error" role="alert" hidden></p>
       <button class="button" type="submit">Add saved copy</button>
     </form>
+  </section>
     <form class="modal-form budget-bundle-form" data-budget-open>
       <label>Open a budget file<input type="file" name="budget" accept=".whab,application/zip" required></label>
       <label>Budget password (optional)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
@@ -209,7 +211,6 @@
       <p class="field-error" role="alert" hidden></p>
       <button class="button primary" type="submit">Open budget</button>
     </form>
-  </section>
 </dialog>
 <dialog class="modal" id="new-budget-dialog" aria-label="New budget">
   {{ heading('New budget', 'Start fresh with separate accounts and transactions.') }}
@@ -230,9 +231,10 @@
       <h3 id="plugin-manager-title">Installed</h3>
       <label class="plugin-category-filter">Category<select data-plugin-category-filter aria-label="Plugin category"><option value="all" selected>All categories</option>{% for category, label in plugin_categories.items() %}<option value="{{ category }}">{{ label }}</option>{% endfor %}</select></label>
     </div>
-    <p class="settings-notice">Saved selections apply when you restart WHAB. Open a plugin’s options to manage its settings.</p>
+    {% if workspace=='demo' %}<p class="settings-notice">Plugin changes are available in your own budget. <a class="text-link" href="{{ url(workspace='personal', category=none) }}">Open my budget</a></p>
+    {% else %}<p class="settings-notice">Saved selections apply when you restart WHAB. Open a plugin’s options to manage its settings.</p>{% endif %}
     {% if manager.error %}<p class="field-error" role="alert">{{ manager.error }}</p>{% endif %}
-    <form data-plugin-selection>
+    <form data-plugin-selection{% if workspace=='demo' %} data-read-only{% endif %}>
       {% for plugin in manager.plugins if (plugin.category=='example' or plugin.id=='example') and plugin.enabled and plugin.manageable and not plugin.required %}<input type="hidden" name="plugin" value="{{ plugin.id }}">{% endfor %}
       <div class="plugin-list">
         {% for category, label in plugin_categories.items() %}
@@ -243,7 +245,7 @@
         {% for plugin in category_plugins %}
           <div class="plugin-row">
             <label class="plugin-toggle">
-              <input type="checkbox" value="{{ plugin.id }}"{% if not plugin.required %} name="plugin"{% endif %}{% if plugin.enabled %} checked{% endif %}{% if plugin.required or (not plugin.manageable and not plugin.enabled) %} disabled{% endif %}>
+              <input type="checkbox" value="{{ plugin.id }}"{% if not plugin.required %} name="plugin"{% endif %}{% if plugin.enabled %} checked{% endif %}{% if workspace=='demo' or plugin.required or (not plugin.manageable and not plugin.enabled) %} disabled{% endif %}>
               <span><strong>{{ plugin.display_name }}</strong><small class="plugin-meta">{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</small>{% if plugin.reason %}<small class="plugin-meta">{{ plugin.reason }}</small>{% endif %}</span>
             </label>
             <div class="plugin-controls"><span class="plugin-state">{{ plugin_status(plugin) }}</span><button class="button plugin-options" type="button" data-dialog="plugin-options-{{ plugin.id }}" data-plugin-options aria-label="Options for {{ plugin.display_name }}">Options{{ icon('chevron-right', 14) }}</button></div>
@@ -257,12 +259,12 @@
       </div>
       <p class="plugin-restart-notice" role="status"{% if not manager.restart_required %} hidden{% endif %}>Restart WHAB to apply your saved plugin selection. Running plugins stay active until then.</p>
       <p class="field-error" role="alert" hidden></p>
-      <div class="settings-actions"><button class="button primary" type="submit">Save plugin selection</button></div>
+      <div class="settings-actions"><button class="button primary" type="submit"{% if workspace=='demo' %} disabled{% endif %}>Save plugin selection</button></div>
     </form>
   </section>
 </dialog>
 {% for plugin in visible_plugins %}
-<dialog class="modal settings-modal" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} options" data-plugin-id="{{ plugin.id }}" data-plugin-active="{{ 'true' if plugin.active else 'false' }}">
+<dialog class="modal settings-modal" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} options" data-plugin-id="{{ plugin.id }}" data-plugin-active="{{ 'true' if plugin.active else 'false' }}" data-plugin-read-only="{{ 'true' if workspace=='demo' else 'false' }}">
   <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Installed plugins</button>
   {{ heading(plugin.display_name, 'Plugin options') }}
   <dl class="plugin-details">

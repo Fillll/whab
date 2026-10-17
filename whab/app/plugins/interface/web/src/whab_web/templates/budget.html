@@ -8,7 +8,7 @@
       {% endfor %}
       {% if shift_month(month,1)!=month %}<a class="icon-button" href="{{ url(month=shift_month(month,1)) }}" aria-label="Next month">{{ icon('chevron-right', 17) }}</a>{% endif %}
     </nav>
-    <a class="button secondary budget-today" href="{{ url(month=today[:7]) }}">This month</a>
+    <a class="button secondary budget-today" href="{{ url(month='current-month') }}">This month</a>
   </div>
   <div class="budget-workspace{% if selected %} has-inspector{% endif %}">
     <section class="budget-table-section" aria-label="Monthly category budget">
