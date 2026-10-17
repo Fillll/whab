@@ -110,6 +110,7 @@ class Store:
             "categories": {},
             "transactions": {},
             "budget": {},
+            "futureFunding": {},
             "items": {},
         }
         for row in self.db.execute(
@@ -165,6 +166,11 @@ class Store:
             }
         for row in self.db.execute("SELECT * FROM budget WHERE workspace=?", (workspace,)):
             state["budget"].setdefault(row["month"], {})[row["category_id"]] = row["assigned"]
+        # Portable format-1 images may predate the additive funding table. They
+        # are read without running migrations against their untrusted schema.
+        if self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='future_funding'").fetchone():
+            for row in self.db.execute("SELECT * FROM future_funding WHERE workspace=?", (workspace,)):
+                state["futureFunding"].setdefault(row["month"], {})[row["currency"]] = row["assigned"]
         if workspace == "personal":
             for row in self.db.execute("SELECT * FROM items"):
                 state["items"][row["id"]] = {
@@ -244,6 +250,15 @@ class Store:
                 (workspace, month, category, assigned)
                 for month, rows in state["budget"].items()
                 for category, assigned in rows.items()
+            ],
+        )
+        self.db.execute("DELETE FROM future_funding WHERE workspace=?", (workspace,))
+        self.db.executemany(
+            "INSERT INTO future_funding(workspace,month,currency,assigned) VALUES(?,?,?,?)",
+            [
+                (workspace, month, currency, assigned)
+                for month, rows in state.get("futureFunding", {}).items()
+                for currency, assigned in rows.items()
             ],
         )
         if workspace == "personal":
@@ -352,7 +367,7 @@ class Store:
             if receipt["plugin_id"] != plugin_id or receipt["fingerprint"] != fingerprint:
                 raise StoreError("This workspace has already received a different file import.")
             return receipt
-        if any(state[key] for key in ("accounts", "transactions", "budget", "items")):
+        if any(state[key] for key in ("accounts", "transactions", "budget", "futureFunding", "items")):
             raise StoreError("File imports require an empty personal workspace.")
         templates = build_initial_state("personal", state["budgetStartMonth"])["categories"]
         if state["categories"] and state["categories"] != templates:
@@ -396,6 +411,11 @@ class Store:
                 for month, rows in state["budget"].items()
                 for category, assigned in rows.items()
             ],
+            "futureFunding": [
+                {"month": month, "currency": currency, "assigned": assigned}
+                for month, rows in sorted(state["futureFunding"].items())
+                for currency, assigned in sorted(rows.items())
+            ],
         })
 
     def restore_budget(self, workspace: str, data: dict) -> None:
@@ -423,6 +443,9 @@ class Store:
                 state["budget"].setdefault(assignment["month"], {})[assignment["categoryId"]] = (
                     assignment["assigned"]
                 )
+            state["futureFunding"] = {}
+            for funding in restored["futureFunding"]:
+                state["futureFunding"].setdefault(funding["month"], {})[funding["currency"]] = funding["assigned"]
             state["budgetStartMonth"] = restored["budgetStartMonth"]
 
         self._mutate(workspace, operation)
@@ -507,6 +530,12 @@ class Store:
         self._mutate(
             workspace,
             lambda state: commands.assign(state, category_id, month, assigned, as_of_month=current_month()),
+        )
+
+    def assign_next_month(self, workspace: str, month: str, currency: str, assigned: int) -> None:
+        self._mutate(
+            workspace,
+            lambda state: commands.assign_next_month(state, month, currency, assigned, as_of_month=current_month()),
         )
 
     def items(self) -> list[dict]:

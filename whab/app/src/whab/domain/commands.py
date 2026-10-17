@@ -6,10 +6,11 @@ changing state, so the same financial behavior applies to every persistence adap
 """
 
 from .accounts import ON_BUDGET_ACCOUNT_TYPES, is_liability, is_on_budget, normalize_account
-from .budget import ensure_assignment_allowed
+from .budget import calculate_workspace, effective_month_funding, ensure_assignment_allowed
 from .categories import ensure_child_category
+from .dates import shift_month
 from .errors import StoreError
-from .money import cents, currency_code
+from .money import cents, currency_code, minor_units
 from .transactions import UNSET
 from .validation import validate_date, validate_label, validate_month
 
@@ -135,3 +136,34 @@ def assign(
         raise StoreError("Assignment cannot be negative.")
     ensure_assignment_allowed(state, category_id, month, assigned, as_of_month)
     state["budget"].setdefault(month, {})[category_id] = assigned
+
+
+def assign_next_month(
+    state: dict, month: str, currency: str, assigned: int, *, as_of_month: str,
+) -> None:
+    """Set next month's total funding without changing its category allocations."""
+    validate_month(month)
+    validate_month(as_of_month)
+    currency = currency_code(currency)
+    minor_units(assigned, currency)
+    if assigned < 0:
+        raise StoreError("Next-month funding cannot be negative.")
+    if month < state["budgetStartMonth"]:
+        raise StoreError("This month is before the budget start month.")
+    if month >= "2200-12":
+        raise StoreError("Next-month funding is unavailable after November 2200.")
+    target = shift_month(month, 1)
+    allocated = max(0, sum(
+        amount for key, amount in state["budget"].get(target, {}).items()
+        if state["categories"][key].get("currency", "USD") == currency
+    ))
+    if assigned < allocated:
+        raise StoreError("Next-month funding cannot be less than its category assignments.")
+    previous = effective_month_funding(state, target, currency)
+    as_of = min(month, as_of_month)
+    available = calculate_workspace(state, as_of)["summariesByCurrency"].get(currency, {}).get(
+        "readyToAssign", 0,
+    )
+    if assigned > previous and assigned - previous > available:
+        raise StoreError("Assignment exceeds available money.")
+    state.setdefault("futureFunding", {}).setdefault(target, {})[currency] = assigned

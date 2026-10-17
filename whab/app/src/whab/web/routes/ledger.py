@@ -16,6 +16,7 @@ from whab.web.schemas import (
     AccountClassificationBody,
     AssignmentBody,
     CategoryBody,
+    NextMonthAssignmentBody,
     ReviewBody,
     TransactionBody,
     Workspace,
@@ -98,6 +99,11 @@ def create_router(store):
     @router.post("/api/transactions")
     def add_transaction(body: TransactionBody):
         store.add_transaction(body.workspace, body.model_dump(exclude={"workspace"}))
+        return {"ok": True}
+
+    @router.put("/api/budget/funding/next-month")
+    def next_month_assignment(body: NextMonthAssignmentBody):
+        store.assign_next_month(body.workspace, body.month, body.currency, body.assigned)
         return {"ok": True}
 
     @router.put("/api/budget/{category_id}")

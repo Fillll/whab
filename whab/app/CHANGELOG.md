@@ -8,8 +8,9 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 PR: [#41](https://github.com/Fillll/whab/pull/41)
 
-- Add currency-scoped monthly summary fields for outstanding category overspending carried into the month and assignments for exactly the following month. Preserve existing available-money calculations and assignment funding checks.
-- Require web plugin 1.7 or newer in the bundled installation for the revised monthly budget layout.
+- Add currency-scoped monthly summary fields for outstanding category overspending carried into the month and funding for exactly the following month.
+- Save next-month funding independently from child category assignments through an optional storage capability and revision-checked public command. Reserve the greater of each future month's saved amount and category allocations once, and release the commitment in its target month. Keep funding limits, debt safeguards and currency isolation in core.
+- Preserve saved funding in neutral portable snapshots while continuing to read older snapshots. Require web 1.7, SQLite 1.2 and remote client 1.2 in the bundled installation.
 
 ## 2.6.1 — 2026-10-16
 

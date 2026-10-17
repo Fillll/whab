@@ -8,12 +8,24 @@ from .accounts import account_summary, is_liability, is_on_budget, normalize_acc
 from .categories import category_tree, ensure_child_category, public_categories
 from .dates import shift_month
 from .errors import StoreError
-from .money import MAX_SAFE_INTEGER, currency_code, currency_minor_units
+from .money import MAX_SAFE_INTEGER, currency_code, currency_minor_units, minor_units
 from .transactions import public_transaction
 from .validation import validate_month
 
 
-def _calculate_currency(state: dict, month: str) -> dict:
+def effective_month_funding(state: dict, month: str, currency: str) -> int:
+    """One future month's funding, with categories consuming its saved floor."""
+    allocated = sum(
+        amount for category_id, amount in state["budget"].get(month, {}).items()
+        if state["categories"][category_id].get("currency", "USD") == currency
+    )
+    floor = state.get("futureFunding", {}).get(month, {}).get(currency, 0)
+    if abs(allocated) > MAX_SAFE_INTEGER:
+        raise StoreError("Ledger totals exceed the supported range.")
+    return max(0, allocated, floor)
+
+
+def _calculate_currency(state: dict, month: str, currency: str) -> dict:
     validate_month(month)
     transactions = [
         public_transaction(t) for t in state["transactions"].values() if not t.get("deleted")
@@ -75,13 +87,20 @@ def _calculate_currency(state: dict, month: str) -> dict:
         if a["type"] == "depository" and not a.get("stale") and not a.get("balanceUnknown")
     )
     debt = sum(max(0, balance_at_month(a)) for a in budget_accounts if a["type"] == "credit")
-    ready = cash - debt - sum(max(0, row["available"]) for row in budget)
+    future = sum(
+        effective_month_funding(state, target, currency)
+        for target in state["budget"].keys() | state.get("futureFunding", {}).keys()
+        if target > month and target >= start
+    )
+    if future > MAX_SAFE_INTEGER:
+        raise StoreError("Ledger totals exceed the supported range.")
+    ready = cash - debt - sum(max(0, row["available"]) for row in budget) - future
     if any(a.get("balanceUnknown") and a["type"] == "credit" for a in budget_accounts):
         ready = min(0, ready)
     summary = {
         "income": income_for(active),
         "previousOverspending": sum(max(0, -b["carryover"]) for b in budget),
-        "assignedNextMonth": sum(state["budget"].get(shift_month(month, 1), {}).values()),
+        "assignedNextMonth": effective_month_funding(state, shift_month(month, 1), currency),
         "spent": spend_for(active),
         "assigned": sum(b["assigned"] for b in budget),
         "available": sum(b["available"] for b in budget),
@@ -119,14 +138,15 @@ def ensure_assignment_allowed(
     previous = state["budget"].get(month, {}).get(category_id, 0)
     as_of = min(month, as_of_month)
     available = calculate_workspace(state, as_of)["summariesByCurrency"][currency]["readyToAssign"]
-    future = sum(
-        amount
-        for m, rows in state["budget"].items()
-        if m > as_of
-        for key, amount in rows.items()
-        if state["categories"][key].get("currency", "USD") == currency
-    )
-    if assigned > previous and assigned - previous > available - future:
+    increase = assigned - previous
+    if month > as_of:
+        allocated = sum(
+            amount for key, amount in state["budget"].get(month, {}).items()
+            if state["categories"][key].get("currency", "USD") == currency
+        )
+        floor = state.get("futureFunding", {}).get(month, {}).get(currency, 0)
+        increase = max(0, floor, allocated + increase) - max(0, floor, allocated)
+    if increase > 0 and increase > available:
         raise StoreError("Assignment exceeds available money.")
 
 
@@ -138,11 +158,21 @@ def calculate_workspace(state: dict, month: str) -> dict:
         for key, row in state["accounts"].items()
     }
     categories = {row["id"]: row for row in public_categories(state["categories"])}
+    funding = state.get("futureFunding", {})
+    for target, rows in funding.items():
+        validate_month(target)
+        if not state["budgetStartMonth"] < target <= "2200-12":
+            raise StoreError("Next-month funding must target a supported month after the budget start.")
+        for currency, assigned in rows.items():
+            minor_units(assigned, currency)
+            if assigned < 0:
+                raise StoreError("Next-month funding cannot be negative.")
     currencies = sorted(
         {
             "USD",
             *(a["currency"] for a in accounts.values()),
             *(c["currency"] for c in categories.values()),
+            *(currency for rows in funding.values() for currency in rows),
         }
     )
     for rows in state["budget"].values():
@@ -174,12 +204,13 @@ def calculate_workspace(state: dict, month: str) -> dict:
                 for m, rows in state["budget"].items()
             },
         }
-        projections[currency] = _calculate_currency(scoped, month)
+        projections[currency] = _calculate_currency(scoped, month, currency)
     default = projections["USD"]
     return {
         **default,
         "currency": "USD",
         "currencyMinorUnits": 2,
+        "nextMonthFundingEditable": True,
         "currencies": currencies,
         "accounts": list(accounts.values()),
         "categories": list(categories.values()),

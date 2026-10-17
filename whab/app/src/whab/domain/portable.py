@@ -26,6 +26,7 @@ TRANSACTION_FIELDS = frozenset({
     "categoryEdited", "deleted",
 })
 ASSIGNMENT_FIELDS = frozenset({"month", "categoryId", "assigned"})
+FUTURE_FUNDING_FIELDS = frozenset({"month", "currency", "assigned"})
 _ROOT_FIELDS = frozenset({
     "formatVersion", "budgetStartMonth", "accounts", "categories", "transactions", "assignments",
 })
@@ -77,7 +78,10 @@ def _booleans(record: dict, fields: tuple[str, ...]) -> None:
 
 def validate_portable_budget(data: object) -> dict:
     """Validate exact JSON records and references, returning independent copies."""
-    if type(data) is not dict or data.keys() != _ROOT_FIELDS:
+    if (
+        type(data) is not dict or not _ROOT_FIELDS <= data.keys()
+        or not data.keys() <= _ROOT_FIELDS | {"futureFunding"}
+    ):
         raise StoreError("Invalid portable budget fields.")
     if type(data["formatVersion"]) is not int or data["formatVersion"] != 1:
         raise StoreError("Unsupported portable budget version.")
@@ -97,6 +101,7 @@ def validate_portable_budget(data: object) -> dict:
     categories = _records(data["categories"], CATEGORY_FIELDS, 10000)
     transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000)
     assignments = _records(data["assignments"], ASSIGNMENT_FIELDS, 250000)
+    future_funding = _records(data.get("futureFunding", []), FUTURE_FUNDING_FIELDS, 250000)
     account_map = _indexed(accounts)
     category_map = _indexed(categories)
     _indexed(transactions)
@@ -163,6 +168,20 @@ def validate_portable_budget(data: object) -> dict:
             raise StoreError("Duplicate portable budget assignment.")
         assignment_keys.add(key)
         money(assignment["assigned"], category["currency"])
+    funding_keys = set()
+    for funding in future_funding:
+        _text(funding["month"], limit=7)
+        validate_month(funding["month"])
+        if not data["budgetStartMonth"] < funding["month"] <= "2200-12":
+            raise StoreError("Invalid portable next-month funding month.")
+        currency_code(funding["currency"])
+        key = (funding["month"], funding["currency"])
+        if key in funding_keys:
+            raise StoreError("Duplicate portable next-month funding.")
+        funding_keys.add(key)
+        money(funding["assigned"], funding["currency"])
+        if funding["assigned"] < 0:
+            raise StoreError("Portable next-month funding cannot be negative.")
     return {
         "formatVersion": 1,
         "budgetStartMonth": data["budgetStartMonth"],
@@ -170,4 +189,5 @@ def validate_portable_budget(data: object) -> dict:
         "categories": categories,
         "transactions": transactions,
         "assignments": assignments,
+        "futureFunding": future_funding,
     }

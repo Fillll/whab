@@ -65,7 +65,50 @@ def test_public_queries_and_commands():
     remote.edit_transaction("personal", "tx")
     remote.edit_transaction("personal", "tx", category_id=None, reviewed=False)
     remote.assign("personal", "cat", "2026-10", 100)
+    remote.assign_next_month("personal", "2026-10", "USD", 200)
     remote.close()
+
+
+def test_next_month_funding_command_preserves_scope_revision_and_retry_identity():
+    import json
+
+    calls = []
+
+    def handler(request):
+        if request.method == "GET":
+            return httpx.Response(200, json=body({}, revision="before"))
+        calls.append(json.loads(request.content))
+        if len(calls) == 1:
+            raise httpx.ReadTimeout("Uncertain response")
+        return httpx.Response(200, json=body(None, revision="funded"))
+
+    remote = make(handler)
+    try:
+        with pytest.raises(StoreError, match="result is unknown"):
+            remote.assign_next_month("personal", "2026-10", "CAD", 1234)
+        assert remote.assign_next_month("personal", "2026-10", "CAD", 1234) is None
+        assert calls[0] == calls[1]
+        assert calls[0]["operation"] == "assign_next_month"
+        assert calls[0]["workspace"] == "personal"
+        assert calls[0]["payload"] == {"month": "2026-10", "currency": "CAD", "assigned": 1234}
+        assert calls[0]["expected_revision"] == "before"
+        assert remote._revision == "funded"
+    finally:
+        remote.close()
+
+
+@pytest.mark.parametrize("status", [400, 404, 422, 401])
+def test_next_month_funding_rejection_explains_older_server_support(status):
+    responses = [httpx.Response(200, json=body({})), httpx.Response(status, text="private detail")]
+    remote = make(lambda request: responses.pop(0))
+    try:
+        with pytest.raises(StoreError) as error:
+            remote.assign_next_month("personal", "2026-10", "USD", 100)
+        assert "private" not in str(error.value)
+        assert ("update the server" in str(error.value)) is (status != 401)
+        assert remote._pending is None
+    finally:
+        remote.close()
 
 
 def test_initial_revision_and_uncertain_retry_identity():

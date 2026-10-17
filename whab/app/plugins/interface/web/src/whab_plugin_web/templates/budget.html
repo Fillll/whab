@@ -12,6 +12,7 @@
   </div>
   <div class="budget-workspace{% if selected %} has-inspector{% endif %}">
     <section class="budget-table-section" aria-label="Monthly category budget">
+      <div class="budget-editing-key" role="note"><span>{{ icon('pencil', 12) }}Editable assigned amounts</span><span>Read-only summaries</span></div>
       <div class="budget-matrix-scroll">
         <table class="budget-matrix" aria-label="Category budget across {{ periods|length }} {{ 'month' if periods|length==1 else 'months' }}">
           <colgroup><col class="budget-category-col">{% for period in periods %}<col><col><col>{% endfor %}</colgroup>
@@ -43,19 +44,40 @@
           </thead>
           <tbody class="budget-overview">
             <tr class="budget-overview-row">
-              <th scope="row">Income</th>
+              <th scope="row">Income<small class="budget-row-note">Summary</small></th>
               {% for period in periods %}<td colspan="3" class="month-start">{{ money_number(period.summary.income) }}</td>{% endfor %}
             </tr>
             <tr class="budget-overview-row">
-              <th scope="row">Previous overspending</th>
+              <th scope="row">Previous overspending<small class="budget-row-note">Summary</small></th>
               {% for period in periods %}<td colspan="3" class="month-start{% if period.month>=data.budgetStartMonth and period.summary.previousOverspending is defined and period.summary.previousOverspending %} negative{% endif %}">{{ money_number(-period.summary.previousOverspending) if period.month>=data.budgetStartMonth and period.summary.previousOverspending is defined else '—' }}</td>{% endfor %}
             </tr>
             <tr class="budget-overview-row">
               <th scope="row">Assigned for next month</th>
-              {% for period in periods %}<td colspan="3" class="month-start">{{ money_number(period.summary.assignedNextMonth) if period.month>=data.budgetStartMonth and period.summary.assignedNextMonth is defined else '—' }}</td>{% endfor %}
+              {% for period in periods %}
+                {% set funding_amount = period.summary.assignedNextMonth %}
+                {% set funding_amount_valid = funding_amount is integer and 0<=funding_amount<=9007199254740991 %}
+                {% set funding_amount_editable = funding_amount_valid and funding_amount<=1000000000000 %}
+                {% set planning_month = data.budgetStartMonth<=period.month<'2200-12' %}
+                <td colspan="3" class="month-start">
+                  {% if period.nextMonthFundingEditable is sameas true and funding_amount_editable and planning_month %}
+                    <div class="budget-next-month-editor">
+                      <form class="budget-assignment" data-api="/budget/funding/next-month" data-method="PUT" data-inline-assignment>
+                        <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ period.month }}"><input type="hidden" name="currency" value="{{ currency }}">
+                        <span class="budget-assignment-edit" aria-hidden="true">{{ icon('pencil', 11) }}</span>
+                        <input type="text" name="assigned" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" autocomplete="off" spellcheck="false" value="{{ money_input(funding_amount) }}" aria-label="Assigned for {{ month_label(shift_month(period.month,1)) }} from {{ month_label(period.month) }}" required>
+                        <button class="budget-assignment-save" type="submit" aria-label="Save assignment for {{ month_label(shift_month(period.month,1)) }} from {{ month_label(period.month) }}">{{ icon('check', 12) }}</button>
+                        <p class="field-error" role="alert" hidden></p>
+                      </form>
+                    </div>
+                  {% else %}
+                    {{ money_number(funding_amount) if funding_amount_valid and planning_month else '—' }}
+                    {% if planning_month %}<small class="budget-row-note">{% if period.nextMonthFundingEditable is sameas true and funding_amount_valid %}Edit next month’s category assignments{% else %}Editing requires a server update{% endif %}</small>{% endif %}
+                  {% endif %}
+                </td>
+              {% endfor %}
             </tr>
             <tr class="budget-overview-row budget-assigned-row">
-              <th scope="row">Assigned this month</th>
+              <th scope="row">Assigned this month<small class="budget-row-note">Summary</small></th>
               {% for period in periods %}
                 <td class="month-start">{{ money_number(period.summary.assigned) if period.month>=data.budgetStartMonth else '—' }}</td>
                 <td>{{ money_number(-period.summary.spent) if period.month>=data.budgetStartMonth else '—' }}</td>
@@ -71,7 +93,7 @@
             {% for group in groups %}
               {% set group_index = loop.index %}
               <tr class="budget-group-row">
-                <td><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}{{ group.name }}</button></td>
+                <td><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}<span>{{ group.name }}</span><small class="budget-group-note">Summary</small></button></td>
                 {% for total in group.periods %}
                   <td class="month-start">{{ money_number(total.assigned) }}</td>
                   <td>{{ money_number(-total.spent) }}</td>
@@ -85,6 +107,7 @@
                     <td class="month-start{% if cell.month==month %} selected-month{% endif %}">
                       <form class="budget-assignment" data-api="/budget/{{ category_path(row.category.id) }}" data-method="PUT" data-inline-assignment>
                         <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ cell.month }}">
+                        <span class="budget-assignment-edit" aria-hidden="true">{{ icon('pencil', 11) }}</span>
                         <input type="text" name="assigned" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" autocomplete="off" spellcheck="false" value="{{ money_input(cell.assigned) }}" aria-label="Assigned to {{ row.category.name }} in {{ month_label(cell.month) }}"{% if cell.month<data.budgetStartMonth %} disabled{% endif %} required>
                         <button class="budget-assignment-save" type="submit" aria-label="Save assignment to {{ row.category.name }} in {{ month_label(cell.month) }}"{% if cell.month<data.budgetStartMonth %} disabled{% endif %}>{{ icon('check', 12) }}</button>
                         <p class="field-error" role="alert" hidden></p>

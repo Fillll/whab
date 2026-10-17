@@ -126,6 +126,7 @@ class LedgerService:
             ),
             "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed"}),
             "assign": ({"categoryId", "month", "assigned"}, set()),
+            "assign_next_month": ({"month", "currency", "assigned"}, set()),
         }
         if type(operation) is not str or operation not in fields:
             raise StoreError("Unknown ledger command.")
@@ -209,6 +210,13 @@ class LedgerService:
                     workspace, payload["transactionId"],
                     category_id=payload.get("categoryId", UNSET), reviewed=payload.get("reviewed"),
                 )
+            elif operation == "assign_next_month":
+                assign_next = getattr(self._store, "assign_next_month", None)
+                if not callable(assign_next):
+                    raise StoreError("This storage plugin does not support next-month funding.")
+                data = assign_next(
+                    workspace, payload["month"], payload["currency"], payload["assigned"],
+                )
             else:
                 data = self._store.assign(
                     workspace, payload["categoryId"], payload["month"], payload["assigned"],
@@ -285,4 +293,9 @@ class LedgerService:
     def assign(self, workspace, category_id, month, assigned):
         return self._local_command("assign", workspace, {
             "categoryId": category_id, "month": month, "assigned": assigned,
+        })
+
+    def assign_next_month(self, workspace, month, currency, assigned):
+        return self._local_command("assign_next_month", workspace, {
+            "month": month, "currency": currency, "assigned": assigned,
         })

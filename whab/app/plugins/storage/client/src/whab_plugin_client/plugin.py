@@ -83,7 +83,7 @@ class RemoteStore:
     def close(self):
         self._client.close()
 
-    def _response(self, response, *, command=False):
+    def _response(self, response, *, command=False, operation=None):
         if response.status_code == 409:
             if command:
                 self._pending = None
@@ -92,6 +92,8 @@ class RemoteStore:
         if response.status_code in {400, 401, 403, 404, 422}:
             if command:
                 self._pending = None
+            if operation == "assign_next_month" and response.status_code in {400, 404, 422}:
+                raise StoreError("Remote server rejected next-month funding. Check the amount and update the server if it does not support this feature.")
             raise StoreError("Remote budget request rejected. Check connection settings and inputs.")
         if response.status_code != 200:
             raise StoreError("Remote budget is unavailable. Retry the same change to confirm its result.")
@@ -138,7 +140,7 @@ class RemoteStore:
                 response = self._client.post(self._path + "/commands", json=body)
             except httpx.HTTPError:
                 raise StoreError("Remote change result is unknown. Retry the same change to confirm it.") from None
-            data = self._response(response, command=True)
+            data = self._response(response, command=True, operation=operation)
             self._pending = None
             return data
 
@@ -206,6 +208,11 @@ class RemoteStore:
     def assign(self, workspace, category_id, month, assigned):
         return self._command("assign", workspace, {
             "categoryId": category_id, "month": month, "assigned": assigned,
+        })
+
+    def assign_next_month(self, workspace, month, currency, assigned):
+        return self._command("assign_next_month", workspace, {
+            "month": month, "currency": currency, "assigned": assigned,
         })
 
     def items(self):

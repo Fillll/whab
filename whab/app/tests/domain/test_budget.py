@@ -146,7 +146,7 @@ def test_previous_overspending_is_outstanding_category_debt_entering_the_month(s
     assert state == before
 
 
-def test_next_month_assignments_cross_the_year_without_reserving_all_future_months(state):
+def test_next_month_row_crosses_the_year_while_funding_protects_all_future_months(state):
     state["budget"] = {
         "2026-12": {"groceries": 2000},
         "2027-01": {"groceries": 3000},
@@ -154,11 +154,11 @@ def test_next_month_assignments_cross_the_year_without_reserving_all_future_mont
     }
     december = calculate_workspace(state, "2026-12")
     assert december["summary"]["assignedNextMonth"] == 3000
-    assert december["summary"]["readyToAssign"] == 98000
+    assert december["summary"]["readyToAssign"] == 91000
     assert calculate_workspace(state, "2027-01")["summary"]["assignedNextMonth"] == 4000
     assert calculate_workspace(state, "2027-02")["summary"]["assignedNextMonth"] == 0
-    # The command still reserves every future assignment, independent of the
-    # single following-month amount shown in the projection.
+    # Funding protects every future month, independent of the single
+    # following-month amount shown by the editable row.
     ensure_assignment_allowed(state, "groceries", "2026-12", 93000, "2026-12")
     with pytest.raises(StoreError, match="exceeds available money"):
         ensure_assignment_allowed(state, "groceries", "2026-12", 93001, "2026-12")
@@ -260,7 +260,7 @@ def test_monthly_section_totals_keep_currencies_separate(multicurrency_state):
 def test_later_transactions_reconstruct_only_their_own_currency_cash(multicurrency_state):
     view = calculate_workspace(multicurrency_state, "2026-08")
     assert {code: row["readyToAssign"] for code, row in view["summariesByCurrency"].items()} == {
-        "USD": 54500, "EUR": 30500, "JPY": 1700,
+        "USD": 44500, "EUR": 24500, "JPY": 1400,
     }
 
 

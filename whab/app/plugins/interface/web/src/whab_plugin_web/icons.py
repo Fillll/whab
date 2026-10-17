@@ -9,6 +9,7 @@ PATHS = {
     "accounts": '<path d="m3 8 9-5 9 5M3 8h18M5 11v6M10 11v6M14 11v6M19 11v6M3 21h18M3 18h18"/>',
     "plus": '<path d="M12 5v14M5 12h14"/>',
     "check": '<path d="m5 12 4 4 10-10"/>',
+    "pencil": '<path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14zM4 14l5 5"/>',
     "check-circle": '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
     "chevron-right": '<path d="m9 6 6 6-6 6"/>',
     "chevron-left": '<path d="m15 6-6 6 6 6"/>',

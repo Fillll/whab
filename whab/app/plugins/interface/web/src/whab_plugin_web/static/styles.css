@@ -2847,6 +2847,25 @@ strong {
   scrollbar-color: var(--line) var(--page);
   scrollbar-width: thin;
 }
+.budget-editing-key {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px 18px;
+  padding: 0 1px 10px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.budget-editing-key > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink);
+}
+.budget-editing-key > span:last-child {
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
 .budget-matrix {
   --category-width: 216px;
   width: 100%;
@@ -3013,6 +3032,19 @@ strong {
 .budget-overview-row td[colspan] {
   font-weight: 500;
 }
+.budget-row-note {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+.budget-next-month-editor {
+  width: 132px;
+  max-width: 100%;
+  margin-left: auto;
+}
 .budget-assigned-row th,
 .budget-assigned-row td {
   height: 51px;
@@ -3064,6 +3096,12 @@ strong {
 .budget-group-toggle[aria-expanded='false'] svg {
   transform: rotate(-90deg);
 }
+.budget-group-note {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 400;
+}
 .budget-category-row td {
   height: 36px;
   border-bottom: 1px solid var(--line);
@@ -3103,10 +3141,10 @@ strong {
   width: 100%;
   min-width: 0;
   min-height: 29px;
-  padding: 4px 2px;
-  border: 1px solid transparent;
+  padding: 4px 6px 4px 22px;
+  border: 1px solid var(--control-border);
   border-radius: 3px;
-  background: transparent;
+  background: var(--field);
   color: inherit;
   text-align: right;
   font-size: 11px;
@@ -3114,6 +3152,22 @@ strong {
   font-variant-numeric: tabular-nums;
   outline-offset: 0;
   transition: background 0.12s, border-color 0.12s;
+}
+.budget-assignment-edit {
+  position: absolute;
+  top: 9px;
+  left: 6px;
+  display: flex;
+  color: var(--muted);
+  pointer-events: none;
+}
+.budget-assignment input[data-cents]:disabled {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.budget-assignment:has(input:disabled) .budget-assignment-edit {
+  display: none;
 }
 .budget-assignment input[data-cents]:hover {
   border-color: var(--input-hover-border);
@@ -3471,6 +3525,9 @@ strong {
   .budget-assignment input[data-cents] {
     min-height: 40px;
     font-size: 16px;
+  }
+  .budget-assignment-edit {
+    top: 14px;
   }
   .budget-category-link,
   .budget-group-toggle {

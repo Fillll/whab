@@ -48,8 +48,8 @@ def test_archive_roundtrip_contains_exactly_two_data_files_and_preserves_unicode
         assert set(bundle.namelist()) == {"manifest.json", "ledger.json"}
         assert all(not entry.is_dir() for entry in bundle.infolist())
         assert json.loads(bundle.read("manifest.json")) == settings
-        assert json.loads(bundle.read("ledger.json")) == ledger()
-    assert document.decode_bundle(raw) == (settings, ledger())
+        assert json.loads(bundle.read("ledger.json")) == {**ledger(), "futureFunding": []}
+    assert document.decode_bundle(raw) == (settings, {**ledger(), "futureFunding": []})
     assert document.digest(raw) == document.digest(bytes(raw))
     assert len(document.digest(raw)) == 64
     assert document.digest(raw) != document.digest(raw + b"changed")

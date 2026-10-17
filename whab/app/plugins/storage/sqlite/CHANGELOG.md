@@ -1,5 +1,12 @@
 # SQLite budget storage plugin changelog
 
+## 1.2.0 — 2026-10-17
+
+PR: [#41](https://github.com/Fillll/whab/pull/41)
+
+- Persist currency-scoped next-month funding atomically in an additive table, and retain it through reopening, neutral snapshots and sanitized SQLite portable exports. Preserve older database and portable-image schemas.
+- Reject replacement imports when a workspace already contains saved funding, and require WHAB 2.7 for core funding validation.
+
 ## 1.1.1 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)

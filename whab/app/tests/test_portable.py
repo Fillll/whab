@@ -30,6 +30,7 @@ def budget():
             "inferredTransfer": True, "categoryEdited": True, "deleted": True,
         }],
         "assignments": [{"month": "2026-09", "categoryId": "food", "assigned": -100}],
+        "futureFunding": [],
     }
 
 
