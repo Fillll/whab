@@ -2848,7 +2848,7 @@ strong {
   scrollbar-width: thin;
 }
 .budget-matrix {
-  --category-width: 186px;
+  --category-width: 216px;
   width: 100%;
   min-width: 1032px;
   table-layout: fixed;
@@ -2936,8 +2936,9 @@ strong {
   letter-spacing: 0;
   margin-top: 2px;
 }
-.budget-month-heading > svg {
-  color: var(--muted);
+.budget-ready {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 .budget-ready-label {
   display: block;
@@ -2958,9 +2959,7 @@ strong {
 .budget-summary-lines {
   display: grid;
   gap: 4px;
-  border-top: 1px solid var(--line);
-  padding: 10px 13px 12px;
-  background: var(--summary-footer);
+  padding: 0 13px 11px;
 }
 .budget-summary-lines > div {
   display: flex;
@@ -2978,13 +2977,13 @@ strong {
   position: sticky;
   top: 0;
   z-index: 3;
-  height: 51px;
+  height: 36px;
   padding: 10px 8px 8px;
   color: var(--muted);
   background: var(--table-heading);
   border-bottom: 1px solid var(--line);
   font-size: 10px;
-  vertical-align: top;
+  vertical-align: middle;
 }
 .budget-columns th:first-child {
   z-index: 4;
@@ -2995,15 +2994,47 @@ strong {
 .budget-columns th:last-child {
   border-top-right-radius: 5px;
 }
-.budget-columns strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: 550;
-}
 .budget-matrix .month-start {
   border-left: 1px solid var(--line);
+}
+.budget-overview-row th,
+.budget-overview-row td {
+  height: 44px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12px;
+}
+.budget-overview-row th:first-child {
+  padding-left: 12px;
+  font-weight: 550;
+  white-space: normal;
+  line-height: 1.35;
+}
+.budget-overview-row td[colspan] {
+  font-weight: 500;
+}
+.budget-assigned-row th,
+.budget-assigned-row td {
+  height: 51px;
+  background: var(--current);
+  font-size: 13px;
+  font-weight: 600;
+}
+.budget-assigned-row th:first-child {
+  font-weight: 650;
+}
+.budget-section-row th,
+.budget-section-row td {
+  height: 35px;
+  padding-top: 5px;
+  border-bottom: 1px solid var(--line);
+  background: var(--page);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 550;
+}
+.budget-section-row th:first-child {
+  padding-left: 12px;
 }
 .budget-group-row td {
   height: 34px;
@@ -3243,7 +3274,7 @@ strong {
     font-size: 9px;
   }
   .budget-matrix {
-    --category-width: 164px;
+    --category-width: 186px;
   }
 }
 @media (max-width: 760px) {
@@ -3347,8 +3378,8 @@ strong {
     margin-top: 2px;
   }
   .budget-matrix {
-    --category-width: 145px;
-    min-width: 985px;
+    --category-width: 186px;
+    min-width: 1026px;
   }
   .budget-matrix-scroll {
     max-height: calc(100dvh - 190px);
@@ -3422,8 +3453,8 @@ strong {
     padding: 7px;
   }
   .budget-matrix {
-    --category-width: 124px;
-    min-width: 935px;
+    --category-width: 164px;
+    min-width: 1004px;
   }
   .budget-category-row td:first-child {
     padding-left: 10px;

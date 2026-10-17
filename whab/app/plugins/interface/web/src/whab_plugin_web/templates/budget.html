@@ -21,13 +21,13 @@
               {% for period in periods %}
                 <th colspan="3" scope="colgroup" class="budget-month-summary-cell">
                   <section class="budget-month-summary{% if period.month==month %} is-selected{% endif %}" aria-label="{{ month_label(period.month) }} summary">
-                    <div class="budget-month-heading"><span class="budget-month-name">{{ month_label(period.month).split(' ')[0] }}<small>{{ period.month[:4] }}</small></span>{{ icon('budget', 16) }}</div>
-                    <div class="budget-ready"><span class="budget-ready-label">To assign</span><strong class="budget-ready-value{% if period.summary.readyToAssign<0 %} negative{% endif %}">{{ money(period.summary.readyToAssign) }}</strong></div>
+                    <div class="budget-month-heading"><span class="budget-month-name">{{ month_label(period.month).split(' ')[0] }}<small>{{ period.month[:4] }}</small></span></div>
                     <div class="budget-summary-lines">
+                      <div><span>Available</span><strong>{{ money(period.summary.available) }}</strong></div>
                       <div><span>Assigned</span><strong>{{ money(period.summary.assigned) }}</strong></div>
                       <div><span>Spent</span><strong>{{ money(period.summary.spent) }}</strong></div>
-                      <div><span>Available</span><strong>{{ money(period.summary.available) }}</strong></div>
                     </div>
+                    <div class="budget-ready"><span class="budget-ready-label">To assign</span><strong class="budget-ready-value{% if period.summary.readyToAssign<0 %} negative{% endif %}">{{ money(period.summary.readyToAssign) if period.month>=data.budgetStartMonth else '—' }}</strong></div>
                   </section>
                 </th>
               {% endfor %}
@@ -35,13 +35,39 @@
             <tr class="budget-columns">
               <th scope="col">Category</th>
               {% for period in periods %}
-                <th scope="col" class="month-start{% if period.month==month %} selected-month{% endif %}"><span>Assigned</span><strong>{{ money_number(period.summary.assigned) }}</strong></th>
-                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}><span>Activity</span><strong>{{ money_number(-period.summary.spent) }}</strong></th>
-                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}><span>Available</span><strong>{{ money_number(period.summary.available) }}</strong></th>
+                <th scope="col" class="month-start{% if period.month==month %} selected-month{% endif %}">Assigned</th>
+                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}>Activity</th>
+                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}>Available</th>
               {% endfor %}
             </tr>
           </thead>
-          <tbody>
+          <tbody class="budget-overview">
+            <tr class="budget-overview-row">
+              <th scope="row">Income</th>
+              {% for period in periods %}<td colspan="3" class="month-start">{{ money_number(period.summary.income) }}</td>{% endfor %}
+            </tr>
+            <tr class="budget-overview-row">
+              <th scope="row">Previous overspending</th>
+              {% for period in periods %}<td colspan="3" class="month-start{% if period.month>=data.budgetStartMonth and period.summary.previousOverspending is defined and period.summary.previousOverspending %} negative{% endif %}">{{ money_number(-period.summary.previousOverspending) if period.month>=data.budgetStartMonth and period.summary.previousOverspending is defined else '—' }}</td>{% endfor %}
+            </tr>
+            <tr class="budget-overview-row">
+              <th scope="row">Assigned for next month</th>
+              {% for period in periods %}<td colspan="3" class="month-start">{{ money_number(period.summary.assignedNextMonth) if period.month>=data.budgetStartMonth and period.summary.assignedNextMonth is defined else '—' }}</td>{% endfor %}
+            </tr>
+            <tr class="budget-overview-row budget-assigned-row">
+              <th scope="row">Assigned this month</th>
+              {% for period in periods %}
+                <td class="month-start">{{ money_number(period.summary.assigned) if period.month>=data.budgetStartMonth else '—' }}</td>
+                <td>{{ money_number(-period.summary.spent) if period.month>=data.budgetStartMonth else '—' }}</td>
+                <td{% if period.summary.available<0 %} class="negative"{% endif %}>{{ money_number(period.summary.available) if period.month>=data.budgetStartMonth else '—' }}</td>
+              {% endfor %}
+            </tr>
+          </tbody>
+          <tbody class="budget-spending">
+            <tr class="budget-section-row">
+              <th scope="rowgroup">Spending categories</th>
+              {% for period in periods %}<td colspan="3" class="month-start"></td>{% endfor %}
+            </tr>
             {% for group in groups %}
               {% set group_index = loop.index %}
               <tr class="budget-group-row">

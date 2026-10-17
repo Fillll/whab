@@ -3,7 +3,7 @@
 import re
 from html import unescape
 
-from whab_plugin_web.views import money_input, shift_month
+from whab_plugin_web.views import money_input, money_number, shift_month
 
 from whab.plugins import format_money
 
@@ -46,6 +46,12 @@ def test_three_month_matrix_uses_core_summaries_and_category_values(client):
         )[1]
         for field in ("readyToAssign", "assigned", "spent", "available"):
             assert format_money(data["summary"][field], "USD") in summary_html
+        positions = [summary_html.index(f">{label}<") for label in (
+            "Available", "Assigned", "Spent", "To assign",
+        )]
+        assert positions == sorted(positions)
+        heading = re.search(r'<div class="budget-month-heading">(.*?)</div>', summary_html, re.S)[1]
+        assert "<svg" not in heading
         monthly_forms = [form for form in forms if form["month"] == month]
         assert len(monthly_forms) == len(data["categories"])
         for budget in data["budget"]:
@@ -55,6 +61,121 @@ def test_three_month_matrix_uses_core_summaries_and_category_values(client):
             assert 'data-minor-units="2"' in form["body"]
             assert 'role="alert" hidden' in form["body"]
             assert not form["disabled"]
+
+
+def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_separate(client, store):
+    for code, factor in (("USD", 1), ("EUR", 10)):
+        account = store.add_account("personal", {
+            "name": f"{code} cash", "type": "depository", "balance": 1000000,
+            "currency": code,
+        })
+        food = store.add_category("personal", {
+            "name": f"{code} food", "group": f"{code} Living", "target": 0, "currency": code,
+        })
+        reserve = store.add_category("personal", {
+            "name": f"{code} reserve", "group": f"{code} Living", "target": 0, "currency": code,
+        })
+        store.assign("personal", reserve, "2026-10", 4000 * factor)
+        for month, assigned, spent, income in (
+            ("2026-10", 500, 1000, 0),
+            ("2026-11", 700, 900, 1111),
+            ("2026-12", 1200, 400, 2222),
+            ("2027-01", 1300, 100, 3333),
+            ("2027-02", 1700, 0, 0),
+        ):
+            store.assign("personal", food, month, assigned * factor)
+            for amount, category in ((spent, food), (-income, None)):
+                if amount:
+                    store.add_transaction("personal", {
+                        "accountId": account, "date": f"{month}-05", "merchant": "Fixture ledger",
+                        "amount": amount * factor, "categoryId": category,
+                    })
+
+    labels = ("Income", "Previous overspending", "Assigned for next month", "Assigned this month")
+    for code, factor in (("USD", 1), ("EUR", 10)):
+        text = client.get(f"/budgets/home/budget/2026-11/{code.lower()}").text
+        overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
+        assert [re.search(r'<th scope="row">([^<]+)</th>', row)[1] for row in overview] == list(labels)
+        assert text.index("Assigned this month") < text.index("Spending categories")
+        assert text.index("Spending categories") < text.index('class="budget-group-row"')
+        assert "overspend this month" not in text.lower()
+        cells = [re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S) for row in overview]
+        assert all(len(row) == 3 for row in cells[:3])
+        assert all('colspan="3"' in attributes for row in cells[:3] for attributes, _ in row)
+        assert len(cells[3]) == 9
+
+        for index, (month, income, previous, next_assigned, assigned, spent, available) in enumerate((
+            ("2026-11", 1111, 500, 1200, 700, 900, 3300),
+            ("2026-12", 2222, 700, 1300, 1200, 400, 4100),
+            ("2027-01", 3333, 0, 1700, 1300, 100, 5300),
+        )):
+            data = client.get(
+                f"/api/workspace?workspace=personal&month={month}&currency={code}"
+            ).json()
+            summary = data["summary"]
+            assert data["currency"] == code
+            expected = {
+                "income": income, "previousOverspending": previous, "assignedNextMonth": next_assigned,
+                "assigned": assigned, "spent": spent, "available": available,
+            }
+            assert {field: summary[field] for field in expected} == {
+                field: value * factor for field, value in expected.items()
+            }
+            for row, value in zip(cells[:3], (
+                summary["income"], -summary["previousOverspending"], summary["assignedNextMonth"],
+            ), strict=True):
+                assert row[index][1].strip() == money_number(value, code)
+            assert [value.strip() for _, value in cells[3][index * 3:index * 3 + 3]] == [
+                money_number(summary[field] * sign, code)
+                for field, sign in (("assigned", 1), ("spent", -1), ("available", 1))
+            ]
+
+
+def test_older_remote_projections_show_unavailable_overview_totals_without_inventing_values(
+    client, store, monkeypatch,
+):
+    workspace = store.workspace
+
+    def older_workspace(*args, **kwargs):
+        data = workspace(*args, **kwargs)
+        for summary in (data["summary"], *data["summariesByCurrency"].values()):
+            summary.pop("previousOverspending", None)
+            summary.pop("assignedNextMonth", None)
+        return data
+
+    monkeypatch.setattr(store, "workspace", older_workspace)
+    response = client.get("/budgets/demo/budget/2026-10/usd")
+    assert response.status_code == 200
+    for label in ("Previous overspending", "Assigned for next month"):
+        row = re.search(rf'<th scope="row">{label}</th>(.*?)</tr>', response.text, re.S)[1]
+        cells = re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S)
+        assert len(cells) == 3
+        assert all(value.strip() == "—" for _, value in cells)
+        assert all("negative" not in attributes for attributes, _ in cells)
+    assert assignment_forms(response.text)
+
+
+def test_historical_income_remains_visible_while_overview_planning_is_unavailable(client, store):
+    account = store.add_account("personal", {
+        "name": "Cash", "type": "depository", "balance": 100000,
+    })
+    for amount, category in ((-12345, None), (6789, "groceries")):
+        store.add_transaction("personal", {
+            "accountId": account, "date": "2026-09-05", "merchant": "Historical fixture",
+            "amount": amount, "categoryId": category,
+        })
+    store.assign("personal", "groceries", "2026-10", 1000)
+    text = client.get("/budgets/home/budget/2026-09/usd").text
+    overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
+    cells = [re.findall(r'<td[^>]*>(.*?)</td>', row, re.S) for row in overview]
+    assert cells[0][0].strip() == "123.45"
+    assert cells[1][0].strip() == "—"
+    assert cells[2][0].strip() == "—"
+    assert [value.strip() for value in cells[3][:3]] == ["—", "—", "—"]
+    assert cells[1][1].strip() == "0.00"
+    assert [value.strip() for value in cells[3][3:6]] == ["10.00", "0.00", "10.00"]
+    historical = re.search(r'aria-label="September 2026 summary">(.*?)</section>', text, re.S)[1]
+    assert re.search(r'class="budget-ready-value[^"]*">([^<]*)</strong>', historical)[1] == "—"
 
 
 def test_future_assignment_uses_its_own_period_and_core_validation(client):

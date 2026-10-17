@@ -80,6 +80,8 @@ def _calculate_currency(state: dict, month: str) -> dict:
         ready = min(0, ready)
     summary = {
         "income": income_for(active),
+        "previousOverspending": sum(max(0, -b["carryover"]) for b in budget),
+        "assignedNextMonth": sum(state["budget"].get(shift_month(month, 1), {}).values()),
         "spent": spend_for(active),
         "assigned": sum(b["assigned"] for b in budget),
         "available": sum(b["available"] for b in budget),
@@ -203,7 +205,10 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
     accounts = [a for a in data["accounts"] if a.get("currency", "USD") == currency]
     account_ids = {a["id"] for a in accounts}
     category_ids = {c["id"] for c in categories}
-    empty_summary = dict.fromkeys(("income", "spent", "assigned", "available", "readyToAssign"), 0)
+    empty_summary = dict.fromkeys((
+        "income", "previousOverspending", "assignedNextMonth", "spent", "assigned",
+        "available", "readyToAssign",
+    ), 0)
     return {
         **data,
         "currency": currency,

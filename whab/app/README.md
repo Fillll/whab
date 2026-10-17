@@ -4,7 +4,7 @@
 
 A highly extensible budgeting app built with Python, with monthly envelopes and rollover, transaction review, spending analytics and manual accounts. Plugins supply replaceable interfaces, storage, imports, reports and additional workflows.
 
-See the [architecture and Mermaid diagrams](../../README.md#architecture), [runtime architecture](../docs/architecture.md) and [budget and plugin model](../docs/target-architecture.md). Current host version: **2.6.0** ([changelog](CHANGELOG.md)).
+See the [architecture and Mermaid diagrams](../../README.md#architecture), [runtime architecture](../docs/architecture.md) and [budget and plugin model](../docs/target-architecture.md). Current host version: **2.7.0** ([changelog](CHANGELOG.md)).
 
 The [client/server deployment option](../../README.md#clientserver-deployment) uses the same architecture: a client plugin connects an interface to a server plugin exposing an API interface capability.
 
@@ -25,7 +25,7 @@ Setup creates private runtime configuration, a token encryption key and TLS mate
 
 Browser views use `/budgets/<budget-key>/<page>/<month>/<currency>`, with every path segment lowercase. For example, `/budgets/home/budget/current-month/usd` opens the original **My Budget**, while `/budgets/demo/budget/2026-10/usd` opens the sample budget at a fixed month. Named budgets use their permanent IDs, independent of display names. See [budget addresses](../docs/usage.md#budget-addresses) for navigation and bookmark behavior.
 
-The web budget shows three consecutive months in one category table, with monthly **To assign** summaries and **Assigned**, **Activity** and **Available** columns. Use the month strip to move the window, collapse category groups, and edit an assignment directly in its month. Settings stays at the bottom left. The web plugin owns this skin; core owns every month's financial projection and validates every assignment.
+The web budget shows three consecutive months in one category table. Monthly summaries show **Available**, **Assigned** and **Spent**, followed by the larger **To assign** amount. Above the spending categories, monthly rows show **Income**, **Previous overspending**, **Assigned for next month** and **Assigned this month**. The last row uses the table's **Assigned**, **Activity** and **Available** columns. Use the month strip to move the window, collapse category groups, and edit an assignment directly in its month. Settings stays at the bottom left. The web plugin owns this skin; core owns every month's financial projection and validates every assignment.
 
 ## Configuration and plugins
 
