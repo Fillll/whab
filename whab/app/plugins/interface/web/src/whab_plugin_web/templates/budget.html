@@ -1,3 +1,12 @@
+{% macro summary_details(period, label, carry_in=false) -%}
+  <details class="budget-summary-details{% if carry_in %} budget-carry-in-details{% endif %}">
+    <summary aria-label="{{ label }} for {{ month_label(period.month) }}: Where it comes from">Where it comes from</summary>
+    {{ caller() }}
+  </details>
+{%- endmacro %}
+{% macro equation_amount(amount, operator) -%}
+  <span class="budget-equation-operator">{{ operator }}</span> {% if amount<0 %}({{ money_number(amount) }}){% else %}{{ money_number(amount) }}{% endif %}
+{%- endmacro %}
 <div class="budget-planner">
   <div class="budget-toolbar">
     <nav class="month-strip" aria-label="Budget month">
@@ -54,7 +63,20 @@
           <tbody class="budget-overview">
             <tr class="budget-overview-row">
               <th scope="row">Income<small class="budget-row-note">Summary</small></th>
-              {% for period in periods %}<td colspan="{{ period.column_count }}" class="month-start">{{ money_number(period.summary.income) }}</td>{% endfor %}
+              {% for period in periods %}
+                {% set income_valid = valid_money(period.summary.income) %}
+                <td colspan="{{ period.column_count }}" class="month-start">
+                  {{ money_number(period.summary.income) if income_valid else '—' }}
+                  {% if income_valid %}
+                    {% call summary_details(period, 'Income') %}
+                      <dl><div><dt>Received income</dt><dd>{{ money_number(period.summary.income) }}</dd></div></dl>
+                      <p>Posted income received in {{ month_label(period.month) }} in on-budget cash accounts, without a spending category. Pending transactions, transfers and credit-card inflows are excluded. Categorized refunds reduce category activity instead.</p>
+                      {% if period.month<data.budgetStartMonth %}<p>Historical income only: this month is before your budget starts.</p>{% endif %}
+                      <p><a class="text-link" href="{{ url('transactions',month=period.month) }}">Review {{ month_label(period.month) }} transactions</a></p>
+                    {% endcall %}
+                  {% endif %}
+                </td>
+              {% endfor %}
             </tr>
             <tr class="budget-overview-row budget-carried-in-row">
               <th scope="row">Carried in<small class="budget-row-note">Previously unassigned + set aside + overall carryover</small></th>
@@ -63,11 +85,10 @@
                   {{ money_number(period.carried_in) if period.carried_in is not none else '—' }}
                   {% if period.carried_in is not none %}
                     {% if period.carried_in_parts %}
-                      <details class="budget-carry-in-details">
-                        <summary>Where it comes from</summary>
+                      {% call summary_details(period, 'Carried in', carry_in=true) %}
                         <dl>{% for label, amount in period.carried_in_parts %}<div><dt>{{ label }}</dt><dd{% if amount<0 %} class="negative"{% endif %}>{{ money_number(amount) }}</dd></div>{% endfor %}</dl>
                         <p>Balances carried by category stay in their categories.</p>
-                      </details>
+                      {% endcall %}
                     {% else %}<small class="budget-row-note">Breakdown unavailable</small>{% endif %}
                   {% endif %}
                 </td>
@@ -94,6 +115,12 @@
                   {% else %}
                     {{ money_number(funding_amount) if funding_amount_valid and planning_month else '—' }}
                     {% if planning_month and period.monthlyFundingFlow is sameas true %}<small class="budget-row-note">{% if period.nextMonthFundingEditable is sameas true and funding_amount_valid %}Amount exceeds the editing limit{% else %}Editing requires a server update{% endif %}</small>{% endif %}
+                    {% if funding_amount_valid and planning_month %}
+                      {% call summary_details(period, 'Assigned for next month') %}
+                        <dl><div><dt>Set aside in {{ month_label(period.month) }}</dt><dd>{{ money_number(funding_amount) }}</dd></div></dl>
+                        <p>This amount is removed from {{ month_label(period.month) }}'s available-to-assign pool and included in Carried in for {{ month_label(shift_month(period.month,1)) }}. It is independent of next month's category assignments.</p>
+                      {% endcall %}
+                    {% endif %}
                   {% endif %}
                 </td>
               {% endfor %}
@@ -101,14 +128,44 @@
             <tr class="budget-overview-row budget-assigned-row">
               <th scope="row">Assigned this month<small class="budget-row-note">Summary</small></th>
               {% for period in periods %}
-                <td colspan="{{ period.column_count }}" class="month-start">{{ money_number(period.summary.assigned) if period.month>=data.budgetStartMonth and valid_money(period.summary.assigned) else '—' }}</td>
+                {% set assigned_valid = period.month>=data.budgetStartMonth and valid_money(period.summary.assigned) %}
+                <td colspan="{{ period.column_count }}" class="month-start">
+                  {{ money_number(period.summary.assigned) if assigned_valid else '—' }}
+                  {% if assigned_valid %}
+                    {% if period.assigned_parts is not none %}
+                      {% call summary_details(period, 'Assigned this month') %}
+                        <dl>{% for label, amount in period.assigned_parts %}<div><dt>{{ label }}</dt><dd{% if amount<0 %} class="negative"{% endif %}>{{ money_number(amount) }}</dd></div>{% endfor %}<div class="budget-summary-total"><dt>Assigned this month</dt><dd>{{ money_number(period.summary.assigned) }}</dd></div></dl>
+                        {% if not period.assigned_parts %}<p>No spending categories are assigned this month.</p>{% endif %}
+                        <p>The total of the category Assigned amounts below for {{ month_label(period.month) }}. Carryover, spending activity and money set aside for next month are excluded.</p>
+                      {% endcall %}
+                    {% else %}<small class="budget-row-note">Breakdown unavailable</small>{% endif %}
+                  {% endif %}
+                </td>
               {% endfor %}
             </tr>
             <tr class="budget-overview-row budget-ready-row">
               <th scope="row">Available to assign<small class="budget-row-note">Summary</small></th>
               {% for period in periods %}
                 {% set ready_valid = period.monthlyFundingFlow is sameas true and period.month>=data.budgetStartMonth and valid_money(period.summary.readyToAssign) %}
-                <td colspan="{{ period.column_count }}" class="month-start{% if ready_valid and period.summary.readyToAssign<0 %} negative{% elif ready_valid and period.summary.readyToAssign>0 %} positive{% endif %}">{{ money_number(period.summary.readyToAssign) if ready_valid else '—' }}{% if ready_valid and valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<small class="budget-row-note" title="Review category overspending, uncategorized spending, and account balances before assigning more money.">Some funds are needed to cover spending or account reserves.</small>{% endif %}</td>
+                <td colspan="{{ period.column_count }}" class="month-start{% if ready_valid and period.summary.readyToAssign<0 %} negative{% elif ready_valid and period.summary.readyToAssign>0 %} positive{% endif %}">
+                  {{ money_number(period.summary.readyToAssign) if ready_valid else '—' }}
+                  {% if ready_valid %}
+                    {% if valid_money(period.summary.income) and period.carried_in is not none and valid_money(period.summary.assignedNextMonth) and valid_money(period.summary.assigned) %}
+                      {% call summary_details(period, 'Available to assign') %}
+                        <dl>
+                          <div><dt>Income</dt><dd>{{ equation_amount(period.summary.income, '+') }}</dd></div>
+                          <div><dt>Carried in</dt><dd{% if period.carried_in<0 %} class="negative"{% endif %}>{{ equation_amount(period.carried_in, '+') }}</dd></div>
+                          <div><dt>Assigned for next month</dt><dd>{{ equation_amount(period.summary.assignedNextMonth, '−') }}</dd></div>
+                          <div><dt>Assigned this month</dt><dd>{{ equation_amount(period.summary.assigned, '−') }}</dd></div>
+                          <div class="budget-summary-total"><dt>Available to assign</dt><dd{% if period.summary.readyToAssign<0 %} class="negative"{% endif %}>{{ equation_amount(period.summary.readyToAssign, '=') }}</dd></div>
+                        </dl>
+                        <p>Income + Carried in − Assigned for next month − Assigned this month.</p>
+                        <p>{% if period.summary.readyToAssign<0 %}A negative amount means this month's funding pool does not cover its category assignments and next-month set-aside. Review carried-in deficits, income and assignments before assigning more.{% else %}This is the unassigned money remaining in {{ month_label(period.month) }}'s funding pool.{% endif %} By-category carryover stays in its categories and is excluded from this pool.</p>
+                      {% endcall %}
+                    {% else %}<small class="budget-row-note">Breakdown unavailable</small>{% endif %}
+                    {% if valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<small class="budget-row-note" title="Review category overspending, uncategorized spending, and account balances before assigning more money.">Some funds are needed to cover spending or account reserves.</small>{% endif %}
+                  {% endif %}
+                </td>
               {% endfor %}
             </tr>
           </tbody>

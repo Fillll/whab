@@ -126,7 +126,10 @@ def test_empty_selected_currency_remains_selected_when_switching_workspaces(clie
     ready = re.search(
         r'<tr class="budget-overview-row budget-ready-row">(.*?)</tr>', text, re.S,
     )[1]
-    assert [value.strip() for value in re.findall(r'<td[^>]*>(.*?)</td>', ready, re.S)] == ["0.00"] * 3
+    assert [
+        re.sub(r'<details\b[^>]*>.*?</details>', "", value, flags=re.S).strip()
+        for value in re.findall(r'<td[^>]*>(.*?)</td>', ready, re.S)
+    ] == ["0.00"] * 3
     assert '/2026-10/eur' in text
     assert 'name="currency" value="EUR"' in text
 

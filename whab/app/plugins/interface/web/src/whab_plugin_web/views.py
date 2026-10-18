@@ -186,6 +186,12 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
                 ],
             }
         )
+    for period in periods:
+        parts = [
+            (category_names.get(row["categoryId"], row["categoryId"]), row.get("assigned"))
+            for row in period["budget"]
+        ]
+        period["assigned_parts"] = parts if all(valid_money(amount) for _, amount in parts) else None
     transactions = sorted(data["transactions"], key=lambda t: t["date"], reverse=True)
     accounts_by_id = {a["id"]: a for a in data["accounts"]}
     spending = defaultdict(int)

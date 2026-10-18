@@ -2,6 +2,8 @@
 
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
+from zipfile import ZipFile
 
 import pytest
 from fastapi.testclient import TestClient
@@ -464,7 +466,16 @@ def test_demo_download_is_a_separate_budget_with_only_demo_ledger(tmp_path, targ
         demo = host.applications[budget_id][0].state.store.export_budget("demo")
         assert ledger == demo and ledger["accounts"] and ledger["transactions"] and ledger["assignments"]
         assert "Private wallet" not in {row["name"] for row in ledger["accounts"]}
-        assert client.get(f"/api/budgets/{budget_id}/export").content == personal
+        unchanged = client.get(f"/api/budgets/{budget_id}/export")
+        assert unchanged.status_code == 200, unchanged.text
+        # ZIP timestamps can change between exports; every file must stay identical.
+        with ZipFile(BytesIO(personal)) as before, ZipFile(BytesIO(unchanged.content)) as after:
+            assert len(before.infolist()) == len(after.infolist())
+            assert {
+                entry.filename: before.read(entry) for entry in before.infolist()
+            } == {
+                entry.filename: after.read(entry) for entry in after.infolist()
+            }
         assert client.get("/api/budget").json()["id"] == current_id
         rejected = client.get(route, params={"workspace": "demo", "include_credentials": "true"})
         assert rejected.status_code == 400 and "cannot include" in rejected.text

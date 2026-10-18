@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.12.0 — 2026-10-18
+
+PR: [#48](https://github.com/Fillll/whab/pull/48)
+
+- Add a per-month Where it comes from disclosure to Income, Assigned this month and Available to assign, alongside the existing carry-in breakdown. Explain received income, show category assignments and display the monthly funding formula with its actual component amounts.
+- Keep next-month funding editable and unavailable totals clearly unavailable. Preserve cash-capacity guidance, currency precision and keyboard-accessible native disclosures.
+
 ## 1.11.0 — 2026-10-18
 
 PR: [#47](https://github.com/Fillll/whab/pull/47)
