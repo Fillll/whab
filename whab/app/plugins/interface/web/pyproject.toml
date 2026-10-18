@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_web"
-version = "1.8.0"
+version = "1.9.0"
 description = "Web interface plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
