@@ -1,5 +1,11 @@
 # Public bank artwork plugin changelog
 
+## 1.3.0 — 2026-10-18
+
+PR: [#56](https://github.com/Fillll/whab/pull/56)
+
+- Add Flush cache to Plugin Settings. Clear saved artwork and failed requests while preserving configured bank websites and account settings, then download logos again on the next request. Successful artwork remains cached indefinitely until manually cleared.
+
 ## 1.2.0 — 2026-10-18
 
 PR: [#52](https://github.com/Fillll/whab/pull/52)

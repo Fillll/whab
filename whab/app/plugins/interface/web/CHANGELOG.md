@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.16.1 — 2026-10-18
+
+PR: [#56](https://github.com/Fillll/whab/pull/56)
+
+- Rename user-facing plugin Options links and dialogs to Settings, including the Account logo shortcut and plugin manager descriptions.
+- Align installed plugin rows as name, package/version, saved enabled state and Settings, retaining accessible selection controls and a compact mobile layout.
+
 ## 1.16.0 — 2026-10-18
 
 PR: [#55](https://github.com/Fillll/whab/pull/55)
