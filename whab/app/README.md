@@ -4,7 +4,7 @@
 
 A highly extensible budgeting app built with Python, with monthly envelopes and rollover, transaction review, spending analytics and manual accounts. Plugins supply replaceable interfaces, storage, imports, reports and additional workflows.
 
-See the [architecture and Mermaid diagrams](../../README.md#architecture), [runtime architecture](../docs/architecture.md) and [budget and plugin model](../docs/target-architecture.md). Current host version: **2.14.3** ([changelog](CHANGELOG.md)).
+See the [architecture and Mermaid diagrams](../../README.md#architecture), [runtime architecture](../docs/architecture.md) and [budget and plugin model](../docs/target-architecture.md). Current host version: **2.15.0** ([changelog](CHANGELOG.md)).
 
 The [client/server deployment option](../../README.md#clientserver-deployment) uses the same architecture: a client plugin connects an interface to a server plugin exposing an API interface capability.
 

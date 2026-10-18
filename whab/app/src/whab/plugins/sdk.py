@@ -229,6 +229,17 @@ class ReceiptStorage(Protocol):
     def delete_receipt(self, workspace: str, transaction_id: str) -> None: ...
 
 
+class ReceiptTransactionLookup(Protocol):
+    """Optional scoped existence check before private receipt operations.
+
+    Validate the workspace and return a strict bool for an active transaction
+    in that workspace. Deleted rows are absent; pending rows remain eligible.
+    Receipt reads and writes must still enforce their own active-row checks.
+    """
+
+    def receipt_transaction_exists(self, workspace: str, transaction_id: str) -> bool: ...
+
+
 class StorageBackend(Protocol):
     """Synchronous application ledger contract, independent of any database driver.
 

@@ -1,3 +1,3 @@
 """WHAB: We Have A Budget."""
 
-__version__ = "2.14.3"
+__version__ = "2.15.0"

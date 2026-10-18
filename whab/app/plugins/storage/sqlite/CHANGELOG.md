@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.7.0 — 2026-10-18
+
+PR: [#62](https://github.com/Fillll/whab/pull/62)
+
+- Provide an indexed, workspace-scoped active transaction lookup for receipt access. Exclude deleted rows while allowing pending transactions, preserve workspace errors, and retain the receipt operations' own transaction checks against concurrent deletion. No new index, storage migration or receipt format is required.
+
 ## 1.6.3 — 2026-10-18
 
 PR: [#61](https://github.com/Fillll/whab/pull/61)

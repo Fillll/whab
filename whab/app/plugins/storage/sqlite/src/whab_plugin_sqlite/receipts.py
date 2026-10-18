@@ -3,6 +3,18 @@
 from whab.plugins import StoreError, receipt_media_type
 
 
+def transaction_exists(store, workspace, transaction_id):
+    """Check one active identity without loading register history or receipt data."""
+    with store._snapshot():
+        store._require_workspace(workspace)
+        if not isinstance(transaction_id, str):
+            return False
+        return bool(store.db.execute(
+            "SELECT 1 FROM transactions WHERE workspace=? AND id=? AND deleted=0",
+            (workspace, transaction_id),
+        ).fetchone())
+
+
 def check_transaction(store, workspace, transaction_id):
     if type(workspace) is not str or workspace not in {"personal", "demo"} or not store.db.execute(
         "SELECT 1 FROM transactions WHERE workspace=? AND id=? AND deleted=0",
