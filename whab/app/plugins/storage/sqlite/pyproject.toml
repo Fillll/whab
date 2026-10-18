@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_sqlite"
-version = "1.6.2"
+version = "1.6.3"
 description = "SQLite budget storage plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"

@@ -159,7 +159,8 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
     try {
       const marker = summary ? 'summary' : '1';
       const response = await fetch(target.href, {
-        headers: {'X-WHAB-Transactions-Fragment': marker},
+        headers: {'X-WHAB-Transactions-Fragment': marker,
+          ...(!refresh && !summary ? {'X-WHAB-Transactions-Sidebar': 'omit'} : {})},
         cache: 'no-store', signal: controller.signal,
       });
       if (!response.ok || response.headers.get('X-WHAB-Transactions-Fragment') !== marker ||

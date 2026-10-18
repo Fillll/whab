@@ -37,7 +37,7 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
   const requests = [], replacements = [], histories = [], fallbacks = [], notices = [];
   const listeners = {};
   const navigationLinks = [];
-  let nextBadge;
+  let nextBadge, nextAccountList = true;
   let content = element();
   const accountList = element();
   const accountListReplacements = [];
@@ -75,7 +75,7 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
         fresh.querySelector = selector => selector === 'h1' ? heading : selector === 'template[data-transaction-navigation-count]' ? countTemplate : null;
         fresh.heading = heading;
         return {querySelector: selector => ['.page-content[data-transactions-fragment]', '[data-transactions-summary]'].includes(selector) ? fresh :
-          selector === 'template[data-account-list]' ? {content: {cloneNode: () => ({refreshedAccountList: true})}} : null};
+          selector === 'template[data-account-list]' && nextAccountList ? {content: {cloneNode: () => ({refreshedAccountList: true})}} : null};
       }
     },
   };
@@ -90,6 +90,7 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
   function respond(index, {marker = '1', ok = true, override = {}, url, reviewBadge} = {}) {
     nextBadge = reviewBadge;
     const entry = requests[index];
+    nextAccountList = entry.options.headers['X-WHAB-Transactions-Sidebar'] !== 'omit';
     const target = new URL(entry.url);
     const parts = context.parsePageRoute(target);
     const current = context.getContext();
@@ -101,6 +102,25 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
   return {navigator, requests, replacements, histories, fallbacks, notices, sidebar, status, context,
     location, listeners, respond, accountListReplacements, content: () => content, navigationLinks};
 }
+
+test('ordinary account, search and page navigation omits the unused sidebar fragment', async () => {
+  const state = harness();
+  for (const target of [second, second + '&q=older', second + '&q=older&tx_page=2']) {
+    const pending = state.navigator.navigate(target, {focus: false});
+    await tick();
+    const index = state.requests.length - 1;
+    assert.deepEqual(JSON.parse(JSON.stringify(state.requests[index].options.headers)), {
+      'X-WHAB-Transactions-Fragment': '1', 'X-WHAB-Transactions-Sidebar': 'omit',
+    });
+    const params = new URL(target).searchParams;
+    state.respond(index, {override: {transactionSearch: params.get('q') || '', transactionRequestedPage: params.get('tx_page') || '1'}});
+    await pending;
+  }
+  assert.equal(state.replacements.length, 3);
+  assert.equal(state.accountListReplacements.length, 0);
+  assert.equal(state.sidebar.scrollTop, 480);
+  assert.equal(state.fallbacks.length, 0);
+});
 
 test('partial review refresh updates, removes and creates the server-rendered navigation badge', async () => {
   const state = harness();
@@ -153,6 +173,7 @@ test('count-only review refresh preserves the register, focus, history and sideb
     await tick();
     assert.equal(state.status.hidden, true);
     assert.equal(state.requests.at(-1).options.headers['X-WHAB-Transactions-Fragment'], 'summary');
+    assert.equal(state.requests.at(-1).options.headers['X-WHAB-Transactions-Sidebar'], undefined);
     assert.equal(state.requests.at(-1).options.cache, 'no-store');
     state.respond(state.requests.length - 1, {marker: 'summary', reviewBadge: count});
     await pending;
@@ -412,6 +433,8 @@ test('an explicit same-address refresh loads renamed canonical account and refre
   const pending = state.navigator.navigate(state.location.href, {refresh: true, history: 'replace'});
   await tick();
   assert.equal(state.requests.length, 1);
+  assert.equal(state.requests[0].options.headers['X-WHAB-Transactions-Fragment'], '1');
+  assert.equal(state.requests[0].options.headers['X-WHAB-Transactions-Sidebar'], undefined);
   const renamed = '/budgets/family-budget/everyday-cash/transactions/2026-10/usd?all_dates=true';
   state.respond(0, {override: {canonicalUrl: renamed, accountSlugs: {first: 'everyday-cash', second: 'savings'}}});
   await pending;

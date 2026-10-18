@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.6.3 — 2026-10-18
+
+PR: [#61](https://github.com/Fillll/whab/pull/61)
+
+- Count unselected-account registers by selecting the currency's account IDs once, avoiding a repeated account lookup for each transaction. Keep explicit account selections on their existing query path, with unchanged snapshots, filters, counts and selected rows.
+
 ## 1.6.2 — 2026-10-18
 
 PR: [#60](https://github.com/Fillll/whab/pull/60)

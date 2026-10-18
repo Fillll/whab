@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.19.3 — 2026-10-18
+
+PR: [#61](https://github.com/Fillll/whab/pull/61)
+
+- Omit the unused sidebar account-list template from ordinary register navigation responses. Explicit refreshes and older clients still receive the complete account list; summary requests retain their compact response and navigation keeps its existing save, race and focus guards.
+
 ## 1.19.2 — 2026-10-18
 
 PR: [#60](https://github.com/Fillll/whab/pull/60)
