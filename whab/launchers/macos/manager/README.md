@@ -20,9 +20,9 @@ starting WHAB.
 
 | Command | Behavior |
 | --- | --- |
-| `configure --runtime-home /absolute/home --channel main\|stable [--port 5173]` | Explicitly adopt an existing runtime or choose a new one. Preserve its `.env` and port. |
+| `configure --runtime-home /absolute/home --channel main\|stable\|alpha [--port 5173]` | Explicitly adopt an existing runtime or choose a new one. Preserve its `.env` and port. |
 | `status` | Return owned-process status and UI paths. |
-| `start [--offline]` | Check for the newest verified revision, prepare it, then start; offline or failed preparation uses the installed version or bundled seed. Repeated Start is idempotent. |
+| `start [--offline]` | Resolve the newest revision eligible for the selected channel, prepare it, then start; offline or failed preparation uses the installed version or bundled seed. Repeated Start is idempotent. |
 | `stop` | Send SIGTERM only to a process with matching PID, kernel creation time, full command, and instance marker. |
 | `restart` | Restart the currently installed revision without checking updates. |
 | `check-update` | Check for updates without changing application code or runtime data. |
@@ -48,6 +48,9 @@ The single stdout line is a JSON object; success exits zero:
   "ca_certificate": "/absolute/runtime/tls/ca.crt",
   "update_available": false,
   "latest_version": null,
+  "latest_build": null,
+  "tested": true,
+  "active_channel": "main",
   "update_warning": null
 }
 ```
@@ -64,9 +67,13 @@ contents. Detailed subprocess output goes to private `logs/install.log`,
 The main channel selects the newest of the last ten main commits whose latest
 GitHub Actions checks named `CI (Python 3.14)` and `CI (Python 3.15)` both succeeded.
 The stable channel resolves the latest non-prerelease semantic version tag to an
-exact commit and requires the same checks. If GitHub cannot verify an update,
-Start retains a working local installation; no unchecked remote revision is
-installed. A bundled seed is a separately identified local fallback, including a
+exact commit and requires the same checks. The opt-in `alpha` channel resolves
+`GET /repos/Fillll/whab/commits/main` directly and accepts its exact 40-character
+commit SHA without querying CI checks or searching older revisions. Its target is
+marked `tested: false`; it accepts pending, absent or failing GitHub checks.
+If GitHub cannot resolve an eligible update, Start retains a working local
+installation. Existing configurations retain their channel; the default remains
+`main`. A bundled seed is a separately identified local fallback, including a
 development source hash when built from an uncommitted checkout.
 
 Source comes only from the official `Fillll/whab` GitHub repository over verified
@@ -75,7 +82,8 @@ and rejects links, traversal, devices and other nonregular entries. Installation
 directories contain a source snapshot and a fresh noneditable virtual environment
 at its final absolute path. Host and all seven supported plugins are installed
 together. A bundled seed uses its matching offline wheelhouse; downloaded updates
-install matching source and its declared dependencies. Before creating any
+install matching source and its declared dependencies. Downloads contain only
+the chosen commit's source tree, with no Git clone or history. Before creating any
 virtual environment, a self-contained bundled Python is copied into a verified,
 private runtime cache under the managed root. Moving or replacing `WHAB.app`
 therefore preserves existing installed environments. Explicitly configured system
@@ -83,7 +91,14 @@ or framework Pythons retain their configured path. Every interpreter invocation
 uses isolated mode and disables bytecode writes to preserve the signed bundle.
 A candidate must pass
 dependency checks and start in an isolated empty Sandbox runtime before touching
-the selected runtime.
+the selected runtime, including for Alpha.
+
+Update availability is scoped to the configured channel. Changing channel clears
+the previous channel's cached target. `latest_build` identifies the newly resolved
+target; `active_channel` and `tested` describe the installed build rather than the
+channel selected for future updates. Reusing an installation at the same SHA
+refreshes its provenance from the resolved target without duplicating installation
+or restarting the server.
 
 `server.py` runs WHAB in the foreground under a detached launcher-owned child.
 Its HTTPS-only `/api/health` response contains application/version/build/instance

@@ -14,8 +14,9 @@ artifacts require matching Python runtimes and separate build validation.
 1. Open WHAB.app. Select **Use default runtime** for a new private environment,
    or **Choose…** to adopt the folder containing your existing WHAB `.env`, `data`,
    `budgets` and `tls`. Stop any manually launched WHAB server before adopting it.
-2. Choose **Latest tested main** or **Stable releases**, then **Start WHAB**.
-   Start prepares the newest verified version when available, starts the local
+2. Choose **Latest tested main**, **Stable releases**, or **Alpha — latest main**,
+   then **Start WHAB**. Start prepares the newest available revision for that
+   channel, starts the local
    HTTPS server and opens your browser. Repeated Open clicks reuse that server.
 3. For a new runtime, use **HTTPS certificate…** to open its CA certificate in
    Keychain Access. Add the certificate, open it, expand **Trust**, and explicitly
@@ -31,12 +32,24 @@ Treat the whole runtime and its backups as private financial data.
 **Restart** restarts the installed version. **Update & Restart** prepares and tests
 an update, stops the running version, creates a consistent private runtime backup,
 then switches versions. A running budget is never interrupted by a background
-update check. **Check for updates** records availability; **Start** also checks.
+update check. **Check for updates** reports whether a newer eligible revision is available;
+**Start** also checks. The version line includes the running source revision.
 When offline, the last working installation remains usable. A first installation
 can use the app's bundled source and wheelhouse without network access.
 
-Latest tested main means the newest official `main` revision with successful CI.
-Stable means a supported official GitHub release. A locally built source seed is
+The update channels are:
+
+- **Latest tested main**: the newest recent official `main` revision with successful CI.
+- **Stable releases**: a supported official GitHub release with successful CI.
+- **Alpha — latest main**: the current official `main` commit, even when CI is pending,
+  missing or failing. Alpha resolves one exact revision and downloads its source
+  snapshot without cloning a Git repository or downloading its history. It still
+  performs dependency validation and a local isolated Sandbox startup check before
+  replacing the running app, and preserves the normal private backup.
+
+Existing configurations keep their selected channel; new configurations default to
+Latest tested main. The update picker selects future updates; the version line
+identifies the revision and channel of the installed build. A locally built source seed is
 labelled development when the checkout is dirty and is not represented as CI tested.
 The launcher rejects unsupported old layouts instead of silently installing an
 incompatible release. Changing the runtime or update channel requires stopping WHAB.
