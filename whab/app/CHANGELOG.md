@@ -4,6 +4,15 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.14.1 — 2026-10-18
+
+PR: [#59](https://github.com/Fillll/whab/pull/59)
+
+- Index dated activity once per request and reuse validated currency scopes across consecutive budget months, avoiding full-history record copies while preserving all projection and funding rules.
+- Read recovery and source files in bounded chunks instead of allocating the maximum container size for small files. Reuse immutable private-field rules during public projection sanitization.
+- Support compact transaction-summary responses so the web interface can refresh review counts without rebuilding the register.
+- Require SQLite 1.6.1, web 1.19.1 and Plaid 1.1.3 in the supported bundle for the corresponding memory and responsiveness fixes.
+
 ## 2.14.0 — 2026-10-18
 
 PR: [#58](https://github.com/Fillll/whab/pull/58)

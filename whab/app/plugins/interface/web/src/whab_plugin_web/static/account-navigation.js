@@ -77,7 +77,16 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
     status.hidden = !active;
   }
 
-  function syncNavigation(target, context, countTemplate) {
+  function syncReviewCount(link, countTemplate) {
+    if (!countTemplate?.content) return;
+    const current = link.querySelector('.nav-count');
+    const fresh = countTemplate.content.querySelector('.nav-count');
+    if (fresh && current) current.replaceWith(fresh.cloneNode(true));
+    else if (fresh) link.append(fresh.cloneNode(true));
+    else current?.remove();
+  }
+
+  function syncNavigation(target, context, countTemplate, summary = false) {
     const selected = context.selectedAccountId || target.searchParams.get('account');
     const nextRoute = parsePageRoute(target);
     const accountSlugs = context.accountSlugs || {};
@@ -85,6 +94,10 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
       const url = new URL(link.href, target);
       const source = parsePageRoute(url);
       if (!source || url.origin !== target.origin || !sameBudget(source.budget, nextRoute.budget, context) || source.currency !== nextRoute.currency) continue;
+      if (summary) {
+        if (source.page === 'transactions' && link.classList.contains('nav-item')) syncReviewCount(link, countTemplate);
+        continue;
+      }
       const accountId = link.dataset?.accountId || url.searchParams.get('account') || Object.keys(accountSlugs).find(id => accountSlugs[id] === source.accountSlug);
       const accountSlug = accountSlugs[accountId] || source.accountSlug;
       const accountPath = source.page === 'transactions' && accountSlug ? `${accountSlug}/` : '';
@@ -101,23 +114,21 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
         link.classList.toggle('active', active);
         if (active) link.setAttribute('aria-current', 'page');
         else link.removeAttribute('aria-current');
-        if (active && countTemplate?.content) {
-          const current = link.querySelector('.nav-count');
-          const fresh = countTemplate.content.querySelector('.nav-count');
-          if (fresh && current) current.replaceWith(fresh.cloneNode(true));
-          else if (fresh) link.append(fresh.cloneNode(true));
-          else current?.remove();
-        }
+        if (active) syncReviewCount(link, countTemplate);
       }
     }
-    const breadcrumb = document.querySelector('.breadcrumb > span');
+    const breadcrumb = !summary && document.querySelector('.breadcrumb > span');
     if (breadcrumb) breadcrumb.textContent = 'Transactions';
   }
 
-  async function navigate(value, {history: action = 'push', focus = 'heading', refresh = false} = {}) {
+  async function navigate(value, {history: action = 'push', focus = 'heading', refresh = false, summary = false} = {}) {
     const target = new URL(value, location.href);
+    const displayedTarget = new URL(displayed);
+    displayedTarget.hash = '';
     if (refresh) target.hash = '';
     if (disposed || !isAccountDestination(target, displayed, getContext())) return false;
+    // A count refresh belongs to the displayed register and returns false if canceled.
+    if (summary && (!refresh || target.href !== displayedTarget.href)) return false;
     if (!refresh && target.href === displayed.href) {
       request += 1;
       controller?.abort();
@@ -134,28 +145,29 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
     try {
       if (!(await flush())) throw new Error('Save the transaction edit before changing accounts.');
     } catch (failure) {
-      if (revision !== request || disposed) return true;
+      if (revision !== request || disposed) return !summary;
       if (action === 'none') window.history.replaceState(window.history.state, '', displayed.href);
       pendingTarget = null;
       notify(failure.message || 'Save the transaction edit before continuing.');
-      return true;
+      return !summary;
     }
-    if (revision !== request || disposed) return true;
+    if (revision !== request || disposed) return !summary;
     controller = new AbortController();
     const sidebar = document.querySelector('.sidebar');
     const position = sidebar && {top: sidebar.scrollTop, left: sidebar.scrollLeft};
-    busy(true);
+    if (!summary) busy(true);
     try {
+      const marker = summary ? 'summary' : '1';
       const response = await fetch(target.href, {
-        headers: {'X-WHAB-Transactions-Fragment': '1'},
+        headers: {'X-WHAB-Transactions-Fragment': marker},
         cache: 'no-store', signal: controller.signal,
       });
-      if (!response.ok || response.headers.get('X-WHAB-Transactions-Fragment') !== '1' ||
+      if (!response.ok || response.headers.get('X-WHAB-Transactions-Fragment') !== marker ||
           response.url && new URL(response.url).href !== target.href) throw new Error('Register fragment unavailable.');
       const html = await response.text();
-      if (revision !== request || disposed) return true;
+      if (revision !== request || disposed) return !summary;
       const parsed = new DOMParser().parseFromString(html, 'text/html');
-      const fresh = parsed.querySelector('.page-content[data-transactions-fragment]');
+      const fresh = parsed.querySelector(summary ? '[data-transactions-summary]' : '.page-content[data-transactions-fragment]');
       const context = JSON.parse(fresh?.dataset.pageContext || 'null');
       const expected = parsePageRoute(target);
       const previous = getContext();
@@ -170,6 +182,12 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
           actual.month !== expected.month || context.currency.toLowerCase() !== expected.currency ||
           actual.currency !== expected.currency || !matchesTransactionFilters(target, context) ||
           knownAccount && context.selectedAccountId !== undefined && context.selectedAccountId !== knownAccount) throw new Error('Register context changed.');
+      const countTemplate = fresh.querySelector('template[data-transaction-navigation-count]');
+      if (summary) {
+        if (!countTemplate?.content || canonical.href !== displayedTarget.href) throw new Error('Register summary changed.');
+        syncNavigation(canonical, context, countTemplate, true);
+        return true;
+      }
       const current = document.querySelector('main > .page-content');
       if (!current) throw new Error('Register container unavailable.');
       const accountList = refresh && document.querySelector('.sidebar-accounts');
@@ -179,7 +197,7 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
       if (accountList) accountList.replaceChildren(accountTemplate.content.cloneNode(true));
       updateContext(context);
       displayed = canonical;
-      syncNavigation(canonical, context, fresh.querySelector('template[data-transaction-navigation-count]'));
+      syncNavigation(canonical, context, countTemplate);
       if (action === 'push') window.history.pushState(window.history.state, '', canonical.href);
       else if (action === 'replace' || canonical.href !== location.href) window.history.replaceState(window.history.state, '', canonical.href);
       onReplace({content: fresh, url: canonical, context});
@@ -193,7 +211,7 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
         focusTarget.focus({preventScroll: true});
       }
     } catch (failure) {
-      if (revision !== request || disposed || failure.name === 'AbortError') return true;
+      if (revision !== request || disposed || failure.name === 'AbortError') return !summary;
       // The normal server page is the fallback; no financial values are cached.
       if (action === 'none') location.replace(target.href);
       else location.assign(target.href);

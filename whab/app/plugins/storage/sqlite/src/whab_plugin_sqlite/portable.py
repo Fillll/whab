@@ -31,6 +31,10 @@ def export_files(store, workspace):
         images = [(transaction_id, store.get_receipt(workspace, transaction_id)) for transaction_id in store.receipt_ids(workspace)]
     clean = Store(":memory:", month=snapshot["budgetStartMonth"])
     try:
+        # Portable images are data containers. Rebuild runtime-only indexes when
+        # restoring into a live Store rather than storing and compressing them.
+        for name in _ADDITIVE_INDEXES:
+            clean.db.execute(f"DROP INDEX {name}")
         # Store.export_budget already validated every record and reference. Use
         # the same private population path as public restore in this fresh DB.
         clean._mutate("personal", lambda state: clean._restore_validated_snapshot(state, snapshot))

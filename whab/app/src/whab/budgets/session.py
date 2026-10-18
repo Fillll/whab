@@ -1,6 +1,7 @@
 """An opened budget owns its plugin setup; private runtime files stay on this device."""
 
 import copy
+import io
 import json
 import os
 import tempfile
@@ -40,11 +41,15 @@ def container_digest(container):
 
 
 def _read_bytes(path, limit=MAX_BUNDLE_BYTES):
-    with Path(path).open("rb") as source:
-        raw = source.read(limit + 1)
-    if len(raw) > limit:
-        raise StoreError("The saved budget record exceeds the supported size.")
-    return raw
+    # A maximum-size read preallocates 50 MiB even for a tiny saved file.
+    # Read through EOF in bounded chunks, including a byte beyond the limit
+    # so growth during the read cannot bypass the size check.
+    with Path(path).open("rb") as source, io.BytesIO() as result:
+        while chunk := source.read(min(64 * 1024, limit + 1 - result.tell())):
+            result.write(chunk)
+            if result.tell() > limit:
+                raise StoreError("The saved budget record exceeds the supported size.")
+        return result.getvalue()
 
 
 def _read_source(path):
@@ -117,8 +122,7 @@ class BudgetSession:
     @classmethod
     def open(cls, home, environment, path, password=None):
         try:
-            with Path(path).expanduser().open("rb") as source:
-                raw = source.read(MAX_BUNDLE_BYTES + 1)
+            raw = _read_bytes(Path(path).expanduser())
             container = decode_container(raw, password=password)
         except OSError:
             raise StoreError("The budget file could not be opened. Check its location and permissions.") from None

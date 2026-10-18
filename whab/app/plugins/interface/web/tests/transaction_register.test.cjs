@@ -193,7 +193,7 @@ test('memo search results remain in place during autosave and refresh only after
   state.register.dispose();
 });
 
-test('review changes under All refresh server counts without reload and wait for memo focus to leave', async () => {
+test('review changes under All request only server counts and wait for memo focus to leave', async () => {
   const state = harness(1, {paged: true});
   const memo = state.rows[0].controls['[data-transaction-field="note"]'];
   memo.matches = () => true;
@@ -205,7 +205,91 @@ test('review changes under All refresh server counts without reload and wait for
   state.document.activeElement = null;
   memo.emit('blur');
   await new Promise(resolve => setTimeout(resolve, 15));
-  assert.deepEqual(state.navigations[0].details, {focus: false, refresh: true, history: 'replace'});
+  assert.deepEqual(state.navigations[0].details, {focus: false, refresh: true, history: 'replace', summary: true});
+  state.document.emit('click');
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.navigations.length, 1);
+  state.register.dispose();
+});
+
+test('bulk review coalesces all successful writes into one summary request', async () => {
+  const state = harness(6, {paged: true});
+  const saving = state.bulk.emit('click').completed;
+  assert.equal(state.requests.length, 4);
+  for (let index = 0; index < 6; index += 1) {
+    state.requests[index].resolve({ok: true});
+    await tick();
+  }
+  await saving;
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.requests.length, 6);
+  assert.deepEqual(state.navigations.map(entry => entry.details), [{focus: false, refresh: true, history: 'replace', summary: true}]);
+  state.document.emit('click');
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.navigations.length, 1);
+  state.register.dispose();
+});
+
+test('a canceled summary keeps refresh pending until a new draft is saved', async () => {
+  const summary = deferred(), navigations = [];
+  const state = harness(1, {paged: true, navigate: (url, details) => {
+    navigations.push(details);
+    return navigations.length === 1 ? summary.promise : Promise.resolve(true);
+  }});
+  state.rows[0].controls['[data-transaction-reviewed]'].emit('click');
+  state.requests[0].resolve({ok: true});
+  await new Promise(resolve => setTimeout(resolve, 15));
+  const memo = state.rows[0].controls['[data-transaction-field="note"]'];
+  memo.value = 'new draft'; memo.emit('input');
+  summary.resolve(true);
+  await tick();
+  assert.equal(navigations.length, 1);
+  const saving = state.register.flush();
+  state.requests[1].resolve({ok: true}); await saving;
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(navigations.length, 2);
+  assert.equal(navigations[1].summary, true);
+  assert.equal(memo.value, 'new draft');
+  state.register.dispose();
+});
+
+test('a summary canceled outside the register is retried once the displayed register is available', async () => {
+  const first = deferred(), navigations = [];
+  const state = harness(1, {paged: true, navigate: (url, details) => {
+    navigations.push(details);
+    return navigations.length === 1 ? first.promise : Promise.resolve(true);
+  }});
+  state.rows[0].controls['[data-transaction-reviewed]'].emit('click');
+  state.requests[0].resolve({ok: true});
+  await new Promise(resolve => setTimeout(resolve, 15));
+  first.resolve(false);
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(navigations.length, 2);
+  assert.equal(navigations.every(details => details.summary), true);
+  state.document.emit('click');
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(navigations.length, 2);
+  state.register.dispose();
+});
+
+test('unavailable summaries stop after one automatic retry and resume only on a later interaction', async () => {
+  const navigations = [];
+  const state = harness(1, {paged: true, navigate: async (url, details) => {
+    navigations.push(details);
+    return false;
+  }});
+  state.rows[0].controls['[data-transaction-reviewed]'].emit('click');
+  state.requests[0].resolve({ok: true});
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(navigations.length, 2);
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(navigations.length, 2);
+  state.document.emit('click');
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(navigations.length, 4);
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(navigations.length, 4);
+  assert.equal(navigations.every(details => details.summary), true);
   state.register.dispose();
 });
 

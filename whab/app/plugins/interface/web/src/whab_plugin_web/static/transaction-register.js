@@ -68,6 +68,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   let searchTimer = null;
   let refreshTimer = null;
   let refreshNeeded = false;
+  let refreshRetries = 0;
   if (paged) updateContext({transactionSearch: search.value, transactionPage: Number(root.dataset.transactionPage), transactionRequestedPage: root.dataset.transactionRequestedPage});
   const editors = new Map();
   const timers = new Map();
@@ -117,30 +118,42 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     count.textContent = `${visible} ${visible === 1 ? 'transaction' : 'transactions'} · ${count.dataset.period}`;
     selection();
   }
-  async function go(url, focus = 'heading', refresh = false) {
+  async function go(url, focus = 'heading', refresh = false, summary = false) {
     const revision = ++filterNavigationRevision;
     filterNavigationPending = true;
     try {
       if (!(await flush())) { if (revision === filterNavigationRevision) notify('Save the transaction edit before continuing.'); return; }
       if (revision !== filterNavigationRevision) return;
-      if (!(await navigate(url, {focus, ...(refresh ? {refresh: true, history: 'replace'} : {})}))) location.assign(url);
+      const handled = await navigate(url, {focus, ...(refresh ? {refresh: true, history: 'replace'} : {}), ...(summary ? {summary: true} : {})});
+      if (!handled && !summary) location.assign(url);
+      if (refresh && handled && revision === filterNavigationRevision) refreshNeeded = false;
     } finally {
-      if (revision === filterNavigationRevision) filterNavigationPending = false;
+      if (revision === filterNavigationRevision) {
+        filterNavigationPending = false;
+        if (refresh && refreshNeeded && refreshRetries < 1) {
+          refreshRetries += 1;
+          refreshAfterMutation(true);
+        }
+      }
     }
   }
   function applyFilters(changes, focus) {
     pendingFilters = {...pendingFilters, ...(paged ? {q: search.value} : {}), ...changes, review: reviewFilter.dataset.reviewState || 'all'};
     void go(pageUrl(pendingFilters), focus);
   }
-  function refreshAfterMutation() {
+  function refreshAfterMutation(retry = false) {
     refreshNeeded = true;
+    // A canceled request gets one idle retry; later interaction or mutation can retry again.
+    if (!retry) refreshRetries = 0;
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
       if (!disposed && !filterNavigationPending && !pendingDestination() && !timers.size && !searchTimer &&
           search.value === displayedSearch && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
           document.activeElement?.matches?.('[data-transaction-field="note"]') !== true &&
           !receiptDialog.open && !receiptBusy && !bulkBusy &&
-          ![...editors.values()].some(writer => writer.dirty)) void go(new URL(location.href), false, true);
+          ![...editors.values()].some(writer => writer.dirty)) {
+        void go(new URL(location.href), false, true, !search.value && displayedReview === 'all');
+      }
     }, 0);
   }
   function editStarted() {

@@ -20,7 +20,19 @@ def portable_payload(store):
         "accountId": account, "date": "2026-10-01", "merchant": "Synthetic purchase",
         "amount": 100, "categoryId": "groceries", "note": "Retained annotation",
     })
-    return store.export_budget_files()
+    payload = store.export_budget_files()
+    # New exports omit runtime indexes. Reconstruct the exact current index set
+    # so this fixture still exercises every historical subset and changed SQL.
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.deserialize(payload["budget.sqlite"])
+        for name in INDEXES:
+            sql = store.db.execute("SELECT sql FROM sqlite_schema WHERE name=?", (name,)).fetchone()[0]
+            connection.execute(sql)
+        connection.commit()
+        return {"budget.sqlite": connection.serialize()}
+    finally:
+        connection.close()
 
 
 def alter(payload, statements):
