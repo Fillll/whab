@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window: NSWindow!
     private var reply: ManagerReply?
     private var busy = false
+    private var menuActivity: String?
+    private var needsAttention = false
     private var timer: Timer?
     private let worker = DispatchQueue(label: "com.whab.launcher.manager", qos: .userInitiated)
     private let statusLabel = NSTextField(labelWithString: "Checking WHAB…")
@@ -203,28 +205,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func closeWindow() { window.performClose(nil) }
 
+    private var menuState: LauncherMenuState {
+        LauncherMenuState(reply: reply, activity: menuActivity, needsAttention: needsAttention)
+    }
+
     private func refreshMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: busy ? "Working…" : (reply?.displayState ?? "WHAB"), action: nil, keyEquivalent: "")
-        menu.addItem(.separator())
-        let items: [(String, Selector)] = [
-            (reply?.running == true ? "Open WHAB" : "Start WHAB", #selector(startOrOpen)),
-            ("Restart", #selector(restart)), ("Update & Restart", #selector(update)),
-            ("Check for updates", #selector(checkUpdates)), ("Stop", #selector(stop)),
-        ]
-        for (title, action) in items {
-            let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
-            item.target = self
-            item.isEnabled = !busy
+        let state = menuState
+        let primary = menu.addItem(withTitle: state.title, action: #selector(openFromMenu), keyEquivalent: "")
+        primary.target = self
+        primary.isEnabled = !busy && state.isEnabled
+        let color: NSColor
+        switch state.indicator {
+        case .online: color = .systemGreen
+        case .offline: color = .secondaryLabelColor
+        case .working: color = .systemOrange
+        case .attention: color = .systemRed
         }
-        menu.addItem(.separator())
+        let dot = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { _ in
+            color.setFill()
+            NSBezierPath(ovalIn: NSRect(x: 3, y: 3, width: 6, height: 6)).fill()
+            return true
+        }
+        dot.isTemplate = false
+        primary.image = dot
         menu.addItem(withTitle: "WHAB settings…", action: #selector(showWindow), keyEquivalent: ",").target = self
-        menu.addItem(withTitle: "View logs", action: #selector(openLogs), keyEquivalent: "").target = self
-        menu.addItem(.separator())
         menu.addItem(withTitle: "Quit launcher", action: #selector(quit), keyEquivalent: "q").target = self
         menu.autoenablesItems = false
         statusItem.menu = menu
-        statusItem.button?.toolTip = "WHAB — \(busy ? "working" : reply?.displayState ?? "ready")"
+        statusItem.button?.toolTip = "WHAB — \(state.title)"
+    }
+
+    @objc private func openFromMenu() {
+        if menuState.opensSettings { showWindow() }
+        else { startOrOpen() }
     }
 
     private func perform(_ command: String, options: [String] = [], silent: Bool = false,
@@ -235,6 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             statusLabel.stringValue = ["start": "Starting WHAB…", "restart": "Restarting WHAB…",
                 "stop": "Stopping WHAB…", "update": "Preparing update…",
                 "check-update": "Checking for updates…", "configure": "Saving settings…"][command] ?? "Working…"
+            menuActivity = statusLabel.stringValue
             messageLabel.stringValue = "WHAB may need a moment to prepare an installation or make a private backup."
             spinner.startAnimation(nil)
         }
@@ -249,10 +264,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.busy = false
+                self.menuActivity = nil
                 self.spinner.stopAnimation(nil)
                 self.actionButtons.forEach { $0.isEnabled = true }
                 self.channel.isEnabled = true
                 if let result = result, result.ok {
+                    self.needsAttention = false
                     self.reply = result
                     self.statusLabel.stringValue = result.displayState
                     self.versionLabel.stringValue = result.versionDescription
@@ -277,6 +294,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         self.perform("status", silent: true)
                     }
                 } else {
+                    self.needsAttention = true
                     self.statusLabel.stringValue = "Needs attention"
                     self.messageLabel.stringValue = result?.error?.message ?? "The launcher could not read WHAB's response. Open logs for details."
                     if let previous = self.reply {
