@@ -481,7 +481,7 @@ function renderPluginSettings(dialog, settings) {
     row.append(button);
     content.append(row);
   }
-  if (!settings.insights.length && !settings.actions.length && !dialog.querySelector('[data-appearance-choice]')) content.append(settingsText('p', 'This plugin has no additional settings.', 'settings-notice'));
+  if (!settings.insights.length && !settings.actions.length && !dialog.querySelector('[data-appearance-choice], [data-file-import]')) content.append(settingsText('p', 'This plugin has no additional settings.', 'settings-notice'));
 }
 
 for (const button of document.querySelectorAll('[data-plugin-options]')) button.addEventListener('click', async () => {
@@ -528,6 +528,9 @@ for (const time of document.querySelectorAll('[data-local-time]')) time.textCont
 const search = document.getElementById('transaction-search');
 const accountFilter = document.getElementById('account-filter');
 const reviewFilter = document.getElementById('review-filter');
+const allDatesFilter = document.getElementById('all-dates-filter');
+const transactionCount = document.getElementById('transaction-count');
+const transactionPeriod = transactionCount?.textContent.split(' · ')[1];
 
 function filterTransactions() {
   let count = 0;
@@ -537,11 +540,12 @@ function filterTransactions() {
       (reviewFilter.getAttribute('aria-pressed') === 'true' && row.dataset.reviewed === 'true');
     if (!row.hidden) count += 1;
   }
-  document.getElementById('transaction-count').textContent = `${count} transactions`;
+  transactionCount.textContent = `${count} transactions · ${transactionPeriod}`;
 }
 if (search) {
   search.addEventListener('input', filterTransactions);
-  accountFilter.addEventListener('change', filterTransactions);
+  accountFilter.addEventListener('change', () => location.assign(pageUrl({account: accountFilter.value})));
+  allDatesFilter.addEventListener('change', () => location.assign(pageUrl({allDates: allDatesFilter.checked})));
   reviewFilter.addEventListener('click', () => {
     const pressed = reviewFilter.getAttribute('aria-pressed') !== 'true';
     reviewFilter.setAttribute('aria-pressed', String(pressed));

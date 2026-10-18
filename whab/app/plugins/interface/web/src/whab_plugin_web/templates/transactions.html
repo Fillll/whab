@@ -2,7 +2,7 @@
 <div class="page-title-row">
   <div>
     <div class="eyebrow">YOUR MONEY, IN DETAIL</div>
-    <h1>Transactions</h1>
+    <h1>{{ selected_account.name if selected_account else 'Transactions' }}</h1>
     <p>Review spending and put it in the right category.</p>
   </div>
   <div class="button-group"><a class="button secondary"
@@ -20,11 +20,11 @@
   </label>
   <select aria-label="Filter by account" id="account-filter">
     <option value="all">All accounts</option>
-  {% for account in data.accounts %}<option value="{{ account.id }}">{{ account.name }}</option>
+  {% for account in data.accounts %}<option value="{{ account.id }}"{% if selected_account and selected_account.id==account.id %} selected{% endif %}>{{ account.name }}</option>
 {% endfor %}</select><input type="text" pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM"
        aria-label="Transaction month"
        data-navigation="month"
-       value="{{ month }}"><button class="filter-button" id="review-filter" aria-pressed="false">{{ icon('check-circle', 15) }}Needs review</button>
+       value="{{ month }}"{% if transaction_all_dates %} disabled{% endif %}><label class="filter-button"><input type="checkbox" id="all-dates-filter"{% if transaction_all_dates %} checked{% endif %}>All dates</label><button class="filter-button" id="review-filter" aria-pressed="false">{{ icon('check-circle', 15) }}Needs review</button>
 </div>
 <div class="table-scroll">
   <table class="transactions-table">
@@ -107,9 +107,9 @@
   <div class="empty-state">
     <span>{{ icon('transactions', 28) }}</span>
     <h2>No transactions here yet</h2>
-    <p>{{ 'Try another month.' if data.accounts else 'Connect a bank account to import transactions.' }}</p>
+    <p>{{ 'This account has no transactions.' if transaction_all_dates and selected_account else 'No transactions match these filters.' if transaction_all_dates else 'Try another month.' if data.accounts else 'Connect a bank account to import transactions.' }}</p>
   </div>
 {% endif %}
 <div class="table-footer">
-  <span id="transaction-count">{{ transactions|length }} transactions · {{ month_label(month) }}</span><span>Off-budget and pending transactions are excluded from budget spending totals.</span>
+  <span id="transaction-count">{{ transactions|length }} transactions · {{ 'All dates' if transaction_all_dates else month_label(month) }}</span><span>Off-budget and pending transactions are excluded from budget spending totals.</span>
 </div>

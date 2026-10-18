@@ -293,14 +293,16 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         file_import_paths={
             f"/api/plugins/{plugin.id}/import/{action}"
             for plugin in import_descriptors
-            for action in ("preview", "commit")
+            for action in ("preview", "commit", "new/preview", "new/commit")
         } | {"/api/budget/open"},
         remote=bool(plugins.interface_plugins()),
     )
     install_error_handlers(app)
     app.include_router(health_router())
     app.include_router(ledger_router(service))
-    app.include_router(file_imports_router(store, plugins))
+    app.include_router(file_imports_router(
+        store, plugins, budget_host, budget_session.id if budget_session else "default",
+    ))
     for plugin in descriptors:
         app.include_router(banks_router(plugin.id, banks, bank_stores[plugin.id]))
         if plugin.id == "plaid":

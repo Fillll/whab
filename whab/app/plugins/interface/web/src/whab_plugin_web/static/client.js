@@ -13,6 +13,21 @@ export function pageUrl(overrides = {}) {
   const month = overrides.month ?? context.monthToken;
   const currency = overrides.currency ?? context.currency;
   url.pathname = `${context.budgetUrl}/${page}/${month}/${currency}`.toLowerCase();
+  if (page !== 'transactions') {
+    url.searchParams.delete('account');
+    url.searchParams.delete('all_dates');
+  } else {
+    if ('currency' in overrides) url.searchParams.delete('account');
+    if ('month' in overrides) url.searchParams.delete('all_dates');
+    if ('account' in overrides) {
+      if (overrides.account === 'all') url.searchParams.delete('account');
+      else url.searchParams.set('account', overrides.account);
+    }
+    if ('allDates' in overrides) {
+      if (overrides.allDates) url.searchParams.set('all_dates', 'true');
+      else url.searchParams.delete('all_dates');
+    }
+  }
   url.hash = '';
   return url;
 }

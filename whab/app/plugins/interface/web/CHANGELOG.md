@@ -1,5 +1,14 @@
 # Web interface plugin changelog
 
+## 1.13.0 — 2026-10-18
+
+PR: [#50](https://github.com/Fillll/whab/pull/50)
+
+- Give the saved-budget list an Open budget heading, and label the file section and its action Add budget. Keep budget creation in its dedicated section and explain that adding a file also opens it.
+- Use centered, inset arrows across native dropdowns, including account filters, transaction categories, currency and plugin category controls.
+- Show enabled file import forms in their plugin Options dialog, including from Demo, instead of on Accounts.
+- Open individual sidebar accounts in their transaction register across all dates, with account and date controls that preserve the selected view.
+
 ## 1.12.1 — 2026-10-18
 
 PR: [#49](https://github.com/Fillll/whab/pull/49)

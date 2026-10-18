@@ -1,8 +1,8 @@
 <section class="setup-panel" data-file-import="{{ importer.id }}">
   <div class="section-title">
-    <h2>{{ importer.display_name }}</h2>
+    <h3>Import into a new budget</h3>
   </div>
-  <p>Choose the original YNAB ZIP export, up to 10 MiB. Preview checks the archive without changing your budget. Import is available only in an empty personal budget.</p>
+  <p>Each import creates and opens a new, separate budget. Choose the original YNAB ZIP export, up to 10 MiB. Preview checks the archive before creating anything.</p>
   <form data-import-form>
     <div class="modal-form">
       <label for="{{ importer.id }}-archive">YNAB ZIP export
@@ -25,6 +25,6 @@
     <p class="modal-description" data-import-month></p>
     <ul class="modal-description" data-import-warnings></ul>
     <p class="modal-description" data-import-reason role="status"></p>
-    <button class="button primary" type="button" data-import-commit disabled>Import into empty budget</button>
+    <button class="button primary" type="button" data-import-commit disabled>Create budget and import</button>
   </section>
 </section>

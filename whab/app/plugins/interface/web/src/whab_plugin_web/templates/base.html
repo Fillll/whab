@@ -37,7 +37,7 @@
     </div>
   {% for group in account_groups if group.accounts %}
   <div class="sidebar-account-scope">{{ group.label }}</div>
-  {% for account in group.accounts %}<a class="sidebar-account" href="{{ url('accounts') }}"><span><span class="sidebar-bank-mark" aria-hidden="true"><span>{{ icon('credit' if is_liability(account) else 'accounts',15) }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo src="{{ logos[account.id] }}" alt="" width="18" height="18" decoding="async" hidden>{% endif %}</span><span>{{ account.name }}</span></span><small>{{ '—' if account.balanceUnknown else money(-account.balance if is_liability(account) else account.balance) }}</small></a>
+  {% for account in group.accounts %}<a class="sidebar-account" href="{{ url('transactions',account=account.id,all_dates='true') }}"{% if selected_account and selected_account.id==account.id %} aria-current="page"{% endif %}><span><span class="sidebar-bank-mark" aria-hidden="true"><span>{{ icon('credit' if is_liability(account) else 'accounts',15) }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo src="{{ logos[account.id] }}" alt="" width="18" height="18" decoding="async" hidden>{% endif %}</span><span>{{ account.name }}</span></span><small>{{ '—' if account.balanceUnknown else money(-account.balance if is_liability(account) else account.balance) }}</small></a>
   {% endfor %}
   {% else %}<p class="sidebar-empty">Connect an account to get started.</p>{% endfor %}
 </div>

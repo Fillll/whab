@@ -11,9 +11,6 @@
     {% include bank.template %}
   {% endwith %}
 {% endfor %}
-{% for importer in import_panels %}
-  {% include importer.template %}
-{% endfor %}
 {% if data.accounts %}
   <dl class="account-summary" aria-label="Account totals in {{ currency }}">
     <div><dt>Assets</dt><dd>{{ money(account_summary.assets) }}</dd></div>

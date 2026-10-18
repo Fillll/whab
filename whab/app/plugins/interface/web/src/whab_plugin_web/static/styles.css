@@ -51,6 +51,7 @@
   --shadow-modal: #0d0805aa;
   --shadow-inspector: #0d0805aa;
   --backdrop: #0d080590;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='m1 1 4 4 4-4' fill='none' stroke='%23d5cbbf' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 :root[data-theme='light'] {
   color-scheme: light;
@@ -90,6 +91,7 @@
   --shadow-modal: #38281930;
   --shadow-inspector: #38281930;
   --backdrop: #20180f66;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='m1 1 4 4 4-4' fill='none' stroke='%23524a42' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 * {
   box-sizing: border-box;
@@ -163,6 +165,26 @@ input[data-navigation='month'] {
 }
 select {
   cursor: pointer;
+}
+select:where(:not([multiple]):not([size]), :not([multiple])[size='1']) {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 10px 6px;
+  padding-right: 34px;
+}
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+@media (forced-colors: active) {
+  select:where(:not([multiple]):not([size]), :not([multiple])[size='1']) {
+    -webkit-appearance: auto;
+    appearance: auto;
+    background-image: none;
+  }
 }
 h1,
 h2,
@@ -827,7 +849,7 @@ strong {
 .transaction-filters select {
   font-size: 11px;
   max-width: 200px;
-  background: var(--page);
+  background-color: var(--page);
 }
 .transaction-filters input[data-navigation='month'] {
   font-size: 11px;
@@ -922,14 +944,16 @@ strong {
 .transactions-table select {
   font-size: 10px;
   border: 0;
-  background: var(--surface);
+  background-color: var(--surface);
   min-height: 29px;
   max-width: 143px;
-  padding: 7px 9px;
+  padding: 7px 30px 7px 9px;
+  background-position: right 10px center;
+  background-size: 8px 5px;
   color: var(--text-secondary);
 }
 .transactions-table select.uncategorized {
-  background: var(--yellow-surface);
+  background-color: var(--yellow-surface);
   color: var(--yellow-ink);
 }
 .transaction-meta {
@@ -1489,7 +1513,7 @@ strong {
 .modal-form label > select {
   font-size: 12px;
   width: 100%;
-  background: var(--field);
+  background-color: var(--field);
 }
 .modal-form label > input::placeholder {
   color: var(--muted);
@@ -1838,6 +1862,11 @@ strong {
   font-size: 15px;
   font-weight: 600;
 }
+#budgets-dialog > .budget-section:first-of-type {
+  margin-top: 20px;
+  padding-top: 0;
+  border-top: 0;
+}
 #budgets-dialog > .modal-form,
 .budget-section > .modal-form {
   margin-top: 0;
@@ -1901,11 +1930,15 @@ strong {
   color: var(--text-secondary);
 }
 .plugin-category-filter select {
-  padding: 7px 10px;
-  border: 1px solid var(--line);
+  padding: 9px 36px 9px 12px;
+  border: 1px solid var(--control-border);
   border-radius: 5px;
-  background: var(--surface);
+  background-color: var(--surface);
   font-size: 11px;
+  line-height: 1.25;
+}
+.plugin-category-filter select:hover {
+  border-color: var(--input-hover-border);
 }
 .plugin-details {
   margin: 0;
@@ -2726,8 +2759,10 @@ strong {
 }
 .topbar-right select {
   min-height: 29px;
-  padding: 5px 7px;
-  background: transparent;
+  padding: 5px 28px 5px 9px;
+  background-color: transparent;
+  background-position: right 10px center;
+  background-size: 8px 5px;
   font-size: 10px;
 }
 .demo-ribbon {
@@ -2752,7 +2787,7 @@ strong {
 .modal-form label > select,
 .money-input,
 .search-input {
-  background: var(--field);
+  background-color: var(--field);
 }
 .toast {
   background: var(--table-heading);
@@ -3613,8 +3648,9 @@ strong {
   .topbar-right select {
     max-width: 55px;
     font-size: 9px;
-    padding-left: 4px;
-    padding-right: 4px;
+    padding-left: 6px;
+    padding-right: 23px;
+    background-position: right 8px center;
   }
   .mode-badge {
     padding: 4px 5px;
