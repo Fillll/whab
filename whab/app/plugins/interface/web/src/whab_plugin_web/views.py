@@ -39,21 +39,29 @@ def _carryover_total(rows):
 
 
 def _carried_in(period, budget_start_month):
-    """Describe the incoming policy using already-calculated, currency-scoped amounts."""
-    if budget_start_month is not None and period["month"] < budget_start_month:
-        return None, None
-    if period["month"] == budget_start_month:
-        return 0, None
+    """Present the core's assignable carry-in without pooling category balances here."""
+    if period.get("monthlyFundingFlow") is not True or (
+        budget_start_month is not None and period["month"] < budget_start_month
+    ):
+        return None, []
+    summary = period["summary"]
+    amount = summary.get("carriedIn")
+    if not valid_money(amount):
+        return None, []
     mode = period.get("incomingRolloverMode")
-    if mode == "category":
-        if not all(valid_money(row.get("carryover")) for row in period["budget"]):
-            return None, None
-        amount, note = period["carryover"], "In categories"
-    elif mode == "balance":
-        amount, note = period["summary"].get("balanceCarryover"), "Overall balance"
-    else:
-        return None, None
-    return (amount, note) if valid_money(amount) else (None, None)
+    if mode not in ("category", "balance") and period["month"] != budget_start_month:
+        return amount, []
+    parts = [
+        (
+            "Opening unassigned money" if period["month"] == budget_start_month
+            else "Previously unassigned money",
+            summary.get("carriedInUnassigned"),
+        ),
+        ("Set aside for this month", summary.get("carriedInSetAside")),
+    ]
+    if mode == "balance":
+        parts.append(("Overall category balance", summary.get("balanceCarryover")))
+    return amount, parts if all(valid_money(value) for _, value in parts) else []
 
 
 def money_input(value, currency="USD"):
@@ -119,7 +127,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         for period in data.get("periods", [data])
     ]
     for period in periods:
-        period["carried_in"], period["carried_in_note"] = _carried_in(
+        period["carried_in"], period["carried_in_parts"] = _carried_in(
             period, data.get("budgetStartMonth")
         )
     period_budgets = [
@@ -251,6 +259,9 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "category_icon": category_icon,
         "groups": groups,
         "periods": periods,
+        "monthly_funding_flow_available": all(
+            period.get("monthlyFundingFlow") is True for period in periods
+        ),
         "month_strip": list(dict.fromkeys(shift_month(month, step) for step in range(-3, 6))),
         "period_months": [period["month"] for period in periods],
         "category_path": lambda identifier: quote(identifier, safe=""),

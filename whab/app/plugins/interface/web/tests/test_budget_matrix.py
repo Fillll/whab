@@ -34,7 +34,7 @@ def displayed_amount(cell):
     """Extract the monetary value independently of its editing or summary treatment."""
     if match := re.search(r'name="assigned"[^>]+value="([^"]+)"', cell):
         return match[1]
-    return re.sub(r'<small\b[^>]*>.*?</small>', "", cell, flags=re.S).strip()
+    return re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", cell, flags=re.S).strip()
 
 
 def test_three_month_matrix_keeps_month_controls_and_editable_category_values(client):
@@ -135,14 +135,14 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
             summary = data["summary"]
             assert data["currency"] == code
             expected = {
-                "income": income, "previousOverspending": previous, "assignedNextMonth": next_assigned,
+                "income": income, "previousOverspending": previous, "assignedNextMonth": 0,
                 "assigned": assigned, "spent": spent, "available": available,
             }
             assert {field: summary[field] for field in expected} == {
                 field: value * factor for field, value in expected.items()
             }
             for row, value in zip(cells, (
-                summary["income"], sum(row["carryover"] for row in data["budget"]),
+                summary["income"], summary["carriedIn"],
                 summary["assignedNextMonth"], summary["assigned"], summary["readyToAssign"],
             ), strict=True):
                 rendered = displayed_amount(row[index][1])
@@ -151,7 +151,7 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
                     else money_number(value, code)
                 )
                 assert rendered == expected_value
-            assert "In categories</small>" in cells[1][index][1]
+            assert "Overall category balance" not in cells[1][index][1]
             assert "<input" not in cells[3][index][1] and "<input" not in cells[4][index][1]
 
 
@@ -164,6 +164,7 @@ def test_older_remote_projections_show_unavailable_overview_totals_without_inven
         data = workspace(*args, **kwargs)
         data.pop("incomingRolloverMode", None)
         data.pop("incomingRolloverModesByCurrency", None)
+        data.pop("monthlyFundingFlow", None)
         for summary in (data["summary"], *data["summariesByCurrency"].values()):
             summary.pop("previousOverspending", None)
             summary.pop("assignedNextMonth", None)
@@ -198,9 +199,9 @@ def test_historical_income_remains_visible_while_overview_planning_is_unavailabl
     assert cells[1][0].strip() == "—"
     assert displayed_amount(cells[2][0]) == "—"
     assert cells[3][0].strip() == cells[4][0].strip() == "—"
-    assert displayed_amount(cells[1][1]) == "0.00"
     assert cells[3][1].strip() == "10.00"
     current = client.get("/api/workspace?workspace=personal&month=2026-10").json()
+    assert displayed_amount(cells[1][1]) == money_number(current["summary"]["carriedIn"])
     assert cells[4][1].strip() == money_number(current["summary"]["readyToAssign"])
     historical = re.search(r'aria-label="September 2026 summary">(.*?)</section>', text, re.S)[1]
     assert "budget-ready" not in historical
@@ -210,7 +211,7 @@ def test_calculated_rows_and_group_totals_are_read_only_while_child_assignments_
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert "Editable assigned amounts" in text and "Read-only summaries" in text
     overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
-    for index in (0, 1, 3, 4):
+    for index in (0, 3, 4):
         assert '<small class="budget-row-note">Summary</small>' in overview[index]
         assert "<input" not in overview[index] and "<form" not in overview[index]
     for row in re.findall(r'<tr class="budget-group-row">(.*?)</tr>', text, re.S):
@@ -350,7 +351,7 @@ def test_large_next_month_totals_remain_visible_without_an_editor(
         money_number(amount),
     ] * 3
     if capability is True:
-        assert row.count("Edit next month’s category assignments") == 3
+        assert row.count("Amount exceeds the editing limit") == 3
         assert "server update" not in row
     else:
         assert row.count("Editing requires a server update") == 3
@@ -404,14 +405,16 @@ def test_next_month_funding_form_saves_source_month_and_currency_without_changin
     refreshed = client.get("/budgets/home/budget/2026-10/eur").text
     saved = next(form for form in assignment_forms(refreshed) if form["api"] == "/budget/funding/next-month")
     assert saved["month"] == "2026-10" and saved["value"] == "123.45"
-    for code, expected in (("EUR", 12345), ("USD", 1000)):
+    for code, expected in (("EUR", 12345), ("USD", 0)):
         current = client.get(f"/api/workspace?workspace=personal&month=2026-10&currency={code}").json()
         assert current["summary"]["assignedNextMonth"] == expected
         following = client.get(f"/api/workspace?workspace=personal&month=2026-11&currency={code}").json()
         assert next(row for row in following["budget"] if row["categoryId"] == categories[code])[
             "assigned"
         ] == 1000
-    for rejected in (999, 100001):
+    assert client.put("/api" + form["api"], json={**payload, "assigned": 999}).status_code == 200
+    assert client.put("/api" + form["api"], json={**payload, "assigned": 12345}).status_code == 200
+    for rejected in (-1, 100001):
         assert client.put("/api" + form["api"], json={**payload, "assigned": rejected}).status_code == 400
     unchanged = client.get("/budgets/home/budget/2026-10/eur").text
     assert next(form for form in assignment_forms(unchanged) if form["api"] == "/budget/funding/next-month")[
@@ -498,3 +501,64 @@ def test_budget_labels_are_escaped_and_uncategorized_activity_is_period_specific
     assert "&lt;Living&gt;" in text
     row = re.search(r'<tr class="budget-category-row budget-uncategorized">(.*?)</tr>', text, re.S)[1]
     assert "-123.45" in row and "/2026-11/usd" in row
+
+
+@pytest.mark.parametrize("capability", [None, False, 1, "true"])
+def test_next_month_editor_requires_new_flow_model_even_if_old_server_supports_floor_edits(
+    client, store, monkeypatch, capability,
+):
+    workspace = store.workspace
+
+    def old_model_workspace(*args, **kwargs):
+        data = workspace(*args, **kwargs)
+        if capability is None:
+            data.pop("monthlyFundingFlow")
+        else:
+            data["monthlyFundingFlow"] = capability
+        assert data["nextMonthFundingEditable"] is True
+        return data
+
+    monkeypatch.setattr(store, "workspace", old_model_workspace)
+    text = client.get("/budgets/demo/budget/2026-10/usd").text
+    assert not [form for form in assignment_forms(text) if form["api"] == "/budget/funding/next-month"]
+    assert category_assignment_forms(text)
+    assert text.count("A server update is needed for monthly funding totals and next-month funding edits.") == 1
+    carried_in = re.search(
+        r'<tr class="budget-overview-row budget-carried-in-row">(.*?)</tr>', text, re.S,
+    )[1]
+    assert [displayed_amount(markup) for markup in re.findall(r'<td[^>]*>(.*?)</td>', carried_in, re.S)] == [
+        "—",
+    ] * 3
+    for label in ("Assigned for next month", "Available to assign"):
+        row = re.search(rf'<th scope="row">{label}.*?</th>(.*?)</tr>', text, re.S)[1]
+        assert [displayed_amount(markup) for markup in re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)] == [
+            "—",
+        ] * 3
+    assert "Editing requires a server update" not in carried_in
+
+
+@pytest.mark.parametrize("capacity", [None, True, "123", 10000, 20000, 9_007_199_254_740_992, 0])
+def test_conservative_spending_note_only_appears_for_valid_lower_capacity(
+    client, store, monkeypatch, capacity,
+):
+    workspace = store.workspace
+
+    def projected_workspace(*args, **kwargs):
+        data = workspace(*args, **kwargs)
+        for summary in (data["summary"], *data["summariesByCurrency"].values()):
+            summary["readyToAssign"] = 10000
+            if capacity is None:
+                summary.pop("fundingCapacity", None)
+            else:
+                summary["fundingCapacity"] = capacity
+        return data
+
+    monkeypatch.setattr(store, "workspace", projected_workspace)
+    text = client.get("/budgets/demo/budget/2026-10/usd").text
+    row = re.search(r'<tr class="budget-overview-row budget-ready-row">(.*?)</tr>', text, re.S)[1]
+    assert [displayed_amount(markup) for markup in re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)] == [
+        "100.00",
+    ] * 3
+    assert ("Some funds are needed to cover spending or account reserves." in row) is (
+        type(capacity) is int and capacity < 10000
+    )

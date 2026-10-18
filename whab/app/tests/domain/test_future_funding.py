@@ -42,14 +42,14 @@ def test_saved_next_month_pool_releases_into_next_month_without_creating_assignm
     assert november["summary"]["assigned"] == 0
 
 
-def test_future_category_assignments_consume_pool_then_require_additional_cash(state):
+def test_future_category_plans_leave_the_explicit_transfer_and_source_pool_unchanged(state):
     reserve(state, 60000)
     commands.assign(state, "rent", "2026-11", 40000, as_of_month="2026-10")
     assert calculate_workspace(state, "2026-10")["summary"]["readyToAssign"] == 40000
     commands.assign(state, "food", "2026-11", 20000, as_of_month="2026-10")
     assert calculate_workspace(state, "2026-10")["summary"]["assignedNextMonth"] == 60000
     commands.assign(state, "food", "2026-11", 60000, as_of_month="2026-10")
-    assert calculate_workspace(state, "2026-10")["summary"]["readyToAssign"] == 0
+    assert calculate_workspace(state, "2026-10")["summary"]["readyToAssign"] == 40000
     assert calculate_workspace(state, "2026-11")["summary"]["readyToAssign"] == 0
     before = deepcopy(state)
     with pytest.raises(StoreError, match="exceeds available"):
@@ -57,13 +57,13 @@ def test_future_category_assignments_consume_pool_then_require_additional_cash(s
     assert state == before
 
 
-def test_category_reductions_restore_saved_floor_and_pool_cannot_erase_allocations(state):
+def test_explicit_transfer_can_be_lowered_below_category_plans_without_erasing_them(state):
     reserve(state, 60000)
     commands.assign(state, "rent", "2026-11", 80000, as_of_month="2026-10")
-    with pytest.raises(StoreError, match="less than its category"):
-        reserve(state, 70000)
+    reserve(state, 70000)
+    assert calculate_workspace(state, "2026-11")["summary"]["assigned"] == 80000
     commands.assign(state, "rent", "2026-11", 20000, as_of_month="2026-10")
-    assert calculate_workspace(state, "2026-10")["summary"]["assignedNextMonth"] == 60000
+    assert calculate_workspace(state, "2026-10")["summary"]["assignedNextMonth"] == 70000
     reserve(state, 20000)
     assert state["budget"] == {"2026-11": {"rent": 20000}}
     assert calculate_workspace(state, "2026-10")["summary"]["readyToAssign"] == 80000
@@ -90,11 +90,11 @@ def test_all_future_targets_are_funded_and_year_rollover_is_exact(state):
     assert state["futureFunding"] == {
         "2027-01": {"USD": 30000}, "2027-02": {"USD": 40000},
     }
-    assert calculate_workspace(state, "2026-12")["summary"]["readyToAssign"] == 30000
+    assert calculate_workspace(state, "2026-12")["summary"]["readyToAssign"] == 70000
     assert calculate_workspace(state, "2027-01")["summary"]["readyToAssign"] == 60000
     assert calculate_workspace(state, "2027-02")["summary"]["readyToAssign"] == 100000
     with pytest.raises(StoreError, match="exceeds available"):
-        reserve(state, 70001, month="2027-01")
+        reserve(state, 100001, month="2027-01")
 
 
 def test_last_supported_target_month_can_be_funded(state):
@@ -146,7 +146,7 @@ def test_unavailable_source_months_leave_state_unchanged(state, month):
 
 
 def test_future_funding_safe_integer_aggregate_is_bounded(state):
-    state["budget"] = {"2026-12": {"rent": MAX_SAFE_INTEGER}}
+    state["budget"] = {"2026-10": {"rent": -MAX_SAFE_INTEGER}}
     state["futureFunding"] = {"2026-11": {"USD": 1}}
     with pytest.raises(StoreError, match="totals exceed"):
         calculate_workspace(state, "2026-10")

@@ -12,7 +12,6 @@ from .budget import (
     effective_month_funding,
     ensure_assignment_allowed,
     ensure_funding_capacity_preserved,
-    funding_capacity,
 )
 from .categories import ensure_child_category
 from .dates import shift_month
@@ -148,7 +147,7 @@ def assign(
 def assign_next_month(
     state: dict, month: str, currency: str, assigned: int, *, as_of_month: str,
 ) -> None:
-    """Set next month's total funding without changing its category allocations."""
+    """Set aside this month's money for the next month, independently of its plans."""
     validate_month(month)
     validate_month(as_of_month)
     currency = currency_code(currency)
@@ -160,24 +159,15 @@ def assign_next_month(
     if month >= "2200-12":
         raise StoreError("Next-month funding is unavailable after November 2200.")
     target = shift_month(month, 1)
-    allocated = max(0, sum(
-        amount for key, amount in state["budget"].get(target, {}).items()
-        if state["categories"][key].get("currency", "USD") == currency
-    ))
-    if assigned < allocated:
-        raise StoreError("Next-month funding cannot be less than its category assignments.")
-    previous_floor = state.get("futureFunding", {}).get(target, {}).get(currency, 0)
-    if month < as_of_month:
-        available = calculate_workspace(state, month, as_of_month=as_of_month)[
-            "summariesByCurrency"
-        ].get(currency, {}).get("readyToAssign", 0)
-        if assigned > previous_floor and assigned - previous_floor > available:
-            raise StoreError("Assignment exceeds available money.")
-    else:
-        previous = effective_month_funding(state, target, currency)
-        available = funding_capacity(state, min(month, as_of_month), currency)
-        if assigned > previous and assigned - previous > available:
-            raise StoreError("Assignment exceeds available money.")
+    previous_floor = effective_month_funding(state, target, currency)
+    summary = calculate_workspace(state, month)["summariesByCurrency"].get(currency, {})
+    available = summary.get("fundingCapacity", 0)
+    if assigned > previous_floor and assigned - previous_floor > available:
+        detail = (
+            " Review overspending, uncategorized spending, transfers, or account reserves."
+            if available < summary.get("readyToAssign", 0) else ""
+        )
+        raise StoreError(f"Assignment exceeds available money.{detail}")
     if assigned > previous_floor:
         candidate = {
             **state,
@@ -208,5 +198,7 @@ def set_rollover_mode(
             month: {**state.get("rolloverModes", {}).get(month, {}), currency: mode},
         },
     }
-    ensure_funding_capacity_preserved(state, candidate, month, as_of_month, currency)
+    ensure_funding_capacity_preserved(
+        state, candidate, month, as_of_month, currency, preserve_monthly_pool=False,
+    )
     state.setdefault("rolloverModes", {}).setdefault(month, {})[currency] = mode

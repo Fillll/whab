@@ -19,7 +19,7 @@ def visible_text(markup):
 
 
 def visible_amount(markup):
-    return visible_text(re.sub(r'<small\b[^>]*>.*?</small>', "", markup, flags=re.S))
+    return visible_text(re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", markup, flags=re.S))
 
 
 def category_row(text, name):
@@ -106,10 +106,12 @@ def test_incoming_category_column_uses_previous_month_and_keeps_mixed_month_rows
             assert visible_amount(body) == money_number(data["summary"][field])
     carried_in = matrix_row(text, "budget-overview-row budget-carried-in-row")
     cells = row_cells(carried_in)
-    assert [visible_amount(body) for _, body in cells[1:]] == ["-25.00", "-25.00", "0.00"]
-    assert "In categories</small>" in cells[1][1]
-    assert "Overall balance</small>" in cells[2][1]
-    assert "In categories</small>" in cells[3][1]
+    for (_, body), month in zip(cells[1:], ("2026-11", "2026-12", "2027-01"), strict=True):
+        data = client.get(f"/api/workspace?workspace=personal&month={month}").json()
+        assert visible_amount(body) == money_number(data["summary"]["carriedIn"])
+    assert "Overall category balance" not in cells[1][1]
+    assert "Overall category balance" in cells[2][1]
+    assert "Overall category balance" not in cells[3][1]
     assert "Previous overspending" not in text and "Balance carried in" not in text
     assert "<input" not in carried_in and "<form" not in carried_in
 
@@ -136,10 +138,10 @@ def test_carryover_column_policy_and_amounts_are_bound_to_the_selected_currency(
     assert "USD reserve" not in eur and "EUR reserve" not in usd
     usd_in = matrix_row(usd, "budget-overview-row budget-carried-in-row")
     eur_in = matrix_row(eur, "budget-overview-row budget-carried-in-row")
-    assert visible_amount(row_cells(usd_in)[1][1]) == "100.00"
-    assert "Overall balance</small>" in row_cells(usd_in)[1][1]
-    assert visible_amount(row_cells(eur_in)[1][1]) == "300.00"
-    assert "In categories</small>" in row_cells(eur_in)[1][1]
+    assert visible_amount(row_cells(usd_in)[1][1]) == "10,000.00"
+    assert "Overall category balance" in row_cells(usd_in)[1][1]
+    assert visible_amount(row_cells(eur_in)[1][1]) == "9,700.00"
+    assert "Overall category balance" not in row_cells(eur_in)[1][1]
     response = client.put("/api/budget/settings/rollover", json={
         "workspace": "personal", "month": "2026-10", "currency": "USD", "mode": "category",
     })
@@ -172,5 +174,9 @@ def test_older_remote_projection_does_not_guess_incoming_mode_from_outgoing_mode
     assert re.findall(r'<th colspan="(\d+)" scope="colgroup"', text) == ["3"] * 3
     assert 'class="budget-rollover-form"' in text
     incoming = matrix_row(text, "budget-overview-row budget-carried-in-row")
-    assert [visible_amount(body) for _, body in row_cells(incoming)[1:]] == ["—"] * 3
+    assert incoming.count("Breakdown unavailable") == 3
+    assert "<details" not in incoming
+    for (_, body), month in zip(row_cells(incoming)[1:], ("2026-10", "2026-11", "2026-12"), strict=True):
+        data = workspace("demo", month)
+        assert visible_amount(body) == money_number(data["summary"]["carriedIn"])
     assert "In categories</small>" not in incoming and "Overall balance</small>" not in incoming

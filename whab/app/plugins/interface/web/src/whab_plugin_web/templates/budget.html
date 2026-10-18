@@ -13,6 +13,7 @@
   <div class="budget-workspace{% if selected %} has-inspector{% endif %}">
     <section class="budget-table-section" aria-label="Monthly category budget">
       <div class="budget-editing-key" role="note"><span>{{ icon('pencil', 12) }}Editable assigned amounts</span><span>Read-only summaries</span></div>
+      {% if not monthly_funding_flow_available %}<p class="budget-flow-update" role="note">A server update is needed for monthly funding totals and next-month funding edits.</p>{% endif %}
       <div class="budget-matrix-scroll">
         <table class="budget-matrix" style="--budget-money-columns: {{ periods|sum(attribute='column_count') }}" aria-label="Category budget across {{ periods|length }} {{ 'month' if periods|length==1 else 'months' }}">
           <colgroup><col class="budget-category-col">{% for period in periods %}{% if period.show_carryover %}<col>{% endif %}<col><col><col>{% endfor %}</colgroup>
@@ -56,20 +57,31 @@
               {% for period in periods %}<td colspan="{{ period.column_count }}" class="month-start">{{ money_number(period.summary.income) }}</td>{% endfor %}
             </tr>
             <tr class="budget-overview-row budget-carried-in-row">
-              <th scope="row">Carried in<small class="budget-row-note">Summary</small></th>
+              <th scope="row">Carried in<small class="budget-row-note">Previously unassigned + set aside + overall carryover</small></th>
               {% for period in periods %}
-                <td colspan="{{ period.column_count }}" class="month-start{% if period.carried_in is not none and period.carried_in<0 %} negative{% endif %}"{% if period.carried_in_note %} title="{{ 'Already included in category balances' if period.carried_in_note=='In categories' else 'Already included in the general budget' }}; not additional income."{% endif %}>{{ money_number(period.carried_in) if period.carried_in is not none else '—' }}{% if period.carried_in_note %}<small class="budget-row-note">{{ period.carried_in_note }}</small>{% endif %}</td>
+                <td colspan="{{ period.column_count }}" class="month-start{% if period.carried_in is not none and period.carried_in<0 %} negative{% endif %}">
+                  {{ money_number(period.carried_in) if period.carried_in is not none else '—' }}
+                  {% if period.carried_in is not none %}
+                    {% if period.carried_in_parts %}
+                      <details class="budget-carry-in-details">
+                        <summary>Where it comes from</summary>
+                        <dl>{% for label, amount in period.carried_in_parts %}<div><dt>{{ label }}</dt><dd{% if amount<0 %} class="negative"{% endif %}>{{ money_number(amount) }}</dd></div>{% endfor %}</dl>
+                        <p>Balances carried by category stay in their categories.</p>
+                      </details>
+                    {% else %}<small class="budget-row-note">Breakdown unavailable</small>{% endif %}
+                  {% endif %}
+                </td>
               {% endfor %}
             </tr>
             <tr class="budget-overview-row">
               <th scope="row">Assigned for next month</th>
               {% for period in periods %}
                 {% set funding_amount = period.summary.assignedNextMonth %}
-                {% set funding_amount_valid = funding_amount is integer and 0<=funding_amount<=9007199254740991 %}
+                {% set funding_amount_valid = period.monthlyFundingFlow is sameas true and funding_amount is integer and 0<=funding_amount<=9007199254740991 %}
                 {% set funding_amount_editable = funding_amount_valid and funding_amount<=1000000000000 %}
                 {% set planning_month = data.budgetStartMonth<=period.month<'2200-12' %}
                 <td colspan="{{ period.column_count }}" class="month-start">
-                  {% if period.nextMonthFundingEditable is sameas true and funding_amount_editable and planning_month %}
+                  {% if period.monthlyFundingFlow is sameas true and period.nextMonthFundingEditable is sameas true and funding_amount_editable and planning_month %}
                     <div class="budget-next-month-editor">
                       <form class="budget-assignment" data-api="/budget/funding/next-month" data-method="PUT" data-inline-assignment>
                         <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ period.month }}"><input type="hidden" name="currency" value="{{ currency }}">
@@ -81,7 +93,7 @@
                     </div>
                   {% else %}
                     {{ money_number(funding_amount) if funding_amount_valid and planning_month else '—' }}
-                    {% if planning_month %}<small class="budget-row-note">{% if period.nextMonthFundingEditable is sameas true and funding_amount_valid %}Edit next month’s category assignments{% else %}Editing requires a server update{% endif %}</small>{% endif %}
+                    {% if planning_month and period.monthlyFundingFlow is sameas true %}<small class="budget-row-note">{% if period.nextMonthFundingEditable is sameas true and funding_amount_valid %}Amount exceeds the editing limit{% else %}Editing requires a server update{% endif %}</small>{% endif %}
                   {% endif %}
                 </td>
               {% endfor %}
@@ -95,8 +107,8 @@
             <tr class="budget-overview-row budget-ready-row">
               <th scope="row">Available to assign<small class="budget-row-note">Summary</small></th>
               {% for period in periods %}
-                {% set ready_valid = period.month>=data.budgetStartMonth and valid_money(period.summary.readyToAssign) %}
-                <td colspan="{{ period.column_count }}" class="month-start{% if ready_valid and period.summary.readyToAssign<0 %} negative{% elif ready_valid and period.summary.readyToAssign>0 %} positive{% endif %}">{{ money_number(period.summary.readyToAssign) if ready_valid else '—' }}</td>
+                {% set ready_valid = period.monthlyFundingFlow is sameas true and period.month>=data.budgetStartMonth and valid_money(period.summary.readyToAssign) %}
+                <td colspan="{{ period.column_count }}" class="month-start{% if ready_valid and period.summary.readyToAssign<0 %} negative{% elif ready_valid and period.summary.readyToAssign>0 %} positive{% endif %}">{{ money_number(period.summary.readyToAssign) if ready_valid else '—' }}{% if ready_valid and valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<small class="budget-row-note" title="Review category overspending, uncategorized spending, and account balances before assigning more money.">Some funds are needed to cover spending or account reserves.</small>{% endif %}</td>
               {% endfor %}
             </tr>
           </tbody>

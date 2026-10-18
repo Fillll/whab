@@ -45,10 +45,14 @@ def test_currency_envelopes_and_hierarchy_survive_reopen_without_conversion(tmp_
         assert before["summariesByCurrency"] == {
             "USD": {"income": 0, "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0,
                     "spent": 2500, "assigned": 10000,
-                    "available": 7500, "readyToAssign": 90000},
+                    "available": 7500, "readyToAssign": 90000,
+                    "carriedIn": 100000, "carriedInUnassigned": 100000,
+                    "carriedInSetAside": 0, "fundingCapacity": 90000},
             "EUR": {"income": 0, "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0,
                     "spent": 1000, "assigned": 20000,
-                    "available": 19000, "readyToAssign": 30000},
+                    "available": 19000, "readyToAssign": 30000,
+                    "carriedIn": 50000, "carriedInUnassigned": 50000,
+                    "carriedInSetAside": 0, "fundingCapacity": 30000},
         }
         assert before["summary"] == before["summariesByCurrency"]["USD"]
         child = next(row for row in before["categories"] if row["id"] == category)

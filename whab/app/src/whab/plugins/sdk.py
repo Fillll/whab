@@ -602,7 +602,9 @@ class NextMonthFunding(Protocol):
     """Optional saved funding capability; month identifies the source month.
 
     Backends supporting this command advertise nextMonthFundingEditable in
-    their workspace projections. Existing storage backends remain valid.
+    their workspace projections. Core 2.9 also advertises monthlyFundingFlow
+    for independent source-month set-asides and assignable carry-in.
+    Existing storage backends remain valid.
     """
 
     def assign_next_month(

@@ -129,7 +129,8 @@ def test_older_rollover_projection_keeps_known_category_carry_in(client, store, 
     incoming = re.search(
         r'<tr class="budget-overview-row budget-carried-in-row">(.*?)</tr>', text, re.S,
     )[1]
-    assert incoming.count("In categories</small>") == 3
+    assert incoming.count("Previously unassigned money") == 3
+    assert "Overall category balance" not in incoming
     assert "—" not in incoming
 
 
@@ -176,11 +177,12 @@ def test_rollover_form_saves_source_currency_and_shows_signed_pool_balance(clien
     following = client.get("/budgets/home/budget/2026-11/usd").text
     row = re.search(r'<tr class="budget-overview-row budget-carried-in-row">(.*?)</tr>', following, re.S)[1]
     first_cell = re.search(r'<td([^>]*)>(.*?)</td>', row, re.S)
-    assert re.sub(r'<small\b[^>]*>.*?</small>', "", first_cell[2], flags=re.S).strip() == money_number(
-        20000 - spent,
+    assert re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", first_cell[2], flags=re.S).strip() == money_number(
+        usd["summary"]["carriedIn"],
     )
-    assert "Overall balance</small>" in first_cell[2]
-    assert ("negative" in first_cell[1]) is (spent > 20000)
+    assert "Overall category balance" in first_cell[2]
+    assert money_number(20000 - spent) in first_cell[2]
+    assert ("negative" in first_cell[1]) is (usd["summary"]["carriedIn"] < 0)
     assert "<input" not in row and "<form" not in row
     assert client.put("/api/budget/settings/rollover", json={**payload, "mode": "category"}).status_code == 200
     restored = client.get("/api/workspace?workspace=personal&month=2026-11&currency=USD").json()
