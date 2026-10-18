@@ -107,20 +107,21 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
                     })
 
     labels = (
-        "Income", "Previous overspending", "Balance carried in", "Assigned for next month",
-        "Assigned this month",
+        "Income", "Carried in", "Assigned for next month", "Available to spend",
     )
     for code, factor in (("USD", 1), ("EUR", 10)):
         text = client.get(f"/budgets/home/budget/2026-11/{code.lower()}").text
         overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
         assert [re.search(r'<th scope="row">([^<]+)', row)[1] for row in overview] == list(labels)
-        assert text.index("Assigned this month") < text.index("Spending categories")
+        assert text.index("Available to spend") < text.index("Spending categories")
         assert text.index("Spending categories") < text.index('class="budget-group-row"')
+        assert "Previous overspending" not in text and "Balance carried in" not in text
+        assert "Assigned this month" not in text
         assert "overspend this month" not in text.lower()
         cells = [re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S) for row in overview]
-        assert all(len(row) == 3 for row in cells[:4])
-        assert all('colspan="4"' in attributes for row in cells[:4] for attributes, _ in row)
-        assert len(cells[4]) == 12
+        assert all(len(row) == 3 for row in cells[:3])
+        assert all('colspan="4"' in attributes for row in cells[:3] for attributes, _ in row)
+        assert len(cells[3]) == 12
 
         for index, (month, income, previous, next_assigned, assigned, spent, available) in enumerate((
             ("2026-11", 1111, 500, 1200, 700, 900, 3300),
@@ -139,8 +140,8 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
             assert {field: summary[field] for field in expected} == {
                 field: value * factor for field, value in expected.items()
             }
-            for row, value in zip(cells[:4], (
-                summary["income"], -summary["previousOverspending"], summary["balanceCarryover"],
+            for row, value in zip(cells[:3], (
+                summary["income"], sum(row["carryover"] for row in data["budget"]),
                 summary["assignedNextMonth"],
             ), strict=True):
                 rendered = displayed_amount(row[index][1])
@@ -149,7 +150,8 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
                     else money_number(value, code)
                 )
                 assert rendered == expected_value
-            assert [value.strip() for _, value in cells[4][index * 4:index * 4 + 4]] == [
+            assert "In categories</small>" in cells[1][index][1]
+            assert [value.strip() for _, value in cells[3][index * 4:index * 4 + 4]] == [
                 money_number(sum(row["carryover"] for row in data["budget"]), code),
                 *[
                     money_number(summary[field] * sign, code)
@@ -165,6 +167,8 @@ def test_older_remote_projections_show_unavailable_overview_totals_without_inven
 
     def older_workspace(*args, **kwargs):
         data = workspace(*args, **kwargs)
+        data.pop("incomingRolloverMode", None)
+        data.pop("incomingRolloverModesByCurrency", None)
         for summary in (data["summary"], *data["summariesByCurrency"].values()):
             summary.pop("previousOverspending", None)
             summary.pop("assignedNextMonth", None)
@@ -173,7 +177,7 @@ def test_older_remote_projections_show_unavailable_overview_totals_without_inven
     monkeypatch.setattr(store, "workspace", older_workspace)
     response = client.get("/budgets/demo/budget/2026-10/usd")
     assert response.status_code == 200
-    for label in ("Previous overspending", "Assigned for next month"):
+    for label in ("Carried in", "Assigned for next month"):
         row = re.search(rf'<th scope="row">{label}.*?</th>(.*?)</tr>', response.text, re.S)[1]
         cells = re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S)
         assert len(cells) == 3
@@ -198,10 +202,9 @@ def test_historical_income_remains_visible_while_overview_planning_is_unavailabl
     assert cells[0][0].strip() == "123.45"
     assert cells[1][0].strip() == "—"
     assert displayed_amount(cells[2][0]) == "—"
-    assert displayed_amount(cells[3][0]) == "—"
-    assert [value.strip() for value in cells[4][:3]] == ["—", "—", "—"]
-    assert cells[1][1].strip() == "0.00"
-    assert [value.strip() for value in cells[4][3:6]] == ["10.00", "0.00", "10.00"]
+    assert [value.strip() for value in cells[3][:3]] == ["—", "—", "—"]
+    assert displayed_amount(cells[1][1]) == "0.00"
+    assert [value.strip() for value in cells[3][3:6]] == ["10.00", "0.00", "10.00"]
     historical = re.search(r'aria-label="September 2026 summary">(.*?)</section>', text, re.S)[1]
     assert re.search(r'class="budget-ready-value[^"]*">([^<]*)</strong>', historical)[1] == "—"
 
@@ -210,7 +213,7 @@ def test_calculated_rows_and_group_totals_are_read_only_while_child_assignments_
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert "Editable assigned amounts" in text and "Read-only summaries" in text
     overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
-    for index in (0, 1, 2, 4):
+    for index in (0, 1, 3):
         assert '<small class="budget-row-note">Summary</small>' in overview[index]
         assert "<input" not in overview[index] and "<form" not in overview[index]
     for row in re.findall(r'<tr class="budget-group-row">(.*?)</tr>', text, re.S):

@@ -111,7 +111,7 @@ def test_rollover_capability_is_period_specific_and_historical_and_final_months_
     assert "2201" not in text
 
 
-def test_older_rollover_projection_omits_unknown_balance_carried_in(client, store, monkeypatch):
+def test_older_rollover_projection_keeps_known_category_carry_in(client, store, monkeypatch):
     workspace = store.workspace
 
     def older_workspace(*args, **kwargs):
@@ -126,6 +126,11 @@ def test_older_rollover_projection_omits_unknown_balance_carried_in(client, stor
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert "Balance carried in" not in text
     assert not rollover_forms(text)
+    incoming = re.search(
+        r'<tr class="budget-overview-row budget-carried-in-row">(.*?)</tr>', text, re.S,
+    )[1]
+    assert incoming.count("In categories</small>") == 3
+    assert "—" not in incoming
 
 
 @pytest.mark.parametrize("spent", [5000, 25000])
@@ -169,9 +174,12 @@ def test_rollover_form_saves_source_currency_and_shows_signed_pool_balance(clien
         "carryover"
     ] == 20000 - spent
     following = client.get("/budgets/home/budget/2026-11/usd").text
-    row = re.search(r'<tr class="budget-overview-row budget-balance-row">(.*?)</tr>', following, re.S)[1]
+    row = re.search(r'<tr class="budget-overview-row budget-carried-in-row">(.*?)</tr>', following, re.S)[1]
     first_cell = re.search(r'<td([^>]*)>(.*?)</td>', row, re.S)
-    assert first_cell[2].strip() == money_number(20000 - spent)
+    assert re.sub(r'<small\b[^>]*>.*?</small>', "", first_cell[2], flags=re.S).strip() == money_number(
+        20000 - spent,
+    )
+    assert "Overall balance</small>" in first_cell[2]
     assert ("negative" in first_cell[1]) is (spent > 20000)
     assert "<input" not in row and "<form" not in row
     assert client.put("/api/budget/settings/rollover", json={**payload, "mode": "category"}).status_code == 200

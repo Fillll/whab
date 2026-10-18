@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.9.0 — 2026-10-17
+
+PR: [#44](https://github.com/Fillll/whab/pull/44)
+
+- Combine Previous overspending and Balance carried in into one read-only Carried in row showing the signed net arriving from previous months. Identify whether balances remain in categories or arrive as an overall balance, without adding or deducting money again.
+- Rename the monthly summary row Available to spend, keeping Income and Assigned for next month above the spending categories. Preserve the existing category carryover columns and calculated monthly totals.
+
 ## 1.8.0 — 2026-10-17
 
 PR: [#43](https://github.com/Fillll/whab/pull/43)

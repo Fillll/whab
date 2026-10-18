@@ -25,6 +25,37 @@ from .icons import category_icon, icon
 WEB_ASSET_VERSION = package_version("whab_plugin_web")
 
 
+def valid_money(value):
+    """Accept exact public-view amounts within the browser's safe integer range."""
+    return type(value) is int and -9007199254740991 <= value <= 9007199254740991
+
+
+def _carryover_total(rows):
+    values = [row.get("carryover", 0) for row in rows]
+    if not all(valid_money(value) for value in values):
+        return None
+    total = sum(values)
+    return total if valid_money(total) else None
+
+
+def _carried_in(period, budget_start_month):
+    """Describe the incoming policy using already-calculated, currency-scoped amounts."""
+    if budget_start_month is not None and period["month"] < budget_start_month:
+        return None, None
+    if period["month"] == budget_start_month:
+        return 0, None
+    mode = period.get("incomingRolloverMode")
+    if mode == "category":
+        if not all(valid_money(row.get("carryover")) for row in period["budget"]):
+            return None, None
+        amount, note = period["carryover"], "In categories"
+    elif mode == "balance":
+        amount, note = period["summary"].get("balanceCarryover"), "Overall balance"
+    else:
+        return None, None
+    return (amount, note) if valid_money(amount) else (None, None)
+
+
 def money_input(value, currency="USD"):
     """Render exact minor units for an ungrouped amount input."""
     digits = currency_minor_units(currency)
@@ -83,10 +114,14 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
             "uncategorized": uncategorized_spending(period),
             "show_carryover": period.get("incomingRolloverMode") == "category",
             "column_count": 4 if period.get("incomingRolloverMode") == "category" else 3,
-            "carryover": sum(row.get("carryover", 0) for row in period["budget"]),
+            "carryover": _carryover_total(period["budget"]),
         }
         for period in data.get("periods", [data])
     ]
+    for period in periods:
+        period["carried_in"], period["carried_in_note"] = _carried_in(
+            period, data.get("budgetStartMonth")
+        )
     period_budgets = [
         {row["categoryId"]: row for row in period["budget"]} for period in periods
     ]
@@ -121,14 +156,21 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
                 **group,
                 "rows": rows,
                 **{
-                    field: sum(r.get(field, 0) for r in rows)
+                    field: (
+                        _carryover_total(rows) if field == "carryover"
+                        else sum(r.get(field, 0) for r in rows)
+                    )
                     for field in ("carryover", "assigned", "spent", "available")
                 },
                 "periods": [
                     {
                         "month": period["month"],
                         **{
-                            field: sum(row["periods"][index].get(field, 0) for row in rows)
+                            field: (
+                                _carryover_total([row["periods"][index] for row in rows])
+                                if field == "carryover"
+                                else sum(row["periods"][index].get(field, 0) for row in rows)
+                            )
                             for field in ("carryover", "assigned", "spent", "available")
                         },
                     }
@@ -202,6 +244,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "money": lambda value: format_money(value, currency),
         "money_input": lambda value: money_input(value, currency),
         "money_number": lambda value: money_number(value, currency),
+        "valid_money": valid_money,
         "month_label": month_label,
         "shift_month": shift_month,
         "icon": icon,
