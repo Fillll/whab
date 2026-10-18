@@ -223,3 +223,45 @@ def test_navigation_bounds_do_not_replace_previous_insight_period_with_current_m
     context = build_context(data, {}, [], workspace="demo", page="insights", month="1900-01")
     assert context["change"] == -50
     assert context["month_strip"][0] == "1900-01"
+
+
+def test_register_window_filters_complete_history_before_bounding_markup():
+    from types import SimpleNamespace
+
+    from starlette.datastructures import URL, QueryParams
+    from whab_plugin_web.views import transaction_window
+
+    rows = [
+        {"id": str(index), "merchant": f"Merchant {index}", "note": "",
+         "reviewed": index % 2 == 0}
+        for index in range(205)
+    ]
+    rows[-1]["note"] = "A far-away STRASSE receipt"
+
+    def window(query=""):
+        url = URL("https://localhost:5173/budgets/demo/transactions/current-month/usd?" + query)
+        return transaction_window(rows, SimpleNamespace(url=url, query_params=QueryParams(url.query)))
+
+    first = window("accounts=one&accounts=two&period=custom&start_date=2026-01-01")
+    assert len(first["rows"]) == 100 and first["count"] == first["total"] == 205
+    assert first["start"] == 1 and first["end"] == 100 and first["page"] == 1
+    assert first["previous"] is None
+    assert QueryParams(URL(first["next"]).query).getlist("accounts") == ["one", "two"]
+    assert ("start_date", "2026-01-01") in first["search_params"]
+    middle = window("tx_page=2")
+    assert len(middle["rows"]) == 100 and middle["start"] == 101 and middle["end"] == 200
+    assert "tx_page=1" in middle["previous"] and "tx_page=3" in middle["next"]
+    last = window("tx_page=999999")
+    assert len(last["rows"]) == 5 and last["page"] == last["pages"] == 3
+    assert last["requested_page"] == "999999" and last["next"] is None
+    for value in ("invalid", "-2", "0"):
+        assert window("tx_page=" + value)["page"] == 1
+    searched = window("q=stra%C3%9Fe&tx_page=3")
+    assert searched["rows"] == [rows[-1]] and searched["count"] == 1
+    assert searched["search"] == "straße" and searched["page"] == 1
+    assert searched["search_params"] == []
+    assert window("q=merchant+204")["rows"] == [rows[-1]]
+    assert window("review=reviewed")["count"] == 103
+    assert window("review=needs-review")["count"] == 102
+    assert window("q=missing")["rows"] == []
+    assert window("q=missing")["start"] == window("q=missing")["end"] == 0

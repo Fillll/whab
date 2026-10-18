@@ -15,6 +15,7 @@
     <script src="{{ asset_prefix }}/static/theme.js?v={{ web_asset_version }}"></script>
     <link rel="stylesheet" href="{{ asset_prefix }}/static/styles.css?v={{ web_asset_version }}">
     <script id="whab-context" type="application/json">{{ client_context|tojson }}</script>
+    <script type="importmap">{{ module_imports(asset_prefix)|tojson }}</script>
     <script src="{{ asset_prefix }}/static/app.js?v={{ web_asset_version }}" type="module"></script>
     {% for script in plugin_scripts %}<script src="{{ script }}" type="module"></script>{% endfor %}
   </head>

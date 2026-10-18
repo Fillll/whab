@@ -22,6 +22,7 @@ export function initAccountPicker(root, onChoose) {
   const normalize = selected => selected.size === accounts.length ? new Set() : new Set(selected);
   const expand = selected => new Set(selected.size ? selected : allIds);
   let committed = normalize(new Set(accounts.filter(option => option.getAttribute('aria-selected') === 'true').map(option => option.dataset.value)));
+  const initial = new Set(committed);
   let draft = expand(committed), active = 0, typed = '', typedAt = 0;
   function listen(target, name, handler) {
     target.addEventListener(name, handler);
@@ -146,5 +147,13 @@ export function initAccountPicker(root, onChoose) {
   listen(document, 'pointerdown', event => { if (!picker.contains(event.target)) close(true); });
   native.hidden = true;
   picker.hidden = false;
-  return {dispose() { listeners.forEach(remove => remove()); close(); picker.hidden = true; native.hidden = false; }};
+  return {
+    restore() {
+      committed = new Set(initial);
+      draft = expand(committed);
+      for (const option of native.options) option.selected = option.value === 'all' ? !committed.size : committed.has(option.value);
+      render();
+    },
+    dispose() { listeners.forEach(remove => remove()); close(); picker.hidden = true; native.hidden = false; },
+  };
 }

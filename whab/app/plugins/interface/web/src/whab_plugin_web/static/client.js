@@ -46,7 +46,10 @@ export function pageUrl(overrides = {}) {
   if (page !== 'transactions') {
     clearPeriod();
     url.searchParams.delete('review');
+    url.searchParams.delete('q');
+    url.searchParams.delete('tx_page');
   } else {
+    if (['account', 'accounts', 'month', 'currency', 'allDates', 'period', 'startDate', 'endDate', 'review', 'q'].some(key => key in overrides)) url.searchParams.delete('tx_page');
     if ('month' in overrides && !('period' in overrides)) clearPeriod();
     if (accountId && !accountSlug) url.searchParams.set('account', accountId);
     if (accounts.length > 1) accounts.forEach(id => url.searchParams.append('accounts', id));
@@ -67,6 +70,10 @@ export function pageUrl(overrides = {}) {
     if ('review' in overrides) {
       if (overrides.review === 'all') url.searchParams.delete('review');
       else url.searchParams.set('review', overrides.review);
+    }
+    if ('q' in overrides) {
+      if (overrides.q) url.searchParams.set('q', overrides.q);
+      else url.searchParams.delete('q');
     }
   }
   url.hash = '';

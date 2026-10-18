@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.13.1 — 2026-10-18
+
+PR: [#57](https://github.com/Fillll/whab/pull/57)
+
+- Aggregate category spending, prior assignments and historical account adjustments once per projection instead of repeatedly scanning transaction history. Preserve all budget calculations, currency boundaries and rollover behavior.
+- Require web 1.18.0 in the supported bundle to keep large transaction registers bounded and searchable.
+
 ## 2.13.0 — 2026-10-18
 
 PR: [#55](https://github.com/Fillll/whab/pull/55)

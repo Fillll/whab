@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.18.0 — 2026-10-18
+
+PR: [#57](https://github.com/Fillll/whab/pull/57)
+
+- Render at most 100 transactions per page, with full-history payee/memo search and review filtering inside the selected account and date range. Preserve filters in page links and support search without JavaScript.
+- Flush pending edits before pagination and filtering, cancel superseded searches, and validate search/page scope before replacing a register fragment.
+- Version every web module dependency so the built-in browser loads matching scripts after an update.
+
 ## 1.17.0 — 2026-10-18
 
 PR: [#56](https://github.com/Fillll/whab/pull/56)

@@ -17,7 +17,8 @@ export function isAccountDestination(target, current, context = {}) {
 
 export function preserveTransactionFilters(target, current) {
   if (parsePageRoute(current)?.page !== 'transactions') return target;
-  for (const key of ['period', 'start_date', 'end_date', 'review', 'all_dates']) {
+  target.searchParams.delete('tx_page');
+  for (const key of ['period', 'start_date', 'end_date', 'review', 'all_dates', 'q']) {
     target.searchParams.delete(key);
     for (const value of current.searchParams.getAll(key)) target.searchParams.append(key, value);
   }
@@ -26,6 +27,8 @@ export function preserveTransactionFilters(target, current) {
 
 export function matchesTransactionFilters(target, context) {
   const params = target.searchParams;
+  if (context.transactionSearch !== undefined && context.transactionSearch !== (params.get('q') || '')) return false;
+  if (context.transactionRequestedPage !== undefined && context.transactionRequestedPage !== (params.get('tx_page') ?? '1')) return false;
   const accounts = [...new Set(params.getAll('accounts'))].sort();
   if (accounts.length && (!Array.isArray(context.selectedAccountIds) ||
       JSON.stringify(accounts) !== JSON.stringify([...new Set(context.selectedAccountIds)].sort()))) return false;
@@ -219,6 +222,14 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
   window.addEventListener('popstate', popstate);
   return {
     navigate,
+    cancelPending() {
+      request += 1;
+      controller?.abort();
+      controller = null;
+      if (pendingTarget && location.href !== displayed.href) window.history.replaceState(window.history.state, '', displayed.href);
+      pendingTarget = null;
+      busy(false);
+    },
     pendingDestination() { return pendingTarget ? new URL(pendingTarget) : null; },
     dispose() {
       disposed = true;

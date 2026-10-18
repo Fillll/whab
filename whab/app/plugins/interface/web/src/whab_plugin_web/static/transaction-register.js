@@ -47,7 +47,7 @@ export function hydrateTransactionCategories(select, template) {
   select.removeAttribute('data-category-options-lazy');
 }
 
-export function initTransactionRegister({navigate = async () => false, pendingDestination = () => null, onMutation = () => {}} = {}) {
+export function initTransactionRegister({navigate = async () => false, pendingDestination = () => null, cancelNavigation = () => {}, onMutation = () => {}} = {}) {
   const root = document.querySelector('[data-transaction-register]');
   if (!root) return {flush: async () => true, dispose() {}};
   const rows = [...root.querySelectorAll('.transaction-row')];
@@ -60,6 +60,14 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   const selectionBar = root.querySelector('[data-transaction-selection-bar]');
   const feedback = root.querySelector('[data-transaction-feedback]');
   const live = root.querySelector('[data-transaction-save-status]');
+  const paged = root.dataset.transactionPaged === 'true';
+  const displayedSearch = search.value;
+  const displayedReview = reviewFilter.dataset.reviewState || 'all';
+  const accountPopup = root.querySelector('[data-account-picker-popup]');
+  const periodPopup = root.querySelector('[data-period-popup]');
+  let searchTimer = null;
+  let refreshTimer = null;
+  if (paged) updateContext({transactionSearch: search.value, transactionPage: Number(root.dataset.transactionPage), transactionRequestedPage: root.dataset.transactionRequestedPage});
   const editors = new Map();
   const timers = new Map();
   const listeners = [];
@@ -108,20 +116,52 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     count.textContent = `${visible} ${visible === 1 ? 'transaction' : 'transactions'} · ${count.dataset.period}`;
     selection();
   }
-  async function go(url, focus = 'heading') {
+  async function go(url, focus = 'heading', refresh = false) {
     const revision = ++filterNavigationRevision;
     filterNavigationPending = true;
     try {
       if (!(await flush())) { if (revision === filterNavigationRevision) notify('Save the transaction edit before continuing.'); return; }
       if (revision !== filterNavigationRevision) return;
-      if (!(await navigate(url, {focus}))) location.assign(url);
+      if (!(await navigate(url, {focus, ...(refresh ? {refresh: true, history: 'replace'} : {})}))) location.assign(url);
     } finally {
       if (revision === filterNavigationRevision) filterNavigationPending = false;
     }
   }
   function applyFilters(changes, focus) {
-    pendingFilters = {...pendingFilters, ...changes, review: reviewFilter.dataset.reviewState || 'all'};
+    pendingFilters = {...pendingFilters, ...(paged ? {q: search.value} : {}), ...changes, review: reviewFilter.dataset.reviewState || 'all'};
     void go(pageUrl(pendingFilters), focus);
+  }
+  function refreshAfterMutation() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      if (!disposed && !filterNavigationPending && !pendingDestination() && !timers.size && !searchTimer &&
+          search.value === displayedSearch && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
+          !receiptDialog.open && !receiptBusy && !bulkBusy &&
+          ![...editors.values()].some(writer => writer.dirty)) void go(new URL(location.href), false, true);
+    }, 0);
+  }
+  function editStarted() {
+    const interruptedFilters = filterNavigationPending || pendingDestination() || Object.keys(pendingFilters).length;
+    clearTimeout(refreshTimer);
+    clearTimeout(searchTimer);
+    searchTimer = null;
+    if (paged) {
+      search.value = displayedSearch;
+      if (reviewFilter.dataset.reviewState !== displayedReview) setReviewState(displayedReview);
+      pendingFilters = {};
+      if (interruptedFilters) accountPicker.restore?.();
+    }
+    filterNavigationRevision += 1;
+    filterNavigationPending = false;
+    cancelNavigation();
+  }
+  function setReviewState(next) {
+    reviewFilter.dataset.reviewState = next;
+    const labels = {all: 'All', 'needs-review': 'Needs review', reviewed: 'Reviewed'};
+    const nextLabels = {all: 'Needs review', 'needs-review': 'Reviewed', reviewed: 'All'};
+    reviewFilter.querySelector('[data-review-label]').textContent = labels[next];
+    reviewFilter.setAttribute('aria-label', `Review status: ${labels[next]}. Click for ${nextLabels[next]}.`);
+    updateContext({reviewFilter: next});
   }
   const accountPicker = initAccountPicker(root, accounts => {
     applyFilters({accounts}, '#account-filter-toggle');
@@ -136,19 +176,51 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   // Populate before the native picker opens, including touch and keyboard focus.
   listen(root, 'pointerdown', hydrateCategory);
   listen(root, 'focusin', hydrateCategory);
-  listen(search, 'input', filter);
+  if (paged) {
+    const searchForm = root.querySelector('[data-transaction-search-form]');
+    const searchNow = () => {
+      clearTimeout(searchTimer);
+      searchTimer = null;
+      applyFilters({q: search.value}, '#transaction-search');
+    };
+    listen(search, 'input', event => {
+      clearTimeout(searchTimer);
+      filterNavigationRevision += 1;
+      filterNavigationPending = false;
+      cancelNavigation();
+      if (!event.isComposing) searchTimer = setTimeout(searchNow, 300);
+    });
+    listen(search, 'compositionend', searchNow);
+    listen(searchForm, 'submit', event => { event.preventDefault(); searchNow(); });
+    for (const link of root.querySelectorAll('[data-transaction-page]')) listen(link, 'click', event => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      clearTimeout(searchTimer);
+      searchTimer = null;
+      if (search.value !== displayedSearch) applyFilters({q: search.value}, '#transaction-search');
+      else void go(link.href, false);
+    });
+  } else listen(search, 'input', filter);
   listen(account, 'change', () => {
     applyFilters({accounts: [...account.selectedOptions].map(option => option.value).filter(value => value !== 'all')}, '#account-filter');
   });
   listen(reviewFilter, 'click', () => {
     const next = {all: 'needs-review', 'needs-review': 'reviewed', reviewed: 'all'}[reviewFilter.dataset.reviewState || 'all'];
-    reviewFilter.dataset.reviewState = next;
-    const labels = {all: 'All', 'needs-review': 'Needs review', reviewed: 'Reviewed'};
-    const nextLabels = {all: 'Needs review', 'needs-review': 'Reviewed', reviewed: 'All'};
-    reviewFilter.querySelector('[data-review-label]').textContent = labels[next];
-    reviewFilter.setAttribute('aria-label', `Review status: ${labels[next]}. Click for ${nextLabels[next]}.`);
-    updateContext({reviewFilter: next});
+    setReviewState(next);
     pendingFilters.review = next;
+    if (paged) {
+      clearTimeout(searchTimer);
+      searchTimer = null;
+      const pending = pendingDestination();
+      if (pending) {
+        const url = new URL(pending);
+        url.searchParams.delete('tx_page');
+        if (next === 'all') url.searchParams.delete('review');
+        else url.searchParams.set('review', next);
+        void go(url, '#review-filter');
+      } else applyFilters({review: next}, '#review-filter');
+      return;
+    }
     filter();
     const pending = pendingDestination();
     if (pending) {
@@ -181,7 +253,10 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         if ('reviewed' in patch) row.dataset.reviewed = String(patch.reviewed);
         row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
         onMutation();
-        filter();
+        if (!paged) filter();
+        else if (!bulkBusy && (search.value && 'note' in patch && document.activeElement !== memo || reviewFilter.dataset.reviewState !== 'all' && 'reviewed' in patch)) {
+          refreshAfterMutation();
+        }
       },
       state(value, failure) {
         row.classList.toggle('is-saving', value === 'saving');
@@ -203,16 +278,21 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     row.saveMemo = saveMemo;
     listen(row.querySelector('[data-select-transaction]'), 'change', selection);
     listen(category, 'change', () => {
+      editStarted();
       category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
       void writer.push({categoryId: category.value || null});
     });
     listen(memo, 'input', () => {
+      editStarted();
       clearTimeout(timers.get(row));
       row.classList.remove('is-saved');
       row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
       timers.set(row, setTimeout(saveMemo, 450));
     });
     listen(memo, 'change', saveMemo);
+    if (paged) listen(memo, 'blur', () => {
+      if (search.value && memo.value === committed.note) refreshAfterMutation();
+    });
     listen(memo, 'keydown', event => {
       if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void saveMemo(); memo.blur(); }
       if (event.key === 'Escape' && !writer.dirty) {
@@ -220,6 +300,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       }
     });
     listen(reviewed, 'click', () => {
+      editStarted();
       const value = reviewed.getAttribute('aria-pressed') !== 'true';
       reviewed.setAttribute('aria-pressed', String(value));
       reviewed.title = value ? 'Reviewed' : 'Not reviewed';
@@ -228,6 +309,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   }
   for (const button of selectionBar.querySelectorAll('[data-bulk-reviewed]')) listen(button, 'click', () => {
     if (bulkBusy) return;
+    editStarted();
     bulkBusy = true;
     const selected = selection().filter(row => row.dataset.pending !== 'true');
     const value = button.dataset.bulkReviewed === 'true';
@@ -248,6 +330,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       bulkBusy = false;
       bulkPromise = null;
       selection();
+      if (paged && (search.value || reviewFilter.dataset.reviewState !== 'all')) refreshAfterMutation();
     });
     return bulkPromise;
   });
@@ -299,6 +382,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     } finally { if (revision === receiptRequest) receiptStatus.textContent = ''; }
   }
   for (const row of rows) listen(row.querySelector('[data-transaction-receipt]'), 'click', () => {
+    editStarted();
     receiptRow = row;
     receiptFile.value = '';
     receiptDialog.querySelector('[data-receipt-payee]').textContent = row.dataset.merchant;
@@ -306,11 +390,17 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     void loadReceipt(row);
   });
   listen(receiptDialog.querySelector('[data-receipt-close]'), 'click', () => { if (!receiptBusy) receiptDialog.close(); });
+  listen(receiptFile, 'change', editStarted);
   listen(receiptDialog, 'cancel', event => { if (receiptBusy) event.preventDefault(); });
   listen(receiptDialog, 'click', event => { if (event.target === receiptDialog && !receiptBusy) receiptDialog.close(); });
-  listen(receiptDialog, 'close', () => { receiptRequest += 1; clearImage(); });
+  listen(receiptDialog, 'close', () => {
+    receiptRequest += 1;
+    clearImage();
+    if (paged && (search.value || reviewFilter.dataset.reviewState !== 'all')) refreshAfterMutation();
+  });
   async function saveReceipt(method, file) {
     if (receiptBusy || !receiptRow) return;
+    editStarted();
     const row = receiptRow;
     receiptError.hidden = true;
     receiptState(true);
@@ -360,12 +450,15 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     if (bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
   }
   listen(window, 'beforeunload', beforeUnload);
-  filter();
+  if (paged) selection();
+  else filter();
   return {
     flush,
     get dirty() { return bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy; },
     dispose() {
       disposed = true;
+      clearTimeout(searchTimer);
+      clearTimeout(refreshTimer);
       accountPicker.dispose();
       periodPicker.dispose();
       for (const timer of timers.values()) clearTimeout(timer);

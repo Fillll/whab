@@ -29,7 +29,7 @@ const accountNavigation = initAccountNavigation({
   flush: flushEdits,
   onReplace({content}) {
     currentRegister?.dispose();
-    currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination()});
+    currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination(), cancelNavigation: () => accountNavigation.cancelPending()});
     bindLogos(content);
   },
   notify,
@@ -556,7 +556,7 @@ document.addEventListener('click', event => {
 });
 for (const time of document.querySelectorAll('[data-local-time]')) time.textContent = new Date(time.dateTime).toISOString().slice(0, 10);
 
-currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination()});
+currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination(), cancelNavigation: () => accountNavigation.cancelPending()});
 document.addEventListener('click', async event => {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !currentRegister?.dirty) return;
   const link = event.target.closest('a[href]');

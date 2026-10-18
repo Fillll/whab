@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from importlib.metadata import version as package_version
+from pathlib import Path
 from urllib.parse import quote
 
 from whab import __version__
@@ -23,6 +24,50 @@ from whab.plugins import (
 from .icons import category_icon, icon
 
 WEB_ASSET_VERSION = package_version("whab_plugin_web")
+WEB_MODULES = tuple(path.name for path in (Path(__file__).parent / "static").glob("*.js"))
+TRANSACTION_PAGE_SIZE = 100
+
+
+def module_imports(asset_prefix):
+    """Give transitive ES modules the same upgrade boundary as their entry point."""
+    return {
+        "imports": {
+            f"{asset_prefix}/static/{name}": f"{asset_prefix}/static/{name}?v={WEB_ASSET_VERSION}"
+            for name in WEB_MODULES
+        }
+    }
+
+
+def transaction_window(transactions, request):
+    """Bound register markup after searching the complete account/date selection."""
+    params = request.query_params
+    search = params.get("q", "")
+    query = search.strip().casefold()
+    review = params.get("review", "all")
+    matches = [
+        row for row in transactions
+        if (not query or query in f"{row['merchant']} {row['note']}".casefold())
+        and (review != "needs-review" or not row["reviewed"])
+        and (review != "reviewed" or row["reviewed"])
+    ]
+    pages = max(1, (len(matches) + TRANSACTION_PAGE_SIZE - 1) // TRANSACTION_PAGE_SIZE)
+    requested_page = params.get("tx_page", "1")
+    try:
+        page = max(1, min(int(requested_page), pages))
+    except ValueError:
+        page = 1
+    start = (page - 1) * TRANSACTION_PAGE_SIZE
+    return {
+        "rows": matches[start:start + TRANSACTION_PAGE_SIZE],
+        "total": len(transactions), "count": len(matches),
+        "start": start + 1 if matches else 0,
+        "end": min(start + TRANSACTION_PAGE_SIZE, len(matches)),
+        "page": page, "pages": pages, "requested_page": requested_page,
+        "search": search,
+        "previous": str(request.url.include_query_params(tx_page=page - 1)) if page > 1 else None,
+        "next": str(request.url.include_query_params(tx_page=page + 1)) if page < pages else None,
+        "search_params": [(key, value) for key, value in params.multi_items() if key not in {"q", "tx_page"}],
+    }
 
 
 def valid_money(value):
@@ -238,6 +283,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
     return {
         "version": __version__,
         "web_asset_version": WEB_ASSET_VERSION,
+        "module_imports": module_imports,
         "data": data,
         "status": status,
         "items": items,
@@ -271,6 +317,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "selected": selected,
         "selected_budget": budgets.get(selected["id"]) if selected else None,
         "transactions": transactions,
+        "transaction_window": transaction_window,
         "accounts_by_id": accounts_by_id,
         "account_groups": [
             {

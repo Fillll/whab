@@ -1145,6 +1145,9 @@ strong {
   border-radius: 4px;
   scrollbar-gutter: stable;
 }
+.transaction-filters > form { margin: 0; }
+.transaction-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.transaction-pagination nav { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
 .transactions-scroll:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;

@@ -49,6 +49,8 @@ def test_register_custom_range_multi_account_urls_preserve_scope_and_canonical_i
         for date in ("2026-09-30", "2026-10-01", "2026-10-03", "2026-10-04"):
             store.add_transaction("personal", {"accountId": account, "date": date,
                 "merchant": f"Purchase {account_index} {date}", "amount": 100, "categoryId": None})
+    for transaction in store.transactions("personal"):
+        store.edit_transaction("personal", transaction["id"], reviewed=True)
     before = store.transactions("personal")
     with TestClient(create_app(store=store, settings=settings(tmp_path)), base_url=BASE) as client:
         params = [("accounts", identifier) for identifier in identifiers[:2]] + [
