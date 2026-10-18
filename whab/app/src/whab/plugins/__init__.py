@@ -16,7 +16,7 @@ from whab.domain.formatting import format_date, format_money
 from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
 from whab.domain.money import SUPPORTED_CURRENCIES, currency_code, currency_minor_units
 from whab.domain.receipts import MAX_RECEIPT_BYTES, receipt_media_type
-from whab.domain.transactions import UNSET
+from whab.domain.transactions import UNSET, validate_review_batch
 from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
 
 from .runtime import PluginError, PluginRegistry, copy_snapshot, load_plugins
@@ -35,6 +35,7 @@ from .sdk import (
     BankUI,
     BudgetContext,
     BudgetSnapshot,
+    BulkReviewStorage,
     CategorySnapshot,
     ExportCell,
     ExportHook,
@@ -89,6 +90,7 @@ __all__ = [
     "API_VERSION",
     "ENTRYPOINT_GROUP",
     "UNSET",
+    "validate_review_batch",
     "LedgerService",
     "RequestConflict",
     "RevisionConflict",
@@ -102,6 +104,7 @@ __all__ = [
     "BankUI",
     "BudgetContext",
     "BudgetSnapshot",
+    "BulkReviewStorage",
     "CategorySnapshot",
     "ExportCell",
     "ExportHook",

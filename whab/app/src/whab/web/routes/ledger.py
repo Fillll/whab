@@ -15,6 +15,7 @@ from whab.web.schemas import (
     AccountBody,
     AccountClassificationBody,
     AssignmentBody,
+    BulkReviewBody,
     CategoryBody,
     NextMonthAssignmentBody,
     ReviewBody,
@@ -95,6 +96,13 @@ def create_router(store):
         store.edit_transaction(
             body.workspace, transaction_id, category_id=category, reviewed=body.reviewed,
             **({"note": body.note} if "note" in body.model_fields_set else {}),
+        )
+        return {"ok": True}
+
+    @router.put("/api/transactions/review")
+    def bulk_review(body: BulkReviewBody):
+        store.review_transactions(
+            body.workspace, body.transactionIds, body.reviewed, request_id=body.requestId,
         )
         return {"ok": True}
 

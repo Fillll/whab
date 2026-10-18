@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.20.0 — 2026-10-18
+
+PR: [#63](https://github.com/Fillll/whab/pull/63)
+
+- Coalesce pure review changes during supported bulk actions into bounded atomic requests, retaining row writers, save barriers and confirmed retry order. Older providers retain their existing individual requests; queued memo and category changes remain ordered, and failed submitted batches are confirmed before later row edits.
+
 ## 1.19.3 — 2026-10-18
 
 PR: [#61](https://github.com/Fillll/whab/pull/61)

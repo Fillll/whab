@@ -1,5 +1,5 @@
 /* Small register controls. Financial validation and persistence stay on the server. */
-import {api, apiUrl, notify, pageUrl, updateContext} from './client.js';
+import {api, apiUrl, getContext, notify, pageUrl, updateContext} from './client.js';
 import {initAccountPicker} from './account-picker.js';
 import {initPeriodPicker} from './period-picker.js';
 
@@ -35,6 +35,57 @@ export function createTransactionWriter(save, {saved = () => {}, state = () => {
     push(patch) { pending = {...pending, ...patch}; return flush(); },
     flush,
     get dirty() { return Boolean(running || Object.keys(pending).length); },
+  };
+}
+
+/* A failed batch keeps its identity until each affected writer confirms its result. */
+export function createReviewBatcher({workspace, saveBatch, saveOne}) {
+  const collecting = new Map();
+  const records = new Map();
+
+  function collect(transactionId, reviewed) {
+    let ticket = collecting.get(reviewed);
+    if (!ticket || ticket.ids.length === 100) {
+      let ready;
+      ticket = {ids: [], reviewed, requestId: crypto.randomUUID(),
+        ready: new Promise(resolve => {ready = resolve;}), running: null, confirmed: false};
+      collecting.set(reviewed, ticket);
+      const queued = ticket;
+      queueMicrotask(() => {
+        if (collecting.get(reviewed) === queued) collecting.delete(reviewed);
+        queued.body = Object.freeze({workspace, transactionIds: Object.freeze([...queued.ids]),
+          reviewed, requestId: queued.requestId});
+        ready();
+      });
+    }
+    ticket.ids.push(transactionId);
+    records.set(transactionId, ticket);
+    return ticket;
+  }
+
+  async function confirm(ticket) {
+    await ticket.ready;
+    if (ticket.confirmed) return;
+    if (!ticket.running) {
+      ticket.running = Promise.resolve().then(() => saveBatch(ticket.body)).then(result => {
+        if (result?.ok !== true) throw new Error('Review changes could not be confirmed. Retry to finish.');
+        ticket.confirmed = true;
+      }).finally(() => {ticket.running = null;});
+    }
+    return ticket.running;
+  }
+
+  return async (transactionId, patch, batch = false) => {
+    let ticket = records.get(transactionId);
+    if (!ticket && batch && Object.keys(patch).length === 1 && typeof patch.reviewed === 'boolean') {
+      ticket = collect(transactionId, patch.reviewed);
+    }
+    if (!ticket) return saveOne(transactionId, patch);
+    await confirm(ticket);
+    const remaining = {...patch};
+    if (remaining.reviewed === ticket.reviewed) delete remaining.reviewed;
+    if (Object.keys(remaining).length) await saveOne(transactionId, remaining);
+    if (records.get(transactionId) === ticket) records.delete(transactionId);
   };
 }
 
@@ -78,6 +129,10 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   let filterNavigationPending = false, filterNavigationRevision = 0;
   let bulkBusy = false;
   let bulkPromise = null;
+  const nativeBulk = getContext().bulkReview === true;
+  const saveOne = (transactionId, patch) => api(`/transactions/${encodeURIComponent(transactionId)}`, {workspace, ...patch}, 'PATCH');
+  const saveReview = nativeBulk ? createReviewBatcher({workspace, saveOne,
+    saveBatch: body => api('/transactions/review', body, 'PUT')}) : null;
   let receiptBusy = false;
   let receiptPromise = null;
   let receiptRow = null;
@@ -264,7 +319,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     const category = row.querySelector('[data-transaction-field="categoryId"]');
     const reviewed = row.querySelector('[data-transaction-reviewed]');
     const committed = {note: memo.value, categoryId: category.value || null, reviewed: row.dataset.reviewed === 'true'};
-    const writer = createTransactionWriter(patch => api(`/transactions/${encodeURIComponent(row.dataset.transactionId)}`, {workspace, ...patch}, 'PATCH'), {
+    const writer = createTransactionWriter(patch => saveReview ? saveReview(row.dataset.transactionId, patch, bulkBusy) : saveOne(row.dataset.transactionId, patch), {
       saved(patch) {
         Object.assign(committed, patch);
         if ('reviewed' in patch) row.dataset.reviewed = String(patch.reviewed);
@@ -333,7 +388,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     const work = [...selected];
     bulkPromise = (async () => {
       let failed = 0;
-      await Promise.all(Array.from({length: Math.min(4, work.length)}, async () => {
+      await Promise.all(Array.from({length: Math.min(nativeBulk ? 100 : 4, work.length)}, async () => {
         while (work.length) {
           const row = work.shift();
           const control = row.querySelector('[data-transaction-reviewed]');

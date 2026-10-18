@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.8.0 — 2026-10-18
+
+PR: [#63](https://github.com/Fillll/whab/pull/63)
+
+- Provide optional atomic review batches: validate every selected transaction with core rules, update only review flags, and commit the batch as one tracked mutation. Preserve all other ledger fields, receipts and rollback on any invalid target or write failure; no index or format migration is required.
+
 ## 1.7.0 — 2026-10-18
 
 PR: [#62](https://github.com/Fillll/whab/pull/62)
