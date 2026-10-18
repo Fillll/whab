@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.15.1 — 2026-10-18
+
+PR: [#53](https://github.com/Fillll/whab/pull/53)
+
+- Place Retrieve logo beside the Bank website input with matching control heights. Press Enter in that field to preview the logo without submitting account settings, while retaining duplicate-request and active-save guards.
+
 ## 1.15.0 — 2026-10-18
 
 PR: [#52](https://github.com/Fillll/whab/pull/52)

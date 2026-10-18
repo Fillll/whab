@@ -104,9 +104,12 @@
     <section class="account-logo-settings" aria-labelledby="account-logo-title">
       <div class="account-logo-heading"><h3 id="account-logo-title">Account logo</h3><button class="text-link" type="button" data-dialog="plugin-options-{{ account_logo_provider.id }}" data-plugin-options>{{ account_logo_provider.display_name }} options{{ icon('chevron-right', 14) }}</button></div>
       <p class="settings-notice">Provided by the {{ account_logo_provider.display_name }} plugin.</p>
-      <label>Bank website<input type="text" inputmode="url" name="bankWebsite" maxlength="2048" placeholder="robinhood.com" autocomplete="off" spellcheck="false" aria-describedby="account-logo-notice"></label>
+      <div class="account-logo-input-row">
+        <label>Bank website<input type="text" inputmode="url" name="bankWebsite" maxlength="2048" placeholder="robinhood.com" autocomplete="off" spellcheck="false" aria-describedby="account-logo-notice"></label>
+        <button class="button secondary" type="button" data-account-logo-retrieve disabled>Retrieve logo</button>
+      </div>
       <p class="settings-notice" id="account-logo-notice">Enter a domain or full URL. Only the public domain goes to external provider <a href="{{ account_logo_provider.provider_url }}" target="_blank" rel="noopener noreferrer">{{ account_logo_provider.provider_name }} ({{ account_logo_provider.provider_url }})</a>. Retrieve previews the logo now; Save can retrieve it later. Saved logos never expire.</p>
-      <div class="account-logo-retrieval"><button class="button secondary" type="button" data-account-logo-retrieve disabled>Retrieve logo</button><img class="account-logo-preview" data-account-logo-preview alt="Bank logo preview" width="48" height="48" hidden><span class="settings-notice" data-account-logo-status role="status"></span></div>
+      <div class="account-logo-retrieval"><img class="account-logo-preview" data-account-logo-preview alt="Bank logo preview" width="48" height="48" hidden><span class="settings-notice" data-account-logo-status role="status"></span></div>
     </section>
     {% endif %}
     <p class="field-error" role="alert" hidden></p>

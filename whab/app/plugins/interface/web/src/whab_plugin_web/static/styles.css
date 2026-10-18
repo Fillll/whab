@@ -3995,6 +3995,9 @@ strong {
 .account-logo-settings {border-top:1px solid var(--line); padding-top:16px; display:grid; gap:12px;}
 .account-logo-heading {display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;}
 .account-logo-heading h3 {margin:0; font-size:1rem;}
+.account-logo-input-row {display:flex; align-items:flex-end; gap:10px;}
+.account-logo-input-row > label {flex:1; min-width:0; margin:0;}
+.account-logo-input-row > .button {flex:none; min-height:39px;}
 .account-logo-retrieval {display:flex; flex-wrap:wrap; align-items:center; gap:12px;}
 .account-logo-retrieval .settings-notice {flex:1; min-width:160px; margin:0;}
 .account-logo-preview {flex:none; object-fit:contain; border:1px solid var(--line); border-radius:6px; background:var(--surface); padding:4px;}
