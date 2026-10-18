@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.19.1 — 2026-10-18
+
+PR: [#59](https://github.com/Fillll/whab/pull/59)
+
+- Refresh the server-rendered review count with a compact summary after unfiltered review changes, preserving the existing transaction rows, editors and listeners. Keep full refreshes for search and review-filtered views, and reject late or mismatched responses.
+- Require WHAB 2.14.1 or newer for the compact fragment response contract.
+
 ## 1.19.0 — 2026-10-18
 
 PR: [#58](https://github.com/Fillll/whab/pull/58)

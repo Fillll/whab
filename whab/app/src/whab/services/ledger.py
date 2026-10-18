@@ -23,6 +23,8 @@ from whab.domain.portable import ACCOUNT_FIELDS, validate_portable_budget
 from whab.domain.transactions import UNSET
 from whab.domain.validation import validate_date, validate_label, validate_month
 
+_PRIVATE_FIELDS = frozenset({"token", "accesstoken", "encryptedtoken", "cursor", "encryptionkey", "items"})
+
 
 class RevisionConflict(StoreError):
     """The caller must refresh its view before submitting another command."""
@@ -45,11 +47,10 @@ def _month(value: str) -> None:
 
 def _public(value):
     """Defense in depth for backend projections: never serialize private bank state."""
-    private = {"token", "accesstoken", "encryptedtoken", "cursor", "encryptionkey", "items"}
     if isinstance(value, dict):
         return {
             key: _public(row) for key, row in value.items()
-            if key.lower().replace("_", "") not in private
+            if key.lower().replace("_", "") not in _PRIVATE_FIELDS
         }
     if isinstance(value, list):
         return [_public(row) for row in value]

@@ -36,19 +36,27 @@ def effective_month_funding(state: dict, month: str, currency: str) -> int:
     return state.get("futureFunding", {}).get(month, {}).get(currency, 0)
 
 
-def _net_account_funds(state: dict, month: str, currency: str, *, opening: bool = False) -> int:
+def _net_account_funds(
+    state: dict, month: str, currency: str, *, opening: bool = False, history: dict | None = None,
+) -> int:
     """Reconstruct a boundary from snapshots, never add imported income twice."""
     accounts = [
         account for account in state["accounts"].values()
         if account.get("currency", "USD") == currency and is_on_budget(account)
     ]
     later_by_account = defaultdict(int)
-    for row in state["transactions"].values():
-        if (
-            not row.get("deleted") and not row["pending"]
-            and (row["date"][:7] >= month if opening else row["date"][:7] > month)
-        ):
-            later_by_account[row["accountId"]] += row["amount"]
+    if history is None:
+        for row in state["transactions"].values():
+            if (
+                not row.get("deleted") and not row["pending"]
+                and (row["date"][:7] >= month if opening else row["date"][:7] > month)
+            ):
+                later_by_account[row["accountId"]] += row["amount"]
+    else:
+        for source, totals in history["posted"].items():
+            if source >= month if opening else source > month:
+                for account_id, amount in totals.items():
+                    later_by_account[account_id] += amount
 
     def balance_at(account):
         return account["balance"] + (-1 if is_liability(account) else 1) * later_by_account[account["id"]]
@@ -62,9 +70,11 @@ def _net_account_funds(state: dict, month: str, currency: str, *, opening: bool 
     return cash - debt
 
 
-def _cash_capacity(state: dict, month: str, currency: str, budget: list[dict]) -> int:
+def _cash_capacity(
+    state: dict, month: str, currency: str, budget: list[dict], *, history: dict | None = None,
+) -> int:
     """Keep category deficits from offsetting cash reserved in other envelopes."""
-    safe = _net_account_funds(state, month, currency) - sum(
+    safe = _net_account_funds(state, month, currency, history=history) - sum(
         max(0, row["available"]) for row in budget
     ) - effective_month_funding(state, shift_month(month, 1), currency)
     if any(
@@ -76,41 +86,50 @@ def _cash_capacity(state: dict, month: str, currency: str, budget: list[dict]) -
     return safe
 
 
-def _calculate_currency(state: dict, month: str, currency: str) -> dict:
-    validate_month(month)
-    transactions = [
-        t for t in state["transactions"].values() if not t.get("deleted")
-    ]
-    cleared = [
-        t for t in transactions if not t.get("pending") and not t.get("isTransfer")
-        and is_on_budget(state["accounts"][t["accountId"]])
-    ]
-    accounts = list(state["accounts"].values())
+def _currency_history(state: dict) -> dict:
+    """Index one validated currency snapshot without copying historical records.
 
-    def income_for(rows):
-        return -sum(
-            t["amount"]
-            for t in rows
-            if t["amount"] < 0
-            and t.get("categoryId") is None
-            and state["accounts"].get(t["accountId"], {}).get("type") != "credit"
-        )
+    Posted account movements include transfers. Envelope activity excludes
+    transfers and off-budget accounts; the two totals must remain independent.
+    """
+    transactions = defaultdict(list)
+    posted = defaultdict(lambda: defaultdict(int))
+    spending = defaultdict(lambda: defaultdict(int))
+    income = defaultdict(int)
+    spent = defaultdict(int)
+    on_budget = {key for key, account in state["accounts"].items() if is_on_budget(account)}
+    for row in state["transactions"].values():
+        if row.get("deleted"):
+            continue
+        source = row["date"][:7]
+        transactions[source].append(row)
+        if not row["pending"]:
+            posted[source][row["accountId"]] += row["amount"]
+        if row.get("pending") or row.get("isTransfer") or row["accountId"] not in on_budget:
+            continue
+        category = row.get("categoryId")
+        amount = row["amount"]
+        spending[source][category] += amount
+        if amount < 0 and category is None and state["accounts"][row["accountId"]].get("type") != "credit":
+            income[source] -= amount
+        if amount > 0 or category is not None:
+            spent[source] += amount
+    return {"transactions": transactions, "posted": posted, "spending": spending,
+            "income": income, "spent": spent}
 
-    def spend_for(rows):
-        return sum(t["amount"] for t in rows if t["amount"] > 0 or t.get("categoryId") is not None)
+
+def _calculate_currency(state: dict, month: str, currency: str, history: dict) -> dict:
+    accounts = [account.copy() for account in state["accounts"].values()]
 
     start = state["budgetStartMonth"]
-    active = [t for t in cleared if t["date"].startswith(month)]
     carry_start = _carryover_start(state, month, currency)
-    # A growing category list must not multiply the cost of reading history.
     prior_spending = defaultdict(int)
-    active_spending = defaultdict(int)
+    active_spending = history["spending"].get(month, {})
     prior_assignments = defaultdict(int)
-    for transaction in cleared:
-        if carry_start <= transaction["date"][:7] < month:
-            prior_spending[transaction.get("categoryId")] += transaction["amount"]
-    for transaction in active:
-        active_spending[transaction.get("categoryId")] += transaction["amount"]
+    for source, totals in history["spending"].items():
+        if carry_start <= source < month:
+            for category_id, amount in totals.items():
+                prior_spending[category_id] += amount
     for source, rows in state["budget"].items():
         if carry_start <= source < month:
             for category_id, amount in rows.items():
@@ -126,15 +145,16 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
             if pool_start <= source <= previous_month
             for amount in rows.values()
         ) - sum(
-            t["amount"] for t in cleared
-            if pool_start <= t["date"][:7] <= previous_month and t.get("categoryId") is not None
+            amount for source, totals in history["spending"].items()
+            if pool_start <= source <= previous_month
+            for category_id, amount in totals.items() if category_id is not None
         )
     budget = []
     for category in state["categories"].values():
         category_id = category["id"]
         assigned = state["budget"].get(month, {}).get(category_id, 0) if month >= start else 0
         carryover = prior_assignments[category_id] - prior_spending[category_id]
-        spent = active_spending[category_id] if month >= start else 0
+        spent = active_spending.get(category_id, 0) if month >= start else 0
         budget.append(
             {
                 "categoryId": category_id,
@@ -145,17 +165,17 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
                 "target": category["target"],
             }
         )
-    income = income_for(active)
+    income = history["income"].get(month, 0)
     next_month_funding = effective_month_funding(state, shift_month(month, 1), currency)
     carried_in_set_aside = effective_month_funding(state, month, currency) if month > start else 0
     carried_in = (
-        _net_account_funds(state, month, currency, opening=True)
+        _net_account_funds(state, month, currency, opening=True, history=history)
         - sum(row["carryover"] for row in budget)
         if month >= start else 0
     )
     carried_in_unassigned = carried_in - carried_in_set_aside - balance_carryover
     ready = income + carried_in - next_month_funding - sum(row["assigned"] for row in budget)
-    safe = _cash_capacity(state, month, currency, budget)
+    safe = _cash_capacity(state, month, currency, budget, history=history)
     if month < start:
         next_month_funding = ready = safe = 0
     summary = {
@@ -167,7 +187,7 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
         "previousOverspending": sum(max(0, -b["carryover"]) for b in budget),
         "balanceCarryover": balance_carryover,
         "assignedNextMonth": next_month_funding,
-        "spent": spend_for(active),
+        "spent": history["spent"].get(month, 0),
         "assigned": sum(b["assigned"] for b in budget),
         "available": sum(b["available"] for b in budget),
         "readyToAssign": ready,
@@ -177,8 +197,7 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
     trend = []
     for offset in range(-5, 1):
         m = shift_month(month, offset)
-        rows = [t for t in cleared if t["date"].startswith(m)]
-        trend.append({"month": m, "income": income_for(rows), "spent": spend_for(rows)})
+        trend.append({"month": m, "income": history["income"].get(m, 0), "spent": history["spent"].get(m, 0)})
     return {
         "month": month,
         "budgetStartMonth": start,
@@ -187,9 +206,9 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
         "rolloverModeEditable": True,
         "monthlyFundingFlow": True,
         "accounts": accounts,
-        "categories": list(state["categories"].values()),
+        "categories": [category.copy() for category in state["categories"].values()],
         "transactions": sorted(
-            [public_transaction(t) for t in transactions if t["date"].startswith(month)],
+            [public_transaction({**row, "currency": currency}) for row in history["transactions"].get(month, ())],
             key=lambda t: (t["date"], t["id"]), reverse=True,
         ),
         "budget": budget,
@@ -303,6 +322,30 @@ def calculate_workspace(state: dict, month: str, *, as_of_month: str | None = No
     validate_month(month)
     as_of_month = month if as_of_month is None else as_of_month
     validate_month(as_of_month)
+    return _project_workspace(_prepare_workspace(state), month)
+
+
+def calculate_workspace_periods(
+    state: dict, month: str, count: int, *, as_of_month: str | None = None,
+) -> list[dict]:
+    """Project consecutive months from one request-local validated ledger index.
+
+    Validate the entire request before preparing history or returning a period.
+    Each result owns its public records; no index survives this calculation.
+    """
+    validate_month(month)
+    if type(count) is not int or not 1 <= count <= 12:
+        raise StoreError("Period count must be an integer between 1 and 12.")
+    months = [shift_month(month, offset) for offset in range(count)]
+    for target in months:
+        validate_month(target)
+    validate_month(month if as_of_month is None else as_of_month)
+    prepared = _prepare_workspace(state)
+    return [_project_workspace(prepared, target) for target in months]
+
+
+def _prepare_workspace(state: dict) -> dict:
+    """Validate references once and retain only request-local currency indexes."""
     accounts = {
         key: normalize_account({**row, "currency": currency_code(row.get("currency", "USD"))})
         for key, row in state["accounts"].items()
@@ -346,7 +389,7 @@ def calculate_workspace(state: dict, month: str, *, as_of_month: str | None = No
     for rows in state["budget"].values():
         for category_id in rows:
             _known_child_category(categories, category_id)
-    transactions = {}
+    transactions = defaultdict(dict)
     for key, row in state["transactions"].items():
         account = accounts.get(row["accountId"])
         if account is None:
@@ -356,32 +399,43 @@ def calculate_workspace(state: dict, month: str, *, as_of_month: str | None = No
             category = _known_child_category(categories, category_id)
             if category["currency"] != account["currency"]:
                 raise StoreError("Category currency must match the account currency.")
-        transactions[key] = {**row, "currency": account["currency"]}
-    projections = {}
+        transactions[account["currency"]][key] = row
+    scoped = {}
+    histories = {}
     for currency in currencies:
         children = {key: c for key, c in categories.items() if c["currency"] == currency}
-        scoped = {
+        scoped[currency] = {
             **state,
             "accounts": {key: a for key, a in accounts.items() if a["currency"] == currency},
             "categories": children,
-            "transactions": {
-                key: t for key, t in transactions.items() if t["currency"] == currency
-            },
+            "transactions": transactions[currency],
             "budget": {
                 m: {key: amount for key, amount in rows.items() if key in children}
                 for m, rows in state["budget"].items()
             },
         }
-        projections[currency] = _calculate_currency(scoped, month, currency)
+        histories[currency] = _currency_history(scoped[currency])
+    return {"accounts": accounts, "categories": categories, "currencies": currencies,
+            "scoped": scoped, "histories": histories}
+
+
+def _project_workspace(prepared: dict, month: str) -> dict:
+    accounts, categories, currencies = (
+        prepared["accounts"], prepared["categories"], prepared["currencies"],
+    )
+    projections = {
+        currency: _calculate_currency(prepared["scoped"][currency], month, currency, prepared["histories"][currency])
+        for currency in currencies
+    }
     default = projections["USD"]
     return {
         **default,
         "currency": "USD",
         "currencyMinorUnits": 2,
         "nextMonthFundingEditable": True,
-        "currencies": currencies,
-        "accounts": list(accounts.values()),
-        "categories": list(categories.values()),
+        "currencies": list(currencies),
+        "accounts": [account.copy() for account in accounts.values()],
+        "categories": [category.copy() for category in categories.values()],
         "categoryGroups": category_tree(categories),
         "transactions": sorted(
             [t for p in projections.values() for t in p["transactions"]],

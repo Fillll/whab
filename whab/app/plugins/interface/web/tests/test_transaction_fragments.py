@@ -4,10 +4,12 @@ import json
 import re
 from html import unescape
 from html.parser import HTMLParser
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
 FRAGMENT = {"X-WHAB-Transactions-Fragment": "1"}
+SUMMARY = {"X-WHAB-Transactions-Fragment": "summary"}
 
 
 class RegisterMarkup(HTMLParser):
@@ -18,7 +20,7 @@ class RegisterMarkup(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag == "div" and "data-transactions-fragment" in attrs:
+        if tag == "div" and ("data-transactions-fragment" in attrs or "data-transactions-summary" in attrs):
             self.context = json.loads(attrs["data-page-context"])
 
 
@@ -80,7 +82,8 @@ def test_register_fragment_preserves_account_date_currency_and_escaping(client):
     assert accounts["JPY"] in unescape(response.text)
 
 
-def test_fragment_navigation_badge_tracks_review_edits_and_selected_account_without_reload(client, store):
+@pytest.mark.parametrize("header", [FRAGMENT, SUMMARY])
+def test_fragment_navigation_badge_tracks_review_edits_and_selected_account_without_reload(client, store, header):
     first = store.add_account("personal", {"name": "First", "type": "depository", "balance": 0})
     second = store.add_account("personal", {"name": "Second", "type": "depository", "balance": 0})
     transactions = [store.add_transaction("personal", {
@@ -90,7 +93,7 @@ def test_fragment_navigation_badge_tracks_review_edits_and_selected_account_with
 
     def count_markup(account):
         response = client.get(
-            f"/budgets/home/transactions/2026-10/usd?account={account}", headers=FRAGMENT,
+            f"/budgets/home/transactions/2026-10/usd?account={account}", headers=header,
         )
         assert response.status_code == 200 and "<!DOCTYPE" not in response.text
         return re.search(r'<template data-transaction-navigation-count>(.*?)</template>', response.text, re.S)[1]
@@ -105,11 +108,45 @@ def test_fragment_navigation_badge_tracks_review_edits_and_selected_account_with
     assert count_markup(second) == '<span class="nav-count">1</span>'
 
 
+def test_summary_returns_only_scoped_server_badge_and_canonical_validation_context(client, store):
+    first = store.add_account("personal", {"name": "First", "type": "depository", "balance": 0})
+    second = store.add_account("personal", {"name": "Second", "type": "depository", "balance": 0})
+    for account, date in [(first, "2026-10-05"), (second, "2026-10-05"), (first, "2026-09-05")]:
+        store.add_transaction("personal", {
+            "accountId": account, "date": date, "merchant": "Private description absent from summary",
+            "amount": 100, "categoryId": None,
+        })
+    path = f"/budgets/home/transactions/2026-10/usd?accounts={first}&accounts={second}&q=&tx_page=1"
+    response = client.get(path, headers=SUMMARY)
+    assert response.status_code == 200
+    assert response.headers["X-WHAB-Transactions-Fragment"] == "summary"
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["Vary"] == "X-WHAB-Transactions-Fragment"
+    assert '<span class="nav-count">2</span>' in response.text
+    assert len(response.content) < 2500
+    assert len(response.content) < len(client.get(path, headers=FRAGMENT).content) / 10
+    assert "Private description" not in response.text
+    for markup in ("transaction-row", "data-transaction-register", "data-account-list", "<script", "<!DOCTYPE"):
+        assert markup not in response.text
+    context = RegisterMarkup(response.text).context
+    assert context["selectedAccountIds"] == [first, second]
+    assert context["transactionSearch"] == "" and context["transactionRequestedPage"] == "1"
+    assert context["reviewFilter"] == "all" and context["currency"] == "USD"
+    assert parse_qs(urlsplit(context["canonicalUrl"]).query, keep_blank_values=True) == {
+        "accounts": [first, second], "q": [""], "tx_page": ["1"],
+    }
+    assert "accountSlugs" not in context
+    other_page = client.get("/budgets/demo/accounts/2026-10/usd", headers=SUMMARY)
+    assert "<!DOCTYPE html>" in other_page.text
+    assert "X-WHAB-Transactions-Fragment" not in other_page.headers
+
+
 @pytest.mark.parametrize("header,status", [
     ({"Origin": "https://untrusted.invalid"}, 403),
     ({"Sec-Fetch-Site": "cross-site"}, 403),
 ])
-def test_register_fragment_does_not_bypass_local_request_guards(client, header, status):
-    response = client.get("/budgets/demo/transactions/2026-08/usd", headers={**FRAGMENT, **header})
+@pytest.mark.parametrize("fragment", [FRAGMENT, SUMMARY])
+def test_register_fragment_does_not_bypass_local_request_guards(client, header, status, fragment):
+    response = client.get("/budgets/demo/transactions/2026-08/usd", headers={**fragment, **header})
     assert response.status_code == status
     assert "transactions-table" not in response.text

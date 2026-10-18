@@ -8,11 +8,12 @@ browser DOM parsing, layout or network latency. No existing runtime is opened.
 Use --portable to include synchronous portable-budget checkpoints on writes.
 """
 
+import tracemalloc
 from argparse import ArgumentParser
 from pathlib import Path
 from statistics import median
 from tempfile import TemporaryDirectory
-from time import perf_counter
+from time import perf_counter, process_time
 
 from fastapi.testclient import TestClient
 from whab_plugin_sqlite import Store
@@ -33,12 +34,16 @@ def main():
     parser.add_argument("--requests", type=int, default=5)
     parser.add_argument("--all-accounts", action="store_true")
     parser.add_argument("--portable", action="store_true")
+    parser.add_argument("--summary", action="store_true", help="Request only the transaction review summary.")
+    parser.add_argument("--profile-memory", action="store_true", help="Measure one additional request's Python allocation peak.")
     parser.add_argument("--page", choices=(
         "transactions", "accounts", "budget", "account-settings", "transaction-edit",
     ), default="transactions")
     args = parser.parse_args()
     if not (1 <= args.accounts <= 1000 and 1 <= args.transactions <= 250000 and 1 <= args.requests <= 100):
         parser.error("Use 1-1000 accounts, 1-250000 transactions and 1-100 requests.")
+    if args.summary and args.page != "transactions":
+        parser.error("Use --summary with --page transactions.")
     store = Store(":memory:", month="2026-10")
     try:
         snapshot = store.export_budget("personal")
@@ -75,7 +80,7 @@ def main():
                     url = "/api/accounts/account-0/settings?workspace=personal"
                 elif args.page == "transaction-edit":
                     url = "/api/transactions/transaction-000000"
-                headers = {"X-WHAB-Transactions-Fragment": "1"}
+                headers = {"X-WHAB-Transactions-Fragment": "summary" if args.summary else "1"}
 
                 def request():
                     if args.page == "transaction-edit":
@@ -84,18 +89,31 @@ def main():
 
                 request().raise_for_status()
                 times = []
+                cpu_times = []
                 for _ in range(args.requests):
+                    cpu_started = process_time()
                     started = perf_counter()
                     result = request()
                     result.raise_for_status()
                     times.append(round((perf_counter() - started) * 1000, 1))
+                    cpu_times.append(round((process_time() - cpu_started) * 1000, 1))
                 print(f"Fictional ledger: {args.accounts} accounts, {args.transactions} transactions, "
                       f"{len(snapshot['categories'])} categories")
                 print(f"View: {args.page}; {'all accounts' if args.all_accounts else 'one account'}")
                 print(f"Portable synchronous saves: {args.portable}")
                 print(f"Selected register rows: {result.text.count('class=\"transaction-row\"')}")
                 print(f"Server request milliseconds: {times}; median {median(times):.1f}")
+                print(f"Process CPU milliseconds: {cpu_times}; median {median(cpu_times):.1f}")
                 print(f"Response bytes: {len(result.content)}; option elements: {result.text.count('<option ')}")
+                if args.profile_memory:
+                    tracemalloc.start()
+                    try:
+                        request().raise_for_status()
+                        peak = tracemalloc.get_traced_memory()[1]
+                    finally:
+                        tracemalloc.stop()
+                    print(f"Peak Python request allocations: {peak / 1024 / 1024:.2f} MiB "
+                          "(excludes SQLite, native and browser allocations)")
                 if session:
                     assert session.status == "saved"
                     saved = decode_container(session.path.read_bytes())

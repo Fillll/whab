@@ -1,5 +1,13 @@
 # SQLite budget storage plugin changelog
 
+## 1.6.1 — 2026-10-18
+
+PR: [#59](https://github.com/Fillll/whab/pull/59)
+
+- Read portable export records directly from allowlisted SQL columns without constructing a second full domain ledger. Validate every record and preserve coherent transaction, metadata and receipt snapshots.
+- Omit the three optional runtime indexes from fresh sanitized portable images, reducing rebuild, compression and saved-file size. Keep runtime indexes and exact portable-schema validation.
+- Share the core's request-local history indexes across consecutive month projections; require WHAB 2.14.1 or newer.
+
 ## 1.6.0 — 2026-10-18
 
 PR: [#58](https://github.com/Fillll/whab/pull/58)

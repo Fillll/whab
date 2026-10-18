@@ -1,5 +1,7 @@
 {% if page=='budget' and request.headers.get('X-WHAB-Budget-Fragment')=='1' %}
 {% include "budget.html" %}
+{% elif page=='transactions' and request.headers.get('X-WHAB-Transactions-Fragment')=='summary' %}
+{% include "transactions-summary.html" %}
 {% elif page=='transactions' and request.headers.get('X-WHAB-Transactions-Fragment')=='1' %}
 {% include "transactions-fragment.html" %}
 <template data-account-list>{% include "sidebar-accounts.html" %}</template>

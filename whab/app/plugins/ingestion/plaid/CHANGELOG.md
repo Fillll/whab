@@ -1,5 +1,12 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.1.3 — 2026-10-18
+
+PR: [#59](https://github.com/Fillll/whab/pull/59)
+
+- Move synchronous storage reads, normalization and durable writes off the async network loop, keeping other requests responsive during bank synchronization.
+- Preserve per-connection synchronization locks until started storage work finishes, including repeated cancellation and shutdown; retain atomic cursor updates, encrypted-token handling and safe errors.
+
 ## 1.1.2 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)

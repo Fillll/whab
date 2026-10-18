@@ -74,7 +74,7 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
         const countTemplate = nextBadge === undefined ? null : {content: {querySelector: () => nextBadge === null ? null : badge(nextBadge)}};
         fresh.querySelector = selector => selector === 'h1' ? heading : selector === 'template[data-transaction-navigation-count]' ? countTemplate : null;
         fresh.heading = heading;
-        return {querySelector: selector => selector === '.page-content[data-transactions-fragment]' ? fresh :
+        return {querySelector: selector => ['.page-content[data-transactions-fragment]', '[data-transactions-summary]'].includes(selector) ? fresh :
           selector === 'template[data-account-list]' ? {content: {cloneNode: () => ({refreshedAccountList: true})}} : null};
       }
     },
@@ -131,6 +131,87 @@ test('partial review refresh updates, removes and creates the server-rendered na
   state.navigationLinks.length = 0;
   const absentNavigation = state.navigator.navigate(third);
   await tick(); state.respond(4, {reviewBadge: '1'}); await absentNavigation;
+  assert.equal(state.fallbacks.length, 0);
+});
+
+test('count-only review refresh preserves the register, focus, history and sidebar while updating its badge', async () => {
+  const state = harness({initialContext: {apiPrefix: '/api', budgetId: 'default'}});
+  let current = badge('3');
+  const attach = next => {
+    current = next;
+    if (next) {
+      next.replaceWith = attach;
+      next.remove = () => {current = null;};
+    }
+  };
+  attach(current);
+  state.navigationLinks.push({...element(), href: first,
+    classList: {contains: name => name === 'nav-item'}, querySelector: () => current, append: attach});
+  const register = state.content(), context = state.context.updated;
+  for (const count of ['2', null, '4']) {
+    const pending = state.navigator.navigate(first, {refresh: true, summary: true, history: 'replace', focus: false});
+    await tick();
+    assert.equal(state.status.hidden, true);
+    assert.equal(state.requests.at(-1).options.headers['X-WHAB-Transactions-Fragment'], 'summary');
+    assert.equal(state.requests.at(-1).options.cache, 'no-store');
+    state.respond(state.requests.length - 1, {marker: 'summary', reviewBadge: count});
+    await pending;
+    assert.equal(current?.textContent ?? null, count);
+    assert.equal(state.navigator.pendingDestination(), null);
+  }
+  assert.equal(state.content(), register);
+  assert.equal(state.context.updated, context);
+  assert.equal(state.replacements.length, 0);
+  assert.equal(state.accountListReplacements.length, 0);
+  assert.equal(state.histories.length, 0);
+  assert.equal(state.sidebar.scrollTop, 480);
+  assert.equal(state.fallbacks.length, 0);
+  state.navigationLinks.length = 0;
+  const missing = state.navigator.navigate(first, {refresh: true, summary: true});
+  await tick(); state.respond(3, {marker: 'summary', reviewBadge: '1'}); await missing;
+  assert.equal(state.fallbacks.length, 0);
+});
+
+test('count summaries validate the same scope and cannot navigate or apply after cancellation', async () => {
+  for (const response of [{marker: '1', reviewBadge: '1'}, {marker: 'summary'},
+    {marker: 'summary', reviewBadge: '1', override: {transactionSearch: 'stale'}},
+    {marker: 'summary', reviewBadge: '1', override: {transactionRequestedPage: '8'}},
+    {marker: 'summary', reviewBadge: '1', override: {selectedAccountId: 'second'}},
+    {marker: 'summary', reviewBadge: '1', override: {canonicalUrl: second}}]) {
+    const state = harness();
+    const pending = state.navigator.navigate(first, {refresh: true, summary: true});
+    await tick(); state.respond(0, response); await pending;
+    assert.equal(state.replacements.length, 0);
+    assert.deepEqual(state.fallbacks, [['assign', first]]);
+  }
+  const state = harness();
+  assert.equal(await state.navigator.navigate(second, {refresh: true, summary: true}), false);
+  assert.equal(await state.navigator.navigate(first, {summary: true}), false);
+  assert.equal(state.requests.length, 0);
+  const stale = state.navigator.navigate(first, {refresh: true, summary: true});
+  await tick();
+  state.navigator.cancelPending();
+  assert.equal(state.requests[0].options.signal.aborted, true);
+  state.respond(0, {marker: 'summary', reviewBadge: '1'}); await stale;
+  assert.equal(state.replacements.length, 0);
+  assert.equal(state.fallbacks.length, 0);
+  assert.equal(state.histories.length, 0);
+});
+
+test('count summaries from a bookmarked anchor use a hashless request and preserve the visible bookmark', async () => {
+  const href = first + '#transaction-42';
+  const state = harness({href});
+  const content = state.content();
+  const pending = state.navigator.navigate(href, {refresh: true, summary: true, history: 'replace'});
+  await tick();
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.requests[0].url, first);
+  state.respond(0, {marker: 'summary', reviewBadge: '2'});
+  assert.equal(await pending, true);
+  assert.equal(state.location.href, href);
+  assert.equal(state.content(), content);
+  assert.equal(state.histories.length, 0);
+  assert.equal(state.replacements.length, 0);
   assert.equal(state.fallbacks.length, 0);
 });
 

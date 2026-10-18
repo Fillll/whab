@@ -8,6 +8,8 @@ WHAB requires HTTPS for local pages, bank endpoints, OAuth redirects in every en
 
 Tests use fictional credentials, in-memory storage, temporary homes and HTTP mock transports. Preserve encrypted-token compatibility, pending-to-posted annotations and atomic imports/cursors.
 
+Synchronous storage operations and synchronization normalization run in the event loop's bounded executor so file writes and ledger locks do not block unrelated network requests. A cancelled request waits for already-started storage work to finish before releasing its per-connection lock; saves and cursor updates retain their synchronous, atomic storage contract. Request context propagates into storage workers.
+
 Imported checking, savings and credit accounts default on-budget. Investment, retirement, loan and CD accounts default off-budget, so their balances and transactions do not fund envelopes. Supported provider subtypes identify brokerage, IRA, Roth IRA, 401(k), 403(b), 457(b), pension, mortgage, auto loan, student loan and CD accounts. Unrecognized subtypes remain unspecified; unrecognized account types become unclassified off-budget accounts. Saved user account classifications survive subsequent bank refreshes.
 
 The existing Plaid plugin also displays merchant artwork when a transaction supplies a supported top-level `logo_url`. Normalization retains only an opaque artwork key for canonical HTTPS PNGs on `plaid-merchant-logos.plaid.com` or `plaid-counterparty-logos.plaid.com`; absent or unsupported artwork keeps the interface fallback. It does not infer a merchant, search counterparties, or request a separate enrichment product.

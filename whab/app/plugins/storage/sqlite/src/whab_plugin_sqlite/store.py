@@ -27,12 +27,7 @@ from whab.domain.imports import (
     imported_account,
     validate_imported_transaction,
 )
-from whab.domain.portable import (
-    ACCOUNT_FIELDS,
-    CATEGORY_FIELDS,
-    TRANSACTION_FIELDS,
-    validate_portable_budget,
-)
+from whab.domain.portable import validate_portable_budget
 from whab.domain.transactions import UNSET, transaction_rows
 from whab.domain.validation import validate_label
 
@@ -426,39 +421,9 @@ class Store:
 
     def export_budget(self, workspace: str = "personal") -> dict:
         """Export one coherent ledger, excluding every provider connection field."""
-        state = self.state(workspace)
-        return validate_portable_budget({
-            "formatVersion": 1,
-            "budgetStartMonth": state["budgetStartMonth"],
-            "accounts": [
-                {**{key: record[key] for key in ACCOUNT_FIELDS},
-                 **{key: record[key] for key in ("bankWebsite", "nameOverridden") if key in record}}
-                for record in state["accounts"].values()
-            ],
-            "categories": [
-                {key: record[key] for key in CATEGORY_FIELDS}
-                for record in state["categories"].values()
-            ],
-            "transactions": [
-                {key: record[key] for key in TRANSACTION_FIELDS}
-                for record in state["transactions"].values()
-            ],
-            "assignments": [
-                {"month": month, "categoryId": category, "assigned": assigned}
-                for month, rows in state["budget"].items()
-                for category, assigned in rows.items()
-            ],
-            "futureFunding": [
-                {"month": month, "currency": currency, "assigned": assigned}
-                for month, rows in sorted(state["futureFunding"].items())
-                for currency, assigned in sorted(rows.items())
-            ],
-            "rolloverModes": [
-                {"month": month, "currency": currency, "mode": mode}
-                for month, rows in sorted(state["rolloverModes"].items())
-                for currency, mode in sorted(rows.items())
-            ],
-        })
+        from .export_reads import snapshot
+
+        return validate_portable_budget(snapshot(self, workspace))
 
     def restore_budget(self, workspace: str, data: dict, *, _receipts=()) -> None:
         """Explicitly initialize a pristine personal ledger; never replace saved data."""
