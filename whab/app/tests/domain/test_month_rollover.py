@@ -313,41 +313,73 @@ def protected_state():
     }
 
 
-def test_restoring_category_carryover_cannot_resurrect_reallocated_money_today():
+@pytest.mark.parametrize("as_of", ["2026-09", "2026-11", "2026-12"])
+def test_category_carryover_choice_can_expose_reallocated_money_as_a_deficit(as_of):
     state = protected_state()
+    state["budgetStartMonth"] = "2026-09"
     assert funding_capacity(state, "2026-11", "USD") == 0
     before = deepcopy(state)
-    with pytest.raises(StoreError, match="current month"):
-        rollover(state, "2026-10", "USD", "category", as_of="2026-11")
+    rollover(state, "2026-10", "USD", "category", as_of=as_of)
+    assert state == {**before, "rolloverModes": {"2026-10": {"USD": "category"}}}
+    november = calculate_workspace(state, "2026-11")
+    assert november["summary"]["readyToAssign"] == -10000
+    assert november["summary"]["fundingCapacity"] == -10000
+    assert balances(november) == {"rent": (10000, 10000), "food": (0, 10000)}
+    rollover(state, "2026-10", "USD", "balance", as_of=as_of)
     assert state == before
 
 
-@pytest.mark.parametrize("change", ["assignment", "rollover"])
-def test_later_balance_boundary_cannot_hide_an_intermediate_historical_deficit(change):
+@pytest.mark.parametrize("as_of", ["2026-09", "2026-11", "2026-12"])
+def test_rollover_rejects_unsupported_projection_totals_without_saving(monkeypatch, as_of):
+    import whab.domain.budget as module
+
+    # Lower only the aggregate ceiling so ordinary fixture amounts can reach
+    # it. Every existing month is supported; the new category carryover would
+    # raise November's total Available from 10000 to 20000.
+    monkeypatch.setattr(module, "MAX_SAFE_INTEGER", 15000)
+    state = protected_state()
+    before = deepcopy(state)
+    assert calculate_workspace(state, "2026-10")["summary"]["available"] == 10000
+    assert calculate_workspace(state, "2026-11")["summary"]["available"] == 10000
+    with pytest.raises(StoreError, match="totals exceed the supported range"):
+        rollover(state, "2026-10", "USD", "category", as_of=as_of)
+    assert state == before
+
+
+def test_later_balance_boundary_cannot_hide_an_intermediate_assignment_deficit():
     state = protected_state()
     state["rolloverModes"]["2026-11"] = {"USD": "balance"}
-    if change == "assignment":
-        state["budget"]["2026-10"] = {}
-        state["rolloverModes"].pop("2026-10")
+    state["budget"]["2026-10"] = {}
+    state["rolloverModes"].pop("2026-10")
     assert funding_capacity(state, "2026-12", "USD") == 10000
     before = deepcopy(state)
     with pytest.raises(StoreError, match="2026-11"):
-        if change == "assignment":
-            commands.assign(state, "rent", "2026-10", 10000, as_of_month="2026-12")
-        else:
-            rollover(state, "2026-10", "USD", "category", as_of="2026-12")
+        commands.assign(state, "rent", "2026-10", 10000, as_of_month="2026-12")
     assert state == before
 
 
-def test_future_mode_changes_preserve_future_cash_after_known_spending():
+def test_rollover_choice_keeps_intermediate_deficits_before_a_later_pooling_boundary():
+    state = protected_state()
+    state["rolloverModes"]["2026-11"] = {"USD": "balance"}
+    before = deepcopy(state)
+    rollover(state, "2026-10", "USD", "category", as_of="2026-12")
+    assert state == {
+        **before,
+        "rolloverModes": {"2026-10": {"USD": "category"}, "2026-11": {"USD": "balance"}},
+    }
+    assert funding_capacity(state, "2026-11", "USD") == -10000
+    assert funding_capacity(state, "2026-12", "USD") == 10000
+
+
+def test_future_mode_changes_preserve_known_spending_and_show_future_deficits():
     state = protected_state()
     state["budgetStartMonth"] = "2026-09"
     state["transactions"]["expense"] = transaction("expense", "2026-11", 10000, None)
     assert funding_capacity(state, "2026-09", "USD") == 20000
     before = deepcopy(state)
-    with pytest.raises(StoreError, match="2026-11"):
-        rollover(state, "2026-10", "USD", "category", as_of="2026-09")
-    assert state == before
+    rollover(state, "2026-10", "USD", "category", as_of="2026-09")
+    assert state == {**before, "rolloverModes": {"2026-10": {"USD": "category"}}}
+    assert funding_capacity(state, "2026-11", "USD") == -10000
 
 
 def test_nonworsening_mode_changes_remain_available_with_an_existing_deficit():

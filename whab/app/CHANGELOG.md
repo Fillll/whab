@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.12.1 — 2026-10-18
+
+PR: [#54](https://github.com/Fillll/whab/pull/54)
+
+- Save monthly rollover choices even when they create or worsen a following funding deficit. Preserve signed projections, account balances, saved assignments and supported numeric ranges; retain funding validation for new assignments and next-month set-asides.
+- Require web 1.15.2 in the supported bundle for visible shortfall warnings and contained rollover save feedback.
+
 ## 2.12.0 — 2026-10-18
 
 PR: [#52](https://github.com/Fillll/whab/pull/52)

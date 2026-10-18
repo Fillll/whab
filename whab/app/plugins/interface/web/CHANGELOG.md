@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.15.2 — 2026-10-18
+
+PR: [#54](https://github.com/Fillll/whab/pull/54)
+
+- Reserve an in-flow line inside each month card for rollover Saving/Saved feedback, preventing overlap and clipping.
+- Mark months with negative funding capacity using a compact red Funding shortfall label, retaining true signed balances and keeping the exact cash-constrained amount in the existing Available to assign disclosure.
+
 ## 1.15.1 — 2026-10-18
 
 PR: [#53](https://github.com/Fillll/whab/pull/53)

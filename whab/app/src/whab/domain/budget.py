@@ -228,18 +228,8 @@ def funding_capacity(state: dict, month: str, currency: str) -> int:
     ).get("fundingCapacity", 0)
 
 
-def ensure_funding_capacity_preserved(
-    state: dict, candidate: dict, source_month: str, as_of_month: str, currency: str,
-    *, preserve_monthly_pool: bool = True,
-) -> None:
-    """An edit must not create or worsen a deficit at any affected boundary.
-
-    Cash, assignments and category carryover change only at ledger months or
-    saved boundaries. Checking those sparse points also protects intervening
-    historical months that a later pooling boundary would otherwise hide.
-    Rollover changes may move an existing category deficit into the monthly pool;
-    that reclassification is allowed if actual cash headroom does not worsen.
-    """
+def _affected_months(state: dict, candidate: dict, source_month: str, as_of_month: str) -> list[str]:
+    """Include every sparse ledger boundary that an edited plan can affect."""
     months = {source_month, as_of_month}
     if source_month < "2200-12":
         months.add(shift_month(source_month, 1))
@@ -251,9 +241,27 @@ def ensure_funding_capacity_preserved(
         for target in ledger.get("futureFunding", {}):
             months.update((shift_month(target, -1), target))
     affected_start = min(source_month, as_of_month)
-    for month in sorted(months):
-        if not affected_start <= month <= "2200-12":
-            continue
+    return sorted(month for month in months if affected_start <= month <= "2200-12")
+
+
+def ensure_projection_totals_supported(
+    state: dict, candidate: dict, source_month: str, as_of_month: str,
+) -> None:
+    """Validate aggregate ranges without treating a negative balance as invalid."""
+    for month in _affected_months(state, candidate, source_month, as_of_month):
+        calculate_workspace(candidate, month)
+
+
+def ensure_funding_capacity_preserved(
+    state: dict, candidate: dict, source_month: str, as_of_month: str, currency: str,
+) -> None:
+    """New assignments must not create or worsen an affected funding deficit.
+
+    Cash, assignments and category carryover change only at ledger months or
+    saved boundaries. Checking those sparse points also protects intervening
+    historical months that a later pooling boundary would otherwise hide.
+    """
+    for month in _affected_months(state, candidate, source_month, as_of_month):
         before = select_currency(calculate_workspace(state, month), currency)
         after = select_currency(calculate_workspace(candidate, month), currency)
         context = "the current month" if month == as_of_month else month
@@ -265,9 +273,7 @@ def ensure_funding_capacity_preserved(
                 if after_cash < after["summary"]["readyToAssign"] else ""
             )
             raise StoreError(f"Change exceeds available money in {context}.{detail}")
-        if preserve_monthly_pool and (
-            after["summary"]["readyToAssign"] < min(before["summary"]["readyToAssign"], 0)
-        ):
+        if after["summary"]["readyToAssign"] < min(before["summary"]["readyToAssign"], 0):
             raise StoreError(f"Change exceeds available money in {context}.")
 
 

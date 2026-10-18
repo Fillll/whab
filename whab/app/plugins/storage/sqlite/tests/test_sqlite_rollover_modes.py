@@ -131,45 +131,78 @@ def test_portable_roundtrip_preserves_unassigned_set_aside_and_optional_pooled_c
         target.close()
 
 
-def test_restoring_reallocated_category_carryover_cannot_underfund_today(store, monkeypatch):
+def test_rollover_with_negative_available_money_is_saved_and_survives_reopen(tmp_path, monkeypatch):
     import whab_plugin_sqlite.store as module
 
     monkeypatch.setattr(module, "current_month", lambda: "2026-11")
-    cash = store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
-    store.assign("personal", "rent", "2026-10", 10000)
-    store.set_rollover_mode("personal", "2026-10", "USD", "balance")
-    store.assign("personal", "groceries", "2026-11", 10000)
-    before = store.state("personal")
-    with pytest.raises(StoreError, match="available money"):
+    path = tmp_path / "negative-rollover.sqlite"
+    store = Store(path, month="2026-10")
+    try:
+        store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+        store.assign("personal", "rent", "2026-10", 10000)
+        store.set_rollover_mode("personal", "2026-10", "USD", "balance")
+        store.assign("personal", "groceries", "2026-11", 10000)
+        before = store.export_budget()
         store.set_rollover_mode("personal", "2026-10", "USD", "category")
-    assert store.state("personal") == before
-    assert store.workspace("personal", "2026-11")["summary"]["readyToAssign"] == 0
-    # An existing external deficit does not prohibit a non-worsening setting.
-    store.db.execute("UPDATE accounts SET balance=9000 WHERE id=?", (cash,))
-    store.set_rollover_mode("personal", "2026-10", "USD", "balance")
-    assert store.workspace("personal", "2026-11")["summary"]["readyToAssign"] == -1000
+        saved = store.export_budget()
+        assert saved == {**before, "rolloverModes": [
+            {"month": "2026-10", "currency": "USD", "mode": "category"},
+        ]}
+        november = store.workspace("personal", "2026-11")
+        assert november["summary"]["readyToAssign"] == -10000
+        assert november["summary"]["fundingCapacity"] == -10000
+        assert november["accounts"][0]["balance"] == 10000
+        assert not store.db.in_transaction
+    finally:
+        store.close()
+    reopened = Store(path, month="2026-11")
+    try:
+        assert reopened.export_budget() == saved
+        assert reopened.workspace("personal", "2026-11") == november
+        with pytest.raises(StoreError, match="available money"):
+            reopened.assign("personal", "groceries", "2026-11", 10001)
+        with pytest.raises(StoreError, match="available money"):
+            reopened.assign_next_month("personal", "2026-11", "USD", 1)
+        assert reopened.export_budget() == saved
+        reopened.set_rollover_mode("personal", "2026-10", "USD", "balance")
+        assert reopened.export_budget() == before
+        assert reopened.workspace("personal", "2026-11")["summary"]["readyToAssign"] == 0
+    finally:
+        reopened.close()
 
 
-@pytest.mark.parametrize("change", ["assignment", "rollover"])
-def test_later_balance_reset_cannot_hide_an_intermediate_historical_deficit(store, monkeypatch, change):
+def test_later_balance_reset_cannot_hide_an_intermediate_assignment_deficit(store, monkeypatch):
     import whab_plugin_sqlite.store as module
 
     monkeypatch.setattr(module, "current_month", lambda: "2026-12")
     store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
     store.set_rollover_mode("personal", "2026-11", "USD", "balance")
-    if change == "rollover":
-        store.assign("personal", "rent", "2026-10", 10000)
-        store.set_rollover_mode("personal", "2026-10", "USD", "balance")
     store.assign("personal", "groceries", "2026-11", 10000)
     assert store.workspace("personal", "2026-11")["summary"]["readyToAssign"] == 0
     assert store.workspace("personal", "2026-12")["summary"]["readyToAssign"] == 10000
     before = store.state("personal")
     with pytest.raises(StoreError, match="available money"):
-        if change == "assignment":
-            store.assign("personal", "rent", "2026-10", 10000)
-        else:
-            store.set_rollover_mode("personal", "2026-10", "USD", "category")
+        store.assign("personal", "rent", "2026-10", 10000)
     assert store.state("personal") == before
+
+
+def test_later_balance_boundary_preserves_a_saved_intermediate_rollover_deficit(store, monkeypatch):
+    import whab_plugin_sqlite.store as module
+
+    monkeypatch.setattr(module, "current_month", lambda: "2026-12")
+    store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+    store.set_rollover_mode("personal", "2026-11", "USD", "balance")
+    store.assign("personal", "rent", "2026-10", 10000)
+    store.set_rollover_mode("personal", "2026-10", "USD", "balance")
+    store.assign("personal", "groceries", "2026-11", 10000)
+    before = store.export_budget()
+    store.set_rollover_mode("personal", "2026-10", "USD", "category")
+    assert store.export_budget() == {**before, "rolloverModes": [
+        {"month": "2026-10", "currency": "USD", "mode": "category"},
+        {"month": "2026-11", "currency": "USD", "mode": "balance"},
+    ]}
+    assert store.workspace("personal", "2026-11")["summary"]["readyToAssign"] == -10000
+    assert store.workspace("personal", "2026-12")["summary"]["readyToAssign"] == 10000
 
 
 @pytest.mark.parametrize("month,currency,mode", [

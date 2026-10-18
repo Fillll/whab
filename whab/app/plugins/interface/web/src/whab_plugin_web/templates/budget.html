@@ -32,7 +32,7 @@
               {% for period in periods %}
                 <th colspan="{{ period.column_count }}" scope="colgroup" class="budget-month-summary-cell" data-budget-key="{{ period.month }}">
                   <section class="budget-month-summary{% if period.month==month %} is-selected{% endif %}" aria-label="{{ month_label(period.month) }} summary">
-                    <div class="budget-month-heading"><span class="budget-month-name">{{ month_label(period.month).split(' ')[0] }}<small>{{ period.month[:4] }}</small></span></div>
+                    <div class="budget-month-heading"><span class="budget-month-name">{{ month_label(period.month).split(' ')[0] }}<small>{{ period.month[:4] }}</small></span>{% if period.monthlyFundingFlow is sameas true and period.month>=data.budgetStartMonth and valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<0 %}<span class="budget-funding-warning negative" role="note">Funding shortfall</span>{% endif %}</div>
                     {% set rollover_known = period.rolloverMode in ['category','balance'] %}
                     {% set rollover_planning = data.budgetStartMonth<=period.month<'2200-12' %}
                     <div class="budget-rollover">
@@ -47,8 +47,10 @@
                               {% endfor %}
                             </div>
                           </fieldset>
-                          <p class="field-error" data-budget-local role="alert" hidden></p>
-                          <span class="budget-save-status" data-budget-save-status data-budget-local role="status" aria-live="polite" hidden></span>
+                          <div class="budget-rollover-feedback">
+                            <span class="budget-save-status" data-budget-save-status data-budget-local role="status" aria-live="polite" hidden></span>
+                            <p class="field-error" data-budget-local role="alert" hidden></p>
+                          </div>
                         </form>
                       {% else %}
                         <div class="budget-rollover-heading"><span>Carryover</span>{% if period.month<'2200-12' %}<small>Into {{ month_label(shift_month(period.month,1)) }}</small>{% endif %}</div>
@@ -160,7 +162,7 @@
                         </dl>
                         <p>Income + Carried in − Assigned for next month − Assigned this month.</p>
                         <p>{% if period.summary.readyToAssign<0 %}A negative amount means this month's funding pool does not cover its category assignments and next-month set-aside. Review carried-in deficits, income and assignments before assigning more.{% else %}This is the unassigned money remaining in {{ month_label(period.month) }}'s funding pool.{% endif %} By-category carryover stays in its categories and is excluded from this pool.</p>
-                        {% if valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<p>Some funds are needed to cover spending or account reserves. Review category overspending, uncategorized spending, and account balances before assigning more money.</p>{% endif %}
+                        {% if valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<p>Some funds are needed to cover spending or account reserves. Review category overspending, uncategorized spending, and account balances before assigning more money.</p>{% if period.summary.fundingCapacity<0 %}<p class="negative">Available after spending and account reserves: {{ money_number(period.summary.fundingCapacity) }}.</p>{% endif %}{% endif %}
                       {% endcall %}
                     {% else %}<small class="budget-row-note">Breakdown unavailable</small>{% endif %}
                   {% endif %}

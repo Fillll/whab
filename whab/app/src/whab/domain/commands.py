@@ -18,6 +18,7 @@ from .budget import (
     effective_month_funding,
     ensure_assignment_allowed,
     ensure_funding_capacity_preserved,
+    ensure_projection_totals_supported,
 )
 from .categories import ensure_child_category
 from .dates import shift_month
@@ -205,7 +206,7 @@ def assign_next_month(
 def set_rollover_mode(
     state: dict, month: str, currency: str, mode: str, *, as_of_month: str,
 ) -> None:
-    """Choose a month's outgoing category boundary without moving any money."""
+    """Choose a month's outgoing boundary, retaining any resulting deficits."""
     validate_month(month)
     validate_month(as_of_month)
     currency = currency_code(currency)
@@ -220,7 +221,5 @@ def set_rollover_mode(
             month: {**state.get("rolloverModes", {}).get(month, {}), currency: mode},
         },
     }
-    ensure_funding_capacity_preserved(
-        state, candidate, month, as_of_month, currency, preserve_monthly_pool=False,
-    )
+    ensure_projection_totals_supported(state, candidate, month, as_of_month)
     state.setdefault("rolloverModes", {}).setdefault(month, {})[currency] = mode

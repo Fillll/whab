@@ -190,3 +190,48 @@ def test_rollover_form_saves_source_currency_and_shows_signed_pool_balance(clien
     assert next(row for row in restored["budget"] if row["categoryId"] == category_ids["USD"])[
         "carryover"
     ] == 20000 - spent
+
+
+def test_rollover_saves_and_flags_next_month_cash_shortfall_even_with_a_positive_monthly_pool(client, store):
+    account = store.add_account("personal", {
+        "name": "Cash fixture", "type": "depository", "balance": 30000, "currency": "USD",
+    })
+    rent = store.add_category("personal", {
+        "name": "Rent fixture", "group": "Home", "target": 0, "currency": "USD",
+    })
+    food = store.add_category("personal", {
+        "name": "Food fixture", "group": "Everyday", "target": 0, "currency": "USD",
+    })
+    store.assign("personal", rent, "2026-10", 10000)
+    store.add_transaction("personal", {
+        "accountId": account, "date": "2026-10-05", "merchant": "Food fixture",
+        "amount": 20000, "categoryId": food,
+    })
+    payload = {"workspace": "personal", "month": "2026-10", "currency": "USD"}
+    assert client.put("/api/budget/settings/rollover", json={**payload, "mode": "balance"}).status_code == 200
+    store.assign("personal", rent, "2026-11", 5000)
+    before = client.get("/api/workspace?workspace=personal&month=2026-11&currency=USD").json()
+    assert before["summary"]["readyToAssign"] == before["summary"]["fundingCapacity"] == 5000
+
+    response = client.put("/api/budget/settings/rollover", json={**payload, "mode": "category"})
+    assert response.status_code == 200
+    following = client.get("/api/workspace?workspace=personal&month=2026-11&currency=USD").json()
+    assert following["summary"]["readyToAssign"] == 15000
+    assert following["summary"]["fundingCapacity"] == -5000
+    assert following["accounts"] == before["accounts"]
+
+    rendered = client.get("/budgets/home/budget/2026-10/usd")
+    assert rendered.status_code == 200
+    text = rendered.text
+    assert [option["value"] for option in rollover_forms(text)[0]["options"] if option["checked"]] == [
+        "category",
+    ]
+    october = re.search(r'aria-label="October 2026 summary">(.*?)</section>', text, re.S)[1]
+    november = re.search(r'aria-label="November 2026 summary">(.*?)</section>', text, re.S)[1]
+    assert "budget-funding-warning" not in october
+    assert 'class="budget-funding-warning negative" role="note">Funding shortfall</span>' in november
+    ready = re.search(r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', text, re.S)[1]
+    attributes, cell = re.findall(r'<td([^>]*)>(.*?)</td>', ready, re.S)[1]
+    assert "positive" in attributes and "negative" not in attributes
+    assert re.sub(r'<details\b[^>]*>.*?</details>', "", cell, flags=re.S).strip() == "150.00"
+    assert 'class="negative">Available after spending and account reserves: -50.00.</p>' in cell

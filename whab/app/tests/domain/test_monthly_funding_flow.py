@@ -271,7 +271,7 @@ def test_unknown_credit_still_blocks_increases_even_when_covering_category_debt(
         assign(ledger, "food", "2026-02", 100000)
 
 
-def test_rollover_cannot_hide_a_worsened_cash_deficit_behind_an_improved_monthly_pool():
+def test_rollover_keeps_negative_monthly_pools_and_worsened_cash_headroom_visible():
     ledger = state(opening=10000)
     ledger["accounts"]["card"] = {
         "id": "card", "type": "credit", "balance": 2000, "source": "manual",
@@ -284,13 +284,24 @@ def test_rollover_cannot_hide_a_worsened_cash_deficit_behind_an_improved_monthly
     summary = project(ledger, "2026-02")["summary"]
     assert summary["readyToAssign"] == -2800
     before = deepcopy(ledger)
-    with pytest.raises(StoreError, match="2026-02"):
-        mode(ledger, "2026-01", "category")
+    mode(ledger, "2026-01", "category")
+    assert ledger == {**before, "rolloverModes": {"2026-01": {"USD": "category"}}}
+    february = project(ledger, "2026-02")
+    # Rent retains its 300 while Food retains its -800. The monthly pool may
+    # improve even though more cash is reserved in positive category balances.
+    assert february["summary"]["readyToAssign"] == -2300
+    assert {row["categoryId"]: row["carryover"] for row in february["budget"]} == {
+        "food": -800, "rent": 300,
+    }
+    assert february["summary"]["available"] + february["summary"]["readyToAssign"] == 7200
+    for operation in (
+        lambda: assign(ledger, "rent", "2026-02", 10001),
+        lambda: reserve(ledger, "2026-02", 1),
+    ):
+        with pytest.raises(StoreError, match="exceeds available"):
+            operation()
+    mode(ledger, "2026-01", "balance")
     assert ledger == before
-    # Restoring category balances would improve the pool to -2300, but reserve
-    # another 300 in Rent and worsen already-negative actual cash headroom.
-    ledger["rolloverModes"]["2026-01"]["USD"] = "category"
-    assert project(ledger, "2026-02")["summary"]["readyToAssign"] == -2300
 
 
 @pytest.mark.parametrize("credit", [False, True])

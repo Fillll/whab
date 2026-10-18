@@ -406,6 +406,44 @@ def test_monthly_rollover_api_pools_balances_once_and_preserves_source_month(cli
     assert restored['summary']['available'] == 899817
 
 
+def test_monthly_rollover_api_saves_negative_next_month_without_moving_money(client, monkeypatch):
+    monkeypatch.setattr('whab_plugin_sqlite.store.current_month', lambda: '2026-11')
+    assert client.post('/api/accounts', json={
+        'workspace': 'personal', 'name': 'Cash', 'type': 'depository', 'balance': 10000,
+    }).status_code == 200
+    assert client.put('/api/budget/rent', json={
+        'workspace': 'personal', 'month': '2026-10', 'assigned': 10000,
+    }).status_code == 200
+    request = {'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'mode': 'balance'}
+    assert client.put('/api/budget/settings/rollover', json=request).status_code == 200
+    assert client.put('/api/budget/groceries', json={
+        'workspace': 'personal', 'month': '2026-11', 'assigned': 10000,
+    }).status_code == 200
+    before = client.get('/api/workspace?workspace=personal&month=2026-11').json()
+    assert before['summary']['readyToAssign'] == 0
+    assert client.put('/api/budget/settings/rollover', json={
+        **request, 'mode': 'category',
+    }).status_code == 200
+    after = client.get('/api/workspace?workspace=personal&month=2026-11').json()
+    assert after['incomingRolloverMode'] == 'category'
+    assert after['summary']['readyToAssign'] == after['summary']['fundingCapacity'] == -10000
+    assert after['accounts'] == before['accounts']
+    assert after['transactions'] == before['transactions']
+    assert [(row['categoryId'], row['assigned']) for row in after['budget']] == [
+        (row['categoryId'], row['assigned']) for row in before['budget']
+    ]
+    assert next(row for row in after['budget'] if row['categoryId'] == 'rent')['carryover'] == 10000
+    assert client.put('/api/budget/groceries', json={
+        'workspace': 'personal', 'month': '2026-11', 'assigned': 10001,
+    }).status_code == 400
+    assert client.put('/api/budget/funding/next-month', json={
+        'workspace': 'personal', 'month': '2026-11', 'currency': 'USD', 'assigned': 1,
+    }).status_code == 400
+    assert client.get('/api/workspace?workspace=personal&month=2026-11').json() == after
+    assert client.put('/api/budget/settings/rollover', json=request).status_code == 200
+    assert client.get('/api/workspace?workspace=personal&month=2026-11').json() == before
+
+
 @pytest.mark.parametrize('change', [
     {'mode': 'reset'}, {'mode': True}, {'mode': None}, {'mode': 1}, {'mode': []},
     {'currency': 'xyz'}, {'currency': None}, {'month': '2026-13'},
