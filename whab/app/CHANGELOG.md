@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.8.1 — 2026-10-17
+
+PR: [#44](https://github.com/Fillll/whab/pull/44)
+
+- Require web 1.9 in bundled installations for the consolidated Carried in overview and Available to spend summary. Keep core rollover, funding and account balance calculations unchanged.
+
 ## 2.8.0 — 2026-10-17
 
 PR: [#43](https://github.com/Fillll/whab/pull/43)
