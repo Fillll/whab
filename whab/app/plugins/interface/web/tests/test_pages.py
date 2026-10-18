@@ -64,8 +64,8 @@ def test_default_formats_and_only_children_in_category_choices(client):
     category_selects = re.findall(r'<select name="categoryId"[^>]*>(.*?)</select>', text, re.S)
     assert category_selects
     assert all('<option value="Everyday"' not in select for select in category_selects)
-    assert 'data-minor-units="3"' in text
-    assert 'data-minor-units="0"' in text
+    assert '"KWD": 3' in text
+    assert '"JPY": 0' in text
     assert 'name="currency"' in text
     assert re.search(r'\$[0-9,]+\.[0-9]{2}', text)
     assert '-$64.25' in text and '$8,200.00' in text

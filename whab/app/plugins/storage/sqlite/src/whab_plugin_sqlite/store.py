@@ -607,8 +607,11 @@ class Store:
         return transaction_rows(self.state(workspace), month)
 
     def workspace(self, workspace: str, month: str | None = None) -> dict:
+        from .projection_reads import snapshot
+
         as_of_month = current_month()
-        return calculate_workspace(self.state(workspace), month or as_of_month, as_of_month=as_of_month)
+        selected_month = month or as_of_month
+        return calculate_workspace(snapshot(self, workspace, selected_month), selected_month, as_of_month=as_of_month)
 
     def workspace_periods(self, workspace: str, month: str, count: int) -> list[dict]:
         from .projections import workspace_periods

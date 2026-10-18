@@ -28,6 +28,7 @@
       </select>
     </label>
 {% endmacro %}
+<script id="account-currency-choices" type="application/json">{{ dict(currency_choices)|tojson }}</script>
 <dialog class="modal"
         id="category-dialog">{{ heading('New category', 'Make space for something you want to budget for.') }}
   <form class="modal-form" data-api="/categories">
@@ -73,8 +74,8 @@
     {{ account_classification() }}
     <p class="settings-notice">On-budget accounts participate in your budget. Off-budget accounts track net worth without affecting budget income or spending.</p>
     <label>
-      Currency<select name="currency">
-      {% for code, digits in currency_choices %}<option value="{{ code }}" data-minor-units="{{ digits }}"{% if code==currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
+      Currency<select name="currency" data-currency-choices-lazy>
+      <option value="{{ currency }}" data-minor-units="{{ minor_units }}" selected>{{ currency }}</option>
       </select>
     </label>
     <label>
@@ -94,8 +95,8 @@
     <input type="hidden" name="workspace" value="{{ workspace }}">
     <p class="settings-notice" role="status" data-account-settings-status></p>
     <div class="form-columns"><label>Account name<input name="name" maxlength="200" required autocomplete="off"></label>
-    <label>Account currency<select name="currency" aria-describedby="account-currency-hint" disabled>
-      {% for code, digits in currency_choices %}<option value="{{ code }}">{{ code }}</option>{% endfor %}
+    <label>Account currency<select name="currency" data-currency-choices-lazy aria-describedby="account-currency-hint" disabled>
+      <option value="{{ currency }}" data-minor-units="{{ minor_units }}" selected>{{ currency }}</option>
     </select></label></div>
     <p class="settings-notice" id="account-currency-hint">Currency can change only before this account has transaction history. Amounts are never converted.</p>
     <div class="account-classification-fields">{{ account_classification() }}</div>

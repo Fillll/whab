@@ -1,5 +1,6 @@
 """Consecutive periods share one ledger read without caching financial state."""
 
+from contextlib import contextmanager
 from copy import deepcopy
 
 import pytest
@@ -15,11 +16,16 @@ def test_workspace_periods_match_single_reads_using_one_snapshot(store, monkeypa
     original = deepcopy(state)
     reads = []
 
-    def snapshot(scope):
-        reads.append(scope)
-        return state
+    original_snapshot = store._snapshot
 
-    monkeypatch.setattr(store, "state", snapshot)
+    @contextmanager
+    def snapshot():
+        reads.append(workspace)
+        with original_snapshot():
+            yield
+
+    monkeypatch.setattr(store, "_snapshot", snapshot)
+    monkeypatch.setattr(store, "state", lambda scope: pytest.fail("Projection must not load complete private state."))
     actual = workspace_periods(store, workspace, "2026-10", 3)
     assert reads == [workspace]
     assert actual == expected

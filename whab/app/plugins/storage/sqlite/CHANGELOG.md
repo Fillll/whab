@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.6.2 — 2026-10-18
+
+PR: [#60](https://github.com/Fillll/whab/pull/60)
+
+- Read complete financial/reference history for core budget calculations while loading full display text and review metadata only for the viewed months. Preserve coherent snapshots, exact results/errors, historical validation, and complete private-state/export/mutation APIs.
+
 ## 1.6.1 — 2026-10-18
 
 PR: [#59](https://github.com/Fillll/whab/pull/59)
