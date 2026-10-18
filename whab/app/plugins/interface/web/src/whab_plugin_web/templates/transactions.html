@@ -24,6 +24,7 @@
 </div>
 <div class="transaction-feedback" data-transaction-feedback hidden role="status"><span data-transaction-feedback-text></span><button class="text-link" type="button" data-transaction-retry>Retry save</button></div>
 <span class="sr-only" data-transaction-save-status aria-live="polite"></span>
+<template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</template>
 <div class="table-scroll transactions-scroll" role="region" aria-labelledby="transaction-title" tabindex="0">
   <table class="transactions-table">
     <thead><tr>
@@ -52,9 +53,9 @@
             {% if transaction.isTransfer %}<span class="transaction-status" title="Transfer" aria-label="Transfer">{{ icon('arrow-right', 13) }}</span>{% endif %}
           </div>
         </td>
-        <td class="transaction-category-cell"><select name="categoryId" data-transaction-field="categoryId" aria-label="Category for {{ transaction.merchant }}" class="{% if not transaction.categoryId and not transaction.isTransfer %}uncategorized{% endif %}">
+        <td class="transaction-category-cell"><select name="categoryId" data-transaction-field="categoryId" data-category-options-lazy aria-label="Category for {{ transaction.merchant }}" class="{% if not transaction.categoryId and not transaction.isTransfer %}uncategorized{% endif %}">
           <option value="">{{ 'Transfer (excluded)' if transaction.inferredTransfer else 'Income / uncategorized' if transaction.amount<0 else 'Uncategorized' }}</option>
-          {% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}"{% if transaction.categoryId==row.category.id %} selected{% endif %}>{{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}
+          {% if transaction.categoryId %}<option value="{{ transaction.categoryId }}" selected>{{ category_labels.get(transaction.categoryId, 'Unknown category') }}</option>{% endif %}
         </select></td>
         <td class="transaction-memo-cell"><textarea rows="1" maxlength="1000" class="transaction-memo" data-transaction-field="note" aria-label="Memo for {{ transaction.merchant }}" placeholder="Memo">{{ transaction.note }}</textarea></td>
         <td class="amount-cell {% if transaction.amount<0 %}inflow{% endif %}">{{ money(-transaction.amount) }}</td>

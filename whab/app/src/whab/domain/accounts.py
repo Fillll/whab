@@ -73,6 +73,34 @@ def bank_website(value):
     raise StoreError("Use the bank's public HTTPS website without credentials, a port, query or fragment.")
 
 
+def bank_website_entry(value):
+    """Best-effort optional artwork input; never block financial metadata edits.
+
+    Users may paste a public address without a scheme. Only its public hostname
+    is retained; the strict validator still guards persisted/provider targets.
+    Unusable artwork input clears this optional field instead of raising.
+    """
+    if type(value) is not str:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    if value.startswith("//"):
+        value = "https:" + value
+    elif "://" not in value:
+        value = "https://" + value
+    elif value[:7].lower() == "http://":
+        value = "https://" + value[7:]
+    try:
+        parsed = urlsplit(value)
+        if (parsed.scheme != "https" or parsed.username is not None or parsed.password is not None
+                or parsed.port is not None or not parsed.hostname):
+            return None
+        return bank_website("https://" + parsed.hostname)
+    except (ValueError, UnicodeError):
+        return None
+
+
 def is_on_budget(account: dict) -> bool:
     """Legacy cash/card records stay on budget; tracking records default off."""
     return account.get("onBudget", account["type"] in ON_BUDGET_ACCOUNT_TYPES)

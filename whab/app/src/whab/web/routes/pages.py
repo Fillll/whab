@@ -84,14 +84,6 @@ def create_router(
             valid_month(month)
         except ValueError as error:
             raise HTTPException(400, "Invalid month") from error
-        if page == "budget" and ui.budget_months > 1:
-            periods = [
-                select_currency(period, currency)
-                for period in service.workspace_periods(workspace, month, ui.budget_months)
-            ]
-            data = {**periods[0], "periods": periods}
-        else:
-            data = select_currency(service.workspace(workspace, month), currency)
         all_accounts = service.accounts(workspace)
         account_slugs = routing.account_slugs(identifier, workspace, all_accounts) if routing else {}
         account_slug = request.path_params.get("account_slug")
@@ -102,27 +94,32 @@ def create_router(
             if account is not None and account != resolved:
                 raise HTTPException(400, "Account does not match this address")
             account = resolved
+        transaction_all_dates = page == "transactions" and all_dates
+        if page == "transactions" and ui.lightweight_transactions:
+            data = service.transaction_register(
+                workspace, None if transaction_all_dates else month, currency, account,
+            )
+        elif page == "budget" and ui.budget_months > 1:
+            periods = [
+                select_currency(period, currency)
+                for period in service.workspace_periods(workspace, month, ui.budget_months)
+            ]
+            data = {**periods[0], "periods": periods}
+        else:
+            data = select_currency(service.workspace(workspace, month), currency)
         selected_account = next((row for row in data["accounts"] if row["id"] == account), None)
         if account_slug is not None and selected_account is None:
             raise HTTPException(404, "Account address not found for this currency")
-        transaction_all_dates = page == "transactions" and all_dates
-        if page == "transactions":
+        if page == "transactions" and not ui.lightweight_transactions:
             if transaction_all_dates:
                 account_ids = {row["id"] for row in data["accounts"]}
-                data = {
-                    **data,
-                    "transactions": [
-                        row for row in service.transactions(workspace)
-                        if row["accountId"] in account_ids
-                    ],
-                }
+                data = {**data, "transactions": [
+                    row for row in service.transactions(workspace) if row["accountId"] in account_ids
+                ]}
             if selected_account is not None:
-                data = {
-                    **data,
-                    "transactions": [
-                        row for row in data["transactions"] if row["accountId"] == account
-                    ],
-                }
+                data = {**data, "transactions": [
+                    row for row in data["transactions"] if row["accountId"] == account
+                ]}
         status = public_status()
         try:
             context = ui.build_context(

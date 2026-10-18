@@ -18,7 +18,6 @@ from whab.plugins import (
     Insight,
     LogoImage,
     Plugin,
-    PluginAction,
     PluginSettings,
     StoreError,
     bank_website,
@@ -28,7 +27,6 @@ _MAX_BYTES = 128 * 1024
 _MAX_CACHE_BYTES = 2 * _MAX_BYTES
 _MAX_DOMAIN_KEYS = 256
 _DYNAMIC_KEY = re.compile(r"domain-[0-9a-f]{32}")
-_CACHE_SECONDS = 365 * 24 * 60 * 60
 _FAILURE_SECONDS = 5 * 60
 _MEDIA_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
 _DOMAINS = {
@@ -149,7 +147,7 @@ def fetch_logo(key: str, *, client: httpx.Client | None = None) -> LogoImage | N
 
 
 class _LogoCache:
-    """Bounded public artwork cache; a flush also invalidates in-flight writes."""
+    """Retain saved public artwork indefinitely, with bounded memory and fetches."""
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
@@ -181,14 +179,6 @@ class _LogoCache:
         if len(self._entries) >= _MAX_DOMAIN_KEYS:
             del self._entries[next(iter(self._entries))]
         self._entries[key] = entry
-
-    def _prune_files(self) -> None:
-        files = [
-            path for path in self._directory.glob("domain-*.json")
-            if _DYNAMIC_KEY.fullmatch(path.stem)
-        ]
-        for path in sorted(files, key=lambda path: path.stat().st_mtime)[:-_MAX_DOMAIN_KEYS]:
-            path.unlink()
 
     def _reset(self) -> None:
         self._generation += 1
@@ -224,14 +214,15 @@ class _LogoCache:
                 type(saved_at) not in (int, float)
                 or not math.isfinite(saved_at)
                 or not 0 <= saved_at <= now
-                or now - saved_at >= _CACHE_SECONDS
             ):
                 return None
             image = LogoImage(
                 data=base64.b64decode(record["data"], validate=True),
                 media_type=record["media_type"],
             )
-            return saved_at + _CACHE_SECONDS, image
+            # The legacy downloaded-at record remains readable, but age no
+            # longer expires successful artwork or triggers another download.
+            return math.inf, image
         except (OSError, ValueError, TypeError, KeyError, OverflowError, RecursionError):
             return None
 
@@ -249,7 +240,6 @@ class _LogoCache:
                 with temporary.open("x", encoding="utf-8") as saved:
                     saved.write(content)
                 temporary.replace(path)
-                self._prune_files()
             except OSError:
                 # Public artwork remains optional when its cache directory is unavailable.
                 pass
@@ -260,7 +250,7 @@ class _LogoCache:
         while True:
             with self._lock:
                 entry = self._entries.get(key)
-                if entry is None and key in self._domains and self._directory is not None:
+                if entry is None and self._directory is not None:
                     entry = self._load(self._directory / f"{key}.json", time.time())
                     if entry is not None:
                         self._remember(key, entry)
@@ -280,8 +270,8 @@ class _LogoCache:
             with self._lock:
                 if generation == self._generation and self.domain(key) is not None:
                     now = time.time()
-                    lifetime = _FAILURE_SECONDS if image is None else _CACHE_SECONDS
-                    self._remember(key, (now + lifetime, image))
+                    expires = now + _FAILURE_SECONDS if image is None else math.inf
+                    self._remember(key, (expires, image))
                     if image is not None:
                         self._save(key, image, now)
                 if self._pending.get(key) is pending:
@@ -299,8 +289,8 @@ class _LogoCache:
         return (
             Insight(
                 title="Cache duration",
-                value="1 year (365 days)",
-                detail="Logos refresh on the next request after they expire. "
+                value="Indefinite",
+                detail="Downloaded logos stay saved across restarts and do not expire. "
                 "Unavailable logos are retried after 5 minutes.",
             ),
             Insight(title="Cached logos", value=str(count)),
@@ -355,13 +345,5 @@ plugin = Plugin(
         resolve=resolve, fetch=fetch, configure_cache=configure_cache, resolve_domain=resolve_domain,
         provider_name="Icon Horse", provider_url="https://icon.horse",
     ),
-    settings=PluginSettings(
-        read=read_settings,
-        actions=(PluginAction(
-            id="flush-cache",
-            label="Flush cache",
-            description="Remove all cached bank logos and retry unavailable logos immediately.",
-        ),),
-        act=apply_setting,
-    ),
+    settings=PluginSettings(read=read_settings),
 )

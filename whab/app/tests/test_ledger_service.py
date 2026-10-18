@@ -445,3 +445,49 @@ def test_invalid_workspace_period_requests_never_dispatch(workspace, month, coun
 def test_workspace_periods_clamp_at_the_last_supported_month(store, month, count, expected):
     periods = LedgerService(store).workspace_periods("personal", month, count)
     assert [period["month"] for period in periods] == expected
+
+
+def test_register_projection_fallback_scopes_public_reads_without_workspace():
+    accounts = [
+        {"id": "usd", "currency": "USD"}, {"id": "second", "currency": "USD"},
+        {"id": "eur", "currency": "EUR"},
+    ]
+    categories = [{"id": "food", "name": "Food", "group": "Living", "target": 0, "currency": "USD"}]
+    rows = [
+        {"id": "first", "accountId": "usd", "date": "2026-10-01", "token": "secret"},
+        {"id": "other", "accountId": "second", "date": "2026-10-01"},
+        {"id": "prior", "accountId": "usd", "date": "2026-09-01"},
+        {"id": "euro", "accountId": "eur", "date": "2026-10-01"},
+    ]
+    store = SimpleNamespace(
+        accounts=lambda _: accounts, categories=lambda _: categories,
+        transactions=lambda *_: rows,
+    )
+    service = LedgerService(store)
+    scoped = service.transaction_register("personal", "2026-10", "USD", "usd")
+    assert scoped["transactions"] == [{"id": "first", "accountId": "usd", "date": "2026-10-01"}]
+    assert [row["id"] for row in scoped["accounts"]] == ["usd", "second"]
+    assert scoped["currencies"] == ["EUR", "USD"]
+    assert [row["id"] for row in scoped["categoryGroups"][0]["children"]] == ["food"]
+    assert len(service.transaction_register("personal", None, "USD")["transactions"]) == 3
+    assert len(service.transaction_register("personal", None, "USD", "eur")["transactions"]) == 3
+    for arguments in (("invalid", None, "USD"), ("personal", "bad", "USD"),
+                      ("personal", None, "USD", []), ("personal", None, "bad")):
+        with pytest.raises(StoreError):
+            service.transaction_register(*arguments)
+
+
+def test_register_projection_fast_path_ignores_private_and_out_of_scope_rows():
+    calls = []
+    data = {
+        "accounts": [{"id": "usd", "currency": "USD"}], "categories": [],
+        "transactions": [
+            {"id": "ok", "accountId": "usd", "date": "2026-10-05", "cursor": "private"},
+            {"id": "wrong-account", "accountId": "unknown", "date": "2026-10-05"},
+            {"id": "wrong-month", "accountId": "usd", "date": "2026-09-05"},
+        ],
+    }
+    service = LedgerService(SimpleNamespace(transaction_register=lambda *args: calls.append(args) or data))
+    result = service.transaction_register("personal", "2026-10", "USD", "usd")
+    assert calls == [("personal", "2026-10", "USD", "usd")]
+    assert result["transactions"] == [{"id": "ok", "accountId": "usd", "date": "2026-10-05"}]

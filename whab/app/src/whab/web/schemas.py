@@ -15,7 +15,7 @@ from pydantic import (
     model_validator,
 )
 
-from whab.domain.accounts import normalize_account
+from whab.domain.accounts import bank_website_entry, normalize_account
 from whab.domain.money import currency_code
 
 Workspace = Literal["demo", "personal"]
@@ -124,11 +124,12 @@ class AccountBody(Body):
 class AccountClassificationBody(Body):
     workspace: Workspace
     name: Label | None = None
-    bankWebsite: str | None = Field(default=None, max_length=2048)
+    bankWebsite: str | None = None
     currency: str | None = None
     type: str | None = None
     onBudget: StrictBool | None = None
     subtype: str | None = None
+    _website = field_validator("bankWebsite")(bank_website_entry)
 
     @model_validator(mode="after")
     def classification(self):
@@ -140,6 +141,10 @@ class AccountClassificationBody(Body):
         if "onBudget" in changes and self.onBudget is None:
             raise ValueError("Invalid account budget scope")
         return self
+
+
+class BankLogoPreviewBody(Body):
+    website: str | None = None
 
 
 class PluginSelectionBody(Body):

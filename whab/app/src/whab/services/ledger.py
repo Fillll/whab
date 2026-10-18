@@ -13,10 +13,11 @@ from json import dumps
 from threading import RLock
 from uuid import uuid4
 
-from whab.domain.accounts import bank_website, normalize_account
+from whab.domain.accounts import bank_website_entry, normalize_account
+from whab.domain.categories import category_tree
 from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
-from whab.domain.money import cents, currency_code
+from whab.domain.money import cents, currency_code, currency_minor_units
 from whab.domain.portable import ACCOUNT_FIELDS, validate_portable_budget
 from whab.domain.transactions import UNSET
 from whab.domain.validation import validate_date, validate_label, validate_month
@@ -161,7 +162,7 @@ class LedgerService:
             if not payload.keys() & {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}:
                 raise StoreError("No account changes provided.")
             if "bankWebsite" in payload:
-                payload["bankWebsite"] = bank_website(payload["bankWebsite"])
+                payload["bankWebsite"] = bank_website_entry(payload["bankWebsite"])
             if "type" in payload:
                 normalize_account(payload)
             if "onBudget" in payload and type(payload["onBudget"]) is not bool:
@@ -254,6 +255,53 @@ class LedgerService:
 
     def workspace(self, workspace, month=None):
         return self.query("workspace", workspace, month)["data"]
+
+    def transaction_register(
+        self, workspace: str, month: str | None, currency: str, account_id: str | None = None,
+    ) -> dict:
+        """Read a scoped register without calculating unrelated envelope histories.
+
+        Optional backend row selection avoids loading other accounts' histories.
+        Existing backends retain compatibility through their public read methods.
+        Every read remains serialized with commands; no financial page cache is used.
+        """
+        self._workspace(workspace)
+        if month is not None:
+            _month(month)
+        currency = currency_code(currency)
+        if account_id is not None:
+            _identifier(account_id)
+        with self._lock:
+            read = getattr(self._store, "transaction_register", None)
+            data = (
+                read(workspace, month, currency, account_id) if callable(read)
+                else {
+                    "accounts": self._store.accounts(workspace),
+                    "categories": self._store.categories(workspace),
+                    "transactions": self._store.transactions(workspace, month),
+                }
+            )
+            accounts = _public(data["accounts"])
+            categories = _public(data["categories"])
+            currencies = sorted({"USD", currency, *(
+                row.get("currency", "USD") for row in accounts + categories
+            )})
+            accounts = [row for row in accounts if row.get("currency", "USD") == currency]
+            categories = [row for row in categories if row.get("currency", "USD") == currency]
+            account_ids = {row["id"] for row in accounts}
+            if account_id not in account_ids:
+                account_id = None
+            transactions = [
+                row for row in _public(data["transactions"])
+                if row["accountId"] in account_ids
+                and (account_id is None or row["accountId"] == account_id)
+                and (month is None or row["date"].startswith(month))
+            ]
+            return {
+                "currency": currency, "currencyMinorUnits": currency_minor_units(currency),
+                "currencies": currencies, "accounts": accounts, "categories": categories,
+                "categoryGroups": category_tree(categories), "transactions": transactions,
+            }
 
     def workspace_periods(self, workspace: str, month: str, count: int) -> list[dict]:
         """Read consecutive core projections under the budget's shared command lock.

@@ -114,7 +114,7 @@ def uncategorized_spending(data):
 def build_context(data, status, items, *, workspace, page, month, selected=None):
     categories = data["categories"]
     currency = currency_code(data.get("currency", "USD"))
-    budgets = {row["categoryId"]: row for row in data["budget"]}
+    budgets = {row["categoryId"]: row for row in data.get("budget", [])}
     selected = next((c for c in categories if c["id"] == selected), None)
     periods = [
         {
@@ -124,7 +124,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
             "column_count": 4 if period.get("incomingRolloverMode") == "category" else 3,
             "carryover": _carryover_total(period["budget"]),
         }
-        for period in data.get("periods", [data])
+        for period in data.get("periods", [] if page == "transactions" else [data])
     ]
     for period in periods:
         period["carried_in"], period["carried_in_parts"] = _carried_in(
@@ -148,7 +148,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
     for group in category_groups:
         rows = [
             {
-                "category": c, **budgets[c["id"]],
+                "category": c, **budgets.get(c["id"], {}),
                 "periods": [
                     {"month": period["month"], **projection[c["id"]]}
                     for period, projection in zip(periods, period_budgets, strict=True)
@@ -208,15 +208,15 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         {"category": c, "spent": spending[c["id"]]} for c in categories if spending[c["id"]] > 0
     ]
     spending_rows.sort(key=lambda row: row["spent"], reverse=True)
-    previous = next((t for t in data["trend"] if t["month"] == period_shift(month, -1)), None)
+    previous = next((t for t in data.get("trend", []) if t["month"] == period_shift(month, -1)), None)
     change = (
         (data["summary"]["spent"] - previous["spent"]) / previous["spent"] * 100
         if previous and previous["spent"] > 0
         else None
     )
-    trend = data["trend"]
+    trend = data.get("trend", [])
     minimum = 100 * 10**currency_minor_units(currency)
-    maximum = (max(minimum, *(t["spent"] for t in trend)) * 6 + 4) // 5
+    maximum = (max([minimum, *(t["spent"] for t in trend)]) * 6 + 4) // 5
     points = [
         {
             "x": 112 + i * 752 / max(1, len(trend) - 1),
@@ -266,6 +266,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "period_months": [period["month"] for period in periods],
         "category_path": lambda identifier: quote(identifier, safe=""),
         "category_names": category_names,
+        "category_labels": {row["id"]: row["name"] for row in categories},
         "category_parents": category_parents,
         "selected": selected,
         "selected_budget": budgets.get(selected["id"]) if selected else None,

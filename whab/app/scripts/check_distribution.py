@@ -105,9 +105,9 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     assert logos["category"] == "interface"
     options = client.get("/api/plugins/bank-logos/settings")
     assert options.status_code == 200 and options.json()["insights"]
-    assert any(action["id"] == "flush-cache" for action in options.json()["actions"])
-    flushed = client.post("/api/plugins/bank-logos/settings/actions/flush-cache", json={})
-    assert flushed.status_code == 200 and flushed.json()["message"]
+    assert any(row["title"] == "Cache duration" and row["value"] == "Indefinite" for row in options.json()["insights"])
+    assert options.json()["actions"] == []
+    assert client.post("/api/plugins/bank-logos/settings/actions/flush-cache", json={}).status_code == 404
     assert client.get("/api/plugins/web/settings").json() == {"insights": [], "actions": []}
     assert client.post("/api/plaid/link-token", json={}).status_code == 400
     export = client.get("/api/plugins/example/export?workspace=demo")

@@ -208,14 +208,15 @@ class PluginRegistry:
                     del self._logo_cache[key]
         return message
 
-    def bank_logo_provider(self):
+    def bank_logo_provider(self, plugin_id: str | None = None):
         """Public attribution for the first enabled explicit-website artwork provider."""
         return next(({
             "id": plugin.id, "display_name": plugin.display_name,
             "provider_name": plugin.bank_logos.provider_name,
             "provider_url": plugin.bank_logos.provider_url,
         } for plugin in self._plugins
-            if plugin.bank_logos is not None and plugin.bank_logos.resolve_domain is not None), None)
+            if (plugin_id is None or plugin.id == plugin_id)
+            and plugin.bank_logos is not None and plugin.bank_logos.resolve_domain is not None), None)
 
     def bank_logo(self, institution: str, *, website: str | None = None) -> tuple[str, str] | None:
         """Only public institution text or an explicitly supplied hostname reaches hooks."""

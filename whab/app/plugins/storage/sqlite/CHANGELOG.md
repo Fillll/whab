@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.4.0 — 2026-10-18
+
+PR: [#52](https://github.com/Fillll/whab/pull/52)
+
+- Read register metadata and selected account/month/currency transactions in one coherent snapshot, without loading envelope history or private provider state. Keep existing workspace, public-row and portable-image contracts unchanged.
+
 ## 1.3.0 — 2026-10-18
 
 PR: [#51](https://github.com/Fillll/whab/pull/51)

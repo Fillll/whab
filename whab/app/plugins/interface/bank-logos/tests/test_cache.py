@@ -1,4 +1,4 @@
-"""Public logo cache lifetime, persistence, flushes and concurrent requests."""
+"""Permanent public logo persistence, bounded memory and concurrent requests."""
 
 import base64
 import importlib
@@ -31,7 +31,7 @@ def record(saved_at=100, **overrides):
     }
 
 
-def test_descriptor_keeps_successful_logos_for_exactly_365_days(monkeypatch, tmp_path):
+def test_descriptor_keeps_successful_logos_indefinitely(monkeypatch, tmp_path):
     now = [100.0]
     requests = []
     monkeypatch.setattr(provider.time, "time", lambda: now[0])
@@ -39,14 +39,14 @@ def test_descriptor_keeps_successful_logos_for_exactly_365_days(monkeypatch, tmp
     provider.plugin.bank_logos.configure_cache(tmp_path)
     assert provider.plugin.bank_logos.fetch("chase") == IMAGE
     assert provider.plugin.bank_logos.fetch("chase") == IMAGE
-    now[0] += provider._CACHE_SECONDS - 1
+    now[0] += 100 * 365 * 24 * 60 * 60
     assert provider.fetch("chase") == IMAGE
     assert requests == ["chase"]
-    now[0] += 1
+    now[0] *= 100
     assert provider.fetch("chase") == IMAGE
-    assert requests == ["chase", "chase"]
+    assert requests == ["chase"]
     saved = json.loads((tmp_path / "chase.json").read_text())
-    assert saved == record(now[0])
+    assert saved == record(100)
     assert not (tmp_path / ".chase.json.tmp").exists()
 
 
@@ -60,21 +60,23 @@ def test_cache_restores_safe_successes_and_never_loads_arbitrary_keys(monkeypatc
     assert provider.fetch("unknown") is None
     assert provider.fetch(None) is None
     settings = provider.plugin.settings.read()
-    assert settings[0].value == "1 year (365 days)"
+    assert settings[0].value == "Indefinite"
+    assert "do not expire" in settings[0].detail
     assert settings[1].value == "1"
     assert "credentials" in settings[2].detail
-    assert provider.plugin.settings.actions[0].id == "flush-cache"
+    assert provider.plugin.settings.actions == ()
+    assert provider.plugin.settings.act is None
 
 
-def test_settings_count_only_unexpired_successes(monkeypatch):
+def test_settings_count_only_successes_without_expiring_them(monkeypatch):
     now = [100.0]
     monkeypatch.setattr(provider.time, "time", lambda: now[0])
     monkeypatch.setattr(provider, "fetch_logo", lambda key: IMAGE if key == "chase" else None)
     assert provider.fetch("chase") == IMAGE
     assert provider.fetch("citi") is None
     assert provider.read_settings()[1].value == "1"
-    now[0] += provider._CACHE_SECONDS
-    assert provider.read_settings()[1].value == "0"
+    now[0] += 100 * 365 * 24 * 60 * 60
+    assert provider.read_settings()[1].value == "1"
 
 
 @pytest.mark.parametrize(
@@ -86,7 +88,6 @@ def test_settings_count_only_unexpired_successes(monkeypatch):
         json.dumps(record(saved_at=float("inf"))),
         json.dumps(record(saved_at=-1)),
         json.dumps(record(saved_at=1001)),
-        json.dumps(record(saved_at=1000 - 365 * 24 * 60 * 60)),
         json.dumps(record(saved_at=10 ** 400)),
         json.dumps(record(data=1)),
         json.dumps(record(data="not base64")),
@@ -95,7 +96,7 @@ def test_settings_count_only_unexpired_successes(monkeypatch):
         "x" * (2 * 128 * 1024 + 1),
     ],
 )
-def test_invalid_expired_or_oversized_saved_files_are_ignored(content, monkeypatch, tmp_path):
+def test_invalid_or_oversized_saved_files_are_ignored(content, monkeypatch, tmp_path):
     monkeypatch.setattr(provider.time, "time", lambda: 1000)
     (tmp_path / "chase.json").write_text(content)
     provider.configure_cache(tmp_path)
@@ -130,7 +131,7 @@ def test_flush_removes_saved_and_temporary_logos_and_retries_failures(monkeypatc
     (tmp_path / ".chase.json.tmp").write_text("interrupted write")
     (tmp_path / "unrelated").write_text("preserved")
     provider._cache._entries["ally"] = (provider.time.time() + 300, None)
-    message = provider.plugin.settings.act("flush-cache")
+    message = provider.apply_setting("flush-cache")
     assert message == "Bank logo cache cleared. Logos will download again when requested."
     assert provider.read_settings()[1].value == "0"
     assert [path.name for path in tmp_path.iterdir()] == ["unrelated"]
@@ -288,15 +289,18 @@ def test_unexpected_fetch_exception_releases_waiters_and_caches_short_failure(mo
     assert not provider._cache._pending
 
 
-def test_saved_logo_expires_at_exactly_one_year(monkeypatch, tmp_path):
-    now = 100 + provider._CACHE_SECONDS
+def test_legacy_saved_logo_survives_arbitrary_age_and_restart(monkeypatch, tmp_path):
+    now = 100 + 100 * 365 * 24 * 60 * 60
     monkeypatch.setattr(provider.time, "time", lambda: now)
     (tmp_path / "chase.json").write_text(json.dumps(record(100)))
     provider.configure_cache(tmp_path)
-    assert provider.read_settings()[1].value == "0"
-    monkeypatch.setattr(provider, "fetch_logo", lambda key: IMAGE)
+    assert provider.read_settings()[1].value == "1"
+    monkeypatch.setattr(provider, "fetch_logo", lambda key: pytest.fail("cached logo downloaded"))
     assert provider.fetch("chase") == IMAGE
-    assert json.loads((tmp_path / "chase.json").read_text())["saved_at"] == now
+    assert json.loads((tmp_path / "chase.json").read_text())["saved_at"] == 100
+    monkeypatch.setattr(provider, "_cache", provider._LogoCache())
+    provider.configure_cache(tmp_path)
+    assert provider.fetch("chase") == IMAGE
 
 
 def test_explicit_hostnames_restore_saved_images_only_after_registration(monkeypatch, tmp_path):
@@ -318,6 +322,30 @@ def test_explicit_hostnames_restore_saved_images_only_after_registration(monkeyp
     # Cache reconfiguration also restores already registered explicit hostnames.
     provider.configure_cache(tmp_path)
     assert provider.fetch(key) == IMAGE
+
+
+def test_explicit_saved_images_survive_mapping_eviction_old_age_and_restart(monkeypatch, tmp_path):
+    now = [100.0]
+    monkeypatch.setattr(provider.time, "time", lambda: now[0])
+    monkeypatch.setattr(provider, "_MAX_DOMAIN_KEYS", 1)
+    monkeypatch.setattr(provider, "fetch_logo", lambda key: IMAGE)
+    provider.configure_cache(tmp_path)
+    first = provider.resolve_domain("first.example.com")
+    assert provider.fetch(first) == IMAGE
+    second = provider.resolve_domain("second.example.com")
+    assert provider.fetch(second) == IMAGE
+    assert provider._cache.domain(first) is None
+    assert len(list(tmp_path.glob("domain-*.json"))) == 2
+
+    now[0] += 100 * 365 * 24 * 60 * 60
+    monkeypatch.setattr(provider, "_cache", provider._LogoCache())
+    provider.configure_cache(tmp_path)
+    monkeypatch.setattr(provider, "fetch_logo", lambda key: pytest.fail("cached logo downloaded"))
+    assert provider.resolve_domain("first.example.com") == first
+    assert provider.fetch(first) == IMAGE
+    assert provider.resolve_domain("second.example.com") == second
+    assert provider.fetch(second) == IMAGE
+    assert len(list(tmp_path.glob("domain-*.json"))) == 2
 
 
 def test_flush_clears_explicit_files_from_earlier_processes_but_keeps_mappings(monkeypatch, tmp_path):
@@ -354,7 +382,7 @@ def test_hostname_registration_is_bounded_and_refreshes_recently_used_keys(monke
     assert len(provider._cache._domains) == 2
 
 
-def test_memory_entries_and_persisted_explicit_images_are_bounded(monkeypatch, tmp_path):
+def test_memory_eviction_preserves_all_saved_images_and_restores_without_download(monkeypatch, tmp_path):
     import os
 
     monkeypatch.setattr(provider, "_MAX_DOMAIN_KEYS", 2)
@@ -370,14 +398,17 @@ def test_memory_entries_and_persisted_explicit_images_are_bounded(monkeypatch, t
     unrelated.write_text("preserved")
     key = provider.resolve_domain("bank.example.com")
     assert provider.fetch(key) == IMAGE
-    assert not old_paths[0].exists()
-    assert not old_paths[1].exists()
+    assert old_paths[0].exists()
+    assert old_paths[1].exists()
     assert old_paths[2].exists()
     assert unrelated.read_text() == "preserved"
     assert provider.fetch("chase") == IMAGE
     assert provider.fetch("citi") == IMAGE
     assert len(provider._cache._entries) == 2
     assert key not in provider._cache._entries
+    monkeypatch.setattr(provider, "fetch_logo", lambda key: pytest.fail("cached logo downloaded"))
+    assert provider.fetch(key) == IMAGE
+    assert provider.fetch("chase") == IMAGE
 
 
 def test_eviction_during_download_does_not_reinsert_unregistered_key(monkeypatch, tmp_path):
