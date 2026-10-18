@@ -17,6 +17,7 @@ from pydantic import (
 
 from whab.domain.accounts import bank_website_entry, normalize_account
 from whab.domain.money import currency_code
+from whab.domain.transactions import validate_review_batch
 
 Workspace = Literal["demo", "personal"]
 Id = Annotated[str, StringConstraints(min_length=1, max_length=200)]
@@ -41,6 +42,20 @@ class ReviewBody(Body):
     categoryId: Id | None = None
     reviewed: StrictBool | None = None
     note: Note = ""
+
+
+class BulkReviewBody(Body):
+    workspace: Workspace
+    requestId: Id
+    transactionIds: Annotated[list[Id], Field(min_length=1, max_length=100)]
+    reviewed: StrictBool
+
+    @model_validator(mode="after")
+    def review_batch(self):
+        if "\x00" in self.requestId:
+            raise ValueError("Invalid request ID")
+        validate_review_batch(self.transactionIds, self.reviewed)
+        return self
 
 
 class TransactionBody(Body):

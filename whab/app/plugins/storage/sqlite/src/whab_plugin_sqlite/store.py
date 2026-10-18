@@ -667,6 +667,11 @@ class Store:
 
         edit_transaction(self, workspace, transaction_id, category_id, reviewed, note)
 
+    def review_transactions(self, workspace: str, transaction_ids: list[str] | tuple[str, ...], reviewed: bool) -> None:
+        from .bulk_review import review_transactions
+
+        review_transactions(self, workspace, transaction_ids, reviewed)
+
     def assign(self, workspace: str, category_id: str, month: str, assigned: int) -> None:
         self._mutate(
             workspace,

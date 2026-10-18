@@ -73,7 +73,9 @@ function harness(count = 5, options = {}) {
       '[data-transaction-search-form]': searchForm})[selector]});
   const window = element();
   window.history = {state: {}, replaceState: (...args) => history.push(args)};
-  const context = {document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, URL,
+  let requestId = 0;
+  const context = {document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, queueMicrotask, URL,
+    crypto: {randomUUID: () => `review-request-${++requestId}`}, getContext: () => ({bulkReview: options.bulkReview === true}),
     encodeURIComponent, location: {href: 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
     updateContext: value => contexts.push(value),
@@ -228,6 +230,187 @@ test('bulk review coalesces all successful writes into one summary request', asy
   await new Promise(resolve => setTimeout(resolve, 15));
   assert.equal(state.navigations.length, 1);
   state.register.dispose();
+});
+
+test('native bulk review sends one bounded request, excludes pending rows and keeps the current editors', async () => {
+  const state = harness(100, {paged: true, bulkReview: true});
+  state.rows[0].dataset.pending = 'true';
+  const memo = state.rows[1].controls['[data-transaction-field="note"]'];
+  memo.matches = () => true;
+  state.document.activeElement = memo;
+  const saving = state.bulk.emit('click').completed;
+  state.bulk.emit('click');
+  assert.equal(state.requests.length, 0);
+  assert.equal(state.register.dirty, true);
+  assert.equal(state.window.emit('beforeunload').event.prevented, true);
+  await tick();
+  assert.equal(state.requests.length, 1);
+  const request = state.requests[0];
+  assert.equal(request.path, '/transactions/review');
+  assert.equal(request.method, 'PUT');
+  assert.equal(request.body.workspace, 'personal');
+  assert.equal(request.body.reviewed, true);
+  assert.equal(request.body.transactionIds.length, 99);
+  assert.equal(request.body.transactionIds.includes('transaction-0'), false);
+  assert.equal(new Set(request.body.transactionIds).size, 99);
+  request.resolve({ok: true}); await saving;
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.rows[0].dataset.reviewed, 'false');
+  assert.equal(state.rows.slice(1).every(row => row.dataset.reviewed === 'true'), true);
+  assert.equal(state.register.dirty, false);
+  assert.equal(state.document.activeElement, memo);
+  assert.equal(state.navigations.length, 0);
+  state.document.activeElement = null; memo.emit('blur');
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.deepEqual(state.navigations.map(entry => entry.details), [{focus: false, refresh: true, history: 'replace', summary: true}]);
+  assert.equal(await state.register.flush(), true);
+  assert.equal(state.requests.length, 1);
+  state.register.dispose();
+});
+
+test('native lost-response retry confirms the same cohort before newer memo and opposite review fields', async () => {
+  const state = harness(3, {paged: true, bulkReview: true});
+  const saving = state.bulk.emit('click').completed;
+  await tick();
+  const original = state.requests[0].body;
+  const memo = state.rows[0].controls['[data-transaction-field="note"]'];
+  memo.matches = () => true;
+  state.document.activeElement = memo;
+  memo.value = 'Latest memo must survive'; memo.emit('input');
+  state.rows[0].controls['[data-transaction-reviewed]'].emit('click');
+  state.requests[0].reject(new Error('Response was lost after commit.'));
+  await saving;
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.rows.every(row => row.classList.contains('has-error')), true);
+  assert.equal(state.register.dirty, true);
+  assert.equal(state.navigations.length, 0);
+  const retry = state.controls['[data-transaction-retry]'].emit('click').completed;
+  await tick();
+  assert.equal(state.requests.length, 2);
+  assert.deepEqual(state.requests[1].body, original);
+  state.requests[1].resolve({ok: true});
+  await tick();
+  assert.equal(state.requests.length, 3);
+  assert.equal(state.requests[2].path, '/transactions/transaction-0');
+  assert.deepEqual(state.requests[2].body, {workspace: 'personal', reviewed: false, note: 'Latest memo must survive'});
+  state.requests[2].resolve({ok: true}); await retry;
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.deepEqual(state.rows.map(row => row.dataset.reviewed), ['false', 'true', 'true']);
+  assert.equal(state.rows.some(row => row.classList.contains('has-error')), false);
+  assert.equal(state.feedback.hidden, true);
+  assert.equal(state.register.dirty, false);
+  assert.equal(state.document.activeElement, memo);
+  assert.equal(memo.value, 'Latest memo must survive');
+  assert.equal(state.navigations.length, 0);
+  state.document.activeElement = null; memo.emit('blur');
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.navigations.length, 1);
+  assert.equal(state.requests.length, 3);
+  state.register.dispose();
+});
+
+test('writers already saving memos form a later native cohort after their original write finishes', async () => {
+  const state = harness(3, {paged: true, bulkReview: true});
+  const memo = state.rows[0].controls['[data-transaction-field="note"]'];
+  memo.value = 'Already saving'; memo.emit('input'); memo.emit('change');
+  const saving = state.bulk.emit('click').completed;
+  await tick();
+  assert.equal(state.requests.length, 2);
+  assert.equal(state.requests[0].path, '/transactions/transaction-0');
+  assert.deepEqual(state.requests[1].body.transactionIds, ['transaction-1', 'transaction-2']);
+  state.requests[1].resolve({ok: true}); await tick();
+  assert.equal(state.register.dirty, true);
+  state.requests[0].resolve({ok: true}); await tick();
+  assert.equal(state.requests.length, 3);
+  assert.equal(state.requests[2].path, '/transactions/review');
+  assert.deepEqual(state.requests[2].body.transactionIds, ['transaction-0']);
+  assert.notEqual(state.requests[2].body.requestId, state.requests[1].body.requestId);
+  state.requests[2].resolve({ok: true}); await saving;
+  assert.equal(state.rows.every(row => row.dataset.reviewed === 'true'), true);
+  assert.equal(memo.value, 'Already saving');
+  state.register.dispose();
+});
+
+test('combined queued category and review patches retain the individual ordered path', async () => {
+  const state = harness(2, {paged: true, bulkReview: true});
+  const memo = state.rows[0].controls['[data-transaction-field="note"]'];
+  memo.value = 'Original memo'; memo.emit('input'); memo.emit('change');
+  const saving = state.bulk.emit('click').completed;
+  const category = state.rows[0].controls['[data-transaction-field="categoryId"]'];
+  category.value = 'rent'; category.emit('change');
+  await tick();
+  state.requests[1].resolve({ok: true});
+  state.requests[0].resolve({ok: true}); await tick();
+  assert.equal(state.requests.length, 3);
+  assert.equal(state.requests[2].path, '/transactions/transaction-0');
+  assert.deepEqual(state.requests[2].body, {workspace: 'personal', reviewed: true, categoryId: 'rent'});
+  state.requests[2].resolve({ok: true}); await saving;
+  assert.equal(category.value, 'rent');
+  assert.equal(state.register.dirty, false);
+  state.register.dispose();
+});
+
+test('atomic errors retain every native row failure and never fall back to individual requests', async () => {
+  const state = harness(2, {paged: true, bulkReview: true});
+  const saving = state.bulk.emit('click').completed;
+  await tick(); state.requests[0].reject(new Error('Transaction not found.')); await saving;
+  assert.equal(state.rows.every(row => row.dataset.reviewed === 'false' && row.classList.contains('has-error')), true);
+  const navigating = state.register.flush();
+  await tick();
+  assert.equal(state.requests.length, 2);
+  assert.deepEqual(state.requests[1].body, state.requests[0].body);
+  assert.equal(state.requests.every(request => request.path === '/transactions/review'), true);
+  state.requests[1].reject(new Error('Transaction not found.'));
+  assert.equal(await navigating, false);
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.navigations.length, 0);
+  assert.equal(state.register.dirty, true);
+  assert.equal(state.feedback.hidden, false);
+  state.register.dispose();
+});
+
+test('search navigation waits for native batch completion and preserves its filter destination', async () => {
+  const state = harness(2, {paged: true, bulkReview: true, review: 'needs-review'});
+  const saving = state.bulk.emit('click').completed;
+  state.controls['#transaction-search'].value = 'another payee';
+  state.searchForm.emit('submit');
+  await tick();
+  assert.equal(state.navigations.length, 0);
+  assert.equal(state.requests.length, 1);
+  state.requests[0].resolve({ok: true}); await saving;
+  await tick();
+  assert.deepEqual(state.navigations, [{url: {q: 'another payee', review: 'needs-review'}, details: {focus: '#transaction-search'}}]);
+  state.register.dispose();
+});
+
+test('disposal settles queued native review saves without triggering a detached register refresh', async () => {
+  const state = harness(3, {paged: true, bulkReview: true});
+  const saving = state.bulk.emit('click').completed;
+  state.register.dispose();
+  await tick();
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.requests[0].path, '/transactions/review');
+  state.requests[0].resolve({ok: true}); await saving;
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.navigations.length, 0);
+  const memo = state.rows[0].controls['[data-transaction-field="note"]'];
+  memo.value = 'Detached'; memo.emit('input'); memo.emit('change');
+  assert.equal(state.requests.length, 1);
+});
+
+for (const failed of [false, true]) test(`disposal settles an active native ${failed ? 'failure' : 'save'} without refresh or another request`, async () => {
+  const state = harness(3, {paged: true, bulkReview: true});
+  const saving = state.bulk.emit('click').completed;
+  await tick();
+  assert.equal(state.requests.length, 1);
+  state.register.dispose();
+  if (failed) state.requests[0].reject(new Error('Unknown result after disposal.'));
+  else state.requests[0].resolve({ok: true});
+  await saving;
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.navigations.length, 0);
+  assert.equal(state.rows.every(row => row.classList.contains('has-error') === failed), true);
 });
 
 test('a canceled summary keeps refresh pending until a new draft is saved', async () => {

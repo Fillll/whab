@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.16.0 — 2026-10-18
+
+PR: [#63](https://github.com/Fillll/whab/pull/63)
+
+- Add optional atomic bulk review with bounded transaction selection, core validation, request replay and one tracked checkpoint per batch. Advertise support to interfaces while retaining the existing path for older storage providers. Require SQLite 1.8.0 and web 1.20.0 in the supported bundle.
+
 ## 2.15.0 — 2026-10-18
 
 PR: [#62](https://github.com/Fillll/whab/pull/62)

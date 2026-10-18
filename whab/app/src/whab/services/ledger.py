@@ -20,7 +20,7 @@ from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
 from whab.domain.money import cents, currency_code, currency_minor_units
 from whab.domain.portable import ACCOUNT_FIELDS, validate_portable_budget
-from whab.domain.transactions import UNSET
+from whab.domain.transactions import UNSET, validate_review_batch
 from whab.domain.validation import validate_date, validate_label, validate_month
 
 _PRIVATE_FIELDS = frozenset({"token", "accesstoken", "encryptedtoken", "cursor", "encryptionkey", "items"})
@@ -77,6 +77,10 @@ class LedgerService:
         with self._lock:
             return self._revision
 
+    @property
+    def supports_bulk_review(self) -> bool:
+        return callable(getattr(self._store, "review_transactions", None))
+
     def invalidate_revision(self) -> None:
         """Invalidate remote readers after a host-managed mutation under the shared lock."""
         with self._lock:
@@ -128,6 +132,7 @@ class LedgerService:
                 {"accountId", "date", "merchant", "amount", "categoryId"}, {"note"},
             ),
             "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed", "note"}),
+            "review_transactions": ({"transactionIds", "reviewed"}, set()),
             "assign": ({"categoryId", "month", "assigned"}, set()),
             "assign_next_month": ({"month", "currency", "assigned"}, set()),
             "set_rollover_mode": ({"month", "currency", "mode"}, set()),
@@ -137,6 +142,10 @@ class LedgerService:
         required, optional = fields[operation]
         if type(payload) is not dict or not required <= payload.keys() or payload.keys() - required - optional:
             raise StoreError("Invalid ledger command fields.")
+        if operation == "review_transactions":
+            payload = {**payload, "transactionIds": list(validate_review_batch(
+                payload["transactionIds"], payload["reviewed"],
+            ))}
         payload = deepcopy(payload)
         for name in ("name", "merchant", "group"):
             if name in payload and payload[name] is not None:
@@ -199,7 +208,7 @@ class LedgerService:
         ).encode()).hexdigest()
         with self._lock:
             if request_id in self._receipts:
-                previous, response = self._receipts[request_id]
+                previous, response, _ = self._receipts[request_id]
                 if previous != fingerprint:
                     raise RequestConflict("Request ID already belongs to another command.")
                 return deepcopy(response)
@@ -221,6 +230,12 @@ class LedgerService:
                     category_id=payload.get("categoryId", UNSET), reviewed=payload.get("reviewed"),
                     **({"note": payload["note"]} if "note" in payload else {}),
                 )
+            elif operation == "review_transactions":
+                review = getattr(self._store, "review_transactions", None)
+                if not callable(review):
+                    raise StoreError("This storage plugin does not support bulk review.")
+                review(workspace, tuple(payload["transactionIds"]), payload["reviewed"])
+                data = None
             elif operation == "assign_next_month":
                 assign_next = getattr(self._store, "assign_next_month", None)
                 if not callable(assign_next):
@@ -239,7 +254,7 @@ class LedgerService:
                 )
             self._revision = str(uuid4())
             response = {"revision": self._revision, "data": data}
-            self._receipts[request_id] = (fingerprint, deepcopy(response))
+            self._receipts[request_id] = (fingerprint, deepcopy(response), expected_revision)
             if len(self._receipts) > 1024:
                 self._receipts.popitem(last=False)
             if self._on_commit is not None:
@@ -575,6 +590,26 @@ class LedgerService:
         if note is not UNSET:
             payload["note"] = note
         return self._local_command("edit_transaction", workspace, payload)
+
+    def review_transactions(self, workspace, transaction_ids, reviewed, *, request_id=None):
+        """Apply a local review intent, retaining exact replay while its receipt exists.
+
+        Local callers need no revision preflight. Evicted receipts and process
+        restarts permit reapplying the boolean set; remote commands still require
+        their explicit original revision.
+        """
+        payload = {"transactionIds": transaction_ids, "reviewed": reviewed}
+        if request_id is None:
+            return self._local_command("review_transactions", workspace, payload)
+        self._workspace(workspace)
+        _identifier(request_id)
+        with self._lock:
+            previous = self._receipts.get(request_id)
+            revision = previous[2] if previous is not None else self._revision
+            return self.command(
+                "review_transactions", workspace, payload,
+                request_id=request_id, expected_revision=revision,
+            )["data"]
 
     def assign(self, workspace, category_id, month, assigned):
         return self._local_command("assign", workspace, {

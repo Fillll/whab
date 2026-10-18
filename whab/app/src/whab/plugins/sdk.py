@@ -217,6 +217,16 @@ InsightsHook: TypeAlias = Callable[[BudgetSnapshot], tuple[Insight, ...]]
 ExportHook: TypeAlias = Callable[[BudgetSnapshot], ExportTable]
 
 
+class BulkReviewStorage(Protocol):
+    """Optional atomic review flags for one to 100 distinct transaction IDs.
+
+    Use the core review rules for every target. Commit all flags or leave every
+    target unchanged on failure; preserve all other transaction and ledger data.
+    """
+
+    def review_transactions(self, workspace: str, transaction_ids: tuple[str, ...], reviewed: bool) -> None: ...
+
+
 class ReceiptStorage(Protocol):
     """Optional private raster attachments, isolated and portable with their ledger."""
 
