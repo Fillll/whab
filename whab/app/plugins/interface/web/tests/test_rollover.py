@@ -44,7 +44,7 @@ def test_rollover_controls_have_two_accessible_choices_for_each_source_month(cli
         assert [option["value"] for option in form["options"]] == ["category", "balance"]
         assert [option["value"] for option in form["options"] if option["checked"]] == ["category"]
         assert ">By category</span>" in form["body"] and ">Overall balance</span>" in form["body"]
-        assert 'class="field-error" role="alert" hidden' in form["body"]
+        assert re.search(r'class="field-error"[^>]*role="alert" hidden', form["body"])
         for option in form["options"]:
             assert f'for="{option["id"]}"' in form["body"]
             ids.append(option["id"])
@@ -127,7 +127,7 @@ def test_older_rollover_projection_keeps_known_category_carry_in(client, store, 
     assert "Balance carried in" not in text
     assert not rollover_forms(text)
     incoming = re.search(
-        r'<tr class="budget-overview-row budget-carried-in-row">(.*?)</tr>', text, re.S,
+        r'<tr class="budget-overview-row budget-carried-in-row"[^>]*>(.*?)</tr>', text, re.S,
     )[1]
     assert incoming.count("Previously unassigned money") == 3
     assert "Overall category balance" not in incoming
@@ -175,7 +175,7 @@ def test_rollover_form_saves_source_currency_and_shows_signed_pool_balance(clien
         "carryover"
     ] == 20000 - spent
     following = client.get("/budgets/home/budget/2026-11/usd").text
-    row = re.search(r'<tr class="budget-overview-row budget-carried-in-row">(.*?)</tr>', following, re.S)[1]
+    row = re.search(r'<tr class="budget-overview-row budget-carried-in-row"[^>]*>(.*?)</tr>', following, re.S)[1]
     first_cell = re.search(r'<td([^>]*)>(.*?)</td>', row, re.S)
     assert re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", first_cell[2], flags=re.S).strip() == money_number(
         usd["summary"]["carriedIn"],

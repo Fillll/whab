@@ -72,7 +72,7 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
         response = client.get(f"/budgets/demo/{page}/current-month/usd")
         assert response.status_code == 200, page
         assert f"WHAB · {whab.__version__}" in response.text
-    for asset in ("styles.css", "theme.js", "app.js", "client.js", "favicon.svg", "logo.svg"):
+    for asset in ("styles.css", "theme.js", "app.js", "budget-edits.js", "client.js", "favicon.svg", "logo.svg"):
         assert client.get("/budgets/demo/static/" + asset).status_code == 200, asset
     assert client.get("/budgets/home/plugins/plaid/static/connect.js").status_code == 200
     assert client.get("/budgets/home/plugins/plaid/static/oauth.js").status_code == 200

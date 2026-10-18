@@ -124,7 +124,7 @@ def test_empty_selected_currency_remains_selected_when_switching_workspaces(clie
     assert '<option value="EUR" selected>EUR</option>' in text
     assert "All amounts in EUR" in text
     ready = re.search(
-        r'<tr class="budget-overview-row budget-ready-row">(.*?)</tr>', text, re.S,
+        r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', text, re.S,
     )[1]
     assert [
         re.sub(r'<details\b[^>]*>.*?</details>', "", value, flags=re.S).strip()

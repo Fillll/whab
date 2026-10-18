@@ -7,7 +7,7 @@ from whab_plugin_web.views import money_number
 
 
 def matrix_row(text, row_class):
-    return re.search(rf'<tr class="{row_class}">(.*?)</tr>', text, re.S)[1]
+    return re.search(rf'<tr class="{row_class}"[^>]*>(.*?)</tr>', text, re.S)[1]
 
 
 def row_cells(row):
@@ -84,7 +84,7 @@ def test_incoming_category_column_uses_previous_month_and_keeps_mixed_month_rows
         assert 'name="assigned"' in cells[9][1]
 
     home = next(
-        row for row in re.findall(r'<tr class="budget-group-row">(.*?)</tr>', text, re.S)
+        row for row in re.findall(r'<tr class="budget-group-row"[^>]*>(.*?)</tr>', text, re.S)
         if re.search(r">Home</span>", row)
     )
     footer = matrix_row(text, "budget-total-row")

@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.12.1 — 2026-10-18
+
+PR: [#49](https://github.com/Fillll/whab/pull/49)
+
+- Save budget assignments and rollover choices in place instead of reloading the page. Apply changed server-rendered values while preserving focus, unsaved edits, scroll position, expanded explanations and collapsed groups.
+- Queue edits without locking unrelated fields, and show local saving, saved and error feedback. Keep calculations and validation in core.
+- Remove the two budget footer notes and the duplicate bottom currency label.
+
 ## 1.12.0 — 2026-10-18
 
 PR: [#48](https://github.com/Fillll/whab/pull/48)
