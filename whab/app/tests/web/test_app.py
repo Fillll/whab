@@ -291,3 +291,114 @@ def test_category_parent_and_fixed_date_http_contract(client):
     for date_value in ("10/03/2026", "20261003", "2026-10-3", "2026-02-30"):
         assert client.post("/api/transactions", json={**tx, "date": date_value}).status_code == 400
     assert client.post("/api/transactions", json=tx).status_code == 200
+
+
+def test_next_month_funding_saves_without_editing_child_assignments(client):
+    assert client.post('/api/accounts', json={
+        'workspace': 'personal', 'name': 'Cash', 'type': 'depository', 'balance': 100000,
+    }).status_code == 200
+    request = {'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'assigned': 30000}
+    assert client.put('/api/budget/funding/next-month', json=request).status_code == 200
+    october = client.get('/api/workspace?workspace=personal&month=2026-10').json()
+    assert october['summary']['assignedNextMonth'] == 30000
+    assert october['summary']['readyToAssign'] == 70000
+    assert all(row['assigned'] == 0 for row in october['budget'])
+    assert client.put('/api/budget/groceries', json={
+        'workspace': 'personal', 'month': '2026-11', 'assigned': 20000,
+    }).status_code == 200
+    assert client.get('/api/workspace?workspace=personal&month=2026-10').json()['summary'] == october['summary']
+    november = client.get('/api/workspace?workspace=personal&month=2026-11').json()
+    assert november['summary']['readyToAssign'] == 80000
+    assert client.put('/api/budget/funding/next-month', json={**request, 'assigned': 19999}).status_code == 400
+    assert client.put('/api/budget/funding/next-month', json={**request, 'assigned': 100001}).status_code == 400
+    assert client.put('/api/budget/funding/next-month', json={**request, 'assigned': 20000}).status_code == 200
+    assert client.get('/api/workspace?workspace=personal&month=2026-10').json()['summary']['readyToAssign'] == 80000
+    assert client.get('/api/workspace?workspace=demo&month=2026-10').json()['summary']['assignedNextMonth'] == 0
+
+
+@pytest.mark.parametrize('change', [
+    {'assigned': True}, {'assigned': 1.5}, {'assigned': '100'}, {'assigned': -1},
+    {'assigned': 1000000000001}, {'currency': 'xyz'}, {'currency': None},
+    {'month': '2026-13'}, {'month': '2200-12'}, {'month': '2026-09'},
+    {'workspace': 'unknown'}, {'categoryId': 'groceries'},
+])
+def test_next_month_funding_rejects_invalid_requests(client, change):
+    request = {'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'assigned': 0}
+    before = client.get('/api/workspace?workspace=personal&month=2026-10').json()
+    assert client.put('/api/budget/funding/next-month', json={**request, **change}).status_code == 400
+    assert client.get('/api/workspace?workspace=personal&month=2026-10').json() == before
+
+
+def test_next_month_funding_preserves_local_origin_guard(client):
+    response = client.put('/api/budget/funding/next-month', json={
+        'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'assigned': 0,
+    }, headers={'Origin': 'https://foreign.example'})
+    assert response.status_code == 403
+
+
+def test_next_month_funding_route_preserves_imported_category_named_next_month(store, tmp_path):
+    records = store.export_budget()
+    records['categories'][0]['id'] = 'next-month'
+    store.restore_budget('personal', records)
+    store.add_account('personal', {'name': 'Cash', 'type': 'depository', 'balance': 10000})
+    settings = Settings(tmp_path, 5173, 'sandbox', '', '', '', False, '', '', (), ui='')
+    with TestClient(create_app(store=store, settings=settings, plugins=PluginRegistry()),
+                    base_url='https://127.0.0.1:5173') as browser:
+        assert browser.put('/api/budget/next-month', json={
+            'workspace': 'personal', 'month': '2026-10', 'assigned': 100,
+        }).status_code == 200
+        assert browser.put('/api/budget/funding/next-month', json={
+            'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'assigned': 3000,
+        }).status_code == 200
+        data = browser.get('/api/workspace?workspace=personal&month=2026-10').json()
+        assert next(row for row in data['budget'] if row['categoryId'] == 'next-month')['assigned'] == 100
+        assert data['summary']['assignedNextMonth'] == 3000
+
+
+def test_historical_demo_months_exclude_plans_funded_by_later_income(client, monkeypatch):
+    monkeypatch.setattr('whab_plugin_sqlite.store.current_month', lambda: '2026-10')
+    may = client.get('/api/workspace?workspace=demo&month=2026-05').json()
+    june = client.get('/api/workspace?workspace=demo&month=2026-06').json()
+    assert may['summary']['readyToAssign'] == 1210000
+    assert june['summary']['readyToAssign'] == 1480000
+    assert client.get('/api/workspace?workspace=demo&month=2026-10').json()['summary']['readyToAssign'] == 2560000
+
+
+def test_monthly_rollover_api_pools_balances_once_and_preserves_source_month(client):
+    october = client.get('/api/workspace?workspace=demo&month=2026-10').json()
+    assert october['rolloverMode'] == 'category'
+    assert client.put('/api/budget/settings/rollover', json={
+        'workspace': 'demo', 'month': '2026-10', 'currency': 'USD', 'mode': 'balance',
+    }).status_code == 200
+    november = client.get('/api/workspace?workspace=demo&month=2026-11').json()
+    assert november['summary']['balanceCarryover'] == 899817
+    assert november['summary']['readyToAssign'] == 3459817
+    assert all(row['carryover'] == 0 and row['available'] == 0 for row in november['budget'])
+    assert november['accounts'] == october['accounts']
+    after = client.get('/api/workspace?workspace=demo&month=2026-10').json()
+    assert after['rolloverMode'] == 'balance' and after['summary'] == october['summary']
+    assert client.get('/api/workspace?workspace=personal&month=2026-10').json()['rolloverMode'] == 'category'
+    assert client.put('/api/budget/settings/rollover', json={
+        'workspace': 'demo', 'month': '2026-10', 'currency': 'USD', 'mode': 'category',
+    }).status_code == 200
+    restored = client.get('/api/workspace?workspace=demo&month=2026-11').json()
+    assert restored['summary']['balanceCarryover'] == 0
+    assert restored['summary']['available'] == 899817
+
+
+@pytest.mark.parametrize('change', [
+    {'mode': 'reset'}, {'mode': True}, {'mode': None}, {'mode': 1}, {'mode': []},
+    {'currency': 'xyz'}, {'currency': None}, {'month': '2026-13'},
+    {'month': '2200-12'}, {'month': '2026-09'}, {'workspace': 'unknown'}, {'assigned': 100},
+])
+def test_monthly_rollover_rejects_invalid_requests_without_mutation(client, change):
+    request = {'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'mode': 'balance'}
+    before = client.get('/api/workspace?workspace=personal&month=2026-11').json()
+    assert client.put('/api/budget/settings/rollover', json={**request, **change}).status_code == 400
+    assert client.get('/api/workspace?workspace=personal&month=2026-11').json() == before
+
+
+def test_monthly_rollover_preserves_local_origin_guard(client):
+    assert client.put('/api/budget/settings/rollover', json={
+        'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'mode': 'balance',
+    }, headers={'Origin': 'https://foreign.example'}).status_code == 403

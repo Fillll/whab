@@ -598,6 +598,30 @@ class FileImport:
             raise ValueError("File import resources must be pathlib.Path directories.")
 
 
+class NextMonthFunding(Protocol):
+    """Optional saved funding capability; month identifies the source month.
+
+    Backends supporting this command advertise nextMonthFundingEditable in
+    their workspace projections. Existing storage backends remain valid.
+    """
+
+    def assign_next_month(
+        self, workspace: str, month: str, currency: str, assigned: int,
+    ) -> None: ...
+
+
+class MonthlyRollover(Protocol):
+    """Optional per-currency closing rule, saved on the outgoing source month.
+
+    Supporting projections advertise rolloverModeEditable and rolloverMode.
+    Existing storage backends remain valid without this capability.
+    """
+
+    def set_rollover_mode(
+        self, workspace: str, month: str, currency: str, mode: str,
+    ) -> None: ...
+
+
 class WorkspaceImporter(Protocol):
     """Optional storage capability; existing StorageBackend implementations stay valid."""
 

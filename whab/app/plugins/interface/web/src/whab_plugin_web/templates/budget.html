@@ -12,6 +12,7 @@
   </div>
   <div class="budget-workspace{% if selected %} has-inspector{% endif %}">
     <section class="budget-table-section" aria-label="Monthly category budget">
+      <div class="budget-editing-key" role="note"><span>{{ icon('pencil', 12) }}Editable assigned amounts</span><span>Read-only summaries</span></div>
       <div class="budget-matrix-scroll">
         <table class="budget-matrix" aria-label="Category budget across {{ periods|length }} {{ 'month' if periods|length==1 else 'months' }}">
           <colgroup><col class="budget-category-col">{% for period in periods %}<col><col><col>{% endfor %}</colgroup>
@@ -21,12 +22,34 @@
               {% for period in periods %}
                 <th colspan="3" scope="colgroup" class="budget-month-summary-cell">
                   <section class="budget-month-summary{% if period.month==month %} is-selected{% endif %}" aria-label="{{ month_label(period.month) }} summary">
-                    <div class="budget-month-heading"><span class="budget-month-name">{{ month_label(period.month).split(' ')[0] }}<small>{{ period.month[:4] }}</small></span>{{ icon('budget', 16) }}</div>
-                    <div class="budget-ready"><span class="budget-ready-label">To assign</span><strong class="budget-ready-value{% if period.summary.readyToAssign<0 %} negative{% endif %}">{{ money(period.summary.readyToAssign) }}</strong></div>
+                    <div class="budget-month-heading"><span class="budget-month-name">{{ month_label(period.month).split(' ')[0] }}<small>{{ period.month[:4] }}</small></span></div>
                     <div class="budget-summary-lines">
+                      <div><span>Available</span><strong>{{ money(period.summary.available) }}</strong></div>
                       <div><span>Assigned</span><strong>{{ money(period.summary.assigned) }}</strong></div>
                       <div><span>Spent</span><strong>{{ money(period.summary.spent) }}</strong></div>
-                      <div><span>Available</span><strong>{{ money(period.summary.available) }}</strong></div>
+                    </div>
+                    <div class="budget-ready"><span class="budget-ready-label">To assign</span><strong class="budget-ready-value{% if period.month>=data.budgetStartMonth and period.summary.readyToAssign<0 %} negative{% endif %}">{{ money(period.summary.readyToAssign) if period.month>=data.budgetStartMonth else '—' }}</strong></div>
+                    {% set rollover_known = period.rolloverMode in ['category','balance'] %}
+                    {% set rollover_planning = data.budgetStartMonth<=period.month<'2200-12' %}
+                    <div class="budget-rollover">
+                      {% if period.rolloverModeEditable is sameas true and rollover_known and rollover_planning %}
+                        <form class="budget-rollover-form" data-api="/budget/settings/rollover" data-method="PUT" data-budget-mutation data-auto>
+                          <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ period.month }}"><input type="hidden" name="currency" value="{{ currency }}">
+                          <fieldset>
+                            <legend>Carryover<span class="budget-rollover-target">Into {{ month_label(shift_month(period.month,1)) }}</span></legend>
+                            <div class="budget-rollover-options">
+                              {% for mode, label in [('category','By category'),('balance','Overall balance')] %}
+                                <label for="rollover-{{ period.month }}-{{ currency|lower }}-{{ mode }}"><input id="rollover-{{ period.month }}-{{ currency|lower }}-{{ mode }}" type="radio" name="mode" value="{{ mode }}"{% if period.rolloverMode==mode %} checked{% endif %}><span>{{ label }}</span></label>
+                              {% endfor %}
+                            </div>
+                          </fieldset>
+                          <p class="field-error" role="alert" hidden></p>
+                        </form>
+                      {% else %}
+                        <div class="budget-rollover-heading"><span>Carryover</span>{% if period.month<'2200-12' %}<small>Into {{ month_label(shift_month(period.month,1)) }}</small>{% endif %}</div>
+                        <span class="budget-rollover-readonly">{{ 'By category' if period.rolloverMode=='category' else 'Overall balance' if period.rolloverMode=='balance' else 'Unavailable' }}</span>
+                        {% if rollover_planning %}<small class="budget-row-note">Editing requires a server update</small>{% endif %}
+                      {% endif %}
                     </div>
                   </section>
                 </th>
@@ -35,17 +58,74 @@
             <tr class="budget-columns">
               <th scope="col">Category</th>
               {% for period in periods %}
-                <th scope="col" class="month-start{% if period.month==month %} selected-month{% endif %}"><span>Assigned</span><strong>{{ money_number(period.summary.assigned) }}</strong></th>
-                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}><span>Activity</span><strong>{{ money_number(-period.summary.spent) }}</strong></th>
-                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}><span>Available</span><strong>{{ money_number(period.summary.available) }}</strong></th>
+                <th scope="col" class="month-start{% if period.month==month %} selected-month{% endif %}">Assigned</th>
+                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}>Activity</th>
+                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}>Available</th>
               {% endfor %}
             </tr>
           </thead>
-          <tbody>
+          <tbody class="budget-overview">
+            <tr class="budget-overview-row">
+              <th scope="row">Income<small class="budget-row-note">Summary</small></th>
+              {% for period in periods %}<td colspan="3" class="month-start">{{ money_number(period.summary.income) }}</td>{% endfor %}
+            </tr>
+            <tr class="budget-overview-row">
+              <th scope="row">Previous overspending<small class="budget-row-note">Summary</small></th>
+              {% for period in periods %}<td colspan="3" class="month-start{% if period.month>=data.budgetStartMonth and period.summary.previousOverspending is defined and period.summary.previousOverspending %} negative{% endif %}">{{ money_number(-period.summary.previousOverspending) if period.month>=data.budgetStartMonth and period.summary.previousOverspending is defined else '—' }}</td>{% endfor %}
+            </tr>
+            {% if periods|selectattr('summary.balanceCarryover','defined')|list %}
+              <tr class="budget-overview-row budget-balance-row">
+                <th scope="row">Balance carried in<small class="budget-row-note">Summary</small></th>
+                {% for period in periods %}
+                  {% set carried_balance = period.summary.balanceCarryover %}
+                  {% set carried_balance_valid = carried_balance is integer and -9007199254740991<=carried_balance<=9007199254740991 and period.month>=data.budgetStartMonth %}
+                  <td colspan="3" class="month-start{% if carried_balance_valid and carried_balance<0 %} negative{% endif %}">{{ money_number(carried_balance) if carried_balance_valid else '—' }}</td>
+                {% endfor %}
+              </tr>
+            {% endif %}
+            <tr class="budget-overview-row">
+              <th scope="row">Assigned for next month</th>
+              {% for period in periods %}
+                {% set funding_amount = period.summary.assignedNextMonth %}
+                {% set funding_amount_valid = funding_amount is integer and 0<=funding_amount<=9007199254740991 %}
+                {% set funding_amount_editable = funding_amount_valid and funding_amount<=1000000000000 %}
+                {% set planning_month = data.budgetStartMonth<=period.month<'2200-12' %}
+                <td colspan="3" class="month-start">
+                  {% if period.nextMonthFundingEditable is sameas true and funding_amount_editable and planning_month %}
+                    <div class="budget-next-month-editor">
+                      <form class="budget-assignment" data-api="/budget/funding/next-month" data-method="PUT" data-inline-assignment>
+                        <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ period.month }}"><input type="hidden" name="currency" value="{{ currency }}">
+                        <span class="budget-assignment-edit" aria-hidden="true">{{ icon('pencil', 11) }}</span>
+                        <input type="text" name="assigned" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" autocomplete="off" spellcheck="false" value="{{ money_input(funding_amount) }}" aria-label="Assigned for {{ month_label(shift_month(period.month,1)) }} from {{ month_label(period.month) }}" required>
+                        <button class="budget-assignment-save" type="submit" aria-label="Save assignment for {{ month_label(shift_month(period.month,1)) }} from {{ month_label(period.month) }}">{{ icon('check', 12) }}</button>
+                        <p class="field-error" role="alert" hidden></p>
+                      </form>
+                    </div>
+                  {% else %}
+                    {{ money_number(funding_amount) if funding_amount_valid and planning_month else '—' }}
+                    {% if planning_month %}<small class="budget-row-note">{% if period.nextMonthFundingEditable is sameas true and funding_amount_valid %}Edit next month’s category assignments{% else %}Editing requires a server update{% endif %}</small>{% endif %}
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+            <tr class="budget-overview-row budget-assigned-row">
+              <th scope="row">Assigned this month<small class="budget-row-note">Summary</small></th>
+              {% for period in periods %}
+                <td class="month-start">{{ money_number(period.summary.assigned) if period.month>=data.budgetStartMonth else '—' }}</td>
+                <td>{{ money_number(-period.summary.spent) if period.month>=data.budgetStartMonth else '—' }}</td>
+                <td{% if period.summary.available<0 %} class="negative"{% endif %}>{{ money_number(period.summary.available) if period.month>=data.budgetStartMonth else '—' }}</td>
+              {% endfor %}
+            </tr>
+          </tbody>
+          <tbody class="budget-spending">
+            <tr class="budget-section-row">
+              <th scope="rowgroup">Spending categories</th>
+              {% for period in periods %}<td colspan="3" class="month-start"></td>{% endfor %}
+            </tr>
             {% for group in groups %}
               {% set group_index = loop.index %}
               <tr class="budget-group-row">
-                <td><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}{{ group.name }}</button></td>
+                <td><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}<span>{{ group.name }}</span><small class="budget-group-note">Summary</small></button></td>
                 {% for total in group.periods %}
                   <td class="month-start">{{ money_number(total.assigned) }}</td>
                   <td>{{ money_number(-total.spent) }}</td>
@@ -59,13 +139,14 @@
                     <td class="month-start{% if cell.month==month %} selected-month{% endif %}">
                       <form class="budget-assignment" data-api="/budget/{{ category_path(row.category.id) }}" data-method="PUT" data-inline-assignment>
                         <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ cell.month }}">
+                        <span class="budget-assignment-edit" aria-hidden="true">{{ icon('pencil', 11) }}</span>
                         <input type="text" name="assigned" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" autocomplete="off" spellcheck="false" value="{{ money_input(cell.assigned) }}" aria-label="Assigned to {{ row.category.name }} in {{ month_label(cell.month) }}"{% if cell.month<data.budgetStartMonth %} disabled{% endif %} required>
                         <button class="budget-assignment-save" type="submit" aria-label="Save assignment to {{ row.category.name }} in {{ month_label(cell.month) }}"{% if cell.month<data.budgetStartMonth %} disabled{% endif %}>{{ icon('check', 12) }}</button>
                         <p class="field-error" role="alert" hidden></p>
                       </form>
                     </td>
                     <td class="budget-money{% if cell.month==month %} selected-month{% endif %}{% if not cell.spent %} zero{% endif %}">{{ money_number(-cell.spent) }}</td>
-                    <td class="{% if cell.month==month %}selected-month {% endif %}{% if cell.available<0 %}negative{% elif not cell.available %}zero{% endif %}"><a class="budget-money" href="{{ url(category=row.category.id,month=cell.month) }}" aria-label="Details for {{ row.category.name }} in {{ month_label(cell.month) }}">{{ money_number(cell.available) }}</a></td>
+                    <td class="{% if cell.month==month %}selected-month {% endif %}{% if cell.available<0 %}negative{% elif not cell.available %}zero{% endif %}"><a class="budget-money" href="{{ url(category=row.category.id,month=cell.month) }}" aria-label="Details for {{ row.category.name }} in {{ month_label(cell.month) }}" title="Carried over: {{ money(cell.carryover) }} · Assigned: {{ money(cell.assigned) }} · Activity: {{ money(-cell.spent) }}">{{ money_number(cell.available) }}</a></td>
                   {% endfor %}
                 </tr>
               {% endfor %}
@@ -114,6 +195,7 @@
       </div>
       <form class="assign-form"
             data-api="/budget/{{ category_path(selected.id) }}"
+            data-budget-mutation
             data-method="PUT">
         <input type="hidden"
                name="workspace"

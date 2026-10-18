@@ -6,10 +6,18 @@ changing state, so the same financial behavior applies to every persistence adap
 """
 
 from .accounts import ON_BUDGET_ACCOUNT_TYPES, is_liability, is_on_budget, normalize_account
-from .budget import ensure_assignment_allowed
+from .budget import (
+    ROLLOVER_MODES,
+    calculate_workspace,
+    effective_month_funding,
+    ensure_assignment_allowed,
+    ensure_funding_capacity_preserved,
+    funding_capacity,
+)
 from .categories import ensure_child_category
+from .dates import shift_month
 from .errors import StoreError
-from .money import cents, currency_code
+from .money import cents, currency_code, minor_units
 from .transactions import UNSET
 from .validation import validate_date, validate_label, validate_month
 
@@ -135,3 +143,70 @@ def assign(
         raise StoreError("Assignment cannot be negative.")
     ensure_assignment_allowed(state, category_id, month, assigned, as_of_month)
     state["budget"].setdefault(month, {})[category_id] = assigned
+
+
+def assign_next_month(
+    state: dict, month: str, currency: str, assigned: int, *, as_of_month: str,
+) -> None:
+    """Set next month's total funding without changing its category allocations."""
+    validate_month(month)
+    validate_month(as_of_month)
+    currency = currency_code(currency)
+    minor_units(assigned, currency)
+    if assigned < 0:
+        raise StoreError("Next-month funding cannot be negative.")
+    if month < state["budgetStartMonth"]:
+        raise StoreError("This month is before the budget start month.")
+    if month >= "2200-12":
+        raise StoreError("Next-month funding is unavailable after November 2200.")
+    target = shift_month(month, 1)
+    allocated = max(0, sum(
+        amount for key, amount in state["budget"].get(target, {}).items()
+        if state["categories"][key].get("currency", "USD") == currency
+    ))
+    if assigned < allocated:
+        raise StoreError("Next-month funding cannot be less than its category assignments.")
+    previous_floor = state.get("futureFunding", {}).get(target, {}).get(currency, 0)
+    if month < as_of_month:
+        available = calculate_workspace(state, month, as_of_month=as_of_month)[
+            "summariesByCurrency"
+        ].get(currency, {}).get("readyToAssign", 0)
+        if assigned > previous_floor and assigned - previous_floor > available:
+            raise StoreError("Assignment exceeds available money.")
+    else:
+        previous = effective_month_funding(state, target, currency)
+        available = funding_capacity(state, min(month, as_of_month), currency)
+        if assigned > previous and assigned - previous > available:
+            raise StoreError("Assignment exceeds available money.")
+    if assigned > previous_floor:
+        candidate = {
+            **state,
+            "futureFunding": {
+                **state.get("futureFunding", {}),
+                target: {**state.get("futureFunding", {}).get(target, {}), currency: assigned},
+            },
+        }
+        ensure_funding_capacity_preserved(state, candidate, month, as_of_month, currency)
+    state.setdefault("futureFunding", {}).setdefault(target, {})[currency] = assigned
+
+
+def set_rollover_mode(
+    state: dict, month: str, currency: str, mode: str, *, as_of_month: str,
+) -> None:
+    """Choose a month's outgoing category boundary without moving any money."""
+    validate_month(month)
+    validate_month(as_of_month)
+    currency = currency_code(currency)
+    if not state["budgetStartMonth"] <= month < "2200-12":
+        raise StoreError("Rollover requires a supported source month from the budget start.")
+    if type(mode) is not str or mode not in ROLLOVER_MODES:
+        raise StoreError("Rollover mode must be category or balance.")
+    candidate = {
+        **state,
+        "rolloverModes": {
+            **state.get("rolloverModes", {}),
+            month: {**state.get("rolloverModes", {}).get(month, {}), currency: mode},
+        },
+    }
+    ensure_funding_capacity_preserved(state, candidate, month, as_of_month, currency)
+    state.setdefault("rolloverModes", {}).setdefault(month, {})[currency] = mode

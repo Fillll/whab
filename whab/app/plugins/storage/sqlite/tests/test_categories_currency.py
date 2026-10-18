@@ -43,9 +43,11 @@ def test_currency_envelopes_and_hierarchy_survive_reopen_without_conversion(tmp_
         ledger.add_transaction("personal", transaction(eur, category))
         before = ledger.workspace("personal", "2026-10")
         assert before["summariesByCurrency"] == {
-            "USD": {"income": 0, "spent": 2500, "assigned": 10000,
+            "USD": {"income": 0, "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0,
+                    "spent": 2500, "assigned": 10000,
                     "available": 7500, "readyToAssign": 90000},
-            "EUR": {"income": 0, "spent": 1000, "assigned": 20000,
+            "EUR": {"income": 0, "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0,
+                    "spent": 1000, "assigned": 20000,
                     "available": 19000, "readyToAssign": 30000},
         }
         assert before["summary"] == before["summariesByCurrency"]["USD"]

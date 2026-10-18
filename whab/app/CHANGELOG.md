@@ -4,6 +4,16 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.7.0 — 2026-10-17
+
+PR: [#41](https://github.com/Fillll/whab/pull/41)
+
+- Add currency-scoped monthly summary fields for outstanding category overspending carried into the month and funding for exactly the following month.
+- Save next-month funding independently from child category assignments through an optional storage capability and revision-checked public command. Reserve the greater of each future month's saved amount and category allocations once, and release the commitment in its target month. Keep funding limits, debt safeguards and currency isolation in core.
+- Let each month and currency carry positive and negative category balances into the same categories or return their net balance to general funds. Preserve total cash and apply each choice to the following month through an optional storage capability and revision-checked command.
+- Correct historical To assign amounts so later category plans do not appear as unfunded commitments before their income existed. Validate edits and rollover changes against funding in every affected month.
+- Preserve saved funding and rollover modes in neutral portable snapshots while continuing to read older snapshots. Require web 1.7, SQLite 1.2 and remote client 1.2 in the bundled installation.
+
 ## 2.6.1 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)

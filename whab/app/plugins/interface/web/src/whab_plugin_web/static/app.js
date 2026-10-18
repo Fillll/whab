@@ -32,17 +32,24 @@ function minorAmount(value, digits) {
   return Number(result);
 }
 
-const inlineAssignments = [...document.querySelectorAll('form[data-inline-assignment]')];
+const budgetMutationForms = [...document.querySelectorAll('form[data-inline-assignment], form[data-budget-mutation]')];
+const assignmentControlStates = new Map(budgetMutationForms.flatMap(form =>
+  [...form.elements].filter(control => control.type !== 'hidden').map(control =>
+    [control, {disabled: control.disabled, readOnly: control.readOnly, checked: control.checked}])));
 let assignmentBusy = false;
 let assignmentNavigation;
 const pendingAssignmentControls = new Map();
 
 function lockAssignments(locked) {
   assignmentBusy = locked;
-  for (const form of inlineAssignments) form.querySelector('[data-cents]').readOnly = locked;
+  for (const [control, original] of assignmentControlStates) {
+    if (control.hasAttribute('data-cents')) control.readOnly = locked || original.readOnly;
+    else control.disabled = locked || original.disabled;
+    if (!locked && control.type === 'radio') control.checked = original.checked;
+  }
 }
 
-// Finish the assignment before following a month/category link that blurred it.
+// Finish the budget change before following a month/category link that blurred it.
 document.addEventListener('click', event => {
   if (!assignmentBusy || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
   const link = event.target.closest('a[href]');
@@ -53,16 +60,20 @@ document.addEventListener('click', event => {
 
 for (const form of document.querySelectorAll('form[data-api]')) {
   const inline = form.hasAttribute('data-inline-assignment');
+  const budgetMutation = inline || form.hasAttribute('data-budget-mutation');
   const amount = inline ? form.querySelector('[data-cents]') : null;
   const originalAmount = amount?.value;
+  const radioChoices = [...form.querySelectorAll('input[type="radio"]')];
+  const originalChoices = new Map(radioChoices.map(choice =>
+    [choice, {checked: choice.checked, disabled: choice.disabled}]));
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (form.dataset.busy || inline && (assignmentBusy || amount.value.trim() === originalAmount)) return;
+    if (form.dataset.busy || budgetMutation && assignmentBusy || inline && amount.value.trim() === originalAmount) return;
     const error = form.querySelector('.field-error');
     try {
       const body = {};
       for (const field of form.elements) {
-        if (!field.name || field.disabled) continue;
+        if (!field.name || field.disabled || field.type === 'radio' && !field.checked) continue;
         body[field.name] = field.hasAttribute('data-boolean') ? field.checked :
           field.hasAttribute('data-boolean-value') ? field.value === 'true' :
           field.hasAttribute('data-cents') ? minorAmount(field.value, Number(form.elements.namedItem('currency')?.selectedOptions?.[0]?.dataset.minorUnits ?? field.dataset.minorUnits)) :
@@ -72,13 +83,17 @@ for (const form of document.querySelectorAll('form[data-api]')) {
       delete body._kind;
       form.dataset.busy = 'true';
       if (error) error.hidden = true;
-      if (inline) {
+      if (radioChoices.length && !budgetMutation) {
+        for (const choice of radioChoices) choice.disabled = true;
+        form.setAttribute('aria-busy', 'true');
+      }
+      if (budgetMutation) {
         lockAssignments(true);
         form.setAttribute('aria-busy', 'true');
-        amount.removeAttribute('aria-invalid');
+        if (inline) amount.removeAttribute('aria-invalid');
       }
       await api(form.dataset.api, body, form.dataset.method || 'POST');
-      if (inline && assignmentNavigation) {
+      if (budgetMutation && assignmentNavigation) {
         location.assign(assignmentNavigation);
       } else if (body.currency) {
         const url = pageUrl({currency: body.currency});
@@ -90,13 +105,20 @@ for (const form of document.querySelectorAll('form[data-api]')) {
         error.hidden = false;
       } else notify(failure.message);
       delete form.dataset.busy;
-      if (inline) {
+      if (radioChoices.length && !budgetMutation) {
+        for (const choice of radioChoices) {
+          choice.disabled = originalChoices.get(choice).disabled;
+          choice.checked = originalChoices.get(choice).checked;
+        }
+        form.removeAttribute('aria-busy');
+      }
+      if (budgetMutation) {
         lockAssignments(false);
         assignmentNavigation = undefined;
         for (const [control, value] of pendingAssignmentControls) control.value = value;
         pendingAssignmentControls.clear();
         form.removeAttribute('aria-busy');
-        amount.setAttribute('aria-invalid', 'true');
+        if (inline) amount.setAttribute('aria-invalid', 'true');
       }
     }
   });

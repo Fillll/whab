@@ -40,6 +40,19 @@ def test_client_server_commands_export_and_concurrent_conflict(store):
     })
     client.edit_transaction("personal", transaction, reviewed=True)
     client.assign("personal", category, "2026-10", 500)
+    client.assign_next_month("personal", "2026-10", "USD", 3000)
+    client.assign("personal", category, "2026-11", 1000)
+    october = client.workspace("personal", "2026-10")
+    assert october["nextMonthFundingEditable"] is True
+    assert october["summary"]["assignedNextMonth"] == 3000
+    assert october["summary"]["readyToAssign"] == 6500
+    assert client.workspace("personal", "2026-11")["summary"]["readyToAssign"] == 8500
+    client.set_rollover_mode("personal", "2026-10", "USD", "balance")
+    assert client.workspace("personal", "2026-10")["rolloverMode"] == "balance"
+    november = client.workspace("personal", "2026-11")
+    assert november["summary"]["balanceCarryover"] == 400
+    assert november["summary"]["readyToAssign"] == 8900
+    assert all(row["carryover"] == 0 for row in november["budget"])
     assert client.transactions("personal", "2026-10")[0]["reviewed"] is True
     assert client.export_budget() == store.export_budget()
     assert "token" not in str(client.workspace("personal", "2026-10"))

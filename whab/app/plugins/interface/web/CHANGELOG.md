@@ -1,5 +1,16 @@
 # Web interface plugin changelog
 
+## 1.7.0 — 2026-10-17
+
+PR: [#41](https://github.com/Fillll/whab/pull/41)
+
+- Show Available, Assigned and Spent above the larger To assign amount, and remove the decorative four-square icon from month headings.
+- Add Income, Previous overspending, Assigned for next month and Assigned this month rows above Spending categories. Make next-month funding and individual category assignments visibly editable with outlined fields and pencil marks, while monthly totals and parent groups carry read-only Summary labels.
+- Save a chosen next-month funding total through core validation without distributing it among categories. Keep unsupported older-server rows read-only, preserve valid totals, and show dashes for historical or unavailable planning values.
+- Add a per-month Carryover choice between By category and Overall balance, with the destination month shown explicitly. Show the signed balance carried into general funds and explain category Available amounts on hover.
+- Serialize budget saves across assignments and rollover choices, retaining the current values and displaying errors when a save fails.
+- Require WHAB 2.7 for the new core monthly projection fields.
+
 ## 1.6.1 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)

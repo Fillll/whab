@@ -49,6 +49,84 @@ def test_replay_is_bound_to_payload_and_original_revision(store):
     assert len(service.accounts("personal")) == 1
 
 
+def test_next_month_funding_uses_revision_replay_and_commit_boundary(store, monkeypatch):
+    monkeypatch.setattr("whab_plugin_sqlite.store.current_month", lambda: "2026-10")
+    saved = []
+    service = LedgerService(store, on_commit=lambda: saved.append(True))
+    service.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+    original = service.revision
+    payload = {"month": "2026-10", "currency": "USD", "assigned": 3000}
+    response = service.command(
+        "assign_next_month", "personal", payload, request_id="funding", expected_revision=original,
+    )
+    assert service.command(
+        "assign_next_month", "personal", payload, request_id="funding", expected_revision=original,
+    ) == response
+    assert len(saved) == 2
+    projection = service.workspace("personal", "2026-10")
+    assert projection["nextMonthFundingEditable"] is True
+    assert projection["summary"]["assignedNextMonth"] == 3000
+    assert projection["summary"]["readyToAssign"] == 7000
+    with pytest.raises(RevisionConflict):
+        service.command(
+            "assign_next_month", "personal", {**payload, "assigned": 4000},
+            request_id="stale", expected_revision=original,
+        )
+    service.assign_next_month("personal", "2026-10", "USD", 2000)
+    assert service.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 8000
+
+
+def test_next_month_funding_is_optional_for_existing_storage():
+    service = LedgerService(SimpleNamespace())
+    revision = service.revision
+    with pytest.raises(StoreError, match="does not support next-month funding"):
+        service.assign_next_month("personal", "2026-10", "USD", 0)
+    assert service.revision == revision
+
+
+def test_monthly_rollover_uses_revision_replay_without_moving_money(store):
+    service = LedgerService(store)
+    cash = service.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+    service.assign("personal", "groceries", "2026-10", 2000)
+    service.add_transaction("personal", {
+        "accountId": cash, "date": "2026-10-05", "merchant": "Grocer", "amount": 1000,
+        "categoryId": "groceries",
+    })
+    before = store.export_budget()
+    revision = service.revision
+    payload = {"month": "2026-10", "currency": "USD", "mode": "balance"}
+    response = service.command(
+        "set_rollover_mode", "personal", payload,
+        request_id="rollover", expected_revision=revision,
+    )
+    assert service.command(
+        "set_rollover_mode", "personal", payload,
+        request_id="rollover", expected_revision=revision,
+    ) == response
+    assert service.workspace("personal", "2026-10")["rolloverMode"] == "balance"
+    november = service.workspace("personal", "2026-11")
+    assert november["rolloverModeEditable"] is True
+    assert november["summary"]["balanceCarryover"] == 1000
+    assert november["summary"]["readyToAssign"] == 9000
+    assert all(row["carryover"] == 0 for row in november["budget"])
+    after = store.export_budget()
+    assert {key: value for key, value in after.items() if key != "rolloverModes"} == {
+        key: value for key, value in before.items() if key != "rolloverModes"
+    }
+    service.set_rollover_mode("personal", "2026-10", "USD", "category")
+    november = service.workspace("personal", "2026-11")
+    assert november["summary"]["balanceCarryover"] == 0
+    assert next(row for row in november["budget"] if row["categoryId"] == "groceries")["carryover"] == 1000
+
+
+def test_rollover_settings_are_optional_for_existing_storage():
+    service = LedgerService(SimpleNamespace())
+    revision = service.revision
+    with pytest.raises(StoreError, match="does not support monthly rollover settings"):
+        service.set_rollover_mode("personal", "2026-10", "USD", "category")
+    assert service.revision == revision
+
+
 def test_concurrent_writers_cannot_both_use_a_revision(store):
     service = LedgerService(store)
     revision = service.revision
@@ -84,6 +162,17 @@ def test_concurrent_writers_cannot_both_use_a_revision(store):
     ("add_category", {"name": "Food", "target": -1}),
     ("assign", {"categoryId": "cat", "month": "2026-99", "assigned": 0}),
     ("assign", {"categoryId": "", "month": "2026-10", "assigned": 0}),
+    ("assign_next_month", {"month": "2026-10", "currency": "USD", "assigned": -1}),
+    ("assign_next_month", {"month": "2026-10", "currency": "xyz", "assigned": 1}),
+    ("assign_next_month", {"month": "2026-10", "currency": "USD", "assigned": True}),
+    ("assign_next_month", {"month": "2026-13", "currency": "USD", "assigned": 0}),
+    ("assign_next_month", {"month": "2026-10", "assigned": 0}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "USD", "mode": "reset"}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "USD", "mode": True}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "USD", "mode": []}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "USD"}),
+    ("set_rollover_mode", {"month": "2026-13", "currency": "USD", "mode": "category"}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "xyz", "mode": "category"}),
     ("edit_transaction", {"transactionId": "tx"}),
     ("edit_transaction", {"transactionId": "tx", "reviewed": "true"}),
     ("add_transaction", {"accountId": "account", "date": "2026-10-01", "merchant": "Cash", "amount": 0, "categoryId": None}),
@@ -236,7 +325,7 @@ def test_workspace_periods_share_core_rollover_refunds_debt_and_currency_rules(s
     assert [(row["carryover"], row["assigned"], row["spent"], row["available"]) for row in grocery_rows] == [
         (0, 20000, 7000, 13000), (13000, 30000, -500, 43500), (43500, 0, 0, 43500),
     ]
-    assert [period["summary"]["readyToAssign"] for period in usd] == [60000, 30000, 30000]
+    assert [period["summary"]["readyToAssign"] for period in usd] == [30000, 30000, 30000]
     eur = [select_currency(period, "EUR") for period in periods]
     assert [period["summary"]["readyToAssign"] for period in eur] == [42000, 42000, 42000]
     assert all({row["currency"] for row in period["accounts"]} == {"EUR"} for period in eur)

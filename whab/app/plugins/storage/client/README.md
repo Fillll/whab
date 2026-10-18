@@ -47,3 +47,7 @@ budget and reviewing the desired change. Pending requests are held in memory;
 after restarting a client, inspect the saved budget before repeating any change
 whose result was unknown. There is no automatic offline write queue or background
 conflict resolution.
+
+WHAB 2.7 and client plugin 1.2 forward `assign_next_month(workspace, source_month, currency, assigned)` through the same revision and idempotency boundary as category assignments. The server owns persistence, release and funding validation. Updated server projections advertise `nextMonthFundingEditable: true`; older servers leave the row read-only. Unsupported or rejected funding commands return a clear error without making up a local allocation. Connection files continue to store only the remote reference; legacy neutral snapshots preserve the server's `futureFunding` records.
+
+The adapter also forwards `set_rollover_mode(workspace, source_month, currency, mode)` through the public command protocol. Server projections advertise `rolloverModeEditable` and per-currency modes; the server owns carryover computation and historical date context. The request identity, conflict handling and unknown-result retry protections are shared with funding changes. Older servers reject unsupported writes clearly and leave the control read-only. Connection containers remain references; neutral snapshots retain `rolloverModes` from the server.

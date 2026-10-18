@@ -126,6 +126,8 @@ class LedgerService:
             ),
             "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed"}),
             "assign": ({"categoryId", "month", "assigned"}, set()),
+            "assign_next_month": ({"month", "currency", "assigned"}, set()),
+            "set_rollover_mode": ({"month", "currency", "mode"}, set()),
         }
         if type(operation) is not str or operation not in fields:
             raise StoreError("Unknown ledger command.")
@@ -149,6 +151,10 @@ class LedgerService:
                 raise StoreError("Targets and assignments cannot be negative.")
         if operation == "add_account":
             normalize_account(payload)
+        if operation == "set_rollover_mode" and (
+            type(payload["mode"]) is not str or payload["mode"] not in {"category", "balance"}
+        ):
+            raise StoreError("Rollover mode must be category or balance.")
         if operation == "update_account":
             if not payload.keys() & {"type", "onBudget", "subtype"}:
                 raise StoreError("No account changes provided.")
@@ -209,6 +215,18 @@ class LedgerService:
                     workspace, payload["transactionId"],
                     category_id=payload.get("categoryId", UNSET), reviewed=payload.get("reviewed"),
                 )
+            elif operation == "assign_next_month":
+                assign_next = getattr(self._store, "assign_next_month", None)
+                if not callable(assign_next):
+                    raise StoreError("This storage plugin does not support next-month funding.")
+                data = assign_next(
+                    workspace, payload["month"], payload["currency"], payload["assigned"],
+                )
+            elif operation == "set_rollover_mode":
+                set_mode = getattr(self._store, "set_rollover_mode", None)
+                if not callable(set_mode):
+                    raise StoreError("This storage plugin does not support monthly rollover settings.")
+                data = set_mode(workspace, payload["month"], payload["currency"], payload["mode"])
             else:
                 data = self._store.assign(
                     workspace, payload["categoryId"], payload["month"], payload["assigned"],
@@ -285,4 +303,14 @@ class LedgerService:
     def assign(self, workspace, category_id, month, assigned):
         return self._local_command("assign", workspace, {
             "categoryId": category_id, "month": month, "assigned": assigned,
+        })
+
+    def assign_next_month(self, workspace, month, currency, assigned):
+        return self._local_command("assign_next_month", workspace, {
+            "month": month, "currency": currency, "assigned": assigned,
+        })
+
+    def set_rollover_mode(self, workspace, month, currency, mode):
+        return self._local_command("set_rollover_mode", workspace, {
+            "month": month, "currency": currency, "mode": mode,
         })

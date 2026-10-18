@@ -6,6 +6,7 @@ import pytest
 
 from whab.domain.budget import calculate_workspace, ensure_assignment_allowed, select_currency
 from whab.domain.errors import StoreError
+from whab.domain.money import MAX_SAFE_INTEGER
 
 
 @pytest.fixture
@@ -101,6 +102,82 @@ def test_future_assignments_are_reserved_but_deficit_reductions_are_allowed(stat
     ensure_assignment_allowed(state, "groceries", "2026-10", 0, "2026-10")
 
 
+def test_previous_overspending_is_outstanding_category_debt_entering_the_month(state):
+    state["categories"].update({
+        "fun": {"id": "fun", "name": "Fun", "group": "Life", "target": 0},
+        "travel": {"id": "travel", "name": "Travel", "group": "Goals", "target": 0},
+    })
+    state["accounts"]["tracking"] = {
+        "id": "tracking", "type": "investment", "balance": 50000,
+    }
+    state["budget"] = {
+        "2026-07": {"groceries": 99999},
+        "2026-08": {"groceries": 2000, "fun": 10000},
+        "2026-09": {"groceries": 1000},
+        "2026-10": {"groceries": 5000},
+    }
+    rows = [
+        transaction("history", "2026-07-01", 99999),
+        transaction("purchase", "2026-08-10", 6500),
+        transaction("refund", "2026-09-10", -500),
+        transaction("pending", "2026-09-15", 99999, pending=True),
+        transaction("transfer", "2026-09-16", 99999, transfer=True),
+        {**transaction("deleted", "2026-09-17", 99999), "deleted": True},
+        {**transaction("tracking", "2026-09-18", 99999), "accountId": "tracking"},
+        {**transaction("trip", "2026-08-20", 4000), "categoryId": "travel"},
+        {**transaction("trip-refund", "2026-09-20", -1000), "categoryId": "travel"},
+        transaction("current-spend", "2026-10-01", 9000),
+        transaction("current-refund", "2026-10-02", -800),
+    ]
+    state["transactions"] = {row["id"]: row for row in rows}
+    before = deepcopy(state)
+    view = calculate_workspace(state, "2026-10")
+    assert view["summary"]["previousOverspending"] == 6000
+    assert {row["categoryId"]: row["carryover"] for row in view["budget"]} == {
+        "groceries": -3000, "fun": 10000, "travel": -3000,
+    }
+    # Positive envelopes cannot offset debt, and this display total does not
+    # deduct debt again from cash that already reflects the original spending.
+    assert view["summary"]["readyToAssign"] == 90000
+    assert view["summary"]["spent"] == 8200
+    assert calculate_workspace(state, "2026-09")["summary"]["previousOverspending"] == 8500
+    assert calculate_workspace(state, "2026-08")["summary"]["previousOverspending"] == 0
+    assert calculate_workspace(state, "2026-07")["summary"]["previousOverspending"] == 0
+    assert state == before
+
+
+def test_next_month_row_crosses_the_year_while_funding_protects_all_future_months(state):
+    state["budget"] = {
+        "2026-12": {"groceries": 2000},
+        "2027-01": {"groceries": 3000},
+        "2027-02": {"groceries": 4000},
+    }
+    december = calculate_workspace(state, "2026-12")
+    assert december["summary"]["assignedNextMonth"] == 3000
+    assert december["summary"]["readyToAssign"] == 91000
+    assert calculate_workspace(state, "2027-01")["summary"]["assignedNextMonth"] == 4000
+    assert calculate_workspace(state, "2027-02")["summary"]["assignedNextMonth"] == 0
+    # Funding protects every future month, independent of the single
+    # following-month amount shown by the editable row.
+    ensure_assignment_allowed(state, "groceries", "2026-12", 93000, "2026-12")
+    with pytest.raises(StoreError, match="exceeds available money"):
+        ensure_assignment_allowed(state, "groceries", "2026-12", 93001, "2026-12")
+
+
+@pytest.mark.parametrize("month", ["1900-01", "2200-12"])
+def test_monthly_section_totals_support_public_month_boundaries(state, month):
+    view = calculate_workspace(state, month)
+    assert view["summary"]["previousOverspending"] == 0
+    assert view["summary"]["assignedNextMonth"] == 0
+
+
+def test_next_month_summary_rejects_an_unsafe_aggregate(state):
+    state["categories"]["fun"] = {"id": "fun", "name": "Fun", "group": "Life", "target": 0}
+    state["budget"] = {"2026-11": {"groceries": MAX_SAFE_INTEGER, "fun": 1}}
+    with pytest.raises(StoreError, match="totals exceed"):
+        calculate_workspace(state, "2026-10")
+
+
 @pytest.fixture
 def multicurrency_state(state):
     """Three currencies with different precision and independently funded envelopes."""
@@ -145,11 +222,14 @@ def test_multiple_currencies_keep_cash_debt_income_and_rollover_separate(multicu
     assert view["currencies"] == ["EUR", "JPY", "USD"]
     assert view["summariesByCurrency"] == {
         "USD": {"income": 12000, "spent": -500, "assigned": 10000,
-                "available": 23500, "readyToAssign": 56500},
+                "available": 23500, "readyToAssign": 56500,
+                "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0},
         "EUR": {"income": 9000, "spent": 2500, "assigned": 6000,
-                "available": 9500, "readyToAssign": 33500},
+                "available": 9500, "readyToAssign": 33500,
+                "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0},
         "JPY": {"income": 1000, "spent": 200, "assigned": 300,
-                "available": 400, "readyToAssign": 2400},
+                "available": 400, "readyToAssign": 2400,
+                "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0},
     }
     assert view["summary"] == view["summariesByCurrency"]["USD"]
     by_currency = {row["currency"]: row for row in view["budget"]}
@@ -163,10 +243,24 @@ def test_multiple_currencies_keep_cash_debt_income_and_rollover_separate(multicu
     assert multicurrency_state == before
 
 
+def test_monthly_section_totals_keep_currencies_separate(multicurrency_state):
+    multicurrency_state["budget"]["2026-08"]["groceries-EUR"] = 0
+    multicurrency_state["budget"]["2026-08"]["groceries-JPY"] = 0
+    multicurrency_state["budget"]["2026-10"] = {
+        "groceries-USD": 30000, "groceries-EUR": 8000, "groceries-JPY": 500,
+    }
+    multicurrency_state["budget"]["2026-11"] = {"groceries-USD": 40000}
+    view = calculate_workspace(multicurrency_state, "2026-09")
+    assert {
+        code: (row["previousOverspending"], row["assignedNextMonth"])
+        for code, row in view["summariesByCurrency"].items()
+    } == {"USD": (0, 30000), "EUR": (2000, 8000), "JPY": (100, 500)}
+
+
 def test_later_transactions_reconstruct_only_their_own_currency_cash(multicurrency_state):
     view = calculate_workspace(multicurrency_state, "2026-08")
     assert {code: row["readyToAssign"] for code, row in view["summariesByCurrency"].items()} == {
-        "USD": 54500, "EUR": 30500, "JPY": 1700,
+        "USD": 44500, "EUR": 24500, "JPY": 1400,
     }
 
 
@@ -231,6 +325,7 @@ def test_currency_without_records_has_an_empty_projection(multicurrency_state):
     assert all(view[key] == [] for key in ("accounts", "categories", "categoryGroups",
                                          "transactions", "budget"))
     assert set(view["summary"].values()) == {0}
+    assert view["summary"]["previousOverspending"] == view["summary"]["assignedNextMonth"] == 0
     assert view["trend"] == [
         {"month": month, "income": 0, "spent": 0}
         for month in ("2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09")
