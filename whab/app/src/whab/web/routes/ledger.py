@@ -89,11 +89,12 @@ def create_router(store):
 
     @router.patch("/api/transactions/{transaction_id}")
     def review(transaction_id: str, body: ReviewBody):
-        if not body.model_fields_set.intersection({"categoryId", "reviewed"}):
+        if not body.model_fields_set.intersection({"categoryId", "reviewed", "note"}):
             raise HTTPException(400, "No changes provided")
         category = body.categoryId if "categoryId" in body.model_fields_set else UNSET
         store.edit_transaction(
-            body.workspace, transaction_id, category_id=category, reviewed=body.reviewed
+            body.workspace, transaction_id, category_id=category, reviewed=body.reviewed,
+            **({"note": body.note} if "note" in body.model_fields_set else {}),
         )
         return {"ok": True}
 
@@ -134,5 +135,9 @@ def create_router(store):
             body.model_dump(exclude={"workspace"}, exclude_unset=True),
         )
         return {"ok": True}
+
+    @router.get("/api/accounts/{account_id}/settings")
+    def account_settings(account_id: str, workspace: Workspace):
+        return store.account_settings(workspace, account_id)
 
     return router

@@ -134,6 +134,10 @@ class Store:
                 account["mask"] = row["mask"]
             if "on_budget" in row.keys():
                 account.update(onBudget=bool(row["on_budget"]), subtype=row["subtype"])
+            if "bank_website" in row.keys() and row["bank_website"] is not None:
+                account["bankWebsite"] = row["bank_website"]
+            if "name_overridden" in row.keys() and row["name_overridden"]:
+                account["nameOverridden"] = bool(row["name_overridden"])
             state["accounts"][row["id"]] = normalize_account(account)
         for row in self.db.execute(
             "SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,)
@@ -196,7 +200,7 @@ class Store:
             (workspace, state["budgetStartMonth"]),
         )
         self.db.executemany(
-            "INSERT INTO accounts(id,workspace,name,institution,type,balance,source,item_id,mask,active,balance_unknown,currency,on_budget,subtype) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,institution=excluded.institution,type=excluded.type,balance=excluded.balance,source=excluded.source,item_id=excluded.item_id,mask=excluded.mask,active=excluded.active,balance_unknown=excluded.balance_unknown,currency=excluded.currency,on_budget=excluded.on_budget,subtype=excluded.subtype",
+            "INSERT INTO accounts(id,workspace,name,institution,type,balance,source,item_id,mask,active,balance_unknown,currency,on_budget,subtype,bank_website,name_overridden) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,institution=excluded.institution,type=excluded.type,balance=excluded.balance,source=excluded.source,item_id=excluded.item_id,mask=excluded.mask,active=excluded.active,balance_unknown=excluded.balance_unknown,currency=excluded.currency,on_budget=excluded.on_budget,subtype=excluded.subtype,bank_website=excluded.bank_website,name_overridden=excluded.name_overridden",
             [
                 (
                     a["id"],
@@ -213,6 +217,8 @@ class Store:
                     a.get("currency", "USD"),
                     int(a["onBudget"]),
                     a["subtype"],
+                    a.get("bankWebsite"),
+                    int(a.get("nameOverridden", False)),
                 )
                 for a in map(normalize_account, state["accounts"].values())
             ],
@@ -408,7 +414,8 @@ class Store:
             "formatVersion": 1,
             "budgetStartMonth": state["budgetStartMonth"],
             "accounts": [
-                {key: record[key] for key in ACCOUNT_FIELDS}
+                {**{key: record[key] for key in ACCOUNT_FIELDS},
+                 **{key: record[key] for key in ("bankWebsite", "nameOverridden") if key in record}}
                 for record in state["accounts"].values()
             ],
             "categories": [
@@ -436,7 +443,7 @@ class Store:
             ],
         })
 
-    def restore_budget(self, workspace: str, data: dict) -> None:
+    def restore_budget(self, workspace: str, data: dict, *, _receipts=()) -> None:
         """Explicitly initialize a pristine personal ledger; never replace saved data."""
         if workspace != "personal":
             raise StoreError("Portable budgets require the personal workspace.")
@@ -468,6 +475,13 @@ class Store:
             for rollover in restored["rolloverModes"]:
                 state["rolloverModes"].setdefault(rollover["month"], {})[rollover["currency"]] = rollover["mode"]
             state["budgetStartMonth"] = restored["budgetStartMonth"]
+            # Foreign keys are deferred until _write_state inserts the validated
+            # transactions. A failed restore rolls images and ledger back together.
+            for transaction_id, image in _receipts:
+                self.db.execute(
+                    "INSERT INTO transaction_receipts(workspace,transaction_id,image) VALUES(?,?,?)",
+                    (workspace, transaction_id, image),
+                )
 
         self._mutate(workspace, operation)
 
@@ -483,7 +497,8 @@ class Store:
 
         if workspace != "personal":
             raise StoreError("Portable budgets require the personal workspace.")
-        self.restore_budget(workspace, read_files(files))
+        snapshot, images = read_files(files, with_receipts=True)
+        self.restore_budget(workspace, snapshot, _receipts=images)
 
     def prepare_budget_files(
         self, workspace: str, files: Mapping[str, bytes], *, existing: bool = False,
@@ -497,6 +512,26 @@ class Store:
 
     def categories(self, workspace: str) -> list[dict]:
         return public_categories(self.state(workspace)["categories"])
+
+    def receipt_ids(self, workspace: str) -> list[str]:
+        from .receipts import ids
+
+        return ids(self, workspace)
+
+    def get_receipt(self, workspace: str, transaction_id: str) -> bytes | None:
+        from .receipts import get
+
+        return get(self, workspace, transaction_id)
+
+    def save_receipt(self, workspace: str, transaction_id: str, raw: bytes) -> None:
+        from .receipts import save
+
+        save(self, workspace, transaction_id, raw)
+
+    def delete_receipt(self, workspace: str, transaction_id: str) -> None:
+        from .receipts import delete
+
+        delete(self, workspace, transaction_id)
 
     def transactions(self, workspace: str, month: str | None = None) -> list[dict]:
         return transaction_rows(self.state(workspace), month)
@@ -543,9 +578,11 @@ class Store:
         transaction_id: str,
         category_id: Any = UNSET,
         reviewed: bool | None = None,
+        note: Any = UNSET,
     ) -> None:
         self._mutate(
-            workspace, lambda state: commands.edit_transaction(state, transaction_id, category_id, reviewed),
+            workspace,
+            lambda state: commands.edit_transaction(state, transaction_id, category_id, reviewed, note),
         )
 
     def assign(self, workspace: str, category_id: str, month: str, assigned: int) -> None:
@@ -671,6 +708,11 @@ class Store:
                 if previous_account:
                     for field in ("type", "onBudget", "subtype"):
                         normalized_account[field] = previous_account[field]
+                    for field in ("bankWebsite", "nameOverridden"):
+                        if field in previous_account:
+                            normalized_account[field] = previous_account[field]
+                    if previous_account.get("nameOverridden"):
+                        normalized_account["name"] = previous_account["name"]
                 state["accounts"][normalized_account["id"]] = normalized_account
             for imported in changes.get("added", []) + changes.get("modified", []):
                 validate_imported_transaction(imported)
@@ -703,6 +745,17 @@ class Store:
                         # or introduce a parent/dangling category reference.
                         normalized_transaction["categoryId"] = None
                 state["transactions"][transaction_id] = normalized_transaction
+                if pending is not None and pending["id"] != transaction_id:
+                    # Keep the user's picture when a provider replaces a pending
+                    # transaction ID with its posted ID, within the same sync.
+                    self.db.execute(
+                        "INSERT OR IGNORE INTO transaction_receipts(workspace,transaction_id,image) SELECT workspace,?,image FROM transaction_receipts WHERE workspace=? AND transaction_id=?",
+                        (transaction_id, "personal", pending["id"]),
+                    )
+                    self.db.execute(
+                        "DELETE FROM transaction_receipts WHERE workspace=? AND transaction_id=?",
+                        ("personal", pending["id"]),
+                    )
             for removed_id in changes.get("removed", []):
                 bank_identifier(removed_id)
                 transaction = state["transactions"].get(removed_id)

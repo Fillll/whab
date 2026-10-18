@@ -297,3 +297,108 @@ def test_saved_logo_expires_at_exactly_one_year(monkeypatch, tmp_path):
     monkeypatch.setattr(provider, "fetch_logo", lambda key: IMAGE)
     assert provider.fetch("chase") == IMAGE
     assert json.loads((tmp_path / "chase.json").read_text())["saved_at"] == now
+
+
+def test_explicit_hostnames_restore_saved_images_only_after_registration(monkeypatch, tmp_path):
+    key = provider.resolve_domain("bank.example.com")
+    monkeypatch.setattr(provider, "fetch_logo", lambda key: IMAGE)
+    provider.configure_cache(tmp_path)
+    assert provider.fetch(key) == IMAGE
+    assert json.loads((tmp_path / f"{key}.json").read_text())["data"] == record()["data"]
+
+    # A restart cannot treat a file name alone as permission to fetch a public domain.
+    monkeypatch.setattr(provider, "_cache", provider._LogoCache())
+    provider.configure_cache(tmp_path)
+    monkeypatch.setattr(provider, "fetch_logo", lambda key: pytest.fail("cached logo downloaded"))
+    assert provider.fetch(key) is None
+    assert provider.resolve_domain("bank.example.com") == key
+    assert provider.fetch(key) == IMAGE
+    assert provider.read_settings()[1].value == "1"
+
+    # Cache reconfiguration also restores already registered explicit hostnames.
+    provider.configure_cache(tmp_path)
+    assert provider.fetch(key) == IMAGE
+
+
+def test_flush_clears_explicit_files_from_earlier_processes_but_keeps_mappings(monkeypatch, tmp_path):
+    key = provider.resolve_domain("bank.example.com")
+    requests = []
+    monkeypatch.setattr(provider, "fetch_logo", lambda key: requests.append(key) or IMAGE)
+    provider.configure_cache(tmp_path)
+    assert provider.fetch(key) == IMAGE
+    old_key = "domain-" + "a" * 32
+    (tmp_path / f"{old_key}.json").write_text(json.dumps(record()))
+    (tmp_path / f".{old_key}.json.tmp").write_text("interrupted write")
+    unrelated = tmp_path / "domain-user-owned.json"
+    unrelated.write_text("preserved")
+    provider.apply_setting("flush-cache")
+    assert list(tmp_path.iterdir()) == [unrelated]
+    assert provider._cache.domain(key) == "bank.example.com"
+    assert provider.fetch(key) == IMAGE
+    assert requests == [key, key]
+
+
+def test_hostname_registration_is_bounded_and_refreshes_recently_used_keys(monkeypatch):
+    monkeypatch.setattr(provider, "_MAX_DOMAIN_KEYS", 2)
+    monkeypatch.setattr(provider, "fetch_logo", lambda key: IMAGE)
+    first = provider.resolve_domain("first.example.com")
+    second = provider.resolve_domain("second.example.com")
+    assert provider.fetch(second) == IMAGE
+    assert provider.resolve_domain("first.example.com") == first
+    third = provider.resolve_domain("third.example.com")
+    assert provider._cache.domain(first) == "first.example.com"
+    assert provider._cache.domain(second) is None
+    assert provider._cache.domain(third) == "third.example.com"
+    assert provider.fetch(second) is None
+    assert second not in provider._cache._entries
+    assert len(provider._cache._domains) == 2
+
+
+def test_memory_entries_and_persisted_explicit_images_are_bounded(monkeypatch, tmp_path):
+    import os
+
+    monkeypatch.setattr(provider, "_MAX_DOMAIN_KEYS", 2)
+    monkeypatch.setattr(provider, "fetch_logo", lambda key: IMAGE)
+    provider.configure_cache(tmp_path)
+    old_paths = []
+    for index in range(3):
+        path = tmp_path / f"domain-{index:032x}.json"
+        path.write_text(json.dumps(record()))
+        os.utime(path, (index, index))
+        old_paths.append(path)
+    unrelated = tmp_path / "domain-user-owned.json"
+    unrelated.write_text("preserved")
+    key = provider.resolve_domain("bank.example.com")
+    assert provider.fetch(key) == IMAGE
+    assert not old_paths[0].exists()
+    assert not old_paths[1].exists()
+    assert old_paths[2].exists()
+    assert unrelated.read_text() == "preserved"
+    assert provider.fetch("chase") == IMAGE
+    assert provider.fetch("citi") == IMAGE
+    assert len(provider._cache._entries) == 2
+    assert key not in provider._cache._entries
+
+
+def test_eviction_during_download_does_not_reinsert_unregistered_key(monkeypatch, tmp_path):
+    monkeypatch.setattr(provider, "_MAX_DOMAIN_KEYS", 1)
+    started = threading.Event()
+    release = threading.Event()
+    first = provider.resolve_domain("first.example.com")
+
+    def delayed_fetch(key):
+        started.set()
+        assert release.wait(5)
+        return IMAGE
+
+    monkeypatch.setattr(provider, "fetch_logo", delayed_fetch)
+    provider.configure_cache(tmp_path)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        downloaded = executor.submit(provider.fetch, first)
+        assert started.wait(5)
+        provider.resolve_domain("second.example.com")
+        release.set()
+        assert downloaded.result(5) == IMAGE
+    assert first not in provider._cache._entries
+    assert not (tmp_path / f"{first}.json").exists()
+    assert provider.fetch(first) is None

@@ -4,6 +4,10 @@ Assets carry their signed value; liabilities carry a positive amount owed. Only
 on-budget cash and credit accounts participate in envelope funding and activity.
 """
 
+import ipaddress
+import re
+from urllib.parse import urlsplit
+
 from .errors import StoreError
 from .money import MAX_SAFE_INTEGER
 
@@ -42,6 +46,33 @@ ON_BUDGET_ACCOUNT_TYPES = frozenset({"depository", "credit"})
 LIABILITY_ACCOUNT_TYPES = frozenset({"credit", "loan", "other_liability"})
 
 
+def bank_website(value):
+    """Keep only a public HTTPS hostname; never save a credential-bearing bank URL."""
+    if value is None or value == "":
+        return None
+    if type(value) is not str or len(value) > 2048 or any(character.isspace() for character in value):
+        raise StoreError("Use the bank's public HTTPS website.")
+    try:
+        parsed = urlsplit(value)
+        if (parsed.scheme != "https" or parsed.username is not None or parsed.password is not None
+                or parsed.port is not None or parsed.query or parsed.fragment or not parsed.hostname):
+            raise ValueError()
+        hostname = parsed.hostname.encode("idna").decode("ascii").lower()
+        labels = hostname.split(".")
+        if (len(hostname) > 253 or len(labels) < 2
+                or labels[-1] in {"localhost", "local", "internal", "lan", "home", "test", "invalid"}
+                or not re.fullmatch(r"[a-z][a-z0-9-]*", labels[-1])
+                or any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) for label in labels)):
+            raise ValueError()
+        try:
+            ipaddress.ip_address(hostname)
+        except ValueError:
+            return "https://" + hostname
+    except (ValueError, UnicodeError):
+        pass
+    raise StoreError("Use the bank's public HTTPS website without credentials, a port, query or fragment.")
+
+
 def is_on_budget(account: dict) -> bool:
     """Legacy cash/card records stay on budget; tracking records default off."""
     return account.get("onBudget", account["type"] in ON_BUDGET_ACCOUNT_TYPES)
@@ -66,7 +97,12 @@ def normalize_account(account: dict) -> dict:
         type(subtype) is not str or subtype not in ACCOUNT_SUBTYPES.get(kind, {})
     ):
         raise StoreError("Invalid account subtype.")
-    return {**account, "onBudget": on_budget, "subtype": subtype}
+    result = {**account, "onBudget": on_budget, "subtype": subtype}
+    if "bankWebsite" in account:
+        result["bankWebsite"] = bank_website(account["bankWebsite"])
+    if "nameOverridden" in account and type(account["nameOverridden"]) is not bool:
+        raise StoreError("Invalid account name override.")
+    return result
 
 
 def account_summary(accounts) -> dict:

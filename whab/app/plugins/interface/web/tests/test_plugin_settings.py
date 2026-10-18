@@ -93,7 +93,7 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     for destination in ("personal", "demo"):
         href = attributes[f"data-{destination}-url"]
         address = urlparse(href)
-        key = "home" if destination == "personal" else "demo"
+        key = "my-budget" if destination == "personal" else "demo"
         assert address.path == f"/budgets/{key}/transactions/2026-09/eur"
         assert address.query == ""
         switched = client.get(href)

@@ -5,7 +5,13 @@ atomically. These commands validate references, money and user annotations befor
 changing state, so the same financial behavior applies to every persistence adapter.
 """
 
-from .accounts import ON_BUDGET_ACCOUNT_TYPES, is_liability, is_on_budget, normalize_account
+from .accounts import (
+    ON_BUDGET_ACCOUNT_TYPES,
+    bank_website,
+    is_liability,
+    is_on_budget,
+    normalize_account,
+)
 from .budget import (
     ROLLOVER_MODES,
     calculate_workspace,
@@ -41,13 +47,24 @@ def add_account(state: dict, account_id: str, account: dict) -> str:
 
 
 def update_account(state: dict, account_id: str, changes: dict) -> None:
-    """Reclassify existing history without changing balances or transactions."""
+    """Edit account metadata without silently converting existing transaction history."""
     account = state["accounts"].get(account_id)
     if account is None:
         raise StoreError("Account not found.")
-    if type(changes) is not dict or not changes or changes.keys() - {"type", "onBudget", "subtype"}:
+    if type(changes) is not dict or not changes or changes.keys() - {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}:
         raise StoreError("Invalid account classification fields.")
     candidate = {**account, **changes}
+    if "name" in changes:
+        candidate["name"] = validate_label(changes["name"])
+        candidate["nameOverridden"] = True
+    if "bankWebsite" in changes:
+        candidate["bankWebsite"] = bank_website(changes["bankWebsite"])
+    if "currency" in changes:
+        candidate["currency"] = currency_code(changes["currency"])
+        if candidate["currency"] != account.get("currency", "USD") and any(
+            row["accountId"] == account_id for row in state["transactions"].values()
+        ):
+            raise StoreError("Currency can only change before an account has transaction history.")
     if "type" in changes and changes["type"] != account["type"]:
         if "subtype" not in changes:
             candidate["subtype"] = None
@@ -108,8 +125,9 @@ def add_transaction(
 
 def edit_transaction(
     state: dict, transaction_id: str, category_id: object = UNSET, reviewed: bool | None = None,
+    note: object = UNSET,
 ) -> None:
-    """Preserve review-only edits and restore inferred transfers when uncategorized."""
+    """Validate annotations together before changing category, review status or memo."""
     transaction = state["transactions"].get(transaction_id)
     if not transaction or transaction.get("deleted"):
         raise StoreError("Transaction not found.")
@@ -120,6 +138,8 @@ def edit_transaction(
             raise StoreError("Category currency must match the account currency.")
     if reviewed is not None and not isinstance(reviewed, bool):
         raise StoreError("Invalid review status.")
+    if note is not UNSET and (not isinstance(note, str) or len(note) > 1000):
+        raise StoreError("Invalid note.")
     if category_id is not UNSET:
         transaction.update(
             categoryId=category_id,
@@ -130,6 +150,8 @@ def edit_transaction(
         )
     if reviewed is not None:
         transaction["reviewed"] = reviewed
+    if note is not UNSET:
+        transaction["note"] = note
 
 
 def assign(

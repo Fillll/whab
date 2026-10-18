@@ -38,7 +38,7 @@ def test_client_server_commands_export_and_concurrent_conflict(store):
         "accountId": account, "date": "2026-10-01", "merchant": "Shop", "amount": 100,
         "categoryId": category,
     })
-    client.edit_transaction("personal", transaction, reviewed=True)
+    client.edit_transaction("personal", transaction, reviewed=True, note="Memo from the remote client")
     client.assign("personal", category, "2026-10", 500)
     client.assign_next_month("personal", "2026-10", "USD", 3000)
     client.assign("personal", category, "2026-11", 1000)
@@ -54,6 +54,7 @@ def test_client_server_commands_export_and_concurrent_conflict(store):
     assert november["summary"]["readyToAssign"] == 8900
     assert all(row["carryover"] == 0 for row in november["budget"])
     assert client.transactions("personal", "2026-10")[0]["reviewed"] is True
+    assert client.transactions("personal", "2026-10")[0]["note"] == "Memo from the remote client"
     assert client.export_budget() == store.export_budget()
     assert "token" not in str(client.workspace("personal", "2026-10"))
     periods = LedgerService(client).workspace_periods("personal", "2026-10", 3)

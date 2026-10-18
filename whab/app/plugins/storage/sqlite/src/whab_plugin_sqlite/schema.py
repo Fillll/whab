@@ -13,6 +13,7 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
         CREATE TABLE IF NOT EXISTS accounts(id TEXT NOT NULL,workspace TEXT NOT NULL,name TEXT NOT NULL,institution TEXT NOT NULL,type TEXT NOT NULL,balance INTEGER NOT NULL,source TEXT NOT NULL,item_id TEXT,mask TEXT,PRIMARY KEY(workspace,id));
         CREATE TABLE IF NOT EXISTS categories(id TEXT NOT NULL,workspace TEXT NOT NULL,name TEXT NOT NULL,group_name TEXT NOT NULL,target INTEGER NOT NULL,PRIMARY KEY(workspace,id));
         CREATE TABLE IF NOT EXISTS transactions(id TEXT NOT NULL,workspace TEXT NOT NULL,account_id TEXT NOT NULL,date TEXT NOT NULL,merchant TEXT NOT NULL,amount INTEGER NOT NULL,category_id TEXT,pending INTEGER NOT NULL DEFAULT 0,reviewed INTEGER NOT NULL DEFAULT 0,source TEXT NOT NULL,note TEXT NOT NULL DEFAULT '',is_transfer INTEGER NOT NULL DEFAULT 0,category_edited INTEGER NOT NULL DEFAULT 0,deleted INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(workspace,id));
+        CREATE TABLE IF NOT EXISTS transaction_receipts(workspace TEXT NOT NULL,transaction_id TEXT NOT NULL,image BLOB NOT NULL,PRIMARY KEY(workspace,transaction_id),FOREIGN KEY(workspace,transaction_id) REFERENCES transactions(workspace,id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED);
         CREATE TABLE IF NOT EXISTS budget(workspace TEXT NOT NULL,month TEXT NOT NULL,category_id TEXT NOT NULL,assigned INTEGER NOT NULL,PRIMARY KEY(workspace,month,category_id));
         CREATE TABLE IF NOT EXISTS future_funding(workspace TEXT NOT NULL,month TEXT NOT NULL,currency TEXT NOT NULL,assigned INTEGER NOT NULL,PRIMARY KEY(workspace,month,currency));
         CREATE TABLE IF NOT EXISTS rollover_modes(workspace TEXT NOT NULL,month TEXT NOT NULL,currency TEXT NOT NULL,mode TEXT NOT NULL,PRIMARY KEY(workspace,month,currency));
@@ -27,6 +28,8 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
             "balance_unknown": "INTEGER NOT NULL DEFAULT 0",
             "on_budget": "INTEGER NOT NULL DEFAULT 1",
             "subtype": "TEXT",
+            "bank_website": "TEXT",
+            "name_overridden": "INTEGER NOT NULL DEFAULT 0",
         },
         "transactions": {
             "inferred_transfer": "INTEGER NOT NULL DEFAULT 0",

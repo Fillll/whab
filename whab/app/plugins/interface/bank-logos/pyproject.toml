@@ -1,12 +1,12 @@
 [project]
 name = "whab_plugin_bank_logos"
-version = "1.0.1"
+version = "1.1.0"
 description = "Public bank artwork plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2,<3", "httpx==0.28.1"]
+dependencies = ["whab>=2.11,<3", "httpx==0.28.1"]
 
 [project.entry-points."whab.plugins"]
 bank-logos = "whab_plugin_bank_logos.plugin:plugin"

@@ -175,6 +175,10 @@ def test_concurrent_writers_cannot_both_use_a_revision(store):
     ("set_rollover_mode", {"month": "2026-10", "currency": "xyz", "mode": "category"}),
     ("edit_transaction", {"transactionId": "tx"}),
     ("edit_transaction", {"transactionId": "tx", "reviewed": "true"}),
+    ("edit_transaction", {"transactionId": "tx", "note": None}),
+    ("edit_transaction", {"transactionId": "tx", "note": False}),
+    ("edit_transaction", {"transactionId": "tx", "note": []}),
+    ("edit_transaction", {"transactionId": "tx", "note": "x" * 1001}),
     ("add_transaction", {"accountId": "account", "date": "2026-10-01", "merchant": "Cash", "amount": 0, "categoryId": None}),
     ("add_transaction", {"accountId": "account", "date": "2026-10-01", "merchant": "Cash", "amount": 1, "categoryId": None, "note": []}),
 ])
@@ -247,6 +251,47 @@ def test_older_storage_can_open_without_optional_account_update():
     service = LedgerService(SimpleNamespace())
     with pytest.raises(StoreError, match="does not support account classification"):
         service.update_account("personal", "a", {"onBudget": False})
+
+
+def test_memo_edits_share_revision_replay_and_atomic_commit_boundary(store):
+    saved = []
+    service = LedgerService(store, on_commit=lambda: saved.append(True))
+    account = service.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+    transaction = service.add_transaction("personal", {
+        "accountId": account, "date": "2026-10-01", "merchant": "Shop", "amount": 100,
+        "categoryId": None, "note": "Original memo",
+    })
+    revision = service.revision
+    payload = {"transactionId": transaction, "categoryId": "fun", "reviewed": True, "note": "Updated memo"}
+    response = service.command(
+        "edit_transaction", "personal", payload, request_id="memo", expected_revision=revision,
+    )
+    assert service.command(
+        "edit_transaction", "personal", payload, request_id="memo", expected_revision=revision,
+    ) == response
+    assert len(saved) == 3
+    assert service.transactions("personal")[0]["note"] == "Updated memo"
+    assert service.transactions("personal")[0]["categoryId"] == "fun"
+    assert service.transactions("personal")[0]["reviewed"] is True
+    assert service.accounts("personal")[0]["balance"] == 9900
+    with pytest.raises(RequestConflict):
+        service.command(
+            "edit_transaction", "personal", {**payload, "note": "Different memo"},
+            request_id="memo", expected_revision=revision,
+        )
+    service.edit_transaction("personal", transaction, note="")
+    assert service.transactions("personal")[0]["note"] == ""
+
+
+def test_omitted_memo_preserves_older_backend_call_signature():
+    calls = []
+
+    def edit_transaction(workspace, transaction_id, category_id, reviewed):
+        calls.append((workspace, transaction_id, category_id, reviewed))
+
+    service = LedgerService(SimpleNamespace(edit_transaction=edit_transaction))
+    service.edit_transaction("personal", "saved", category_id=None, reviewed=True)
+    assert calls == [("personal", "saved", None, True)]
 
 
 def test_shared_lock_invalidation_does_not_checkpoint(store):

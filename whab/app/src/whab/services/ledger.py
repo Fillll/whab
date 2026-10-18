@@ -13,11 +13,11 @@ from json import dumps
 from threading import RLock
 from uuid import uuid4
 
-from whab.domain.accounts import normalize_account
+from whab.domain.accounts import bank_website, normalize_account
 from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
 from whab.domain.money import cents, currency_code
-from whab.domain.portable import validate_portable_budget
+from whab.domain.portable import ACCOUNT_FIELDS, validate_portable_budget
 from whab.domain.transactions import UNSET
 from whab.domain.validation import validate_date, validate_label, validate_month
 
@@ -119,12 +119,12 @@ class LedgerService:
     def _validate(operation: str, payload: dict) -> dict:
         fields = {
             "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype"}),
-            "update_account": ({"accountId"}, {"type", "onBudget", "subtype"}),
+            "update_account": ({"accountId"}, {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}),
             "add_category": ({"name", "target"}, {"group", "parentId", "currency"}),
             "add_transaction": (
                 {"accountId", "date", "merchant", "amount", "categoryId"}, {"note"},
             ),
-            "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed"}),
+            "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed", "note"}),
             "assign": ({"categoryId", "month", "assigned"}, set()),
             "assign_next_month": ({"month", "currency", "assigned"}, set()),
             "set_rollover_mode": ({"month", "currency", "mode"}, set()),
@@ -149,6 +149,8 @@ class LedgerService:
         for name in ("target", "assigned"):
             if name in payload and payload[name] < 0:
                 raise StoreError("Targets and assignments cannot be negative.")
+        if "note" in payload and (type(payload["note"]) is not str or len(payload["note"]) > 1000):
+            raise StoreError("Invalid note.")
         if operation == "add_account":
             normalize_account(payload)
         if operation == "set_rollover_mode" and (
@@ -156,8 +158,10 @@ class LedgerService:
         ):
             raise StoreError("Rollover mode must be category or balance.")
         if operation == "update_account":
-            if not payload.keys() & {"type", "onBudget", "subtype"}:
+            if not payload.keys() & {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}:
                 raise StoreError("No account changes provided.")
+            if "bankWebsite" in payload:
+                payload["bankWebsite"] = bank_website(payload["bankWebsite"])
             if "type" in payload:
                 normalize_account(payload)
             if "onBudget" in payload and type(payload["onBudget"]) is not bool:
@@ -170,10 +174,8 @@ class LedgerService:
                 raise StoreError("Transaction date must be between 1900-01-01 and 2200-12-31.")
             if not payload["amount"]:
                 raise StoreError("Amount must not be zero.")
-            if type(payload.get("note", "")) is not str or len(payload.get("note", "")) > 1000:
-                raise StoreError("Invalid note.")
         if operation == "edit_transaction":
-            if not payload.keys() & {"categoryId", "reviewed"}:
+            if not payload.keys() & {"categoryId", "reviewed", "note"}:
                 raise StoreError("No transaction changes provided.")
             if "reviewed" in payload and type(payload["reviewed"]) is not bool:
                 raise StoreError("Invalid review status.")
@@ -214,6 +216,7 @@ class LedgerService:
                 data = self._store.edit_transaction(
                     workspace, payload["transactionId"],
                     category_id=payload.get("categoryId", UNSET), reviewed=payload.get("reviewed"),
+                    **({"note": payload["note"]} if "note" in payload else {}),
                 )
             elif operation == "assign_next_month":
                 assign_next = getattr(self._store, "assign_next_month", None)
@@ -284,6 +287,24 @@ class LedgerService:
     def update_account(self, workspace, account_id, changes):
         return self._local_command("update_account", workspace, {**changes, "accountId": account_id})
 
+    def account_settings(self, workspace, account_id):
+        """Return one public account and a history-aware currency edit capability."""
+        _identifier(account_id)
+        if callable(getattr(self._store, "export_budget", None)):
+            snapshot = self.query("portable", workspace)["data"]
+        else:
+            # Basic metadata remains available on a backend without portable
+            # history. Missing proof of emptiness never enables currency edits.
+            snapshot = {"accounts": self.accounts(workspace), "transactions": None}
+        account = next((row for row in snapshot["accounts"] if row["id"] == account_id), None)
+        if account is None:
+            raise StoreError("Account not found.")
+        account = {key: value for key, value in account.items()
+                   if key in ACCOUNT_FIELDS | {"bankWebsite", "nameOverridden"}}
+        return {"account": account, "currencyEditable": snapshot["transactions"] is not None and not any(
+            row["accountId"] == account_id for row in snapshot["transactions"]
+        )}
+
     def add_category(self, workspace, category):
         return self._local_command("add_category", workspace, category)
 
@@ -292,12 +313,14 @@ class LedgerService:
             raise StoreError("Public commands only create manual transactions.")
         return self._local_command("add_transaction", workspace, transaction)
 
-    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None):
+    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET):
         payload = {"transactionId": transaction_id}
         if category_id is not UNSET:
             payload["categoryId"] = category_id
         if reviewed is not None:
             payload["reviewed"] = reviewed
+        if note is not UNSET:
+            payload["note"] = note
         return self._local_command("edit_transaction", workspace, payload)
 
     def assign(self, workspace, category_id, month, assigned):

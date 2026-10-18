@@ -163,3 +163,57 @@ def test_network_failure_falls_back_without_exposing_provider_details():
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         assert fetch_logo("chase", client=client) is None
+
+
+@pytest.mark.parametrize(
+    "hostname",
+    [
+        None, {}, "", "https://chase.com", "example.com/login", "example.com\\login",
+        "example.com:443", "user@example.com", "example.com?account=private",
+        "example.com#private", "localhost", "bank.local", "bank.internal", "127.0.0.1",
+        "[::1]", "bank .com", "a" * 254,
+    ],
+)
+def test_explicit_domain_hook_rejects_urls_private_hosts_and_invalid_values(hostname):
+    assert provider.resolve_domain(hostname) is None
+
+
+def test_explicit_public_hostname_resolution_is_local_normalized_and_opaque(monkeypatch):
+    import hashlib
+
+    def unexpected_client(**kwargs):
+        raise AssertionError("Resolving a public hostname must not access the network")
+
+    monkeypatch.setattr(provider.httpx, "Client", unexpected_client)
+    key = provider.resolve_domain("BANK.EXAMPLE.COM")
+    assert key == "domain-" + hashlib.sha256(b"bank.example.com").hexdigest()[:32]
+    assert provider.resolve_domain("bank.example.com") == key
+    assert "bank.example.com" not in key
+    international = provider.resolve_domain("b\u00fccher.example.com")
+    assert provider._cache.domain(international) == "xn--bcher-kva.example.com"
+    assert provider.plugin.bank_logos.resolve_domain is provider.resolve_domain
+    assert provider.plugin.bank_logos.provider_name == "Icon Horse"
+    assert provider.plugin.bank_logos.provider_url == "https://icon.horse"
+
+
+def test_explicit_hostname_fetch_uses_fixed_service_only_after_registration(monkeypatch):
+    import hashlib
+
+    hostname = "secure.bank.example.com"
+    key = "domain-" + hashlib.sha256(hostname.encode()).hexdigest()[:32]
+    monkeypatch.setattr(provider, "_cache", provider._LogoCache())
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, headers={"content-type": "image/png"}, content=PNG)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        assert provider.fetch_logo(key, client=client) is None
+        assert provider.resolve_domain(hostname) == key
+        assert provider.fetch_logo(key, client=client).data == PNG
+    assert [str(request.url) for request in requests] == [
+        "https://icon.horse/icon/secure.bank.example.com",
+    ]
+    assert not requests[0].content
+    assert "authorization" not in requests[0].headers

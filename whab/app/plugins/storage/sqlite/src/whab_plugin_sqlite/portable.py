@@ -3,14 +3,14 @@
 import sqlite3
 from collections.abc import Mapping
 
-from whab.domain.errors import StoreError
+from whab.plugins import StoreError, receipt_media_type
 
 from .store import Store
 
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
 _FORMAT_VERSION = 1
-_ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000}
+_ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000}
 
 
 def _schema(connection):
@@ -24,10 +24,15 @@ def _schema(connection):
 
 def export_files(store, workspace):
     """Serialize a fresh database that has never contained connection credentials."""
-    snapshot = store.export_budget(workspace)
+    with store._snapshot():
+        snapshot = store.export_budget(workspace)
+        images = [(transaction_id, store.get_receipt(workspace, transaction_id)) for transaction_id in store.receipt_ids(workspace)]
     clean = Store(":memory:", month=snapshot["budgetStartMonth"])
     try:
         clean.restore_budget("personal", snapshot)
+        for transaction_id, image in images:
+            receipt_media_type(image)
+            clean.db.execute("INSERT INTO transaction_receipts(workspace,transaction_id,image) VALUES('personal',?,?)", (transaction_id, image))
         # The image belongs to this budget; demo seeding is supplied by the host
         # installation and must not travel as a second ledger inside its payload.
         for table in ("meta", *_ROW_LIMITS):
@@ -69,9 +74,12 @@ def _validate_rows(connection, *, legacy_accounts, legacy_tables):
         for row in connection.execute(f"SELECT {columns} FROM {table}"):
             if any(type(value) is not int or value not in (0, 1) for value in row):
                 raise StoreError("SQLite budget flags must be integer booleans.")
+    if "name_overridden" in {row["name"] for row in connection.execute("PRAGMA table_info(accounts)")}:
+        if any(type(row[0]) is not int or row[0] not in (0, 1) for row in connection.execute("SELECT name_overridden FROM accounts")):
+            raise StoreError("SQLite budget flags must be integer booleans.")
 
 
-def read_files(files):
+def read_files(files, *, with_receipts=False):
     """Treat untrusted SQLite rows as data; never execute their schema or migrations."""
     if not isinstance(files, Mapping) or set(files) != {_FILENAME}:
         raise StoreError("This SQLite budget requires exactly one budget.sqlite payload.")
@@ -97,7 +105,14 @@ def read_files(files):
         compatible_schemas = [
             [row for row in schema if row[2] not in omitted]
             for schema in (expected_schema, legacy_schema)
+            for schema in (schema, [
+                (*row[:3], row[3].replace(
+                    ", bank_website TEXT, name_overridden INTEGER NOT NULL DEFAULT 0", ""
+                )) if row[1] == "accounts" else row
+                for row in schema
+            ])
             for omitted in ((), ("future_funding",), ("rollover_modes",), ("future_funding", "rollover_modes"))
+            for omitted in (omitted, (*omitted, "transaction_receipts"))
         ]
         reader.db.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
         reader.db.execute("PRAGMA trusted_schema=OFF")
@@ -116,7 +131,16 @@ def read_files(files):
             legacy_accounts="on_budget" not in {row["name"] for row in reader.db.execute("PRAGMA table_info(accounts)")},
             legacy_tables=set(_ROW_LIMITS) - {row[1] for row in actual_schema if row[0] == "table"},
         )
-        return reader.export_budget()
+        snapshot = reader.export_budget()
+        images = []
+        if any(row[1] == "transaction_receipts" for row in actual_schema):
+            transactions = {row["id"] for row in snapshot["transactions"] if not row["deleted"]}
+            for transaction_id, image in reader.db.execute("SELECT transaction_id,image FROM transaction_receipts ORDER BY transaction_id"):
+                if transaction_id not in transactions:
+                    raise StoreError("Receipt images must belong to an active transaction.")
+                receipt_media_type(image)
+                images.append((transaction_id, image))
+        return (snapshot, images) if with_receipts else snapshot
     except sqlite3.Error:
         raise StoreError("This SQLite budget database is invalid or damaged.") from None
     finally:
@@ -140,7 +164,7 @@ def _semantic(snapshot):
 
 
 def prepare_files(store, files, *, existing):
-    snapshot = read_files(files)
+    snapshot, images = read_files(files, with_receipts=True)
     if existing:
         with store._snapshot():
             state = store._read_state("personal")
@@ -150,6 +174,9 @@ def prepare_files(store, files, *, existing):
                 return
         if receipt is not None:
             return
-    elif _semantic(store.export_budget()) == _semantic(snapshot):
+    elif _semantic(store.export_budget()) == _semantic(snapshot) and images == [
+        (transaction_id, store.get_receipt("personal", transaction_id))
+        for transaction_id in store.receipt_ids("personal")
+    ]:
         return
-    store.restore_budget("personal", snapshot)
+    store.restore_budget("personal", snapshot, _receipts=images)

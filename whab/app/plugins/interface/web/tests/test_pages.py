@@ -162,7 +162,7 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
     assert 'name="onBudget" data-boolean-value' in text
     assert 'data-edit-account="' + accounts["Long term investments"] + '"' in text
     assert 'data-account-subtype="brokerage"' in text
-    assert 'Changing budget scope applies to all transactions' in text
+    assert 'Budget scope applies to all transactions' in text
     assert 'data-on-budget="false" data-liability="true" disabled hidden>Loan' in text
     assert client.patch("/api/accounts/" + accounts["Everyday cash"], json={
         "workspace": "personal", "type": "depository", "onBudget": False,

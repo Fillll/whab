@@ -4,7 +4,7 @@ import re
 from html import unescape
 
 import pytest
-from whab_plugin_web.views import build_context, money_number, month_label
+from whab_plugin_web.views import money_number, month_label
 
 
 def overview_cells(text, label):
@@ -41,7 +41,7 @@ def equation(amount, operator, currency):
     return f"{operator} ({number})" if amount < 0 else f"{operator} {number}"
 
 
-def test_each_month_explains_its_income_child_assignments_and_funding_equation(client, store):
+def test_each_month_explains_income_links_matching_assigned_total_and_funding_equation(client, store):
     for currency, factor in (("USD", 1), ("EUR", 10)):
         account = store.add_account("personal", {
             "name": f"{currency} cash", "type": "depository", "balance": 100000 * factor,
@@ -81,19 +81,26 @@ def test_each_month_explains_its_income_child_assignments_and_funding_equation(c
         )):
             income_body = disclosure(cells["Income"][index][1], "Income", month)
             assert terms(income_body) == [("Received income", money_number(income * factor, currency))]
-            assert f'/budgets/home/transactions/{month}/{currency.lower()}' in income_body
+            assert f'/budgets/my-budget/transactions/{month}/{currency.lower()}' in income_body
             assigned_body = disclosure(
                 cells["Assigned this month"][index][1], "Assigned this month", month,
             )
-            assigned_parts = dict(terms(assigned_body))
-            assert assigned_parts.pop("Assigned this month") == money_number(
-                sum(assignments) * factor, currency,
-            )
-            for name, amount in zip(("Fixture rent", "Fixture utilities"), assignments, strict=True):
-                assert assigned_parts.pop(f"Fixture living / {name}") == money_number(
-                    amount * factor, currency,
-                )
-            assert set(assigned_parts.values()) <= {money_number(0, currency)}
+            assert not terms(assigned_body)
+            assert "Fixture rent" not in assigned_body and "Fixture utilities" not in assigned_body
+            assert f"Assigned total in the spending table for {month_label(month)}" in assigned_body
+            target = f"assigned-total-{month}-{currency.lower()}"
+            source = f"assigned-summary-{month}-{currency.lower()}"
+            assert f'href="#{target}"' in assigned_body
+            assert f'data-budget-source-link="{target}"' in assigned_body
+            assert f'data-budget-source-overview="{source}"' in assigned_body
+            assert f'aria-label="Show matching Assigned total for {month_label(month)} in {currency}"' in assigned_body
+            assert f'id="{source}"' in cells["Assigned this month"][index][0]
+            footer = re.search(rf'<td id="{target}"([^>]*)>(.*?)</td>', text, re.S)
+            assert 'tabindex="-1"' in footer[1]
+            total = money_number(sum(assignments) * factor, currency)
+            assert footer[2] == total
+            summary_value = re.sub(r'<details\b[^>]*>.*?</details>', '', cells["Assigned this month"][index][1], flags=re.S).strip()
+            assert summary_value == total
             ready_body = disclosure(
                 cells["Available to assign"][index][1], "Available to assign", month,
             )
@@ -231,9 +238,14 @@ def test_ready_breakdown_requires_exact_core_components_without_replacing_the_to
         assert not cell.strip().startswith("—")
 
 
-def test_unusable_child_projection_does_not_fabricate_an_assignment_breakdown(store):
-    data = store.workspace("demo", "2026-10")
-    data["budget"].append({"categoryId": "unsupported-remote-child", "assigned": None})
-    context = build_context(data, {}, [], workspace="demo", page="budget", month="2026-10")
-    assert context["periods"][0]["assigned_parts"] is None
-    assert context["periods"][0]["summary"]["assigned"] == data["summary"]["assigned"]
+def test_assigned_total_links_keep_stable_targets_in_budget_refresh_fragments(client):
+    path = "/budgets/demo/budget/2026-10/usd"
+    page = client.get(path).text
+    fragment = client.get(path, headers={"X-WHAB-Budget-Fragment": "1"}).text
+    for month in ("2026-10", "2026-11", "2026-12"):
+        for text in (page, fragment):
+            body = disclosure(overview_cells(text, "Assigned this month")[("2026-10", "2026-11", "2026-12").index(month)][1], "Assigned this month", month)
+            assert f'data-budget-source-link="assigned-total-{month}-usd"' in body
+            assert f'data-budget-source-overview="assigned-summary-{month}-usd"' in body
+            assert len(re.findall(rf'id="assigned-total-{month}-usd"', text)) == 1
+            assert len(re.findall(rf'id="assigned-summary-{month}-usd"', text)) == 1

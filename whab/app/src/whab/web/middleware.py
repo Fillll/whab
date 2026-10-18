@@ -4,6 +4,12 @@ from urllib.parse import urlsplit
 
 from fastapi.responses import JSONResponse
 
+from whab.domain.receipts import MAX_RECEIPT_BYTES, RECEIPT_TYPES
+
+
+def _receipt_upload(path, method):
+    return method == "PUT" and path.startswith("/api/transactions/") and path.endswith("/receipt")
+
 
 class RequestBodyLimit:
     """Bound chunked request bodies before Starlette/Pydantic buffer or parse them."""
@@ -21,7 +27,7 @@ class RequestBodyLimit:
         ):
             await self.app(scope, receive, send)
             return
-        limit = (
+        limit = MAX_RECEIPT_BYTES if _receipt_upload(scope["path"], scope["method"]) else (
             (50 * 1024 * 1024 if scope["path"] == "/api/budget/open" else 10 * 1024 * 1024) if scope["path"] in self.file_import_paths
             else 128 * 1024 if scope["path"] in self.webhook_paths else 32 * 1024
         )
@@ -85,13 +91,15 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
             "OPTIONS",
         }:
             file_import = request.url.path in file_import_paths
+            receipt_upload = _receipt_upload(request.url.path, request.method)
             content_type = "application/zip" if file_import else "application/json"
+            actual_type = request.headers.get("content-type", "").split(";")[0]
             if (
                 request.method != "DELETE"
-                and request.headers.get("content-type", "").split(";")[0] != content_type
+                and (actual_type not in RECEIPT_TYPES if receipt_upload else actual_type != content_type)
             ):
-                return JSONResponse({"error": f"Use {content_type}"}, status_code=415)
-            limit = (50 * 1024 * 1024 if request.url.path == "/api/budget/open" else 10 * 1024 * 1024) if file_import else 128 * 1024 if webhook else 32 * 1024
+                return JSONResponse({"error": "Use a PNG, JPEG or WebP image" if receipt_upload else f"Use {content_type}"}, status_code=415)
+            limit = MAX_RECEIPT_BYTES if receipt_upload else (50 * 1024 * 1024 if request.url.path == "/api/budget/open" else 10 * 1024 * 1024) if file_import else 128 * 1024 if webhook else 32 * 1024
             try:
                 if int(request.headers.get("content-length", "0")) > limit:
                     return JSONResponse({"error": "Request too large"}, status_code=413)

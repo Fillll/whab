@@ -91,7 +91,7 @@ def validate_portable_budget(data: object) -> dict:
     validate_month(data["budgetStartMonth"])
     accounts = _records(
         data["accounts"], _LEGACY_ACCOUNT_FIELDS, 1000,
-        optional=frozenset({"onBudget", "subtype"}),
+        optional=frozenset({"onBudget", "subtype", "bankWebsite", "nameOverridden"}),
     )
     for index, account in enumerate(accounts):
         _text(account["type"])

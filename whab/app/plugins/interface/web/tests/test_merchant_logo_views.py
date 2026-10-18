@@ -42,16 +42,17 @@ def test_merchant_artwork_keeps_initial_until_loaded_and_preserves_payee_details
     image = images[0]
     assert f'src="{LOGO_PATH}"' in image
     assert all(attribute in image for attribute in (
-        'alt=""', 'width="28"', 'height="28"', 'decoding="async"', " hidden",
+        'alt=""', 'width="18"', 'height="18"', 'decoding="async"', " hidden",
     ))
     assert "onerror=" not in image and "onload=" not in image
     # Hidden lazy images never enter the viewport, so they cannot trigger the load fallback.
     assert 'loading="lazy"' not in image
     assert '<span class="merchant-mark" aria-hidden="true"><span>F</span>' in text
     assert "<strong>Fictional Market</strong>" in text
-    assert "<span>Groceries for dinner</span>" in text and "<span>Pending</span>" in text
+    assert 'aria-label="Memo for Fictional Market"' in text
+    assert ">Groceries for dinner</textarea>" in text and 'aria-label="Pending"' in text
     assert 'data-payee="fictional market groceries for dinner"' in text
-    assert 'aria-label="Mark Fictional Market reviewed"' in text
+    assert 'aria-label="Reviewed: Fictional Market"' in text
 
 
 def test_missing_merchant_artwork_keeps_text_only_and_ignores_raw_provider_values():
@@ -64,7 +65,7 @@ def test_missing_merchant_artwork_keeps_text_only_and_ignores_raw_provider_value
         assert "data-merchant-logo" not in text and 'class="merchant-mark"' not in text
         assert "untrusted.example" not in text
         assert "<strong>Fictional Market</strong>" in text
-        assert "<strong>Manual market</strong>" in text and "<span>Manual</span>" in text
+        assert "<strong>Manual market</strong>" in text and 'aria-label="Memo for Manual market"' in text
 
 
 def test_artwork_and_payee_content_remain_escaped():
@@ -79,4 +80,4 @@ def test_artwork_and_payee_content_remain_escaped():
     assert '<span class="merchant-mark" aria-hidden="true"><span>&lt;</span>' in text
     assert f'src="{LOGO_PATH}?label=&#34;bad&#34;&amp;size=28"' in text
     assert ' onmouseover="bad' not in text
-    assert 'data-api="/transactions/purchase%22%20onmouseover%3D%22bad"' in text
+    assert 'data-transaction-id="purchase&#34; onmouseover=&#34;bad"' in text

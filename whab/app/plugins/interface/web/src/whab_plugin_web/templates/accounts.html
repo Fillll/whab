@@ -1,3 +1,4 @@
+{% set logos = account_logos|default({}) %}
 <div class="page-title-row">
   <div>
     <div class="eyebrow">YOUR FINANCIAL PICTURE</div>
@@ -33,7 +34,7 @@
             {% if account.stale %} · Stale snapshot
             {% endif %}
           </span>
-          <button class="text-link account-edit" data-dialog="account-classification-dialog" data-edit-account="{{ account.id }}" data-account-name="{{ account.name }}" data-account-type="{{ account.type }}" data-account-on-budget="{{ 'true' if is_on_budget(account) else 'false' }}" data-account-subtype="{{ account.subtype or '' }}" aria-label="Edit classification for {{ account.name }}">Edit classification</button>
+          <button class="text-link account-edit" data-dialog="account-classification-dialog" data-edit-account="{{ account.id }}" data-account-name="{{ account.name }}" data-account-type="{{ account.type }}" data-account-on-budget="{{ 'true' if is_on_budget(account) else 'false' }}" data-account-subtype="{{ account.subtype or '' }}" aria-label="Account settings for {{ account.name }}">Account settings</button>
         </div>
         <span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' and account.source in bank_source_ids else account.source|capitalize }}</span>
         <div class="account-balance">

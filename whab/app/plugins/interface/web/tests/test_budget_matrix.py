@@ -538,7 +538,7 @@ def test_next_month_editor_requires_new_flow_model_even_if_old_server_supports_f
 
 
 @pytest.mark.parametrize("capacity", [None, True, "123", 10000, 20000, 9_007_199_254_740_992, 0])
-def test_conservative_spending_note_only_appears_for_valid_lower_capacity(
+def test_conservative_spending_note_stays_inside_closed_breakdown_for_valid_lower_capacity(
     client, store, monkeypatch, capacity,
 ):
     workspace = store.workspace
@@ -562,3 +562,9 @@ def test_conservative_spending_note_only_appears_for_valid_lower_capacity(
     assert ("Some funds are needed to cover spending or account reserves." in row) is (
         type(capacity) is int and capacity < 10000
     )
+    for attributes, body in re.findall(r'<details\b([^>]*)>(.*?)</details>', row, re.S):
+        assert not re.search(r'\bopen(?:\s|=|$)', attributes)
+        assert 'Available to assign' in body and 'Where it comes from' in body
+    visible = re.sub(r'<details\b[^>]*>.*?</details>', '', row, flags=re.S)
+    assert "Some funds are needed to cover spending or account reserves." not in visible
+    assert "Review category overspending" not in visible

@@ -1,20 +1,33 @@
-"""Fetch public bank icons without sending account information or arbitrary domains."""
+"""Fetch public bank icons without sending account information or private URLs."""
 
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import math
+import re
 import threading
 import time
 from pathlib import Path
 
 import httpx
 
-from whab.plugins import BankLogos, Insight, LogoImage, Plugin, PluginAction, PluginSettings
+from whab.plugins import (
+    BankLogos,
+    Insight,
+    LogoImage,
+    Plugin,
+    PluginAction,
+    PluginSettings,
+    StoreError,
+    bank_website,
+)
 
 _MAX_BYTES = 128 * 1024
 _MAX_CACHE_BYTES = 2 * _MAX_BYTES
+_MAX_DOMAIN_KEYS = 256
+_DYNAMIC_KEY = re.compile(r"domain-[0-9a-f]{32}")
 _CACHE_SECONDS = 365 * 24 * 60 * 60
 _FAILURE_SECONDS = 5 * 60
 _MEDIA_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
@@ -87,8 +100,21 @@ def resolve(institution_name: str) -> str | None:
     return _NAMES.get(_normalize(institution_name))
 
 
+def resolve_domain(public_hostname: str) -> str | None:
+    """Register an explicitly supplied public hostname without any network access."""
+    if (type(public_hostname) is not str or not public_hostname or len(public_hostname) > 253
+            or any(character in public_hostname for character in "/\\:@?#")):
+        return None
+    try:
+        normalized = bank_website("https://" + public_hostname)
+    except StoreError:
+        return None
+    hostname = normalized.removeprefix("https://")
+    return _cache.register_domain(hostname)
+
+
 def _fetch(client: httpx.Client, domain: str) -> LogoImage | None:
-    # Both the host and domain come from constants; callers cannot choose a URL.
+    # The destination is fixed. The path contains only a validated public hostname.
     url = f"https://icon.horse/icon/{domain}"
     try:
         with client.stream("GET", url, follow_redirects=False) as response:
@@ -112,10 +138,10 @@ def _fetch(client: httpx.Client, domain: str) -> LogoImage | None:
 
 
 def fetch_logo(key: str, *, client: httpx.Client | None = None) -> LogoImage | None:
-    """Fetch a curated key; an injected client supports network-free provider tests."""
-    if type(key) is not str or key not in _DOMAINS:
+    """Fetch a registered key; an injected client supports network-free provider tests."""
+    domain = _cache.domain(key)
+    if domain is None:
         return None
-    domain = _DOMAINS[key]
     if client is not None:
         return _fetch(client, domain)
     with httpx.Client(timeout=3.0, follow_redirects=False, trust_env=False) as owned_client:
@@ -131,6 +157,38 @@ class _LogoCache:
         self._pending: dict[str, threading.Event] = {}
         self._generation = 0
         self._directory: Path | None = None
+        self._domains: dict[str, str] = {}
+
+    def domain(self, key: str) -> str | None:
+        if type(key) is not str:
+            return None
+        with self._lock:
+            return _DOMAINS.get(key) or self._domains.get(key)
+
+    def register_domain(self, hostname: str) -> str:
+        key = "domain-" + hashlib.sha256(hostname.encode("ascii")).hexdigest()[:32]
+        with self._lock:
+            self._domains.pop(key, None)
+            if len(self._domains) >= _MAX_DOMAIN_KEYS:
+                oldest = next(iter(self._domains))
+                del self._domains[oldest]
+                self._entries.pop(oldest, None)
+            self._domains[key] = hostname
+        return key
+
+    def _remember(self, key: str, entry: tuple[float, LogoImage | None]) -> None:
+        self._entries.pop(key, None)
+        if len(self._entries) >= _MAX_DOMAIN_KEYS:
+            del self._entries[next(iter(self._entries))]
+        self._entries[key] = entry
+
+    def _prune_files(self) -> None:
+        files = [
+            path for path in self._directory.glob("domain-*.json")
+            if _DYNAMIC_KEY.fullmatch(path.stem)
+        ]
+        for path in sorted(files, key=lambda path: path.stat().st_mtime)[:-_MAX_DOMAIN_KEYS]:
+            path.unlink()
 
     def _reset(self) -> None:
         self._generation += 1
@@ -148,10 +206,10 @@ class _LogoCache:
             except OSError:
                 return
             now = time.time()
-            for key in _DOMAINS:
+            for key in (*_DOMAINS, *self._domains):
                 entry = self._load(directory / f"{key}.json", now)
                 if entry is not None:
-                    self._entries[key] = entry
+                    self._remember(key, entry)
 
     @staticmethod
     def _load(path: Path, now: float) -> tuple[float, LogoImage] | None:
@@ -191,16 +249,21 @@ class _LogoCache:
                 with temporary.open("x", encoding="utf-8") as saved:
                     saved.write(content)
                 temporary.replace(path)
+                self._prune_files()
             except OSError:
                 # Public artwork remains optional when its cache directory is unavailable.
                 pass
 
     def get(self, key: str) -> LogoImage | None:
-        if type(key) is not str or key not in _DOMAINS:
+        if self.domain(key) is None:
             return None
         while True:
             with self._lock:
                 entry = self._entries.get(key)
+                if entry is None and key in self._domains and self._directory is not None:
+                    entry = self._load(self._directory / f"{key}.json", time.time())
+                    if entry is not None:
+                        self._remember(key, entry)
                 if entry is not None and time.time() < entry[0]:
                     return entry[1]
                 pending = self._pending.get(key)
@@ -215,10 +278,10 @@ class _LogoCache:
             image = fetch_logo(key)
         finally:
             with self._lock:
-                if generation == self._generation:
+                if generation == self._generation and self.domain(key) is not None:
                     now = time.time()
                     lifetime = _FAILURE_SECONDS if image is None else _CACHE_SECONDS
-                    self._entries[key] = now + lifetime, image
+                    self._remember(key, (now + lifetime, image))
                     if image is not None:
                         self._save(key, image, now)
                 if self._pending.get(key) is pending:
@@ -243,8 +306,8 @@ class _LogoCache:
             Insight(title="Cached logos", value=str(count)),
             Insight(
                 title="Public artwork",
-                value="Curated bank domains only",
-                detail="Only allowlisted public bank domains are sent to Icon Horse. "
+                value="Public bank hostnames only",
+                detail="Only curated bank domains or the public bank website you set are sent to Icon Horse. "
                 "Account details and bank credentials are never sent.",
             ),
         )
@@ -253,7 +316,12 @@ class _LogoCache:
         with self._lock:
             self._reset()
             if self._directory is not None:
-                for key in _DOMAINS:
+                keys = set(_DOMAINS)
+                for path in self._directory.iterdir():
+                    name = path.name.removeprefix(".").removesuffix(".tmp").removesuffix(".json")
+                    if _DYNAMIC_KEY.fullmatch(name):
+                        keys.add(name)
+                for key in keys:
                     (self._directory / f"{key}.json").unlink(missing_ok=True)
                     (self._directory / f".{key}.json.tmp").unlink(missing_ok=True)
 
@@ -283,7 +351,10 @@ def apply_setting(action_id: str) -> str:
 plugin = Plugin(
     id="bank-logos",
     display_name="Bank logos (Icon Horse)",
-    bank_logos=BankLogos(resolve=resolve, fetch=fetch, configure_cache=configure_cache),
+    bank_logos=BankLogos(
+        resolve=resolve, fetch=fetch, configure_cache=configure_cache, resolve_domain=resolve_domain,
+        provider_name="Icon Horse", provider_url="https://icon.horse",
+    ),
     settings=PluginSettings(
         read=read_settings,
         actions=(PluginAction(

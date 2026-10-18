@@ -104,3 +104,31 @@ def test_failed_review_validation_does_not_partially_apply_category_annotations(
     with pytest.raises(StoreError, match="Invalid review status"):
         commands.edit_transaction(state, "fixture", "food", reviewed="true")
     assert state == before
+
+
+def test_memo_edits_preserve_financial_fields_and_allow_explicit_clearing():
+    state = ledger()
+    commands.add_account(state, "cash", {"name": "Cash", "type": "depository", "balance": 1000})
+    commands.add_transaction(state, "fixture", purchase(categoryId=None), source="demo")
+    before = deepcopy(state)
+    memo = "Receipt: café\n" + "✓" * 986
+    assert len(memo) == 1000
+    commands.edit_transaction(state, "fixture", note=memo)
+    expected = deepcopy(before)
+    expected["transactions"]["fixture"]["note"] = memo
+    assert state == expected
+    commands.edit_transaction(state, "fixture", "food", reviewed=False)
+    assert state["transactions"]["fixture"]["note"] == memo
+    commands.edit_transaction(state, "fixture", note="")
+    assert state["transactions"]["fixture"]["note"] == ""
+
+
+@pytest.mark.parametrize("note", [None, False, 100, [], {}, "x" * 1001])
+def test_invalid_memo_does_not_partially_apply_other_transaction_edits(note):
+    state = ledger()
+    commands.add_account(state, "cash", {"name": "Cash", "type": "depository", "balance": 1000})
+    commands.add_transaction(state, "fixture", purchase(categoryId=None), source="demo")
+    before = deepcopy(state)
+    with pytest.raises(StoreError, match="Invalid note"):
+        commands.edit_transaction(state, "fixture", "food", reviewed=False, note=note)
+    assert state == before

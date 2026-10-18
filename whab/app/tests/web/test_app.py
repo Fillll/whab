@@ -422,3 +422,41 @@ def test_monthly_rollover_preserves_local_origin_guard(client):
     assert client.put('/api/budget/settings/rollover', json={
         'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'mode': 'balance',
     }, headers={'Origin': 'https://foreign.example'}).status_code == 403
+
+
+def test_memo_patch_updates_annotations_atomically_without_changing_money(client):
+    before = client.get("/api/workspace?workspace=demo&month=2026-10").json()
+    transaction = before["transactions"][0]
+    path = "/api/transactions/" + transaction["id"]
+    memo = "Family receipt\n" + "é" * 985
+    assert len(memo) == 1000
+    assert client.patch(path, json={"workspace": "demo", "note": memo}).status_code == 200
+    after = client.get("/api/workspace?workspace=demo&month=2026-10").json()
+    saved = next(row for row in after["transactions"] if row["id"] == transaction["id"])
+    assert saved == {**transaction, "note": memo}
+    assert after["accounts"] == before["accounts"]
+    assert after["summary"] == before["summary"]
+    for invalid in (None, False, 17, [], {}, "x" * 1001):
+        assert client.patch(path, json={
+            "workspace": "demo", "categoryId": None, "reviewed": False, "note": invalid,
+        }).status_code == 400
+        assert client.get("/api/workspace?workspace=demo&month=2026-10").json() == after
+    assert client.patch(path, json={"workspace": "demo"}).status_code == 400
+    assert client.patch(path, json={"workspace": "demo", "reviewed": False}).status_code == 200
+    saved = next(row for row in client.get(
+        "/api/workspace?workspace=demo&month=2026-10",
+    ).json()["transactions"] if row["id"] == transaction["id"])
+    assert saved["note"] == memo
+    assert client.patch(path, json={"workspace": "demo", "note": ""}).status_code == 200
+    saved = next(row for row in client.get(
+        "/api/workspace?workspace=demo&month=2026-10",
+    ).json()["transactions"] if row["id"] == transaction["id"])
+    assert saved["note"] == ""
+
+
+def test_memo_patch_preserves_origin_guard(client):
+    transaction = client.get("/api/workspace?workspace=demo&month=2026-10").json()["transactions"][0]
+    assert client.patch(
+        "/api/transactions/" + transaction["id"], json={"workspace": "demo", "note": "Blocked"},
+        headers={"Origin": "https://foreign.example"},
+    ).status_code == 403

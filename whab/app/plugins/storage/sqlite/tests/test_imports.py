@@ -18,12 +18,10 @@ def test_pending_posted_preserves_edits_and_replay_is_unique(
         [imported_account()],
     )
     assert store.workspace("personal", "2026-10")["summary"]["spent"] == 0
-    store.edit_transaction("personal", "pending", "fun", True)
-    store.db.execute(
-        "UPDATE transactions SET note='Family outing' WHERE id='pending' AND workspace='personal'"
-    )
+    store.edit_transaction("personal", "pending", "fun", True, note="Family outing")
     posted = imported_transaction(
-        "posted", amount=1200, pendingTransactionId="pending", merchantLogo="posted-logo"
+        "posted", amount=1200, pendingTransactionId="pending", merchantLogo="posted-logo",
+        note="Provider must not replace the user memo",
     )
     batch = sync_changes([posted], removed=["pending"])
     apply_import("item", batch, "two", [imported_account()])
@@ -44,11 +42,18 @@ def test_pending_posted_preserves_edits_and_replay_is_unique(
         [imported_account()],
     )
     assert store.transactions("personal")[0]["categoryId"] == "fun"
+    assert store.transactions("personal")[0]["note"] == "Family outing"
     assert store.state("personal")["transactions"]["posted"]["merchantLogo"] == "updated-logo"
     apply_import(
         "item", sync_changes(modified=[imported_transaction("posted")]), "four", [imported_account()]
     )
     assert store.state("personal")["transactions"]["posted"]["merchantLogo"] is None
+    store.edit_transaction("personal", "posted", note="")
+    apply_import(
+        "item", sync_changes(modified=[imported_transaction("posted", note="Provider memo")]),
+        "five", [imported_account()],
+    )
+    assert store.transactions("personal")[0]["note"] == ""
 
 
 @pytest.mark.parametrize("invalid_key", ["", "a" * 201, "../logo", "logo\n", True, {}])

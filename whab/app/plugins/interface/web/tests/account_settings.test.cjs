@@ -1,0 +1,220 @@
+/* Run with node --test plugins/interface/web/tests/account_settings.test.cjs. */
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+const vm = require('node:vm');
+
+const source = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/account-settings.js'), 'utf8');
+const plain = value => JSON.parse(JSON.stringify(value));
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => {resolve = yes; reject = no;});
+  return {promise, resolve, reject};
+}
+const tick = () => new Promise(resolve => setImmediate(resolve));
+
+function events(properties = {}) {
+  const listeners = {};
+  return Object.assign({
+    addEventListener(type, callback) {(listeners[type] ||= []).push(callback);},
+    async emit(type, detail = {}) {
+      const event = {prevented: false, preventDefault() {this.prevented = true;}, ...detail};
+      await Promise.all((listeners[type] || []).map(callback => callback(event)));
+      return event;
+    },
+  }, properties);
+}
+
+function harness({flush = async () => true, logo = true} = {}) {
+  const requests = [], refreshed = [], updates = [], order = [];
+  const error = {hidden: true, textContent: ''}, status = {textContent: ''}, submit = {disabled: true};
+  const elements = Object.fromEntries(Object.entries({workspace: 'personal', name: '', onBudget: 'true',
+    type: 'depository', subtype: '', currency: 'USD', ...(logo ? {bankWebsite: ''} : {})})
+    .map(([name, value]) => [name, {name, value, disabled: name === 'currency',
+      focus() {this.focused = true;}}]));
+  const original = Object.fromEntries(Object.entries(elements).map(([name, element]) => [name, element.value]));
+  const dialog = events({open: true, closes: 0, close() {
+    this.open = false; this.closes += 1; order.push('close'); void this.emit('close');
+  }});
+  const form = events({dataset: {}, elements,
+    reset() {for (const [name, field] of Object.entries(elements)) field.value = original[name];},
+    closest: () => dialog,
+    querySelector: selector => ({'.field-error': error, '[data-account-settings-status]': status,
+      '[type="submit"]': submit})[selector],
+  });
+  const document = events({querySelector: () => form});
+  const context = {document, encodeURIComponent, Error};
+  vm.runInNewContext(source.replaceAll('export function ', 'function '), context);
+  context.initAccountSettings({
+    api(path, body, method) {
+      const pending = deferred();
+      requests.push({path, body: body === undefined ? undefined : plain(body), method, ...pending});
+      order.push(method || 'GET');
+      return pending.promise;
+    },
+    readForm() {
+      return Object.fromEntries(Object.values(elements).filter(field => !field.disabled)
+        .map(field => [field.name, field.name === 'onBudget' ? field.value === 'true' :
+          field.name === 'subtype' ? field.value || null : field.value]));
+    },
+    updateFields() {updates.push({onBudget: elements.onBudget.value, type: elements.type.value});},
+    flush,
+    refresh: async value => {order.push('refresh'); refreshed.push(plain(value));},
+  });
+  function open(id = 'checking') {
+    dialog.open = true;
+    const button = {dataset: {editAccount: id}};
+    return document.emit('click', {target: {closest: selector => selector === '[data-edit-account]' ? button : null}});
+  }
+  function metadata(index = 0, override = {}) {
+    requests[index].resolve({account: {name: 'Everyday checking', onBudget: true, type: 'depository',
+      subtype: 'checking', currency: 'USD', bankWebsite: 'https://bank.example', ...override.account},
+    currencyEditable: false, ...override});
+  }
+  return {requests, refreshed, updates, order, error, status, submit, elements, dialog, form, open, metadata};
+}
+
+test('opening settings loads only the addressed account and keeps Save blocked until metadata arrives', async () => {
+  const state = harness();
+  const loading = state.open('bank/account');
+  assert.equal(state.requests[0].path, '/accounts/bank%2Faccount/settings?workspace=personal');
+  assert.equal(state.submit.disabled, true);
+  assert.equal(state.elements.currency.disabled, true);
+  assert.equal(state.status.textContent, 'Loading account settings…');
+  state.metadata();
+  await loading;
+  assert.equal(state.elements.name.value, 'Everyday checking');
+  assert.equal(state.elements.bankWebsite.value, 'https://bank.example');
+  assert.equal(state.elements.subtype.value, 'checking');
+  assert.equal(state.elements.currency.disabled, true);
+  assert.equal(state.submit.disabled, false);
+  assert.equal(state.elements.name.focused, true);
+  assert.equal(state.updates.length, 2);
+});
+
+test('a slower metadata response cannot overwrite the account opened most recently', async () => {
+  const state = harness();
+  const first = state.open('first');
+  const second = state.open('second');
+  state.metadata(1, {account: {name: 'Second account', onBudget: false, type: 'other', currency: 'EUR'}});
+  await second;
+  state.metadata(0, {account: {name: 'First account'}});
+  await first;
+  assert.equal(state.elements.name.value, 'Second account');
+  assert.equal(state.elements.currency.value, 'EUR');
+  assert.equal(state.form.dataset.api, '/accounts/second');
+  assert.equal(state.updates.length, 2);
+});
+
+test('closing a dialog invalidates an outstanding metadata request', async () => {
+  const state = harness();
+  const pending = state.open();
+  state.dialog.close();
+  state.metadata();
+  await pending;
+  assert.equal(state.elements.name.value, '');
+  assert.equal(state.submit.disabled, true);
+  assert.equal(state.updates.length, 0);
+});
+
+test('a failed metadata request keeps Save disabled and cannot submit reset defaults', async () => {
+  let flushes = 0;
+  const state = harness({flush: async () => {flushes += 1; return true;}});
+  const pending = state.open();
+  state.requests[0].reject(new Error('Account settings are unavailable.'));
+  await pending;
+  assert.equal(state.error.hidden, false);
+  assert.equal(state.error.textContent, 'Account settings are unavailable.');
+  assert.equal(state.submit.disabled, true);
+  const event = await state.form.emit('submit');
+  assert.equal(event.prevented, true);
+  assert.equal(state.requests.length, 1);
+  assert.equal(flushes, 0);
+});
+
+test('one save PATCH includes classification and an editable currency, then refreshes without a reload', async () => {
+  const savedEdits = deferred();
+  const state = harness({flush: () => savedEdits.promise});
+  const opening = state.open();
+  state.metadata(0, {currencyEditable: true});
+  await opening;
+  Object.assign(state.elements.name, {value: 'Household savings'});
+  state.elements.onBudget.value = 'false';
+  state.elements.type.value = 'investment';
+  state.elements.subtype.value = '';
+  state.elements.currency.value = 'EUR';
+  state.elements.bankWebsite.value = 'https://savings.example';
+  const saving = state.form.emit('submit');
+  await state.form.emit('submit');
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.submit.disabled, true);
+  assert.equal((await state.dialog.emit('cancel')).prevented, true);
+  savedEdits.resolve(true);
+  await tick();
+  assert.deepEqual(state.requests[1].body, {workspace: 'personal', name: 'Household savings',
+    onBudget: false, type: 'investment', subtype: null, currency: 'EUR', bankWebsite: 'https://savings.example'});
+  assert.equal(state.requests[1].path, '/accounts/checking');
+  assert.equal(state.requests[1].method, 'PATCH');
+  assert.equal(state.dialog.open, true);
+  state.requests[1].resolve({ok: true});
+  await saving;
+  assert.deepEqual(state.refreshed, [{currency: 'EUR', changedCurrency: true}]);
+  assert.deepEqual(state.order, ['GET', 'PATCH', 'close', 'refresh']);
+  assert.equal(state.dialog.closes, 1);
+  assert.equal(state.requests.length, 2);
+  assert.equal(state.form.dataset.busy, undefined);
+});
+
+test('history-locked currency is omitted and saving works without the optional logo plugin', async () => {
+  const state = harness({logo: false});
+  const opening = state.open();
+  state.metadata();
+  await opening;
+  state.elements.name.value = 'Renamed account';
+  const saving = state.form.emit('submit');
+  await tick();
+  assert.equal('currency' in state.requests[1].body, false);
+  assert.equal('bankWebsite' in state.requests[1].body, false);
+  state.requests[1].resolve({ok: true});
+  await saving;
+  assert.deepEqual(state.refreshed, [{currency: 'USD', changedCurrency: false}]);
+});
+
+test('a rejected PATCH retains edits and the open dialog, and retry submits the same account once', async () => {
+  const state = harness();
+  const opening = state.open();
+  state.metadata();
+  await opening;
+  state.elements.name.value = 'New account label';
+  const saving = state.form.emit('submit');
+  await tick();
+  state.requests[1].reject(new Error('Name could not be saved.'));
+  await saving;
+  assert.equal(state.dialog.open, true);
+  assert.equal(state.elements.name.value, 'New account label');
+  assert.equal(state.error.hidden, false);
+  assert.equal(state.error.textContent, 'Name could not be saved.');
+  assert.equal(state.submit.disabled, false);
+  assert.equal(state.refreshed.length, 0);
+  const retry = state.form.emit('submit');
+  await tick();
+  assert.equal(state.error.hidden, true);
+  assert.deepEqual(state.requests[2].body, state.requests[1].body);
+  assert.equal(state.requests[2].path, '/accounts/checking');
+  state.requests[2].resolve({ok: true});
+  await retry;
+  assert.equal(state.dialog.closes, 1);
+});
+
+test('unsaved transaction failures block account mutation and retain the settings dialog', async () => {
+  const state = harness({flush: async () => false});
+  const opening = state.open();
+  state.metadata();
+  await opening;
+  await state.form.emit('submit');
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.dialog.open, true);
+  assert.equal(state.error.textContent, 'Save the transaction or budget edit before continuing.');
+  assert.equal(state.submit.disabled, false);
+});

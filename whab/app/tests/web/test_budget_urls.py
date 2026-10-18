@@ -32,7 +32,8 @@ def create_budget(client, name):
     response = client.post(scoped("home", "budget/new"), json={"name": name})
     assert response.status_code == 200, response.text
     result = response.json()
-    assert result["url"] == f'/budgets/{result["id"]}/budget/current-month/usd'
+    assert re.fullmatch(r'/budgets/[a-z0-9]+(?:-[a-z0-9]+)*/budget/current-month/usd', result["url"])
+    assert result["id"] not in result["url"]
     return result
 
 
@@ -108,7 +109,7 @@ def test_explicit_paths_isolate_reads_writes_plugins_exports_and_page_assets(tmp
         response = client.get(first["url"])
         context = page_context(response)
         assert context["apiPrefix"] == f"/budgets/{a}/api"
-        assert context["budgetUrl"] == f"/budgets/{a}"
+        assert context["budgetUrl"] == "/budgets/household"
         assert "Household wallet" in response.text and "Travel wallet" not in response.text
         assert f'/budgets/{a}/static/app.js' in response.text
         assert client.get(f"/budgets/{a}/static/app.js").status_code == 200
@@ -295,14 +296,14 @@ def test_explicit_startup_budget_landing_uses_its_stable_key_and_keeps_demo_avai
     with TestClient(app, base_url=BASE) as client:
         response = client.get("/", follow_redirects=False)
         assert response.status_code == 303
-        assert response.headers["location"] == f"/budgets/{startup.id}/budget/current-month/usd"
+        assert response.headers["location"] == "/budgets/startup-household/budget/current-month/usd"
         assert client.get("/budgets/home/budget/current-month/usd").status_code == 404
         demo = client.get("/budgets/demo/budget/current-month/usd")
         assert demo.status_code == 200
         assert "Sample data" in demo.text and "Demo budget" in demo.text
         breadcrumb = re.search(r'<div class="breadcrumb">(.*?)</div>', demo.text, re.S)[1]
         assert "Startup household" not in breadcrumb
-        assert f'href="/budgets/{startup.id}/budget/current-month/usd"' in demo.text
+        assert 'href="/budgets/startup-household/budget/current-month/usd"' in demo.text
 
 
 @pytest.mark.parametrize("target_key", ["home", "portable"])

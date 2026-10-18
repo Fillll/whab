@@ -1,115 +1,83 @@
 {% set merchant_logos = merchant_logos|default({}) %}
+<section data-transaction-register data-workspace="{{ workspace }}">
 <div class="page-title-row">
   <div>
-    <div class="eyebrow">YOUR MONEY, IN DETAIL</div>
-    <h1>{{ selected_account.name if selected_account else 'Transactions' }}</h1>
-    <p>Review spending and put it in the right category.</p>
+    <h1 id="transaction-title" tabindex="-1">{{ selected_account.name if selected_account else 'Transactions' }}</h1>
   </div>
-  <div class="button-group"><a class="button secondary"
-   href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}"
-   download>{{ icon('download', 16) }}Export</a><button class="button primary"
-        data-dialog="transaction-dialog"
-        {% if not manual_accounts %}disabled title="Add a manual account in Accounts first" {% endif %}>{{ icon('plus', 16) }}Add transaction</button>
-  </div>
+  <div class="button-group">{% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}">{{ icon('settings', 16) }}Account settings</button>{% endif %}<a class="button secondary" href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}" download>{{ icon('download', 16) }}Export</a><button class="button primary" data-dialog="transaction-dialog" {% if not manual_accounts %}disabled title="Add a manual account in Accounts first" {% endif %}>{{ icon('plus', 16) }}Add transaction</button></div>
 </div>
 <div class="transaction-filters">
-  <label class="search-input">
-    {{ icon('search', 17) }}<input aria-label="Search transactions"
-       id="transaction-search"
-       placeholder="Search transactions…">
-  </label>
+  <label class="search-input">{{ icon('search', 17) }}<input aria-label="Search transactions" id="transaction-search" placeholder="Search transactions…"></label>
   <select aria-label="Filter by account" id="account-filter">
     <option value="all">All accounts</option>
-  {% for account in data.accounts %}<option value="{{ account.id }}"{% if selected_account and selected_account.id==account.id %} selected{% endif %}>{{ account.name }}</option>
-{% endfor %}</select><input type="text" pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM"
-       aria-label="Transaction month"
-       data-navigation="month"
-       value="{{ month }}"{% if transaction_all_dates %} disabled{% endif %}><label class="filter-button"><input type="checkbox" id="all-dates-filter"{% if transaction_all_dates %} checked{% endif %}>All dates</label><button class="filter-button" id="review-filter" aria-pressed="false">{{ icon('check-circle', 15) }}Needs review</button>
+    {% for account in data.accounts %}<option value="{{ account.id }}"{% if selected_account and selected_account.id==account.id %} selected{% endif %}>{{ account.name }}</option>{% endfor %}
+  </select>
+  <input type="text" pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM" aria-label="Transaction month" data-navigation="month" value="{{ month }}"{% if transaction_all_dates %} disabled{% endif %}>
+  <label class="filter-button"><input type="checkbox" id="all-dates-filter"{% if transaction_all_dates %} checked{% endif %}>All dates</label>
+  <button class="filter-button" id="review-filter" aria-pressed="false">{{ icon('check-circle', 15) }}Needs review</button>
 </div>
-<div class="table-scroll">
+<div class="transaction-selection-bar" data-transaction-selection-bar hidden>
+  <span class="transaction-selection-count" data-transaction-selection-count></span>
+  <button class="button secondary" type="button" data-bulk-reviewed="true">Mark reviewed</button>
+  <button class="button secondary" type="button" data-bulk-reviewed="false">Mark unreviewed</button>
+  <button class="text-link" type="button" data-clear-selection>Clear selection</button>
+</div>
+<div class="transaction-feedback" data-transaction-feedback hidden role="status"><span data-transaction-feedback-text></span><button class="text-link" type="button" data-transaction-retry>Retry save</button></div>
+<span class="sr-only" data-transaction-save-status aria-live="polite"></span>
+<div class="table-scroll transactions-scroll" role="region" aria-labelledby="transaction-title" tabindex="0">
   <table class="transactions-table">
-    <thead>
-      <tr>
-        <th>Reviewed</th>
-        <th>Date</th>
-        <th>Payee</th>
-        <th>Category</th>
-        <th>Account</th>
-        <th>Amount</th>
-      </tr>
-    </thead>
+    <thead><tr>
+      <th class="transaction-select-cell" scope="col"><span class="sr-only">Multi-select</span><input type="checkbox" data-select-all aria-label="Select all transactions in this view" title="Multi-select"></th>
+      <th scope="col" class="date-cell">Date</th>
+      <th class="transaction-receipt-cell" scope="col"><span class="sr-only">Receipt</span><span title="Receipt">{{ icon('image', 14) }}</span></th>
+      <th scope="col">Payee</th>
+      <th scope="col" class="transaction-category-cell">Category</th>
+      <th class="transaction-memo-cell" scope="col">Memo</th>
+      <th scope="col" class="amount-cell">Amount</th>
+      <th scope="col" class="transaction-currency-cell">Currency</th>
+      <th scope="col" class="transaction-review-cell"><abbr title="Reviewed">R</abbr></th>
+    </tr></thead>
     <tbody>
-      {% for transaction in transactions %}
-        <tr class="transaction-row"
-            data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}"
-            data-account="{{ transaction.accountId }}"
-            data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}">
-          <td>
-            <form data-api="/transactions/{{ transaction.id|urlencode }}"
-                  data-method="PATCH"
-                  data-auto>
-              <input type="hidden" name="workspace" value="{{ workspace }}"><input type="checkbox"
-       name="reviewed"
-       data-boolean
-       aria-label="Mark {{ transaction.merchant }} reviewed"
-       {% if transaction.reviewed %}checked {% endif %}
-       {% if transaction.pending %}disabled {% endif %}>
-            </form>
-          </td>
-          <td class="date-cell">{{ date_label(transaction.date) }}</td>
-          <td>
-            <div class="transaction-payee">
-              {% if merchant_logos.get(transaction.id) %}
-                <span class="merchant-mark" aria-hidden="true"><span>{{ transaction.merchant[:1]|upper }}</span><img class="merchant-logo-image" data-merchant-logo src="{{ merchant_logos[transaction.id] }}" alt="" width="28" height="28" decoding="async" hidden></span>
-              {% endif %}
-              <div>
-                <strong>{{ transaction.merchant }}</strong>
-                <div class="transaction-meta">
-                  {% if transaction.pending %}<span>Pending</span>
-                  {% endif %}
-                  {% if transaction.isTransfer %}<span>Transfer</span>
-                  {% endif %}
-                  {% if transaction.source=="manual" %}<span>Manual</span>
-                  {% endif %}
-                  {% if transaction.accountId in accounts_by_id and not is_on_budget(accounts_by_id[transaction.accountId]) %}<span>Off-budget · excluded from budget</span>
-                  {% endif %}
-                  {% if transaction.note %}<span>{{ transaction.note }}</span>
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <form data-api="/transactions/{{ transaction.id|urlencode }}"
-                  data-method="PATCH"
-                  data-auto><input type="hidden" name="workspace" value="{{ workspace }}"><select name="categoryId"
-        data-null
-        aria-label="Category for {{ transaction.merchant }}"
-        class="{% if not transaction.categoryId and not transaction.isTransfer %}uncategorized {% endif %}"><option value="">{{ 'Transfer (excluded)' if transaction.inferredTransfer else 'Income / uncategorized' if transaction.amount<0 else 'Uncategorized' }}</option>
-              {% for group in groups %}<optgroup label="{{ group.name }}">
-                {% for row in group.rows %}<option value="{{ row.category.id }}"
-                  {% if transaction.categoryId==row.category.id %}selected {% endif %}>{{ row.category.name }}</option>{% endfor %}
-              </optgroup>{% endfor %}
-      </select>
-    </form>
-  </td>
-  <td class="account-cell">
-    {{ accounts_by_id[transaction.accountId].name if transaction.accountId in accounts_by_id else 'Disconnected account' }}
-  </td>
-  <td class="amount-cell {% if transaction.amount<0 %}inflow {% endif %}">{{ money(-transaction.amount) }}
-  </td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
+    {% for transaction in transactions %}
+      {% set account = accounts_by_id.get(transaction.accountId) %}
+      <tr class="transaction-row" data-transaction-id="{{ transaction.id }}" data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
+        <td class="transaction-select-cell"><input type="checkbox" data-select-transaction aria-label="Select {{ transaction.merchant }} on {{ date_label(transaction.date) }}"></td>
+        <td class="date-cell">{{ date_label(transaction.date) }}</td>
+        <td class="transaction-receipt-cell"><button class="transaction-receipt-button" type="button" data-transaction-receipt aria-label="Receipt for {{ transaction.merchant }}" title="Receipt" disabled>{{ icon('image', 15) }}</button></td>
+        <td class="transaction-payee-cell" title="{{ account.name if account else 'Disconnected account' }}{% if account and not is_on_budget(account) %} · Off-budget · excluded from budget{% endif %}{% if transaction.pending %} · Pending{% endif %}{% if transaction.isTransfer %} · Transfer{% endif %}">
+          <div class="transaction-payee">
+            {% if merchant_logos.get(transaction.id) %}<span class="merchant-mark" aria-hidden="true"><span>{{ transaction.merchant[:1]|upper }}</span><img class="merchant-logo-image" data-merchant-logo src="{{ merchant_logos[transaction.id] }}" alt="" width="18" height="18" decoding="async" hidden></span>{% endif %}
+            <strong>{{ transaction.merchant }}</strong>
+            {% if transaction.pending %}<span class="transaction-status" title="Pending" aria-label="Pending">{{ icon('clock', 13) }}</span>{% endif %}
+            {% if transaction.isTransfer %}<span class="transaction-status" title="Transfer" aria-label="Transfer">{{ icon('arrow-right', 13) }}</span>{% endif %}
+          </div>
+        </td>
+        <td class="transaction-category-cell"><select name="categoryId" data-transaction-field="categoryId" aria-label="Category for {{ transaction.merchant }}" class="{% if not transaction.categoryId and not transaction.isTransfer %}uncategorized{% endif %}">
+          <option value="">{{ 'Transfer (excluded)' if transaction.inferredTransfer else 'Income / uncategorized' if transaction.amount<0 else 'Uncategorized' }}</option>
+          {% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}"{% if transaction.categoryId==row.category.id %} selected{% endif %}>{{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}
+        </select></td>
+        <td class="transaction-memo-cell"><textarea rows="1" maxlength="1000" class="transaction-memo" data-transaction-field="note" aria-label="Memo for {{ transaction.merchant }}" placeholder="Memo">{{ transaction.note }}</textarea></td>
+        <td class="amount-cell {% if transaction.amount<0 %}inflow{% endif %}">{{ money(-transaction.amount) }}</td>
+        <td class="transaction-currency-cell">{{ account.currency|default(currency) if account else currency }}</td>
+        <td class="transaction-review-cell"><button type="button" class="transaction-review-button" data-transaction-reviewed aria-pressed="{{ 'true' if transaction.reviewed else 'false' }}" aria-label="Reviewed: {{ transaction.merchant }}" title="{{ 'Pending transactions cannot be reviewed yet' if transaction.pending else 'Reviewed' if transaction.reviewed else 'Not reviewed' }}"{% if transaction.pending %} disabled{% endif %}>R</button></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
 </div>
-{% if not transactions %}
-  <div class="empty-state">
-    <span>{{ icon('transactions', 28) }}</span>
-    <h2>No transactions here yet</h2>
-    <p>{{ 'This account has no transactions.' if transaction_all_dates and selected_account else 'No transactions match these filters.' if transaction_all_dates else 'Try another month.' if data.accounts else 'Connect a bank account to import transactions.' }}</p>
-  </div>
-{% endif %}
-<div class="table-footer">
-  <span id="transaction-count">{{ transactions|length }} transactions · {{ 'All dates' if transaction_all_dates else month_label(month) }}</span><span>Off-budget and pending transactions are excluded from budget spending totals.</span>
-</div>
+{% if not transactions %}<div class="empty-state"><span>{{ icon('transactions', 28) }}</span><h2>No transactions here yet</h2><p>{{ 'This account has no transactions.' if transaction_all_dates and selected_account else 'No transactions match these filters.' if transaction_all_dates else 'Try another month.' if data.accounts else 'Connect a bank account to import transactions.' }}</p></div>{% endif %}
+<div class="table-footer"><span id="transaction-count" data-period="{{ 'All dates' if transaction_all_dates else month_label(month) }}">{{ transactions|length }} {{ 'transaction' if transactions|length == 1 else 'transactions' }} · {{ 'All dates' if transaction_all_dates else month_label(month) }}</span></div>
+<dialog class="modal transaction-receipt-dialog" data-transaction-receipt-dialog aria-labelledby="receipt-title">
+  <div class="modal-heading"><h2 id="receipt-title">Receipt</h2><button class="icon-button" type="button" data-receipt-close aria-label="Close receipt">{{ icon('close', 16) }}</button></div>
+  <p class="settings-notice" data-receipt-payee></p>
+  <img class="receipt-preview" data-receipt-preview alt="Saved transaction receipt" hidden>
+  <p class="settings-notice" data-receipt-empty>No receipt saved.</p>
+  <form data-receipt-form class="modal-form">
+    <label>Receipt image<input type="file" data-receipt-file accept="image/jpeg,image/png,image/webp" required></label>
+    <p class="settings-notice">JPEG, PNG or WebP · up to 5 MiB</p>
+    <p class="field-error" data-receipt-error role="alert" hidden></p>
+    <p class="settings-notice" data-receipt-status role="status"></p>
+    <div class="receipt-actions"><button class="button primary" type="submit" data-receipt-save>Save receipt</button><button class="button secondary" type="button" data-receipt-remove hidden>Remove receipt</button></div>
+  </form>
+</dialog>
+</section>
