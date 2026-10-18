@@ -11,7 +11,7 @@ from tests.support.bank_logos import imported_store as imported_store
 from tests.support.ui import make_ui
 from whab.app import create_app
 from whab.config import Settings
-from whab.plugins import BankLogos, LogoImage, Plugin, PluginRegistry
+from whab.plugins import BankLogos, LogoImage, Plugin, PluginAction, PluginRegistry, PluginSettings
 
 
 def client_for(store, home, *optional):
@@ -50,6 +50,47 @@ def test_logo_route_returns_typed_bytes_with_local_guards_and_server_cache(store
         assert client.get("/api/plugins/disabled/bank-logos/chase").status_code == 404
         assert client.get("/api/plugins/logos/bank-logos/not!allowed").status_code == 404
         assert fetched == ["chase"]
+
+
+def test_http_cache_flush_keeps_account_settings_and_retrieves_the_same_logo_again(store, tmp_path):
+    fetched, actions = [], []
+    plugin = Plugin(
+        "logos", "Fictional bank logos",
+        bank_logos=BankLogos(
+            lambda _: None, lambda key: fetched.append(key) or LogoImage(PNG, "image/png"),
+            resolve_domain=lambda _: "saved-website",
+        ),
+        settings=PluginSettings(
+            lambda: (), (PluginAction("flush-cache", "Flush cache"),),
+            lambda action: actions.append(action) or "Bank logo cache cleared.",
+        ),
+    )
+    with client_for(store, tmp_path, plugin) as client:
+        account_id = client.post("/api/accounts", json={
+            "workspace": "personal", "name": "Fictional savings", "type": "depository",
+            "subtype": "savings", "balance": 12300,
+        }).json()["accountId"]
+        assert client.patch("/api/accounts/" + account_id, json={
+            "workspace": "personal", "bankWebsite": "bank.example.org",
+        }).status_code == 200
+        saved_accounts = store.accounts("personal")
+        assert saved_accounts[0]["bankWebsite"] == "https://bank.example.org"
+        preview = client.post("/api/plugins/bank-logo-preview", json={"website": "bank.example.org"}).json()
+        assert preview["available"]
+        assert client.get(preview["logoUrl"]).content == PNG
+        assert fetched == ["saved-website"]
+        result = client.post("/api/plugins/logos/settings/actions/flush-cache", json={})
+        assert result.status_code == 200 and result.headers["cache-control"] == "no-store"
+        assert result.json() == {
+            "message": "Bank logo cache cleared.", "settings": {"insights": [], "actions": [{
+                "id": "flush-cache", "label": "Flush cache", "description": "",
+            }]},
+        }
+        assert actions == ["flush-cache"]
+        assert store.accounts("personal") == saved_accounts
+        for _ in range(2):
+            assert client.get(preview["logoUrl"]).content == PNG
+        assert fetched == ["saved-website", "saved-website"]
 
 
 @pytest.mark.parametrize("data,media_type", [

@@ -22,12 +22,13 @@ import importlib.metadata as metadata
 import importlib
 import json
 import sys
+from unittest.mock import patch
 sys.path.insert(0, sys.argv[1])
 expected = json.loads(sys.argv[2])
 import whab
 from whab.app import create_app
 from whab.config import Settings
-from whab.plugins import load_plugins
+from whab.plugins import LogoImage, load_plugins
 from whab_plugin_plaid.logos import logo_key
 from fastapi.testclient import TestClient
 
@@ -103,11 +104,32 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
             assert row["distribution"] == expected[row["id"]]["distribution"], row["id"]
     logos = next(row for row in management["plugins"] if row["id"] == "bank-logos")
     assert logos["category"] == "interface"
-    options = client.get("/api/plugins/bank-logos/settings")
-    assert options.status_code == 200 and options.json()["insights"]
-    assert any(row["title"] == "Cache duration" and row["value"] == "Indefinite" for row in options.json()["insights"])
-    assert options.json()["actions"] == []
-    assert client.post("/api/plugins/bank-logos/settings/actions/flush-cache", json={}).status_code == 404
+    logo_settings = client.get("/api/plugins/bank-logos/settings")
+    assert logo_settings.status_code == 200 and logo_settings.json()["insights"]
+    assert any(row["title"] == "Cache duration" and row["value"] == "Indefinite" for row in logo_settings.json()["insights"])
+    assert [(row["id"], row["label"]) for row in logo_settings.json()["actions"]] == [("flush-cache", "Flush cache")]
+    assert client.patch('/api/accounts/' + tracking_id, json={
+        'workspace': 'personal', 'bankWebsite': 'https://bank.example.org',
+    }).status_code == 200
+    saved_accounts = client.get('/api/workspace?workspace=personal').json()['accounts']
+    image = LogoImage(bytes.fromhex('89504e470d0a1a0a') + b'fictional', 'image/png')
+    provider = importlib.import_module('whab_plugin_bank_logos.plugin')
+    with patch.object(provider, 'fetch_logo', return_value=image) as fetch:
+        preview = client.post('/api/plugins/bank-logo-preview', json={'website': 'bank.example.org'}).json()
+        assert preview['available'] and preview['website'] == 'https://bank.example.org'
+        logo_url = preview['logoUrl']
+        assert client.get(logo_url).content == image.data and fetch.call_count == 1
+        cache = settings.home / 'cache' / 'plugins' / 'bank-logos'
+        assert tuple(cache.glob('domain-*.json'))
+        flushed = client.post('/api/plugins/bank-logos/settings/actions/flush-cache', json={})
+        assert flushed.status_code == 200
+        assert any(row['title'] == 'Cached logos' and row['value'] == '0' for row in flushed.json()['settings']['insights'])
+        assert not tuple(cache.glob('domain-*.json'))
+        assert client.get('/api/workspace?workspace=personal').json()['accounts'] == saved_accounts
+        # The saved public hostname survives flushing, so the same image URL can fetch again.
+        assert client.get(logo_url).content == image.data and fetch.call_count == 2
+        assert client.get(logo_url).content == image.data and fetch.call_count == 2
+        assert tuple(cache.glob('domain-*.json'))
     assert client.get("/api/plugins/web/settings").json() == {"insights": [], "actions": []}
     assert client.post("/api/plaid/link-token", json={}).status_code == 400
     export = client.get("/api/plugins/example/export?workspace=demo")

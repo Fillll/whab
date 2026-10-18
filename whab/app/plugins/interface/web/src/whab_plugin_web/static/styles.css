@@ -2053,54 +2053,50 @@ strong {
 }
 .plugin-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
 .plugin-toggle {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 9px;
   min-width: 0;
   font-size: 12px;
   line-height: 1.6;
   cursor: pointer;
 }
 .plugin-toggle > input[type='checkbox'] {
-  margin: 3px 0 0;
+  margin: 0;
   flex-shrink: 0;
 }
 .plugin-toggle > input:disabled {
   cursor: default;
 }
-.plugin-toggle > span {
-  min-width: 0;
-}
 .plugin-toggle strong {
-  display: block;
+  min-width: 0;
   font-weight: 600;
 }
-.plugin-meta {
-  display: block;
-  margin-top: 3px;
+.plugin-meta,
+.plugin-reason {
+  min-width: 0;
   font-size: 10px;
+  line-height: 1.6;
   color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
-.plugin-controls {
-  display: flex;
-  align-items: flex-end;
-  flex-direction: column;
-  gap: 8px;
+.plugin-reason {
+  grid-column: 1 / -1;
+  padding-left: 22px;
 }
 .plugin-state {
   font-size: 10px;
   line-height: 1.6;
   color: var(--text-secondary);
 }
-.plugin-options {
+.plugin-settings-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2964,14 +2960,26 @@ strong {
     padding: 9px;
   }
   .plugin-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 10px;
   }
-  .plugin-controls {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding-left: 25px;
+  .plugin-row .plugin-toggle {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .plugin-row .plugin-meta {
+    grid-column: 1;
+    grid-row: 2;
+    padding-left: 22px;
+  }
+  .plugin-state {
+    grid-column: 1;
+    grid-row: 3;
+    padding-left: 22px;
+  }
+  .plugin-settings-button {
+    grid-column: 2;
+    grid-row: 1 / 4;
   }
   .plugin-category-filter {
     gap: 6px;

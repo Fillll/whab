@@ -18,6 +18,7 @@ from whab.plugins import (
     Insight,
     LogoImage,
     Plugin,
+    PluginAction,
     PluginSettings,
     StoreError,
     bank_website,
@@ -345,5 +346,14 @@ plugin = Plugin(
         resolve=resolve, fetch=fetch, configure_cache=configure_cache, resolve_domain=resolve_domain,
         provider_name="Icon Horse", provider_url="https://icon.horse",
     ),
-    settings=PluginSettings(read=read_settings),
+    settings=PluginSettings(
+        read=read_settings,
+        actions=(PluginAction(
+            id="flush-cache",
+            label="Flush cache",
+            description="Delete downloaded logos and retry unavailable logos. "
+            "Saved bank websites stay unchanged; logos download again when requested.",
+        ),),
+        act=apply_setting,
+    ),
 )
