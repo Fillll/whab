@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.12.2 — 2026-10-18
+
+PR: [#50](https://github.com/Fillll/whab/pull/50)
+
+- Give the saved-budget list an Open budget heading, and label the file section and its action Add budget. Keep budget creation in its dedicated section and explain that adding a file also opens it.
+- Improve the plugin category selector's arrow spacing and alignment while preserving native selection and keyboard controls.
+
 ## 1.12.1 — 2026-10-18
 
 PR: [#49](https://github.com/Fillll/whab/pull/49)

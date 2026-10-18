@@ -161,25 +161,28 @@
 </dialog>
 <dialog class="modal settings-modal" id="budgets-dialog" aria-label="Budgets" data-workspace="{{ workspace }}">
   <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
-  {{ heading('Budgets', 'Choose a budget, or download a copy.') }}
+  {{ heading('Budgets', 'Open, create or add a budget.') }}
   <p class="field-error" data-budget-load-error role="alert" hidden></p>
-  <form class="modal-form" data-budget-switch data-personal-url="{{ url(workspace='personal', category=none) }}" data-demo-url="{{ url(workspace='demo', category=none) }}">
-    <fieldset class="budget-list" data-available-budgets>
-      <legend>Available budgets</legend>
-      {% for key, label, description in [('personal', budget_name|default('My budget'), 'Your accounts and budget'), ('demo', 'Demo budget', 'Fictional data to explore WHAB')] %}
-      <div class="budget-choice"{% if workspace==key %} aria-current="true"{% endif %}>
-        <label class="budget-choice-select">
-          <input type="radio" name="budget" value="{{ budget_id }}:{{ key }}" data-budget-id="{{ budget_id }}" data-workspace="{{ key }}" required{% if workspace==key %} checked{% endif %}>
-          <span class="budget-choice-copy"><strong>{{ label }}</strong>{% if workspace==key %}<small class="budget-current">Current budget</small>{% else %}<small>{{ description }}</small>{% endif %}</span>
-        </label>
-        <button class="button secondary" type="button" data-budget-download data-budget-id="{{ budget_id }}" data-workspace="{{ key }}" data-name="{{ label }}" aria-label="Download {{ label }}">Download</button>
-      </div>
-      {% endfor %}
-    </fieldset>
-    <label>Budget password (if required)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
-    <p class="field-error" role="alert" hidden></p>
-    <button class="button primary" type="submit">Open selected budget</button>
-  </form>
+  <section class="budget-section" aria-labelledby="open-budget-title">
+    <h3 id="open-budget-title">Open budget</h3>
+    <form class="modal-form" data-budget-switch data-personal-url="{{ url(workspace='personal', category=none) }}" data-demo-url="{{ url(workspace='demo', category=none) }}">
+      <fieldset class="budget-list" data-available-budgets>
+        <legend>Available budgets</legend>
+        {% for key, label, description in [('personal', budget_name|default('My budget'), 'Your accounts and budget'), ('demo', 'Demo budget', 'Fictional data to explore WHAB')] %}
+        <div class="budget-choice"{% if workspace==key %} aria-current="true"{% endif %}>
+          <label class="budget-choice-select">
+            <input type="radio" name="budget" value="{{ budget_id }}:{{ key }}" data-budget-id="{{ budget_id }}" data-workspace="{{ key }}" required{% if workspace==key %} checked{% endif %}>
+            <span class="budget-choice-copy"><strong>{{ label }}</strong>{% if workspace==key %}<small class="budget-current">Current budget</small>{% else %}<small>{{ description }}</small>{% endif %}</span>
+          </label>
+          <button class="button secondary" type="button" data-budget-download data-budget-id="{{ budget_id }}" data-workspace="{{ key }}" data-name="{{ label }}" aria-label="Download {{ label }}">Download</button>
+        </div>
+        {% endfor %}
+      </fieldset>
+      <label>Budget password (if required)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
+      <p class="field-error" role="alert" hidden></p>
+      <button class="button primary" type="submit">Open selected budget</button>
+    </form>
+  </section>
   <section class="budget-section" aria-labelledby="create-budget-title">
     <h3 id="create-budget-title">Create new budget</h3>
     <form class="modal-form" data-budget-new>
@@ -188,14 +191,15 @@
       <button class="button primary" type="submit">Create budget</button>
     </form>
   </section>
-  <section class="budget-section" aria-labelledby="open-budget-title">
-    <h3 id="open-budget-title">Open existing budget</h3>
+  <section class="budget-section" aria-labelledby="add-budget-title">
+    <h3 id="add-budget-title">Add budget</h3>
+    <p class="settings-notice">Add a WHAB file to your budget list and open it.</p>
     <form class="modal-form" data-budget-open>
       <label>Choose a budget file<input type="file" name="budget" accept=".whab,application/zip" required></label>
       <label>Budget password (if required)<input type="password" name="password" maxlength="1024" autocomplete="off"></label>
-      <label class="budget-copy-option"><input type="checkbox" name="as_copy"><span>Open as a separate budget</span></label>
+      <label class="budget-copy-option"><input type="checkbox" name="as_copy"><span>Add as a separate budget</span></label>
       <p class="field-error" role="alert" hidden></p>
-      <button class="button primary" type="submit">Open budget</button>
+      <button class="button primary" type="submit">Add budget</button>
     </form>
   </section>
   <details class="budget-advanced" data-budget-advanced hidden>

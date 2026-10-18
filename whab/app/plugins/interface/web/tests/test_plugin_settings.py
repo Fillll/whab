@@ -141,10 +141,11 @@ def test_budget_creation_and_file_opening_are_inline_actions_that_leave_the_moda
     text = client.get(f"/budgets/{workspace.replace('personal', 'home')}/budget/current-month/usd").text
     budgets = dialog(text, "budgets-dialog")
     assert "new-budget-dialog" not in text
+    assert budgets.index('id="open-budget-title">Open budget') < budgets.index("data-budget-switch")
     assert budgets.index("data-budget-switch") < budgets.index("Create new budget")
     assert budgets.index("Create new budget") < budgets.index("data-budget-new")
-    assert budgets.index("data-budget-new") < budgets.index("Open existing budget")
-    assert budgets.index("Open existing budget") < budgets.index("data-budget-open")
+    assert budgets.index("data-budget-new") < budgets.index('id="add-budget-title">Add budget')
+    assert budgets.index('id="add-budget-title">Add budget') < budgets.index("data-budget-open")
     assert budgets.index("data-budget-open") < budgets.index('class="budget-advanced"')
     creation = re.search(r'<form\b[^>]*\bdata-budget-new\b.*?</form>', budgets, re.S)[0]
     assert 'class="modal-form" data-budget-new' in creation
@@ -158,8 +159,8 @@ def test_budget_creation_and_file_opening_are_inline_actions_that_leave_the_moda
     assert "required" in opening_inputs["budget"]
     assert opening_inputs["password"]["type"] == "password"
     assert opening_inputs["as_copy"]["type"] == "checkbox"
-    assert "Open as a separate budget" in opening
-    assert '<button class="button primary" type="submit">Open budget</button>' in opening
+    assert "Add as a separate budget" in opening
+    assert '<button class="button primary" type="submit">Add budget</button>' in opening
     assert 'role="alert" hidden' in opening
 
 
