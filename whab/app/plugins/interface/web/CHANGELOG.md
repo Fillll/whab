@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.14.0 — 2026-10-18
+
+PR: [#51](https://github.com/Fillll/whab/pull/51)
+
+- Use a compact transaction table with independent multi-select, date, receipt, payee, category, memo, signed amount, currency and a small reviewed toggle. Save edits in place and finish pending writes before switching accounts or exporting.
+- Replace only the main register during account navigation, preserve the sidebar and scroll, and use readable budget/account URLs. Add account settings for name, classification, empty-account currency and plugin-labelled bank artwork.
+- Connect Assigned this month to its matching table total instead of listing every category. Move reserve wording into its disclosure and preserve the sticky title-column border while scrolling.
+
 ## 1.13.0 — 2026-10-18
 
 PR: [#50](https://github.com/Fillll/whab/pull/50)
