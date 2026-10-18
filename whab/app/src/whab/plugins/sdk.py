@@ -660,6 +660,21 @@ class TransactionRegister(Protocol):
     ) -> dict: ...
 
 
+class TransactionRegisterFiltered(Protocol):
+    """Optional indexed register read for inclusive dates and multiple accounts.
+
+    None bounds are open; account_ids None means all accounts of currency, while
+    an empty tuple selects no transactions. Preserve public transaction fields,
+    deterministic date/id ordering and a coherent account/category/row snapshot.
+    Existing TransactionRegister and StorageBackend implementations remain valid.
+    """
+
+    def transaction_register_filtered(
+        self, workspace: str, start_date: str | None, end_date: str | None,
+        currency: str, account_ids: tuple[str, ...] | None,
+    ) -> dict: ...
+
+
 class MonthlyRollover(Protocol):
     """Optional per-currency closing rule, saved on the outgoing source month.
 

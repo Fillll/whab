@@ -32,8 +32,11 @@ function element(properties = {}) {
   }, properties);
 }
 
-function harness(count = 5) {
+function harness(count = 5, options = {}) {
   const requests = [];
+  const navigations = [];
+  const contexts = [], history = [];
+  let pickerChoose, pickerDisposed = false, periodChoose, periodDisposed = false;
   const rowList = Array.from({length: count}, (_, index) => {
     const controls = Object.fromEntries(['[data-select-transaction]', '[data-transaction-field="note"]',
       '[data-transaction-field="categoryId"]', '[data-transaction-reviewed]', '[data-transaction-receipt]']
@@ -56,14 +59,27 @@ function harness(count = 5) {
     '#transaction-count', '[data-select-all]', '[data-transaction-save-status]', '#all-dates-filter',
     '[data-navigation="month"]', '[data-transaction-retry]'].map(selector => [selector, element()]));
   controls['#transaction-count'].dataset.period = 'All dates';
+  const reviewLabel = element();
+  controls['#review-filter'].dataset.reviewState = 'all';
+  controls['#review-filter'].querySelector = () => reviewLabel;
   const root = element({dataset: {workspace: 'personal'},
     querySelectorAll: () => rowList,
     querySelector: selector => ({...controls, '[data-transaction-selection-bar]': selectionBar,
       '[data-transaction-feedback]': feedback, '[data-transaction-receipt-dialog]': receiptDialog})[selector]});
   const window = element();
+  window.history = {state: {}, replaceState: (...args) => history.push(args)};
   const context = {document: {querySelector: () => root}, window, setTimeout, clearTimeout, URL,
     encodeURIComponent, location: {assign() {throw new Error('Unexpected full navigation.');}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
+    updateContext: value => contexts.push(value),
+    initAccountPicker(_, onChoose) {
+      pickerChoose = onChoose;
+      return {dispose() {pickerDisposed = true;}};
+    },
+    initPeriodPicker(_, onChoose) {
+      periodChoose = onChoose;
+      return {dispose() {periodDisposed = true;}};
+    },
     api(path, body, method) {
       if (path.startsWith('/receipts?')) return Promise.resolve({supported: false, transactionIds: []});
       const pending = deferred();
@@ -71,9 +87,14 @@ function harness(count = 5) {
       return pending.promise;
     },
   };
-  vm.runInNewContext(source.replace(/^import .*$/m, '').replaceAll('export function ', 'function '), context);
-  const register = context.initTransactionRegister();
-  return {register, requests, rows: rowList, bulk, window, feedback, feedbackText, controls};
+  vm.runInNewContext(source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function '), context);
+  const register = context.initTransactionRegister({navigate: async (url, details) => {
+    navigations.push({url: JSON.parse(JSON.stringify(url)), details: JSON.parse(JSON.stringify(details))});
+    return true;
+  }, ...options});
+  return {register, requests, rows: rowList, bulk, window, feedback, feedbackText, controls, navigations,
+    chooseAccount: value => pickerChoose(value), isPickerDisposed: () => pickerDisposed,
+    choosePeriod: value => periodChoose(value), isPeriodDisposed: () => periodDisposed, reviewLabel, contexts, history};
 }
 
 test('navigation waits for every wave of a bulk review and retains a later failure for retry', async () => {
@@ -134,5 +155,149 @@ test('category edits update the uncategorized indicator immediately while transf
   assert.equal(transferCategory.classList.contains('uncategorized'), false);
   state.requests[2].resolve({ok: true});
   assert.equal(await state.register.flush(), true);
+  state.register.dispose();
+});
+
+test('the artwork account picker uses partial navigation and releases its listeners with the register', async () => {
+  const state = harness(1);
+  await state.chooseAccount(['savings', 'checking']);
+  await tick();
+  assert.deepEqual(state.navigations, [{url: {accounts: ['savings', 'checking'], review: 'all'}, details: {focus: '#account-filter-toggle'}}]);
+  assert.equal(state.requests.length, 0);
+  state.register.dispose();
+  assert.equal(state.isPickerDisposed(), true);
+  assert.equal(state.isPeriodDisposed(), true);
+});
+
+test('period presets and date boundaries navigate within the register without writing transactions', async () => {
+  const state = harness(1);
+  const selection = {period: 'custom', startDate: '2026-09-10', endDate: '2026-10-10'};
+  await state.choosePeriod(selection);
+  await tick();
+  assert.deepEqual(state.navigations, [{url: {...selection, review: 'all'}, details: {focus: '#transaction-period-toggle'}}]);
+  assert.equal(state.requests.length, 0);
+  state.register.dispose();
+});
+
+test('review filtering cycles all, needs review and reviewed while preserving search and selection counts', () => {
+  const state = harness(3);
+  state.rows[0].dataset.reviewed = 'true';
+  const review = state.controls['#review-filter'];
+  review.emit('click');
+  assert.deepEqual(state.rows.map(row => row.hidden), [true, false, false]);
+  assert.equal(state.reviewLabel.textContent, 'Needs review');
+  assert.equal(state.rows[0].controls['[data-select-transaction]'].checked, false);
+  assert.match(state.controls['#transaction-count'].textContent, /^2 transactions/);
+  review.emit('click');
+  assert.deepEqual(state.rows.map(row => row.hidden), [false, true, true]);
+  assert.equal(state.reviewLabel.textContent, 'Reviewed');
+  assert.match(state.controls['#transaction-count'].textContent, /^1 transaction/);
+  state.controls['#transaction-search'].value = 'payee 1';
+  state.controls['#transaction-search'].emit('input');
+  assert.deepEqual(state.rows.map(row => row.hidden), [true, true, true]);
+  review.emit('click');
+  assert.deepEqual(state.rows.map(row => row.hidden), [true, false, true]);
+  assert.equal(state.reviewLabel.textContent, 'All');
+  assert.match(state.controls['#transaction-count'].textContent, /^1 transaction/);
+  assert.equal(state.requests.length, 0);
+  assert.equal(state.history.length, 3);
+  assert.deepEqual(state.contexts.map(value => value.reviewFilter), ['needs-review', 'reviewed', 'all']);
+  state.register.dispose();
+});
+
+test('marking a transaction reviewed immediately removes it from the Needs review view after save', async () => {
+  const state = harness(2);
+  state.controls['#review-filter'].emit('click');
+  state.rows[0].controls['[data-transaction-reviewed]'].emit('click');
+  assert.deepEqual(state.requests[0].body, {workspace: 'personal', reviewed: true});
+  state.requests[0].resolve({ok: true});
+  await tick();
+  assert.equal(state.rows[0].hidden, true);
+  assert.equal(state.rows[1].hidden, false);
+  assert.match(state.controls['#transaction-count'].textContent, /^1 transaction/);
+  state.register.dispose();
+});
+
+test('rapid account and period choices retain both pending filter selections', async () => {
+  const state = harness(1);
+  state.chooseAccount(['checking', 'savings']);
+  state.choosePeriod({period: 'custom', startDate: '2026-10-01', endDate: ''});
+  await tick();
+  assert.equal(state.navigations.length, 1);
+  assert.deepEqual(state.navigations.at(-1), {
+    url: {accounts: ['checking', 'savings'], period: 'custom', startDate: '2026-10-01', endDate: '', review: 'all'},
+    details: {focus: '#transaction-period-toggle'},
+  });
+  state.register.dispose();
+});
+
+test('review changes while a filter request is pending reissue the latest combined filters', async () => {
+  const pending = [], changes = [];
+  const state = harness(1, {navigate: (url, details) => {
+    const request = deferred();
+    pending.push(request);
+    changes.push({url: JSON.parse(JSON.stringify(url)), details: JSON.parse(JSON.stringify(details))});
+    return request.promise;
+  }});
+  state.chooseAccount(['checking', 'savings']);
+  state.choosePeriod({period: 'custom', startDate: '2026-10-01', endDate: ''});
+  await tick();
+  assert.equal(pending.length, 1);
+  state.controls['#review-filter'].emit('click');
+  assert.equal(state.reviewLabel.textContent, 'Needs review');
+  await tick();
+  assert.equal(pending.length, 2);
+  assert.deepEqual(changes.at(-1), {
+    url: {accounts: ['checking', 'savings'], period: 'custom', startDate: '2026-10-01', endDate: '', review: 'needs-review'},
+    details: {focus: '#review-filter'},
+  });
+  assert.equal(state.history.length, 0);
+  pending[1].resolve(true);
+  pending[0].resolve(true);
+  await tick();
+  assert.equal(state.requests.length, 0);
+  state.register.dispose();
+});
+
+test('a review change before the filter save barrier finishes suppresses the earlier navigation', async () => {
+  const state = harness(1);
+  state.choosePeriod({period: 'previous-month', month: 'current-month'});
+  state.controls['#review-filter'].emit('click');
+  await tick();
+  assert.deepEqual(state.navigations, [{
+    url: {period: 'previous-month', month: 'current-month', review: 'needs-review'},
+    details: {focus: '#review-filter'},
+  }]);
+  state.register.dispose();
+});
+
+test('review changes during sidebar navigation preserve the pending account and date range', async () => {
+  const destination = new URL('https://localhost:5173/budgets/home/savings/transactions/current-month/usd?period=custom&start_date=2026-09-10&end_date=2026-10-10');
+  const pending = [], navigations = [];
+  const state = harness(1, {pendingDestination: () => destination, navigate: (url, details) => {
+    const request = deferred();
+    pending.push(request);
+    navigations.push({url: String(url), details: JSON.parse(JSON.stringify(details))});
+    return request.promise;
+  }});
+  state.controls['#review-filter'].emit('click');
+  await tick();
+  const first = new URL(navigations[0].url);
+  assert.equal(first.pathname, destination.pathname);
+  assert.equal(first.searchParams.get('start_date'), '2026-09-10');
+  assert.equal(first.searchParams.get('end_date'), '2026-10-10');
+  assert.equal(first.searchParams.get('review'), 'needs-review');
+  state.controls['#review-filter'].emit('click');
+  await tick();
+  const latest = new URL(navigations.at(-1).url);
+  assert.equal(latest.pathname, destination.pathname);
+  assert.equal(latest.searchParams.get('period'), 'custom');
+  assert.equal(latest.searchParams.get('start_date'), '2026-09-10');
+  assert.equal(latest.searchParams.get('end_date'), '2026-10-10');
+  assert.equal(latest.searchParams.get('review'), 'reviewed');
+  assert.equal(destination.searchParams.has('review'), false);
+  assert.equal(state.history.length, 0);
+  for (const request of pending) request.resolve(true);
+  await tick();
   state.register.dispose();
 });

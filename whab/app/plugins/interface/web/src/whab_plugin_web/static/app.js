@@ -5,6 +5,7 @@ import {initBudgetSourceLinks} from './budget-source-links.js';
 import {initAccountNavigation} from './account-navigation.js';
 import {initTransactionRegister} from './transaction-register.js';
 import {initAccountSettings} from './account-settings.js';
+import {bindLogos} from './logo-images.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -13,21 +14,6 @@ document.addEventListener('whab:notice', event => {
   notify(event.detail.message);
 });
 
-function bindLogos(scope = document) {
-for (const image of scope.querySelectorAll('[data-bank-logo], [data-merchant-logo]')) {
-  if (image.dataset.logoBound) continue;
-  image.dataset.logoBound = 'true';
-  const update = () => {
-    const loaded = image.naturalWidth > 0;
-    image.hidden = !loaded;
-    image.previousElementSibling.hidden = loaded;
-    image.parentElement.classList.toggle('has-logo', loaded);
-  };
-  image.addEventListener('load', update);
-  image.addEventListener('error', update);
-  if (image.complete) update();
-}
-}
 bindLogos();
 
 let currentRegister = null;
@@ -43,7 +29,7 @@ const accountNavigation = initAccountNavigation({
   flush: flushEdits,
   onReplace({content}) {
     currentRegister?.dispose();
-    currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args)});
+    currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination()});
     bindLogos(content);
   },
   notify,
@@ -570,7 +556,7 @@ document.addEventListener('click', event => {
 });
 for (const time of document.querySelectorAll('[data-local-time]')) time.textContent = new Date(time.dateTime).toISOString().slice(0, 10);
 
-currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args)});
+currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination()});
 document.addEventListener('click', async event => {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !currentRegister?.dirty) return;
   const link = event.target.closest('a[href]');

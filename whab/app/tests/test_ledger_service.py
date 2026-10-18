@@ -491,3 +491,50 @@ def test_register_projection_fast_path_ignores_private_and_out_of_scope_rows():
     result = service.transaction_register("personal", "2026-10", "USD", "usd")
     assert calls == [("personal", "2026-10", "USD", "usd")]
     assert result["transactions"] == [{"id": "ok", "accountId": "usd", "date": "2026-10-05"}]
+
+
+def test_register_filters_multiple_accounts_and_inclusive_dates_on_legacy_backend():
+    accounts = [{"id": identifier, "currency": currency} for identifier, currency in (
+        ("one", "USD"), ("two", "USD"), ("three", "USD"), ("euro", "EUR"),
+    )]
+    rows = [{"id": f"{account}-{date}", "accountId": account, "date": date} for account in (
+        "one", "two", "three", "euro",
+    ) for date in ("2026-09-30", "2026-10-01", "2026-10-05", "2026-10-06")]
+    store = SimpleNamespace(accounts=lambda _: accounts, categories=lambda _: [], transactions=lambda *_: rows)
+    service = LedgerService(store)
+    result = service.transaction_register("personal", None, "USD", account_ids=["one", "two", "one"],
+                                          start_date="2026-10-01", end_date="2026-10-05")
+    assert {row["id"] for row in result["transactions"]} == {
+        "one-2026-10-01", "one-2026-10-05", "two-2026-10-01", "two-2026-10-05",
+    }
+    assert service.transaction_register("personal", None, "USD", account_ids=[])["transactions"] == []
+    for changes in ({"account_ids": "one"}, {"account_ids": [None]}, {"account_ids": ["one"] * 501},
+                    {"start_date": "2026-02-30"}, {"end_date": "bad"},
+                    {"start_date": "2026-10-02", "end_date": "2026-10-01"}):
+        with pytest.raises(StoreError):
+            service.transaction_register("personal", None, "USD", **changes)
+
+
+def test_register_filtered_capability_is_scoped_again_and_keeps_old_signature_compatible():
+    calls = []
+    data = {"accounts": [{"id": "one", "currency": "USD"}], "categories": [], "transactions": [
+        {"id": "ok", "accountId": "one", "date": "2026-10-05", "token": "private"},
+        {"id": "outside", "accountId": "one", "date": "2026-10-01"},
+        {"id": "foreign", "accountId": "other", "date": "2026-10-05"},
+    ]}
+    service = LedgerService(SimpleNamespace(
+        accounts=lambda _: data["accounts"],
+        transaction_register_filtered=lambda *args: calls.append(args) or data,
+    ))
+    result = service.transaction_register("personal", None, "USD", "one",
+                                          start_date="2026-10-05", end_date="2026-10-05")
+    assert calls == [("personal", "2026-10-05", "2026-10-05", "USD", ("one",))]
+    assert result["transactions"] == [{"id": "ok", "accountId": "one", "date": "2026-10-05"}]
+    service.transaction_register("personal", None, "USD", start_date="2026-10-05")
+    assert calls[-1][-1] is None
+    service.transaction_register("personal", None, "USD", "missing", start_date="2026-10-05")
+    assert calls[-1][-1] is None
+    legacy_calls = []
+    service = LedgerService(SimpleNamespace(transaction_register=lambda *args: legacy_calls.append(args) or data))
+    service.transaction_register("personal", "2026-10", "USD", account_ids=["one"])
+    assert legacy_calls == [("personal", "2026-10", "USD", None)]

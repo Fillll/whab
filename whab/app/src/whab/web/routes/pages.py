@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from whab import __version__
@@ -14,6 +14,7 @@ from whab.services.ledger import LedgerService
 from whab.web.navigation import budget_key, page_url
 from whab.web.plugin_snapshot import build_snapshot
 from whab.web.schemas import valid_month
+from whab.web.transaction_filters import transaction_period
 
 
 def create_router(
@@ -71,6 +72,11 @@ def create_router(
         category: str | None = None,
         account: str | None = None,
         all_dates: bool = False,
+        accounts: list[str] | None = Query(default=None),
+        period: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        review: Literal["all", "needs-review", "reviewed"] = "all",
     ):
         if any(name in request.query_params for name in ("page", "workspace", "month", "currency")):
             raise HTTPException(400, "Routing values belong in the address path.")
@@ -94,10 +100,27 @@ def create_router(
             if account is not None and account != resolved:
                 raise HTTPException(400, "Account does not match this address")
             account = resolved
-        transaction_all_dates = page == "transactions" and all_dates
+        selected_ids = None
+        transaction_range = None
+        if page == "transactions":
+            if accounts is not None:
+                selected_ids = list(dict.fromkeys(accounts))
+                allowed = {row["id"] for row in all_accounts if row.get("currency", "USD") == currency}
+                if any(identifier not in allowed for identifier in selected_ids):
+                    raise HTTPException(400, "Account selection is not available for this currency")
+                if account_slug is not None and selected_ids != [account]:
+                    raise HTTPException(400, "Account selection does not match this address")
+                account = selected_ids[0] if len(selected_ids) == 1 else None
+            try:
+                transaction_range = transaction_period(month, month_token, period, start_date, end_date, all_dates)
+            except ValueError as error:
+                raise HTTPException(400, str(error)) from error
+            month = transaction_range.month
+        transaction_all_dates = transaction_range is not None and transaction_range.start is None and transaction_range.end is None
         if page == "transactions" and ui.lightweight_transactions:
             data = service.transaction_register(
-                workspace, None if transaction_all_dates else month, currency, account,
+                workspace, transaction_range.query_month, currency, account,
+                account_ids=selected_ids, start_date=transaction_range.start, end_date=transaction_range.end,
             )
         elif page == "budget" and ui.budget_months > 1:
             periods = [
@@ -111,15 +134,17 @@ def create_router(
         if account_slug is not None and selected_account is None:
             raise HTTPException(404, "Account address not found for this currency")
         if page == "transactions" and not ui.lightweight_transactions:
-            if transaction_all_dates:
-                account_ids = {row["id"] for row in data["accounts"]}
-                data = {**data, "transactions": [
-                    row for row in service.transactions(workspace) if row["accountId"] in account_ids
-                ]}
-            if selected_account is not None:
-                data = {**data, "transactions": [
-                    row for row in data["transactions"] if row["accountId"] == account
-                ]}
+            account_ids = {row["id"] for row in data["accounts"]}
+            rows = service.transactions(workspace, transaction_range.query_month)
+            data = {**data, "transactions": [
+                row for row in rows if row["accountId"] in account_ids
+                and (selected_ids is None or row["accountId"] in selected_ids)
+                and (selected_ids is not None or selected_account is None or row["accountId"] == account)
+                and (transaction_range.start is None or row["date"] >= transaction_range.start)
+                and (transaction_range.end is None or row["date"] <= transaction_range.end)
+            ]}
+        if page == "transactions" and selected_ids is None:
+            selected_ids = [selected_account["id"]] if selected_account else []
         status = public_status()
         try:
             context = ui.build_context(
@@ -159,6 +184,9 @@ def create_router(
         context["api_prefix"] = api_prefix
         canonical_filters = dict(request.query_params)
         canonical_filters.pop("account", None)
+        canonical_filters.pop("accounts", None)
+        if selected_ids and len(selected_ids) > 1:
+            canonical_filters["accounts"] = selected_ids
         canonical_url = page_url(
             key, page, month_token, currency,
             account_slug=account_slugs.get(selected_account["id"]) if selected_account and page == "transactions" else None,
@@ -169,6 +197,11 @@ def create_router(
             budgetId=identifier, budgetAliases=routing.budget_route_keys(identifier) if routing else [key],
             accountSlugs={row["id"]: account_slugs[row["id"]] for row in data["accounts"] if row["id"] in account_slugs},
             selectedAccountId=selected_account["id"] if selected_account and page == "transactions" else None,
+            selectedAccountIds=selected_ids or [],
+            transactionPeriod=transaction_range.selection if transaction_range else None,
+            startDate=transaction_range.start if transaction_range else None,
+            endDate=transaction_range.end if transaction_range else None,
+            reviewFilter=review,
             canonicalUrl=canonical_url,
             personalBudgetKey=personal_key, monthToken=month_token, page=page,
         )
@@ -178,6 +211,13 @@ def create_router(
             budget_name=budget_name, budget_id=service.budget_id,
             selected_account=selected_account if page == "transactions" else None,
             transaction_all_dates=transaction_all_dates,
+            selected_account_ids=selected_ids or [],
+            transaction_period=transaction_range.selection if transaction_range else None,
+            transaction_start_date=transaction_range.start if transaction_range else None,
+            transaction_end_date=transaction_range.end if transaction_range else None,
+            transaction_period_label=transaction_range.label if transaction_range else None,
+            transaction_count_period=transaction_range.count_label if transaction_range else None,
+            transaction_review_filter=review,
         )
         from whab.web.bank_status import public_bank_status
 
@@ -260,8 +300,12 @@ def create_router(
     def account_index(
         request: Request, key: str, account_slug: str, month_token: str, currency: str,
         category: str | None = None, account: str | None = None, all_dates: bool = False,
+        accounts: list[str] | None = Query(default=None), period: str | None = None,
+        start_date: str | None = None, end_date: str | None = None,
+        review: Literal["all", "needs-review", "reviewed"] = "all",
     ):
         return index(request, key, "transactions", month_token, currency,
-                     category=category, account=account, all_dates=all_dates)
+                     category=category, account=account, all_dates=all_dates, accounts=accounts,
+                     period=period, start_date=start_date, end_date=end_date, review=review)
 
     return router

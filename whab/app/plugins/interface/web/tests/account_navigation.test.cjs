@@ -266,3 +266,114 @@ test('an explicit same-address refresh loads renamed canonical account and refre
   assert.equal(state.context.getContext().selectedAccountId, 'first');
   assert.equal(state.fallbacks.length, 0);
 });
+
+test('sidebar account destinations retain date and review filters without inheriting the old account', () => {
+  const state = harness();
+  const current = new URL(first + '&period=custom&start_date=2026-09-10&end_date=2026-10-10&review=reviewed');
+  const target = new URL(second + '&period=previous-month&review=needs-review');
+  const preserved = state.context.preserveTransactionFilters(target, current);
+  assert.equal(preserved.searchParams.get('account'), 'second');
+  assert.equal(preserved.searchParams.get('period'), 'custom');
+  assert.equal(preserved.searchParams.get('start_date'), '2026-09-10');
+  assert.equal(preserved.searchParams.get('end_date'), '2026-10-10');
+  assert.equal(preserved.searchParams.get('review'), 'reviewed');
+  assert.equal(preserved.searchParams.get('all_dates'), 'true');
+  const nonRegister = new URL(first.replace('/transactions/', '/accounts/'));
+  const unchanged = new URL(second);
+  const original = unchanged.href;
+  assert.equal(state.context.preserveTransactionFilters(unchanged, nonRegister).href, original);
+});
+
+test('filter matching rejects stale multi-account, custom date and review fragments', () => {
+  const state = harness();
+  const target = new URL('https://localhost:5173/budgets/home/transactions/2026-10/usd?accounts=first&accounts=second&period=custom&start_date=2026-09-10&end_date=2026-10-10&review=reviewed');
+  const expected = {selectedAccountIds: ['second', 'first'], transactionPeriod: 'custom',
+    startDate: '2026-09-10', endDate: '2026-10-10', reviewFilter: 'reviewed'};
+  assert.equal(state.context.matchesTransactionFilters(target, expected), true);
+  for (const override of [
+    {selectedAccountIds: ['first']}, {selectedAccountIds: ['first', 'third']},
+    {transactionPeriod: 'previous-month'}, {startDate: '2026-09-11'}, {endDate: '2026-10-09'},
+    {reviewFilter: 'needs-review'},
+  ]) assert.equal(state.context.matchesTransactionFilters(target, {...expected, ...override}), false);
+  const allAccounts = new URL(first.replace('?account=first&all_dates=true', ''));
+  assert.equal(state.context.matchesTransactionFilters(allAccounts, {selectedAccountIds: ['first']}), false);
+  assert.equal(state.context.matchesTransactionFilters(new URL(first), {}), true);
+});
+
+test('modern all-date fragments cannot silently return a bounded monthly register', () => {
+  const state = harness();
+  assert.equal(state.context.matchesTransactionFilters(new URL(first), {transactionPeriod: 'all'}), true);
+  assert.equal(state.context.matchesTransactionFilters(new URL(first), {transactionPeriod: 'current-month'}), false);
+});
+
+test('mismatched filter fragments fall back without replacing the current budget content', async () => {
+  for (const override of [
+    {selectedAccountIds: ['first']}, {transactionPeriod: 'previous-month'},
+    {startDate: '2026-09-11'}, {endDate: '2026-10-09'}, {reviewFilter: 'needs-review'},
+  ]) {
+    const state = harness({initialContext: {budgetId: 'private-home', apiPrefix: '/budgets/home/api'}});
+    const target = new URL('https://localhost:5173/budgets/home/transactions/2026-10/usd?accounts=first&accounts=second&period=custom&start_date=2026-09-10&end_date=2026-10-10&review=reviewed');
+    const pending = state.navigator.navigate(target);
+    await tick();
+    state.respond(0, {override: {selectedAccountIds: ['first', 'second'], transactionPeriod: 'custom',
+      startDate: '2026-09-10', endDate: '2026-10-10', reviewFilter: 'reviewed', ...override}});
+    await pending;
+    assert.deepEqual(state.fallbacks, [['assign', target.href]]);
+    assert.equal(state.replacements.length, 0);
+    assert.equal(state.context.getContext().budgetId, 'private-home');
+    assert.equal(state.context.getContext().apiPrefix, '/budgets/home/api');
+  }
+});
+
+test('sidebar clicks preserve the active range and reject other budgets and origins', async () => {
+  const href = first + '&period=custom&start_date=2026-09-10&end_date=2026-10-10&review=reviewed';
+  const state = harness({href});
+  function click(target) {
+    const link = {href: target, hasAttribute: () => false, target: ''};
+    const event = {button: 0, target: {closest: () => link}, preventDefault() {this.prevented = true;}};
+    state.listeners.click(event);
+    return event;
+  }
+  assert.equal(click(second.replace('/home/', '/another-budget/')).prevented, undefined);
+  assert.equal(click(second.replace('localhost', 'external.invalid')).prevented, undefined);
+  await tick();
+  assert.equal(state.requests.length, 0);
+  assert.equal(click(second).prevented, true);
+  await tick();
+  const fetched = new URL(state.requests[0].url);
+  assert.equal(fetched.searchParams.get('account'), 'second');
+  assert.equal(fetched.searchParams.get('period'), 'custom');
+  assert.equal(fetched.searchParams.get('start_date'), '2026-09-10');
+  assert.equal(fetched.searchParams.get('end_date'), '2026-10-10');
+  assert.equal(fetched.searchParams.get('review'), 'reviewed');
+  state.navigator.dispose();
+  state.respond(0);
+  await tick();
+  assert.equal(state.replacements.length, 0);
+});
+
+test('the pending destination is transient, copied and retained until the newest request finishes', async () => {
+  const state = harness();
+  assert.equal(state.navigator.pendingDestination(), null);
+  const earlier = state.navigator.navigate(second);
+  assert.equal(state.navigator.pendingDestination().href, second);
+  const copy = state.navigator.pendingDestination();
+  copy.searchParams.set('review', 'reviewed');
+  assert.equal(state.navigator.pendingDestination().searchParams.has('review'), false);
+  await tick();
+  const latest = state.navigator.navigate(third);
+  await tick();
+  state.respond(0);
+  await earlier;
+  assert.equal(state.navigator.pendingDestination().href, third);
+  state.respond(1);
+  await latest;
+  assert.equal(state.navigator.pendingDestination(), null);
+  const closing = state.navigator.navigate(second);
+  await tick();
+  state.navigator.dispose();
+  assert.equal(state.navigator.pendingDestination(), null);
+  state.respond(2);
+  await closing;
+  assert.equal(state.replacements.length, 1);
+});
