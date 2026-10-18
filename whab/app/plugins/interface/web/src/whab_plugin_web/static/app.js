@@ -1,5 +1,6 @@
 /* WHAB controls. Business rules live in Python; bank UI is loaded by enabled plugins. */
 import {api, apiUrl, notify, pageUrl} from './client.js';
+import {initBudgetEdits, syncBudgetGroups} from './budget-edits.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -20,126 +21,70 @@ for (const image of document.querySelectorAll('[data-bank-logo], [data-merchant-
   if (image.complete) update();
 }
 
-function minorAmount(value, digits) {
-  const clean = value.trim();
+function minorAmount(value, digits, authoritative = false) {
+  const trimmed = value.trim();
+  const negative = authoritative && trimmed.startsWith('-');
+  const clean = negative ? trimmed.slice(1) : trimmed;
   const decimal = digits ? `(\\.\\d{1,${digits}})?` : '';
   if (!new RegExp(`^\\d+${decimal}$`).test(clean)) {
     throw new Error(digits ? `Enter an amount with up to ${digits} decimal places.` : 'Enter a whole-number amount.');
   }
   const [whole, fraction = ''] = clean.split('.');
   const result = BigInt(whole) * 10n ** BigInt(digits) + BigInt(fraction.padEnd(digits, '0'));
-  if (result > 1_000_000_000_000n) throw new Error('That amount is too large.');
-  return Number(result);
+  if (result > (authoritative ? BigInt(Number.MAX_SAFE_INTEGER) : 1_000_000_000_000n)) throw new Error('That amount is too large.');
+  return negative ? -Number(result) : Number(result);
 }
 
-const budgetMutationForms = [...document.querySelectorAll('form[data-inline-assignment], form[data-budget-mutation]')];
-const assignmentControlStates = new Map(budgetMutationForms.flatMap(form =>
-  [...form.elements].filter(control => control.type !== 'hidden').map(control =>
-    [control, {disabled: control.disabled, readOnly: control.readOnly, checked: control.checked}])));
-let assignmentBusy = false;
-let assignmentNavigation;
-const pendingAssignmentControls = new Map();
-
-function lockAssignments(locked) {
-  assignmentBusy = locked;
-  for (const [control, original] of assignmentControlStates) {
-    if (control.hasAttribute('data-cents')) control.readOnly = locked || original.readOnly;
-    else control.disabled = locked || original.disabled;
-    if (!locked && control.type === 'radio') control.checked = original.checked;
+function formBody(form, {authoritative = false} = {}) {
+  const body = {};
+  for (const field of form.elements) {
+    if (!field.name || field.disabled || field.type === 'radio' && !field.checked) continue;
+    body[field.name] = field.hasAttribute('data-boolean') ? field.checked :
+      field.hasAttribute('data-boolean-value') ? field.value === 'true' :
+      field.hasAttribute('data-cents') ? minorAmount(field.value, Number(form.elements.namedItem('currency')?.selectedOptions?.[0]?.dataset.minorUnits ?? field.dataset.minorUnits), authoritative) :
+      field.hasAttribute('data-null') && !field.value ? null : field.value;
   }
+  if (body._kind === 'income') body.amount = -body.amount;
+  delete body._kind;
+  return body;
 }
 
-// Finish the budget change before following a month/category link that blurred it.
-document.addEventListener('click', event => {
-  if (!assignmentBusy || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-  const link = event.target.closest('a[href]');
-  if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
-  event.preventDefault();
-  assignmentNavigation = link.href;
-});
-
+const budgetEdits = initBudgetEdits({readForm: formBody});
 for (const form of document.querySelectorAll('form[data-api]')) {
-  const inline = form.hasAttribute('data-inline-assignment');
-  const budgetMutation = inline || form.hasAttribute('data-budget-mutation');
-  const amount = inline ? form.querySelector('[data-cents]') : null;
-  const originalAmount = amount?.value;
+  if (form.hasAttribute('data-inline-assignment') || form.hasAttribute('data-budget-mutation')) continue;
   const radioChoices = [...form.querySelectorAll('input[type="radio"]')];
   const originalChoices = new Map(radioChoices.map(choice =>
     [choice, {checked: choice.checked, disabled: choice.disabled}]));
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (form.dataset.busy || budgetMutation && assignmentBusy || inline && amount.value.trim() === originalAmount) return;
+    if (form.dataset.busy) return;
     const error = form.querySelector('.field-error');
+    form.dataset.busy = 'true';
     try {
-      const body = {};
-      for (const field of form.elements) {
-        if (!field.name || field.disabled || field.type === 'radio' && !field.checked) continue;
-        body[field.name] = field.hasAttribute('data-boolean') ? field.checked :
-          field.hasAttribute('data-boolean-value') ? field.value === 'true' :
-          field.hasAttribute('data-cents') ? minorAmount(field.value, Number(form.elements.namedItem('currency')?.selectedOptions?.[0]?.dataset.minorUnits ?? field.dataset.minorUnits)) :
-          field.hasAttribute('data-null') && !field.value ? null : field.value;
-      }
-      if (body._kind === 'income') body.amount = -body.amount;
-      delete body._kind;
-      form.dataset.busy = 'true';
+      const body = formBody(form);
+      if (!(await budgetEdits.flush())) throw new Error('Save or discard the budget edit before continuing.');
       if (error) error.hidden = true;
-      if (radioChoices.length && !budgetMutation) {
+      if (radioChoices.length) {
         for (const choice of radioChoices) choice.disabled = true;
         form.setAttribute('aria-busy', 'true');
       }
-      if (budgetMutation) {
-        lockAssignments(true);
-        form.setAttribute('aria-busy', 'true');
-        if (inline) amount.removeAttribute('aria-invalid');
-      }
       await api(form.dataset.api, body, form.dataset.method || 'POST');
-      if (budgetMutation && assignmentNavigation) {
-        location.assign(assignmentNavigation);
-      } else if (body.currency) {
-        const url = pageUrl({currency: body.currency});
-        location.assign(url);
-      } else location.reload();
+      if (body.currency) location.assign(pageUrl({currency: body.currency}));
+      else location.reload();
     } catch (failure) {
       if (error) {
         error.textContent = failure.message;
         error.hidden = false;
       } else notify(failure.message);
       delete form.dataset.busy;
-      if (radioChoices.length && !budgetMutation) {
-        for (const choice of radioChoices) {
-          choice.disabled = originalChoices.get(choice).disabled;
-          choice.checked = originalChoices.get(choice).checked;
-        }
-        form.removeAttribute('aria-busy');
+      for (const choice of radioChoices) {
+        choice.disabled = originalChoices.get(choice).disabled;
+        choice.checked = originalChoices.get(choice).checked;
       }
-      if (budgetMutation) {
-        lockAssignments(false);
-        assignmentNavigation = undefined;
-        for (const [control, value] of pendingAssignmentControls) control.value = value;
-        pendingAssignmentControls.clear();
-        form.removeAttribute('aria-busy');
-        if (inline) amount.setAttribute('aria-invalid', 'true');
-      }
+      form.removeAttribute('aria-busy');
     }
   });
   if (form.hasAttribute('data-auto')) form.addEventListener('change', () => form.requestSubmit());
-  if (inline) {
-    amount.addEventListener('focus', () => amount.select());
-    amount.addEventListener('blur', () => form.requestSubmit());
-    amount.addEventListener('keydown', event => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        form.requestSubmit();
-      } else if (event.key === 'Escape') {
-        event.preventDefault();
-        amount.value = originalAmount;
-        amount.removeAttribute('aria-invalid');
-        const error = form.querySelector('.field-error');
-        if (error) error.hidden = true;
-        amount.blur();
-      }
-    });
-  }
 }
 
 function updateAccountFields(form) {
@@ -224,6 +169,7 @@ if (pluginSelection) {
       error.hidden = true;
       submit.disabled = true;
       const plugins = selectedPlugins();
+      if (!(await budgetEdits.flush())) throw new Error('Save or discard the budget edit before continuing.');
       await api('/plugins/management', {plugins}, 'PUT');
       location.hash = 'plugins';
       location.reload();
@@ -408,6 +354,7 @@ function budgetForm(selector, action) {
     for (const button of buttons) button.disabled = true;
     error.hidden = true;
     try {
+      if (!(await budgetEdits.flush())) throw new Error('Resolve the budget edit that could not be saved before continuing.');
       const result = await action(form);
       budgetDialog.close();
       document.getElementById('settings-dialog').close();
@@ -567,17 +514,14 @@ for (const input of document.querySelectorAll('[data-navigation]')) {
       return;
     }
     const url = pageUrl({[input.dataset.navigation]: input.value});
-    if (assignmentBusy) {
-      assignmentNavigation = url.href;
-      pendingAssignmentControls.set(input, initialValue);
-    } else location.assign(url);
+    if (!budgetEdits.navigate(url.href, () => { input.value = initialValue; })) location.assign(url);
   });
 }
-for (const button of document.querySelectorAll('[data-budget-group]')) button.addEventListener('click', () => {
-  const expanded = button.getAttribute('aria-expanded') === 'true';
-  button.setAttribute('aria-expanded', String(!expanded));
-  for (const row of document.querySelectorAll('[data-budget-group-member]'))
-    if (row.dataset.budgetGroupMember === button.dataset.budgetGroup) row.hidden = expanded;
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-budget-group]');
+  if (!button) return;
+  button.setAttribute('aria-expanded', String(button.getAttribute('aria-expanded') !== 'true'));
+  syncBudgetGroups(document);
 });
 for (const time of document.querySelectorAll('[data-local-time]')) time.textContent = new Date(time.dateTime).toISOString().slice(0, 10);
 

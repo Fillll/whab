@@ -38,7 +38,7 @@ def period_context(data):
 
 def carried_in_row(text):
     return re.search(
-        r'<tr class="budget-overview-row budget-carried-in-row">(.*?)</tr>', text, re.S,
+        r'<tr class="budget-overview-row budget-carried-in-row"[^>]*>(.*?)</tr>', text, re.S,
     )[1]
 
 

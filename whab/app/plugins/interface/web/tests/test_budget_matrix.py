@@ -109,7 +109,7 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
     )
     for code, factor in (("USD", 1), ("EUR", 10)):
         text = client.get(f"/budgets/home/budget/2026-11/{code.lower()}").text
-        overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
+        overview = re.findall(r'<tr class="budget-overview-row[^"]*"[^>]*>(.*?)</tr>', text, re.S)
         assert [re.search(r'<th scope="row">([^<]+)', row)[1] for row in overview] == list(labels)
         assert text.index("Available to assign") < text.index("Spending categories")
         assert text.index("Spending categories") < text.index('class="budget-columns"')
@@ -117,7 +117,7 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
         assert "Previous overspending" not in text and "Balance carried in" not in text
         assert "Available to spend" not in text
         assert "overspend this month" not in text.lower()
-        thead = re.search(r"<thead>(.*?)</thead>", text, re.S)[1]
+        thead = re.search(r"<thead[^>]*>(.*?)</thead>", text, re.S)[1]
         assert "budget-columns" not in thead
         assert 'scope="col"' not in thead
         cells = [re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S) for row in overview]
@@ -193,7 +193,7 @@ def test_historical_income_remains_visible_while_overview_planning_is_unavailabl
         })
     store.assign("personal", "groceries", "2026-10", 1000)
     text = client.get("/budgets/home/budget/2026-09/usd").text
-    overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
+    overview = re.findall(r'<tr class="budget-overview-row[^"]*"[^>]*>(.*?)</tr>', text, re.S)
     cells = [re.findall(r'<td[^>]*>(.*?)</td>', row, re.S) for row in overview]
     assert displayed_amount(cells[0][0]) == "123.45"
     assert cells[1][0].strip() == "—"
@@ -210,11 +210,11 @@ def test_historical_income_remains_visible_while_overview_planning_is_unavailabl
 def test_calculated_rows_and_group_totals_are_read_only_while_child_assignments_are_editable(client):
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert "Editable assigned amounts" in text and "Read-only summaries" in text
-    overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
+    overview = re.findall(r'<tr class="budget-overview-row[^"]*"[^>]*>(.*?)</tr>', text, re.S)
     for index in (0, 3, 4):
         assert '<small class="budget-row-note">Summary</small>' in overview[index]
         assert "<input" not in overview[index] and "<form" not in overview[index]
-    for row in re.findall(r'<tr class="budget-group-row">(.*?)</tr>', text, re.S):
+    for row in re.findall(r'<tr class="budget-group-row"[^>]*>(.*?)</tr>', text, re.S):
         assert "Summary</small>" in row
         assert "<input" not in row and "<form" not in row
         assert 'data-budget-group="' in row
@@ -222,7 +222,7 @@ def test_calculated_rows_and_group_totals_are_read_only_while_child_assignments_
     for form in category_assignment_forms(text):
         assert 'class="budget-assignment-edit" aria-hidden="true"' in form["body"]
         assert 'type="text" name="assigned"' in form["body"]
-    for row in re.findall(r'<tr class="budget-category-row[^"]*">(.*?)</tr>', text, re.S):
+    for row in re.findall(r'<tr class="budget-category-row[^"]*"[^>]*>(.*?)</tr>', text, re.S):
         cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
         for index in range(1, len(cells), 4):
             for readonly_index in (index, index + 2, index + 3):
@@ -257,7 +257,7 @@ def test_scalar_overview_uses_core_summary_values_and_selected_currency(
     monkeypatch.setattr(store, "workspace", projected_workspace)
     text = client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text
     for row_class, expected in (("budget-assigned-row", assigned), ("budget-ready-row", ready)):
-        row = re.search(rf'<tr class="budget-overview-row {row_class}">(.*?)</tr>', text, re.S)[1]
+        row = re.search(rf'<tr class="budget-overview-row {row_class}"[^>]*>(.*?)</tr>', text, re.S)[1]
         cells = re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S)
         assert len(cells) == 3
         assert [displayed_amount(markup) for _, markup in cells] == [
@@ -287,7 +287,7 @@ def test_unavailable_remote_ready_to_assign_is_not_recomputed_from_other_balance
     response = client.get("/budgets/demo/budget/2026-10/usd")
     assert response.status_code == 200
     row = re.search(
-        r'<tr class="budget-overview-row budget-ready-row">(.*?)</tr>', response.text, re.S,
+        r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', response.text, re.S,
     )[1]
     cells = re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S)
     assert len(cells) == 3
@@ -472,7 +472,7 @@ def test_historical_cells_are_disabled_and_navigation_stays_within_core_bounds(c
     text = client.get(f"/budgets/demo/budget/{earlier}/usd").text
     forms = assignment_forms(text)
     assert forms and all(form["disabled"] == (form["month"] < start) for form in forms)
-    assert "Your budget begins" in text
+    assert "budget-start-note" not in text
     for boundary, absent in (("1900-01", "Previous month"), ("2200-12", "Next month")):
         response = client.get(f"/budgets/demo/budget/{boundary}/usd")
         assert response.status_code == 200
@@ -499,7 +499,7 @@ def test_budget_labels_are_escaped_and_uncategorized_activity_is_period_specific
     text = client.get("/budgets/home/budget/2026-10/usd").text
     assert category_name not in text and "&lt;script&gt;" in text
     assert "&lt;Living&gt;" in text
-    row = re.search(r'<tr class="budget-category-row budget-uncategorized">(.*?)</tr>', text, re.S)[1]
+    row = re.search(r'<tr class="budget-category-row budget-uncategorized"[^>]*>(.*?)</tr>', text, re.S)[1]
     assert "-123.45" in row and "/2026-11/usd" in row
 
 
@@ -524,7 +524,7 @@ def test_next_month_editor_requires_new_flow_model_even_if_old_server_supports_f
     assert category_assignment_forms(text)
     assert text.count("A server update is needed for monthly funding totals and next-month funding edits.") == 1
     carried_in = re.search(
-        r'<tr class="budget-overview-row budget-carried-in-row">(.*?)</tr>', text, re.S,
+        r'<tr class="budget-overview-row budget-carried-in-row"[^>]*>(.*?)</tr>', text, re.S,
     )[1]
     assert [displayed_amount(markup) for markup in re.findall(r'<td[^>]*>(.*?)</td>', carried_in, re.S)] == [
         "—",
@@ -555,7 +555,7 @@ def test_conservative_spending_note_only_appears_for_valid_lower_capacity(
 
     monkeypatch.setattr(store, "workspace", projected_workspace)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
-    row = re.search(r'<tr class="budget-overview-row budget-ready-row">(.*?)</tr>', text, re.S)[1]
+    row = re.search(r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', text, re.S)[1]
     assert [displayed_amount(markup) for markup in re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)] == [
         "100.00",
     ] * 3
