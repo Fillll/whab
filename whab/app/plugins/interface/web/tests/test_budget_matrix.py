@@ -195,14 +195,14 @@ def test_historical_income_remains_visible_while_overview_planning_is_unavailabl
     text = client.get("/budgets/home/budget/2026-09/usd").text
     overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
     cells = [re.findall(r'<td[^>]*>(.*?)</td>', row, re.S) for row in overview]
-    assert cells[0][0].strip() == "123.45"
+    assert displayed_amount(cells[0][0]) == "123.45"
     assert cells[1][0].strip() == "—"
     assert displayed_amount(cells[2][0]) == "—"
     assert cells[3][0].strip() == cells[4][0].strip() == "—"
-    assert cells[3][1].strip() == "10.00"
+    assert displayed_amount(cells[3][1]) == "10.00"
     current = client.get("/api/workspace?workspace=personal&month=2026-10").json()
     assert displayed_amount(cells[1][1]) == money_number(current["summary"]["carriedIn"])
-    assert cells[4][1].strip() == money_number(current["summary"]["readyToAssign"])
+    assert displayed_amount(cells[4][1]) == money_number(current["summary"]["readyToAssign"])
     historical = re.search(r'aria-label="September 2026 summary">(.*?)</section>', text, re.S)[1]
     assert "budget-ready" not in historical
 

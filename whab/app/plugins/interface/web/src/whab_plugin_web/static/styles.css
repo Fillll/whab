@@ -3100,39 +3100,56 @@ strong {
   color: var(--muted);
   font-size: 12px;
 }
-.budget-carry-in-details {
+.budget-summary-details {
   margin: 4px 0;
   color: var(--muted);
   font-size: 10px;
   font-weight: 400;
   white-space: normal;
 }
-.budget-carry-in-details summary {
+.budget-summary-details summary {
   cursor: pointer;
 }
-.budget-carry-in-details dl {
+.budget-summary-details summary:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 3px;
+}
+.budget-summary-details dl {
   margin: 9px 0 4px;
 }
-.budget-carry-in-details dl div {
+.budget-summary-details dl div {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   margin-top: 5px;
 }
-.budget-carry-in-details dt {
+.budget-summary-details dt {
   text-align: left;
 }
-.budget-carry-in-details dd {
+.budget-summary-details dd {
   margin: 0;
   color: var(--ink);
+  white-space: nowrap;
 }
-.budget-carry-in-details dd.negative {
+.budget-summary-details dd.negative {
   color: var(--danger);
 }
-.budget-carry-in-details p {
+.budget-summary-details p {
   margin: 8px 0 0;
   text-align: left;
   line-height: 1.4;
+}
+.budget-summary-details .budget-summary-total {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+  font-weight: 550;
+}
+.budget-equation-operator {
+  display: inline-block;
+  min-width: 10px;
+  color: var(--muted);
+  text-align: center;
 }
 .budget-next-month-editor {
   width: 132px;

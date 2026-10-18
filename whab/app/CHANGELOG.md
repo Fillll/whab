@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.9.1 — 2026-10-18
+
+PR: [#48](https://github.com/Fillll/whab/pull/48)
+
+- Require web 1.12 in the supported bundle for expandable explanations of every read-only monthly budget total. Preserve core financial calculations.
+
 ## 2.9.0 — 2026-10-18
 
 PR: [#47](https://github.com/Fillll/whab/pull/47)
