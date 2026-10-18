@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.8.0 — 2026-10-17
+
+PR: [#43](https://github.com/Fillll/whab/pull/43)
+
+- Expose the previous month's incoming rollover mode in each currency's budget projection, including when the source month is outside the displayed window. Keep category balances and cash calculations unchanged.
+- Require web 1.8 in bundled installations for the visible incoming category carryover column.
+
 ## 2.7.0 — 2026-10-17
 
 PR: [#41](https://github.com/Fillll/whab/pull/41)
