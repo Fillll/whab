@@ -228,8 +228,9 @@ def ensure_funding_capacity_preserved(
             months.update((source, shift_month(source, 1)))
         for target in ledger.get("futureFunding", {}):
             months.update((shift_month(target, -1), target))
+    affected_start = min(source_month, as_of_month)
     for month in sorted(months):
-        if not source_month <= month <= "2200-12":
+        if not affected_start <= month <= "2200-12":
             continue
         before = calculate_workspace(state, month, as_of_month=as_of_month)[
             "summariesByCurrency"

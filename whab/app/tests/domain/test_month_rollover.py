@@ -357,6 +357,28 @@ def test_future_funding_instruction_preserves_its_source_month_after_known_spend
     assert state == before
 
 
+@pytest.mark.parametrize("change", ["assignment", "funding"])
+def test_future_commitment_preserves_intervening_months_before_its_source(change):
+    state = protected_state()
+    state["budgetStartMonth"] = "2026-09"
+    state["budget"] = {}
+    state["rolloverModes"] = {}
+    state["transactions"] = {
+        "expense": transaction("expense", "2026-10", 10000, None),
+        "income": transaction("income", "2026-11", -10000, None),
+    }
+    assert funding_capacity(state, "2026-09", "USD") == 10000
+    assert funding_capacity(state, "2026-10", "USD") == 0
+    assert funding_capacity(state, "2026-11", "USD") == 10000
+    before = deepcopy(state)
+    with pytest.raises(StoreError, match="2026-10"):
+        if change == "assignment":
+            commands.assign(state, "rent", "2026-11", 10000, as_of_month="2026-09")
+        else:
+            commands.assign_next_month(state, "2026-11", "USD", 10000, as_of_month="2026-09")
+    assert state == before
+
+
 def test_final_supported_month_category_assignment_does_not_project_beyond_public_range():
     state = protected_state()
     state["budget"] = {}
