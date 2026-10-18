@@ -2,6 +2,7 @@
 
 import sqlite3
 from collections.abc import Mapping
+from itertools import combinations
 
 from whab.plugins import StoreError, receipt_media_type
 
@@ -10,6 +11,7 @@ from .store import Store
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
 _FORMAT_VERSION = 1
+_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history")
 _ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000}
 
 
@@ -29,7 +31,9 @@ def export_files(store, workspace):
         images = [(transaction_id, store.get_receipt(workspace, transaction_id)) for transaction_id in store.receipt_ids(workspace)]
     clean = Store(":memory:", month=snapshot["budgetStartMonth"])
     try:
-        clean.restore_budget("personal", snapshot)
+        # Store.export_budget already validated every record and reference. Use
+        # the same private population path as public restore in this fresh DB.
+        clean._mutate("personal", lambda state: clean._restore_validated_snapshot(state, snapshot))
         for transaction_id, image in images:
             receipt_media_type(image)
             clean.db.execute("INSERT INTO transaction_receipts(workspace,transaction_id,image) VALUES('personal',?,?)", (transaction_id, image))
@@ -103,7 +107,7 @@ def read_files(files, *, with_receipts=False):
         # Each planning table is additive. Preserve the exact prior schemas for
         # every combination without executing any stored SQL or migrations.
         compatible_schemas = [
-            [row for row in schema if row[2] not in omitted]
+            [row for row in schema if row[2] not in omitted and row[1] not in omitted_indexes]
             for schema in (expected_schema, legacy_schema)
             for schema in (schema, [
                 (*row[:3], row[3].replace(
@@ -113,6 +117,10 @@ def read_files(files, *, with_receipts=False):
             ])
             for omitted in ((), ("future_funding",), ("rollover_modes",), ("future_funding", "rollover_modes"))
             for omitted in (omitted, (*omitted, "transaction_receipts"))
+            # These exact indexes are optional optimizations. Every present
+            # object, including its index SQL, must still match the allowlist.
+            for count in range(len(_ADDITIVE_INDEXES) + 1)
+            for omitted_indexes in combinations(_ADDITIVE_INDEXES, count)
         ]
         reader.db.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
         reader.db.execute("PRAGMA trusted_schema=OFF")

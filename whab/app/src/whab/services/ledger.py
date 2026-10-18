@@ -5,6 +5,7 @@ process-specific capabilities: a restarted server rejects an old revision rather
 than risking duplicate writes after losing its in-memory idempotency receipts.
 """
 
+from calendar import monthrange
 from collections import OrderedDict
 from collections.abc import Callable
 from copy import deepcopy
@@ -13,7 +14,7 @@ from json import dumps
 from threading import RLock
 from uuid import uuid4
 
-from whab.domain.accounts import bank_website_entry, normalize_account
+from whab.domain.accounts import account_summary, bank_website_entry, normalize_account
 from whab.domain.categories import category_tree
 from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
@@ -256,6 +257,37 @@ class LedgerService:
     def workspace(self, workspace, month=None):
         return self.query("workspace", workspace, month)["data"]
 
+    def account_overview(self, workspace, month, currency):
+        """Read account metadata without envelope histories when storage supports it."""
+        self._workspace(workspace)
+        _month(month)
+        currency = currency_code(currency)
+        with self._lock:
+            read = getattr(self._store, "account_overview", None)
+            data = _public(read(workspace, month, currency) if callable(read)
+                           else self._store.workspace(workspace, month))
+            accounts = data["accounts"]
+            categories = data["categories"]
+            currencies = sorted({"USD", currency, *(
+                row.get("currency", "USD") for row in accounts + categories
+            )})
+            accounts = [row for row in accounts if row.get("currency", "USD") == currency]
+            categories = [row for row in categories if row.get("currency", "USD") == currency]
+            selected = {row["id"] for row in accounts}
+            to_review = data["toReview"] if callable(read) else sum(
+                row["accountId"] in selected and not row["pending"] and not row["reviewed"]
+                for row in data["transactions"]
+            )
+            if type(to_review) is not int or to_review < 0:
+                raise StoreError("Storage returned an invalid account review count.")
+            return {
+                "currency": currency, "currencyMinorUnits": currency_minor_units(currency),
+                "currencies": currencies, "accounts": accounts, "categories": categories,
+                "categoryGroups": category_tree(categories), "transactions": [], "budget": [],
+                "periods": [], "summary": {"spent": 0}, "accountSummary": account_summary(accounts),
+                "toReview": to_review,
+            }
+
     def transaction_register(
         self, workspace: str, month: str | None, currency: str, account_id: str | None = None,
         *, account_ids: list[str] | tuple[str, ...] | None = None,
@@ -328,6 +360,142 @@ class LedgerService:
                 "categoryGroups": category_tree(categories), "transactions": transactions,
             }
 
+    def transaction_page(
+        self, workspace, month, currency, account_id=None, *, account_ids=None,
+        start_date=None, end_date=None, search="", review="all", page=1, page_size=100,
+    ) -> dict:
+        """Read one public register page, preserving legacy storage compatibility."""
+        self._workspace(workspace)
+        if month is not None:
+            _month(month)
+        currency = currency_code(currency)
+        if account_id is not None:
+            _identifier(account_id)
+        if account_ids is not None:
+            if type(account_ids) not in (list, tuple) or len(account_ids) > 500:
+                raise StoreError("Invalid account selection.")
+            for identifier in account_ids:
+                _identifier(identifier)
+            account_ids = tuple(dict.fromkeys(account_ids))
+        for value in (start_date, end_date):
+            if value is not None:
+                validate_date(value)
+        if start_date is not None and end_date is not None and start_date > end_date:
+            raise StoreError("Start date must not be after end date.")
+        if type(search) is not str or len(search) > 2000:
+            raise StoreError("Transaction search must be text of at most 2000 characters.")
+        if type(review) is not str or review not in {"all", "needs-review", "reviewed"}:
+            raise StoreError("Invalid transaction review filter.")
+        if type(page) is not int or page < 1:
+            raise StoreError("Transaction page must be a positive integer.")
+        if type(page_size) is not int or not 1 <= page_size <= 1000:
+            raise StoreError("Transaction page size must be an integer between 1 and 1000.")
+        query = search.strip().casefold()
+
+        def matches(row):
+            return (
+                (not query or query in f"{row['merchant']} {row['note']}".casefold())
+                and (review != "needs-review" or not row["reviewed"])
+                and (review != "reviewed" or row["reviewed"])
+            )
+
+        def metadata(total, count, to_review):
+            pages = max(1, (count + page_size - 1) // page_size)
+            current = min(page, pages)
+            offset = (current - 1) * page_size
+            return {
+                "total": total, "count": count, "page": current, "pages": pages,
+                "start": offset + 1 if count else 0,
+                "end": min(offset + page_size, count), "toReview": to_review,
+            }
+
+        read = getattr(self._store, "transaction_register_page", None)
+        if not callable(read):
+            data = self.transaction_register(
+                workspace, month, currency, account_id, account_ids=account_ids,
+                start_date=start_date, end_date=end_date,
+            )
+            scoped = data["transactions"]
+            rows = sorted((row for row in scoped if matches(row)),
+                          key=lambda row: (row["date"], row["id"]), reverse=True)
+            to_review = sum(not row["reviewed"] and not row["pending"] for row in scoped)
+            window = metadata(len(scoped), len(rows), to_review)
+            offset = window["start"] - 1 if rows else 0
+            return {
+                **data, "transactions": rows[offset:offset + page_size],
+                "transactionPage": window, "toReview": to_review,
+            }
+
+        with self._lock:
+            selected = account_ids
+            if selected is None and account_id is not None:
+                known = self._store.accounts(workspace)
+                selected = (account_id,) if any(
+                    row["id"] == account_id and row.get("currency", "USD") == currency for row in known
+                ) else None
+            if month is not None:
+                year, number = map(int, month.split("-"))
+                first, last = month + "-01", f"{month}-{monthrange(year, number)[1]:02d}"
+                start_date = max(first, start_date) if start_date is not None else first
+                end_date = min(last, end_date) if end_date is not None else last
+            data = _public(read(
+                workspace, start_date, end_date, currency, selected, search, review, page, page_size,
+            ))
+            try:
+                accounts = data["accounts"]
+                categories = data["categories"]
+                currencies = sorted({"USD", currency, *(
+                    row.get("currency", "USD") for row in accounts + categories
+                )})
+                accounts = [row for row in accounts if row.get("currency", "USD") == currency]
+                categories = [row for row in categories if row.get("currency", "USD") == currency]
+                available = {row["id"] for row in accounts}
+                counts = data["transactionPage"]
+                if not all(type(counts[key]) is int and counts[key] >= 0 for key in (
+                    "total", "count", "toReview", "page", "pages", "start", "end",
+                )) or counts["count"] > counts["total"] or counts["toReview"] > counts["total"]:
+                    raise ValueError
+                if not query and review == "all" and counts["count"] != counts["total"]:
+                    raise ValueError
+                empty_scope = (
+                    not available or selected is not None and not available.intersection(selected)
+                    or start_date is not None and end_date is not None and start_date > end_date
+                )
+                if empty_scope and counts["total"]:
+                    raise ValueError
+                window = metadata(counts["total"], counts["count"], counts["toReview"])
+                if any(counts[key] != value for key, value in window.items()):
+                    raise ValueError
+                rows = data["transactions"]
+                expected = window["end"] - window["start"] + 1 if counts["count"] else 0
+                if type(rows) is not list or len(rows) != expected:
+                    raise ValueError
+                for row in rows:
+                    _identifier(row["id"])
+                    validate_date(row["date"])
+                    if (
+                        row["accountId"] not in available
+                        or selected is not None and row["accountId"] not in selected
+                        or row.get("currency", currency) != currency or row.get("deleted")
+                        or start_date is not None and row["date"] < start_date
+                        or end_date is not None and row["date"] > end_date
+                        or type(row["merchant"]) is not str or type(row["note"]) is not str
+                        or type(row["pending"]) is not bool or type(row["reviewed"]) is not bool
+                        or not matches(row)
+                    ):
+                        raise ValueError
+                if len({row["id"] for row in rows}) != len(rows):
+                    raise ValueError
+                rows = sorted(rows, key=lambda row: (row["date"], row["id"]), reverse=True)
+            except (KeyError, TypeError, ValueError):
+                raise StoreError("Storage returned an invalid transaction page.") from None
+            return {
+                "currency": currency, "currencyMinorUnits": currency_minor_units(currency),
+                "currencies": currencies, "accounts": accounts, "categories": categories,
+                "categoryGroups": category_tree(categories), "transactions": rows,
+                "transactionPage": window, "toReview": window["toReview"],
+            }
+
     def workspace_periods(self, workspace: str, month: str, count: int) -> list[dict]:
         """Read consecutive core projections under the budget's shared command lock.
 
@@ -342,6 +510,9 @@ class LedgerService:
         remaining = (2200 - year) * 12 + (12 - number) + 1
         count = min(count, remaining)
         with self._lock:
+            read = getattr(self._store, "workspace_periods", None)
+            if callable(read):
+                return _public(read(workspace, month, count))
             return [
                 _public(self._store.workspace(workspace, shift_month(month, offset)))
                 for offset in range(count)
@@ -362,21 +533,29 @@ class LedgerService:
 
     def account_settings(self, workspace, account_id):
         """Return one public account and a history-aware currency edit capability."""
+        self._workspace(workspace)
         _identifier(account_id)
-        if callable(getattr(self._store, "export_budget", None)):
-            snapshot = self.query("portable", workspace)["data"]
-        else:
-            # Basic metadata remains available on a backend without portable
-            # history. Missing proof of emptiness never enables currency edits.
-            snapshot = {"accounts": self.accounts(workspace), "transactions": None}
-        account = next((row for row in snapshot["accounts"] if row["id"] == account_id), None)
-        if account is None:
-            raise StoreError("Account not found.")
-        account = {key: value for key, value in account.items()
-                   if key in ACCOUNT_FIELDS | {"bankWebsite", "nameOverridden"}}
-        return {"account": account, "currencyEditable": snapshot["transactions"] is not None and not any(
-            row["accountId"] == account_id for row in snapshot["transactions"]
-        )}
+        with self._lock:
+            read = getattr(self._store, "account_settings", None)
+            if callable(read):
+                result = _public(read(workspace, account_id))
+                account = result["account"]
+                editable = result.get("currencyEditable") is True
+            else:
+                if callable(getattr(self._store, "export_budget", None)):
+                    snapshot = self.query("portable", workspace)["data"]
+                else:
+                    # Missing proof of empty history never enables currency edits.
+                    snapshot = {"accounts": self.accounts(workspace), "transactions": None}
+                account = next((row for row in snapshot["accounts"] if row["id"] == account_id), None)
+                editable = snapshot["transactions"] is not None and not any(
+                    row["accountId"] == account_id for row in snapshot["transactions"]
+                )
+            if account is None or account.get("id") != account_id:
+                raise StoreError("Account not found.")
+            account = {key: value for key, value in account.items()
+                       if key in ACCOUNT_FIELDS | {"bankWebsite", "nameOverridden"}}
+            return {"account": account, "currencyEditable": editable}
 
     def add_category(self, workspace, category):
         return self._local_command("add_category", workspace, category)

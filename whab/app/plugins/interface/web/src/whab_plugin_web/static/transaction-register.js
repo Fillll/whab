@@ -67,6 +67,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   const periodPopup = root.querySelector('[data-period-popup]');
   let searchTimer = null;
   let refreshTimer = null;
+  let refreshNeeded = false;
   if (paged) updateContext({transactionSearch: search.value, transactionPage: Number(root.dataset.transactionPage), transactionRequestedPage: root.dataset.transactionRequestedPage});
   const editors = new Map();
   const timers = new Map();
@@ -132,10 +133,12 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     void go(pageUrl(pendingFilters), focus);
   }
   function refreshAfterMutation() {
+    refreshNeeded = true;
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
       if (!disposed && !filterNavigationPending && !pendingDestination() && !timers.size && !searchTimer &&
           search.value === displayedSearch && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
+          document.activeElement?.matches?.('[data-transaction-field="note"]') !== true &&
           !receiptDialog.open && !receiptBusy && !bulkBusy &&
           ![...editors.values()].some(writer => writer.dirty)) void go(new URL(location.href), false, true);
     }, 0);
@@ -163,6 +166,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     reviewFilter.setAttribute('aria-label', `Review status: ${labels[next]}. Click for ${nextLabels[next]}.`);
     updateContext({reviewFilter: next});
   }
+  listen(document, 'click', () => { if (refreshNeeded) refreshAfterMutation(); });
   const accountPicker = initAccountPicker(root, accounts => {
     applyFilters({accounts}, '#account-filter-toggle');
   });
@@ -254,7 +258,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
         onMutation();
         if (!paged) filter();
-        else if (!bulkBusy && (search.value && 'note' in patch && document.activeElement !== memo || reviewFilter.dataset.reviewState !== 'all' && 'reviewed' in patch)) {
+        else if (!bulkBusy && (refreshNeeded || search.value && 'note' in patch && document.activeElement !== memo || 'reviewed' in patch)) {
           refreshAfterMutation();
         }
       },
@@ -291,7 +295,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     });
     listen(memo, 'change', saveMemo);
     if (paged) listen(memo, 'blur', () => {
-      if (search.value && memo.value === committed.note) refreshAfterMutation();
+      if (refreshNeeded || search.value && memo.value === committed.note) refreshAfterMutation();
     });
     listen(memo, 'keydown', event => {
       if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void saveMemo(); memo.blur(); }
@@ -330,7 +334,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       bulkBusy = false;
       bulkPromise = null;
       selection();
-      if (paged && (search.value || reviewFilter.dataset.reviewState !== 'all')) refreshAfterMutation();
+      if (paged) refreshAfterMutation();
     });
     return bulkPromise;
   });
@@ -396,7 +400,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   listen(receiptDialog, 'close', () => {
     receiptRequest += 1;
     clearImage();
-    if (paged && (search.value || reviewFilter.dataset.reviewState !== 'all')) refreshAfterMutation();
+    if (paged && (refreshNeeded || search.value || reviewFilter.dataset.reviewState !== 'all')) refreshAfterMutation();
   });
   async function saveReceipt(method, file) {
     if (receiptBusy || !receiptRow) return;

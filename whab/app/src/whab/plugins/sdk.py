@@ -376,6 +376,9 @@ class UserInterface:
     core projections on budget pages. The default retains the single-month shape.
     lightweight_transactions opts into register metadata/rows without envelope
     summaries on transaction pages; the default retains full workspace inputs.
+    lightweight_accounts requests account metadata/totals without envelopes.
+    A positive transaction_page_size requests a bounded register projection;
+    zero keeps the complete register input for existing visual plugins.
     """
 
     templates: Path
@@ -383,6 +386,8 @@ class UserInterface:
     build_context: UIContextBuilder
     budget_months: int = 1
     lightweight_transactions: bool = False
+    lightweight_accounts: bool = False
+    transaction_page_size: int = 0
 
     def __post_init__(self) -> None:
         if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
@@ -393,6 +398,10 @@ class UserInterface:
             raise ValueError("User interface budget months must be an integer between 1 and 12.")
         if type(self.lightweight_transactions) is not bool:
             raise ValueError("User interface lightweight transactions must be a boolean.")
+        if type(self.lightweight_accounts) is not bool:
+            raise ValueError("User interface lightweight accounts must be a boolean.")
+        if type(self.transaction_page_size) is not int or not 0 <= self.transaction_page_size <= 1000:
+            raise ValueError("User interface transaction page size must be an integer between 0 and 1000.")
 
 
 class BankStore(Protocol):
@@ -673,6 +682,53 @@ class TransactionRegisterFiltered(Protocol):
         self, workspace: str, start_date: str | None, end_date: str | None,
         currency: str, account_ids: tuple[str, ...] | None,
     ) -> dict: ...
+
+
+class TransactionRegisterPage(Protocol):
+    """Optional atomic bounded register query; existing register reads stay valid.
+
+    Scope dates, currency and accounts before counting or paging. Search is a
+    literal substring of casefolded merchant + space + note, with surrounding
+    query whitespace removed. Review is all, needs-review or reviewed. Preserve
+    date/id descending order and public row fields. Return accounts/categories,
+    transactions and transactionPage metadata (total/count/page/pages/start/end/
+    toReview). total and toReview describe the account/date selection before
+    search/review; toReview excludes pending rows. Clamp positive pages to the
+    available range. Empty account_ids selects nothing; None selects currency.
+    """
+
+    def transaction_register_page(
+        self, workspace: str, start_date: str | None, end_date: str | None,
+        currency: str, account_ids: tuple[str, ...] | None, search: str,
+        review: str, page: int, page_size: int,
+    ) -> dict: ...
+
+
+class AccountOverview(Protocol):
+    """Optional account/category metadata and selected month/currency review count.
+
+    Return accounts, categories and toReview atomically without envelope history.
+    toReview counts nondeleted, nonpending, unreviewed rows. The service owns
+    currency filtering and core account totals. Existing storage remains valid.
+    """
+
+    def account_overview(self, workspace: str, month: str, currency: str) -> dict: ...
+
+
+class AccountSettings(Protocol):
+    """Optional atomic public account plus currencyEditable history proof.
+
+    Every transaction, including deleted and historical rows, locks currency.
+    Never include provider state or credentials. Legacy export fallback remains.
+    """
+
+    def account_settings(self, workspace: str, account_id: str) -> dict: ...
+
+
+class WorkspacePeriods(Protocol):
+    """Optional batch of ordinary workspace projections from one ledger snapshot."""
+
+    def workspace_periods(self, workspace: str, month: str, count: int) -> list[dict]: ...
 
 
 class MonthlyRollover(Protocol):

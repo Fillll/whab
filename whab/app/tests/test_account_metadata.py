@@ -97,6 +97,7 @@ def test_manual_website_hook_gets_only_hostname_and_public_attribution():
 
 
 def test_settings_on_backend_without_portable_history_keeps_currency_locked(store, monkeypatch):
+    monkeypatch.setattr(store, "account_settings", None)
     key = store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 0})
     monkeypatch.setattr(store, "export_budget", None)
     result = LedgerService(store).account_settings("personal", key)

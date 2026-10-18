@@ -20,6 +20,9 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
         CREATE TABLE IF NOT EXISTS items(id TEXT PRIMARY KEY,token TEXT,institution_name TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'connected',last_synced TEXT,error TEXT,cursor TEXT,baseline_ready INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS workspace_imports(workspace TEXT PRIMARY KEY,plugin_id TEXT NOT NULL,fingerprint TEXT NOT NULL,account_count INTEGER NOT NULL,category_count INTEGER NOT NULL,transaction_count INTEGER NOT NULL,assignment_count INTEGER NOT NULL);
         CREATE INDEX IF NOT EXISTS tx_month ON transactions(workspace,date);
+        CREATE INDEX IF NOT EXISTS tx_register ON transactions(workspace,date DESC,id DESC) WHERE deleted=0;
+        CREATE INDEX IF NOT EXISTS tx_register_account ON transactions(workspace,account_id,date DESC,id DESC) WHERE deleted=0;
+        CREATE INDEX IF NOT EXISTS tx_account_history ON transactions(workspace,account_id);
     """)
     migrations = {
         "accounts": {

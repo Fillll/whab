@@ -4,6 +4,15 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.14.0 — 2026-10-18
+
+PR: [#58](https://github.com/Fillll/whab/pull/58)
+
+- Add optional bounded register, account metadata/settings and batch workspace reads, with compatible legacy storage fallbacks and UI opt-ins. Preserve shared revision locking, currency boundaries, full-history search/counts and deleted-history currency protection.
+- Validate category metadata once per projection and build public transactions only for the requested month, retaining identical budget calculations and error contracts.
+- Reduce strict calendar-date validation and reuse credential-free archives during synchronous portable checkpoints, preserving recovery journals and credential separation.
+- Require SQLite 1.6.0 and web 1.19.0 in the supported bundle.
+
 ## 2.13.1 — 2026-10-18
 
 PR: [#57](https://github.com/Fillll/whab/pull/57)

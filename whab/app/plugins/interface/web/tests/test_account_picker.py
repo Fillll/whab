@@ -67,9 +67,10 @@ def test_picker_uses_scoped_bank_logos_without_fetching_while_rendering(imported
         assert len(options) == 4
         known = [option for option in options if 'data-bank-logo' in option]
         assert len(known) == 2
-        assert all(f'src="/budgets/home{LOGO_PATH}"' in option for option in known)
+        assert all(f'data-logo-src="/budgets/home{LOGO_PATH}"' in option for option in known)
+        assert all(re.search(r"\ssrc=", option) is None for option in known)
         toggle = re.search(r'<button id="account-filter-toggle".*?</button>', text, re.S)[0]
-        assert f'src="/budgets/home{LOGO_PATH}"' in toggle
+        assert f'data-logo-src="/budgets/home{LOGO_PATH}"' in toggle
         assert 'alt=""' in toggle and 'decoding="async" hidden' in toggle
         assert 'data-account-picker-label>Fictional checking</span>' in toggle
         unknown = next(option for option in options if 'data-value="synthetic-unknown"' in option)

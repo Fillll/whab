@@ -36,6 +36,7 @@ function element(properties = {}) {
 
 function harness(selected = ['checking']) {
   const chosen = [];
+  const logoBindings = [];
   const native = element({options: ['all', 'checking', 'savings', 'travel', 'cash'].map(value => ({
     value, selected: value === 'all' ? !selected.length : selected.includes(value),
   }))});
@@ -73,12 +74,12 @@ function harness(selected = ['checking']) {
   })[selector]});
   const document = element();
   let now = 1_000;
-  const context = {document, Date: {now: () => now}, bindLogos() {}};
+  const context = {document, Date: {now: () => now}, bindLogos(scope) {logoBindings.push(scope);}};
   vm.runInNewContext(source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function '), context);
   const control = context.initAccountPicker(root, selected => chosen.push([...selected]));
   const active = () => options.findIndex(option => option.id === search.getAttribute('aria-activedescendant'));
   const key = (target, key, detail) => picker.emit('keydown', target.emit('keydown', {key, ...detail}));
-  return {native, value, button, options, list, popup, apply, picker, document, context, control, chosen, active,
+  return {native, value, button, options, list, popup, apply, picker, document, context, control, chosen, active, logoBindings,
     search, selectAll, selectNone, count, empty,
     selected: () => native.options.filter(option => option.selected && option.value !== 'all').map(option => option.value),
     advance: milliseconds => {now += milliseconds;},
@@ -97,6 +98,23 @@ test('enhancement preserves the selected account and native fallback when unavai
   assert.deepEqual(state.selected(), ['checking']);
   assert.deepEqual(state.chosen, []);
   assert.doesNotThrow(() => state.context.initAccountPicker({querySelector: () => null}, () => {}));
+});
+
+test('opening, selection changes and canceled navigation restoration bind every cloned header mark', () => {
+  const state = harness();
+  state.button.emit('click');
+  const original = state.value.childNodes[0];
+  assert.equal(state.logoBindings.length, 1);
+  assert.equal(state.logoBindings[0], state.value);
+  state.choose(2);
+  assert.notEqual(state.value.childNodes[0], original);
+  assert.equal(state.logoBindings.length, 2);
+  const draft = state.value.childNodes[0];
+  state.control.restore();
+  assert.notEqual(state.value.childNodes[0], draft);
+  assert.equal(state.logoBindings.length, 3);
+  assert.equal(state.logoBindings.every(scope => scope === state.value), true);
+  state.control.dispose();
 });
 
 test('pointer selection builds a multi-account draft and Apply commits once', () => {

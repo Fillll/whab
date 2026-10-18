@@ -139,6 +139,8 @@ def test_funding_equation_preserves_signs_zero_and_currency_minor_units(
         return data
 
     monkeypatch.setattr(store, "workspace", projected_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text
     attributes, cell = overview_cells(text, "Available to assign")[0]
     body = disclosure(cell, "Available to assign", "2026-10")
@@ -166,6 +168,8 @@ def test_older_server_keeps_explainable_income_and_assignments_but_not_new_fundi
         return data
 
     monkeypatch.setattr(store, "workspace", older_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     for label in ("Income", "Assigned this month"):
         for index, month in enumerate(("2026-10", "2026-11", "2026-12")):
@@ -187,6 +191,8 @@ def test_next_month_amount_gets_an_explanation_when_the_server_cannot_edit_it(
         return data
 
     monkeypatch.setattr(store, "workspace", readonly_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/home/budget/2026-10/usd").text
     cell = overview_cells(text, "Assigned for next month")[0][1]
     assert "<input" not in cell and "<form" not in cell
@@ -228,6 +234,8 @@ def test_ready_breakdown_requires_exact_core_components_without_replacing_the_to
         return data
 
     monkeypatch.setattr(store, "workspace", malformed_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     response = client.get("/budgets/demo/budget/2026-10/usd")
     assert response.status_code == 200
     if field == "income":

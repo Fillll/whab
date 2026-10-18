@@ -16,5 +16,7 @@ plugin = Plugin(
         build_context=build_context,
         budget_months=3,
         lightweight_transactions=True,
+        lightweight_accounts=True,
+        transaction_page_size=100,
     ),
 )

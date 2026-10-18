@@ -117,11 +117,24 @@ def create_router(
                 raise HTTPException(400, str(error)) from error
             month = transaction_range.month
         transaction_all_dates = transaction_range is not None and transaction_range.start is None and transaction_range.end is None
-        if page == "transactions" and ui.lightweight_transactions:
+        if page == "transactions" and ui.transaction_page_size:
+            try:
+                requested_page = max(1, int(request.query_params.get("tx_page", "1")))
+            except ValueError:
+                requested_page = 1
+            data = service.transaction_page(
+                workspace, transaction_range.query_month, currency, account,
+                account_ids=selected_ids, start_date=transaction_range.start, end_date=transaction_range.end,
+                search=request.query_params.get("q", ""), review=review,
+                page=requested_page, page_size=ui.transaction_page_size,
+            )
+        elif page == "transactions" and ui.lightweight_transactions:
             data = service.transaction_register(
                 workspace, transaction_range.query_month, currency, account,
                 account_ids=selected_ids, start_date=transaction_range.start, end_date=transaction_range.end,
             )
+        elif page == "accounts" and ui.lightweight_accounts:
+            data = service.account_overview(workspace, month, currency)
         elif page == "budget" and ui.budget_months > 1:
             periods = [
                 select_currency(period, currency)
@@ -133,7 +146,7 @@ def create_router(
         selected_account = next((row for row in data["accounts"] if row["id"] == account), None)
         if account_slug is not None and selected_account is None:
             raise HTTPException(404, "Account address not found for this currency")
-        if page == "transactions" and not ui.lightweight_transactions:
+        if page == "transactions" and not (ui.lightweight_transactions or ui.transaction_page_size):
             account_ids = {row["id"] for row in data["accounts"]}
             rows = service.transactions(workspace, transaction_range.query_month)
             data = {**data, "transactions": [

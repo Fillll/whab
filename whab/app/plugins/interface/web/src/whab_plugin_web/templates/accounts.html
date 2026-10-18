@@ -26,7 +26,7 @@
   <div class="account-list">
     {% for account in group.accounts %}
       <div class="account-row">
-        <span class="bank-mark" aria-hidden="true"><span>{{ account.institution[:1] }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo src="{{ logos[account.id] }}" alt="" width="39" height="39" decoding="async" hidden>{% endif %}</span>
+        <span class="bank-mark" aria-hidden="true"><span>{{ account.institution[:1] }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo data-logo-src="{{ logos[account.id] }}" alt="" width="39" height="39" decoding="async" hidden>{% endif %}</span>
         <div class="account-description">
           <strong>{{ account.name }}</strong><span>{{ account.institution }}
             {% if account.mask %} · ••{{ account.mask }}

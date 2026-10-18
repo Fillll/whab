@@ -80,6 +80,31 @@ def test_register_fragment_preserves_account_date_currency_and_escaping(client):
     assert accounts["JPY"] in unescape(response.text)
 
 
+def test_fragment_navigation_badge_tracks_review_edits_and_selected_account_without_reload(client, store):
+    first = store.add_account("personal", {"name": "First", "type": "depository", "balance": 0})
+    second = store.add_account("personal", {"name": "Second", "type": "depository", "balance": 0})
+    transactions = [store.add_transaction("personal", {
+        "accountId": account, "date": "2026-10-05", "merchant": f"Purchase {index}",
+        "amount": 100, "categoryId": None,
+    }) for index, account in enumerate((first, first, second))]
+
+    def count_markup(account):
+        response = client.get(
+            f"/budgets/home/transactions/2026-10/usd?account={account}", headers=FRAGMENT,
+        )
+        assert response.status_code == 200 and "<!DOCTYPE" not in response.text
+        return re.search(r'<template data-transaction-navigation-count>(.*?)</template>', response.text, re.S)[1]
+
+    assert count_markup(first) == '<span class="nav-count">2</span>'
+    for index in range(2):
+        response = client.patch(f"/api/transactions/{transactions[index]}", json={
+            "workspace": "personal", "reviewed": True,
+        })
+        assert response.status_code == 200
+        assert count_markup(first) == ('<span class="nav-count">1</span>' if index == 0 else '')
+    assert count_markup(second) == '<span class="nav-count">1</span>'
+
+
 @pytest.mark.parametrize("header,status", [
     ({"Origin": "https://untrusted.invalid"}, 403),
     ({"Sec-Fetch-Site": "cross-site"}, 403),

@@ -75,6 +75,8 @@ def test_unsupported_rollover_projections_remain_read_only(client, store, monkey
         return data
 
     monkeypatch.setattr(store, "workspace", unsupported_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert not rollover_forms(text)
     assert text.count('class="budget-rollover-readonly"') == 3
@@ -99,6 +101,8 @@ def test_rollover_capability_is_period_specific_and_historical_and_final_months_
         return data
 
     monkeypatch.setattr(store, "workspace", mixed_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert [form["month"] for form in rollover_forms(text)] == ["2026-10", "2026-12"]
     start = workspace("demo", "2026-10")["budgetStartMonth"]
@@ -123,6 +127,8 @@ def test_older_rollover_projection_keeps_known_category_carry_in(client, store, 
         return data
 
     monkeypatch.setattr(store, "workspace", older_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert "Balance carried in" not in text
     assert not rollover_forms(text)

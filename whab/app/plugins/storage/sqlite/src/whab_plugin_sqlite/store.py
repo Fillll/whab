@@ -414,6 +414,16 @@ class Store:
             self._require_workspace(workspace)
             return self._read_accounts(workspace)
 
+    def account_overview(self, workspace: str, month: str, currency: str) -> dict:
+        from .account_reads import account_overview
+
+        return account_overview(self, workspace, month, currency)
+
+    def account_settings(self, workspace: str, account_id: str) -> dict:
+        from .account_reads import account_settings
+
+        return account_settings(self, workspace, account_id)
+
     def export_budget(self, workspace: str = "personal") -> dict:
         """Export one coherent ledger, excluding every provider connection field."""
         state = self.state(workspace)
@@ -457,40 +467,47 @@ class Store:
 
         def operation(state):
             restored = validate_portable_budget(data)
-            receipt = self._workspace_import_receipt(state, "portable-budget", "restore")
-            if receipt is not None:
-                raise StoreError("Portable budgets require an empty personal workspace.")
-            self.db.execute("DELETE FROM categories WHERE workspace=?", (workspace,))
-            state["accounts"] = {
-                record["id"]: {
-                    **record,
-                    "stale": record["stale"] or record["source"] not in {"manual", "demo"},
-                }
-                for record in restored["accounts"]
-            }
-            state["categories"] = {record["id"]: record for record in restored["categories"]}
-            state["transactions"] = {record["id"]: record for record in restored["transactions"]}
-            state["budget"] = {}
-            for assignment in restored["assignments"]:
-                state["budget"].setdefault(assignment["month"], {})[assignment["categoryId"]] = (
-                    assignment["assigned"]
-                )
-            state["futureFunding"] = {}
-            for funding in restored["futureFunding"]:
-                state["futureFunding"].setdefault(funding["month"], {})[funding["currency"]] = funding["assigned"]
-            state["rolloverModes"] = {}
-            for rollover in restored["rolloverModes"]:
-                state["rolloverModes"].setdefault(rollover["month"], {})[rollover["currency"]] = rollover["mode"]
-            state["budgetStartMonth"] = restored["budgetStartMonth"]
-            # Foreign keys are deferred until _write_state inserts the validated
-            # transactions. A failed restore rolls images and ledger back together.
-            for transaction_id, image in _receipts:
-                self.db.execute(
-                    "INSERT INTO transaction_receipts(workspace,transaction_id,image) VALUES(?,?,?)",
-                    (workspace, transaction_id, image),
-                )
+            self._restore_validated_snapshot(state, restored, _receipts)
 
         self._mutate(workspace, operation)
+
+    def _restore_validated_snapshot(self, state: dict, restored: dict, receipts=()) -> None:
+        """Populate a pristine ledger from an already validated portable snapshot.
+
+        Public restores validate before entering here. Fresh portable exports
+        reuse their validated export snapshot without validating history twice.
+        """
+        workspace = state["_id"]
+        receipt = self._workspace_import_receipt(state, "portable-budget", "restore")
+        if receipt is not None:
+            raise StoreError("Portable budgets require an empty personal workspace.")
+        self.db.execute("DELETE FROM categories WHERE workspace=?", (workspace,))
+        state["accounts"] = {
+            record["id"]: {
+                **record,
+                "stale": record["stale"] or record["source"] not in {"manual", "demo"},
+            }
+            for record in restored["accounts"]
+        }
+        state["categories"] = {record["id"]: record for record in restored["categories"]}
+        state["transactions"] = {record["id"]: record for record in restored["transactions"]}
+        state["budget"] = {}
+        for assignment in restored["assignments"]:
+            state["budget"].setdefault(assignment["month"], {})[assignment["categoryId"]] = assignment["assigned"]
+        state["futureFunding"] = {}
+        for funding in restored["futureFunding"]:
+            state["futureFunding"].setdefault(funding["month"], {})[funding["currency"]] = funding["assigned"]
+        state["rolloverModes"] = {}
+        for rollover in restored["rolloverModes"]:
+            state["rolloverModes"].setdefault(rollover["month"], {})[rollover["currency"]] = rollover["mode"]
+        state["budgetStartMonth"] = restored["budgetStartMonth"]
+        # Foreign keys are deferred until _write_state inserts the validated
+        # transactions. A failed restore rolls images and ledger back together.
+        for transaction_id, image in receipts:
+            self.db.execute(
+                "INSERT INTO transaction_receipts(workspace,transaction_id,image) VALUES(?,?,?)",
+                (workspace, transaction_id, image),
+            )
 
     def export_budget_files(self, workspace: str = "personal") -> dict[str, bytes]:
         """Return the SQLite-owned data payload for a plugin budget container."""
@@ -590,6 +607,17 @@ class Store:
                 ],
             }
 
+    def transaction_register_page(
+        self, workspace: str, start_date: str | None, end_date: str | None,
+        currency: str, account_ids: tuple[str, ...] | None, search: str,
+        review: str, page: int, page_size: int,
+    ) -> dict:
+        from .register import transaction_register_page
+
+        return transaction_register_page(
+            self, workspace, start_date, end_date, currency, account_ids, search, review, page, page_size,
+        )
+
     def receipt_ids(self, workspace: str) -> list[str]:
         from .receipts import ids
 
@@ -616,6 +644,11 @@ class Store:
     def workspace(self, workspace: str, month: str | None = None) -> dict:
         as_of_month = current_month()
         return calculate_workspace(self.state(workspace), month or as_of_month, as_of_month=as_of_month)
+
+    def workspace_periods(self, workspace: str, month: str, count: int) -> list[dict]:
+        from .projections import workspace_periods
+
+        return workspace_periods(self, workspace, month, count)
 
     def add_account(self, workspace: str, account: dict) -> str:
         account_id = str(uuid4())
@@ -657,10 +690,9 @@ class Store:
         reviewed: bool | None = None,
         note: Any = UNSET,
     ) -> None:
-        self._mutate(
-            workspace,
-            lambda state: commands.edit_transaction(state, transaction_id, category_id, reviewed, note),
-        )
+        from .transaction_edits import edit_transaction
+
+        edit_transaction(self, workspace, transaction_id, category_id, reviewed, note)
 
     def assign(self, workspace: str, category_id: str, month: str, assigned: int) -> None:
         self._mutate(

@@ -27,10 +27,10 @@ async function requireSavedEdits() {
 initBudgetSourceLinks();
 const accountNavigation = initAccountNavigation({
   flush: flushEdits,
-  onReplace({content}) {
+  onReplace() {
     currentRegister?.dispose();
     currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination(), cancelNavigation: () => accountNavigation.cancelPending()});
-    bindLogos(content);
+    bindLogos();
   },
   notify,
 });
