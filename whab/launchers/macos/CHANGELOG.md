@@ -11,6 +11,7 @@ PR: [#42](https://github.com/Fillll/whab/pull/42)
 - Show the running source revision and installed channel, provide explicit
   update-check feedback, and keep cached update targets and CI provenance
   accurate when switching channels or reusing the same installed revision.
+- Verify the complete bundle against the canonical demo budget address.
 
 ## 1.0.0 — 2026-10-16
 
