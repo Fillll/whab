@@ -29,14 +29,23 @@ def test_next_month_funding_survives_reopen_and_json_and_sqlite_roundtrips(tmp_p
             {"month": "2026-11", "currency": "USD", "assigned": 4000},
             {"month": "2026-12", "currency": "USD", "assigned": 1000},
         ]
-        assert original.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 5000
-        assert original.workspace("personal", "2026-11")["summary"]["readyToAssign"] == 9000
+        october = original.workspace("personal", "2026-10")["summariesByCurrency"]
+        november = original.workspace("personal", "2026-11")["summariesByCurrency"]
+        assert october["USD"]["readyToAssign"] == 6000
+        assert october["CAD"]["readyToAssign"] == 13000
+        assert november["USD"]["readyToAssign"] == 9000
+        assert (november["USD"]["carriedIn"], november["USD"]["carriedInUnassigned"],
+                november["USD"]["carriedInSetAside"]) == (10000, 6000, 4000)
+        assert (november["CAD"]["carriedIn"], november["CAD"]["carriedInUnassigned"],
+                november["CAD"]["carriedInSetAside"]) == (20000, 13000, 7000)
     finally:
         original.close()
     reopened = Store(path, month="2026-11")
     try:
         assert reopened.export_budget() == snapshot
         assert reopened.state("personal")["futureFunding"] == expected
+        assert reopened.workspace("personal", "2026-10")["summariesByCurrency"] == october
+        assert reopened.workspace("personal", "2026-11")["summariesByCurrency"] == november
     finally:
         reopened.close()
     for binary in (False, True):
@@ -48,6 +57,8 @@ def test_next_month_funding_survives_reopen_and_json_and_sqlite_roundtrips(tmp_p
                 target.restore_budget("personal", snapshot)
             assert target.export_budget() == snapshot
             assert target.state("personal")["futureFunding"] == expected
+            assert target.workspace("personal", "2026-10")["summariesByCurrency"] == october
+            assert target.workspace("personal", "2026-11")["summariesByCurrency"] == november
             # A retry recognizes the same records without rewriting the cache.
             changes = target.db.total_changes
             target.prepare_budget_files("personal", files)
@@ -56,15 +67,20 @@ def test_next_month_funding_survives_reopen_and_json_and_sqlite_roundtrips(tmp_p
             target.close()
 
 
-def test_funding_replaces_previous_floor_and_uses_category_assignments_without_double_counting(store):
+def test_explicit_funding_replaces_only_the_transfer_and_leaves_next_month_plans_independent(store):
     store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
     store.assign_next_month("personal", "2026-10", "USD", 4000)
     store.assign("personal", "rent", "2026-11", 2500)
     assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 6000
     store.assign_next_month("personal", "2026-10", "USD", 5000)
     assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 5000
-    with pytest.raises(StoreError, match="category assignments"):
-        store.assign_next_month("personal", "2026-10", "USD", 0)
+    store.assign_next_month("personal", "2026-10", "USD", 0)
+    assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 10000
+    november = store.workspace("personal", "2026-11")["summary"]
+    assert november["assigned"] == 2500
+    assert november["carriedIn"] == november["carriedInUnassigned"] == 10000
+    assert november["carriedInSetAside"] == 0
+    assert november["readyToAssign"] == 7500
     store.assign_next_month("personal", "2026-10", "USD", 2500)
     assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 7500
     store.assign("personal", "rent", "2026-11", 0)

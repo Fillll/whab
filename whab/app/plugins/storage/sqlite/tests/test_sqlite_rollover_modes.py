@@ -52,7 +52,7 @@ def test_rollover_choices_survive_reopen_and_both_portable_formats(tmp_path):
             target.close()
 
 
-def test_past_workspace_display_uses_current_date_without_weakening_assignment_guards(store, monkeypatch):
+def test_monthly_display_is_independent_of_current_date_without_weakening_later_guards(store, monkeypatch):
     import whab_plugin_sqlite.store as module
 
     monkeypatch.setattr(module, "current_month", lambda: "2026-11")
@@ -61,11 +61,12 @@ def test_past_workspace_display_uses_current_date_without_weakening_assignment_g
     assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 10000
     assert store.workspace("personal")["month"] == "2026-11"
     before = store.state("personal")
-    with pytest.raises(StoreError):
+    with pytest.raises(StoreError, match="available money"):
         store.assign("personal", "groceries", "2026-10", 3000)
     assert store.state("personal") == before
     monkeypatch.setattr(module, "current_month", lambda: "2026-10")
-    assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 2000
+    assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 10000
+    assert store.workspace("personal", "2026-11")["summary"]["fundingCapacity"] == 2000
 
 
 def test_saved_rollover_mode_changes_only_its_currency_without_adding_cash(store):
@@ -92,6 +93,42 @@ def test_saved_rollover_mode_changes_only_its_currency_without_adding_cash(store
     assert {account["currency"]: account["balance"] for account in store.accounts("personal")} == {
         "USD": 9500, "CAD": 10000,
     }
+
+
+@pytest.mark.parametrize("choice,pool,category_carry", [
+    ("category", 0, 2500), ("balance", 2500, 0),
+])
+@pytest.mark.parametrize("binary", [False, True])
+def test_portable_roundtrip_preserves_unassigned_set_aside_and_optional_pooled_carry(
+    store, choice, pool, category_carry, binary,
+):
+    cash = store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+    store.assign("personal", "groceries", "2026-10", 3000)
+    store.add_transaction("personal", {
+        "accountId": cash, "date": "2026-10-01", "merchant": "Shop", "amount": 500,
+        "categoryId": "groceries",
+    })
+    store.assign_next_month("personal", "2026-10", "USD", 2000)
+    store.set_rollover_mode("personal", "2026-10", "USD", choice)
+    expected = store.workspace("personal", "2026-11")
+    summary = expected["summary"]
+    assert summary["carriedInUnassigned"] == 5000
+    assert summary["carriedInSetAside"] == 2000
+    assert summary["balanceCarryover"] == pool
+    assert summary["carriedIn"] == summary["readyToAssign"] == 7000 + pool
+    assert next(row for row in expected["budget"] if row["categoryId"] == "groceries")[
+        "carryover"
+    ] == category_carry
+    target = Store(":memory:", month="2026-11")
+    try:
+        if binary:
+            target.restore_budget_files("personal", store.export_budget_files())
+        else:
+            target.restore_budget("personal", store.export_budget())
+        assert target.workspace("personal", "2026-11") == expected
+        assert target.accounts("personal")[0]["balance"] == 9500
+    finally:
+        target.close()
 
 
 def test_restoring_reallocated_category_carryover_cannot_underfund_today(store, monkeypatch):

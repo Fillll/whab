@@ -30,18 +30,51 @@ def _carryover_start(state: dict, month: str, currency: str) -> str:
 
 
 def effective_month_funding(state: dict, month: str, currency: str) -> int:
-    """One future month's funding, with categories consuming its saved floor."""
-    allocated = sum(
-        amount for category_id, amount in state["budget"].get(month, {}).items()
-        if state["categories"][category_id].get("currency", "USD") == currency
+    """Explicit money set aside for a target month, independent of its plans."""
+    return state.get("futureFunding", {}).get(month, {}).get(currency, 0)
+
+
+def _net_account_funds(state: dict, month: str, currency: str, *, opening: bool = False) -> int:
+    """Reconstruct a boundary from snapshots, never add imported income twice."""
+    accounts = [
+        account for account in state["accounts"].values()
+        if account.get("currency", "USD") == currency and is_on_budget(account)
+    ]
+    later = [
+        row for row in state["transactions"].values()
+        if not row.get("deleted") and not row["pending"]
+        and (row["date"][:7] >= month if opening else row["date"][:7] > month)
+    ]
+
+    def balance_at(account):
+        return account["balance"] + (-1 if is_liability(account) else 1) * sum(
+            row["amount"] for row in later if row["accountId"] == account["id"]
+        )
+
+    cash = sum(
+        balance_at(account) for account in accounts
+        if account["type"] == "depository"
+        and not account.get("stale") and not account.get("balanceUnknown")
     )
-    floor = state.get("futureFunding", {}).get(month, {}).get(currency, 0)
-    if abs(allocated) > MAX_SAFE_INTEGER:
-        raise StoreError("Ledger totals exceed the supported range.")
-    return max(0, allocated, floor)
+    debt = sum(max(0, balance_at(account)) for account in accounts if account["type"] == "credit")
+    return cash - debt
 
 
-def _calculate_currency(state: dict, month: str, currency: str, as_of_month: str) -> dict:
+def _cash_capacity(state: dict, month: str, currency: str, budget: list[dict]) -> int:
+    """Keep category deficits from offsetting cash reserved in other envelopes."""
+    safe = _net_account_funds(state, month, currency) - sum(
+        max(0, row["available"]) for row in budget
+    ) - effective_month_funding(state, shift_month(month, 1), currency)
+    if any(
+        account.get("balanceUnknown") and account["type"] == "credit"
+        for account in state["accounts"].values()
+        if account.get("currency", "USD") == currency and is_on_budget(account)
+    ):
+        safe = min(0, safe)
+    return safe
+
+
+def _calculate_currency(state: dict, month: str, currency: str) -> dict:
     validate_month(month)
     transactions = [
         public_transaction(t) for t in state["transactions"].values() if not t.get("deleted")
@@ -52,7 +85,6 @@ def _calculate_currency(state: dict, month: str, currency: str, as_of_month: str
         and is_on_budget(state["accounts"][t["accountId"]])
     ]
     accounts = list(state["accounts"].values())
-    budget_accounts = [a for a in accounts if is_on_budget(a)]
 
     def income_for(rows):
         return -sum(
@@ -106,38 +138,28 @@ def _calculate_currency(state: dict, month: str, currency: str, as_of_month: str
                 "target": category["target"],
             }
         )
-    later = [t for t in transactions if not t["pending"] and t["date"][:7] > month]
-
-    def balance_at_month(account):
-        return account["balance"] + (-1 if is_liability(account) else 1) * sum(
-            t["amount"] for t in later if t["accountId"] == account["id"]
-        )
-
-    cash = sum(
-        balance_at_month(a) for a in budget_accounts
-        if a["type"] == "depository" and not a.get("stale") and not a.get("balanceUnknown")
+    income = income_for(active)
+    next_month_funding = effective_month_funding(state, shift_month(month, 1), currency)
+    carried_in_set_aside = effective_month_funding(state, month, currency) if month > start else 0
+    carried_in = (
+        _net_account_funds(state, month, currency, opening=True)
+        - sum(row["carryover"] for row in budget)
+        if month >= start else 0
     )
-    debt = sum(max(0, balance_at_month(a)) for a in budget_accounts if a["type"] == "credit")
-    if month < as_of_month:
-        # Later plans may have been funded by later income. A historical month
-        # retains only the explicit funding instruction made for its own boundary.
-        future = state.get("futureFunding", {}).get(shift_month(month, 1), {}).get(currency, 0)
-    else:
-        future = sum(
-            effective_month_funding(state, target, currency)
-            for target in state["budget"].keys() | state.get("futureFunding", {}).keys()
-            if target > month and target >= start
-        )
-    if future > MAX_SAFE_INTEGER:
-        raise StoreError("Ledger totals exceed the supported range.")
-    ready = cash - debt - sum(max(0, row["available"]) for row in budget) - future
-    if any(a.get("balanceUnknown") and a["type"] == "credit" for a in budget_accounts):
-        ready = min(0, ready)
+    carried_in_unassigned = carried_in - carried_in_set_aside - balance_carryover
+    ready = income + carried_in - next_month_funding - sum(row["assigned"] for row in budget)
+    safe = _cash_capacity(state, month, currency, budget)
+    if month < start:
+        next_month_funding = ready = safe = 0
     summary = {
-        "income": income_for(active),
+        "income": income,
+        "carriedIn": carried_in,
+        "carriedInUnassigned": carried_in_unassigned,
+        "carriedInSetAside": carried_in_set_aside,
+        "fundingCapacity": min(ready, safe),
         "previousOverspending": sum(max(0, -b["carryover"]) for b in budget),
         "balanceCarryover": balance_carryover,
-        "assignedNextMonth": effective_month_funding(state, shift_month(month, 1), currency),
+        "assignedNextMonth": next_month_funding,
         "spent": spend_for(active),
         "assigned": sum(b["assigned"] for b in budget),
         "available": sum(b["available"] for b in budget),
@@ -156,6 +178,7 @@ def _calculate_currency(state: dict, month: str, currency: str, as_of_month: str
         "rolloverMode": rollover_mode(state, month, currency),
         "incomingRolloverMode": incoming_mode,
         "rolloverModeEditable": True,
+        "monthlyFundingFlow": True,
         "accounts": accounts,
         "categories": list(state["categories"].values()),
         "transactions": [t for t in transactions if t["date"].startswith(month)],
@@ -177,20 +200,14 @@ def ensure_assignment_allowed(
         )
     previous = state["budget"].get(month, {}).get(category_id, 0)
     increase = assigned - previous
-    if month < as_of_month:
-        available = calculate_workspace(state, month, as_of_month=as_of_month)[
-            "summariesByCurrency"
-        ][currency]["readyToAssign"]
-    else:
-        as_of = min(month, as_of_month)
-        available = funding_capacity(state, as_of, currency)
-        if month > as_of:
-            allocated = sum(
-                amount for key, amount in state["budget"].get(month, {}).items()
-                if state["categories"][key].get("currency", "USD") == currency
-            )
-            floor = state.get("futureFunding", {}).get(month, {}).get(currency, 0)
-            increase = max(0, floor, allocated + increase) - max(0, floor, allocated)
+    projection = select_currency(calculate_workspace(state, month), currency)
+    available = projection["summary"]["readyToAssign"]
+    unknown_credit = any(
+        account.get("balanceUnknown") and account["type"] == "credit"
+        for account in projection["accounts"] if is_on_budget(account)
+    )
+    if increase > 0 and unknown_credit:
+        raise StoreError("Assignment exceeds available money. Review unknown credit account balances.")
     if increase > 0 and increase > available:
         raise StoreError("Assignment exceeds available money.")
     if assigned > previous:
@@ -205,20 +222,23 @@ def ensure_assignment_allowed(
 
 
 def funding_capacity(state: dict, month: str, currency: str) -> int:
-    """Protect all commitments independently of the historical display policy."""
-    return calculate_workspace(state, month, as_of_month=month)["summariesByCurrency"].get(
+    """Protect real cash independently of the monthly allocation identity."""
+    return calculate_workspace(state, month)["summariesByCurrency"].get(
         currency, {},
-    ).get("readyToAssign", 0)
+    ).get("fundingCapacity", 0)
 
 
 def ensure_funding_capacity_preserved(
     state: dict, candidate: dict, source_month: str, as_of_month: str, currency: str,
+    *, preserve_monthly_pool: bool = True,
 ) -> None:
     """An edit must not create or worsen a deficit at any affected boundary.
 
     Cash, assignments and category carryover change only at ledger months or
     saved boundaries. Checking those sparse points also protects intervening
     historical months that a later pooling boundary would otherwise hide.
+    Rollover changes may move an existing category deficit into the monthly pool;
+    that reclassification is allowed if actual cash headroom does not worsen.
     """
     months = {source_month, as_of_month}
     if source_month < "2200-12":
@@ -234,22 +254,28 @@ def ensure_funding_capacity_preserved(
     for month in sorted(months):
         if not affected_start <= month <= "2200-12":
             continue
-        before = calculate_workspace(state, month, as_of_month=as_of_month)[
-            "summariesByCurrency"
-        ].get(currency, {}).get("readyToAssign", 0)
-        after = calculate_workspace(candidate, month, as_of_month=as_of_month)[
-            "summariesByCurrency"
-        ].get(currency, {}).get("readyToAssign", 0)
-        if after < min(before, 0):
-            context = "the current month" if month == as_of_month else month
+        before = select_currency(calculate_workspace(state, month), currency)
+        after = select_currency(calculate_workspace(candidate, month), currency)
+        context = "the current month" if month == as_of_month else month
+        before_cash = _cash_capacity(state, month, currency, before["budget"])
+        after_cash = _cash_capacity(candidate, month, currency, after["budget"])
+        if after_cash < min(before_cash, 0):
+            detail = (
+                " Review overspending, uncategorized spending, transfers, or account reserves."
+                if after_cash < after["summary"]["readyToAssign"] else ""
+            )
+            raise StoreError(f"Change exceeds available money in {context}.{detail}")
+        if preserve_monthly_pool and (
+            after["summary"]["readyToAssign"] < min(before["summary"]["readyToAssign"], 0)
+        ):
             raise StoreError(f"Change exceeds available money in {context}.")
 
 
 def calculate_workspace(state: dict, month: str, *, as_of_month: str | None = None) -> dict:
-    """Project money independently with an adapter-supplied historical reference.
+    """Project each month's own income, incoming money and explicit allocations.
 
-    Without an explicit reference, the selected month is the funding basis. This
-    keeps direct domain calls deterministic and conservative, without a clock.
+    The adapter's as-of month remains a validated compatibility argument. Monthly
+    pools follow dated ledger boundaries, independently of the viewing date.
     """
     validate_month(month)
     as_of_month = month if as_of_month is None else as_of_month
@@ -323,7 +349,7 @@ def calculate_workspace(state: dict, month: str, *, as_of_month: str | None = No
                 for m, rows in state["budget"].items()
             },
         }
-        projections[currency] = _calculate_currency(scoped, month, currency, as_of_month)
+        projections[currency] = _calculate_currency(scoped, month, currency)
     default = projections["USD"]
     return {
         **default,
@@ -360,7 +386,8 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
     account_ids = {a["id"] for a in accounts}
     category_ids = {c["id"] for c in categories}
     empty_summary = dict.fromkeys((
-        "income", "previousOverspending", "balanceCarryover", "assignedNextMonth", "spent", "assigned",
+        "income", "carriedIn", "carriedInUnassigned", "carriedInSetAside", "fundingCapacity",
+        "previousOverspending", "balanceCarryover", "assignedNextMonth", "spent", "assigned",
         "available", "readyToAssign",
     ), 0)
     return {

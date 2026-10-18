@@ -325,11 +325,13 @@ def test_workspace_periods_share_core_rollover_refunds_debt_and_currency_rules(s
     assert [(row["carryover"], row["assigned"], row["spent"], row["available"]) for row in grocery_rows] == [
         (0, 20000, 7000, 13000), (13000, 30000, -500, 43500), (43500, 0, 0, 43500),
     ]
-    assert [period["summary"]["readyToAssign"] for period in usd] == [30000, 30000, 30000]
+    assert [period["summary"]["readyToAssign"] for period in usd] == [60000, 30000, 30000]
+    assert [period["summary"]["carriedIn"] for period in usd] == [80000, 60000, 30000]
+    assert all(period["monthlyFundingFlow"] is True for period in usd)
     eur = [select_currency(period, "EUR") for period in periods]
     assert [period["summary"]["readyToAssign"] for period in eur] == [42000, 42000, 42000]
     assert all({row["currency"] for row in period["accounts"]} == {"EUR"} for period in eur)
-    # Reading another month does not weaken the command's future reservation rule.
+    # The monthly display does not reserve later plans, while edits protect their funding.
     with pytest.raises(StoreError, match="exceeds available money"):
         service.assign("personal", "groceries", "2026-10", 50001)
     assert service.revision == revision and store.export_budget() == before

@@ -134,9 +134,21 @@ def test_transfers_history_and_card_debt_never_invent_cash(
         "one",
         [imported_account(10000)],
     )
-    assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 10000
+    summary = store.workspace("personal", "2026-10")["summary"]
+    assert summary["readyToAssign"] == 20000
+    assert summary["fundingCapacity"] == 10000
     store.add_account("personal", {"name": "Card", "type": "credit", "balance": 2000})
-    assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 8000
+    summary = store.workspace("personal", "2026-10")["summary"]
+    assert summary["readyToAssign"] == 18000
+    assert summary["fundingCapacity"] == 8000
+    before = store.state("personal")
+    for action in (
+        lambda: store.assign("personal", "fun", "2026-10", 8001),
+        lambda: store.assign_next_month("personal", "2026-10", "USD", 8001),
+    ):
+        with pytest.raises(StoreError, match="available money"):
+            action()
+        assert store.state("personal") == before
     with pytest.raises(StoreError, match="manual account"):
         store.add_transaction(
             "personal",
@@ -190,7 +202,7 @@ def test_removed_and_unknown_balances_are_conservative(
     apply_import("item", sync_changes([imported_transaction()]), "one", [imported_account()])
     apply_import("item", sync_changes(), "two", [])
     assert store.accounts("personal")[0]["stale"] is True
-    assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 0
+    assert store.workspace("personal", "2026-10")["summary"]["fundingCapacity"] == 0
     assert len(store.transactions("personal")) == 1
     apply_import(
         "item",
@@ -212,7 +224,13 @@ def test_removed_and_unknown_balances_are_conservative(
             },
         ],
     )
-    assert store.workspace("personal", "2026-10")["summary"]["readyToAssign"] <= 0
+    summary = store.workspace("personal", "2026-10")["summary"]
+    assert summary["readyToAssign"] == 11000
+    assert summary["fundingCapacity"] == 0
+    before = store.state("personal")
+    with pytest.raises(StoreError, match="available money"):
+        store.assign("personal", "fun", "2026-10", 1)
+    assert store.state("personal") == before
 
 
 def test_manual_money_and_import_currency_validation(

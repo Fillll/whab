@@ -3095,6 +3095,45 @@ strong {
   font-weight: 400;
   line-height: 1.35;
 }
+.budget-flow-update {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.budget-carry-in-details {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+  white-space: normal;
+}
+.budget-carry-in-details summary {
+  cursor: pointer;
+}
+.budget-carry-in-details dl {
+  margin: 9px 0 4px;
+}
+.budget-carry-in-details dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 5px;
+}
+.budget-carry-in-details dt {
+  text-align: left;
+}
+.budget-carry-in-details dd {
+  margin: 0;
+  color: var(--ink);
+}
+.budget-carry-in-details dd.negative {
+  color: var(--danger);
+}
+.budget-carry-in-details p {
+  margin: 8px 0 0;
+  text-align: left;
+  line-height: 1.4;
+}
 .budget-next-month-editor {
   width: 132px;
   max-width: 100%;

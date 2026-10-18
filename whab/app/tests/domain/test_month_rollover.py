@@ -52,7 +52,8 @@ def test_default_category_mode_keeps_both_signs_in_their_own_categories(state):
     assert balances(february) == {"food": (5000, 5000), "rent": (-2500, -2500)}
     assert february["summary"]["previousOverspending"] == 2500
     assert february["summary"]["balanceCarryover"] == 0
-    assert february["summary"]["readyToAssign"] == 7500
+    assert february["summary"]["readyToAssign"] == 10000
+    assert february["summary"]["fundingCapacity"] == 7500
     assert state == before
 
 
@@ -231,7 +232,7 @@ def test_historical_cash_does_not_deduct_assignments_funded_by_later_income(six_
     assert may["summary"]["readyToAssign"] == 1210000
     assert june["summary"]["readyToAssign"] == 1480000
     assert october["summary"]["readyToAssign"] == 2560000
-    assert funding_capacity(six_month_state, "2026-05", "USD") == -1540000
+    assert funding_capacity(six_month_state, "2026-05", "USD") == 1210000
 
 
 def test_history_deducts_only_its_own_explicit_next_month_instruction(six_month_state):
@@ -262,21 +263,21 @@ def test_historical_edit_cannot_use_later_income_or_consume_current_future_reser
     assert six_month_state == before
     six_month_state["budget"]["2026-11"] = {"food": 2559000}
     before = deepcopy(six_month_state)
-    with pytest.raises(StoreError, match="current month"):
+    with pytest.raises(StoreError, match="2026-11"):
         commands.assign(six_month_state, "food", "2026-05", 552000, as_of_month="2026-10")
     assert six_month_state == before
 
 
 def test_historical_edit_does_not_worsen_a_current_deficit_but_a_pool_reset_absorbs_cost(six_month_state):
     six_month_state["budget"]["2026-11"] = {"food": 2600000}
-    assert funding_capacity(six_month_state, "2026-10", "USD") == -40000
-    with pytest.raises(StoreError, match="current month"):
+    assert funding_capacity(six_month_state, "2026-11", "USD") == -40000
+    with pytest.raises(StoreError, match="2026-11"):
         commands.assign(six_month_state, "food", "2026-05", 550001, as_of_month="2026-10")
     rollover(six_month_state, "2026-05", "USD", "balance")
     six_month_state["budget"]["2026-11"] = {"food": 2700000}
-    assert funding_capacity(six_month_state, "2026-10", "USD") == -40000
+    assert funding_capacity(six_month_state, "2026-11", "USD") == -40000
     commands.assign(six_month_state, "food", "2026-05", 551000, as_of_month="2026-10")
-    assert funding_capacity(six_month_state, "2026-10", "USD") == -40000
+    assert funding_capacity(six_month_state, "2026-11", "USD") == -40000
 
 
 def test_past_reserve_uses_historical_headroom_without_creating_cash_today(six_month_state):
@@ -342,7 +343,7 @@ def test_future_mode_changes_preserve_future_cash_after_known_spending():
     state = protected_state()
     state["budgetStartMonth"] = "2026-09"
     state["transactions"]["expense"] = transaction("expense", "2026-11", 10000, None)
-    assert funding_capacity(state, "2026-09", "USD") == 0
+    assert funding_capacity(state, "2026-09", "USD") == 20000
     before = deepcopy(state)
     with pytest.raises(StoreError, match="2026-11"):
         rollover(state, "2026-10", "USD", "category", as_of="2026-09")
@@ -367,7 +368,7 @@ def test_current_and_future_assignments_preserve_cash_after_known_future_spendin
     assert funding_capacity(state, "2026-10", "USD") == 20000
     assert funding_capacity(state, "2026-11", "USD") == 10000
     before = deepcopy(state)
-    with pytest.raises(StoreError, match="2026-11"):
+    with pytest.raises(StoreError, match="exceeds available"):
         commands.assign(state, "rent", month, 15000, as_of_month="2026-10")
     assert state == before
 
@@ -380,7 +381,7 @@ def test_combined_future_assignments_cannot_double_use_cash_needed_for_known_spe
     state["transactions"]["expense"] = transaction("expense", "2026-11", 10000, None)
     commands.assign(state, "rent", "2026-10", 10000, as_of_month="2026-09")
     before = deepcopy(state)
-    with pytest.raises(StoreError, match="2026-11"):
+    with pytest.raises(StoreError, match="exceeds available"):
         commands.assign(state, "food", "2026-11", 10000, as_of_month="2026-09")
     assert state == before
 
@@ -391,13 +392,13 @@ def test_future_funding_instruction_preserves_its_source_month_after_known_spend
     state["rolloverModes"] = {}
     state["transactions"]["expense"] = transaction("expense", "2026-11", 10000, None)
     before = deepcopy(state)
-    with pytest.raises(StoreError, match="2026-11"):
+    with pytest.raises(StoreError, match="exceeds available"):
         commands.assign_next_month(state, "2026-11", "USD", 15000, as_of_month="2026-10")
     assert state == before
 
 
 @pytest.mark.parametrize("change", ["assignment", "funding"])
-def test_future_commitment_preserves_intervening_months_before_its_source(change):
+def test_future_month_plans_can_use_that_month_income_without_borrowing_it_earlier(change):
     state = protected_state()
     state["budgetStartMonth"] = "2026-09"
     state["budget"] = {}
@@ -409,12 +410,16 @@ def test_future_commitment_preserves_intervening_months_before_its_source(change
     assert funding_capacity(state, "2026-09", "USD") == 10000
     assert funding_capacity(state, "2026-10", "USD") == 0
     assert funding_capacity(state, "2026-11", "USD") == 10000
+    if change == "assignment":
+        commands.assign(state, "rent", "2026-11", 10000, as_of_month="2026-09")
+    else:
+        commands.assign_next_month(state, "2026-11", "USD", 10000, as_of_month="2026-09")
+    assert funding_capacity(state, "2026-09", "USD") == 10000
+    assert funding_capacity(state, "2026-10", "USD") == 0
+    assert funding_capacity(state, "2026-11", "USD") == 0
     before = deepcopy(state)
-    with pytest.raises(StoreError, match="2026-10"):
-        if change == "assignment":
-            commands.assign(state, "rent", "2026-11", 10000, as_of_month="2026-09")
-        else:
-            commands.assign_next_month(state, "2026-11", "USD", 10000, as_of_month="2026-09")
+    with pytest.raises(StoreError, match="exceeds available"):
+        commands.assign(state, "food", "2026-10", 1, as_of_month="2026-09")
     assert state == before
 
 

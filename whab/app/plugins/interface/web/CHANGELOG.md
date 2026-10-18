@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.11.0 — 2026-10-18
+
+PR: [#47](https://github.com/Fillll/whab/pull/47)
+
+- Explain Carried in as previously unassigned money, funds set aside for this month and overall category carryover, with an expandable core-calculated breakdown. Keep by-category balances exclusively in category Carryover columns.
+- Support independent next-month set-asides and show the exact monthly allocation formula from WHAB 2.9. Leave older-server funding controls read-only and incompatible totals unavailable until upgraded.
+- Explain when actual cash, spending or account reserves constrain new assignments below the displayed monthly pool.
+
 ## 1.10.0 — 2026-10-17
 
 PR: [#45](https://github.com/Fillll/whab/pull/45)

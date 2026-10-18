@@ -4,6 +4,15 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.9.0 — 2026-10-18
+
+PR: [#47](https://github.com/Fillll/whab/pull/47)
+
+- Calculate Available to assign as received income plus assignable carry-in, less the explicit next-month set-aside and current category assignments. Expose previously unassigned, incoming set-aside and overall category carryover components; keep by-category balances outside the general pool.
+- Treat saved next-month funding as an independent transfer rather than a floor for the target month's category assignments. Preserve existing records and remove the requirement to cover those assignments. Do not implicitly reserve later category plans in earlier monthly displays.
+- Validate monthly funding and actual eligible cash independently, preserving credit reserves, historical boundaries and currency isolation. Let assignments cover existing category debt without inventing funds for other categories.
+- Advertise monthly funding semantics through a public capability and require web 1.11 in the supported bundle.
+
 ## 2.8.2 — 2026-10-17
 
 PR: [#45](https://github.com/Fillll/whab/pull/45)

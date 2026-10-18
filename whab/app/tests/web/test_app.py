@@ -266,7 +266,8 @@ def test_multiple_currency_http_views_reject_mixing_and_identify_exports(client)
     assert {a["currency"] for a in eur["accounts"]} == {"EUR"}
     assert len(eur["transactions"]) == 1 and eur["categoryGroups"][0]["children"] == [food]
     assert before["summary"]["spent"] == 0
-    assert before["summariesByCurrency"]["EUR"]["readyToAssign"] == 29500
+    assert before["summariesByCurrency"]["EUR"]["readyToAssign"] == 30000
+    assert before["summariesByCurrency"]["EUR"]["fundingCapacity"] == 29500
     assert before["summariesByCurrency"]["USD"]["readyToAssign"] == 50000
     rows = list(csv.DictReader(io.StringIO(client.get("/api/export?workspace=personal").text)))
     assert rows[0]["currency"] == "EUR" and rows[0]["amount_cents"] == "500"
@@ -309,10 +310,29 @@ def test_next_month_funding_saves_without_editing_child_assignments(client):
     assert client.get('/api/workspace?workspace=personal&month=2026-10').json()['summary'] == october['summary']
     november = client.get('/api/workspace?workspace=personal&month=2026-11').json()
     assert november['summary']['readyToAssign'] == 80000
-    assert client.put('/api/budget/funding/next-month', json={**request, 'assigned': 19999}).status_code == 400
+    assert client.put('/api/budget/funding/next-month', json={**request, 'assigned': 19999}).status_code == 200
+    reduced = client.get('/api/workspace?workspace=personal&month=2026-11').json()
+    assert reduced['summary']['carriedIn'] == 100000
+    assert reduced['summary']['carriedInSetAside'] == 19999
+    assert reduced['summary']['carriedInUnassigned'] == 80001
+    assert reduced['summary']['assigned'] == 20000
+    assert reduced['summary']['readyToAssign'] == 80000
     assert client.put('/api/budget/funding/next-month', json={**request, 'assigned': 100001}).status_code == 400
     assert client.put('/api/budget/funding/next-month', json={**request, 'assigned': 20000}).status_code == 200
     assert client.get('/api/workspace?workspace=personal&month=2026-10').json()['summary']['readyToAssign'] == 80000
+    assert client.put('/api/budget/funding/next-month', json={**request, 'assigned': 0}).status_code == 200
+    for month, expected_ready in (('2026-10', 100000), ('2026-11', 80000)):
+        data = client.get(f'/api/workspace?workspace=personal&month={month}').json()
+        summary = data['summary']
+        assert data['monthlyFundingFlow'] is True
+        assert summary['readyToAssign'] == expected_ready == (
+            summary['income'] + summary['carriedIn']
+            - summary['assignedNextMonth'] - summary['assigned']
+        )
+        assert summary['carriedIn'] == (
+            summary['carriedInUnassigned'] + summary['carriedInSetAside']
+            + summary['balanceCarryover']
+        )
     assert client.get('/api/workspace?workspace=demo&month=2026-10').json()['summary']['assignedNextMonth'] == 0
 
 
