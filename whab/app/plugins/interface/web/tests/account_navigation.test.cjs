@@ -103,6 +103,43 @@ test('only same-budget HTTPS account-register destinations qualify for partial n
     second.replace('/transactions/', '/accounts/'), second + '#settings']) assert.equal(qualifies(value), false);
 });
 
+test('search and requested pagination must match the returned fragment, including clamped pages', () => {
+  const state = harness();
+  const target = new URL(first + '&q=older+memo&tx_page=999');
+  const context = {transactionSearch: 'older memo', transactionRequestedPage: '999', transactionPage: 3};
+  assert.equal(state.context.matchesTransactionFilters(target, context), true);
+  assert.equal(state.context.matchesTransactionFilters(target, {...context, transactionSearch: 'stale'}), false);
+  assert.equal(state.context.matchesTransactionFilters(target, {...context, transactionRequestedPage: '2'}), false);
+  const account = state.context.preserveTransactionFilters(new URL(second + '&tx_page=5'), target);
+  assert.equal(account.searchParams.get('q'), 'older memo');
+  assert.equal(account.searchParams.has('tx_page'), false);
+});
+
+test('typing a newer search can cancel a pending request before its next debounce', async () => {
+  const state = harness();
+  const pending = state.navigator.navigate(first + '&q=old');
+  await tick();
+  state.navigator.cancelPending();
+  assert.equal(state.requests[0].options.signal.aborted, true);
+  assert.equal(state.navigator.pendingDestination(), null);
+  state.respond(0);
+  await pending;
+  assert.equal(state.replacements.length, 0);
+  assert.equal(state.status.hidden, true);
+});
+
+test('canceling a history request restores the address of the still-visible register', async () => {
+  const state = harness();
+  state.location.href = second;
+  const pending = state.listeners.popstate();
+  await tick();
+  state.navigator.cancelPending();
+  assert.equal(state.location.href, first);
+  state.respond(0);
+  await pending;
+  assert.equal(state.replacements.length, 0);
+});
+
 test('partial account switches replace only the content after pending saves finish', async () => {
   const saved = deferred();
   const state = harness({flush: () => saved.promise});

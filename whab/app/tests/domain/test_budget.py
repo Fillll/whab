@@ -344,3 +344,83 @@ def test_currency_without_records_has_an_empty_projection(multicurrency_state):
 def test_select_currency_rejects_invalid_currency(multicurrency_state):
     with pytest.raises(StoreError, match="ISO 4217"):
         select_currency(calculate_workspace(multicurrency_state, "2026-09"), "ZZZ")
+
+
+def test_category_projection_reads_history_independently_of_category_count(state, monkeypatch):
+    """Guard the large-ledger bottleneck without a machine-dependent time limit."""
+    from whab.domain import budget
+
+    reads = 0
+
+    class CountedTransaction(dict):
+        def __getitem__(self, key):
+            nonlocal reads
+            reads += key == "categoryId"
+            return super().__getitem__(key)
+
+    public_transaction = budget.public_transaction
+    monkeypatch.setattr(budget, "public_transaction", lambda row: CountedTransaction(public_transaction(row)))
+    state["categories"] = {
+        f"category-{index}": {
+            "id": f"category-{index}", "name": f"Category {index}", "group": "Everyday", "target": 0,
+        }
+        for index in range(100)
+    }
+    state["budget"] = {
+        "2026-08": dict.fromkeys(state["categories"], 500),
+        "2026-09": dict.fromkeys(state["categories"], 200),
+    }
+    state["transactions"] = {
+        f"{category}-{label}": {
+            **transaction(f"{category}-{label}", date, amount), "categoryId": category,
+        }
+        for category in state["categories"]
+        for label, date, amount in (
+            ("purchase", "2026-08-01", 100),
+            ("refund", "2026-08-02", -20),
+            ("current", "2026-09-01", 30),
+        )
+    }
+    view = calculate_workspace(state, "2026-09")
+    assert len(view["budget"]) == 100
+    assert all((row["carryover"], row["spent"], row["available"]) == (420, 30, 590)
+               for row in view["budget"])
+    assert reads < 12 * len(state["transactions"])
+
+
+@pytest.mark.parametrize("opening, expected", [(False, 17200), (True, 17000)])
+def test_account_boundary_reads_each_later_transaction_once(state, opening, expected):
+    """Multiple account snapshots must not multiply reconstruction work."""
+    from whab.domain.budget import _net_account_funds
+
+    reads = 0
+
+    class CountedTransaction(dict):
+        def __getitem__(self, key):
+            nonlocal reads
+            reads += key == "accountId"
+            return super().__getitem__(key)
+
+    state["accounts"] = {
+        "cash": {"id": "cash", "type": "depository", "balance": 10000},
+        "savings": {"id": "savings", "type": "depository", "balance": 5000},
+        "card": {"id": "card", "type": "credit", "balance": 3000},
+        "stale": {"id": "stale", "type": "depository", "balance": 99999, "stale": True},
+        "unknown": {"id": "unknown", "type": "depository", "balance": 99999, "balanceUnknown": True},
+        "off-budget": {"id": "off-budget", "type": "investment", "balance": 99999},
+    }
+    rows = [
+        {**transaction("purchase", "2026-10-01", 1000), "accountId": "cash"},
+        {**transaction("savings", "2026-10-02", 2000), "accountId": "savings"},
+        {**transaction("card", "2026-10-03", 2200), "accountId": "card"},
+        {**transaction("current", "2026-09-01", -200), "accountId": "cash"},
+        transaction("past", "2026-08-01", 99999),
+        transaction("pending", "2026-10-01", 99999, pending=True),
+        {**transaction("deleted", "2026-10-01", 99999), "deleted": True},
+        {**transaction("stale", "2026-10-01", 99999), "accountId": "stale"},
+        {**transaction("unknown", "2026-10-01", 99999), "accountId": "unknown"},
+        {**transaction("tracking", "2026-10-01", 99999), "accountId": "off-budget"},
+    ]
+    state["transactions"] = {row["id"]: CountedTransaction(row) for row in rows}
+    assert _net_account_funds(state, "2026-09", "USD", opening=opening) == expected
+    assert reads <= len(rows)

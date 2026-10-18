@@ -6,7 +6,7 @@
 {% set review_state = transaction_review_filter|default('all') %}
 {% set review_labels = {'all': 'All', 'needs-review': 'Needs review', 'reviewed': 'Reviewed'} %}
 {% set next_review_labels = {'all': 'Needs review', 'needs-review': 'Reviewed', 'reviewed': 'All'} %}
-<section data-transaction-register data-workspace="{{ workspace }}">
+<section data-transaction-register data-workspace="{{ workspace }}" data-transaction-paged="true" data-transaction-page="{{ register.page }}" data-transaction-requested-page="{{ register.requested_page }}">
 <div class="page-title-row">
   <div>
     <h1 id="transaction-title" tabindex="-1">{{ selected_account.name if selected_account else 'Transactions' }}</h1>
@@ -14,7 +14,11 @@
   <div class="button-group">{% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}">{{ icon('settings', 16) }}Account settings</button>{% endif %}<a class="button secondary" href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}" download>{{ icon('download', 16) }}Export</a><button class="button primary" data-dialog="transaction-dialog" {% if not manual_accounts %}disabled title="Add a manual account in Accounts first" {% endif %}>{{ icon('plus', 16) }}Add transaction</button></div>
 </div>
 <div class="transaction-filters">
-  <label class="search-input">{{ icon('search', 17) }}<input aria-label="Search transactions" id="transaction-search" placeholder="Search transactions…"></label>
+  <form method="get" action="{{ request.url.path }}" data-transaction-search-form>
+    {% for key,value in register.search_params %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+    <label class="search-input">{{ icon('search', 17) }}<input type="search" name="q" aria-label="Search transactions" id="transaction-search" value="{{ register.search }}" placeholder="Search all transactions…"></label>
+    <noscript><button class="button secondary" type="submit">Search</button></noscript>
+  </form>
   <div class="transaction-account-filter">
     <select aria-label="Filter by account" id="account-filter" multiple size="1">
       <option value="all"{% if not selected_ids %} selected{% endif %}>All accounts</option>
@@ -81,7 +85,7 @@
       <th scope="col" class="transaction-review-cell"><abbr title="Reviewed">R</abbr></th>
     </tr></thead>
     <tbody>
-    {% for transaction in transactions %}
+    {% for transaction in register.rows %}
       {% set account = accounts_by_id.get(transaction.accountId) %}
       <tr class="transaction-row" data-transaction-id="{{ transaction.id }}" data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
         <td class="transaction-select-cell"><input type="checkbox" data-select-transaction aria-label="Select {{ transaction.merchant }} on {{ date_label(transaction.date) }}"></td>
@@ -108,8 +112,11 @@
     </tbody>
   </table>
 </div>
-{% if not transactions %}<div class="empty-state"><span>{{ icon('transactions', 28) }}</span><h2>No transactions here yet</h2><p>{{ 'This account has no transactions.' if transaction_all_dates and selected_account else 'No transactions match these filters.' if transaction_all_dates else 'Try another month.' if data.accounts else 'Connect a bank account to import transactions.' }}</p></div>{% endif %}
-<div class="table-footer"><span id="transaction-count" data-period="{{ transaction_count_period|default(period_label) }}">{{ transactions|length }} {{ 'transaction' if transactions|length == 1 else 'transactions' }} · {{ transaction_count_period|default(period_label) }}</span></div>
+{% if not register.count %}<div class="empty-state"><span>{{ icon('transactions', 28) }}</span><h2>{{ 'No matching transactions' if register.total else 'No transactions here yet' }}</h2><p>{{ 'Try another search or review filter.' if register.total else 'This account has no transactions.' if transaction_all_dates and selected_account else 'No transactions match these filters.' if transaction_all_dates else 'Try another month.' if data.accounts else 'Connect a bank account to import transactions.' }}</p></div>{% endif %}
+<div class="table-footer transaction-pagination">
+  <span id="transaction-count" data-period="{{ transaction_count_period|default(period_label) }}">{{ register.count }} {% if register.count != register.total %}matching {% endif %}{{ 'transaction' if register.count == 1 else 'transactions' }}{% if register.count != register.total %} of {{ register.total }}{% endif %} · {{ transaction_count_period|default(period_label) }}{% if register.pages > 1 %} · Showing {{ register.start }}–{{ register.end }}{% endif %}</span>
+  {% if register.pages > 1 %}<nav aria-label="Transaction pages">{% if register.previous %}<a class="text-link" data-transaction-page href="{{ register.previous }}">Previous</a>{% endif %}<span>Page {{ register.page }} of {{ register.pages }}</span>{% if register.next %}<a class="text-link" data-transaction-page href="{{ register.next }}">Next</a>{% endif %}</nav>{% endif %}
+</div>
 <dialog class="modal transaction-receipt-dialog" data-transaction-receipt-dialog aria-labelledby="receipt-title">
   <div class="modal-heading"><h2 id="receipt-title">Receipt</h2><button class="icon-button" type="button" data-receipt-close aria-label="Close receipt">{{ icon('close', 16) }}</button></div>
   <p class="settings-notice" data-receipt-payee></p>

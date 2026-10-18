@@ -1,5 +1,6 @@
 """Appearance belongs to the running web plugin and its own browser assets."""
 
+import json
 import re
 from html.parser import HTMLParser
 from importlib.metadata import version
@@ -106,3 +107,17 @@ def test_theme_bootstrap_precedes_styles_and_uses_web_plugin_asset_version(clien
     assert asset.status_code == 200
     assert "javascript" in asset.headers["content-type"]
     assert asset.content == files("whab_plugin_web").joinpath("static/theme.js").read_bytes()
+
+
+def test_every_transitive_web_module_has_a_versioned_import_before_the_entry_point(client):
+    response = client.get("/budgets/demo/transactions/current-month/usd")
+    text = response.text
+    imports = re.search(r'<script type="importmap">(.*?)</script>', text)[1]
+    mapping = json.loads(imports)["imports"]
+    assets = files("whab_plugin_web").joinpath("static")
+    for asset in assets.iterdir():
+        if asset.name.endswith(".js"):
+            assert mapping[f"/budgets/demo/static/{asset.name}"] == (
+                f"/budgets/demo/static/{asset.name}?v={version('whab_plugin_web')}"
+            )
+    assert text.index('type="importmap"') < text.index('type="module"')

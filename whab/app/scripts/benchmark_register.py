@@ -28,6 +28,8 @@ def main():
     parser.add_argument("--accounts", type=int, default=31)
     parser.add_argument("--transactions", type=int, default=31000)
     parser.add_argument("--requests", type=int, default=5)
+    parser.add_argument("--all-accounts", action="store_true")
+    parser.add_argument("--page", choices=("transactions", "accounts", "budget"), default="transactions")
     args = parser.parse_args()
     if not (1 <= args.accounts <= 1000 and 1 <= args.transactions <= 250000 and 1 <= args.requests <= 100):
         parser.error("Use 1-1000 accounts, 1-250000 transactions and 1-100 requests.")
@@ -59,7 +61,9 @@ def main():
             registry = PluginRegistry((web_plugin,))
             with TestClient(create_app(store=store, settings=settings, plugins=registry),
                             base_url="https://127.0.0.1:5173") as client:
-                url = "/budgets/home/transactions/2026-10/usd?account=account-0&all_dates=true"
+                url = f"/budgets/home/{args.page}/2026-10/usd"
+                if args.page == "transactions":
+                    url += "?all_dates=true" + ("" if args.all_accounts else "&account=account-0")
                 headers = {"X-WHAB-Transactions-Fragment": "1"}
                 client.get(url, headers=headers).raise_for_status()
                 times = []
@@ -70,6 +74,7 @@ def main():
                     times.append(round((perf_counter() - started) * 1000, 1))
                 print(f"Fictional ledger: {args.accounts} accounts, {args.transactions} transactions, "
                       f"{len(snapshot['categories'])} categories")
+                print(f"View: {args.page}; {'all accounts' if args.all_accounts else 'one account'}")
                 print(f"Selected register rows: {result.text.count('class=\"transaction-row\"')}")
                 print(f"Server request milliseconds: {times}; median {median(times):.1f}")
                 print(f"HTML bytes: {len(result.content)}; option elements: {result.text.count('<option ')}")

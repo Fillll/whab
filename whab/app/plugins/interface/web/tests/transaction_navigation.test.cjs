@@ -153,3 +153,19 @@ test('a relative preset drops stale custom date drafts merged from an earlier pe
   assert.equal(preset.searchParams.has('start_date'), false);
   assert.equal(preset.searchParams.has('end_date'), false);
 });
+
+test('register filters reset pagination while retaining the complete-history search', () => {
+  const navigate = navigation('https://localhost:5173/budgets/home/transactions/2026-10/usd?accounts=first&accounts=second&tx_page=12&q=earlier+memo');
+  for (const changes of [{account: 'first'}, {accounts: []}, {month: '2026-09'}, {currency: 'EUR'},
+    {period: 'previous-month'}, {review: 'needs-review'}, {q: 'new search'}]) {
+    const target = navigate(changes);
+    assert.equal(target.searchParams.has('tx_page'), false);
+    assert.equal(target.searchParams.get('q'), changes.q || 'earlier memo');
+  }
+  assert.equal(navigate({q: ''}).searchParams.has('q'), false);
+  for (const page of ['accounts', 'budget', 'insights']) {
+    const target = navigate({page});
+    assert.equal(target.searchParams.has('q'), false);
+    assert.equal(target.searchParams.has('tx_page'), false);
+  }
+});

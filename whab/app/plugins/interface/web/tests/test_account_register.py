@@ -113,3 +113,32 @@ def test_account_register_skips_envelope_projection_and_reuses_category_choices(
         category = re.search(r'<select name="categoryId"[^>]*>(.*?)</select>', row, re.S)[1]
         assert len(re.findall(r'<option\b', category)) == 2
         assert '<option value="groceries" selected>Groceries</option>' in category
+
+
+def test_large_register_searches_unrendered_transactions_and_preserves_page_filters(client, store):
+    account = store.add_account("personal", {"name": "Large wallet", "type": "depository", "balance": 0})
+    for index in range(205):
+        store.add_transaction("personal", {
+            "accountId": account, "date": "2026-10-05", "merchant": f"Purchase {index:03}",
+            "amount": 100, "categoryId": None,
+        })
+    path = f"/budgets/home/transactions/2026-10/usd?account={account}&all_dates=true"
+    first = client.get(path).text
+    assert len(register_rows(first)) == 100
+    assert "205 transactions · All dates · Showing 1–100" in first
+    assert 'aria-label="Transaction pages"' in first and "Page 1 of 3" in first
+    assert 'data-transaction-paged="true"' in first
+    last = client.get(path + "&tx_page=999").text
+    assert len(register_rows(last)) == 5 and "Page 3 of 3" in last
+    assert "Showing 201–205" in last
+    # A query matches the complete account history, including rows absent from page one.
+    offscreen = re.search(r'data-merchant="(Purchase \d+)"', register_rows(last)[0])[1]
+    searched = client.get(path + "&q=" + offscreen.replace(" ", "+") + "&tx_page=3").text
+    assert len(register_rows(searched)) == 1 and offscreen in register_rows(searched)[0]
+    assert "1 matching transaction of 205" in searched
+    assert f'value="{offscreen}" placeholder="Search all transactions…"' in searched
+    assert 'method="get"' in searched and 'name="all_dates" value="true"' in searched
+    assert 'name="tx_page"' not in searched
+    missing = client.get(path + "&q=unfindable").text
+    assert not register_rows(missing) and "No matching transactions" in missing
+    assert "0 matching transactions of 205" in missing

@@ -3,6 +3,7 @@
 import re
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from starlette.requests import Request
 from whab_plugin_web.plugin import resources
 from whab_plugin_web.views import build_context
 
@@ -18,6 +19,9 @@ def render_transactions(transactions, **extra):
     context = build_context(
         data, {}, [], workspace="personal", page="transactions", month="2026-10"
     )
+    request = Request({"type": "http", "scheme": "https", "server": ("localhost", 5173),
+                       "path": "/budgets/home/transactions/2026-10/usd", "query_string": b"", "headers": []})
+    context.update(request=request, register=context["transaction_window"](transactions, request))
     environment = Environment(
         loader=FileSystemLoader(resources / "templates"), autoescape=select_autoescape()
     )
