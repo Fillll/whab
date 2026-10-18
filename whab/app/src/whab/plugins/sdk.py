@@ -9,6 +9,7 @@ from datetime import date
 from pathlib import Path
 from types import MappingProxyType
 from typing import Protocol, TypeAlias
+from urllib.parse import urlsplit
 
 from whab.domain.accounts import is_on_budget
 from whab.domain.categories import category_group_id, validate_child_category
@@ -216,6 +217,18 @@ InsightsHook: TypeAlias = Callable[[BudgetSnapshot], tuple[Insight, ...]]
 ExportHook: TypeAlias = Callable[[BudgetSnapshot], ExportTable]
 
 
+class ReceiptStorage(Protocol):
+    """Optional private raster attachments, isolated and portable with their ledger."""
+
+    def receipt_ids(self, workspace: str) -> list[str]: ...
+
+    def get_receipt(self, workspace: str, transaction_id: str) -> bytes | None: ...
+
+    def save_receipt(self, workspace: str, transaction_id: str, raw: bytes) -> None: ...
+
+    def delete_receipt(self, workspace: str, transaction_id: str) -> None: ...
+
+
 class StorageBackend(Protocol):
     """Synchronous application ledger contract, independent of any database driver.
 
@@ -246,6 +259,7 @@ class StorageBackend(Protocol):
         transaction_id: str,
         category_id: object = UNSET,
         reviewed: bool | None = None,
+        note: object = UNSET,
     ) -> None: ...
 
     def assign(self, workspace: str, category_id: str, month: str, assigned: int) -> None: ...
@@ -515,12 +529,26 @@ class BankLogos:
     resolve: Callable[[str], str | None]
     fetch: Callable[[str], LogoImage | None]
     configure_cache: Callable[[Path], None] | None = None
+    resolve_domain: Callable[[str], str | None] | None = None
+    provider_name: str = ""
+    provider_url: str = ""
 
     def __post_init__(self) -> None:
         if not callable(self.resolve) or not callable(self.fetch):
             raise ValueError("Bank logo resolution and fetching must be callable.")
         if self.configure_cache is not None and not callable(self.configure_cache):
             raise ValueError("Bank logo cache configuration must be callable or None.")
+        if self.resolve_domain is not None and not callable(self.resolve_domain):
+            raise ValueError("Bank logo domain resolution must be callable or None.")
+        _text(self.provider_name, "Bank logo provider name", limit=200)
+        _text(self.provider_url, "Bank logo provider URL", limit=2048)
+        if self.provider_url:
+            try:
+                url = urlsplit(self.provider_url)
+                if url.scheme != "https" or not url.hostname or url.username is not None or url.password is not None:
+                    raise ValueError()
+            except ValueError:
+                raise ValueError("Bank logo providers must use a public HTTPS URL.") from None
 
 
 @dataclass(frozen=True, slots=True)
@@ -686,6 +714,7 @@ class Plugin:
                 raise ValueError("Plugin bank logos must be a BankLogos descriptor or None.")
             BankLogos(
                 self.bank_logos.resolve, self.bank_logos.fetch, self.bank_logos.configure_cache,
+                self.bank_logos.resolve_domain, self.bank_logos.provider_name, self.bank_logos.provider_url,
             )
         if self.file_import is not None:
             if type(self.file_import) is not FileImport:

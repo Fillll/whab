@@ -23,6 +23,7 @@ Id = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 Label = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Cents = Annotated[StrictInt, Field(ge=-1_000_000_000_000, le=1_000_000_000_000)]
 PositiveCents = Annotated[StrictInt, Field(ge=0, le=1_000_000_000_000)]
+Note = Annotated[str, Field(max_length=1000)]
 
 
 def valid_month(value):
@@ -39,6 +40,7 @@ class ReviewBody(Body):
     workspace: Workspace
     categoryId: Id | None = None
     reviewed: StrictBool | None = None
+    note: Note = ""
 
 
 class TransactionBody(Body):
@@ -48,7 +50,7 @@ class TransactionBody(Body):
     merchant: Label
     amount: Cents
     categoryId: Id | None
-    note: Annotated[str, Field(max_length=1000)] = ""
+    note: Note = ""
 
     @field_validator("date")
     @classmethod
@@ -121,6 +123,9 @@ class AccountBody(Body):
 
 class AccountClassificationBody(Body):
     workspace: Workspace
+    name: Label | None = None
+    bankWebsite: str | None = Field(default=None, max_length=2048)
+    currency: str | None = None
     type: str | None = None
     onBudget: StrictBool | None = None
     subtype: str | None = None

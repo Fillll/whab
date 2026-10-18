@@ -1,6 +1,10 @@
 /* WHAB controls. Business rules live in Python; bank UI is loaded by enabled plugins. */
 import {api, apiUrl, notify, pageUrl} from './client.js';
 import {initBudgetEdits, syncBudgetGroups} from './budget-edits.js';
+import {initBudgetSourceLinks} from './budget-source-links.js';
+import {initAccountNavigation} from './account-navigation.js';
+import {initTransactionRegister} from './transaction-register.js';
+import {initAccountSettings} from './account-settings.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -9,7 +13,10 @@ document.addEventListener('whab:notice', event => {
   notify(event.detail.message);
 });
 
-for (const image of document.querySelectorAll('[data-bank-logo], [data-merchant-logo]')) {
+function bindLogos(scope = document) {
+for (const image of scope.querySelectorAll('[data-bank-logo], [data-merchant-logo]')) {
+  if (image.dataset.logoBound) continue;
+  image.dataset.logoBound = 'true';
   const update = () => {
     const loaded = image.naturalWidth > 0;
     image.hidden = !loaded;
@@ -20,6 +27,27 @@ for (const image of document.querySelectorAll('[data-bank-logo], [data-merchant-
   image.addEventListener('error', update);
   if (image.complete) update();
 }
+}
+bindLogos();
+
+let currentRegister = null;
+async function flushEdits() {
+  if (!(await budgetEdits.flush())) return false;
+  return !currentRegister || await currentRegister.flush();
+}
+async function requireSavedEdits() {
+  if (!(await flushEdits())) throw new Error('Save the transaction or budget edit before continuing.');
+}
+initBudgetSourceLinks();
+const accountNavigation = initAccountNavigation({
+  flush: flushEdits,
+  onReplace({content}) {
+    currentRegister?.dispose();
+    currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args)});
+    bindLogos(content);
+  },
+  notify,
+});
 
 function minorAmount(value, digits, authoritative = false) {
   const trimmed = value.trim();
@@ -51,7 +79,7 @@ function formBody(form, {authoritative = false} = {}) {
 
 const budgetEdits = initBudgetEdits({readForm: formBody});
 for (const form of document.querySelectorAll('form[data-api]')) {
-  if (form.hasAttribute('data-inline-assignment') || form.hasAttribute('data-budget-mutation')) continue;
+  if (form.hasAttribute('data-inline-assignment') || form.hasAttribute('data-budget-mutation') || form.hasAttribute('data-account-classification')) continue;
   const radioChoices = [...form.querySelectorAll('input[type="radio"]')];
   const originalChoices = new Map(radioChoices.map(choice =>
     [choice, {checked: choice.checked, disabled: choice.disabled}]));
@@ -62,7 +90,7 @@ for (const form of document.querySelectorAll('form[data-api]')) {
     form.dataset.busy = 'true';
     try {
       const body = formBody(form);
-      if (!(await budgetEdits.flush())) throw new Error('Save or discard the budget edit before continuing.');
+      await requireSavedEdits();
       if (error) error.hidden = true;
       if (radioChoices.length) {
         for (const choice of radioChoices) choice.disabled = true;
@@ -116,23 +144,31 @@ for (const form of document.querySelectorAll('[data-account-form]')) {
   form.querySelector('[data-account-type]').addEventListener('change', () => updateAccountFields(form));
   updateAccountFields(form);
 }
-for (const button of document.querySelectorAll('[data-edit-account]')) button.addEventListener('click', () => {
-  const form = document.querySelector('[data-account-classification]');
-  form.dataset.api = `/accounts/${encodeURIComponent(button.dataset.editAccount)}`;
-  form.querySelector('[data-account-edit-name]').textContent = button.dataset.accountName;
-  form.elements.onBudget.value = button.dataset.accountOnBudget;
-  updateAccountFields(form);
-  form.elements.type.value = button.dataset.accountType;
-  updateAccountFields(form);
-  form.elements.subtype.value = button.dataset.accountSubtype;
-  form.querySelector('.field-error').hidden = true;
+initAccountSettings({
+  api, readForm: formBody, updateFields: updateAccountFields,
+  flush: flushEdits,
+  async refresh({currency, changedCurrency}) {
+    const target = new URL(location.href);
+    if (changedCurrency) {
+      target.pathname = target.pathname.replace(/\/[a-z]{3}$/, '/' + currency.toLowerCase());
+      location.assign(target);
+    } else if (!(await accountNavigation.navigate(target, {history: 'replace', refresh: true}))) location.reload();
+    bindLogos();
+  },
 });
 
-for (const button of document.querySelectorAll('[data-dialog]')) button.addEventListener('click', () => document.getElementById(button.dataset.dialog).showModal());
-for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => button.closest('dialog').close());
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-dialog]');
+  if (button && !button.disabled) document.getElementById(button.dataset.dialog)?.showModal();
+});
+for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => {
+  const dialog = button.closest('dialog');
+  if (!dialog.querySelector('[data-account-classification][data-busy]')) dialog.close();
+});
 for (const dialog of document.querySelectorAll('dialog')) {
+  if (dialog.hasAttribute('data-transaction-receipt-dialog')) continue;
   dialog.addEventListener('click', event => {
-    if (event.target === dialog && !dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy]')) dialog.close();
+    if (event.target === dialog && !dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy]')) dialog.close();
   });
   dialog.addEventListener('cancel', event => {
     if (dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy]')) event.preventDefault();
@@ -169,7 +205,7 @@ if (pluginSelection) {
       error.hidden = true;
       submit.disabled = true;
       const plugins = selectedPlugins();
-      if (!(await budgetEdits.flush())) throw new Error('Save or discard the budget edit before continuing.');
+      await requireSavedEdits();
       await api('/plugins/management', {plugins}, 'PUT');
       location.hash = 'plugins';
       location.reload();
@@ -256,6 +292,7 @@ budgetDialog.querySelector('[data-budget-save]').addEventListener('click', async
   button.disabled = true;
   error.hidden = true;
   try {
+    await requireSavedEdits();
     await api('/budget/save', {});
     await loadBudgetControls();
   } catch (failure) {
@@ -275,6 +312,7 @@ function budgetPasswordHeaders(password) {
 }
 
 async function downloadBudget(path, password, name) {
+  await requireSavedEdits();
   const response = await fetch(path, {headers: budgetPasswordHeaders(password)});
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
@@ -354,7 +392,7 @@ function budgetForm(selector, action) {
     for (const button of buttons) button.disabled = true;
     error.hidden = true;
     try {
-      if (!(await budgetEdits.flush())) throw new Error('Resolve the budget edit that could not be saved before continuing.');
+      await requireSavedEdits();
       const result = await action(form);
       budgetDialog.close();
       document.getElementById('settings-dialog').close();
@@ -378,6 +416,7 @@ copyForm.addEventListener('submit', async event => {
   submit.disabled = true;
   error.hidden = true;
   try {
+    await requireSavedEdits();
     await api('/budget/copies', {name: copyForm.elements.name.value.trim(), path: copyForm.elements.path.value.trim()});
     copyForm.reset();
     await loadBudgetControls();
@@ -507,13 +546,19 @@ for (const button of document.querySelectorAll('[data-plugin-options]')) button.
 });
 
 for (const input of document.querySelectorAll('[data-navigation]')) {
+  if (input.closest('[data-transaction-register]')) continue;
   const initialValue = input.value;
-  input.addEventListener('change', () => {
+  input.addEventListener('change', async () => {
     if (!input.checkValidity()) {
       input.reportValidity();
       return;
     }
     const url = pageUrl({[input.dataset.navigation]: input.value});
+    if (currentRegister && !(await currentRegister.flush())) {
+      input.value = initialValue;
+      notify('Save the transaction edit before continuing.');
+      return;
+    }
     if (!budgetEdits.navigate(url.href, () => { input.value = initialValue; })) location.assign(url);
   });
 }
@@ -525,31 +570,14 @@ document.addEventListener('click', event => {
 });
 for (const time of document.querySelectorAll('[data-local-time]')) time.textContent = new Date(time.dateTime).toISOString().slice(0, 10);
 
-const search = document.getElementById('transaction-search');
-const accountFilter = document.getElementById('account-filter');
-const reviewFilter = document.getElementById('review-filter');
-const allDatesFilter = document.getElementById('all-dates-filter');
-const transactionCount = document.getElementById('transaction-count');
-const transactionPeriod = transactionCount?.textContent.split(' · ')[1];
-
-function filterTransactions() {
-  let count = 0;
-  for (const row of document.querySelectorAll('.transaction-row')) {
-    row.hidden = !row.dataset.payee.includes(search.value.toLowerCase()) ||
-      (accountFilter.value !== 'all' && row.dataset.account !== accountFilter.value) ||
-      (reviewFilter.getAttribute('aria-pressed') === 'true' && row.dataset.reviewed === 'true');
-    if (!row.hidden) count += 1;
-  }
-  transactionCount.textContent = `${count} transactions · ${transactionPeriod}`;
-}
-if (search) {
-  search.addEventListener('input', filterTransactions);
-  accountFilter.addEventListener('change', () => location.assign(pageUrl({account: accountFilter.value})));
-  allDatesFilter.addEventListener('change', () => location.assign(pageUrl({allDates: allDatesFilter.checked})));
-  reviewFilter.addEventListener('click', () => {
-    const pressed = reviewFilter.getAttribute('aria-pressed') !== 'true';
-    reviewFilter.setAttribute('aria-pressed', String(pressed));
-    reviewFilter.classList.toggle('selected', pressed);
-    filterTransactions();
-  });
-}
+currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args)});
+document.addEventListener('click', async event => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !currentRegister?.dirty) return;
+  const link = event.target.closest('a[href]');
+  if (!link || link.hasAttribute('download') || link.target && link.target !== '_self') return;
+  const target = new URL(link.href, location.href);
+  if (target.origin !== location.origin || target.href.split('#')[0] === location.href.split('#')[0]) return;
+  event.preventDefault();
+  if (await currentRegister.flush()) location.assign(target.href);
+  else notify('Save the transaction edit before continuing.');
+});

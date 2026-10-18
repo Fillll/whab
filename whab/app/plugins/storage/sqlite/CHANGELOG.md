@@ -1,5 +1,12 @@
 # SQLite budget storage plugin changelog
 
+## 1.3.0 — 2026-10-18
+
+PR: [#51](https://github.com/Fillll/whab/pull/51)
+
+- Persist bounded receipt images in an additive table, retain them in sanitized portable images and move them with matched pending transactions. Roll back uploads that would exceed the portable-image size bound.
+- Preserve account names, public bank websites and explicit memo edits through synchronization and portable roundtrips. Keep all historical amounts bound to their original currency.
+
 ## 1.2.0 — 2026-10-17
 
 PR: [#41](https://github.com/Fillll/whab/pull/41)

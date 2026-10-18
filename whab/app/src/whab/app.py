@@ -26,6 +26,7 @@ from whab.plugins import (
 )
 from whab.plugins.management import PluginManager, installed_entrypoints
 from whab.plugins.storage import close_storage, open_storage
+from whab.services.receipts import ReceiptService
 from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
 from whab.web.middleware import install_middleware
@@ -35,6 +36,7 @@ from whab.web.routes.health import create_router as health_router
 from whab.web.routes.ledger import create_router as ledger_router
 from whab.web.routes.pages import create_router as pages_router
 from whab.web.routes.plugins import create_router as plugins_router
+from whab.web.routes.receipts import create_router as receipts_router
 
 
 def plugin_config(settings, session, plugin_id):
@@ -300,6 +302,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     install_error_handlers(app)
     app.include_router(health_router())
     app.include_router(ledger_router(service))
+    receipt_service = ReceiptService(store, store.lock)
+    app.include_router(receipts_router(receipt_service))
+    app.state.receipt_service = receipt_service
     app.include_router(file_imports_router(
         store, plugins, budget_host, budget_session.id if budget_session else "default",
     ))

@@ -89,14 +89,27 @@
     <button class="button primary full-width">Add account</button>
   </form>
 </dialog>
-<dialog class="modal" id="account-classification-dialog">{{ heading('Account classification', 'Choose how this account is used in WHAB.') }}
+<dialog class="modal account-settings-dialog" id="account-classification-dialog">{{ heading('Account settings', 'Name, classification and appearance for this account.') }}
   <form class="modal-form" data-api="/accounts" data-method="PATCH" data-account-form data-account-classification>
     <input type="hidden" name="workspace" value="{{ workspace }}">
-    <p class="settings-notice"><strong data-account-edit-name></strong></p>
-    {{ account_classification() }}
-    <p class="settings-notice">Changing budget scope applies to all transactions in this account. Off-budget accounts stay in net worth and are excluded from budget income, spending and category activity.</p>
+    <p class="settings-notice" role="status" data-account-settings-status></p>
+    <div class="form-columns"><label>Account name<input name="name" maxlength="200" required autocomplete="off"></label>
+    <label>Account currency<select name="currency" aria-describedby="account-currency-hint" disabled>
+      {% for code, digits in currency_choices %}<option value="{{ code }}">{{ code }}</option>{% endfor %}
+    </select></label></div>
+    <p class="settings-notice" id="account-currency-hint">Currency can change only before this account has transaction history. Amounts are never converted.</p>
+    <div class="account-classification-fields">{{ account_classification() }}</div>
+    <p class="settings-notice">Budget scope applies to all transactions. Off-budget accounts track net worth and are excluded from budget income and spending.</p>
+    {% if account_logo_provider|default(none) %}
+    <section class="account-logo-settings" aria-labelledby="account-logo-title">
+      <div class="account-logo-heading"><h3 id="account-logo-title">Account logo</h3><button class="text-link" type="button" data-dialog="plugin-options-{{ account_logo_provider.id }}" data-plugin-options>{{ account_logo_provider.display_name }} options{{ icon('chevron-right', 14) }}</button></div>
+      <p class="settings-notice">Provided by the {{ account_logo_provider.display_name }} plugin.</p>
+      <label>Bank website<input type="url" name="bankWebsite" maxlength="2048" placeholder="https://www.your-bank.com" autocomplete="off"></label>
+      <p class="settings-notice">Saving a website lets WHAB request its logo from <a href="{{ account_logo_provider.provider_url }}" target="_blank" rel="noopener noreferrer">{{ account_logo_provider.provider_name }} ({{ account_logo_provider.provider_url }})</a>. Only the bank’s public domain is sent to this external website. Leave blank to use the plugin’s default logo.</p>
+    </section>
+    {% endif %}
     <p class="field-error" role="alert" hidden></p>
-    <button class="button primary full-width">Save classification</button>
+    <button class="button primary full-width" type="submit" disabled>Save account</button>
   </form>
 </dialog>
 <dialog class="modal"

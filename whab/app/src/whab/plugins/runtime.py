@@ -7,6 +7,9 @@ from importlib import metadata
 from pathlib import Path
 from threading import Lock
 from time import monotonic
+from urllib.parse import urlsplit
+
+from whab.domain.accounts import bank_website
 
 from .sdk import (
     API_VERSION,
@@ -205,8 +208,31 @@ class PluginRegistry:
                     del self._logo_cache[key]
         return message
 
-    def bank_logo(self, institution: str) -> tuple[str, str] | None:
-        """First enabled match wins. Only institution text reaches resolver hooks."""
+    def bank_logo_provider(self):
+        """Public attribution for the first enabled explicit-website artwork provider."""
+        return next(({
+            "id": plugin.id, "display_name": plugin.display_name,
+            "provider_name": plugin.bank_logos.provider_name,
+            "provider_url": plugin.bank_logos.provider_url,
+        } for plugin in self._plugins
+            if plugin.bank_logos is not None and plugin.bank_logos.resolve_domain is not None), None)
+
+    def bank_logo(self, institution: str, *, website: str | None = None) -> tuple[str, str] | None:
+        """Only public institution text or an explicitly supplied hostname reaches hooks."""
+        if website:
+            try:
+                hostname = urlsplit(bank_website(website)).hostname
+            except ValueError:
+                return None
+            for plugin in self._plugins:
+                if plugin.bank_logos is None or plugin.bank_logos.resolve_domain is None:
+                    continue
+                try:
+                    key = plugin.bank_logos.resolve_domain(hostname)
+                    if valid_plugin_name(key):
+                        return plugin.id, key
+                except Exception:
+                    pass
         if type(institution) is not str or not institution or len(institution) > 200:
             return None
         for plugin in self._plugins:

@@ -1,5 +1,8 @@
 {% if page=='budget' and request.headers.get('X-WHAB-Budget-Fragment')=='1' %}
 {% include "budget.html" %}
+{% elif page=='transactions' and request.headers.get('X-WHAB-Transactions-Fragment')=='1' %}
+{% include "transactions-fragment.html" %}
+<template data-account-list>{% include "sidebar-accounts.html" %}</template>
 {% else %}
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
@@ -16,7 +19,6 @@
     {% for script in plugin_scripts %}<script src="{{ script }}" type="module"></script>{% endfor %}
   </head>
   <body>
-    {% set logos = account_logos|default({}) %}
     <div class="app-shell">
       <aside class="sidebar">
         <a class="brand" href="{{ url('budget') }}" aria-label="WHAB home"><img class="brand-symbol" src="{{ asset_prefix }}/static/logo.svg?v={{ web_asset_version }}" alt="" width="40" height="40"><span><strong>WHAB</strong><small>We Have A Budget</small></span></a>
@@ -31,15 +33,7 @@
     {% endfor %}
   </nav>
   <div class="sidebar-accounts">
-    <div class="nav-label">
-      ACCOUNTS <a href="{{ url('accounts') }}"
-    aria-label="Add bank account">{{ icon('plus', 15) }}</a>
-    </div>
-  {% for group in account_groups if group.accounts %}
-  <div class="sidebar-account-scope">{{ group.label }}</div>
-  {% for account in group.accounts %}<a class="sidebar-account" href="{{ url('transactions',account=account.id,all_dates='true') }}"{% if selected_account and selected_account.id==account.id %} aria-current="page"{% endif %}><span><span class="sidebar-bank-mark" aria-hidden="true"><span>{{ icon('credit' if is_liability(account) else 'accounts',15) }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo src="{{ logos[account.id] }}" alt="" width="18" height="18" decoding="async" hidden>{% endif %}</span><span>{{ account.name }}</span></span><small>{{ '—' if account.balanceUnknown else money(-account.balance if is_liability(account) else account.balance) }}</small></a>
-  {% endfor %}
-  {% else %}<p class="sidebar-empty">Connect an account to get started.</p>{% endfor %}
+    {% include "sidebar-accounts.html" %}
 </div>
 <div class="sidebar-bottom">
   <div class="local-status">
@@ -63,7 +57,11 @@
       <span>{{ icon('sparkles', 14) }}You’re exploring sample data. Your accounts are separate.</span><a class="text-link" href="{{ url('accounts',workspace='personal') }}">Set up my budget {{ icon('arrow-right', 14) }}</a>
     </div>
   {% endif %}
-  <div class="page-content">{% include page+".html" %}</div>
+  {% if page=='transactions' %}
+    {% include "transactions-fragment.html" %}
+  {% else %}
+    <div class="page-content">{% include page+".html" %}</div>
+  {% endif %}
 </main>
 </div>
 <div class="toast" id="toast" role="status" hidden>

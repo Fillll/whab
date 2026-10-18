@@ -19,9 +19,10 @@ from starlette.concurrency import run_in_threadpool
 
 from whab.domain.errors import StoreError
 from whab.domain.money import currency_code
-from whab.web.navigation import PAGES, budget_key, page_url
+from whab.web.navigation import PAGES, budget_key, page_url, valid_route_key
 from whab.web.schemas import valid_month
 
+from .aliases import RouteAliases
 from .container import decode_container, encode_container
 from .credentials import encrypt_credentials
 from .document import atomic_write, encode_bundle, new_manifest
@@ -81,6 +82,41 @@ class BudgetHost:
         self._open_lock = asyncio.Lock()
         self._recent_path = settings.home / "budgets" / f"index-{settings.plaid_env}.json"
         self.recent = self._read_recent()
+        self.route_aliases = RouteAliases(settings.home / "budgets" / f"routes-{settings.plaid_env}.json")
+
+    def _budget_aliases(self):
+        names = {identifier: entry["name"] for identifier, entry in self.recent.items()}
+        names.update({identifier: session.name if session else "My budget" for identifier, (_, session) in list(self.applications.items())})
+        reserved = {identifier: identifier for identifier in names}
+        reserved.update(home="default", demo="demo")
+        return self.route_aliases.update("budgets", [{"id": identifier, "name": name} for identifier, name in names.items()], reserved=reserved)
+
+    def route_key(self, identifier):
+        if identifier == "demo":
+            return "demo"
+        return self._budget_aliases().get(identifier, budget_key(identifier))
+
+    def resolve_key(self, key):
+        if key == "demo":
+            return self.default_id
+        if key == "home":
+            return "default"
+        self._budget_aliases()
+        if key in self.applications or key in self.recent:
+            return key
+        return self.route_aliases.resolve("budgets", key)
+
+    def budget_route_keys(self, identifier):
+        if identifier == "demo":
+            return ["demo"]
+        self._budget_aliases()
+        return list(dict.fromkeys([budget_key(identifier), *self.route_aliases.aliases("budgets", identifier)]))
+
+    def account_slugs(self, identifier, workspace, accounts):
+        return self.route_aliases.update(f"accounts:{identifier}:{workspace}", accounts)
+
+    def resolve_account_slug(self, identifier, workspace, slug):
+        return self.route_aliases.resolve(f"accounts:{identifier}:{workspace}", slug)
 
     def _read_recent(self):
         if not self._recent_path.exists():
@@ -297,7 +333,7 @@ class BudgetHost:
                     raise
             return {
                 **result, "id": operation,
-                "url": page_url(budget_key(operation), "accounts", currency=data.currency),
+                "url": page_url(self.route_key(operation), "accounts", currency=data.currency),
                 "opened": True,
             }
 
@@ -339,6 +375,18 @@ class BudgetHost:
                 snapshot = getattr(store, "export_budget", None)
                 if not callable(snapshot):
                     raise StoreError("This storage plugin cannot export the demo budget.")
+                images = getattr(store, "receipt_ids", None)
+                if callable(images) and images("demo"):
+                    exporter = getattr(store, "export_budget_files", None)
+                    if not callable(exporter):
+                        raise StoreError("This storage plugin cannot export receipt images with the demo budget.")
+                    # The storage capability exports a sanitized workspace image;
+                    # a fresh identity never carries personal plugin data or credentials.
+                    manifest = new_manifest("Demo budget", storage=settings.storage)
+                    return encode_container(manifest, {
+                        f"plugins/{settings.storage}/{name}": raw
+                        for name, raw in exporter("demo").items()
+                    })
                 # Demo is a separate ledger, not the active portable budget's
                 # identity, plugin data or remote connection reference.
                 return encode_bundle(new_manifest("Demo budget"), snapshot("demo"))
@@ -361,7 +409,7 @@ class BudgetHost:
             return Response(raw, media_type="application/zip", headers={"Content-Disposition": 'attachment; filename="budget.whab"'})
 
         def activate(budget_id):
-            response = JSONResponse({"id": budget_id, "opened": True, "url": page_url(budget_key(budget_id))})
+            response = JSONResponse({"id": budget_id, "opened": True, "url": page_url(self.route_key(budget_id))})
             response.set_cookie(COOKIE, budget_id, httponly=True, samesite="strict", secure=True)
             return response
 
@@ -375,11 +423,11 @@ class BudgetHost:
         def list_budgets(request: Request):
             result = self.list(current_id)
             if "whab.budget_key" in request.scope:
-                key = request.scope["whab.budget_key"]
+                identifier = request.scope["whab.budget_id"]
                 for entry in result["budgets"]:
-                    entry["url"] = page_url(budget_key(entry["id"]))
-                    entry["active"] = budget_key(entry["id"]) == key
-                result["budgets"].append({"id": "demo", "name": "Demo budget", "active": key == "demo", "url": page_url("demo")})
+                    entry["url"] = page_url(self.route_key(entry["id"]))
+                    entry["active"] = entry["id"] == identifier
+                result["budgets"].append({"id": "demo", "name": "Demo budget", "active": identifier == "demo", "url": page_url("demo")})
             return result
 
         @router.get("/api/budget")
@@ -413,7 +461,7 @@ class BudgetHost:
 
         @router.get("/api/budgets/{budget_id}/export")
         async def export_budget(budget_id: str, request: Request, include_credentials: bool = False, workspace: Literal["personal", "demo"] = "personal"):
-            if "whab.budget_key" in request.scope and request.scope["whab.budget_key"] != budget_key(budget_id):
+            if "whab.budget_id" in request.scope and request.scope["whab.budget_id"] != budget_id:
                 raise HTTPException(400, "Budget does not match this download address.")
             password = request_password(request)
             if budget_id not in self.applications:
@@ -495,21 +543,29 @@ class BudgetDispatch:
         key = parts[2] if len(parts) > 2 else ""
         tail = "/" + "/".join(parts[3:])
         try:
-            if key not in {"home", "demo"} and str(UUID(key)) != key:
+            if not valid_route_key(key):
                 raise ValueError
             if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/")):
                 if tail.endswith("/webhook"):
                     raise ValueError
             else:
-                if len(parts) != 6 or parts[3] not in PAGES or parts[5] != parts[5].lower():
+                account_route = len(parts) == 7 and valid_route_key(parts[3]) and parts[4] == "transactions"
+                if not account_route and (len(parts) != 6 or parts[3] not in PAGES):
                     raise ValueError
-                if parts[4] != "current-month":
-                    valid_month(parts[4])
-                currency_code(parts[5].upper())
+                month, currency = parts[-2:]
+                if currency != currency.lower():
+                    raise ValueError
+                if month != "current-month":
+                    valid_month(month)
+                currency_code(currency.upper())
         except (ValueError, StoreError):
             await JSONResponse({"error": "Budget address not found"}, status_code=404)(scope, receive, send)
             return
-        identifier = self.host.default_id if key == "demo" else "default" if key == "home" else key
+        try:
+            identifier = self.host.resolve_key(key)
+        except StoreError:
+            await self._unavailable(scope, receive, send)
+            return
         entry = self.host.applications.get(identifier)
         if entry is None:
             if identifier not in self.host.recent:
@@ -527,9 +583,11 @@ class BudgetDispatch:
                     return
                 entry = self.host.applications[identifier]
         scoped = dict(scope)
-        scoped["whab.budget_key"] = key
+        scoped["whab.budget_key"] = "demo" if key == "demo" else self.host.route_key(identifier)
+        scoped["whab.budget_id"] = "demo" if key == "demo" else identifier
         scoped["whab.workspace"] = "demo" if key == "demo" else "personal"
-        scoped["whab.personal_key"] = budget_key(self.host.default_id)
+        scoped["whab.personal_key"] = self.host.route_key(self.host.default_id)
+        scoped["whab.routing"] = self.host
         if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/")):
             scoped["path"] = tail
             scoped["raw_path"] = tail.encode("utf-8")
@@ -550,6 +608,7 @@ class BudgetDispatch:
                 response = JSONResponse({"error": "HTTPS is required"}, status_code=400, headers={"Cache-Control": "no-store"})
                 await response(scope, receive, send)
                 return
+            scope = {**scope, "whab.routing": self.host}
             if scope["path"] == "/" and any(
                 name == "oauth_state_id"
                 for name, _ in parse_qsl(scope.get("query_string", b"").decode("utf-8"))

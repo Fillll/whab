@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.11.0 — 2026-10-18
+
+PR: [#51](https://github.com/Fillll/whab/pull/51)
+
+- Add optional storage-owned private raster receipts with guarded local endpoints and portable SQLite images. Preserve memo edits and account name overrides through bank synchronization.
+- Add account metadata settings, allow currency changes only before transaction history, and expose explicit bank website attribution through optional branding hooks.
+- Use readable budget/account aliases while keeping internal IDs, API scoping, legacy URLs and renamed bookmarks stable. Require the updated web, SQLite, client and Bank logos packages in the supported bundle.
+
 ## 2.10.0 — 2026-10-18
 
 PR: [#50](https://github.com/Fillll/whab/pull/50)

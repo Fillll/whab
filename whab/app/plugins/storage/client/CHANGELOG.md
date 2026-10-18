@@ -1,5 +1,11 @@
 # HTTPS remote budget client plugin changelog
 
+## 1.3.0 — 2026-10-18
+
+PR: [#51](https://github.com/Fillll/whab/pull/51)
+
+- Forward optional memo and account metadata edits through the existing revision and idempotency protocol. Preserve omitted notes, support explicit clearing and report unavailable receipt storage without creating local shadow data.
+
 ## 1.2.0 — 2026-10-17
 
 PR: [#41](https://github.com/Fillll/whab/pull/41)

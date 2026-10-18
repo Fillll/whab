@@ -818,8 +818,7 @@ strong {
   display: flex;
   gap: 11px;
   align-items: center;
-  padding-bottom: 23px;
-  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
   flex-wrap: wrap;
 }
 .search-input {
@@ -872,44 +871,184 @@ strong {
   border-color: var(--accent-border);
   color: var(--accent-ink);
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.transactions-scroll {
+  max-height: max(220px, calc(100dvh - 270px));
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  scrollbar-gutter: stable;
+}
+.transactions-scroll:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
 .transactions-table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 740px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  min-width: 900px;
   font-size: 11px;
+  line-height: 1.25;
 }
 .transactions-table th {
-  text-align: left;
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--muted);
-  padding: 17px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 32px;
+  padding: 5px 8px;
   border-bottom: 1px solid var(--line);
+  background: var(--table-heading);
+  color: var(--text-secondary);
+  text-align: left;
+  font-size: 10px;
+  font-weight: 550;
+  white-space: nowrap;
 }
-.transactions-table th:first-child {
-  width: 54px;
-  padding-left: 0;
-}
-.transactions-table th:last-child {
-  text-align: right;
+.transactions-table th + th,
+.transactions-table td + td {
+  border-left: 1px solid var(--line);
 }
 .transactions-table td {
-  padding: 18px 12px;
+  height: 34px;
+  padding: 3px 8px;
   border-bottom: 1px solid var(--line);
+  vertical-align: middle;
 }
-.transactions-table td:first-child {
-  padding-left: 9px;
+.transactions-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.transactions-table tbody tr:hover {
+  background: var(--input-hover);
+}
+.transactions-table tbody tr.is-selected,
+.transactions-table tbody tr[aria-selected='true'] {
+  background: var(--accent);
+}
+.transactions-table .transaction-select-cell {
+  width: 36px;
+  padding-left: 8px;
+  padding-right: 8px;
+  text-align: center;
+}
+.transactions-table input[type='checkbox'] {
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: auto;
+}
+.transactions-table th.date-cell {
+  width: 96px;
+}
+.transactions-table .transaction-receipt-cell {
+  width: 36px;
+  padding: 2px 3px;
+  text-align: center;
+}
+.transactions-table .transaction-category-cell {
+  width: 21%;
+}
+.transactions-table .transaction-memo-cell {
+  width: 24%;
+}
+.transactions-table th.amount-cell {
+  width: 108px;
+}
+.transactions-table .transaction-currency-cell {
+  width: 64px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 10px;
+}
+.transactions-table .transaction-review-cell {
+  width: 36px;
+  padding: 2px 3px;
+  text-align: center;
+}
+.transaction-review-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-height: 24px;
+  padding: 3px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+}
+.transaction-review-button[aria-pressed='false'] {
+  color: var(--muted);
+  background: transparent;
+}
+.transaction-review-button[aria-pressed='true'] {
+  color: var(--success);
+  background: var(--success-surface);
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.transaction-review-button:hover:not(:disabled) {
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+}
+.transaction-navigation-status {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.transactions-table .amount-cell {
+  text-align: right;
 }
 .transaction-payee strong {
-  font-weight: 550;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .transaction-payee {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  min-width: 0;
 }
 .transaction-payee > div {
   min-width: 0;
+  overflow: hidden;
+}
+.transaction-state,
+.transaction-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: var(--muted);
+}
+.transaction-state svg,
+.transaction-status svg {
+  width: 12px;
+  height: 12px;
+}
+.transaction-state.is-reviewed {
+  color: var(--success);
 }
 .merchant-mark {
   display: flex;
@@ -938,35 +1077,155 @@ strong {
 .merchant-mark > span[hidden] {
   display: none;
 }
-.transactions-table td:last-child {
-  text-align: right;
+.transactions-table .merchant-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 10px;
 }
 .transactions-table select {
   font-size: 10px;
-  border: 0;
-  background-color: var(--surface);
-  min-height: 29px;
-  max-width: 143px;
-  padding: 7px 30px 7px 9px;
+  line-height: 1.25;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background-color: transparent;
+  width: 100%;
+  min-height: 26px;
+  max-width: none;
+  padding: 4px 27px 4px 6px;
   background-position: right 10px center;
   background-size: 8px 5px;
   color: var(--text-secondary);
+  text-overflow: ellipsis;
+}
+.transactions-table select:hover,
+.transactions-table select:focus-visible {
+  border-color: var(--control-border);
+  background-color: var(--field);
 }
 .transactions-table select.uncategorized {
   background-color: var(--yellow-surface);
   color: var(--yellow-ink);
 }
-.transaction-meta {
-  display: flex;
-  gap: 7px;
-  font-size: 9px;
-  color: var(--muted);
-  margin-top: 5px;
-  max-width: 230px;
-  flex-wrap: wrap;
+.transaction-memo-cell input,
+.transaction-memo-cell textarea {
+  width: 100%;
+  min-height: 26px;
+  height: 26px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  font-size: 11px;
+  font-family: inherit;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  resize: none;
 }
-.transaction-meta:empty {
-  display: none;
+.transaction-memo-cell input::placeholder,
+.transaction-memo-cell textarea::placeholder {
+  color: var(--muted);
+}
+.transaction-memo-cell input:hover,
+.transaction-memo-cell input:focus,
+.transaction-memo-cell textarea:hover,
+.transaction-memo-cell textarea:focus {
+  border-color: var(--control-border);
+  background: var(--field);
+}
+.transaction-memo-cell textarea:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.transaction-receipt-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  min-height: 26px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--muted);
+}
+.transaction-receipt-button:hover,
+.transaction-receipt-button:focus-visible {
+  border-color: var(--control-border);
+  background: var(--field);
+  color: var(--ink);
+}
+.transaction-receipt-button.has-receipt {
+  color: var(--action);
+}
+.transaction-receipt-button svg {
+  width: 15px;
+  height: 15px;
+}
+.transactions-table .is-saving {
+  color: var(--muted);
+}
+.transactions-table .is-saved {
+  box-shadow: inset 0 -1px var(--success);
+}
+.transactions-table .has-error {
+  box-shadow: inset 0 -1px var(--danger);
+}
+.transaction-selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  background: var(--accent);
+  font-size: 11px;
+}
+.transaction-selection-count {
+  margin-right: auto;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.transaction-selection-bar .button {
+  min-height: 26px;
+  padding: 4px 8px;
+  font-size: 10px;
+}
+.transaction-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-left: 2px solid var(--danger);
+  background: var(--danger-surface);
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.transaction-receipt-dialog {
+  width: 560px;
+}
+.receipt-preview {
+  display: block;
+  width: 100%;
+  max-height: 55dvh;
+  margin: 0 0 18px;
+  object-fit: contain;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.receipt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
 }
 .date-cell,
 .account-cell {
@@ -2912,6 +3171,17 @@ strong {
   padding: 0 12px 16px 1px;
   white-space: normal;
 }
+.budget-matrix th:first-child::after,
+.budget-matrix td:first-child::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -1px;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
 .budget-intro h1 {
   margin-bottom: 8px;
   font-size: 25px;
@@ -3680,6 +3950,19 @@ strong {
   }
 }
 @media (pointer: coarse) {
+  .transactions-table td {
+    height: 42px;
+  }
+  .transactions-table select,
+  .transaction-memo-cell input,
+  .transaction-memo-cell textarea,
+  .transaction-receipt-button {
+    min-height: 34px;
+  }
+  .transactions-table input[type='checkbox'] {
+    width: 18px;
+    height: 18px;
+  }
   .budget-category-row td {
     height: 44px;
   }
@@ -3703,3 +3986,16 @@ strong {
     min-height: 40px;
   }
 }
+
+.budget-matrix .budget-source-highlight {
+  outline: 2px solid var(--focus);
+  outline-offset: -3px;
+  scroll-margin-block: 60px;
+}
+.account-logo-settings {border-top:1px solid var(--line); padding-top:16px; display:grid; gap:12px;}
+.account-logo-heading {display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;}
+.account-logo-heading h3 {margin:0; font-size:1rem;}
+.account-settings-dialog {width:min(600px,calc(100vw - 32px));}
+.account-classification-fields {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px;}
+.account-settings-dialog [data-account-settings-status]:empty {display:none;}
+@media(max-width:540px) {.account-classification-fields {grid-template-columns:1fr;}}

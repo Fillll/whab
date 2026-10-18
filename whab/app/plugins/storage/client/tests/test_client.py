@@ -126,6 +126,39 @@ def test_rollover_mode_command_preserves_scope_revision_and_retry_identity():
         remote.close()
 
 
+def test_memo_edit_retains_retry_identity_and_distinguishes_clear_from_omitted():
+    import json
+
+    calls = []
+
+    def handler(request):
+        if request.method == "GET":
+            return httpx.Response(200, json=body({}, revision="before"))
+        calls.append(json.loads(request.content))
+        if len(calls) == 1:
+            raise httpx.ReadTimeout("Uncertain response")
+        return httpx.Response(200, json=body(None, revision="updated"))
+
+    remote = make(handler)
+    try:
+        with pytest.raises(StoreError, match="result is unknown"):
+            remote.edit_transaction("personal", "saved", "fun", True, note="Family outing")
+        assert remote.edit_transaction("personal", "saved", "fun", True, note="Family outing") is None
+        assert calls[0] == calls[1]
+        assert calls[0]["operation"] == "edit_transaction"
+        assert calls[0]["workspace"] == "personal"
+        assert calls[0]["expected_revision"] == "before"
+        assert calls[0]["payload"] == {
+            "transactionId": "saved", "categoryId": "fun", "reviewed": True, "note": "Family outing",
+        }
+        remote.edit_transaction("personal", "saved", note="")
+        assert calls[-1]["payload"] == {"transactionId": "saved", "note": ""}
+        remote.edit_transaction("personal", "saved", reviewed=False)
+        assert calls[-1]["payload"] == {"transactionId": "saved", "reviewed": False}
+    finally:
+        remote.close()
+
+
 @pytest.mark.parametrize("status", [400, 404, 422, 401])
 @pytest.mark.parametrize("operation", ["assign_next_month", "set_rollover_mode"])
 def test_planning_rejection_explains_older_server_support(status, operation):

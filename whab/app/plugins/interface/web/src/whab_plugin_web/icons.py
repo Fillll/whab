@@ -11,6 +11,8 @@ PATHS = {
     "check": '<path d="m5 12 4 4 10-10"/>',
     "pencil": '<path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14zM4 14l5 5"/>',
     "check-circle": '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+    "image": '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 3-3 5 5"/>',
+    "clock": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     "chevron-right": '<path d="m9 6 6 6-6 6"/>',
     "chevron-left": '<path d="m15 6-6 6 6 6"/>',
     "chevron-down": '<path d="m6 9 6 6 6-6"/>',

@@ -197,12 +197,14 @@ class RemoteStore:
             raise StoreError("Remote clients only create manual transactions.")
         return self._command("add_transaction", workspace, transaction)
 
-    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None):
+    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET):
         payload = {"transactionId": transaction_id}
         if category_id is not UNSET:
             payload["categoryId"] = category_id
         if reviewed is not None:
             payload["reviewed"] = reviewed
+        if note is not UNSET:
+            payload["note"] = note
         return self._command("edit_transaction", workspace, payload)
 
     def assign(self, workspace, category_id, month, assigned):

@@ -1,5 +1,11 @@
 # Public bank artwork plugin changelog
 
+## 1.1.0 — 2026-10-18
+
+PR: [#51](https://github.com/Fillll/whab/pull/51)
+
+- Resolve explicitly saved public bank hostnames through the fixed Icon Horse artwork source, alongside curated institution aliases. Cache only bounded validated raster files and expose provider attribution for account settings.
+
 ## 1.0.1 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)

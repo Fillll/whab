@@ -131,16 +131,13 @@
               <th scope="row">Assigned this month<small class="budget-row-note">Summary</small></th>
               {% for period in periods %}
                 {% set assigned_valid = period.month>=data.budgetStartMonth and valid_money(period.summary.assigned) %}
-                <td colspan="{{ period.column_count }}" class="month-start" data-budget-key="{{ period.month }}">
+                <td id="assigned-summary-{{ period.month }}-{{ currency|lower }}" colspan="{{ period.column_count }}" class="month-start" data-budget-key="{{ period.month }}">
                   {{ money_number(period.summary.assigned) if assigned_valid else '—' }}
                   {% if assigned_valid %}
-                    {% if period.assigned_parts is not none %}
-                      {% call summary_details(period, 'Assigned this month') %}
-                        <dl>{% for label, amount in period.assigned_parts %}<div><dt>{{ label }}</dt><dd{% if amount<0 %} class="negative"{% endif %}>{{ money_number(amount) }}</dd></div>{% endfor %}<div class="budget-summary-total"><dt>Assigned this month</dt><dd>{{ money_number(period.summary.assigned) }}</dd></div></dl>
-                        {% if not period.assigned_parts %}<p>No spending categories are assigned this month.</p>{% endif %}
-                        <p>The total of the category Assigned amounts below for {{ month_label(period.month) }}. Carryover, spending activity and money set aside for next month are excluded.</p>
-                      {% endcall %}
-                    {% else %}<small class="budget-row-note">Breakdown unavailable</small>{% endif %}
+                    {% call summary_details(period, 'Assigned this month') %}
+                      <p>This is the Assigned total in the spending table for {{ month_label(period.month) }}. It adds up this month's category assignments. Carryover, spending activity and money set aside for next month are excluded.</p>
+                      <p><a class="text-link" href="#assigned-total-{{ period.month }}-{{ currency|lower }}" data-budget-source-link="assigned-total-{{ period.month }}-{{ currency|lower }}" data-budget-source-overview="assigned-summary-{{ period.month }}-{{ currency|lower }}" aria-label="Show matching Assigned total for {{ month_label(period.month) }} in {{ currency }}">Show matching total</a></p>
+                    {% endcall %}
                   {% endif %}
                 </td>
               {% endfor %}
@@ -163,9 +160,9 @@
                         </dl>
                         <p>Income + Carried in − Assigned for next month − Assigned this month.</p>
                         <p>{% if period.summary.readyToAssign<0 %}A negative amount means this month's funding pool does not cover its category assignments and next-month set-aside. Review carried-in deficits, income and assignments before assigning more.{% else %}This is the unassigned money remaining in {{ month_label(period.month) }}'s funding pool.{% endif %} By-category carryover stays in its categories and is excluded from this pool.</p>
+                        {% if valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<p>Some funds are needed to cover spending or account reserves. Review category overspending, uncategorized spending, and account balances before assigning more money.</p>{% endif %}
                       {% endcall %}
                     {% else %}<small class="budget-row-note">Breakdown unavailable</small>{% endif %}
-                    {% if valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<small class="budget-row-note" title="Review category overspending, uncategorized spending, and account balances before assigning more money.">Some funds are needed to cover spending or account reserves.</small>{% endif %}
                   {% endif %}
                 </td>
               {% endfor %}
@@ -228,7 +225,7 @@
               </tr>
             {% endif %}
           </tbody>
-          <tfoot data-budget-key="totals"><tr class="budget-total-row" data-budget-key="total"><td data-budget-key="category">Total</td>{% for period in periods %}{% if period.show_carryover %}<td class="month-start budget-carryover{% if valid_money(period.carryover) and period.carryover<0 %} negative{% elif period.carryover==0 %} zero{% endif %}" data-budget-key="{{ period.month }}:carryover">{{ money_number(period.carryover) if valid_money(period.carryover) else '—' }}</td>{% endif %}<td{% if not period.show_carryover %} class="month-start"{% endif %} data-budget-key="{{ period.month }}:assigned">{{ money_number(period.summary.assigned) }}</td><td data-budget-key="{{ period.month }}:activity">{{ money_number(-period.summary.spent) }}</td><td data-budget-key="{{ period.month }}:available">{{ money_number(period.summary.available) }}</td>{% endfor %}</tr></tfoot>
+          <tfoot data-budget-key="totals"><tr class="budget-total-row" data-budget-key="total"><td data-budget-key="category">Total</td>{% for period in periods %}{% if period.show_carryover %}<td class="month-start budget-carryover{% if valid_money(period.carryover) and period.carryover<0 %} negative{% elif period.carryover==0 %} zero{% endif %}" data-budget-key="{{ period.month }}:carryover">{{ money_number(period.carryover) if valid_money(period.carryover) else '—' }}</td>{% endif %}<td id="assigned-total-{{ period.month }}-{{ currency|lower }}" tabindex="-1" aria-label="Total assigned in {{ month_label(period.month) }}: {{ money_number(period.summary.assigned) }} {{ currency }}"{% if not period.show_carryover %} class="month-start"{% endif %} data-budget-key="{{ period.month }}:assigned">{{ money_number(period.summary.assigned) }}</td><td data-budget-key="{{ period.month }}:activity">{{ money_number(-period.summary.spent) }}</td><td data-budget-key="{{ period.month }}:available">{{ money_number(period.summary.available) }}</td>{% endfor %}</tr></tfoot>
         </table>
       </div>
       <div class="budget-table-footer" data-budget-key="footer"><button class="button secondary" data-dialog="category-dialog">{{ icon('plus', 15) }}Add category</button></div>

@@ -59,25 +59,29 @@ To use an existing certificate, set **both** `WHAB_TLS_CERT_FILE` and `WHAB_TLS_
 Browser addresses identify the saved budget and selected view:
 
 ```text
-/budgets/<budget-key>/<page>/<month>/<currency>
+/budgets/<budget-slug>/<page>/<month>/<currency>
+/budgets/<budget-slug>/<account-slug>/transactions/<month>/<currency>
 ```
 
 Every segment is lowercase, including the currency code. Visible budget names and ISO currency labels keep their ordinary capitalization. API payloads and stored currencies continue to use uppercase ISO codes such as `USD`; lowercase is the browser address policy.
 
 | View | Address |
 | --- | --- |
-| Original budget, current month | `/budgets/home/budget/current-month/usd` |
-| Original budget, fixed month | `/budgets/home/transactions/2026-10/eur` |
+| Original budget, current month | `/budgets/my-budget/budget/current-month/usd` |
+| Original budget, fixed month | `/budgets/my-budget/transactions/2026-10/eur` |
 | Fictional sample budget | `/budgets/demo/accounts/current-month/usd` |
-| Named budget | `/budgets/123e4567-e89b-42d3-a456-426614174000/budget/current-month/usd` |
+| Named budget | `/budgets/family-budget/budget/current-month/usd` |
+| Account register | `/budgets/family-budget/daily-checking/transactions/current-month/usd?all_dates=true` |
 
-`home` identifies the original local budget, displayed as **My Budget**, during an ordinary local launch. A created or opened named budget uses its permanent budget ID. Renaming the displayed budget does not change that key. `demo` identifies one separate **Demo Budget** backed by the startup runtime's fictional data. There is no `personal` or workspace segment, and choosing demo does not select a second dataset inside each real budget. The page is `budget`, `transactions`, `insights` or `accounts`.
+Budget and account names produce readable lowercase aliases. Accented Latin names are normalized, Cyrillic names are transliterated, and punctuation becomes hyphens. Duplicate names get short numeric suffixes; IDs provide a fallback when a name cannot produce a slug. The permanent IDs remain financial identities. The device-local `WHAB_HOME/budgets/routes-<environment>.json` registry retains previous aliases so a rename does not break bookmarks or let a duplicate name capture them. That registry is separate from portable `.whab` files. Legacy UUID budget addresses, the original budget's `home` alias, and `?account=<id>` links remain supported. The browser replaces them with the readable address without loading the page again.
+
+`demo` identifies one separate **Demo Budget** backed by the startup runtime's fictional data. There is no `personal` or workspace segment, and choosing demo does not select a second dataset inside each real budget. The page is `budget`, `transactions`, `insights` or `accounts`.
 
 `current-month` resolves to the current calendar month whenever the page loads. A bookmark with it follows the calendar; `2026-10` remains October 2026. On the Budget page the month is the first of the three displayed months. Page and currency changes retain `current-month`; moving the month arrows selects an explicit month. Optional view selections, such as a category, may remain query parameters.
 
-The clean root address `/` opens the initial demo view or the selected saved budget. When launched with `--budget` or `WHAB_BUDGET`, it opens that budget's permanent-ID address even without a browser selection cookie. That launch starts the selected portable runtime; it does not also open the original local budget at `home`. Its one Demo Budget uses the startup runtime's sample data. Old `/?page=...&workspace=...&month=...&currency=...` view addresses are no longer supported and are not redirected. Use the canonical address shown in the browser for bookmarks. Plaid's OAuth continuation parameter remains supported for an in-progress connection.
+The clean root address `/` opens the initial demo view or the selected saved budget. When launched with `--budget` or `WHAB_BUDGET`, it opens that budget's readable address even without a browser selection cookie. That launch starts the selected portable runtime; it does not also open the original local budget at `home`. Its one Demo Budget uses the startup runtime's sample data. Old `/?page=...&workspace=...&month=...&currency=...` view addresses are no longer supported and are not redirected. Use the canonical address shown in the browser for bookmarks. Plaid's OAuth continuation parameter remains supported for an in-progress connection.
 
-Each open tab uses the budget in its address for reads, changes, plugin assets and downloads. Switching a budget in another tab does not retarget that tab's financial operations. Existing unscoped local API integrations remain available; they retain their documented session and workspace behavior.
+Each open tab resolves its address to one permanent budget ID; API calls, plugin assets and downloads retain that ID scope. Switching a budget in another tab does not retarget its financial operations. Existing unscoped local API integrations remain available with their documented session and workspace behavior.
 
 ## Portable budgets
 

@@ -114,6 +114,7 @@ def test_storage_backend_protocol_is_database_independent_and_preserves_public_s
     assert StoreError is DomainStoreError
     assert UNSET is DomainUnset
     assert signature(StorageBackend.edit_transaction).parameters["category_id"].default is UNSET
+    assert signature(StorageBackend.edit_transaction).parameters["note"].default is UNSET
     assert signature(StorageBackend.apply_sync).parameters["expected_cursor"].default is UNSET
     assert signature(BankStore.apply_sync).parameters["expected_cursor"].default is UNSET
     expected = {
