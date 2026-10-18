@@ -1,5 +1,11 @@
 # Public bank artwork plugin changelog
 
+## 1.2.0 — 2026-10-18
+
+PR: [#52](https://github.com/Fillll/whab/pull/52)
+
+- Keep successful cached artwork indefinitely across restarts and memory eviction, including existing saved files. Stop age-based refresh and disk pruning, retain short failure retries, and show cache information without a Flush cache action.
+
 ## 1.1.0 — 2026-10-18
 
 PR: [#51](https://github.com/Fillll/whab/pull/51)

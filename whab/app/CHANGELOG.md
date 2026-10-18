@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.12.0 — 2026-10-18
+
+PR: [#52](https://github.com/Fillll/whab/pull/52)
+
+- Normalize optional bank website input without blocking account edits, and add a guarded provider-attributed logo preview endpoint that does not change account metadata.
+- Offer an optional atomic scoped register projection and UI opt-in that skip envelope calculations while preserving existing plugin contracts. Require the updated web, SQLite and Bank logos packages in the supported bundle.
+
 ## 2.11.0 — 2026-10-18
 
 PR: [#51](https://github.com/Fillll/whab/pull/51)

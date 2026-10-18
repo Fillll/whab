@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.15.0 — 2026-10-18
+
+PR: [#52](https://github.com/Fillll/whab/pull/52)
+
+- Accept bare bank domains and add optional Retrieve logo with an immediate preview. Keep missing artwork and invalid website input from blocking account Save, and identify the external source and indefinite cache policy.
+- Request lightweight transaction-register projections and render category choices once, populating native dropdowns on pointer or keyboard focus. Keep account switching fresh and avoid caching financial page HTML.
+
 ## 1.14.0 — 2026-10-18
 
 PR: [#51](https://github.com/Fillll/whab/pull/51)
