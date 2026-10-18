@@ -424,3 +424,85 @@ def test_account_boundary_reads_each_later_transaction_once(state, opening, expe
     state["transactions"] = {row["id"]: CountedTransaction(row) for row in rows}
     assert _net_account_funds(state, "2026-09", "USD", opening=opening) == expected
     assert reads <= len(rows)
+
+
+def test_projection_validates_category_records_independently_of_history_size(state, monkeypatch):
+    from whab.domain import categories
+
+    validations = []
+    validate = categories.validate_child_category
+
+    def counted_validation(category):
+        validations.append(category["id"])
+        return validate(category)
+
+    monkeypatch.setattr(categories, "validate_child_category", counted_validation)
+    state["transactions"] = {
+        f"history-{index}": transaction(f"history-{index}", "2026-08-01", 10)
+        for index in range(1000)
+    }
+    state["budget"] = {"2026-08": {"groceries": 20000}, "2026-09": {"groceries": 5000}}
+    view = calculate_workspace(state, "2026-09")
+    assert view["budget"][0]["carryover"] == 10000
+    assert view["budget"][0]["available"] == 15000
+    assert len(validations) <= 3 * len(state["categories"])
+
+
+def test_only_selected_month_rows_become_public_transactions_in_stable_order(state, monkeypatch):
+    from whab.domain import budget
+
+    projected = []
+    public_transaction = budget.public_transaction
+
+    def selected_transaction(row):
+        assert row["date"].startswith("2026-09")
+        projected.append(row["id"])
+        return public_transaction(row)
+
+    monkeypatch.setattr(budget, "public_transaction", selected_transaction)
+    state["transactions"] = {
+        row["id"]: row for row in (
+            transaction("past", "2026-08-01", 100),
+            transaction("a", "2026-09-10", 20),
+            transaction("future", "2026-10-01", 100),
+            transaction("z", "2026-09-10", 30, pending=True),
+            transaction("later", "2026-09-11", 40, transfer=True),
+            {**transaction("deleted", "2026-09-12", 999), "deleted": True},
+        )
+    }
+    before = deepcopy(state)
+    view = calculate_workspace(state, "2026-09")
+    assert set(projected) == {"a", "z", "later"}
+    assert [row["id"] for row in view["transactions"]] == ["later", "z", "a"]
+    assert view["summary"]["spent"] == 20
+    assert state == before
+
+
+def test_optional_transaction_fields_still_use_public_defaults(state):
+    state["transactions"] = {"income": {
+        "id": "income", "accountId": "cash", "date": "2026-09-01", "amount": -1000,
+        "pending": False,
+    }}
+    view = calculate_workspace(state, "2026-09")
+    assert view["summary"]["income"] == 1000
+    row = view["transactions"][0]
+    assert all(row[key] is None for key in (
+        "merchant", "merchantLogo", "categoryId", "reviewed", "source", "note", "isTransfer", "inferredTransfer",
+    ))
+
+
+@pytest.mark.parametrize("category_id", ["missing", "category-group:parent", [], 123])
+@pytest.mark.parametrize("deleted", [False, True])
+def test_projection_preserves_invalid_transaction_category_errors(state, category_id, deleted):
+    state["transactions"] = {"invalid": {
+        **transaction("invalid", "2026-08-01", 100), "categoryId": category_id, "deleted": deleted,
+    }}
+    with pytest.raises(StoreError, match="Category not found. Only child categories can be assigned."):
+        calculate_workspace(state, "2026-09")
+
+
+@pytest.mark.parametrize("category_id", ["missing", "category-group:parent", 123])
+def test_projection_preserves_invalid_assignment_category_errors(state, category_id):
+    state["budget"] = {"2026-08": {category_id: 100}}
+    with pytest.raises(StoreError, match="Category not found. Only child categories can be assigned."):
+        calculate_workspace(state, "2026-09")

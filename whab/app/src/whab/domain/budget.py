@@ -79,11 +79,10 @@ def _cash_capacity(state: dict, month: str, currency: str, budget: list[dict]) -
 def _calculate_currency(state: dict, month: str, currency: str) -> dict:
     validate_month(month)
     transactions = [
-        public_transaction(t) for t in state["transactions"].values() if not t.get("deleted")
+        t for t in state["transactions"].values() if not t.get("deleted")
     ]
-    transactions.sort(key=lambda t: (t["date"], t["id"]), reverse=True)
     cleared = [
-        t for t in transactions if not t["pending"] and not t["isTransfer"]
+        t for t in transactions if not t.get("pending") and not t.get("isTransfer")
         and is_on_budget(state["accounts"][t["accountId"]])
     ]
     accounts = list(state["accounts"].values())
@@ -93,12 +92,12 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
             t["amount"]
             for t in rows
             if t["amount"] < 0
-            and t["categoryId"] is None
+            and t.get("categoryId") is None
             and state["accounts"].get(t["accountId"], {}).get("type") != "credit"
         )
 
     def spend_for(rows):
-        return sum(t["amount"] for t in rows if t["amount"] > 0 or t["categoryId"] is not None)
+        return sum(t["amount"] for t in rows if t["amount"] > 0 or t.get("categoryId") is not None)
 
     start = state["budgetStartMonth"]
     active = [t for t in cleared if t["date"].startswith(month)]
@@ -109,9 +108,9 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
     prior_assignments = defaultdict(int)
     for transaction in cleared:
         if carry_start <= transaction["date"][:7] < month:
-            prior_spending[transaction["categoryId"]] += transaction["amount"]
+            prior_spending[transaction.get("categoryId")] += transaction["amount"]
     for transaction in active:
-        active_spending[transaction["categoryId"]] += transaction["amount"]
+        active_spending[transaction.get("categoryId")] += transaction["amount"]
     for source, rows in state["budget"].items():
         if carry_start <= source < month:
             for category_id, amount in rows.items():
@@ -128,7 +127,7 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
             for amount in rows.values()
         ) - sum(
             t["amount"] for t in cleared
-            if pool_start <= t["date"][:7] <= previous_month and t["categoryId"] is not None
+            if pool_start <= t["date"][:7] <= previous_month and t.get("categoryId") is not None
         )
     budget = []
     for category in state["categories"].values():
@@ -189,7 +188,10 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
         "monthlyFundingFlow": True,
         "accounts": accounts,
         "categories": list(state["categories"].values()),
-        "transactions": [t for t in transactions if t["date"].startswith(month)],
+        "transactions": sorted(
+            [public_transaction(t) for t in transactions if t["date"].startswith(month)],
+            key=lambda t: (t["date"], t["id"]), reverse=True,
+        ),
         "budget": budget,
         "summary": summary,
         "accountSummary": account_summary(accounts),
@@ -285,6 +287,13 @@ def ensure_funding_capacity_preserved(
             raise StoreError(f"Change exceeds available money in {context}.")
 
 
+def _known_child_category(categories: dict, category_id: str) -> dict:
+    """Resolve a reference after every category record has already been validated."""
+    if type(category_id) is not str or category_id not in categories:
+        raise StoreError("Category not found. Only child categories can be assigned.")
+    return categories[category_id]
+
+
 def calculate_workspace(state: dict, month: str, *, as_of_month: str | None = None) -> dict:
     """Project each month's own income, incoming money and explicit allocations.
 
@@ -336,7 +345,7 @@ def calculate_workspace(state: dict, month: str, *, as_of_month: str | None = No
     )
     for rows in state["budget"].values():
         for category_id in rows:
-            ensure_child_category(categories, category_id)
+            _known_child_category(categories, category_id)
     transactions = {}
     for key, row in state["transactions"].items():
         account = accounts.get(row["accountId"])
@@ -344,7 +353,7 @@ def calculate_workspace(state: dict, month: str, *, as_of_month: str | None = No
             raise StoreError("Transaction account not found.")
         category_id = row.get("categoryId")
         if category_id is not None:
-            category = ensure_child_category(categories, category_id)
+            category = _known_child_category(categories, category_id)
             if category["currency"] != account["currency"]:
                 raise StoreError("Category currency must match the account currency.")
         transactions[key] = {**row, "currency": account["currency"]}
