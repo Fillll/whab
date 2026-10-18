@@ -77,7 +77,7 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
     status.hidden = !active;
   }
 
-  function syncNavigation(target, context) {
+  function syncNavigation(target, context, countTemplate) {
     const selected = context.selectedAccountId || target.searchParams.get('account');
     const nextRoute = parsePageRoute(target);
     const accountSlugs = context.accountSlugs || {};
@@ -101,6 +101,13 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
         link.classList.toggle('active', active);
         if (active) link.setAttribute('aria-current', 'page');
         else link.removeAttribute('aria-current');
+        if (active && countTemplate?.content) {
+          const current = link.querySelector('.nav-count');
+          const fresh = countTemplate.content.querySelector('.nav-count');
+          if (fresh && current) current.replaceWith(fresh.cloneNode(true));
+          else if (fresh) link.append(fresh.cloneNode(true));
+          else current?.remove();
+        }
       }
     }
     const breadcrumb = document.querySelector('.breadcrumb > span');
@@ -172,7 +179,7 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
       if (accountList) accountList.replaceChildren(accountTemplate.content.cloneNode(true));
       updateContext(context);
       displayed = canonical;
-      syncNavigation(canonical, context);
+      syncNavigation(canonical, context, fresh.querySelector('template[data-transaction-navigation-count]'));
       if (action === 'push') window.history.pushState(window.history.state, '', canonical.href);
       else if (action === 'replace' || canonical.href !== location.href) window.history.replaceState(window.history.state, '', canonical.href);
       onReplace({content: fresh, url: canonical, context});

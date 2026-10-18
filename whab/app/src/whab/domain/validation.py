@@ -1,7 +1,7 @@
 """Validation shared by ledger commands and imported financial records."""
 
 import re
-from datetime import datetime
+from datetime import date
 
 from .errors import StoreError
 
@@ -10,7 +10,7 @@ def validate_date(value: str) -> None:
     try:
         if (
             not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value)
-            or datetime.strptime(value, "%Y-%m-%d").date().isoformat() != value
+            or date.fromisoformat(value).isoformat() != value
         ):
             raise ValueError
     except (ValueError, TypeError):

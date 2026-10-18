@@ -1,3 +1,3 @@
-{% set register = transaction_window(transactions, request) %}
+{% set register = transaction_window(transactions, request, data.get('transactionPage')) %}
 {% set fragment_context = dict(client_context, transactionSearch=register.search, transactionPage=register.page, transactionRequestedPage=register.requested_page) %}
-<div class="page-content" data-transactions-fragment data-page-context="{{ fragment_context|tojson|forceescape }}">{% include "transactions.html" %}</div>
+<div class="page-content" data-transactions-fragment data-page-context="{{ fragment_context|tojson|forceescape }}"><template data-transaction-navigation-count>{% if to_review %}<span class="nav-count">{{ to_review }}</span>{% endif %}</template>{% include "transactions.html" %}</div>

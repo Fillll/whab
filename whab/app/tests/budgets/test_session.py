@@ -66,6 +66,27 @@ def test_new_session_saves_ledger_and_keeps_runtime_credentials_and_paths_off_bu
     assert str(session.storage_home) not in json.dumps([manifest, ledger])
 
 
+def test_plain_checkpoint_compresses_once_and_durably_saves_identical_recovery_archive(opened, monkeypatch):
+    session, store = opened
+    encode = module.encode_container
+    encodings = []
+
+    def count_encoding(*args, **kwargs):
+        raw = encode(*args, **kwargs)
+        encodings.append(raw)
+        return raw
+
+    monkeypatch.setattr(module, "encode_container", count_encoding)
+    account = TrackedStorage(store, session).add_account(
+        "personal", {"name": "Saved once", "type": "depository", "balance": 75},
+    )
+    assert len(encodings) == 1
+    assert session.path.read_bytes() == encodings[0]
+    assert (session.storage_home / "plugin-data.whab").read_bytes() == encodings[0]
+    assert any(row["id"] == account for row in decode_budget(encodings[0])[1]["accounts"])
+    assert session.status == "saved"
+
+
 def test_open_initializes_only_personal_ledger_and_preserves_demo(tmp_path, incoming):
     path, manifest, ledger = incoming
     session = BudgetSession.open(tmp_path / "runtime", "sandbox", path)
@@ -494,6 +515,10 @@ def test_copy_with_rotated_encrypted_credentials_is_preserved_across_restart_wit
         session.storage_config = first
         session.bind(remote)
         assert session.status == "saved"
+        local = decode_container((session.storage_home / "plugin-data.whab").read_bytes())
+        assert local.credential_blob is None
+        assert local.credentials is None
+        assert local.files == files
         backup = tmp_path / "remote-backup.whab"
         session.add_copy("Backup", str(backup))
         assert session.destinations[0]["status"] == "saved"

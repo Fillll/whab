@@ -374,7 +374,10 @@ class BudgetSession:
                 candidate = container_digest(container)
                 atomic_write(self.storage_home / "manifest.json", json.dumps(self.manifest).encode())
                 if container.legacy_ledger is None:
-                    atomic_write(self.storage_home / "plugin-data.whab", encode_container(self.manifest, self.files))
+                    # The ordinary archive is already validated and contains no
+                    # credentials. Encrypted remote credentials stay source-only.
+                    local_raw = raw if container.credential_blob is None else encode_container(self.manifest, self.files)
+                    atomic_write(self.storage_home / "plugin-data.whab", local_raw)
                 source = {"content": self._source["content"] if self._source else None, "pending": candidate}
                 # Journal before replacing files, so either revision can reopen after interruption.
                 atomic_write(self.storage_home / "source.json", json.dumps(source).encode())

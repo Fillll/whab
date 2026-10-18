@@ -171,6 +171,8 @@ def test_older_remote_projections_show_unavailable_overview_totals_without_inven
         return data
 
     monkeypatch.setattr(store, "workspace", older_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     response = client.get("/budgets/demo/budget/2026-10/usd")
     assert response.status_code == 200
     for label in ("Carried in", "Assigned for next month"):
@@ -255,6 +257,8 @@ def test_scalar_overview_uses_core_summary_values_and_selected_currency(
         return data
 
     monkeypatch.setattr(store, "workspace", projected_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text
     for row_class, expected in (("budget-assigned-row", assigned), ("budget-ready-row", ready)):
         row = re.search(rf'<tr class="budget-overview-row {row_class}"[^>]*>(.*?)</tr>', text, re.S)[1]
@@ -284,6 +288,8 @@ def test_unavailable_remote_ready_to_assign_is_not_recomputed_from_other_balance
         return data
 
     monkeypatch.setattr(store, "workspace", unsupported_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     response = client.get("/budgets/demo/budget/2026-10/usd")
     assert response.status_code == 200
     row = re.search(
@@ -317,6 +323,8 @@ def test_next_month_editor_requires_explicit_capability_and_valid_minor_units(
         return data
 
     monkeypatch.setattr(store, "workspace", unsupported_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert not [form for form in assignment_forms(text) if form["api"] == "/budget/funding/next-month"]
     row = re.search(r'<th scope="row">Assigned for next month</th>(.*?)</tr>', text, re.S)[1]
@@ -344,6 +352,8 @@ def test_large_next_month_totals_remain_visible_without_an_editor(
         return data
 
     monkeypatch.setattr(store, "workspace", large_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     row = re.search(r'<th scope="row">Assigned for next month</th>(.*?)</tr>', text, re.S)[1]
     assert not [form for form in assignment_forms(text) if form["api"] == "/budget/funding/next-month"]
@@ -369,6 +379,8 @@ def test_next_month_editor_uses_each_periods_capability_and_excludes_historical_
         return data
 
     monkeypatch.setattr(store, "workspace", mixed_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert [form["month"] for form in assignment_forms(text) if form["api"] == "/budget/funding/next-month"] == [
         "2026-10", "2026-12",
@@ -519,6 +531,8 @@ def test_next_month_editor_requires_new_flow_model_even_if_old_server_supports_f
         return data
 
     monkeypatch.setattr(store, "workspace", old_model_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert not [form for form in assignment_forms(text) if form["api"] == "/budget/funding/next-month"]
     assert category_assignment_forms(text)
@@ -554,6 +568,8 @@ def test_conservative_spending_note_stays_inside_closed_breakdown_for_valid_lowe
         return data
 
     monkeypatch.setattr(store, "workspace", projected_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     response = client.get("/budgets/demo/budget/2026-10/usd")
     assert response.status_code == 200
     text = response.text
@@ -593,6 +609,8 @@ def test_funding_shortfall_requires_current_monthly_flow_capability(client, stor
         return data
 
     monkeypatch.setattr(store, "workspace", unsupported_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     response = client.get("/budgets/demo/budget/2026-10/usd")
     assert response.status_code == 200
     text = response.text
@@ -610,6 +628,8 @@ def test_funding_shortfall_is_not_shown_before_the_budget_start(client, store, m
         return data
 
     monkeypatch.setattr(store, "workspace", negative_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     response = client.get(f"/budgets/demo/budget/{shift_month(start, -1)}/usd")
     assert response.status_code == 200
     text = response.text

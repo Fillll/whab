@@ -169,6 +169,8 @@ def test_older_remote_projection_does_not_guess_incoming_mode_from_outgoing_mode
         return data
 
     monkeypatch.setattr(store, "workspace", older_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert column_labels(text) == ["Category", *["Assigned", "Activity", "Available"] * 3]
     assert re.findall(r'<th colspan="(\d+)" scope="colgroup"', text) == ["3"] * 3

@@ -262,3 +262,24 @@ def test_user_interface_rejects_non_boolean_lightweight_transactions(tmp_path, v
 
 def test_user_interface_can_opt_into_lightweight_transactions(tmp_path):
     assert UserInterface(tmp_path, tmp_path, build_context, lightweight_transactions=True).lightweight_transactions
+
+
+@pytest.mark.parametrize("value", [0, 1, None, "true", []])
+def test_user_interface_rejects_non_boolean_lightweight_accounts(tmp_path, value):
+    with pytest.raises(ValueError, match="lightweight accounts"):
+        UserInterface(tmp_path, tmp_path, build_context, lightweight_accounts=value)
+
+
+@pytest.mark.parametrize("value", [True, -1, 1001, 1.5, "100", None])
+def test_user_interface_rejects_invalid_transaction_page_size(tmp_path, value):
+    with pytest.raises(ValueError, match="transaction page size"):
+        UserInterface(tmp_path, tmp_path, build_context, transaction_page_size=value)
+
+
+@pytest.mark.parametrize("size", [0, 1, 100, 1000])
+def test_optional_page_reads_keep_legacy_defaults_and_bound_requested_size(tmp_path, size):
+    legacy = UserInterface(tmp_path, tmp_path, build_context)
+    assert not legacy.lightweight_accounts and legacy.transaction_page_size == 0
+    current = UserInterface(tmp_path, tmp_path, build_context,
+                            lightweight_accounts=True, transaction_page_size=size)
+    assert current.lightweight_accounts and current.transaction_page_size == size

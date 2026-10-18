@@ -73,7 +73,7 @@ function harness(count = 5, options = {}) {
       '[data-transaction-search-form]': searchForm})[selector]});
   const window = element();
   window.history = {state: {}, replaceState: (...args) => history.push(args)};
-  const context = {document: {querySelector: () => root}, window, setTimeout, clearTimeout, URL,
+  const context = {document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, URL,
     encodeURIComponent, location: {href: 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
     updateContext: value => contexts.push(value),
@@ -190,6 +190,38 @@ test('memo search results remain in place during autosave and refresh only after
   memo.emit('blur');
   await new Promise(resolve => setTimeout(resolve, 15));
   assert.deepEqual(state.navigations[0].details, {focus: false, refresh: true, history: 'replace'});
+  state.register.dispose();
+});
+
+test('review changes under All refresh server counts without reload and wait for memo focus to leave', async () => {
+  const state = harness(1, {paged: true});
+  const memo = state.rows[0].controls['[data-transaction-field="note"]'];
+  memo.matches = () => true;
+  state.rows[0].controls['[data-transaction-reviewed]'].emit('click');
+  state.document.activeElement = memo;
+  state.requests[0].resolve({ok: true});
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.navigations.length, 0);
+  state.document.activeElement = null;
+  memo.emit('blur');
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.deepEqual(state.navigations[0].details, {focus: false, refresh: true, history: 'replace'});
+  state.register.dispose();
+});
+
+test('ordinary memo-only saves under All do not refresh the register or disturb the editor', async () => {
+  const state = harness(1, {paged: true});
+  const memo = state.rows[0].controls['[data-transaction-field="note"]'];
+  state.document.activeElement = memo;
+  memo.value = 'Keep the cursor here'; memo.emit('input'); memo.emit('change');
+  state.requests[0].resolve({ok: true});
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.navigations.length, 0);
+  assert.equal(state.document.activeElement, memo);
+  state.document.activeElement = null;
+  memo.emit('blur');
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(state.navigations.length, 0);
   state.register.dispose();
 });
 

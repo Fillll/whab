@@ -44,12 +44,13 @@ def test_merchant_artwork_keeps_initial_until_loaded_and_preserves_payee_details
     images = re.findall(r"<img\b[^>]*\bdata-merchant-logo\b[^>]*>", text)
     assert len(images) == 1
     image = images[0]
-    assert f'src="{LOGO_PATH}"' in image
+    assert f'data-logo-src="{LOGO_PATH}"' in image
+    assert re.search(r"\ssrc=", image) is None
     assert all(attribute in image for attribute in (
         'alt=""', 'width="18"', 'height="18"', 'decoding="async"', " hidden",
     ))
     assert "onerror=" not in image and "onload=" not in image
-    # Hidden lazy images never enter the viewport, so they cannot trigger the load fallback.
+    # Observation uses the fallback wrapper because the decorative image starts hidden.
     assert 'loading="lazy"' not in image
     assert '<span class="merchant-mark" aria-hidden="true"><span>F</span>' in text
     assert "<strong>Fictional Market</strong>" in text
@@ -82,6 +83,6 @@ def test_artwork_and_payee_content_remain_escaped():
     assert '<strong>&lt;script&gt;bad&lt;/script&gt;</strong>' in text
     assert '&lt;img src=&#34;bad&#34;&gt;' in text
     assert '<span class="merchant-mark" aria-hidden="true"><span>&lt;</span>' in text
-    assert f'src="{LOGO_PATH}?label=&#34;bad&#34;&amp;size=28"' in text
+    assert f'data-logo-src="{LOGO_PATH}?label=&#34;bad&#34;&amp;size=28"' in text
     assert ' onmouseover="bad' not in text
     assert 'data-transaction-id="purchase&#34; onmouseover=&#34;bad"' in text

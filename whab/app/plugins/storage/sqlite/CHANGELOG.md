@@ -1,5 +1,14 @@
 # SQLite budget storage plugin changelog
 
+## 1.6.0 — 2026-10-18
+
+PR: [#58](https://github.com/Fillll/whab/pull/58)
+
+- Count and page transaction selections in one snapshot, with literal Unicode search, stable ordering and additive indexes; materialize only the requested page.
+- Read account totals/review counts and account history metadata without loading or exporting the ledger. Read consecutive budget months from one ledger snapshot.
+- Save transaction category, memo and review edits through the existing core command in one targeted SQL update, preserving receipts, provider fields, account balances and rollback behavior.
+- Avoid validating an already validated export twice while constructing its sanitized fresh database; preserve older portable schemas without the new optional indexes.
+
 ## 1.5.0 — 2026-10-18
 
 PR: [#55](https://github.com/Fillll/whab/pull/55)

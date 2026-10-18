@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.19.0 — 2026-10-18
+
+PR: [#58](https://github.com/Fillll/whab/pull/58)
+
+- Request bounded register pages and account metadata from the host, preserving full-selection totals, search, filters, pagination and review badges while avoiding full-history page inputs.
+- Defer optional account and merchant artwork until visible and limit concurrent loads so image requests leave capacity for navigation and saves. Retain immediate explicit previews and decorative fallbacks.
+- Refresh review counts after partial navigation and review changes, and keep the count readable in the selected navigation item.
+
 ## 1.18.0 — 2026-10-18
 
 PR: [#57](https://github.com/Fillll/whab/pull/57)

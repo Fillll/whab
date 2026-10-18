@@ -141,6 +141,8 @@ def test_combined_row_formats_core_currency_and_has_an_explanatory_read_only_bre
         return data
 
     monkeypatch.setattr(store, "workspace", projected_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     text = client.get(f"/budgets/home/budget/2026-11/{currency.lower()}").text
     row = carried_in_row(text)
     attributes, markup = re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S)[0]
@@ -169,6 +171,8 @@ def test_unsupported_remote_breakdown_never_invents_component_values(client, sto
         return data
 
     monkeypatch.setattr(store, "workspace", malformed_workspace)
+    # This fixture models a backend with only the single-month projection contract.
+    monkeypatch.setattr(store, "workspace_periods", None)
     response = client.get("/budgets/demo/budget/2026-10/usd")
     assert response.status_code == 200
     row = carried_in_row(response.text)

@@ -29,9 +29,15 @@ function element() {
   };
 }
 
+function badge(text) {
+  return {...element(), textContent: text, cloneNode() {return badge(this.textContent);}};
+}
+
 function harness({flush = async () => true, initialContext = {}, href = first} = {}) {
   const requests = [], replacements = [], histories = [], fallbacks = [], notices = [];
   const listeners = {};
+  const navigationLinks = [];
+  let nextBadge;
   let content = element();
   const accountList = element();
   const accountListReplacements = [];
@@ -53,7 +59,7 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
     body: {append() {}}, createElement: () => status,
     getElementById: id => id === 'whab-context' ? pageContext : {},
     querySelector: selector => selector === '.sidebar' ? sidebar : selector === '.sidebar-accounts' ? accountList : selector === 'main > .page-content' ? content : null,
-    querySelectorAll: () => [],
+    querySelectorAll: () => navigationLinks,
     addEventListener: (type, callback) => {listeners[type] = callback;},
     removeEventListener: type => {delete listeners[type];},
   };
@@ -65,7 +71,8 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
         const fresh = element();
         fresh.dataset.pageContext = text;
         const heading = element();
-        fresh.querySelector = selector => selector === 'h1' ? heading : null;
+        const countTemplate = nextBadge === undefined ? null : {content: {querySelector: () => nextBadge === null ? null : badge(nextBadge)}};
+        fresh.querySelector = selector => selector === 'h1' ? heading : selector === 'template[data-transaction-navigation-count]' ? countTemplate : null;
         fresh.heading = heading;
         return {querySelector: selector => selector === '.page-content[data-transactions-fragment]' ? fresh :
           selector === 'template[data-account-list]' ? {content: {cloneNode: () => ({refreshedAccountList: true})}} : null};
@@ -80,7 +87,8 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
   Object.defineProperty(context, 'updated', {get: () => context.getContext()});
   const navigator = context.initAccountNavigation({flush,
     onReplace: () => {sidebar.scrollTop = 0;}, notify: message => notices.push(message)});
-  function respond(index, {marker = '1', ok = true, override = {}, url} = {}) {
+  function respond(index, {marker = '1', ok = true, override = {}, url, reviewBadge} = {}) {
+    nextBadge = reviewBadge;
     const entry = requests[index];
     const target = new URL(entry.url);
     const parts = context.parsePageRoute(target);
@@ -91,8 +99,40 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
         canonicalUrl: target.href, monthToken: parts.month, currency: parts.currency.toUpperCase(), ...override})});
   }
   return {navigator, requests, replacements, histories, fallbacks, notices, sidebar, status, context,
-    location, listeners, respond, accountListReplacements, content: () => content};
+    location, listeners, respond, accountListReplacements, content: () => content, navigationLinks};
 }
+
+test('partial review refresh updates, removes and creates the server-rendered navigation badge', async () => {
+  const state = harness();
+  let current;
+  function attach(next) {
+    current = next;
+    if (next) {
+      next.replaceWith = value => attach(value);
+      next.remove = () => {current = null;};
+    }
+  }
+  attach(badge('3'));
+  const link = {...element(), href: first, classList: {contains: name => name === 'nav-item', toggle() {}},
+    querySelector: () => current, append: attach};
+  state.navigationLinks.push(link);
+  for (const count of ['2', null, '4']) {
+    const refreshing = state.navigator.navigate(state.location.href, {refresh: true, history: 'replace'});
+    await tick();
+    state.respond(state.requests.length - 1, {reviewBadge: count});
+    await refreshing;
+    assert.equal(current?.textContent ?? null, count);
+  }
+  assert.equal(state.replacements.length, 3);
+  assert.equal(state.fallbacks.length, 0);
+  const olderFragment = state.navigator.navigate(second);
+  await tick(); state.respond(3); await olderFragment;
+  assert.equal(current.textContent, '4');
+  state.navigationLinks.length = 0;
+  const absentNavigation = state.navigator.navigate(third);
+  await tick(); state.respond(4, {reviewBadge: '1'}); await absentNavigation;
+  assert.equal(state.fallbacks.length, 0);
+});
 
 test('only same-budget HTTPS account-register destinations qualify for partial navigation', () => {
   const state = harness();
