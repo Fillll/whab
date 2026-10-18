@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from whab.domain.errors import StoreError
 from whab.plugins import BankError, BankStore, WebhookResult
 
+from .async_work import run_blocking
 from .mapping import normalize_account, normalize_changes
 
 
@@ -161,7 +162,7 @@ class PlaidService:
             "language": "en",
         }
         if item_id:
-            payload["access_token"] = self.token(item_id)
+            payload["access_token"] = await run_blocking(self.token, item_id)
         else:
             payload.update(products=["transactions"], transactions={"days_requested": 730})
         webhook = self.env.get("PLAID_WEBHOOK_URL")
@@ -192,7 +193,7 @@ class PlaidService:
         try:
             data = await self._call("/item/public_token/exchange", {"public_token": public_token})
             item_id, token = data["item_id"], data["access_token"]
-            self.store.save_item(
+            await run_blocking(self.store.save_item,
                 item_id,
                 encrypt_token(token, self.env["TOKEN_ENCRYPTION_KEY"], item_id),
                 institution_name or "Connected institution",
@@ -207,15 +208,16 @@ class PlaidService:
     async def sync(self, item_id: str | None = None) -> dict:
         self.require_configured()
         if not item_id:
-            results = await asyncio.gather(*(self.sync(item["id"]) for item in self.store.items()))
+            items = await run_blocking(self.store.items)
+            results = await asyncio.gather(*(self.sync(item["id"]) for item in items))
             return {
                 kind: sum(result[kind] for result in results)
                 for kind in ("added", "modified", "removed")
             }
         async with self._locks.setdefault(item_id, asyncio.Lock()):
             try:
-                token = self.token(item_id)
-                original_cursor = self.store.get_item(item_id).get("cursor")
+                token = await run_blocking(self.token, item_id)
+                original_cursor = (await run_blocking(self.store.get_item, item_id)).get("cursor")
                 attempt = 0
                 while True:
                     cursor = original_cursor
@@ -248,23 +250,21 @@ class PlaidService:
                             continue
                         raise
                 accounts = await self._call("/accounts/get", {"access_token": token})
-                institution_name = self.store.get_item(item_id)["institutionName"]
-                return self.store.apply_sync(
-                    item_id,
-                    normalize_changes(changes),
-                    cursor,
-                    [
-                        normalize_account(account, item_id, institution_name)
-                        for account in accounts["accounts"]
-                    ],
-                    historical_complete,
-                    expected_cursor=original_cursor,
-                )
+
+                def persist():
+                    institution_name = self.store.get_item(item_id)["institutionName"]
+                    return self.store.apply_sync(
+                        item_id, normalize_changes(changes), cursor,
+                        [normalize_account(account, item_id, institution_name) for account in accounts["accounts"]],
+                        historical_complete, expected_cursor=original_cursor,
+                    )
+
+                return await run_blocking(persist)
             except Exception as error:
                 reconnect = (
                     isinstance(error, PlaidRemoteError) and error.code == "ITEM_LOGIN_REQUIRED"
                 )
-                self.store.set_item_status(
+                await run_blocking(self.store.set_item_status,
                     item_id,
                     "reconnect" if reconnect else "error",
                     "Reconnect this institution through Plaid Link."
@@ -281,8 +281,9 @@ class PlaidService:
         self.require_configured()
         async with self._locks.setdefault(item_id, asyncio.Lock()):
             try:
-                await self._call("/item/remove", {"access_token": self.token(item_id)})
-                self.store.disconnect_item(item_id)
+                token = await run_blocking(self.token, item_id)
+                await self._call("/item/remove", {"access_token": token})
+                await run_blocking(self.store.disconnect_item, item_id)
             except (PlaidRemoteError, StoreError):
                 raise PlaidError("Bank disconnection could not complete. Try again.") from None
 
@@ -361,7 +362,7 @@ class PlaidService:
         if not isinstance(event, dict) or not isinstance(event.get("item_id"), str):
             return WebhookResult(False, status_code=400, error="Invalid webhook")
         item_id = event["item_id"]
-        if not self.store.get_item(item_id):
+        if not await run_blocking(self.store.get_item, item_id):
             return WebhookResult(True)
         if (
             event.get("webhook_type") == "TRANSACTIONS"
@@ -376,7 +377,7 @@ class PlaidService:
                 and isinstance(error, dict)
                 and error.get("error_code") == "ITEM_LOGIN_REQUIRED"
             ):
-                self.store.set_item_status(
+                await run_blocking(self.store.set_item_status,
                     item_id, "reconnect", "Reconnect this institution through Plaid Link."
                 )
         return WebhookResult(True)
