@@ -44,11 +44,25 @@ def transaction_register_page(
             "COALESCE(SUM(CASE WHEN " + " AND ".join(matches) + " THEN 1 ELSE 0 END),0)"
             if matches else "COUNT(*)"
         )
+        count_scope = scope
+        count_arguments = arguments
+        if account_ids is None:
+            # Resolve the currency's accounts once instead of joining each
+            # transaction. Explicit account selections already make the JOIN
+            # selective, so keep their existing query plan.
+            count_scope = (
+                " FROM transactions t WHERE " + " AND ".join([
+                    "t.workspace=?", "t.deleted=0",
+                    "t.account_id IN (SELECT id FROM accounts WHERE workspace=? AND currency=?)",
+                    *conditions[3:],
+                ])
+            )
+            count_arguments = [workspace, workspace, currency, *arguments[2:]]
         counts = store.db.execute(
             "SELECT COUNT(*) AS total,"
             "COALESCE(SUM(CASE WHEN t.reviewed=0 AND t.pending=0 THEN 1 ELSE 0 END),0) AS to_review,"
-            + matched_count + " AS matched" + scope,
-            [*match_arguments, *arguments],
+            + matched_count + " AS matched" + count_scope,
+            [*match_arguments, *count_arguments],
         ).fetchone()
         total, count, to_review = counts["total"], counts["matched"], counts["to_review"]
         pages = max(1, (count + page_size - 1) // page_size)

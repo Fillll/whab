@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 FRAGMENT = {"X-WHAB-Transactions-Fragment": "1"}
+OMIT_SIDEBAR = {**FRAGMENT, "X-WHAB-Transactions-Sidebar": "omit"}
 SUMMARY = {"X-WHAB-Transactions-Fragment": "summary"}
 
 
@@ -31,6 +32,7 @@ def test_transaction_fragment_matches_full_register_without_reloading_shell(clie
     assert response.headers["X-WHAB-Transactions-Fragment"] == "1"
     assert response.headers["Cache-Control"] == "no-store"
     assert "X-WHAB-Transactions-Fragment" in response.headers["Vary"]
+    assert "X-WHAB-Transactions-Sidebar" in response.headers["Vary"]
     register, account_payload = response.text.split('<template data-account-list>', 1)
     full = client.get(path).text
     assert register.strip() in full
@@ -41,6 +43,36 @@ def test_transaction_fragment_matches_full_register_without_reloading_shell(clie
     assert context["budgetUrl"] == "/budgets/demo"
     assert context["page"] == "transactions" and context["monthToken"] == "2026-08"
     assert context["currency"] == "USD"
+
+
+def test_sidebar_omission_is_opt_in_and_preserves_the_same_register(client, store):
+    path = "/budgets/demo/transactions/2026-08/usd?all_dates=true&q=&tx_page=1"
+    legacy = client.get(path, headers=FRAGMENT)
+    lean = client.get(path, headers=OMIT_SIDEBAR)
+    assert lean.status_code == 200
+    assert lean.headers["X-WHAB-Transactions-Fragment"] == "1"
+    assert lean.headers["Cache-Control"] == "no-store"
+    assert "data-account-list" not in lean.text
+    assert lean.text.strip() == legacy.text.split('<template data-account-list>', 1)[0].strip()
+    assert RegisterMarkup(lean.text).context == RegisterMarkup(legacy.text).context
+    assert len(lean.content) < len(legacy.content)
+    explicit_include = client.get(path, headers={**FRAGMENT, "X-WHAB-Transactions-Sidebar": "include"})
+    assert '<template data-account-list>' in explicit_include.text
+    full = client.get(path, headers={"X-WHAB-Transactions-Sidebar": "omit"})
+    assert "<!DOCTYPE html>" in full.text and 'class="sidebar"' in full.text
+
+
+def test_default_fragment_refresh_includes_new_account_sidebar_markup(client, store):
+    first = store.add_account("personal", {"name": "Original account", "type": "depository", "balance": 0})
+    path = f"/budgets/home/transactions/2026-10/usd?account={first}"
+    before = client.get(path, headers=FRAGMENT)
+    assert before.status_code == 200 and '<template data-account-list>' in before.text
+    second = store.add_account("personal", {"name": "New account", "type": "depository", "balance": 0})
+    refreshed = client.get(path, headers=FRAGMENT)
+    sidebar = refreshed.text.split('<template data-account-list>', 1)[1]
+    assert f'data-account-id="{first}"' in sidebar
+    assert f'data-account-id="{second}"' in sidebar and "New account" in sidebar
+    assert 'data-account-list' not in client.get(path, headers=OMIT_SIDEBAR).text
 
 
 @pytest.mark.parametrize("header", [{}, {"X-WHAB-Transactions-Fragment": "true"}])
@@ -55,7 +87,8 @@ def test_register_fragment_is_opt_in_and_only_for_transactions(client, header):
         assert "X-WHAB-Transactions-Fragment" not in full.headers
 
 
-def test_register_fragment_preserves_account_date_currency_and_escaping(client):
+@pytest.mark.parametrize("header", [FRAGMENT, OMIT_SIDEBAR])
+def test_register_fragment_preserves_account_date_currency_and_escaping(client, header):
     accounts = {}
     for currency in ("USD", "JPY"):
         response = client.post("/api/accounts", json={
@@ -70,14 +103,14 @@ def test_register_fragment_preserves_account_date_currency_and_escaping(client):
                 "amount": 123, "categoryId": None,
             }).status_code == 200
     base = "/budgets/home/transactions/2026-09/jpy?account=" + accounts["JPY"]
-    response = client.get(base, headers=FRAGMENT)
+    response = client.get(base, headers=header)
     assert response.status_code == 200
     assert "JPY &lt;script&gt;fixture&lt;/script&gt;" in response.text
     assert "USD wallet" not in response.text and "USD &lt;script&gt;" not in response.text
     assert "2026-09-05" in response.text and "2026-08-05" not in response.text
     assert "<script>fixture</script>" not in response.text
     assert 'data-transaction-id=' in response.text
-    all_dates = client.get(base + "&all_dates=true", headers=FRAGMENT)
+    all_dates = client.get(base + "&all_dates=true", headers=header)
     assert "2026-08-05" in all_dates.text
     assert accounts["JPY"] in unescape(response.text)
 
@@ -121,7 +154,8 @@ def test_summary_returns_only_scoped_server_badge_and_canonical_validation_conte
     assert response.status_code == 200
     assert response.headers["X-WHAB-Transactions-Fragment"] == "summary"
     assert response.headers["Cache-Control"] == "no-store"
-    assert response.headers["Vary"] == "X-WHAB-Transactions-Fragment"
+    assert "X-WHAB-Transactions-Fragment" in response.headers["Vary"]
+    assert "X-WHAB-Transactions-Sidebar" in response.headers["Vary"]
     assert '<span class="nav-count">2</span>' in response.text
     assert len(response.content) < 2500
     assert len(response.content) < len(client.get(path, headers=FRAGMENT).content) / 10
@@ -145,7 +179,7 @@ def test_summary_returns_only_scoped_server_badge_and_canonical_validation_conte
     ({"Origin": "https://untrusted.invalid"}, 403),
     ({"Sec-Fetch-Site": "cross-site"}, 403),
 ])
-@pytest.mark.parametrize("fragment", [FRAGMENT, SUMMARY])
+@pytest.mark.parametrize("fragment", [FRAGMENT, OMIT_SIDEBAR, SUMMARY])
 def test_register_fragment_does_not_bypass_local_request_guards(client, header, status, fragment):
     response = client.get("/budgets/demo/transactions/2026-08/usd", headers={**fragment, **header})
     assert response.status_code == status

@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.14.3 — 2026-10-18
+
+PR: [#61](https://github.com/Fillll/whab/pull/61)
+
+- Vary transaction responses by the optional sidebar-fragment header, and require SQLite 1.6.3 and web 1.19.3 in the supported bundle for cheaper register counts and smaller navigation responses.
+
 ## 2.14.2 — 2026-10-18
 
 PR: [#60](https://github.com/Fillll/whab/pull/60)

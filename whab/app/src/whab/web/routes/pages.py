@@ -299,7 +299,7 @@ def create_router(
         try:
             response = templates.TemplateResponse(request=request, name="base.html", context=context)
             if page == "transactions":
-                response.headers["Vary"] = "X-WHAB-Transactions-Fragment"
+                response.headers["Vary"] = "X-WHAB-Transactions-Fragment, X-WHAB-Transactions-Sidebar"
                 if request.headers.get("X-WHAB-Transactions-Fragment") in ("1", "summary"):
                     response.headers["X-WHAB-Transactions-Fragment"] = request.headers["X-WHAB-Transactions-Fragment"]
                     response.headers["Cache-Control"] = "no-store"

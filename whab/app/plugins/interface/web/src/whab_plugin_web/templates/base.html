@@ -4,7 +4,9 @@
 {% include "transactions-summary.html" %}
 {% elif page=='transactions' and request.headers.get('X-WHAB-Transactions-Fragment')=='1' %}
 {% include "transactions-fragment.html" %}
+{% if request.headers.get('X-WHAB-Transactions-Sidebar')!='omit' %}
 <template data-account-list>{% include "sidebar-accounts.html" %}</template>
+{% endif %}
 {% else %}
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
