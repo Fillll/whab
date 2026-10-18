@@ -29,6 +29,7 @@ from pathlib import Path
 REPOSITORY = "Fillll/whab"
 API = f"https://api.github.com/repos/{REPOSITORY}"
 REQUIRED_CHECKS = {"CI (Python 3.14)", "CI (Python 3.15)"}
+CHANNELS = ("main", "alpha", "stable")
 PLUGINS = (
     "interface/bank-logos", "storage/client", "ingestion/plaid", "interface/server",
     "storage/sqlite", "interface/web", "ingestion/ynab",
@@ -173,6 +174,12 @@ def successful_checks(sha):
 
 
 def latest_target(channel):
+    if channel not in CHANNELS:
+        raise LauncherError("invalid_channel", "Choose a supported WHAB update channel.")
+    if channel == "alpha":
+        head = request_json(f"{API}/commits/main")
+        sha = commit_sha(head.get("sha") if isinstance(head, dict) else None)
+        return {"build": sha, "version": sha[:12], "channel": channel, "tested": False}
     if channel == "main":
         history = request_json(f"{API}/commits?sha=main&per_page=10")
         if not isinstance(history, list):
@@ -245,7 +252,7 @@ def download_source(sha, destination):
                     output.write(block)
         extract_archive(archive, destination)
     except (OSError, tarfile.TarError, urllib.error.URLError):
-        raise LauncherError("download_failed", "Could not download the verified WHAB source. The current installation is preserved.") from None
+        raise LauncherError("download_failed", "Could not download the selected WHAB source. The current installation is preserved.") from None
     finally:
         archive.unlink(missing_ok=True)
 
@@ -422,7 +429,7 @@ class Manager:
         config = read_json(self.root / "config.json")
         if config is None:
             raise LauncherError("unconfigured", "Choose a new runtime home or explicitly adopt your existing WHAB runtime first.")
-        if config.get("schema") != 1 or config.get("channel") not in {"main", "stable"}:
+        if config.get("schema") != 1 or config.get("channel") not in CHANNELS:
             raise LauncherError("invalid_configuration", "This launcher configuration is unsupported.")
         absolute(config["runtime_home"])
         if not 1024 <= config.get("port", 0) <= 65535:
@@ -433,6 +440,9 @@ class Manager:
         if self.running_record():
             raise LauncherError("running", "Stop WHAB before changing its runtime home, port, or update channel.")
         old = read_json(self.root / "config.json", {})
+        selected_channel = channel if channel is not None else old.get("channel", "main")
+        if selected_channel not in CHANNELS:
+            raise LauncherError("invalid_channel", "Choose a supported WHAB update channel.")
         home = absolute(runtime_home or old.get("runtime_home") or self.root.parent / "runtime")
         if home == self.root or home.is_relative_to(self.root) or self.root.is_relative_to(home):
             raise LauncherError("invalid_runtime", "The runtime home and managed installation must be separate directories.")
@@ -447,7 +457,7 @@ class Manager:
             raise LauncherError("invalid_port", "Choose a port between 1024 and 65535.")
         if port is not None and "PORT" in values and selected_port != int(values["PORT"]):
             raise LauncherError("port_conflict", "The selected port differs from the adopted .env PORT. Change that local setting explicitly before configuring.")
-        config = {"schema": 1, "runtime_home": str(home), "channel": channel or old.get("channel", "main"), "port": selected_port}
+        config = {"schema": 1, "runtime_home": str(home), "channel": selected_channel, "port": selected_port}
         if (home / ".env").is_symlink():
             config["environment_target"] = str((home / ".env").resolve())
         selected_python = self.python_override or old.get("python")
@@ -455,6 +465,8 @@ class Manager:
             config["python"] = str(selected_python)
         self.verify_python(config)
         write_json(self.root / "config.json", config)
+        if old.get("channel", "main") != selected_channel:
+            (self.root / "update.json").unlink(missing_ok=True)
         return self.status() | {"message": "WHAB runtime configured. Existing runtime settings are preserved."}
 
     def verify_python(self, config):
@@ -541,18 +553,24 @@ class Manager:
         state = "running" if record else ("stopped" if config else "unconfigured")
         home = Path(config["runtime_home"]) if config else self.root.parent / "runtime"
         update = read_json(self.root / "update.json", {})
+        channel = config.get("channel", "main")
+        target = update.get("target", {})
+        if target.get("channel") != channel:
+            target = {}
+        warning = update.get("warning") if update.get("channel", channel) == channel else None
         return {"state": state, "status": state, "running": bool(record),
                 "url": f"https://localhost:{config.get('port', 5173)}", "version": active.get("version"),
-                "build": active.get("build"), "channel": config.get("channel", "main"),
+                "build": active.get("build"), "channel": channel,
+                "active_channel": active.get("channel"), "tested": bool(active.get("tested")),
                 "runtime_home": str(home), "log_file": str(self.root / "logs/whab.log"),
                 "ca_certificate": str(home / "tls/ca.crt"),
-                "update_available": bool(update.get("target") and update["target"].get("build") != active.get("build")),
-                "latest_version": update.get("target", {}).get("version"), "update_warning": update.get("warning")}
+                "update_available": bool(target and target.get("build") != active.get("build")),
+                "latest_version": target.get("version"), "latest_build": target.get("build"), "update_warning": warning}
 
     def check_update(self):
         config = self.config()
         target = latest_target(config["channel"])
-        write_json(self.root / "update.json", {"target": target, "checked_at": time.time()})
+        write_json(self.root / "update.json", {"channel": config["channel"], "target": target, "checked_at": time.time()})
         return self.status()
 
     def log(self, name):
@@ -592,6 +610,12 @@ class Manager:
         directory = self.root / "versions" / build
         manifest = read_json(directory / "installation.json")
         if manifest:
+            # The exact source may have first been installed through Alpha and
+            # later passed CI. Only this newly resolved target supplies its
+            # selected channel and CI provenance; a selector change alone does
+            # not promote the active installation to a tested build.
+            manifest = {**manifest, "channel": target.get("channel"), "tested": bool(target.get("tested"))}
+            write_json(directory / "installation.json", manifest)
             return manifest
         if directory.exists():
             shutil.rmtree(directory)
@@ -616,7 +640,7 @@ class Manager:
                 options.extend(["--no-index", "--find-links", str(self.wheelhouse)])
             self.run([python, "-I", "-B", "-m", "pip", "install", *options, *packages], cwd=app)
             self.run([python, "-I", "-B", "-m", "pip", "check"], cwd=app)
-            manifest = {"build": build, "version": source_version(app), "directory": str(directory), "app": str(app), "python": str(python), "tested": target.get("tested", False)}
+            manifest = {"build": build, "version": source_version(app), "directory": str(directory), "app": str(app), "python": str(python), "channel": target.get("channel"), "tested": bool(target.get("tested"))}
             self.smoke(manifest)
             write_json(directory / "installation.json", manifest)
             return manifest
@@ -776,6 +800,7 @@ class Manager:
         if previous and previous["build"] == candidate["build"]:
             if not self.running_record():
                 self.launch(candidate, home, config["port"])
+            write_json(self.root / "active.json", candidate)
             return self.status()
         # An unmanaged process may still own an explicitly adopted runtime.
         # Refuse before copying SQLite or writing any transition journal.
@@ -821,7 +846,7 @@ class Manager:
                 target = read_json(self.root / "update.json")["target"]
             except LauncherError as error:
                 warning = str(error)
-        if target and (not current or target["build"] != current["build"]):
+        if target:
             try:
                 candidate = self.prepare(target)
             except LauncherError as error:
@@ -841,7 +866,7 @@ class Manager:
             result = self.status()
         if warning:
             result["message"] = f"Started the available installation. {warning}"
-            write_json(self.root / "update.json", {"warning": warning, "checked_at": time.time()})
+            write_json(self.root / "update.json", {"channel": config["channel"], "warning": warning, "checked_at": time.time()})
         return result
 
     def update(self):
@@ -907,7 +932,7 @@ def parser():
     commands = result.add_subparsers(dest="command", required=True)
     configure = commands.add_parser("configure")
     configure.add_argument("--runtime-home")
-    configure.add_argument("--channel", choices=("main", "stable"))
+    configure.add_argument("--channel", choices=CHANNELS)
     configure.add_argument("--port", type=int)
     start = commands.add_parser("start")
     start.add_argument("--offline", action="store_true")

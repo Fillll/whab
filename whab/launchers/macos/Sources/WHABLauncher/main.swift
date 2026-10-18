@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var timer: Timer?
     private let worker = DispatchQueue(label: "com.whab.launcher.manager", qos: .userInitiated)
     private let statusLabel = NSTextField(labelWithString: "Checking WHAB…")
-    private let versionLabel = NSTextField(labelWithString: "")
+    private let versionLabel = NSTextField(wrappingLabelWithString: "")
     private let messageLabel = NSTextField(wrappingLabelWithString: "")
     private let runtimeField = NSTextField(string: "")
     private let channel = NSPopUpButton()
@@ -119,7 +119,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         content.addArrangedSubview(statusRow)
         versionLabel.textColor = .secondaryLabelColor
         versionLabel.font = .systemFont(ofSize: 12)
+        versionLabel.maximumNumberOfLines = 2
         content.addArrangedSubview(versionLabel)
+        versionLabel.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let primary = NSStackView()
         primary.spacing = 8
@@ -163,7 +165,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let settings = NSStackView()
         settings.spacing = 10
         settings.addArrangedSubview(NSTextField(labelWithString: "Updates"))
-        channel.addItems(withTitles: ["Latest tested main", "Stable releases"])
+        for option in LauncherChannel.allCases {
+            channel.addItem(withTitle: option.title)
+            channel.lastItem?.representedObject = option.rawValue
+        }
         channel.target = self
         channel.action = #selector(changeChannel)
         settings.addArrangedSubview(channel)
@@ -250,17 +255,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if let result = result, result.ok {
                     self.reply = result
                     self.statusLabel.stringValue = result.displayState
-                    self.versionLabel.stringValue = "\(result.version.map { "WHAB \($0) · " } ?? "")\(result.channel == "stable" ? "Stable releases" : "Latest tested main")\(result.updateAvailable == true ? " · Update available" : "")"
+                    self.versionLabel.stringValue = result.versionDescription
                     self.runtimeField.stringValue = result.runtimeHome ?? self.runtimeField.stringValue
-                    self.channel.selectItem(at: result.channel == "stable" ? 1 : 0)
+                    self.channel.selectItem(withTitle: result.configuredChannel.title)
                     self.startButton.title = result.running == true ? "Open WHAB" : "Start WHAB"
                     if result.state == "unconfigured" {
                         self.messageLabel.stringValue = "Choose your existing WHAB runtime folder, or select Use default runtime to start with a new private budget environment."
                     }
                     if !silent {
-                        self.messageLabel.stringValue = result.message ?? (result.updateAvailable == true
-                            ? "An update is available. Choose Update & Restart when you are ready."
-                            : "WHAB is ready. Your private runtime remains separate from installed versions.")
+                        self.messageLabel.stringValue = result.message ?? (command == "check-update"
+                            ? result.updateCheckMessage
+                            : (result.updateAvailable == true
+                                ? "An update is available. Choose Update & Restart when you are ready."
+                                : result.readyMessage))
                     }
                     if openAfter, let url = result.localURL { NSWorkspace.shared.open(url) }
                     self.refreshMenu()
@@ -272,6 +279,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 } else {
                     self.statusLabel.stringValue = "Needs attention"
                     self.messageLabel.stringValue = result?.error?.message ?? "The launcher could not read WHAB's response. Open logs for details."
+                    if let previous = self.reply {
+                        self.channel.selectItem(withTitle: previous.configuredChannel.title)
+                    }
                     self.refreshMenu()
                     if !silent { self.showWindow() }
                 }
@@ -300,7 +310,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             perform("configure", options: ["--runtime-home", url.path, "--channel", selectedChannel])
         }
     }
-    private var selectedChannel: String { channel.indexOfSelectedItem == 1 ? "stable" : "main" }
+    private var selectedChannel: String {
+        LauncherChannel.configured(channel.selectedItem?.representedObject as? String).rawValue
+    }
     @objc private func changeChannel() { perform("configure", options: ["--channel", selectedChannel]) }
     @objc private func defaultRuntime() {
         let runtime = root.deletingLastPathComponent().appendingPathComponent("runtime")

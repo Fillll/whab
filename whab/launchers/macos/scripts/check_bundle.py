@@ -124,7 +124,7 @@ class BundleCheck:
                                                 urllib.request.HTTPSHandler(context=self.context))
         initial_health = self.health(first)
         self.checks.append("verified HTTPS identity and build")
-        page = self.get("/?workspace=demo&page=budget")
+        page = self.get("/budgets/demo/budget/current-month/usd")
         require(b"WHAB" in page and b"Demo budget" in page and b"<h1>Budget</h1>" in page
                 and first["version"].encode() in page, "The rendered demo budget or visible application version is missing.")
         self.checks.append("rendered demo budget and version")
