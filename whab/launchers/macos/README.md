@@ -1,8 +1,10 @@
 # WHAB for macOS
 
 WHAB.app is a native companion that installs and runs WHAB on your Mac. It opens
-the budgeting interface in your browser and keeps Start, Stop, Restart, updates
-and settings in the menu bar. The launcher has its own version, recorded in
+the budgeting interface in your browser. The menu bar has three entries:
+**Online — Open** with a small green status dot, **WHAB settings…**, and
+**Quit launcher**. Start, Stop, Restart, updates and logs remain in settings.
+The launcher has its own version, recorded in
 `VERSION`; the installed WHAB host and each plugin keep their existing versions.
 
 Requires macOS 13 or newer. Build on the architecture of the Mac that will run
@@ -37,6 +39,11 @@ update check. **Check for updates** reports whether a newer eligible revision is
 When offline, the last working installation remains usable. A first installation
 can use the app's bundled source and wheelhouse without network access.
 
+The first menu entry combines status and action: **Online — Open** opens the
+browser, and **Offline — Start** starts a stopped server and opens it. Setup or
+attention states open settings. While an action is in progress, its status appears
+in this row and the row is disabled; routine status checks retain the last status.
+
 The update channels are:
 
 - **Latest tested main**: the newest recent official `main` revision with successful CI.
@@ -55,7 +62,7 @@ The launcher rejects unsupported old layouts instead of silently installing an
 incompatible release. Changing the runtime or update channel requires stopping WHAB.
 
 Closing the window leaves the launcher in the menu bar. **Quit launcher** leaves
-the budget server running; use **Stop** to shut down the budget. Optional **Open
+the budget server running; use **Stop** in settings to shut down the budget. Optional **Open
 launcher at login** uses macOS Login Items. After your initial explicit runtime
 setup, opening WHAB.app starts the budget (or reuses its running server) and opens
 the browser. Reopening it from Spotlight or the Dock does the same.
@@ -139,5 +146,5 @@ CLI is documented in [manager/README.md](manager/README.md).
 
 Manager processes run asynchronously with separate argument arrays; no shell
 interprets user paths. URLs opened from manager responses must be HTTPS on a
-loopback host. The app shows short status/errors, and **View logs** opens the
+loopback host. The app shows short status/errors, and **View logs** in settings opens the
 private local log file without uploading its contents.

@@ -122,6 +122,47 @@ struct ManagerReply: Decodable {
     }
 }
 
+struct LauncherMenuState {
+    enum Indicator { case online, offline, working, attention }
+
+    let title: String
+    let indicator: Indicator
+    var opensSettings = false
+    var isEnabled = true
+
+    init(reply: ManagerReply?, activity: String? = nil, needsAttention: Bool = false) {
+        if let activity = activity {
+            title = activity
+            indicator = .working
+            isEnabled = false
+        } else if needsAttention {
+            title = "Needs attention — Settings…"
+            indicator = .attention
+            opensSettings = true
+        } else if let reply = reply {
+            if reply.state == "unconfigured" {
+                title = "Setup needed — Settings…"
+                indicator = .offline
+                opensSettings = true
+            } else if reply.running == true && reply.localURL != nil {
+                title = "Online — Open"
+                indicator = .online
+            } else if reply.state == "stopped" && reply.running == false {
+                title = "Offline — Start"
+                indicator = .offline
+            } else {
+                title = "Unavailable — Settings…"
+                indicator = .attention
+                opensSettings = true
+            }
+        } else {
+            title = "Checking…"
+            indicator = .working
+            isEnabled = false
+        }
+    }
+}
+
 struct ManagerInvocation {
     let executable: URL
     let arguments: [String]
