@@ -54,7 +54,7 @@ def test_settings_links_to_installed_plugins_with_all_categories_as_default(clie
     )
     settings = dialog(text, "settings-dialog")
     assert 'data-dialog="plugins-dialog"' in settings
-    assert "Installed plugins and their options" in settings
+    assert "Installed plugins and their settings" in settings
     assert "data-plugin-selection" not in settings
     installed = dialog(text, "plugins-dialog")
     assert 'data-plugin-category-filter aria-label="Plugin category"' in installed
@@ -200,10 +200,11 @@ def test_plugin_categories_and_names_are_sorted_and_examples_are_hidden(client, 
     ({}, "Disabled", "Not running", "Enable this plugin, save your selection, and restart"),
     ({"active": True, "enabled": True, "required": True}, "Required", "Running", None),
 ])
-def test_each_plugin_has_options_with_saved_and_running_state(client, monkeypatch, changes, selection, runtime, guidance):
+def test_each_plugin_has_settings_with_saved_and_running_state(client, monkeypatch, changes, selection, runtime, guidance):
     text = render(client, monkeypatch, plugin("sample", **changes), restart_required=True)
     options = dialog(text, "plugin-options-sample")
-    assert '<h2>Sample</h2>' in options and "Plugin options" in options
+    assert '<h2>Sample</h2>' in options and "Plugin settings" in options
+    assert 'aria-label="Sample settings"' in options
     assert '<dt>Selection</dt><dd>' + selection in options
     assert '<dt>Runtime</dt><dd>' + runtime in options
     assert '<dt>Plugin</dt><dd>whab-sample · 1.0.0</dd>' in options
@@ -213,7 +214,17 @@ def test_each_plugin_has_options_with_saved_and_running_state(client, monkeypatc
         assert guidance in options
     else:
         assert '<section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings></section>' in options
-    assert "Restart WHAB to apply your saved plugin selection" in dialog(text, "plugins-dialog")
+    installed = dialog(text, "plugins-dialog")
+    assert "Restart WHAB to apply your saved plugin selection" in installed
+    row = re.search(r'<div class="plugin-row">(.*?)</div>', installed, re.S)[1]
+    label = re.search(r'<label class="plugin-toggle">(.*?)</label>', row, re.S)[1]
+    assert '<strong>Sample</strong>' in label
+    assert "whab-sample" not in label  # Package details do not clutter the checkbox's accessible name.
+    assert row.index('</label>') < row.index('whab-sample · 1.0.0') < row.index(
+        f'<span class="plugin-state">{selection}</span>'
+    ) < row.index('aria-label="Settings for Sample"')
+    assert re.findall(r'<button\b[^>]*aria-label="([^"]+)"', row) == ["Settings for Sample"]
+    assert "Plugin options" not in text and "Options for" not in text
 
 
 def test_metadata_and_errors_are_escaped_and_disabled_selection_is_locked(client, monkeypatch):
@@ -229,7 +240,7 @@ def test_metadata_and_errors_are_escaped_and_disabled_selection_is_locked(client
     assert '&lt;img src=x onerror=alert(1)&gt;' in text
     assert '&lt;script&gt;failure&lt;/script&gt;' in text
     assert 'value="unsafe" name="plugin" disabled' in text
-    assert 'aria-label="Options for &lt;script&gt;name&lt;/script&gt;"' in text
+    assert 'aria-label="Settings for &lt;script&gt;name&lt;/script&gt;"' in text
     assert 'id="plugin-options-unsafe"' in text
 
 

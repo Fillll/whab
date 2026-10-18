@@ -22,8 +22,8 @@ def test_picker_keeps_native_fallback_and_selected_account_without_logos(client,
     assert f'<option value="{identifier}" selected>Wallet &lt;shared&gt; &amp; savings</option>' in text
     assert '<div class="account-picker" data-account-picker hidden>' in text
     toggle = re.search(r'<button id="account-filter-toggle".*?</button>', text, re.S)[0]
-    assert 'role="combobox"' in toggle and 'aria-label="Filter by account"' in toggle
-    assert 'aria-expanded="false"' in toggle and 'aria-controls="account-filter-options"' in toggle
+    assert 'aria-haspopup="dialog"' in toggle and 'aria-label="Filter by account"' in toggle
+    assert 'aria-expanded="false"' in toggle and 'aria-controls="account-filter-popup"' in toggle
     assert 'data-account-picker-label>Wallet &lt;shared&gt; &amp; savings</span>' in toggle
     assert 'data-bank-logo' not in toggle
     options = picker_options(text)
@@ -37,6 +37,16 @@ def test_picker_keeps_native_fallback_and_selected_account_without_logos(client,
     assert 'aria-multiselectable="true"' in text
     assert 'data-account-picker-popup hidden' in text
     assert 'data-account-picker-apply>Apply</button>' in text
+    assert 'id="account-filter-popup" class="account-picker-popup" role="dialog" aria-label="Choose accounts"' in text
+    search = re.search(r'<input type="search" data-account-picker-search[^>]+>', text)[0]
+    assert 'aria-label="Search accounts"' in search and 'role="combobox"' in search
+    assert 'aria-controls="account-filter-options"' in search and 'aria-autocomplete="list"' in search
+    assert 'aria-describedby="account-filter-help account-filter-selection"' in search
+    assert 'data-account-picker-select-all aria-label="Select all accounts"' in text
+    assert 'title="Select all accounts, including accounts outside your search"' in text
+    assert 'data-account-picker-select-none aria-label="Select no accounts"' in text
+    assert 'data-account-picker-empty role="status" hidden>No accounts match your search.</p>' in text
+    assert 'data-account-picker-count role="status" aria-live="polite">1 of 1 selected</span>' in text
 
 
 def test_picker_uses_scoped_bank_logos_without_fetching_while_rendering(imported_store, tmp_path, client_for):
@@ -97,8 +107,15 @@ def test_picker_shows_multiple_selected_accounts_without_making_one_current(clie
     assert f'data-value="{identifiers[2]}" aria-selected="false"' in options[3]
     toggle = re.search(r'<button id="account-filter-toggle".*?</button>', text, re.S)[0]
     assert 'data-account-picker-label>2 accounts</span>' in toggle
+    assert 'data-account-picker-count role="status" aria-live="polite">2 of 3 selected</span>' in text
     assert 'Account settings for' not in text
     assert 'aria-current="page"' not in re.search(r'<div class="sidebar-accounts">.*?</div>\s*<div class="sidebar-bottom">', text, re.S)[0]
+
+
+def test_empty_account_picker_explains_its_empty_selection_and_cannot_apply(client):
+    text = client.get("/budgets/home/transactions/2026-10/usd").text
+    assert 'data-account-picker-count role="status" aria-live="polite">0 of 0 selected</span>' in text
+    assert 'data-account-picker-apply disabled>Apply</button>' in text
 
 
 def test_period_picker_has_presets_and_an_open_ended_custom_range(client):

@@ -64,8 +64,12 @@ def test_cache_restores_safe_successes_and_never_loads_arbitrary_keys(monkeypatc
     assert "do not expire" in settings[0].detail
     assert settings[1].value == "1"
     assert "credentials" in settings[2].detail
-    assert provider.plugin.settings.actions == ()
-    assert provider.plugin.settings.act is None
+    assert len(provider.plugin.settings.actions) == 1
+    action = provider.plugin.settings.actions[0]
+    assert action.id == "flush-cache"
+    assert action.label == "Flush cache"
+    assert "Saved bank websites stay unchanged" in action.description
+    assert provider.plugin.settings.act is provider.apply_setting
 
 
 def test_settings_count_only_successes_without_expiring_them(monkeypatch):
@@ -131,7 +135,7 @@ def test_flush_removes_saved_and_temporary_logos_and_retries_failures(monkeypatc
     (tmp_path / ".chase.json.tmp").write_text("interrupted write")
     (tmp_path / "unrelated").write_text("preserved")
     provider._cache._entries["ally"] = (provider.time.time() + 300, None)
-    message = provider.apply_setting("flush-cache")
+    message = provider.plugin.settings.act(provider.plugin.settings.actions[0].id)
     assert message == "Bank logo cache cleared. Logos will download again when requested."
     assert provider.read_settings()[1].value == "0"
     assert [path.name for path in tmp_path.iterdir()] == ["unrelated"]
@@ -145,7 +149,7 @@ def test_flush_removes_saved_and_temporary_logos_and_retries_failures(monkeypatc
 def test_flush_works_without_a_persistent_directory(monkeypatch):
     monkeypatch.setattr(provider, "fetch_logo", lambda key: IMAGE)
     assert provider.fetch("chase") == IMAGE
-    provider.apply_setting("flush-cache")
+    provider.plugin.settings.act("flush-cache")
     assert provider.read_settings()[1].value == "0"
 
 
@@ -359,7 +363,7 @@ def test_flush_clears_explicit_files_from_earlier_processes_but_keeps_mappings(m
     (tmp_path / f".{old_key}.json.tmp").write_text("interrupted write")
     unrelated = tmp_path / "domain-user-owned.json"
     unrelated.write_text("preserved")
-    provider.apply_setting("flush-cache")
+    provider.plugin.settings.act("flush-cache")
     assert list(tmp_path.iterdir()) == [unrelated]
     assert provider._cache.domain(key) == "bank.example.com"
     assert provider.fetch(key) == IMAGE
