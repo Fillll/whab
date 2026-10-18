@@ -23,12 +23,6 @@
                 <th colspan="{{ period.column_count }}" scope="colgroup" class="budget-month-summary-cell">
                   <section class="budget-month-summary{% if period.month==month %} is-selected{% endif %}" aria-label="{{ month_label(period.month) }} summary">
                     <div class="budget-month-heading"><span class="budget-month-name">{{ month_label(period.month).split(' ')[0] }}<small>{{ period.month[:4] }}</small></span></div>
-                    <div class="budget-summary-lines">
-                      <div><span>Available</span><strong>{{ money(period.summary.available) }}</strong></div>
-                      <div><span>Assigned</span><strong>{{ money(period.summary.assigned) }}</strong></div>
-                      <div><span>Spent</span><strong>{{ money(period.summary.spent) }}</strong></div>
-                    </div>
-                    <div class="budget-ready"><span class="budget-ready-label">To assign</span><strong class="budget-ready-value{% if period.month>=data.budgetStartMonth and period.summary.readyToAssign<0 %} negative{% endif %}">{{ money(period.summary.readyToAssign) if period.month>=data.budgetStartMonth else '—' }}</strong></div>
                     {% set rollover_known = period.rolloverMode in ['category','balance'] %}
                     {% set rollover_planning = data.budgetStartMonth<=period.month<'2200-12' %}
                     <div class="budget-rollover">
@@ -53,15 +47,6 @@
                     </div>
                   </section>
                 </th>
-              {% endfor %}
-            </tr>
-            <tr class="budget-columns">
-              <th scope="col">Category</th>
-              {% for period in periods %}
-                {% if period.show_carryover %}<th scope="col" class="month-start budget-carryover-heading{% if period.month==month %} selected-month{% endif %}">Carryover<small>From {{ month_label(shift_month(period.month,-1),true) }} {{ shift_month(period.month,-1)[:4] }}</small></th>{% endif %}
-                <th scope="col" class="{% if not period.show_carryover %}month-start{% endif %}{% if period.month==month %} selected-month{% endif %}">Assigned</th>
-                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}>Activity</th>
-                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}>Available</th>
               {% endfor %}
             </tr>
           </thead>
@@ -102,12 +87,16 @@
               {% endfor %}
             </tr>
             <tr class="budget-overview-row budget-assigned-row">
-              <th scope="row">Available to spend<small class="budget-row-note">Summary</small></th>
+              <th scope="row">Assigned this month<small class="budget-row-note">Summary</small></th>
               {% for period in periods %}
-                {% if period.show_carryover %}<td class="month-start budget-carryover{% if valid_money(period.carryover) and period.carryover<0 %} negative{% elif period.carryover==0 %} zero{% endif %}">{{ money_number(period.carryover) if valid_money(period.carryover) else '—' }}</td>{% endif %}
-                <td{% if not period.show_carryover %} class="month-start"{% endif %}>{{ money_number(period.summary.assigned) if period.month>=data.budgetStartMonth else '—' }}</td>
-                <td>{{ money_number(-period.summary.spent) if period.month>=data.budgetStartMonth else '—' }}</td>
-                <td{% if period.summary.available<0 %} class="negative"{% endif %}>{{ money_number(period.summary.available) if period.month>=data.budgetStartMonth else '—' }}</td>
+                <td colspan="{{ period.column_count }}" class="month-start">{{ money_number(period.summary.assigned) if period.month>=data.budgetStartMonth and valid_money(period.summary.assigned) else '—' }}</td>
+              {% endfor %}
+            </tr>
+            <tr class="budget-overview-row budget-ready-row">
+              <th scope="row">Available to assign<small class="budget-row-note">Summary</small></th>
+              {% for period in periods %}
+                {% set ready_valid = period.month>=data.budgetStartMonth and valid_money(period.summary.readyToAssign) %}
+                <td colspan="{{ period.column_count }}" class="month-start{% if ready_valid and period.summary.readyToAssign<0 %} negative{% elif ready_valid and period.summary.readyToAssign>0 %} positive{% endif %}">{{ money_number(period.summary.readyToAssign) if ready_valid else '—' }}</td>
               {% endfor %}
             </tr>
           </tbody>
@@ -115,6 +104,15 @@
             <tr class="budget-section-row">
               <th scope="rowgroup">Spending categories</th>
               {% for period in periods %}<td colspan="{{ period.column_count }}" class="month-start"></td>{% endfor %}
+            </tr>
+            <tr class="budget-columns">
+              <th scope="col">Category</th>
+              {% for period in periods %}
+                {% if period.show_carryover %}<th scope="col" class="month-start budget-carryover-heading{% if period.month==month %} selected-month{% endif %}">Carryover<small>From {{ month_label(shift_month(period.month,-1),true) }} {{ shift_month(period.month,-1)[:4] }}</small></th>{% endif %}
+                <th scope="col" class="{% if not period.show_carryover %}month-start{% endif %}{% if period.month==month %} selected-month{% endif %}">Assigned</th>
+                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}>Activity</th>
+                <th scope="col"{% if period.month==month %} class="selected-month"{% endif %}>Available</th>
+              {% endfor %}
             </tr>
             {% for group in groups %}
               {% set group_index = loop.index %}

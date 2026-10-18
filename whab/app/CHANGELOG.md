@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.8.2 — 2026-10-17
+
+PR: [#45](https://github.com/Fillll/whab/pull/45)
+
+- Require web 1.10 in bundled installations for compact month cards and a five-row overview ending in Available to assign. Preserve core financial projections and funding rules.
+
 ## 2.8.1 — 2026-10-17
 
 PR: [#44](https://github.com/Fillll/whab/pull/44)

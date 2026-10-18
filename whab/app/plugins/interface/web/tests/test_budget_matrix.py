@@ -6,8 +6,6 @@ from html import unescape
 import pytest
 from whab_plugin_web.views import money_input, money_number, month_label, shift_month
 
-from whab.plugins import format_money
-
 
 def assignment_forms(text):
     return [
@@ -39,7 +37,7 @@ def displayed_amount(cell):
     return re.sub(r'<small\b[^>]*>.*?</small>', "", cell, flags=re.S).strip()
 
 
-def test_three_month_matrix_uses_core_summaries_and_category_values(client):
+def test_three_month_matrix_keeps_month_controls_and_editable_category_values(client):
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert 'aria-label="Category budget across 3 months"' in text
     assert 'class="category-inspector"' not in text
@@ -59,12 +57,11 @@ def test_three_month_matrix_uses_core_summaries_and_category_values(client):
         summary_html = re.search(
             rf'aria-label="{label} 2026 summary">(.*?)</section>', text, re.S
         )[1]
-        for field in ("readyToAssign", "assigned", "spent", "available"):
-            assert format_money(data["summary"][field], "USD") in summary_html
-        positions = [summary_html.index(f">{label}<") for label in (
-            "Available", "Assigned", "Spent", "To assign",
-        )]
-        assert positions == sorted(positions)
+        assert 'class="budget-summary-lines"' not in summary_html
+        assert 'class="budget-ready"' not in summary_html
+        assert "To assign" not in summary_html
+        assert "<strong" not in summary_html
+        assert "<legend>Carryover" in summary_html
         heading = re.search(r'<div class="budget-month-heading">(.*?)</div>', summary_html, re.S)[1]
         assert "<svg" not in heading
         monthly_forms = [form for form in forms if form["month"] == month]
@@ -107,21 +104,25 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
                     })
 
     labels = (
-        "Income", "Carried in", "Assigned for next month", "Available to spend",
+        "Income", "Carried in", "Assigned for next month", "Assigned this month",
+        "Available to assign",
     )
     for code, factor in (("USD", 1), ("EUR", 10)):
         text = client.get(f"/budgets/home/budget/2026-11/{code.lower()}").text
         overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
         assert [re.search(r'<th scope="row">([^<]+)', row)[1] for row in overview] == list(labels)
-        assert text.index("Available to spend") < text.index("Spending categories")
-        assert text.index("Spending categories") < text.index('class="budget-group-row"')
+        assert text.index("Available to assign") < text.index("Spending categories")
+        assert text.index("Spending categories") < text.index('class="budget-columns"')
+        assert text.index('class="budget-columns"') < text.index('class="budget-group-row"')
         assert "Previous overspending" not in text and "Balance carried in" not in text
-        assert "Assigned this month" not in text
+        assert "Available to spend" not in text
         assert "overspend this month" not in text.lower()
+        thead = re.search(r"<thead>(.*?)</thead>", text, re.S)[1]
+        assert "budget-columns" not in thead
+        assert 'scope="col"' not in thead
         cells = [re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S) for row in overview]
-        assert all(len(row) == 3 for row in cells[:3])
-        assert all('colspan="4"' in attributes for row in cells[:3] for attributes, _ in row)
-        assert len(cells[3]) == 12
+        assert all(len(row) == 3 for row in cells)
+        assert all('colspan="4"' in attributes for row in cells for attributes, _ in row)
 
         for index, (month, income, previous, next_assigned, assigned, spent, available) in enumerate((
             ("2026-11", 1111, 500, 1200, 700, 900, 3300),
@@ -140,9 +141,9 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
             assert {field: summary[field] for field in expected} == {
                 field: value * factor for field, value in expected.items()
             }
-            for row, value in zip(cells[:3], (
+            for row, value in zip(cells, (
                 summary["income"], sum(row["carryover"] for row in data["budget"]),
-                summary["assignedNextMonth"],
+                summary["assignedNextMonth"], summary["assigned"], summary["readyToAssign"],
             ), strict=True):
                 rendered = displayed_amount(row[index][1])
                 expected_value = (
@@ -151,13 +152,7 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
                 )
                 assert rendered == expected_value
             assert "In categories</small>" in cells[1][index][1]
-            assert [value.strip() for _, value in cells[3][index * 4:index * 4 + 4]] == [
-                money_number(sum(row["carryover"] for row in data["budget"]), code),
-                *[
-                    money_number(summary[field] * sign, code)
-                    for field, sign in (("assigned", 1), ("spent", -1), ("available", 1))
-                ],
-            ]
+            assert "<input" not in cells[3][index][1] and "<input" not in cells[4][index][1]
 
 
 def test_older_remote_projections_show_unavailable_overview_totals_without_inventing_values(
@@ -202,18 +197,20 @@ def test_historical_income_remains_visible_while_overview_planning_is_unavailabl
     assert cells[0][0].strip() == "123.45"
     assert cells[1][0].strip() == "—"
     assert displayed_amount(cells[2][0]) == "—"
-    assert [value.strip() for value in cells[3][:3]] == ["—", "—", "—"]
+    assert cells[3][0].strip() == cells[4][0].strip() == "—"
     assert displayed_amount(cells[1][1]) == "0.00"
-    assert [value.strip() for value in cells[3][3:6]] == ["10.00", "0.00", "10.00"]
+    assert cells[3][1].strip() == "10.00"
+    current = client.get("/api/workspace?workspace=personal&month=2026-10").json()
+    assert cells[4][1].strip() == money_number(current["summary"]["readyToAssign"])
     historical = re.search(r'aria-label="September 2026 summary">(.*?)</section>', text, re.S)[1]
-    assert re.search(r'class="budget-ready-value[^"]*">([^<]*)</strong>', historical)[1] == "—"
+    assert "budget-ready" not in historical
 
 
 def test_calculated_rows_and_group_totals_are_read_only_while_child_assignments_are_editable(client):
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert "Editable assigned amounts" in text and "Read-only summaries" in text
     overview = re.findall(r'<tr class="budget-overview-row[^"]*">(.*?)</tr>', text, re.S)
-    for index in (0, 1, 3):
+    for index in (0, 1, 3, 4):
         assert '<small class="budget-row-note">Summary</small>' in overview[index]
         assert "<input" not in overview[index] and "<form" not in overview[index]
     for row in re.findall(r'<tr class="budget-group-row">(.*?)</tr>', text, re.S):
@@ -235,6 +232,67 @@ def test_calculated_rows_and_group_totals_are_read_only_while_child_assignments_
         assert form["currency"] == "USD" and form["workspace"] == "demo"
         assert form["month"] in {"2026-10", "2026-11", "2026-12"}
         assert f'from {month_label(form["month"])}' in form["body"]
+
+
+@pytest.mark.parametrize(("currency", "assigned", "ready"), [
+    ("USD", 123456, 7654321), ("JPY", 1234, -7654), ("KWD", 1234, 0),
+])
+def test_scalar_overview_uses_core_summary_values_and_selected_currency(
+    client, store, monkeypatch, currency, assigned, ready,
+):
+    store.add_account("personal", {
+        "name": "Fixture cash", "type": "depository", "balance": 1000000,
+        "currency": currency,
+    })
+    workspace = store.workspace
+
+    def projected_workspace(*args, **kwargs):
+        data = workspace(*args, **kwargs)
+        for summary in (data["summary"], *data["summariesByCurrency"].values()):
+            summary["assigned"] = assigned
+            summary["readyToAssign"] = ready
+        return data
+
+    monkeypatch.setattr(store, "workspace", projected_workspace)
+    text = client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text
+    for row_class, expected in (("budget-assigned-row", assigned), ("budget-ready-row", ready)):
+        row = re.search(rf'<tr class="budget-overview-row {row_class}">(.*?)</tr>', text, re.S)[1]
+        cells = re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S)
+        assert len(cells) == 3
+        assert [displayed_amount(markup) for _, markup in cells] == [
+            money_number(expected, currency),
+        ] * 3
+        assert "<input" not in row and "<form" not in row
+        assert all(("negative" in attributes) is (expected < 0) for attributes, _ in cells)
+
+
+@pytest.mark.parametrize("amount", [None, True, "12345", 1.25, 9_007_199_254_740_992,
+                                    -9_007_199_254_740_992])
+def test_unavailable_remote_ready_to_assign_is_not_recomputed_from_other_balances(
+    client, store, monkeypatch, amount,
+):
+    workspace = store.workspace
+
+    def unsupported_workspace(*args, **kwargs):
+        data = workspace(*args, **kwargs)
+        for summary in (data["summary"], *data["summariesByCurrency"].values()):
+            if amount is None:
+                summary.pop("readyToAssign", None)
+            else:
+                summary["readyToAssign"] = amount
+        return data
+
+    monkeypatch.setattr(store, "workspace", unsupported_workspace)
+    response = client.get("/budgets/demo/budget/2026-10/usd")
+    assert response.status_code == 200
+    row = re.search(
+        r'<tr class="budget-overview-row budget-ready-row">(.*?)</tr>', response.text, re.S,
+    )[1]
+    cells = re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S)
+    assert len(cells) == 3
+    assert all(displayed_amount(markup) == "—" for _, markup in cells)
+    assert all("negative" not in attributes and "positive" not in attributes for attributes, _ in cells)
+    assert category_assignment_forms(response.text)
 
 
 @pytest.mark.parametrize("capability,amount", [
