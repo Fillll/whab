@@ -270,7 +270,7 @@ strong {
   height: 43px;
   padding: 0 14px;
   margin-bottom: 5px;
-  border-radius: 7px;
+  border-radius: 0;
   font-size: 13px;
   color: var(--text-secondary);
   text-align: left;
@@ -282,12 +282,12 @@ strong {
   background: var(--surface);
 }
 .nav-item.active {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--selection);
+  color: var(--selection-ink);
   font-weight: 600;
 }
 .nav-item.active svg {
-  color: var(--accent-ink);
+  color: inherit;
 }
 .nav-count {
   margin-left: auto;
@@ -926,11 +926,67 @@ strong {
   overflow-y: auto;
   padding: 4px;
 }
+.account-picker-popup {
+  width: 320px;
+}
+.account-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 8px 0;
+  padding: 0 9px;
+  border: 1px solid var(--control-border);
+  border-radius: 5px;
+  color: var(--muted);
+}
+.account-picker-search:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.account-picker-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 11px;
+  color: var(--ink);
+}
+.account-picker-search > svg {
+  flex: none;
+}
+.account-picker-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.account-picker-bulk-actions .text-link {
+  font-size: 11px;
+}
 .account-picker-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 7px 8px;
   border-top: 1px solid var(--line);
+}
+.account-picker-count,
+.account-picker-empty {
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.account-picker-count {
+  min-width: 0;
+}
+.account-picker-empty {
+  margin: 0;
+  padding: 16px 12px;
 }
 .account-picker-actions .button,
 .transaction-period-form .button {
@@ -969,6 +1025,8 @@ strong {
 }
 .account-picker[hidden],
 .account-picker-popup[hidden],
+.account-picker-empty[hidden],
+.account-picker-option[hidden],
 .transaction-period-popup[hidden],
 .transaction-account-filter > select[hidden] {
   display: none;
@@ -3161,10 +3219,7 @@ strong {
   height: auto;
   padding: 11px 10px;
   font-size: 12px;
-  border-radius: 5px;
-}
-.nav-item.active {
-  box-shadow: inset 2px 0 var(--selection);
+  border-radius: 0;
 }
 .sidebar-accounts {
   margin-top: 26px;
@@ -3731,7 +3786,8 @@ strong {
   background: var(--row-hover);
 }
 .budget-category-row.selected td:first-child {
-  box-shadow: inset 2px 0 var(--selection);
+  background: var(--selection);
+  color: var(--selection-ink);
 }
 .budget-category-link {
   display: flex;

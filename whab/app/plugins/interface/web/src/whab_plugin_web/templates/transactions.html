@@ -21,19 +21,22 @@
       {% for account in data.accounts %}<option value="{{ account.id }}"{% if account.id in selected_ids %} selected{% endif %}>{{ account.name }}</option>{% endfor %}
     </select>
     <div class="account-picker" data-account-picker hidden>
-      <button id="account-filter-toggle" class="account-picker-toggle" type="button" role="combobox" aria-label="Filter by account" aria-describedby="account-filter-value account-filter-help" aria-haspopup="listbox" aria-expanded="false" aria-controls="account-filter-options">
+      <button id="account-filter-toggle" class="account-picker-toggle" type="button" aria-label="Filter by account" aria-describedby="account-filter-value account-filter-help" aria-haspopup="dialog" aria-expanded="false" aria-controls="account-filter-popup">
         <span class="account-picker-value" id="account-filter-value" data-account-picker-value>
           {% if selected_ids|length == 1 and selected_account %}<span class="account-picker-mark sidebar-bank-mark" aria-hidden="true"><span>{{ icon('credit' if is_liability(selected_account) else 'accounts',15) }}</span>{% if logos.get(selected_account.id) %}<img class="bank-logo-image" data-bank-logo src="{{ logos[selected_account.id] }}" alt="" width="18" height="18" decoding="async" hidden>{% endif %}</span><span data-account-picker-label>{{ selected_account.name }}</span>{% else %}<span class="account-picker-mark sidebar-bank-mark" aria-hidden="true"><span>{{ icon('accounts',15) }}</span></span><span data-account-picker-label>{{ selected_ids|length|string + ' accounts' if selected_ids else 'All accounts' }}</span>{% endif %}
         </span>
         {{ icon('chevron-down',14) }}
       </button>
-      <span class="sr-only" id="account-filter-help">Use arrow keys to move, Space to select, and Enter to apply.</span>
-      <div class="account-picker-popup" data-account-picker-popup hidden>
+      <span class="sr-only" id="account-filter-help">Search accounts and choose matches with arrow keys and Enter. Use Apply to update transactions. Select all includes accounts outside your search; Select none clears the draft.</span>
+      <div id="account-filter-popup" class="account-picker-popup" role="dialog" aria-label="Choose accounts" data-account-picker-popup hidden>
+        <label class="account-picker-search">{{ icon('search', 15) }}<input type="search" data-account-picker-search aria-label="Search accounts" role="combobox" aria-autocomplete="list" aria-controls="account-filter-options" aria-expanded="true" aria-describedby="account-filter-help account-filter-selection" placeholder="Search accounts…" autocomplete="off" spellcheck="false"></label>
+        <div class="account-picker-bulk-actions"><button class="text-link" type="button" data-account-picker-select-all aria-label="Select all accounts" title="Select all accounts, including accounts outside your search">Select all</button><button class="text-link" type="button" data-account-picker-select-none aria-label="Select no accounts">Select none</button></div>
         <div id="account-filter-options" class="account-picker-options" role="listbox" aria-label="Accounts" aria-multiselectable="true">
-          <div class="account-picker-option" id="account-filter-option-all" role="option" data-account-option data-value="all" aria-selected="{{ 'false' if selected_ids else 'true' }}" tabindex="-1"><span class="account-picker-mark sidebar-bank-mark" aria-hidden="true"><span>{{ icon('accounts',15) }}</span></span><span data-account-picker-label>All accounts</span></div>
+          <div class="account-picker-option" id="account-filter-option-all" role="option" data-account-option data-account-picker-all data-value="all" aria-selected="{{ 'false' if selected_ids else 'true' }}" tabindex="-1"><span class="account-picker-mark sidebar-bank-mark" aria-hidden="true"><span>{{ icon('accounts',15) }}</span></span><span data-account-picker-label>All accounts</span></div>
           {% for account in data.accounts %}<div class="account-picker-option" id="account-filter-option-{{ loop.index }}" role="option" data-account-option data-value="{{ account.id }}" aria-selected="{{ 'true' if account.id in selected_ids else 'false' }}" tabindex="-1"><span class="account-picker-mark sidebar-bank-mark" aria-hidden="true"><span>{{ icon('credit' if is_liability(account) else 'accounts',15) }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo src="{{ logos[account.id] }}" alt="" width="18" height="18" decoding="async" hidden>{% endif %}</span><span data-account-picker-label>{{ account.name }}</span></div>{% endfor %}
         </div>
-        <div class="account-picker-actions"><button type="button" class="button secondary" data-account-picker-apply>Apply</button></div>
+        <p class="account-picker-empty" data-account-picker-empty role="status" hidden>No accounts match your search.</p>
+        <div class="account-picker-actions"><span id="account-filter-selection" class="account-picker-count" data-account-picker-count role="status" aria-live="polite">{{ selected_ids|length if selected_ids else data.accounts|length }} of {{ data.accounts|length }} selected</span><button type="button" class="button secondary" data-account-picker-apply{% if not data.accounts %} disabled{% endif %}>Apply</button></div>
       </div>
     </div>
   </div>

@@ -1,9 +1,11 @@
 # Web interface plugin changelog
 
-## 1.16.1 — 2026-10-18
+## 1.17.0 — 2026-10-18
 
 PR: [#56](https://github.com/Fillll/whab/pull/56)
 
+- Use flat yellow navigation and selected category labels without the inset accent edge or rounded navigation corners.
+- Add account search and explicit Select all/Select none controls to the multi-account picker. Keep filtered-out selections, show selected counts and require at least one account before applying a cleared draft.
 - Rename user-facing plugin Options links and dialogs to Settings, including the Account logo shortcut and plugin manager descriptions.
 - Align installed plugin rows as name, package/version, saved enabled state and Settings, retaining accessible selection controls and a compact mobile layout.
 
