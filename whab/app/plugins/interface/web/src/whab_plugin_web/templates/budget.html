@@ -28,7 +28,29 @@
                       <div><span>Assigned</span><strong>{{ money(period.summary.assigned) }}</strong></div>
                       <div><span>Spent</span><strong>{{ money(period.summary.spent) }}</strong></div>
                     </div>
-                    <div class="budget-ready"><span class="budget-ready-label">To assign</span><strong class="budget-ready-value{% if period.summary.readyToAssign<0 %} negative{% endif %}">{{ money(period.summary.readyToAssign) if period.month>=data.budgetStartMonth else '—' }}</strong></div>
+                    <div class="budget-ready"><span class="budget-ready-label">To assign</span><strong class="budget-ready-value{% if period.month>=data.budgetStartMonth and period.summary.readyToAssign<0 %} negative{% endif %}">{{ money(period.summary.readyToAssign) if period.month>=data.budgetStartMonth else '—' }}</strong></div>
+                    {% set rollover_known = period.rolloverMode in ['category','balance'] %}
+                    {% set rollover_planning = data.budgetStartMonth<=period.month<'2200-12' %}
+                    <div class="budget-rollover">
+                      {% if period.rolloverModeEditable is sameas true and rollover_known and rollover_planning %}
+                        <form class="budget-rollover-form" data-api="/budget/settings/rollover" data-method="PUT" data-budget-mutation data-auto>
+                          <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ period.month }}"><input type="hidden" name="currency" value="{{ currency }}">
+                          <fieldset>
+                            <legend>Carryover<span class="budget-rollover-target">Into {{ month_label(shift_month(period.month,1)) }}</span></legend>
+                            <div class="budget-rollover-options">
+                              {% for mode, label in [('category','By category'),('balance','Overall balance')] %}
+                                <label for="rollover-{{ period.month }}-{{ currency|lower }}-{{ mode }}"><input id="rollover-{{ period.month }}-{{ currency|lower }}-{{ mode }}" type="radio" name="mode" value="{{ mode }}"{% if period.rolloverMode==mode %} checked{% endif %}><span>{{ label }}</span></label>
+                              {% endfor %}
+                            </div>
+                          </fieldset>
+                          <p class="field-error" role="alert" hidden></p>
+                        </form>
+                      {% else %}
+                        <div class="budget-rollover-heading"><span>Carryover</span>{% if period.month<'2200-12' %}<small>Into {{ month_label(shift_month(period.month,1)) }}</small>{% endif %}</div>
+                        <span class="budget-rollover-readonly">{{ 'By category' if period.rolloverMode=='category' else 'Overall balance' if period.rolloverMode=='balance' else 'Unavailable' }}</span>
+                        {% if rollover_planning %}<small class="budget-row-note">Editing requires a server update</small>{% endif %}
+                      {% endif %}
+                    </div>
                   </section>
                 </th>
               {% endfor %}
@@ -51,6 +73,16 @@
               <th scope="row">Previous overspending<small class="budget-row-note">Summary</small></th>
               {% for period in periods %}<td colspan="3" class="month-start{% if period.month>=data.budgetStartMonth and period.summary.previousOverspending is defined and period.summary.previousOverspending %} negative{% endif %}">{{ money_number(-period.summary.previousOverspending) if period.month>=data.budgetStartMonth and period.summary.previousOverspending is defined else '—' }}</td>{% endfor %}
             </tr>
+            {% if periods|selectattr('summary.balanceCarryover','defined')|list %}
+              <tr class="budget-overview-row budget-balance-row">
+                <th scope="row">Balance carried in<small class="budget-row-note">Summary</small></th>
+                {% for period in periods %}
+                  {% set carried_balance = period.summary.balanceCarryover %}
+                  {% set carried_balance_valid = carried_balance is integer and -9007199254740991<=carried_balance<=9007199254740991 and period.month>=data.budgetStartMonth %}
+                  <td colspan="3" class="month-start{% if carried_balance_valid and carried_balance<0 %} negative{% endif %}">{{ money_number(carried_balance) if carried_balance_valid else '—' }}</td>
+                {% endfor %}
+              </tr>
+            {% endif %}
             <tr class="budget-overview-row">
               <th scope="row">Assigned for next month</th>
               {% for period in periods %}
@@ -114,7 +146,7 @@
                       </form>
                     </td>
                     <td class="budget-money{% if cell.month==month %} selected-month{% endif %}{% if not cell.spent %} zero{% endif %}">{{ money_number(-cell.spent) }}</td>
-                    <td class="{% if cell.month==month %}selected-month {% endif %}{% if cell.available<0 %}negative{% elif not cell.available %}zero{% endif %}"><a class="budget-money" href="{{ url(category=row.category.id,month=cell.month) }}" aria-label="Details for {{ row.category.name }} in {{ month_label(cell.month) }}">{{ money_number(cell.available) }}</a></td>
+                    <td class="{% if cell.month==month %}selected-month {% endif %}{% if cell.available<0 %}negative{% elif not cell.available %}zero{% endif %}"><a class="budget-money" href="{{ url(category=row.category.id,month=cell.month) }}" aria-label="Details for {{ row.category.name }} in {{ month_label(cell.month) }}" title="Carried over: {{ money(cell.carryover) }} · Assigned: {{ money(cell.assigned) }} · Activity: {{ money(-cell.spent) }}">{{ money_number(cell.available) }}</a></td>
                   {% endfor %}
                 </tr>
               {% endfor %}
@@ -163,6 +195,7 @@
       </div>
       <form class="assign-form"
             data-api="/budget/{{ category_path(selected.id) }}"
+            data-budget-mutation
             data-method="PUT">
         <input type="hidden"
                name="workspace"

@@ -353,3 +353,52 @@ def test_next_month_funding_route_preserves_imported_category_named_next_month(s
         data = browser.get('/api/workspace?workspace=personal&month=2026-10').json()
         assert next(row for row in data['budget'] if row['categoryId'] == 'next-month')['assigned'] == 100
         assert data['summary']['assignedNextMonth'] == 3000
+
+
+def test_historical_demo_months_exclude_plans_funded_by_later_income(client, monkeypatch):
+    monkeypatch.setattr('whab_plugin_sqlite.store.current_month', lambda: '2026-10')
+    may = client.get('/api/workspace?workspace=demo&month=2026-05').json()
+    june = client.get('/api/workspace?workspace=demo&month=2026-06').json()
+    assert may['summary']['readyToAssign'] == 1210000
+    assert june['summary']['readyToAssign'] == 1480000
+    assert client.get('/api/workspace?workspace=demo&month=2026-10').json()['summary']['readyToAssign'] == 2560000
+
+
+def test_monthly_rollover_api_pools_balances_once_and_preserves_source_month(client):
+    october = client.get('/api/workspace?workspace=demo&month=2026-10').json()
+    assert october['rolloverMode'] == 'category'
+    assert client.put('/api/budget/settings/rollover', json={
+        'workspace': 'demo', 'month': '2026-10', 'currency': 'USD', 'mode': 'balance',
+    }).status_code == 200
+    november = client.get('/api/workspace?workspace=demo&month=2026-11').json()
+    assert november['summary']['balanceCarryover'] == 899817
+    assert november['summary']['readyToAssign'] == 3459817
+    assert all(row['carryover'] == 0 and row['available'] == 0 for row in november['budget'])
+    assert november['accounts'] == october['accounts']
+    after = client.get('/api/workspace?workspace=demo&month=2026-10').json()
+    assert after['rolloverMode'] == 'balance' and after['summary'] == october['summary']
+    assert client.get('/api/workspace?workspace=personal&month=2026-10').json()['rolloverMode'] == 'category'
+    assert client.put('/api/budget/settings/rollover', json={
+        'workspace': 'demo', 'month': '2026-10', 'currency': 'USD', 'mode': 'category',
+    }).status_code == 200
+    restored = client.get('/api/workspace?workspace=demo&month=2026-11').json()
+    assert restored['summary']['balanceCarryover'] == 0
+    assert restored['summary']['available'] == 899817
+
+
+@pytest.mark.parametrize('change', [
+    {'mode': 'reset'}, {'mode': True}, {'mode': None}, {'mode': 1}, {'mode': []},
+    {'currency': 'xyz'}, {'currency': None}, {'month': '2026-13'},
+    {'month': '2200-12'}, {'month': '2026-09'}, {'workspace': 'unknown'}, {'assigned': 100},
+])
+def test_monthly_rollover_rejects_invalid_requests_without_mutation(client, change):
+    request = {'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'mode': 'balance'}
+    before = client.get('/api/workspace?workspace=personal&month=2026-11').json()
+    assert client.put('/api/budget/settings/rollover', json={**request, **change}).status_code == 400
+    assert client.get('/api/workspace?workspace=personal&month=2026-11').json() == before
+
+
+def test_monthly_rollover_preserves_local_origin_guard(client):
+    assert client.put('/api/budget/settings/rollover', json={
+        'workspace': 'personal', 'month': '2026-10', 'currency': 'USD', 'mode': 'balance',
+    }, headers={'Origin': 'https://foreign.example'}).status_code == 403

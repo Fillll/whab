@@ -31,6 +31,7 @@ def budget():
         }],
         "assignments": [{"month": "2026-09", "categoryId": "food", "assigned": -100}],
         "futureFunding": [],
+        "rolloverModes": [],
     }
 
 

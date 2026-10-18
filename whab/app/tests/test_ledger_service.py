@@ -84,6 +84,49 @@ def test_next_month_funding_is_optional_for_existing_storage():
     assert service.revision == revision
 
 
+def test_monthly_rollover_uses_revision_replay_without_moving_money(store):
+    service = LedgerService(store)
+    cash = service.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+    service.assign("personal", "groceries", "2026-10", 2000)
+    service.add_transaction("personal", {
+        "accountId": cash, "date": "2026-10-05", "merchant": "Grocer", "amount": 1000,
+        "categoryId": "groceries",
+    })
+    before = store.export_budget()
+    revision = service.revision
+    payload = {"month": "2026-10", "currency": "USD", "mode": "balance"}
+    response = service.command(
+        "set_rollover_mode", "personal", payload,
+        request_id="rollover", expected_revision=revision,
+    )
+    assert service.command(
+        "set_rollover_mode", "personal", payload,
+        request_id="rollover", expected_revision=revision,
+    ) == response
+    assert service.workspace("personal", "2026-10")["rolloverMode"] == "balance"
+    november = service.workspace("personal", "2026-11")
+    assert november["rolloverModeEditable"] is True
+    assert november["summary"]["balanceCarryover"] == 1000
+    assert november["summary"]["readyToAssign"] == 9000
+    assert all(row["carryover"] == 0 for row in november["budget"])
+    after = store.export_budget()
+    assert {key: value for key, value in after.items() if key != "rolloverModes"} == {
+        key: value for key, value in before.items() if key != "rolloverModes"
+    }
+    service.set_rollover_mode("personal", "2026-10", "USD", "category")
+    november = service.workspace("personal", "2026-11")
+    assert november["summary"]["balanceCarryover"] == 0
+    assert next(row for row in november["budget"] if row["categoryId"] == "groceries")["carryover"] == 1000
+
+
+def test_rollover_settings_are_optional_for_existing_storage():
+    service = LedgerService(SimpleNamespace())
+    revision = service.revision
+    with pytest.raises(StoreError, match="does not support monthly rollover settings"):
+        service.set_rollover_mode("personal", "2026-10", "USD", "category")
+    assert service.revision == revision
+
+
 def test_concurrent_writers_cannot_both_use_a_revision(store):
     service = LedgerService(store)
     revision = service.revision
@@ -124,6 +167,12 @@ def test_concurrent_writers_cannot_both_use_a_revision(store):
     ("assign_next_month", {"month": "2026-10", "currency": "USD", "assigned": True}),
     ("assign_next_month", {"month": "2026-13", "currency": "USD", "assigned": 0}),
     ("assign_next_month", {"month": "2026-10", "assigned": 0}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "USD", "mode": "reset"}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "USD", "mode": True}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "USD", "mode": []}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "USD"}),
+    ("set_rollover_mode", {"month": "2026-13", "currency": "USD", "mode": "category"}),
+    ("set_rollover_mode", {"month": "2026-10", "currency": "xyz", "mode": "category"}),
     ("edit_transaction", {"transactionId": "tx"}),
     ("edit_transaction", {"transactionId": "tx", "reviewed": "true"}),
     ("add_transaction", {"accountId": "account", "date": "2026-10-01", "merchant": "Cash", "amount": 0, "categoryId": None}),

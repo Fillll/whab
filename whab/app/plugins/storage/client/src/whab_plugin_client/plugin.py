@@ -92,8 +92,8 @@ class RemoteStore:
         if response.status_code in {400, 401, 403, 404, 422}:
             if command:
                 self._pending = None
-            if operation == "assign_next_month" and response.status_code in {400, 404, 422}:
-                raise StoreError("Remote server rejected next-month funding. Check the amount and update the server if it does not support this feature.")
+            if operation in {"assign_next_month", "set_rollover_mode"} and response.status_code in {400, 404, 422}:
+                raise StoreError("Remote server rejected this planning change. Check the inputs and update the server if it does not support this feature.")
             raise StoreError("Remote budget request rejected. Check connection settings and inputs.")
         if response.status_code != 200:
             raise StoreError("Remote budget is unavailable. Retry the same change to confirm its result.")
@@ -213,6 +213,11 @@ class RemoteStore:
     def assign_next_month(self, workspace, month, currency, assigned):
         return self._command("assign_next_month", workspace, {
             "month": month, "currency": currency, "assigned": assigned,
+        })
+
+    def set_rollover_mode(self, workspace, month, currency, mode):
+        return self._command("set_rollover_mode", workspace, {
+            "month": month, "currency": currency, "mode": mode,
         })
 
     def items(self):

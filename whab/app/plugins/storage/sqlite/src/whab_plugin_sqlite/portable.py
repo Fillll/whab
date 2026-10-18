@@ -10,7 +10,7 @@ from .store import Store
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
 _FORMAT_VERSION = 1
-_ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000}
+_ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000}
 
 
 def _schema(connection):
@@ -42,12 +42,12 @@ def export_files(store, workspace):
         clean.close()
 
 
-def _validate_rows(connection, *, legacy_accounts, legacy_funding):
+def _validate_rows(connection, *, legacy_accounts, legacy_tables):
     meta = connection.execute("SELECT workspace FROM meta").fetchall()
     if len(meta) != 1 or meta[0][0] != "personal":
         raise StoreError("SQLite budget images must contain exactly one personal ledger.")
     for table, limit in _ROW_LIMITS.items():
-        if legacy_funding and table == "future_funding":
+        if table in legacy_tables:
             continue
         count, foreign = connection.execute(
             f"SELECT COUNT(*),COALESCE(SUM(workspace <> 'personal'),0) FROM {table}"
@@ -92,10 +92,13 @@ def read_files(files):
             )) if row[1] == "accounts" else row
             for row in expected_schema
         ]
-        # Funding floors were added independently of account scope, so accept
-        # both older exact schemas without executing their stored SQL.
-        legacy_funding_schema = [row for row in expected_schema if row[2] != "future_funding"]
-        legacy_both_schema = [row for row in legacy_schema if row[2] != "future_funding"]
+        # Each planning table is additive. Preserve the exact prior schemas for
+        # every combination without executing any stored SQL or migrations.
+        compatible_schemas = [
+            [row for row in schema if row[2] not in omitted]
+            for schema in (expected_schema, legacy_schema)
+            for omitted in ((), ("future_funding",), ("rollover_modes",), ("future_funding", "rollover_modes"))
+        ]
         reader.db.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
         reader.db.execute("PRAGMA trusted_schema=OFF")
         reader.db.execute("PRAGMA query_only=ON")
@@ -103,15 +106,15 @@ def read_files(files):
         actual_schema = _schema(reader.db)
         if (
             reader.db.execute("PRAGMA user_version").fetchone()[0] != _FORMAT_VERSION
-            or actual_schema not in (expected_schema, legacy_schema, legacy_funding_schema, legacy_both_schema)
+            or actual_schema not in compatible_schemas
         ):
             raise StoreError("This SQLite budget has an unsupported database schema.")
         if [row[0] for row in reader.db.execute("PRAGMA quick_check")] != ["ok"]:
             raise StoreError("This SQLite budget database is damaged.")
         _validate_rows(
             reader.db,
-            legacy_accounts=actual_schema in (legacy_schema, legacy_both_schema),
-            legacy_funding=actual_schema in (legacy_funding_schema, legacy_both_schema),
+            legacy_accounts="on_budget" not in {row["name"] for row in reader.db.execute("PRAGMA table_info(accounts)")},
+            legacy_tables=set(_ROW_LIMITS) - {row[1] for row in actual_schema if row[0] == "table"},
         )
         return reader.export_budget()
     except sqlite3.Error:
@@ -132,6 +135,7 @@ def _semantic(snapshot):
         "transactions": sorted(snapshot["transactions"], key=lambda transaction: transaction["id"]),
         "assignments": sorted(snapshot["assignments"], key=lambda assignment: (assignment["month"], assignment["categoryId"])),
         "futureFunding": sorted(snapshot["futureFunding"], key=lambda funding: (funding["month"], funding["currency"])),
+        "rolloverModes": sorted(snapshot["rolloverModes"], key=lambda rollover: (rollover["month"], rollover["currency"])),
     }
 
 

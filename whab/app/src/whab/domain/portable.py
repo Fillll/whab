@@ -8,6 +8,7 @@ Money stays in the original currency's integer minor units without conversion.
 import re
 
 from .accounts import ACCOUNT_TYPES, normalize_account
+from .budget import ROLLOVER_MODES
 from .categories import validate_child_category
 from .errors import StoreError
 from .money import MAX_SAFE_INTEGER, currency_code, minor_units
@@ -27,6 +28,7 @@ TRANSACTION_FIELDS = frozenset({
 })
 ASSIGNMENT_FIELDS = frozenset({"month", "categoryId", "assigned"})
 FUTURE_FUNDING_FIELDS = frozenset({"month", "currency", "assigned"})
+ROLLOVER_MODE_FIELDS = frozenset({"month", "currency", "mode"})
 _ROOT_FIELDS = frozenset({
     "formatVersion", "budgetStartMonth", "accounts", "categories", "transactions", "assignments",
 })
@@ -80,7 +82,7 @@ def validate_portable_budget(data: object) -> dict:
     """Validate exact JSON records and references, returning independent copies."""
     if (
         type(data) is not dict or not _ROOT_FIELDS <= data.keys()
-        or not data.keys() <= _ROOT_FIELDS | {"futureFunding"}
+        or not data.keys() <= _ROOT_FIELDS | {"futureFunding", "rolloverModes"}
     ):
         raise StoreError("Invalid portable budget fields.")
     if type(data["formatVersion"]) is not int or data["formatVersion"] != 1:
@@ -102,6 +104,7 @@ def validate_portable_budget(data: object) -> dict:
     transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000)
     assignments = _records(data["assignments"], ASSIGNMENT_FIELDS, 250000)
     future_funding = _records(data.get("futureFunding", []), FUTURE_FUNDING_FIELDS, 250000)
+    rollover_modes = _records(data.get("rolloverModes", []), ROLLOVER_MODE_FIELDS, 250000)
     account_map = _indexed(accounts)
     category_map = _indexed(categories)
     _indexed(transactions)
@@ -182,6 +185,20 @@ def validate_portable_budget(data: object) -> dict:
         money(funding["assigned"], funding["currency"])
         if funding["assigned"] < 0:
             raise StoreError("Portable next-month funding cannot be negative.")
+    mode_keys = set()
+    for policy in rollover_modes:
+        _text(policy["month"], limit=7)
+        validate_month(policy["month"])
+        if not data["budgetStartMonth"] <= policy["month"] < "2200-12":
+            raise StoreError("Invalid portable rollover source month.")
+        currency_code(policy["currency"])
+        _text(policy["mode"], limit=8)
+        if policy["mode"] not in ROLLOVER_MODES:
+            raise StoreError("Rollover mode must be category or balance.")
+        key = (policy["month"], policy["currency"])
+        if key in mode_keys:
+            raise StoreError("Duplicate portable rollover mode.")
+        mode_keys.add(key)
     return {
         "formatVersion": 1,
         "budgetStartMonth": data["budgetStartMonth"],
@@ -190,4 +207,5 @@ def validate_portable_budget(data: object) -> dict:
         "transactions": transactions,
         "assignments": assignments,
         "futureFunding": future_funding,
+        "rolloverModes": rollover_modes,
     }

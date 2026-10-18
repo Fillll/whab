@@ -610,6 +610,18 @@ class NextMonthFunding(Protocol):
     ) -> None: ...
 
 
+class MonthlyRollover(Protocol):
+    """Optional per-currency closing rule, saved on the outgoing source month.
+
+    Supporting projections advertise rolloverModeEditable and rolloverMode.
+    Existing storage backends remain valid without this capability.
+    """
+
+    def set_rollover_mode(
+        self, workspace: str, month: str, currency: str, mode: str,
+    ) -> None: ...
+
+
 class WorkspaceImporter(Protocol):
     """Optional storage capability; existing StorageBackend implementations stay valid."""
 

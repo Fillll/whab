@@ -6,7 +6,14 @@ changing state, so the same financial behavior applies to every persistence adap
 """
 
 from .accounts import ON_BUDGET_ACCOUNT_TYPES, is_liability, is_on_budget, normalize_account
-from .budget import calculate_workspace, effective_month_funding, ensure_assignment_allowed
+from .budget import (
+    ROLLOVER_MODES,
+    calculate_workspace,
+    effective_month_funding,
+    ensure_assignment_allowed,
+    ensure_funding_capacity_preserved,
+    funding_capacity,
+)
 from .categories import ensure_child_category
 from .dates import shift_month
 from .errors import StoreError
@@ -159,11 +166,47 @@ def assign_next_month(
     ))
     if assigned < allocated:
         raise StoreError("Next-month funding cannot be less than its category assignments.")
-    previous = effective_month_funding(state, target, currency)
-    as_of = min(month, as_of_month)
-    available = calculate_workspace(state, as_of)["summariesByCurrency"].get(currency, {}).get(
-        "readyToAssign", 0,
-    )
-    if assigned > previous and assigned - previous > available:
-        raise StoreError("Assignment exceeds available money.")
+    previous_floor = state.get("futureFunding", {}).get(target, {}).get(currency, 0)
+    if month < as_of_month:
+        available = calculate_workspace(state, month, as_of_month=as_of_month)[
+            "summariesByCurrency"
+        ].get(currency, {}).get("readyToAssign", 0)
+        if assigned > previous_floor and assigned - previous_floor > available:
+            raise StoreError("Assignment exceeds available money.")
+    else:
+        previous = effective_month_funding(state, target, currency)
+        available = funding_capacity(state, min(month, as_of_month), currency)
+        if assigned > previous and assigned - previous > available:
+            raise StoreError("Assignment exceeds available money.")
+    if assigned > previous_floor:
+        candidate = {
+            **state,
+            "futureFunding": {
+                **state.get("futureFunding", {}),
+                target: {**state.get("futureFunding", {}).get(target, {}), currency: assigned},
+            },
+        }
+        ensure_funding_capacity_preserved(state, candidate, month, as_of_month, currency)
     state.setdefault("futureFunding", {}).setdefault(target, {})[currency] = assigned
+
+
+def set_rollover_mode(
+    state: dict, month: str, currency: str, mode: str, *, as_of_month: str,
+) -> None:
+    """Choose a month's outgoing category boundary without moving any money."""
+    validate_month(month)
+    validate_month(as_of_month)
+    currency = currency_code(currency)
+    if not state["budgetStartMonth"] <= month < "2200-12":
+        raise StoreError("Rollover requires a supported source month from the budget start.")
+    if type(mode) is not str or mode not in ROLLOVER_MODES:
+        raise StoreError("Rollover mode must be category or balance.")
+    candidate = {
+        **state,
+        "rolloverModes": {
+            **state.get("rolloverModes", {}),
+            month: {**state.get("rolloverModes", {}).get(month, {}), currency: mode},
+        },
+    }
+    ensure_funding_capacity_preserved(state, candidate, month, as_of_month, currency)
+    state.setdefault("rolloverModes", {}).setdefault(month, {})[currency] = mode

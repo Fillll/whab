@@ -223,13 +223,13 @@ def test_multiple_currencies_keep_cash_debt_income_and_rollover_separate(multicu
     assert view["summariesByCurrency"] == {
         "USD": {"income": 12000, "spent": -500, "assigned": 10000,
                 "available": 23500, "readyToAssign": 56500,
-                "previousOverspending": 0, "assignedNextMonth": 0},
+                "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0},
         "EUR": {"income": 9000, "spent": 2500, "assigned": 6000,
                 "available": 9500, "readyToAssign": 33500,
-                "previousOverspending": 0, "assignedNextMonth": 0},
+                "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0},
         "JPY": {"income": 1000, "spent": 200, "assigned": 300,
                 "available": 400, "readyToAssign": 2400,
-                "previousOverspending": 0, "assignedNextMonth": 0},
+                "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0},
     }
     assert view["summary"] == view["summariesByCurrency"]["USD"]
     by_currency = {row["currency"]: row for row in view["budget"]}

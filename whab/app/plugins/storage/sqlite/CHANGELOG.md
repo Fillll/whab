@@ -4,8 +4,8 @@
 
 PR: [#41](https://github.com/Fillll/whab/pull/41)
 
-- Persist currency-scoped next-month funding atomically in an additive table, and retain it through reopening, neutral snapshots and sanitized SQLite portable exports. Preserve older database and portable-image schemas.
-- Reject replacement imports when a workspace already contains saved funding, and require WHAB 2.7 for core funding validation.
+- Persist currency-scoped next-month funding and monthly rollover choices atomically in additive tables, and retain them through reopening, neutral snapshots and sanitized SQLite portable exports. Preserve older database and portable-image schemas.
+- Supply the current month to core historical projections and funding validation. Reject replacement imports when a workspace already contains saved funding or rollover settings, and require WHAB 2.7 for core validation.
 
 ## 1.1.1 — 2026-10-16
 

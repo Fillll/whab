@@ -2992,6 +2992,89 @@ strong {
   color: var(--ink);
   font-weight: 500;
 }
+.budget-rollover {
+  padding: 9px 13px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+}
+.budget-rollover-form,
+.budget-rollover-form fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.budget-rollover-form legend,
+.budget-rollover-heading {
+  width: 100%;
+  margin: 0 0 7px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+.budget-rollover-target,
+.budget-rollover-heading small {
+  float: right;
+  margin-left: 6px;
+  font-size: 9px;
+}
+.budget-rollover-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 2px;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  background: var(--field);
+}
+.budget-rollover-options label {
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.budget-rollover-options input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  opacity: 0;
+}
+.budget-rollover-options span {
+  display: block;
+  padding: 6px 3px;
+  border-radius: 2px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.2;
+  text-align: center;
+  transition: background 0.12s, color 0.12s;
+}
+.budget-rollover-options input:checked + span {
+  background: var(--current);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.budget-rollover-options input:focus-visible + span {
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
+}
+.budget-rollover-form[aria-busy='true'] {
+  opacity: 0.65;
+}
+.budget-rollover-form[aria-busy='true'] label {
+  cursor: wait;
+}
+.budget-rollover-form .field-error {
+  margin: 7px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: normal;
+}
+.budget-rollover-readonly {
+  color: var(--muted);
+}
 .budget-columns th {
   position: sticky;
   top: 0;
@@ -3191,7 +3274,7 @@ strong {
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.budget-assignment-save {
+.budget-assignment .budget-assignment-save {
   position: absolute;
   right: 0;
   top: 100%;
@@ -3204,7 +3287,7 @@ strong {
   opacity: 0;
   pointer-events: none;
 }
-.budget-assignment:focus-within .budget-assignment-save {
+.budget-assignment:focus-within .budget-assignment-save:not(:disabled) {
   opacity: 1;
   pointer-events: auto;
 }

@@ -18,6 +18,7 @@ from whab.web.schemas import (
     CategoryBody,
     NextMonthAssignmentBody,
     ReviewBody,
+    RolloverBody,
     TransactionBody,
     Workspace,
     valid_month,
@@ -104,6 +105,11 @@ def create_router(store):
     @router.put("/api/budget/funding/next-month")
     def next_month_assignment(body: NextMonthAssignmentBody):
         store.assign_next_month(body.workspace, body.month, body.currency, body.assigned)
+        return {"ok": True}
+
+    @router.put("/api/budget/settings/rollover")
+    def rollover_mode(body: RolloverBody):
+        store.set_rollover_mode(body.workspace, body.month, body.currency, body.mode)
         return {"ok": True}
 
     @router.put("/api/budget/{category_id}")

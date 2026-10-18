@@ -72,7 +72,9 @@ def test_container_does_not_require_or_fetch_a_financial_ledger():
 def test_v1_manifest_and_ledger_remain_readable():
     settings, records = manifest(), ledger()
     restored = container.decode_container(encode_bundle(settings, records))
-    assert restored.manifest == settings and restored.legacy_ledger == {**records, "futureFunding": []}
+    assert restored.manifest == settings and restored.legacy_ledger == {
+        **records, "futureFunding": [], "rolloverModes": [],
+    }
     assert restored.files == {} and restored.credentials is None
 
 

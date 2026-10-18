@@ -4,7 +4,7 @@
 
 PR: [#41](https://github.com/Fillll/whab/pull/41)
 
-- Forward next-month funding through the existing revision-checked remote command protocol, preserving retry identity and reporting unsupported or rejected writes clearly. Require WHAB 2.7 for the new command.
+- Forward next-month funding and monthly rollover choices through the existing revision-checked remote command protocol, preserving retry identity and reporting unsupported or rejected writes clearly. Require WHAB 2.7 for the new commands.
 
 ## 1.1.1 — 2026-10-16
 

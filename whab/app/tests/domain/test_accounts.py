@@ -60,7 +60,7 @@ def test_off_budget_activity_and_snapshots_never_fund_or_consume_envelopes(state
     result = calculate_workspace(state, "2026-10")
     assert result["summary"] == {
         "income": 0, "spent": 0, "assigned": 2000, "available": 3000, "readyToAssign": 7000,
-        "previousOverspending": 0, "assignedNextMonth": 0,
+        "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0,
     }
     assert result["budget"][0]["carryover"] == 1000
     assert all(row["income"] == row["spent"] == 0 for row in result["trend"])

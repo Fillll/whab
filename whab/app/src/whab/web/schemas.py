@@ -80,6 +80,15 @@ class NextMonthAssignmentBody(AssignmentBody):
     _currency = field_validator("currency")(currency_code)
 
 
+class RolloverBody(Body):
+    workspace: Workspace
+    month: str
+    currency: str
+    mode: Literal["category", "balance"]
+    _month = field_validator("month")(valid_month)
+    _currency = field_validator("currency")(currency_code)
+
+
 class CategoryBody(Body):
     workspace: Workspace
     name: Label

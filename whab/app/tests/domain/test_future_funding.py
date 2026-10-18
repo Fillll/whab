@@ -77,8 +77,9 @@ def test_current_assignments_cannot_spend_reserved_cash_and_reductions_remain_al
     state["accounts"]["cash"]["balance"] = 0
     reserve(state, 50000)
     commands.assign(state, "rent", "2026-10", 10000, as_of_month="2026-10")
-    # An allocation inside the already funded future pool needs no extra cash.
-    commands.assign(state, "rent", "2026-11", 10000, as_of_month="2026-10")
+    # The old floor cannot authorize worsening a future month after cash is lost.
+    with pytest.raises(StoreError, match="exceeds available"):
+        commands.assign(state, "rent", "2026-11", 10000, as_of_month="2026-10")
     with pytest.raises(StoreError, match="exceeds available"):
         reserve(state, 50001)
 
@@ -155,6 +156,7 @@ def snapshot(**changes):
     return {
         "formatVersion": 1, "budgetStartMonth": "2026-10",
         "accounts": [], "categories": [], "transactions": [], "assignments": [],
+        "rolloverModes": [],
         **changes,
     }
 
