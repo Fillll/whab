@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.receipt_images import png
@@ -44,6 +45,18 @@ def test_receipt_upload_view_replace_and_delete_are_local_and_do_not_change_ledg
         assert client.get(endpoint, headers={"host": "untrusted.invalid"}).status_code == 403
         assert client.get(endpoint, headers={"sec-fetch-site": "cross-site"}).status_code == 403
         assert client.get("http://127.0.0.1:5173" + endpoint).status_code == 400
+        assert client.delete(endpoint).status_code == 200
+        assert client.get(endpoint).status_code == 404
+
+
+def test_native_receipt_routes_forward_scoped_lookup_without_loading_history(store, tmp_path, monkeypatch):
+    with client_for(store, tmp_path) as client:
+        key = add_transaction(client)
+        monkeypatch.setattr(store, "transactions", lambda *_: pytest.fail("Receipt access must not load transaction history."))
+        endpoint = f"/api/transactions/{key}/receipt?workspace=personal"
+        assert client.get(endpoint).status_code == 404
+        assert client.put(endpoint, content=png(), headers={"content-type": "image/png"}).status_code == 200
+        assert client.get(endpoint).content == png()
         assert client.delete(endpoint).status_code == 200
         assert client.get(endpoint).status_code == 404
 

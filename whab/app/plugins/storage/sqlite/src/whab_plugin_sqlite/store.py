@@ -583,6 +583,11 @@ class Store:
             self, workspace, start_date, end_date, currency, account_ids, search, review, page, page_size,
         )
 
+    def receipt_transaction_exists(self, workspace: str, transaction_id: str) -> bool:
+        from .receipts import transaction_exists
+
+        return transaction_exists(self, workspace, transaction_id)
+
     def receipt_ids(self, workspace: str) -> list[str]:
         from .receipts import ids
 

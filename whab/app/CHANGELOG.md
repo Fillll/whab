@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.15.0 — 2026-10-18
+
+PR: [#62](https://github.com/Fillll/whab/pull/62)
+
+- Add optional `ReceiptTransactionLookup` storage support so receipt operations can check one active transaction without loading its complete ledger history. Keep the existing public-read fallback for older storage plugins, strict capability-result validation and private receipt guards. Require SQLite 1.7.0 in the supported bundle.
+
 ## 2.14.3 — 2026-10-18
 
 PR: [#61](https://github.com/Fillll/whab/pull/61)

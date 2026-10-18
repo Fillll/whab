@@ -16,10 +16,19 @@ class ReceiptService:
             raise StoreError("Invalid workspace.")
         if not self.supported:
             raise StoreError("This storage plugin does not support receipt images.")
-        if transaction_id is not None and not any(
-            row["id"] == transaction_id for row in self.store.transactions(workspace)
-        ):
-            raise StoreError("Transaction not found.")
+        if transaction_id is not None:
+            lookup = getattr(self.store, "receipt_transaction_exists", None)
+            if callable(lookup):
+                found = lookup(workspace, transaction_id)
+                if type(found) is not bool:
+                    raise StoreError("Storage returned an invalid receipt transaction lookup.")
+                # Let storage check workspace metadata before a malformed ID,
+                # matching the legacy full-history read's error precedence.
+                found = found and isinstance(transaction_id, str)
+            else:
+                found = any(row["id"] == transaction_id for row in self.store.transactions(workspace))
+            if not found:
+                raise StoreError("Transaction not found.")
 
     def index(self, workspace):
         with self.lock:
