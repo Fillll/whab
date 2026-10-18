@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.10.0 — 2026-10-17
+
+PR: [#45](https://github.com/Fillll/whab/pull/45)
+
+- Simplify month cards to their date and Carryover control, removing the repeated Available, Assigned, Spent and large To assign values.
+- Show one amount per month for Income, Carried in, Assigned for next month, Assigned this month and Available to assign. Use core's existing assignment and remaining-funding totals, with negative funding clearly marked.
+- Move detailed Carryover, Assigned, Activity and Available column headings below Spending categories, preserving category editors, totals and sticky headings.
+
 ## 1.9.0 — 2026-10-17
 
 PR: [#44](https://github.com/Fillll/whab/pull/44)

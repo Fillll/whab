@@ -1,5 +1,7 @@
 """Bundled Web pages, visual assets and escaped user content."""
 
+import re
+
 from whab import __version__
 from whab.plugins import Insight, Plugin
 
@@ -120,7 +122,11 @@ def test_pages_keep_currency_totals_and_categories_separate(client):
 def test_empty_selected_currency_remains_selected_when_switching_workspaces(client):
     text = client.get("/budgets/demo/budget/2026-10/eur").text
     assert '<option value="EUR" selected>EUR</option>' in text
-    assert 'EUR 0.00' in text
+    assert "All amounts in EUR" in text
+    ready = re.search(
+        r'<tr class="budget-overview-row budget-ready-row">(.*?)</tr>', text, re.S,
+    )[1]
+    assert [value.strip() for value in re.findall(r'<td[^>]*>(.*?)</td>', ready, re.S)] == ["0.00"] * 3
     assert '/2026-10/eur' in text
     assert 'name="currency" value="EUR"' in text
 

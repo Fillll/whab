@@ -87,13 +87,23 @@ def test_incoming_category_column_uses_previous_month_and_keeps_mixed_month_rows
         row for row in re.findall(r'<tr class="budget-group-row">(.*?)</tr>', text, re.S)
         if re.search(r">Home</span>", row)
     )
-    overview = matrix_row(text, "budget-overview-row budget-assigned-row")
     footer = matrix_row(text, "budget-total-row")
-    for row in (home, overview, footer):
+    for row in (home, footer):
         attributes, body = row_cells(row)[1]
         assert "budget-carryover" in attributes and "negative" in attributes
         assert visible_text(body) == "-25.00"
         assert "<input" not in body
+    overview = matrix_row(text, "budget-overview-row budget-assigned-row")
+    ready = matrix_row(text, "budget-overview-row budget-ready-row")
+    for row, field in ((overview, "assigned"), (ready, "readyToAssign")):
+        cells = row_cells(row)[1:]
+        assert [re.search(r'colspan="(\d+)"', attributes)[1] for attributes, _ in cells] == [
+            "4", "3", "4",
+        ]
+        assert "budget-carryover" not in row and "<input" not in row
+        for (_, body), month in zip(cells, ("2026-11", "2026-12", "2027-01"), strict=True):
+            data = client.get(f"/api/workspace?workspace=personal&month={month}").json()
+            assert visible_amount(body) == money_number(data["summary"][field])
     carried_in = matrix_row(text, "budget-overview-row budget-carried-in-row")
     cells = row_cells(carried_in)
     assert [visible_amount(body) for _, body in cells[1:]] == ["-25.00", "-25.00", "0.00"]

@@ -2897,7 +2897,7 @@ strong {
 .budget-matrix .budget-intro {
   background: var(--page);
   vertical-align: bottom;
-  padding: 0 12px 25px 1px;
+  padding: 0 12px 16px 1px;
   white-space: normal;
 }
 .budget-intro h1 {
@@ -2919,7 +2919,6 @@ strong {
 .budget-month-summary {
   position: relative;
   overflow: hidden;
-  min-height: 206px;
   border-radius: 6px;
   background: var(--surface);
   text-align: left;
@@ -2954,43 +2953,6 @@ strong {
   font-weight: 400;
   letter-spacing: 0;
   margin-top: 2px;
-}
-.budget-ready {
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-.budget-ready-label {
-  display: block;
-  padding: 0 13px;
-  color: var(--muted);
-  font-size: 10px;
-}
-.budget-ready-value {
-  display: block;
-  padding: 2px 13px 12px;
-  color: var(--success);
-  font-size: clamp(23px, 2.1vw, 31px);
-  font-weight: 450;
-  line-height: 1.4;
-  letter-spacing: -0.8px;
-  white-space: nowrap;
-}
-.budget-summary-lines {
-  display: grid;
-  gap: 4px;
-  padding: 0 13px 11px;
-}
-.budget-summary-lines > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 10px;
-}
-.budget-summary-lines strong {
-  color: var(--ink);
-  font-weight: 500;
 }
 .budget-rollover {
   padding: 9px 13px 12px;
@@ -3138,15 +3100,18 @@ strong {
   max-width: 100%;
   margin-left: auto;
 }
-.budget-assigned-row th,
-.budget-assigned-row td {
+.budget-ready-row th,
+.budget-ready-row td {
   height: 51px;
   background: var(--current);
   font-size: 13px;
   font-weight: 600;
 }
-.budget-assigned-row th:first-child {
+.budget-ready-row th:first-child {
   font-weight: 650;
+}
+.budget-ready-row td.positive {
+  color: var(--success);
 }
 .budget-section-row th,
 .budget-section-row td {
@@ -3529,9 +3494,6 @@ strong {
   }
   .budget-matrix-scroll {
     max-height: calc(100dvh - 190px);
-  }
-  .budget-ready-value {
-    font-size: 27px;
   }
   .budget-table-footer {
     flex-wrap: wrap;

@@ -50,8 +50,8 @@ def test_rollover_controls_have_two_accessible_choices_for_each_source_month(cli
             ids.append(option["id"])
     assert len(ids) == len(set(ids)) == 6
     summary = re.search(r'aria-label="October 2026 summary">(.*?)</section>', text, re.S)[1]
-    assert summary.index(">Available<") < summary.index(">Assigned<") < summary.index(">Spent<")
-    assert summary.index(">Spent<") < summary.index(">To assign<") < summary.index("<legend>Carryover")
+    assert summary.index('class="budget-month-heading"') < summary.index("<legend>Carryover")
+    assert "budget-summary-lines" not in summary and "budget-ready" not in summary
     assert 'title="Carried over: ' in text and " · Assigned: " in text and " · Activity: " in text
 
 
