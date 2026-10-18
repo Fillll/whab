@@ -3,6 +3,77 @@ import XCTest
 @testable import WHABLauncher
 
 final class LauncherModelTests: XCTestCase {
+    func testMenuWaitsForInitialStatusBeforeAllowingAnAction() {
+        let state = LauncherMenuState(reply: nil)
+        XCTAssertEqual(state.title, "Checking…")
+        XCTAssertEqual(state.indicator, .working)
+        XCTAssertFalse(state.isEnabled)
+        XCTAssertFalse(state.opensSettings)
+    }
+
+    func testMenuShowsForegroundActivityInsteadOfAnEarlierOnlineReply() throws {
+        let reply = try JSONDecoder().decode(ManagerReply.self, from: Data(
+            #"{"ok":true,"state":"running","running":true,"url":"https://localhost:5173/"}"#.utf8))
+        let state = LauncherMenuState(reply: reply, activity: "Preparing update…")
+        XCTAssertEqual(state.title, "Preparing update…")
+        XCTAssertEqual(state.indicator, .working)
+        XCTAssertFalse(state.isEnabled)
+        XCTAssertFalse(state.opensSettings)
+    }
+
+    func testMenuOpensTheBrowserForAnOnlineLocalHTTPSRuntime() throws {
+        let reply = try JSONDecoder().decode(ManagerReply.self, from: Data(
+            #"{"ok":true,"state":"running","running":true,"url":"https://localhost:5173/"}"#.utf8))
+        let state = LauncherMenuState(reply: reply)
+        XCTAssertEqual(state.title, "Online — Open")
+        XCTAssertEqual(state.indicator, .online)
+        XCTAssertTrue(state.isEnabled)
+        XCTAssertFalse(state.opensSettings)
+    }
+
+    func testMenuOffersStartWhenTheConfiguredRuntimeIsStopped() throws {
+        let reply = try JSONDecoder().decode(ManagerReply.self, from: Data(
+            #"{"ok":true,"state":"stopped","running":false,"url":"https://localhost:5173/"}"#.utf8))
+        let state = LauncherMenuState(reply: reply)
+        XCTAssertEqual(state.title, "Offline — Start")
+        XCTAssertEqual(state.indicator, .offline)
+        XCTAssertTrue(state.isEnabled)
+        XCTAssertFalse(state.opensSettings)
+    }
+
+    func testMenuRoutesUnconfiguredRuntimeToSettings() throws {
+        let reply = try JSONDecoder().decode(ManagerReply.self, from: Data(
+            #"{"ok":true,"state":"unconfigured","running":false}"#.utf8))
+        let state = LauncherMenuState(reply: reply)
+        XCTAssertEqual(state.title, "Setup needed — Settings…")
+        XCTAssertEqual(state.indicator, .offline)
+        XCTAssertTrue(state.isEnabled)
+        XCTAssertTrue(state.opensSettings)
+    }
+
+    func testMenuRoutesManagerFailureToSettingsDespiteAnEarlierOnlineReply() throws {
+        let reply = try JSONDecoder().decode(ManagerReply.self, from: Data(
+            #"{"ok":true,"state":"running","running":true,"url":"https://localhost:5173/"}"#.utf8))
+        let state = LauncherMenuState(reply: reply, needsAttention: true)
+        XCTAssertEqual(state.title, "Needs attention — Settings…")
+        XCTAssertEqual(state.indicator, .attention)
+        XCTAssertTrue(state.isEnabled)
+        XCTAssertTrue(state.opensSettings)
+    }
+
+    func testMenuRequiresAnAllowedBrowserURLBeforeShowingOnline() throws {
+        var reply = try JSONDecoder().decode(ManagerReply.self, from: Data(
+            #"{"ok":true,"state":"running","running":true}"#.utf8))
+        for url in [nil, "http://localhost:5173/", "https://example.com/", "https://user:password@localhost/"] as [String?] {
+            reply.url = url
+            let state = LauncherMenuState(reply: reply)
+            XCTAssertEqual(state.title, "Unavailable — Settings…")
+            XCTAssertEqual(state.indicator, .attention)
+            XCTAssertTrue(state.isEnabled)
+            XCTAssertTrue(state.opensSettings)
+        }
+    }
+
     func testUpdateChannelsHaveExplicitStableMappings() {
         XCTAssertEqual(LauncherChannel.allCases.map(\.rawValue), ["main", "stable", "alpha"])
         XCTAssertEqual(Set(LauncherChannel.allCases.map(\.title)).count, 3)

@@ -1,5 +1,15 @@
 # macOS launcher changelog
 
+## 1.1.1 — 2026-10-17
+
+PR: [#46](https://github.com/Fillll/whab/pull/46)
+
+- Reduce the menu bar menu to a combined status/open action, WHAB settings and
+  Quit launcher. Show a small green dot when online, with distinct stopped,
+  setup, working and attention states; keep lifecycle controls and logs in settings.
+- Preserve the last status during background checks and show attention after a
+  failed manager response instead of retaining a stale online indication.
+
 ## 1.1.0 — 2026-10-17
 
 PR: [#42](https://github.com/Fillll/whab/pull/42)
