@@ -537,7 +537,7 @@ def test_next_month_editor_requires_new_flow_model_even_if_old_server_supports_f
     assert "Editing requires a server update" not in carried_in
 
 
-@pytest.mark.parametrize("capacity", [None, True, "123", 10000, 20000, 9_007_199_254_740_992, 0])
+@pytest.mark.parametrize("capacity", [None, True, "123", -5000, 10000, 20000, 9_007_199_254_740_992, 0])
 def test_conservative_spending_note_stays_inside_closed_breakdown_for_valid_lower_capacity(
     client, store, monkeypatch, capacity,
 ):
@@ -554,7 +554,9 @@ def test_conservative_spending_note_stays_inside_closed_breakdown_for_valid_lowe
         return data
 
     monkeypatch.setattr(store, "workspace", projected_workspace)
-    text = client.get("/budgets/demo/budget/2026-10/usd").text
+    response = client.get("/budgets/demo/budget/2026-10/usd")
+    assert response.status_code == 200
+    text = response.text
     row = re.search(r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', text, re.S)[1]
     assert [displayed_amount(markup) for markup in re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)] == [
         "100.00",
@@ -568,3 +570,51 @@ def test_conservative_spending_note_stays_inside_closed_breakdown_for_valid_lowe
     visible = re.sub(r'<details\b[^>]*>.*?</details>', '', row, flags=re.S)
     assert "Some funds are needed to cover spending or account reserves." not in visible
     assert "Review category overspending" not in visible
+    shortfall = type(capacity) is int and capacity < 0
+    assert text.count('class="budget-funding-warning negative" role="note">Funding shortfall</span>') == (
+        3 if shortfall else 0
+    )
+    assert ("Available after spending and account reserves: -50.00." in row) is shortfall
+    assert "Available after spending and account reserves" not in visible
+
+
+@pytest.mark.parametrize("capability", [None, False, 1, "true"])
+def test_funding_shortfall_requires_current_monthly_flow_capability(client, store, monkeypatch, capability):
+    workspace = store.workspace
+
+    def unsupported_workspace(*args, **kwargs):
+        data = workspace(*args, **kwargs)
+        for summary in (data["summary"], *data["summariesByCurrency"].values()):
+            summary["fundingCapacity"] = -5000
+        if capability is None:
+            data.pop("monthlyFundingFlow", None)
+        else:
+            data["monthlyFundingFlow"] = capability
+        return data
+
+    monkeypatch.setattr(store, "workspace", unsupported_workspace)
+    response = client.get("/budgets/demo/budget/2026-10/usd")
+    assert response.status_code == 200
+    text = response.text
+    assert "budget-funding-warning" not in text
+
+
+def test_funding_shortfall_is_not_shown_before_the_budget_start(client, store, monkeypatch):
+    workspace = store.workspace
+    start = workspace("demo", "2026-10")["budgetStartMonth"]
+
+    def negative_workspace(*args, **kwargs):
+        data = workspace(*args, **kwargs)
+        for summary in (data["summary"], *data["summariesByCurrency"].values()):
+            summary["fundingCapacity"] = -5000
+        return data
+
+    monkeypatch.setattr(store, "workspace", negative_workspace)
+    response = client.get(f"/budgets/demo/budget/{shift_month(start, -1)}/usd")
+    assert response.status_code == 200
+    text = response.text
+    before_start = re.search(
+        rf'aria-label="{month_label(shift_month(start, -1))} summary">(.*?)</section>', text, re.S,
+    )[1]
+    assert "budget-funding-warning" not in before_start
+    assert text.count('class="budget-funding-warning negative" role="note">Funding shortfall</span>') == 2
