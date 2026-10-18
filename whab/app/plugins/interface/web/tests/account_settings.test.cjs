@@ -26,24 +26,46 @@ function events(properties = {}) {
   }, properties);
 }
 
-function harness({flush = async () => true, logo = true} = {}) {
+function currencySelect(code) {
+  let value = code, lazy = true;
+  return {name: 'currency', disabled: true, replacements: 0,
+    options: [{value: code, dataset: {minorUnits: '2'}, defaultSelected: true}],
+    get value() {return value;},
+    set value(next) {value = this.options.some(option => option.value === next) ? next : '';},
+    get selectedOptions() {return this.options.filter(option => option.value === value);},
+    hasAttribute: name => name === 'data-currency-choices-lazy' && lazy,
+    removeAttribute() {lazy = false;},
+    replaceChildren(...options) {this.replacements += 1; this.options = options; this.reset();},
+    reset() {this.value = this.options.find(option => option.defaultSelected)?.value || this.options[0]?.value || '';},
+  };
+}
+
+function harness({flush = async () => true, logo = true, lazyCurrency = false, initialCurrency = 'USD'} = {}) {
   const requests = [], refreshed = [], updates = [], order = [];
   const error = {hidden: true, textContent: ''}, status = {textContent: ''}, submit = {disabled: true};
   const elements = Object.fromEntries(Object.entries({workspace: 'personal', name: '', onBudget: 'true',
-    type: 'depository', subtype: '', currency: 'USD', ...(logo ? {bankWebsite: ''} : {})})
+    type: 'depository', subtype: '', currency: initialCurrency, ...(logo ? {bankWebsite: ''} : {})})
     .map(([name, value]) => [name, {name, value, disabled: name === 'currency',
       focus() {this.focused = true;}}]));
+  if (lazyCurrency) elements.currency = currencySelect(initialCurrency);
   const original = Object.fromEntries(Object.entries(elements).map(([name, element]) => [name, element.value]));
   const dialog = events({open: true, closes: 0, close() {
     this.open = false; this.closes += 1; order.push('close'); void this.emit('close');
   }});
   const form = events({dataset: {}, elements,
-    reset() {for (const [name, field] of Object.entries(elements)) field.value = original[name];},
+    reset() {for (const [name, field] of Object.entries(elements)) {
+      if (field.reset) field.reset();
+      else field.value = original[name];
+    }},
     closest: () => dialog,
     querySelector: selector => ({'.field-error': error, '[data-account-settings-status]': status,
       '[type="submit"]': submit})[selector],
   });
-  const document = events({querySelector: () => form});
+  let metadataReads = 0;
+  const document = events({querySelector: () => form,
+    getElementById() {metadataReads += 1; return {textContent: JSON.stringify({USD: 2, EUR: 2, JPY: 0, KWD: 3, CLF: 4})};},
+    createElement: () => ({dataset: {}}),
+  });
   const context = {document, encodeURIComponent, Error};
   vm.runInNewContext(source.replaceAll('export function ', 'function '), context);
   context.initAccountSettings({
@@ -72,8 +94,100 @@ function harness({flush = async () => true, logo = true} = {}) {
       subtype: 'checking', currency: 'USD', bankWebsite: 'https://bank.example', ...override.account},
     currencyEditable: false, ...override});
   }
-  return {requests, refreshed, updates, order, error, status, submit, elements, dialog, form, open, metadata};
+  return {requests, refreshed, updates, order, error, status, submit, elements, dialog, form, open, metadata,
+    hydrateCurrencyChoices: context.hydrateCurrencyChoices, metadataReads: () => metadataReads};
 }
+
+test('lazy currency choices preserve current selection, reset defaults and unrelated form drafts', () => {
+  const state = harness({lazyCurrency: true});
+  const currency = state.elements.currency;
+  state.elements.name.value = 'Keep this account name draft';
+  assert.equal(currency.options.length, 1);
+  state.hydrateCurrencyChoices(currency);
+  assert.equal(currency.value, 'USD');
+  assert.equal(currency.options.length, 5);
+  assert.equal(currency.disabled, true);
+  assert.equal(state.elements.name.value, 'Keep this account name draft');
+  currency.value = 'JPY';
+  const options = currency.options;
+  state.hydrateCurrencyChoices(currency);
+  assert.equal(currency.options, options);
+  assert.equal(currency.value, 'JPY');
+  assert.equal(currency.replacements, 1);
+  assert.equal(state.metadataReads(), 1);
+  currency.reset();
+  assert.equal(currency.value, 'USD');
+  const second = currencySelect('EUR');
+  state.hydrateCurrencyChoices(second);
+  assert.equal(second.value, 'EUR');
+  second.value = 'JPY'; second.reset();
+  assert.equal(second.value, 'EUR');
+  assert.equal(state.metadataReads(), 1);
+});
+
+test('hydrated manual currency choices submit the selected JPY, KWD and CLF minor units', () => {
+  const state = harness({lazyCurrency: true});
+  const currency = state.elements.currency;
+  state.hydrateCurrencyChoices(currency);
+  currency.disabled = false;
+  const app = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/app.js'), 'utf8');
+  const parser = {};
+  vm.runInNewContext(app.slice(app.indexOf('function minorAmount('), app.indexOf('\nconst budgetEdits =')), parser);
+  const balance = {name: 'balance', value: '', disabled: false, dataset: {minorUnits: '2'},
+    hasAttribute: name => name === 'data-cents'};
+  currency.hasAttribute = () => false;
+  const elements = [currency, balance];
+  elements.namedItem = name => name === 'currency' ? currency : balance;
+  for (const [code, input, expected] of [['JPY', '123', 123], ['KWD', '1.234', 1234], ['CLF', '1.2345', 12345]]) {
+    currency.value = code; balance.value = input;
+    assert.deepEqual(plain(parser.formBody({elements})), {currency: code, balance: expected});
+  }
+  currency.value = 'JPY'; balance.value = '1.01';
+  assert.throws(() => parser.formBody({elements}), /Enter a whole-number amount/);
+});
+
+test('the dialog opener hydrates currency choices before showModal without resetting form fields', () => {
+  const app = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/app.js'), 'utf8');
+  const snippet = app.slice(app.indexOf("document.addEventListener('click', event => {"), app.indexOf("for (const button of document.querySelectorAll('[data-close-dialog]')"));
+  const order = [], currency = currencySelect('USD');
+  let click;
+  const dialog = {querySelectorAll: () => [currency], showModal: () => order.push('open')};
+  const button = {dataset: {dialog: 'account-dialog'}};
+  vm.runInNewContext(snippet, {
+    document: {addEventListener: (_, callback) => {click = callback;}, getElementById: () => dialog},
+    hydrateCurrencyChoices: select => {assert.equal(select, currency); order.push('hydrate');},
+  });
+  click({target: {closest: () => button}});
+  assert.deepEqual(order, ['hydrate', 'open']);
+  button.disabled = true;
+  click({target: {closest: () => button}});
+  assert.deepEqual(order, ['hydrate', 'open']);
+});
+
+test('settings hydrate before applying another account currency and preserve its history lock', async () => {
+  const state = harness({lazyCurrency: true});
+  const currency = state.elements.currency;
+  const loading = state.open('yen-account');
+  assert.equal(currency.options.length, 1);
+  state.metadata(0, {account: {name: 'Yen account', onBudget: true, type: 'depository', currency: 'JPY'}});
+  await loading;
+  assert.equal(currency.value, 'JPY');
+  assert.equal(currency.options.length, 5);
+  assert.equal(currency.disabled, true);
+  state.elements.name.value = 'Renamed yen account';
+  const saving = state.form.emit('submit');
+  await tick();
+  assert.equal('currency' in state.requests[1].body, false);
+  state.requests[1].resolve({ok: true}); await saving;
+  const options = currency.options;
+  const next = state.open('euro-account');
+  state.metadata(2, {currencyEditable: true, account: {name: 'Euro account', onBudget: true, type: 'depository', currency: 'EUR'}});
+  await next;
+  assert.equal(currency.value, 'EUR');
+  assert.equal(currency.options, options);
+  assert.equal(currency.disabled, false);
+  assert.equal(currency.replacements, 1);
+});
 
 test('opening settings loads only the addressed account and keeps Save blocked until metadata arrives', async () => {
   const state = harness();
@@ -94,7 +208,7 @@ test('opening settings loads only the addressed account and keeps Save blocked u
 });
 
 test('a slower metadata response cannot overwrite the account opened most recently', async () => {
-  const state = harness();
+  const state = harness({lazyCurrency: true});
   const first = state.open('first');
   const second = state.open('second');
   state.metadata(1, {account: {name: 'Second account', onBudget: false, type: 'other', currency: 'EUR'}});
@@ -108,7 +222,7 @@ test('a slower metadata response cannot overwrite the account opened most recent
 });
 
 test('closing a dialog invalidates an outstanding metadata request', async () => {
-  const state = harness();
+  const state = harness({lazyCurrency: true});
   const pending = state.open();
   state.dialog.close();
   state.metadata();
@@ -116,6 +230,8 @@ test('closing a dialog invalidates an outstanding metadata request', async () =>
   assert.equal(state.elements.name.value, '');
   assert.equal(state.submit.disabled, true);
   assert.equal(state.updates.length, 0);
+  assert.equal(state.elements.currency.options.length, 1);
+  assert.equal(state.metadataReads(), 0);
 });
 
 test('a failed metadata request keeps Save disabled and cannot submit reset defaults', async () => {

@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.19.2 — 2026-10-18
+
+PR: [#60](https://github.com/Fillll/whab/pull/60)
+
+- Populate the two hidden account dialogs' currency choices when opened, using one compact server-rendered catalogue. Preserve selected currencies, fetched account settings, form reset defaults, history locks and exact currency minor-unit parsing.
+
 ## 1.19.1 — 2026-10-18
 
 PR: [#59](https://github.com/Fillll/whab/pull/59)

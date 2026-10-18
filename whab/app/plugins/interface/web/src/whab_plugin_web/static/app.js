@@ -4,7 +4,7 @@ import {initBudgetEdits, syncBudgetGroups} from './budget-edits.js';
 import {initBudgetSourceLinks} from './budget-source-links.js';
 import {initAccountNavigation} from './account-navigation.js';
 import {initTransactionRegister} from './transaction-register.js';
-import {initAccountSettings} from './account-settings.js';
+import {hydrateCurrencyChoices, initAccountSettings} from './account-settings.js';
 import {bindLogos} from './logo-images.js';
 
 const toast = document.getElementById('toast');
@@ -145,7 +145,11 @@ initAccountSettings({
 
 document.addEventListener('click', event => {
   const button = event.target.closest('[data-dialog]');
-  if (button && !button.disabled) document.getElementById(button.dataset.dialog)?.showModal();
+  if (button && !button.disabled) {
+    const dialog = document.getElementById(button.dataset.dialog);
+    for (const select of dialog?.querySelectorAll('select[data-currency-choices-lazy]') || []) hydrateCurrencyChoices(select);
+    dialog?.showModal();
+  }
 });
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => {
   const dialog = button.closest('dialog');

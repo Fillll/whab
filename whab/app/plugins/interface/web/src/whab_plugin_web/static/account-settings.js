@@ -1,3 +1,23 @@
+let currencyChoices;
+
+/* Closed account dialogs keep one option until their currency choices are needed. */
+export function hydrateCurrencyChoices(select) {
+  if (!select.hasAttribute?.('data-currency-choices-lazy')) return;
+  currencyChoices ||= Object.entries(JSON.parse(document.getElementById('account-currency-choices').textContent));
+  const value = select.value;
+  const defaultValue = select.options[0].value;
+  const options = currencyChoices.map(([code, digits]) => {
+    const option = document.createElement('option');
+    option.value = option.textContent = code;
+    option.dataset.minorUnits = String(digits);
+    option.defaultSelected = code === defaultValue;
+    return option;
+  });
+  select.replaceChildren(...options);
+  select.value = value;
+  select.removeAttribute('data-currency-choices-lazy');
+}
+
 /* Account metadata stays in the addressed budget; opening settings loads one account. */
 export function initAccountSettings({api, readForm, updateFields, flush, refresh}) {
   const form = document.querySelector('[data-account-classification]');
@@ -31,6 +51,7 @@ export function initAccountSettings({api, readForm, updateFields, flush, refresh
       form.elements.type.value = account.type;
       updateFields(form);
       form.elements.subtype.value = account.subtype || '';
+      hydrateCurrencyChoices(currency);
       currency.value = originalCurrency = account.currency;
       currency.disabled = !result.currencyEditable;
       if (form.elements.bankWebsite) form.elements.bankWebsite.value = account.bankWebsite || '';

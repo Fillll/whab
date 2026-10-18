@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.14.2 — 2026-10-18
+
+PR: [#60](https://github.com/Fillll/whab/pull/60)
+
+- Require SQLite 1.6.2 and web 1.19.2 in the supported bundle for lower projection CPU/memory costs and lighter initial account-dialog markup.
+
 ## 2.14.1 — 2026-10-18
 
 PR: [#59](https://github.com/Fillll/whab/pull/59)
