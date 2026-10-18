@@ -4,6 +4,8 @@ No imported income is added to balance snapshots. Pre-budget history remains
 analytics data; stale cash and unknown credit balances cannot create funding.
 """
 
+from collections import defaultdict
+
 from .accounts import account_summary, is_liability, is_on_budget, normalize_account
 from .categories import category_tree, ensure_child_category, public_categories
 from .dates import shift_month
@@ -40,16 +42,16 @@ def _net_account_funds(state: dict, month: str, currency: str, *, opening: bool 
         account for account in state["accounts"].values()
         if account.get("currency", "USD") == currency and is_on_budget(account)
     ]
-    later = [
-        row for row in state["transactions"].values()
-        if not row.get("deleted") and not row["pending"]
-        and (row["date"][:7] >= month if opening else row["date"][:7] > month)
-    ]
+    later_by_account = defaultdict(int)
+    for row in state["transactions"].values():
+        if (
+            not row.get("deleted") and not row["pending"]
+            and (row["date"][:7] >= month if opening else row["date"][:7] > month)
+        ):
+            later_by_account[row["accountId"]] += row["amount"]
 
     def balance_at(account):
-        return account["balance"] + (-1 if is_liability(account) else 1) * sum(
-            row["amount"] for row in later if row["accountId"] == account["id"]
-        )
+        return account["balance"] + (-1 if is_liability(account) else 1) * later_by_account[account["id"]]
 
     cash = sum(
         balance_at(account) for account in accounts
@@ -101,7 +103,19 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
     start = state["budgetStartMonth"]
     active = [t for t in cleared if t["date"].startswith(month)]
     carry_start = _carryover_start(state, month, currency)
-    prior = [t for t in cleared if carry_start <= t["date"][:7] < month]
+    # A growing category list must not multiply the cost of reading history.
+    prior_spending = defaultdict(int)
+    active_spending = defaultdict(int)
+    prior_assignments = defaultdict(int)
+    for transaction in cleared:
+        if carry_start <= transaction["date"][:7] < month:
+            prior_spending[transaction["categoryId"]] += transaction["amount"]
+    for transaction in active:
+        active_spending[transaction["categoryId"]] += transaction["amount"]
+    for source, rows in state["budget"].items():
+        if carry_start <= source < month:
+            for category_id, amount in rows.items():
+                prior_assignments[category_id] += amount
     previous_month = shift_month(month, -1)
     incoming_mode = rollover_mode(state, previous_month, currency) if previous_month >= start else None
     balance_carryover = 0
@@ -120,14 +134,8 @@ def _calculate_currency(state: dict, month: str, currency: str) -> dict:
     for category in state["categories"].values():
         category_id = category["id"]
         assigned = state["budget"].get(month, {}).get(category_id, 0) if month >= start else 0
-        carryover = sum(
-            rows.get(category_id, 0) for m, rows in state["budget"].items() if carry_start <= m < month
-        ) - sum(t["amount"] for t in prior if t["categoryId"] == category_id)
-        spent = (
-            sum(t["amount"] for t in active if t["categoryId"] == category_id)
-            if month >= start
-            else 0
-        )
+        carryover = prior_assignments[category_id] - prior_spending[category_id]
+        spent = active_spending[category_id] if month >= start else 0
         budget.append(
             {
                 "categoryId": category_id,
