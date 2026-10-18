@@ -153,7 +153,7 @@ def test_periods_preserve_core_values_without_recalculating_budget_rules():
         "2027-02", "2027-03", "2027-04", "2027-05",
     ]
     assert context["groups"][0]["periods"] == [
-        {"month": period["month"], **{field: period["summary"][field]
+        {"month": period["month"], "carryover": 0, **{field: period["summary"][field]
          for field in ("assigned", "spent", "available")}}
         for period in projections
     ]
@@ -164,6 +164,43 @@ def test_periods_preserve_core_values_without_recalculating_budget_rules():
     assert context["money_number"](123456) == "1,234.56"
     assert context["category_path"](child["id"]) == "food%2F%20%26%3F%22"
     assert "uncategorized" not in projections[0]
+
+
+def test_incoming_columns_and_carryover_totals_use_each_core_period_without_recalculating():
+    children = [
+        {"id": "food", "name": "Food", "group": "Living"},
+        {"id": "rent", "name": "Rent", "group": "Living"},
+    ]
+    projections = []
+    for month, mode, carryovers in (
+        ("2026-12", "category", (900, -1400)),
+        ("2027-01", "balance", (0, 0)),
+        ("2027-02", None, (0, 0)),
+    ):
+        projections.append({
+            "month": month, "incomingRolloverMode": mode,
+            "categories": children, "accounts": [], "transactions": [],
+            "budget": [
+                {"categoryId": child["id"], "assigned": 123, "spent": 45,
+                 "carryover": carryover, "available": 6789}
+                for child, carryover in zip(children, carryovers, strict=True)
+            ],
+            "summary": {"assigned": 246, "spent": 90, "available": 13578},
+            "trend": [{"month": month, "spent": 90}],
+        })
+    context = build_context(
+        {**projections[0], "periods": projections}, {}, [],
+        workspace="demo", page="budget", month="2026-12",
+    )
+    assert [period["show_carryover"] for period in context["periods"]] == [True, False, False]
+    assert [period["column_count"] for period in context["periods"]] == [4, 3, 3]
+    assert [period["carryover"] for period in context["periods"]] == [-500, 0, 0]
+    group = context["groups"][0]
+    assert group["carryover"] == -500
+    assert [period["carryover"] for period in group["periods"]] == [-500, 0, 0]
+    assert [row["carryover"] for row in group["rows"]] == [900, -1400]
+    assert [period["available"] for period in group["periods"]] == [13578] * 3
+    assert all("column_count" not in period for period in projections)
 
 
 @pytest.mark.parametrize(("name", "expected"), [

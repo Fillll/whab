@@ -81,6 +81,9 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         {
             **period, "month": period.get("month", month),
             "uncategorized": uncategorized_spending(period),
+            "show_carryover": period.get("incomingRolloverMode") == "category",
+            "column_count": 4 if period.get("incomingRolloverMode") == "category" else 3,
+            "carryover": sum(row.get("carryover", 0) for row in period["budget"]),
         }
         for period in data.get("periods", [data])
     ]
@@ -118,15 +121,15 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
                 **group,
                 "rows": rows,
                 **{
-                    field: sum(r[field] for r in rows)
-                    for field in ("assigned", "spent", "available")
+                    field: sum(r.get(field, 0) for r in rows)
+                    for field in ("carryover", "assigned", "spent", "available")
                 },
                 "periods": [
                     {
                         "month": period["month"],
                         **{
-                            field: sum(row["periods"][index][field] for row in rows)
-                            for field in ("assigned", "spent", "available")
+                            field: sum(row["periods"][index].get(field, 0) for row in rows)
+                            for field in ("carryover", "assigned", "spent", "available")
                         },
                     }
                     for index, period in enumerate(periods)

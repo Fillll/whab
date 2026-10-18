@@ -56,6 +56,29 @@ def test_default_category_mode_keeps_both_signs_in_their_own_categories(state):
     assert state == before
 
 
+@pytest.mark.parametrize("month,incoming", [
+    ("2025-12", None), ("2026-01", None), ("2026-02", "category"),
+])
+def test_incoming_policy_begins_only_after_the_first_budget_month(state, month, incoming):
+    before = deepcopy(state)
+    view = calculate_workspace(state, month)
+    assert view["incomingRolloverMode"] == incoming
+    assert view["incomingRolloverModesByCurrency"] == {"USD": incoming}
+    assert select_currency(view)["incomingRolloverMode"] == incoming
+    assert state == before
+
+
+def test_incoming_policy_uses_the_previous_month_including_an_empty_source_month(state):
+    rollover(state, "2026-01", "USD", "balance")
+    rollover(state, "2026-03", "USD", "balance")
+    february = calculate_workspace(state, "2026-02")
+    march = calculate_workspace(state, "2026-03")
+    april = calculate_workspace(state, "2026-04")
+    assert (february["incomingRolloverMode"], february["rolloverMode"]) == ("balance", "category")
+    assert (march["incomingRolloverMode"], march["rolloverMode"]) == ("category", "balance")
+    assert april["incomingRolloverMode"] == "balance"
+
+
 def test_balance_mode_pools_net_signed_categories_without_adding_cash_twice(state):
     before = deepcopy(state)
     rollover(state, "2026-01", "USD", "balance")
@@ -137,6 +160,22 @@ def test_modes_and_pooled_balances_are_currency_scoped_including_mode_only_curre
     assert select_currency(view, "JPY")["summary"]["readyToAssign"] == 9000
     assert select_currency(view, "EUR")["rolloverMode"] == "balance"
     assert select_currency(view, "USD")["rolloverMode"] == "category"
+    assert view["incomingRolloverMode"] == "category"
+    assert view["incomingRolloverModesByCurrency"] == {
+        "EUR": "category", "JPY": "balance", "USD": "category",
+    }
+    assert select_currency(view, "JPY")["incomingRolloverMode"] == "balance"
+    assert select_currency(view, "EUR")["incomingRolloverMode"] == "category"
+    assert select_currency(view, "USD")["incomingRolloverMode"] == "category"
+    assert select_currency(view, "GBP")["incomingRolloverMode"] is None
+
+
+def test_select_currency_does_not_guess_incoming_policy_for_older_projections(state):
+    view = calculate_workspace(state, "2026-02")
+    del view["incomingRolloverMode"]
+    del view["incomingRolloverModesByCurrency"]
+    assert select_currency(view, "USD")["incomingRolloverMode"] is None
+    assert select_currency(view, "JPY")["incomingRolloverMode"] is None
 
 
 @pytest.mark.parametrize("month,currency,mode", [

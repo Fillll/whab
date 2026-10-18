@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.8.0 — 2026-10-17
+
+PR: [#43](https://github.com/Fillll/whab/pull/43)
+
+- Show a read-only Carryover column before Assigned when the previous month carries balances by category. Include signed category balances and group and monthly totals, with the source month in the heading.
+- Keep months receiving an overall balance and the first budget month in the three-column layout. Require WHAB 2.8 for currency-scoped incoming rollover metadata.
+
 ## 1.7.0 — 2026-10-17
 
 PR: [#41](https://github.com/Fillll/whab/pull/41)

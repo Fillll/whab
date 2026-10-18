@@ -71,8 +71,9 @@ def _calculate_currency(state: dict, month: str, currency: str, as_of_month: str
     carry_start = _carryover_start(state, month, currency)
     prior = [t for t in cleared if carry_start <= t["date"][:7] < month]
     previous_month = shift_month(month, -1)
+    incoming_mode = rollover_mode(state, previous_month, currency) if previous_month >= start else None
     balance_carryover = 0
-    if previous_month >= start and rollover_mode(state, previous_month, currency) == "balance":
+    if incoming_mode == "balance":
         pool_start = _carryover_start(state, previous_month, currency)
         balance_carryover = sum(
             amount
@@ -153,6 +154,7 @@ def _calculate_currency(state: dict, month: str, currency: str, as_of_month: str
         "month": month,
         "budgetStartMonth": start,
         "rolloverMode": rollover_mode(state, month, currency),
+        "incomingRolloverMode": incoming_mode,
         "rolloverModeEditable": True,
         "accounts": accounts,
         "categories": list(state["categories"].values()),
@@ -342,6 +344,9 @@ def calculate_workspace(state: dict, month: str, *, as_of_month: str | None = No
         ],
         "summariesByCurrency": {c: p["summary"] for c, p in projections.items()},
         "rolloverModesByCurrency": {c: p["rolloverMode"] for c, p in projections.items()},
+        "incomingRolloverModesByCurrency": {
+            c: p["incomingRolloverMode"] for c, p in projections.items()
+        },
         "accountSummariesByCurrency": {c: p["accountSummary"] for c, p in projections.items()},
         "trendsByCurrency": {c: p["trend"] for c, p in projections.items()},
     }
@@ -363,6 +368,7 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
         "currency": currency,
         "currencyMinorUnits": currency_minor_units(currency),
         "rolloverMode": data.get("rolloverModesByCurrency", {}).get(currency, "category"),
+        "incomingRolloverMode": data.get("incomingRolloverModesByCurrency", {}).get(currency),
         "currencies": sorted({*data.get("currencies", ["USD"]), currency}),
         "accounts": accounts,
         "accountSummary": data.get("accountSummariesByCurrency", {}).get(

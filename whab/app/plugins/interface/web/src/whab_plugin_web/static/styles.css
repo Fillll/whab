@@ -2869,7 +2869,7 @@ strong {
 .budget-matrix {
   --category-width: 216px;
   width: 100%;
-  min-width: 1032px;
+  min-width: calc(var(--category-width) + var(--budget-money-columns, 9) * 92px);
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -3095,6 +3095,16 @@ strong {
 }
 .budget-columns th:last-child {
   border-top-right-radius: 5px;
+}
+.budget-carryover-heading small {
+  display: block;
+  margin-top: 3px;
+  color: var(--quiet);
+  font-size: 9px;
+  font-weight: 400;
+}
+.budget-matrix .budget-carryover {
+  color: var(--muted);
 }
 .budget-matrix .month-start {
   border-left: 1px solid var(--line);
@@ -3516,7 +3526,6 @@ strong {
   }
   .budget-matrix {
     --category-width: 186px;
-    min-width: 1026px;
   }
   .budget-matrix-scroll {
     max-height: calc(100dvh - 190px);
@@ -3591,7 +3600,6 @@ strong {
   }
   .budget-matrix {
     --category-width: 164px;
-    min-width: 1004px;
   }
   .budget-category-row td:first-child {
     padding-left: 10px;

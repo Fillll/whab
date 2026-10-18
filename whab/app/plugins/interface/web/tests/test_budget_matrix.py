@@ -119,8 +119,8 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
         assert "overspend this month" not in text.lower()
         cells = [re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S) for row in overview]
         assert all(len(row) == 3 for row in cells[:4])
-        assert all('colspan="3"' in attributes for row in cells[:4] for attributes, _ in row)
-        assert len(cells[4]) == 9
+        assert all('colspan="4"' in attributes for row in cells[:4] for attributes, _ in row)
+        assert len(cells[4]) == 12
 
         for index, (month, income, previous, next_assigned, assigned, spent, available) in enumerate((
             ("2026-11", 1111, 500, 1200, 700, 900, 3300),
@@ -149,9 +149,12 @@ def test_monthly_overview_precedes_categories_and_keeps_periods_and_currencies_s
                     else money_number(value, code)
                 )
                 assert rendered == expected_value
-            assert [value.strip() for _, value in cells[4][index * 3:index * 3 + 3]] == [
-                money_number(summary[field] * sign, code)
-                for field, sign in (("assigned", 1), ("spent", -1), ("available", 1))
+            assert [value.strip() for _, value in cells[4][index * 4:index * 4 + 4]] == [
+                money_number(sum(row["carryover"] for row in data["budget"]), code),
+                *[
+                    money_number(summary[field] * sign, code)
+                    for field, sign in (("assigned", 1), ("spent", -1), ("available", 1))
+                ],
             ]
 
 
@@ -214,14 +217,15 @@ def test_calculated_rows_and_group_totals_are_read_only_while_child_assignments_
         assert "Summary</small>" in row
         assert "<input" not in row and "<form" not in row
         assert 'data-budget-group="' in row
-        assert len(re.findall(r'<td\b', row)) == 10
+        assert len(re.findall(r'<td\b', row)) == 13
     for form in category_assignment_forms(text):
         assert 'class="budget-assignment-edit" aria-hidden="true"' in form["body"]
         assert 'type="text" name="assigned"' in form["body"]
     for row in re.findall(r'<tr class="budget-category-row[^"]*">(.*?)</tr>', text, re.S):
         cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
-        for index in range(2, len(cells), 3):
-            assert "<input" not in cells[index] and "<input" not in cells[index + 1]
+        for index in range(1, len(cells), 4):
+            for readonly_index in (index, index + 2, index + 3):
+                assert "<input" not in cells[readonly_index]
     forms = [form for form in assignment_forms(text) if form["api"] == "/budget/funding/next-month"]
     assert len(forms) == 3
     for form in forms:
