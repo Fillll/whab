@@ -65,6 +65,138 @@ class IsolatedManagerTest(unittest.TestCase):
         self.assertEqual(self.root.stat().st_mode & 0o777, 0o700)
         self.assertNotIn("private-test-secret", json.dumps(status))
 
+    def test_alpha_configuration_preserves_existing_default(self):
+        self.config()
+        self.assertEqual(self.manager.config()["channel"], "main")
+        with patch.object(self.manager, "verify_python", return_value=sys.executable):
+            status = self.manager.configure(channel="alpha")
+            self.manager.configure()
+        self.assertEqual(status["channel"], "alpha")
+        self.assertEqual(self.manager.config()["channel"], "alpha")
+        self.assertFalse(status["tested"])
+
+    def test_invalid_channel_never_changes_existing_configuration(self):
+        self.config()
+        original = (self.root / "config.json").read_bytes()
+        for channel in ("", "unchecked", "MAIN"):
+            with self.subTest(channel=channel), self.assertRaisesRegex(launcher.LauncherError, "supported WHAB update channel"):
+                self.manager.configure(channel=channel)
+            self.assertEqual((self.root / "config.json").read_bytes(), original)
+
+    def test_switching_channels_discards_previous_channel_update_target(self):
+        self.config()
+        for source, destination, tested in (("main", "alpha", True), ("alpha", "main", False)):
+            launcher.write_json(self.root / "update.json", {
+                "channel": source, "target": {"build": OTHER_SHA, "version": "new", "channel": source, "tested": tested},
+            })
+            with patch.object(self.manager, "verify_python", return_value=sys.executable):
+                status = self.manager.configure(channel=destination)
+            self.assertFalse((self.root / "update.json").exists())
+            self.assertFalse(status["update_available"])
+            self.assertIsNone(status["latest_build"])
+            self.assertIsNone(status["latest_version"])
+
+    def test_status_ignores_a_cached_target_from_another_channel(self):
+        self.config()
+        launcher.write_json(self.root / "update.json", {
+            "channel": "alpha", "warning": "stale warning",
+            "target": {"build": OTHER_SHA, "version": "new", "channel": "alpha", "tested": False},
+        })
+        status = self.manager.status()
+        self.assertFalse(status["update_available"])
+        self.assertIsNone(status["latest_build"])
+        self.assertIsNone(status["latest_version"])
+        self.assertIsNone(status["update_warning"])
+
+    def test_channel_selection_does_not_relabel_an_installed_alpha_build_as_tested(self):
+        self.config()
+        installation = self.installation() | {"channel": "alpha", "tested": False}
+        launcher.write_json(self.root / "active.json", installation)
+        status = self.manager.status()
+        self.assertEqual(status["channel"], "main")
+        self.assertEqual(status["active_channel"], "alpha")
+        self.assertFalse(status["tested"])
+
+    def test_check_update_records_exact_alpha_head_without_installing(self):
+        self.config()
+        with patch.object(self.manager, "verify_python", return_value=sys.executable):
+            self.manager.configure(channel="alpha")
+        with patch.object(launcher, "request_json", return_value={"sha": OTHER_SHA}) as request, patch.object(self.manager, "prepare") as prepare:
+            status = self.manager.check_update()
+        request.assert_called_once_with(f"{launcher.API}/commits/main")
+        prepare.assert_not_called()
+        self.assertTrue(status["update_available"])
+        self.assertEqual(status["latest_build"], OTHER_SHA)
+        self.assertEqual(status["latest_version"], OTHER_SHA[:12])
+        self.assertFalse(launcher.read_json(self.root / "update.json")["target"]["tested"])
+
+    def test_cached_installation_refreshes_provenance_only_from_resolved_target(self):
+        self.config()
+        installation = self.installation() | {"channel": "alpha", "tested": False}
+        manifest_path = Path(installation["directory"]) / "installation.json"
+        launcher.write_json(manifest_path, installation)
+        for channel, tested in (("main", True), ("alpha", False)):
+            target = {"build": SHA, "channel": channel, "tested": tested}
+            with self.subTest(channel=channel), patch.object(launcher, "download_source") as download, patch.object(self.manager, "smoke") as smoke:
+                candidate = self.manager.prepare(target)
+            self.assertEqual(candidate["channel"], channel)
+            self.assertEqual(candidate["tested"], tested)
+            self.assertEqual(launcher.read_json(manifest_path), candidate)
+            download.assert_not_called()
+            smoke.assert_not_called()
+
+    def test_online_start_refreshes_same_revision_provenance_without_reinstalling(self):
+        self.config()
+        installation = self.installation() | {"channel": "alpha", "tested": False}
+        launcher.write_json(self.root / "active.json", installation)
+        launcher.write_json(Path(installation["directory"]) / "installation.json", installation)
+        target = {"build": SHA, "version": SHA[:12], "channel": "main", "tested": True}
+        with patch.object(launcher, "latest_target", return_value=target), patch.object(self.manager, "launch") as launch, patch.object(self.manager, "backup") as backup, patch.object(self.manager, "run") as run:
+            status = self.manager.start()
+        self.assertTrue(status["tested"])
+        self.assertEqual(status["active_channel"], "main")
+        self.assertEqual(self.manager.active()["build"], SHA)
+        launch.assert_called_once()
+        run.assert_not_called()
+        backup.assert_not_called()
+
+    def test_alpha_candidate_still_requires_local_installation_and_smoke_checks(self):
+        self.config()
+        target = {"build": SHA, "channel": "alpha", "tested": False}
+        def source(_sha, destination):
+            app = destination / "whab/app"
+            (app / "src/whab").mkdir(parents=True)
+            (app / "src/whab/__init__.py").write_text('__version__ = "2.7.0"\n')
+            for package in [app, *(app / "plugins" / name for name in launcher.PLUGINS)]:
+                package.mkdir(parents=True, exist_ok=True)
+                (package / "pyproject.toml").write_text("[project]\n")
+        with patch.object(launcher, "download_source", side_effect=source), patch.object(self.manager, "stable_python", return_value=sys.executable), patch.object(self.manager, "run") as run, patch.object(self.manager, "smoke") as smoke:
+            installation = self.manager.prepare(target)
+        self.assertEqual(run.call_count, 3)
+        self.assertEqual(run.call_args.args[0][-2:], ["pip", "check"])
+        smoke.assert_called_once_with(installation)
+        self.assertEqual(installation["channel"], "alpha")
+        self.assertFalse(installation["tested"])
+
+    def test_failed_alpha_local_smoke_preserves_previous_installation(self):
+        self.config()
+        old = self.installation()
+        launcher.write_json(self.root / "active.json", old)
+        target = {"build": OTHER_SHA, "channel": "alpha", "tested": False}
+        def source(_sha, destination):
+            app = destination / "whab/app"
+            (app / "src/whab").mkdir(parents=True)
+            (app / "src/whab/__init__.py").write_text('__version__ = "2.7.0"\n')
+            for package in [app, *(app / "plugins" / name for name in launcher.PLUGINS)]:
+                package.mkdir(parents=True, exist_ok=True)
+                (package / "pyproject.toml").write_text("[project]\n")
+        with patch.object(self.manager, "check_update", side_effect=lambda: launcher.write_json(self.root / "update.json", {"target": target})), patch.object(launcher, "download_source", side_effect=source), patch.object(self.manager, "stable_python", return_value=sys.executable), patch.object(self.manager, "run"), patch.object(self.manager, "smoke", side_effect=launcher.LauncherError("smoke_failed", "candidate not ready")), patch.object(self.manager, "stop") as stop:
+            with self.assertRaisesRegex(launcher.LauncherError, "candidate not ready"):
+                self.manager.update()
+        stop.assert_not_called()
+        self.assertEqual(self.manager.active(), old)
+        self.assertFalse((self.root / "versions" / OTHER_SHA).exists())
+
     def test_adoption_rejects_different_port_without_rewriting_env(self):
         self.config("PORT=6412\n")
         with self.assertRaisesRegex(launcher.LauncherError, "differs"):
@@ -417,6 +549,28 @@ class SourceVerificationTest(unittest.TestCase):
     def test_main_selects_newest_commit_with_both_successful_checks(self):
         with patch.object(launcher, "request_json", return_value=[{"sha": SHA}, {"sha": OTHER_SHA}]), patch.object(launcher, "successful_checks", side_effect=[False, True]):
             self.assertEqual(launcher.latest_target("main")["build"], OTHER_SHA)
+
+    def test_alpha_selects_exact_main_head_without_history_or_ci_queries(self):
+        with patch.object(launcher, "request_json", return_value={"sha": SHA}) as request, patch.object(launcher, "successful_checks", side_effect=AssertionError("Alpha must not query CI")):
+            target = launcher.latest_target("alpha")
+        request.assert_called_once_with(f"{launcher.API}/commits/main")
+        self.assertEqual(target, {"build": SHA, "version": SHA[:12], "channel": "alpha", "tested": False})
+
+    def test_alpha_rejects_malformed_or_inexact_heads(self):
+        for response in (None, [], {"sha": "main"}, {"sha": SHA[:12]}, {"sha": OTHER_SHA.upper()}, {}):
+            with self.subTest(response=response), patch.object(launcher, "request_json", return_value=response), self.assertRaisesRegex(launcher.LauncherError, "exact source revision"):
+                launcher.latest_target("alpha")
+
+    def test_unknown_channel_never_falls_back_to_stable(self):
+        with patch.object(launcher, "request_json") as request, self.assertRaisesRegex(launcher.LauncherError, "supported WHAB update channel"):
+            launcher.latest_target("unchecked")
+        request.assert_not_called()
+
+    def test_cli_accepts_alpha_alongside_existing_channel_names(self):
+        for channel in ("main", "alpha", "stable"):
+            with self.subTest(channel=channel):
+                parsed = launcher.parser().parse_args(["configure", "--channel", channel])
+                self.assertEqual(parsed.channel, channel)
 
     def test_main_refuses_when_ci_is_not_ready(self):
         with patch.object(launcher, "request_json", return_value=[{"sha": SHA}]), patch.object(launcher, "successful_checks", return_value=False):
