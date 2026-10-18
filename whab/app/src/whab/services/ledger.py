@@ -258,6 +258,8 @@ class LedgerService:
 
     def transaction_register(
         self, workspace: str, month: str | None, currency: str, account_id: str | None = None,
+        *, account_ids: list[str] | tuple[str, ...] | None = None,
+        start_date: str | None = None, end_date: str | None = None,
     ) -> dict:
         """Read a scoped register without calculating unrelated envelope histories.
 
@@ -271,16 +273,36 @@ class LedgerService:
         currency = currency_code(currency)
         if account_id is not None:
             _identifier(account_id)
+        if account_ids is not None:
+            if type(account_ids) not in (list, tuple) or len(account_ids) > 500:
+                raise StoreError("Invalid account selection.")
+            for identifier in account_ids:
+                _identifier(identifier)
+            account_ids = tuple(dict.fromkeys(account_ids))
+        for value in (start_date, end_date):
+            if value is not None:
+                validate_date(value)
+        if start_date is not None and end_date is not None and start_date > end_date:
+            raise StoreError("Start date must not be after end date.")
         with self._lock:
             read = getattr(self._store, "transaction_register", None)
-            data = (
-                read(workspace, month, currency, account_id) if callable(read)
-                else {
+            filtered_read = getattr(self._store, "transaction_register_filtered", None)
+            if callable(filtered_read) and (account_ids is not None or start_date is not None or end_date is not None):
+                selected = account_ids
+                if account_ids is None and account_id is not None:
+                    known = self._store.accounts(workspace)
+                    selected = (account_id,) if any(
+                        row["id"] == account_id and row.get("currency", "USD") == currency for row in known
+                    ) else None
+                data = filtered_read(workspace, start_date, end_date, currency, selected)
+            elif callable(read):
+                data = read(workspace, month, currency, account_id if account_ids is None else None)
+            else:
+                data = {
                     "accounts": self._store.accounts(workspace),
                     "categories": self._store.categories(workspace),
                     "transactions": self._store.transactions(workspace, month),
                 }
-            )
             accounts = _public(data["accounts"])
             categories = _public(data["categories"])
             currencies = sorted({"USD", currency, *(
@@ -288,14 +310,17 @@ class LedgerService:
             )})
             accounts = [row for row in accounts if row.get("currency", "USD") == currency]
             categories = [row for row in categories if row.get("currency", "USD") == currency]
-            account_ids = {row["id"] for row in accounts}
-            if account_id not in account_ids:
+            available_account_ids = {row["id"] for row in accounts}
+            if account_id not in available_account_ids:
                 account_id = None
             transactions = [
                 row for row in _public(data["transactions"])
-                if row["accountId"] in account_ids
-                and (account_id is None or row["accountId"] == account_id)
+                if row["accountId"] in available_account_ids
+                and (account_ids is None or row["accountId"] in account_ids)
+                and (account_ids is not None or account_id is None or row["accountId"] == account_id)
                 and (month is None or row["date"].startswith(month))
+                and (start_date is None or row["date"] >= start_date)
+                and (end_date is None or row["date"] <= end_date)
             ]
             return {
                 "currency": currency, "currencyMinorUnits": currency_minor_units(currency),

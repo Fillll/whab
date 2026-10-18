@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.13.0 — 2026-10-18
+
+PR: [#55](https://github.com/Fillll/whab/pull/55)
+
+- Add inclusive transaction date ranges, current/previous-month presets and multiple account selection while preserving legacy register addresses. Expose filter state to UI plugins and retain budget/currency isolation.
+- Offer an optional filtered-register storage capability with compatible public-read fallbacks. Require web 1.16.0 and SQLite 1.5.0 in the supported bundle.
+
 ## 2.12.1 — 2026-10-18
 
 PR: [#54](https://github.com/Fillll/whab/pull/54)

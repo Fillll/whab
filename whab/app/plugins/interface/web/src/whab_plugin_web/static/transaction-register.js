@@ -1,5 +1,7 @@
 /* Small register controls. Financial validation and persistence stay on the server. */
-import {api, apiUrl, notify, pageUrl} from './client.js';
+import {api, apiUrl, notify, pageUrl, updateContext} from './client.js';
+import {initAccountPicker} from './account-picker.js';
+import {initPeriodPicker} from './period-picker.js';
 
 export function createTransactionWriter(save, {saved = () => {}, state = () => {}} = {}) {
   let pending = {};
@@ -45,7 +47,7 @@ export function hydrateTransactionCategories(select, template) {
   select.removeAttribute('data-category-options-lazy');
 }
 
-export function initTransactionRegister({navigate = async () => false, onMutation = () => {}} = {}) {
+export function initTransactionRegister({navigate = async () => false, pendingDestination = () => null, onMutation = () => {}} = {}) {
   const root = document.querySelector('[data-transaction-register]');
   if (!root) return {flush: async () => true, dispose() {}};
   const rows = [...root.querySelectorAll('.transaction-row')];
@@ -62,6 +64,8 @@ export function initTransactionRegister({navigate = async () => false, onMutatio
   const timers = new Map();
   const listeners = [];
   let disposed = false;
+  let pendingFilters = {};
+  let filterNavigationPending = false, filterNavigationRevision = 0;
   let bulkBusy = false;
   let bulkPromise = null;
   let receiptBusy = false;
@@ -96,7 +100,8 @@ export function initTransactionRegister({navigate = async () => false, onMutatio
     let visible = 0;
     for (const row of rows) {
       row.hidden = !row.dataset.payee.includes(search.value.toLowerCase()) ||
-        (reviewFilter.getAttribute('aria-pressed') === 'true' && row.dataset.reviewed === 'true');
+        (reviewFilter.dataset.reviewState === 'needs-review' && row.dataset.reviewed === 'true') ||
+        (reviewFilter.dataset.reviewState === 'reviewed' && row.dataset.reviewed !== 'true');
       if (row.hidden) row.querySelector('[data-select-transaction]').checked = false;
       else visible += 1;
     }
@@ -104,9 +109,24 @@ export function initTransactionRegister({navigate = async () => false, onMutatio
     selection();
   }
   async function go(url, focus = 'heading') {
-    if (!(await flush())) { notify('Save the transaction edit before continuing.'); return; }
-    if (!(await navigate(url, {focus}))) location.assign(url);
+    const revision = ++filterNavigationRevision;
+    filterNavigationPending = true;
+    try {
+      if (!(await flush())) { if (revision === filterNavigationRevision) notify('Save the transaction edit before continuing.'); return; }
+      if (revision !== filterNavigationRevision) return;
+      if (!(await navigate(url, {focus}))) location.assign(url);
+    } finally {
+      if (revision === filterNavigationRevision) filterNavigationPending = false;
+    }
   }
+  function applyFilters(changes, focus) {
+    pendingFilters = {...pendingFilters, ...changes, review: reviewFilter.dataset.reviewState || 'all'};
+    void go(pageUrl(pendingFilters), focus);
+  }
+  const accountPicker = initAccountPicker(root, accounts => {
+    applyFilters({accounts}, '#account-filter-toggle');
+  });
+  const periodPicker = initPeriodPicker(root, changes => applyFilters(changes, '#transaction-period-toggle'));
   const categoryOptions = root.querySelector('template[data-transaction-categories]');
   const hydrateCategory = event => {
     if (event.target.matches('select[data-category-options-lazy]')) {
@@ -117,19 +137,30 @@ export function initTransactionRegister({navigate = async () => false, onMutatio
   listen(root, 'pointerdown', hydrateCategory);
   listen(root, 'focusin', hydrateCategory);
   listen(search, 'input', filter);
-  listen(account, 'change', () => { void go(pageUrl({account: account.value}), '#account-filter'); });
-  listen(root.querySelector('#all-dates-filter'), 'change', event => {
-    void go(pageUrl({allDates: event.target.checked}), '#all-dates-filter');
-  });
-  listen(root.querySelector('[data-navigation="month"]'), 'change', event => {
-    if (!event.target.checkValidity()) { event.target.reportValidity(); return; }
-    void go(pageUrl({month: event.target.value}), '[data-navigation="month"]');
+  listen(account, 'change', () => {
+    applyFilters({accounts: [...account.selectedOptions].map(option => option.value).filter(value => value !== 'all')}, '#account-filter');
   });
   listen(reviewFilter, 'click', () => {
-    const pressed = reviewFilter.getAttribute('aria-pressed') !== 'true';
-    reviewFilter.setAttribute('aria-pressed', String(pressed));
-    reviewFilter.classList.toggle('selected', pressed);
+    const next = {all: 'needs-review', 'needs-review': 'reviewed', reviewed: 'all'}[reviewFilter.dataset.reviewState || 'all'];
+    reviewFilter.dataset.reviewState = next;
+    const labels = {all: 'All', 'needs-review': 'Needs review', reviewed: 'Reviewed'};
+    const nextLabels = {all: 'Needs review', 'needs-review': 'Reviewed', reviewed: 'All'};
+    reviewFilter.querySelector('[data-review-label]').textContent = labels[next];
+    reviewFilter.setAttribute('aria-label', `Review status: ${labels[next]}. Click for ${nextLabels[next]}.`);
+    updateContext({reviewFilter: next});
+    pendingFilters.review = next;
     filter();
+    const pending = pendingDestination();
+    if (pending) {
+      const url = new URL(pending);
+      if (next === 'all') url.searchParams.delete('review');
+      else url.searchParams.set('review', next);
+      void go(url, '#review-filter');
+    } else if (filterNavigationPending) applyFilters({review: next}, '#review-filter');
+    else {
+      const url = pageUrl({review: next});
+      window.history.replaceState(window.history.state, '', url.href);
+    }
   });
   listen(selectAll, 'change', () => {
     for (const row of rows) if (!row.hidden) row.querySelector('[data-select-transaction]').checked = selectAll.checked;
@@ -329,12 +360,14 @@ export function initTransactionRegister({navigate = async () => false, onMutatio
     if (bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
   }
   listen(window, 'beforeunload', beforeUnload);
-  selection();
+  filter();
   return {
     flush,
     get dirty() { return bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy; },
     dispose() {
       disposed = true;
+      accountPicker.dispose();
+      periodPicker.dispose();
       for (const timer of timers.values()) clearTimeout(timer);
       for (const remove of listeners) remove();
       clearImage();

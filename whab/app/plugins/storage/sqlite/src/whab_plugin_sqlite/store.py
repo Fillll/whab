@@ -541,21 +541,35 @@ class Store:
     ) -> dict:
         """Read only register rows; envelope histories and banking state are not loaded."""
         with self._snapshot():
+            accounts = self.accounts(workspace)
+            selected = (account_id,) if any(
+                row["id"] == account_id and row["currency"] == currency for row in accounts
+            ) else None
+            return self.transaction_register_filtered(
+                workspace, month + "-01" if month else None,
+                month + "-31" if month else None, currency, selected,
+            )
+
+    def transaction_register_filtered(
+        self, workspace: str, start_date: str | None, end_date: str | None,
+        currency: str, account_ids: tuple[str, ...] | None,
+    ) -> dict:
+        """Select inclusive dates/accounts in SQL without reading unrelated histories."""
+        with self._snapshot():
             self._require_workspace(workspace)
             accounts = self.accounts(workspace)
             categories = self.categories(workspace)
-            if account_id not in {
-                row["id"] for row in accounts if row["currency"] == currency
-            }:
-                account_id = None
             conditions = ["t.workspace=?", "t.deleted=0", "a.currency=?"]
             arguments = [workspace, currency]
-            if month is not None:
-                conditions.extend(("t.date>=?", "t.date<?"))
-                arguments.extend((month + "-01", month + "-32"))
-            if account_id is not None:
-                conditions.append("t.account_id=?")
-                arguments.append(account_id)
+            if start_date is not None:
+                conditions.append("t.date>=?")
+                arguments.append(start_date)
+            if end_date is not None:
+                conditions.append("t.date<=?")
+                arguments.append(end_date)
+            if account_ids is not None:
+                conditions.append("t.account_id IN (" + ",".join("?" for _ in account_ids) + ")")
+                arguments.extend(account_ids)
             rows = self.db.execute(
                 "SELECT t.id,t.account_id AS accountId,t.date,t.merchant,"
                 "t.merchant_logo AS merchantLogo,t.amount,t.category_id AS categoryId,"

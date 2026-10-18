@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.5.0 — 2026-10-18
+
+PR: [#55](https://github.com/Fillll/whab/pull/55)
+
+- Filter register transactions by multiple accounts and inclusive date bounds in SQL within one coherent snapshot. Preserve the existing month/account projection and portable database contracts.
+
 ## 1.4.0 — 2026-10-18
 
 PR: [#52](https://github.com/Fillll/whab/pull/52)

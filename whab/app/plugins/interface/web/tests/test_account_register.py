@@ -40,7 +40,7 @@ def test_sidebar_accounts_open_all_dates_and_keep_account_management_separate(cl
     assert all("Other account purchase" not in row for row in rows)
     assert re.search(r'<h1\b[^>]*>First wallet</h1>', register)
     assert f'<option value="{first}" selected>First wallet</option>' in register
-    assert 'id="all-dates-filter" checked' in register
+    assert 'id="transaction-period-toggle"' in register and 'data-period-label>Custom dates</span>' in register
     assert '2 transactions · All dates' in register
     assert re.search(r'<a class="sidebar-account"[^>]*href="[^"]*/first-wallet/transactions/2026-10/usd\?all_dates=true"[^>]*aria-current="page"', register)
     monthly = client.get(f"/budgets/home/transactions/2026-10/usd?account={first}").text

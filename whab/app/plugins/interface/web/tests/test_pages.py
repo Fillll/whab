@@ -72,7 +72,9 @@ def test_default_formats_and_only_children_in_category_choices(client):
     assert '−$' not in text and '+$' not in text
     assert 'Parent category<input name="group"' in text
     assert 'Child category name' in text
-    assert 'type="date"' not in text and 'type="month"' not in text
+    date_filters = re.findall(r'<input type="date"[^>]*name="([^"]+)"', text)
+    assert date_filters == ["start_date", "end_date"]
+    assert 'type="month"' not in text
 
 
 def test_pages_keep_currency_totals_and_categories_separate(client):

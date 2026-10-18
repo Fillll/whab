@@ -168,7 +168,7 @@ This prototype requests **Transactions**. Investments import is the next separat
 
 ## Budget scope
 
-Choose an individual account in the sidebar to open its transaction register across **All dates**. Turn off All dates to filter by the displayed month. The account filter and selected date range stay in the address; switching currency clears the account filter. The main **Accounts** navigation remains the place to manage account classifications and connections.
+Choose an individual account in the sidebar to open its transaction register. The account picker shows available bank logos and lets you choose several accounts before Apply. The period picker offers **This month**, **Previous month**, and **Custom dates** with inclusive start/end dates; leave a bound blank to keep it open. Legacy All dates bookmarks use Custom dates with both bounds open. The top **R** filter cycles **Needs review → Reviewed → All**. Account, period and review choices stay in the address; switching currency clears the account selection. The main **Accounts** navigation remains the place to manage account classifications and connections.
 
 Accounts have a core `onBudget` flag, an account `type` and an optional `subtype`. On-budget checking, savings, cash and credit accounts participate in envelope funding, income and spending. Off-budget accounts track your wider finances: brokerage investments; retirement accounts such as traditional IRA, Roth IRA and 401(k); property such as a home or vehicle; mortgages, car loans and student loans; and fixed-term deposits such as CDs. You can also track other assets or liabilities and keep a cash or credit account off budget.
 

@@ -8,7 +8,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/transaction-register.js'), 'utf8');
 const context = {};
 vm.runInNewContext(source.slice(0, source.indexOf('export function initTransactionRegister'))
-  .replace(/^import .*$/m, '').replaceAll('export function ', 'function '), context);
+  .replace(/^import .*$/gm, '').replaceAll('export function ', 'function '), context);
 const {createTransactionWriter} = context;
 
 function deferred() {

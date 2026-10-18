@@ -15,11 +15,37 @@ export function isAccountDestination(target, current, context = {}) {
     sameBudget(source.budget, destination.budget, context) && source.currency === destination.currency && !target.hash);
 }
 
+export function preserveTransactionFilters(target, current) {
+  if (parsePageRoute(current)?.page !== 'transactions') return target;
+  for (const key of ['period', 'start_date', 'end_date', 'review', 'all_dates']) {
+    target.searchParams.delete(key);
+    for (const value of current.searchParams.getAll(key)) target.searchParams.append(key, value);
+  }
+  return target;
+}
+
+export function matchesTransactionFilters(target, context) {
+  const params = target.searchParams;
+  const accounts = [...new Set(params.getAll('accounts'))].sort();
+  if (accounts.length && (!Array.isArray(context.selectedAccountIds) ||
+      JSON.stringify(accounts) !== JSON.stringify([...new Set(context.selectedAccountIds)].sort()))) return false;
+  if (!accounts.length && !params.has('account') && !parsePageRoute(target)?.accountSlug && context.selectedAccountIds?.length) return false;
+  if (params.has('period') && context.transactionPeriod !== params.get('period')) return false;
+  const legacyAll = !params.has('period') && ['true', '1', 'on', 'yes'].includes((params.get('all_dates') || '').toLowerCase());
+  if (legacyAll && context.transactionPeriod !== undefined &&
+      (context.transactionPeriod !== 'all' || context.startDate || context.endDate)) return false;
+  if (params.get('period') === 'custom' || !params.has('period') && !legacyAll && (params.has('start_date') || params.has('end_date'))) {
+    if ((context.startDate || null) !== params.get('start_date') || (context.endDate || null) !== params.get('end_date')) return false;
+  }
+  return context.reviewFilter === undefined || context.reviewFilter === (params.get('review') || 'all');
+}
+
 export function initAccountNavigation({onReplace = () => {}, flush = async () => true, notify = () => {}} = {}) {
   let displayed = new URL(location.href);
   let request = 0;
   let controller = null;
   let loadingContent = null;
+  let pendingTarget = null;
   let disposed = false;
   const initialContext = getContext();
   if (initialContext.canonicalUrl) {
@@ -63,6 +89,8 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
       if (accountSlug) url.searchParams.delete('account');
       link.href = url.href;
       if (link.classList.contains('sidebar-account')) {
+        preserveTransactionFilters(url, target);
+        link.href = url.href;
         if (selected && accountId === selected) link.setAttribute('aria-current', 'page');
         else link.removeAttribute('aria-current');
       } else if (link.classList.contains('nav-item')) {
@@ -84,10 +112,12 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
       request += 1;
       controller?.abort();
       controller = null;
+      pendingTarget = null;
       busy(false);
       return true;
     }
     const revision = ++request;
+    pendingTarget = target.href;
     controller?.abort();
     controller = null;
     busy(false);
@@ -96,6 +126,7 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
     } catch (failure) {
       if (revision !== request || disposed) return true;
       if (action === 'none') window.history.replaceState(window.history.state, '', displayed.href);
+      pendingTarget = null;
       notify(failure.message || 'Save the transaction edit before continuing.');
       return true;
     }
@@ -127,7 +158,7 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
           previous.budgetId && context.budgetId !== previous.budgetId ||
           context.page !== 'transactions' || context.monthToken !== expected.month ||
           actual.month !== expected.month || context.currency.toLowerCase() !== expected.currency ||
-          actual.currency !== expected.currency ||
+          actual.currency !== expected.currency || !matchesTransactionFilters(target, context) ||
           knownAccount && context.selectedAccountId !== undefined && context.selectedAccountId !== knownAccount) throw new Error('Register context changed.');
       const current = document.querySelector('main > .page-content');
       if (!current) throw new Error('Register container unavailable.');
@@ -159,6 +190,7 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
     } finally {
       if (revision === request && !disposed) {
         controller = null;
+        pendingTarget = null;
         busy(false);
       }
     }
@@ -169,7 +201,7 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = event.target.closest('a.sidebar-account[href]');
     if (!link || link.hasAttribute('download') || link.target && link.target !== '_self') return;
-    const target = new URL(link.href, location.href);
+    const target = preserveTransactionFilters(new URL(link.href, location.href), new URL(location.href));
     if (!isAccountDestination(target, displayed, getContext())) return;
     event.preventDefault();
     void navigate(target);
@@ -187,9 +219,11 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
   window.addEventListener('popstate', popstate);
   return {
     navigate,
+    pendingDestination() { return pendingTarget ? new URL(pendingTarget) : null; },
     dispose() {
       disposed = true;
       request += 1;
+      pendingTarget = null;
       controller?.abort();
       busy(false);
       status.remove();

@@ -850,10 +850,183 @@ strong {
   max-width: 200px;
   background-color: var(--page);
 }
-.transaction-filters input[data-navigation='month'] {
-  font-size: 11px;
-  background: var(--page);
+.transaction-account-filter {
+  width: 200px;
+  min-width: 0;
+}
+.transaction-account-filter > select {
+  width: 100%;
+}
+.account-picker,
+.transaction-period-filter {
+  position: relative;
+}
+.transaction-period-filter {
+  width: 200px;
+  min-width: 0;
+}
+.account-picker-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
   min-height: 39px;
+  padding: 8px 12px;
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: var(--page);
+  color: var(--ink);
+  font-size: 11px;
+  text-align: left;
+}
+.account-picker-toggle > svg {
+  flex: none;
+  color: var(--muted);
+}
+.account-picker-value,
+.account-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.account-picker-value [data-account-picker-label],
+.account-picker-toggle [data-period-label] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-picker-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+.account-picker-popup,
+.transaction-period-popup {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 5px);
+  right: 0;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(360px, calc(100vw - 32px));
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 6px 18px var(--shadow-toast);
+}
+.account-picker-options {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.account-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 7px 8px;
+  border-top: 1px solid var(--line);
+}
+.account-picker-actions .button,
+.transaction-period-form .button {
+  min-height: 30px;
+  padding: 6px 12px;
+  font-size: 11px;
+}
+.account-picker-option {
+  min-height: 34px;
+  padding: 7px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.account-picker-option [data-account-picker-label] {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.account-picker-option::after {
+  content: '';
+  flex: 0 0 14px;
+}
+.account-picker-option[aria-selected='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.account-picker-option[aria-selected='true']::after {
+  content: '✓';
+}
+.account-picker-option:hover,
+.account-picker-option.is-active {
+  outline: 1px solid var(--control-border);
+  outline-offset: -1px;
+  background: var(--row-hover);
+}
+.account-picker[hidden],
+.account-picker-popup[hidden],
+.transaction-period-popup[hidden],
+.transaction-account-filter > select[hidden] {
+  display: none;
+}
+.transaction-period-popup {
+  width: 320px;
+  padding: 5px;
+}
+.transaction-period-presets {
+  display: grid;
+  gap: 3px;
+}
+.transaction-period-presets > button {
+  padding: 9px;
+  border-radius: 4px;
+  font-size: 11px;
+  text-align: left;
+}
+.transaction-period-presets > button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.transaction-period-presets > button:hover {
+  background: var(--row-hover);
+}
+.transaction-period-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 5px;
+  padding: 11px 7px 6px;
+  border-top: 1px solid var(--line);
+}
+.transaction-period-form h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+}
+.transaction-period-form .field-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.transaction-period-form label {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.transaction-period-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 7px;
+  font-size: 11px;
+}
+.transaction-period-form .button {
+  grid-column: 1 / -1;
+  justify-self: end;
 }
 .filter-button {
   display: flex;
@@ -870,6 +1043,32 @@ strong {
   background: var(--accent);
   border-color: var(--accent-border);
   color: var(--accent-ink);
+}
+.transaction-review-filter {
+  white-space: nowrap;
+  padding: 8px 11px;
+}
+.transaction-review-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 600;
+}
+.transaction-review-filter[data-review-state='needs-review'] .transaction-review-letter {
+  background: var(--accent);
+  border-color: var(--accent-border);
+  color: var(--accent-ink);
+}
+.transaction-review-filter[data-review-state='reviewed'] .transaction-review-letter {
+  background: var(--success-surface);
+  border-color: var(--success);
+  color: var(--success);
 }
 .sr-only {
   position: absolute;
@@ -2640,13 +2839,15 @@ strong {
   .transaction-filters {
     gap: 8px;
   }
-  .transaction-filters > select {
+  .transaction-filters > select,
+  .transaction-filters > .transaction-account-filter,
+  .transaction-filters > .transaction-period-filter {
     flex: 1;
     max-width: calc(50% - 8px);
   }
-  .transaction-filters > input[data-navigation='month'] {
-    max-width: calc(50% - 8px);
-    flex: 1;
+  .account-picker-popup {
+    left: 0;
+    right: auto;
   }
   .filter-button {
     font-size: 9px;

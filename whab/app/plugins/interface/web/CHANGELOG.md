@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.16.0 — 2026-10-18
+
+PR: [#55](https://github.com/Fillll/whab/pull/55)
+
+- Show optional bank logos in a keyboard-accessible account picker, with multiple selections applied together and generic artwork fallbacks.
+- Replace the month field and All dates checkbox with current/previous-month presets and custom inclusive date bounds. Add a compact three-state R filter for Needs review, Reviewed and All.
+- Preserve date/review choices during account navigation, retain latest rapid filter changes, and reject stale fragments whose account or date scope differs from the requested register.
+
 ## 1.15.2 — 2026-10-18
 
 PR: [#54](https://github.com/Fillll/whab/pull/54)
