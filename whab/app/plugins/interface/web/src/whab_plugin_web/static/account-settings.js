@@ -89,7 +89,7 @@ export function initAccountLogoPreview(form, api) {
     button.disabled = !ready;
   }
   field.addEventListener('input', clear);
-  button.addEventListener('click', async () => {
+  async function retrieve() {
     if (!ready || button.disabled || form.dataset.busy) return;
     clear();
     const current = revision;
@@ -128,6 +128,12 @@ export function initAccountLogoPreview(form, api) {
     } finally {
       if (current === revision) button.disabled = false;
     }
+  }
+  button.addEventListener('click', retrieve);
+  field.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || event.isComposing) return;
+    event.preventDefault();
+    return retrieve();
   });
   return {
     reset() { ready = false; clear(); },

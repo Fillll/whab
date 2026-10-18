@@ -19,8 +19,13 @@ function events(properties = {}) {
   const listeners = {};
   return Object.assign({
     addEventListener(type, callback) {(listeners[type] ||= []).push(callback);},
-    async emit(type) {await Promise.all((listeners[type] || []).map(callback => callback()));},
+    async emit(type, event) {await Promise.all((listeners[type] || []).map(callback => callback(event)));},
   }, properties);
+}
+
+function keyboardEvent(key, properties = {}) {
+  return {key, isComposing: false, defaultPrevented: false,
+    preventDefault() {this.defaultPrevented = true;}, ...properties};
 }
 
 function harness({website = 'Robinhood.com', available = true, complete = false} = {}) {
@@ -93,6 +98,68 @@ test('repeated clicks share the active lookup and cannot issue duplicate request
   state.success();
   await pending;
   assert.equal(state.button.disabled, false);
+});
+
+test('Enter in the website field retrieves the preview instead of submitting account settings', async () => {
+  const state = harness();
+  state.preview.ready();
+  const enter = keyboardEvent('Enter');
+  const pending = state.field.emit('keydown', enter);
+  assert.equal(enter.defaultPrevented, true, 'Enter must not submit the account form');
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.requests[0].url, '/plugins/bank-logo-preview');
+  assert.deepEqual(state.requests[0].body, {website: 'Robinhood.com'});
+  assert.equal(state.requests[0].method, undefined, 'preview uses POST without saving metadata');
+  assert.equal(state.submit.disabled, false);
+  state.success();
+  await pending;
+  await tick();
+  state.image.onload();
+  assert.equal(state.field.value, 'https://robinhood.com');
+  assert.equal(state.image.src, localLogo);
+  assert.equal(state.image.hidden, false);
+  assert.equal(state.requests.length, 1, 'Enter must never also save the account');
+});
+
+test('repeated Enter and a click cannot duplicate an active keyboard lookup', async () => {
+  const state = harness();
+  state.preview.ready();
+  const pending = state.field.emit('keydown', keyboardEvent('Enter'));
+  assert.equal(state.button.disabled, true);
+  const repeated = keyboardEvent('Enter');
+  await state.field.emit('keydown', repeated);
+  await state.button.emit('click');
+  assert.equal(repeated.defaultPrevented, true, 'a pending lookup must not allow implicit Save');
+  assert.equal(state.requests.length, 1);
+  state.success();
+  await pending;
+  await tick();
+  assert.equal(state.button.disabled, false);
+});
+
+test('Enter cannot retrieve or submit before metadata is ready, after reset or during Save', async () => {
+  for (const mode of ['not-ready', 'reset', 'saving']) {
+    const state = harness();
+    if (mode !== 'not-ready') state.preview.ready();
+    if (mode === 'reset') state.preview.reset();
+    if (mode === 'saving') state.form.dataset.busy = 'true';
+    const enter = keyboardEvent('Enter');
+    await state.field.emit('keydown', enter);
+    await tick();
+    assert.equal(enter.defaultPrevented, true, `${mode} must not permit an implicit Save`);
+    assert.equal(state.requests.length, 0, `${mode} must not begin a logo lookup`);
+  }
+});
+
+test('other keys and IME composition keep their normal website-field behavior', async () => {
+  const state = harness();
+  state.preview.ready();
+  for (const event of [keyboardEvent('Tab'), keyboardEvent('Escape'), keyboardEvent('r'),
+    keyboardEvent('Enter', {isComposing: true})]) {
+    await state.field.emit('keydown', event);
+    assert.equal(event.defaultPrevented, false, `${event.key} must remain available to the input`);
+    assert.equal(state.requests.length, 0);
+  }
 });
 
 test('a cached image that is already complete immediately shows the preview', async () => {
