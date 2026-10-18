@@ -36,6 +36,15 @@ export function createTransactionWriter(save, {saved = () => {}, state = () => {
   };
 }
 
+export function hydrateTransactionCategories(select, template) {
+  if (!select?.hasAttribute('data-category-options-lazy') || !template?.content) return;
+  const value = select.value;
+  const placeholder = select.options[0].cloneNode(true);
+  select.replaceChildren(placeholder, template.content.cloneNode(true));
+  select.value = value;
+  select.removeAttribute('data-category-options-lazy');
+}
+
 export function initTransactionRegister({navigate = async () => false, onMutation = () => {}} = {}) {
   const root = document.querySelector('[data-transaction-register]');
   if (!root) return {flush: async () => true, dispose() {}};
@@ -98,6 +107,15 @@ export function initTransactionRegister({navigate = async () => false, onMutatio
     if (!(await flush())) { notify('Save the transaction edit before continuing.'); return; }
     if (!(await navigate(url, {focus}))) location.assign(url);
   }
+  const categoryOptions = root.querySelector('template[data-transaction-categories]');
+  const hydrateCategory = event => {
+    if (event.target.matches('select[data-category-options-lazy]')) {
+      hydrateTransactionCategories(event.target, categoryOptions);
+    }
+  };
+  // Populate before the native picker opens, including touch and keyboard focus.
+  listen(root, 'pointerdown', hydrateCategory);
+  listen(root, 'focusin', hydrateCategory);
   listen(search, 'input', filter);
   listen(account, 'change', () => { void go(pageUrl({account: account.value}), '#account-filter'); });
   listen(root.querySelector('#all-dates-filter'), 'change', event => {

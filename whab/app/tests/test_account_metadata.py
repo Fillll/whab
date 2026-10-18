@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from whab.app import create_app
 from whab.config import Settings
-from whab.domain.accounts import bank_website, normalize_account
+from whab.domain.accounts import bank_website, bank_website_entry, normalize_account
 from whab.domain.errors import StoreError
 from whab.plugins import BankLogos, Plugin, PluginRegistry
 from whab.services.ledger import LedgerService
@@ -32,6 +32,24 @@ def test_bank_website_normalizes_public_hostname_and_discards_paths():
         normalize_account({"type": "depository", "nameOverridden": "yes"})
 
 
+@pytest.mark.parametrize("value", [
+    "Robinhood.com", " Robinhood.com ", "http://Robinhood.com/login",
+    "HTTPS://Robinhood.com", "//Robinhood.com", "https://Robinhood.com/login",
+    "Robinhood.com/us/en/?ref=abc#top", "https://Robinhood.com/?ref=abc#top",
+])
+def test_optional_bank_website_accepts_common_public_address_entry(value):
+    assert bank_website_entry(value) == "https://robinhood.com"
+
+
+@pytest.mark.parametrize("value", [
+    None, "", " ", "not a website", "garbage", "https://localhost",
+    "http://127.0.0.1", "https://user:secret@bank.example.org", "bank.example.org:443",
+    "ftp://bank.example.org", "a" * 2049, 42, {},
+])
+def test_optional_bank_website_ignores_unusable_or_sensitive_entry(value):
+    assert bank_website_entry(value) is None
+
+
 def test_account_settings_only_returns_one_public_account_and_blocks_historical_currency_edits(store, tmp_path):
     settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", ui="")
     with TestClient(create_app(store=store, settings=settings, plugins=PluginRegistry()), base_url="https://127.0.0.1:5173") as client:
@@ -47,7 +65,11 @@ def test_account_settings_only_returns_one_public_account_and_blocks_historical_
         assert client.get(endpoint + "/settings?workspace=personal").json()["currencyEditable"] is False
         assert client.patch(endpoint, json={"workspace": "personal", "currency": "USD"}).status_code == 400
         assert client.patch(endpoint, json={"workspace": "personal", "currency": "CAD"}).status_code == 200
-        assert client.patch(endpoint, json={"workspace": "personal", "bankWebsite": "https://localhost"}).status_code == 400
+        assert client.patch(endpoint, json={"workspace": "personal", "bankWebsite": "https://localhost", "name": "Saved despite unavailable artwork", "type": "depository"}).status_code == 200
+        account = client.get(endpoint + "/settings?workspace=personal").json()["account"]
+        assert account.get("bankWebsite") is None and account["name"] == "Saved despite unavailable artwork"
+        assert client.patch(endpoint, json={"workspace": "personal", "bankWebsite": "BANK.example.org"}).status_code == 200
+        assert client.get(endpoint + "/settings?workspace=personal").json()["account"]["bankWebsite"] == "https://bank.example.org"
         assert client.get("/api/accounts/missing/settings?workspace=personal").status_code == 400
         assert client.get(endpoint + "/settings?workspace=demo").status_code == 400
     service = LedgerService(store, lock=RLock())

@@ -7,6 +7,7 @@ export function initAccountSettings({api, readForm, updateFields, flush, refresh
   const status = form.querySelector('[data-account-settings-status]');
   const submit = form.querySelector('[type="submit"]');
   const currency = form.elements.currency;
+  const logo = initAccountLogoPreview(form, api);
   let revision = 0;
   let originalCurrency;
   document.addEventListener('click', async event => {
@@ -14,6 +15,7 @@ export function initAccountSettings({api, readForm, updateFields, flush, refresh
     if (!button || form.dataset.busy) return;
     const current = ++revision;
     form.reset();
+    logo.reset();
     form.dataset.api = `/accounts/${encodeURIComponent(button.dataset.editAccount)}`;
     error.hidden = true;
     submit.disabled = true;
@@ -32,6 +34,7 @@ export function initAccountSettings({api, readForm, updateFields, flush, refresh
       currency.value = originalCurrency = account.currency;
       currency.disabled = !result.currencyEditable;
       if (form.elements.bankWebsite) form.elements.bankWebsite.value = account.bankWebsite || '';
+      logo.ready();
       status.textContent = '';
       submit.disabled = false;
       if (dialog.open) form.elements.name.focus();
@@ -65,5 +68,69 @@ export function initAccountSettings({api, readForm, updateFields, flush, refresh
     }
   });
   dialog.addEventListener('cancel', event => { if (form.dataset.busy) event.preventDefault(); });
-  dialog.addEventListener('close', () => { revision += 1; });
+  dialog.addEventListener('close', () => { revision += 1; logo.reset(); });
+}
+
+/* A failed optional artwork lookup must never block saving the account. */
+export function initAccountLogoPreview(form, api) {
+  const button = form.querySelector('[data-account-logo-retrieve]');
+  if (!button) return {reset() {}, ready() {}};
+  const field = form.elements.bankWebsite;
+  const image = form.querySelector('[data-account-logo-preview]');
+  const status = form.querySelector('[data-account-logo-status]');
+  let revision = 0;
+  let ready = false;
+  function clear() {
+    revision += 1;
+    image.onload = image.onerror = null;
+    image.hidden = true;
+    image.removeAttribute('src');
+    status.textContent = '';
+    button.disabled = !ready;
+  }
+  field.addEventListener('input', clear);
+  button.addEventListener('click', async () => {
+    if (!ready || button.disabled || form.dataset.busy) return;
+    clear();
+    const current = revision;
+    const value = field.value;
+    button.disabled = true;
+    status.textContent = 'Retrieving logo…';
+    const unavailable = () => {
+      image.hidden = true;
+      status.textContent = 'No logo found. You can still save this account.';
+    };
+    try {
+      const result = await api('/plugins/bank-logo-preview', {website: value});
+      if (current !== revision || field.value !== value) return;
+      if (!result.available || typeof result.logoUrl !== 'string' ||
+          !result.logoUrl.startsWith('/') || result.logoUrl.startsWith('//')) {
+        unavailable();
+        return;
+      }
+      if (new URL(result.logoUrl, location.href).origin !== location.origin) {
+        unavailable();
+        return;
+      }
+      if (result.website) field.value = result.website;
+      const loaded = () => {
+        if (current !== revision) return;
+        image.hidden = false;
+        status.textContent = `Logo retrieved from ${result.provider?.provider_name || 'the logo provider'}.`;
+      };
+      image.onload = loaded;
+      image.onerror = () => { if (current === revision) unavailable(); };
+      image.src = result.logoUrl;
+      status.textContent = 'Loading preview…';
+      if (image.complete && image.naturalWidth > 0) loaded();
+    } catch {
+      if (current === revision) unavailable();
+    } finally {
+      if (current === revision) button.disabled = false;
+    }
+  });
+  return {
+    reset() { ready = false; clear(); },
+    ready() { ready = true; button.disabled = false; },
+  };
 }

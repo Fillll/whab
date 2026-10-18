@@ -7,7 +7,7 @@ changing state, so the same financial behavior applies to every persistence adap
 
 from .accounts import (
     ON_BUDGET_ACCOUNT_TYPES,
-    bank_website,
+    bank_website_entry,
     is_liability,
     is_on_budget,
     normalize_account,
@@ -58,7 +58,7 @@ def update_account(state: dict, account_id: str, changes: dict) -> None:
         candidate["name"] = validate_label(changes["name"])
         candidate["nameOverridden"] = True
     if "bankWebsite" in changes:
-        candidate["bankWebsite"] = bank_website(changes["bankWebsite"])
+        candidate["bankWebsite"] = bank_website_entry(changes["bankWebsite"])
     if "currency" in changes:
         candidate["currency"] = currency_code(changes["currency"])
         if candidate["currency"] != account.get("currency", "USD") and any(

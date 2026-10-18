@@ -88,3 +88,28 @@ def test_empty_account_register_explains_the_selected_account(client, store):
     assert re.search(r'<h1\b[^>]*>Empty &lt;wallet&gt;</h1>', text)
     assert "This account has no transactions." in text
     assert not register_rows(text)
+
+
+def test_account_register_skips_envelope_projection_and_reuses_category_choices(client, store, monkeypatch):
+    account = store.add_account("personal", {"name": "Fast account", "type": "depository", "balance": 0})
+    for index in range(12):
+        store.add_transaction("personal", {
+            "accountId": account, "date": "2026-10-05", "merchant": f"Synthetic {index}",
+            "amount": 100, "categoryId": "groceries",
+        })
+    def unrelated(*args, **kwargs):
+        raise AssertionError("Transaction pages must not calculate envelope histories")
+    monkeypatch.setattr(store, "workspace", unrelated)
+    monkeypatch.setattr(store, "state", unrelated)
+    text = client.get(
+        f"/budgets/home/transactions/2026-10/usd?account={account}&all_dates=true",
+        headers={"X-WHAB-Transactions-Fragment": "1"},
+    ).text
+    assert len(register_rows(text)) == 12
+    assert text.count('<template data-transaction-categories>') == 1
+    assert text.count('<optgroup label="Everyday">') == 1
+    assert text.count('data-category-options-lazy') == 12
+    for row in register_rows(text):
+        category = re.search(r'<select name="categoryId"[^>]*>(.*?)</select>', row, re.S)[1]
+        assert len(re.findall(r'<option\b', category)) == 2
+        assert '<option value="groceries" selected>Groceries</option>' in category

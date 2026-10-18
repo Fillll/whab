@@ -114,31 +114,7 @@ class Store:
             "rolloverModes": {},
             "items": {},
         }
-        for row in self.db.execute(
-            "SELECT * FROM accounts WHERE workspace=? ORDER BY rowid", (workspace,)
-        ):
-            account = {
-                "id": row["id"],
-                "name": row["name"],
-                "institution": row["institution"],
-                "type": row["type"] if row["type"] in ACCOUNT_TYPES else "other",
-                "balance": row["balance"],
-                "currency": row["currency"],
-                "source": row["source"],
-                "stale": not bool(row["active"]),
-                "balanceUnknown": bool(row["balance_unknown"]),
-            }
-            if row["item_id"]:
-                account["itemId"] = row["item_id"]
-            if row["mask"]:
-                account["mask"] = row["mask"]
-            if "on_budget" in row.keys():
-                account.update(onBudget=bool(row["on_budget"]), subtype=row["subtype"])
-            if "bank_website" in row.keys() and row["bank_website"] is not None:
-                account["bankWebsite"] = row["bank_website"]
-            if "name_overridden" in row.keys() and row["name_overridden"]:
-                account["nameOverridden"] = bool(row["name_overridden"])
-            state["accounts"][row["id"]] = normalize_account(account)
+        state["accounts"] = {row["id"]: row for row in self._read_accounts(workspace)}
         for row in self.db.execute(
             "SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,)
         ):
@@ -404,8 +380,39 @@ class Store:
         except StoreError as error:
             return {"canImport": False, "reason": str(error), "alreadyImported": False}
 
+    def _read_accounts(self, workspace: str) -> list[dict]:
+        accounts = []
+        for row in self.db.execute(
+            "SELECT * FROM accounts WHERE workspace=? ORDER BY rowid", (workspace,)
+        ):
+            account = {
+                "id": row["id"],
+                "name": row["name"],
+                "institution": row["institution"],
+                "type": row["type"] if row["type"] in ACCOUNT_TYPES else "other",
+                "balance": row["balance"],
+                "currency": row["currency"],
+                "source": row["source"],
+                "stale": not bool(row["active"]),
+                "balanceUnknown": bool(row["balance_unknown"]),
+            }
+            if row["item_id"]:
+                account["itemId"] = row["item_id"]
+            if row["mask"]:
+                account["mask"] = row["mask"]
+            if "on_budget" in row.keys():
+                account.update(onBudget=bool(row["on_budget"]), subtype=row["subtype"])
+            if "bank_website" in row.keys() and row["bank_website"] is not None:
+                account["bankWebsite"] = row["bank_website"]
+            if "name_overridden" in row.keys() and row["name_overridden"]:
+                account["nameOverridden"] = bool(row["name_overridden"])
+            accounts.append(normalize_account(account))
+        return accounts
+
     def accounts(self, workspace: str) -> list[dict]:
-        return list(self.state(workspace)["accounts"].values())
+        with self._snapshot():
+            self._require_workspace(workspace)
+            return self._read_accounts(workspace)
 
     def export_budget(self, workspace: str = "personal") -> dict:
         """Export one coherent ledger, excluding every provider connection field."""
@@ -510,8 +517,64 @@ class Store:
             raise StoreError("Budget preparation requires the personal workspace and a boolean cache flag.")
         prepare_files(self, files, existing=existing)
 
+    def _require_workspace(self, workspace: str) -> None:
+        if type(workspace) is not str or workspace not in {"demo", "personal"}:
+            raise StoreError("Invalid workspace.")
+        if not self.db.execute("SELECT 1 FROM meta WHERE workspace=?", (workspace,)).fetchone():
+            raise StoreError("Workspace not found.")
+
     def categories(self, workspace: str) -> list[dict]:
-        return public_categories(self.state(workspace)["categories"])
+        with self._snapshot():
+            self._require_workspace(workspace)
+            return public_categories({
+                row["id"]: {
+                    "id": row["id"], "name": row["name"], "group": row["group_name"],
+                    "target": row["target"], "currency": row["currency"],
+                }
+                for row in self.db.execute(
+                    "SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,),
+                )
+            })
+
+    def transaction_register(
+        self, workspace: str, month: str | None, currency: str, account_id: str | None,
+    ) -> dict:
+        """Read only register rows; envelope histories and banking state are not loaded."""
+        with self._snapshot():
+            self._require_workspace(workspace)
+            accounts = self.accounts(workspace)
+            categories = self.categories(workspace)
+            if account_id not in {
+                row["id"] for row in accounts if row["currency"] == currency
+            }:
+                account_id = None
+            conditions = ["t.workspace=?", "t.deleted=0", "a.currency=?"]
+            arguments = [workspace, currency]
+            if month is not None:
+                conditions.extend(("t.date>=?", "t.date<?"))
+                arguments.extend((month + "-01", month + "-32"))
+            if account_id is not None:
+                conditions.append("t.account_id=?")
+                arguments.append(account_id)
+            rows = self.db.execute(
+                "SELECT t.id,t.account_id AS accountId,t.date,t.merchant,"
+                "t.merchant_logo AS merchantLogo,t.amount,t.category_id AS categoryId,"
+                "t.pending,t.reviewed,t.source,t.note,t.is_transfer AS isTransfer,"
+                "t.inferred_transfer AS inferredTransfer,a.currency "
+                "FROM transactions t JOIN accounts a "
+                "ON a.workspace=t.workspace AND a.id=t.account_id WHERE "
+                + " AND ".join(conditions) + " ORDER BY t.date DESC,t.id DESC",
+                arguments,
+            )
+            return {
+                "accounts": accounts, "categories": categories,
+                "transactions": [
+                    {**dict(row), **{key: bool(row[key]) for key in (
+                        "pending", "reviewed", "isTransfer", "inferredTransfer",
+                    )}}
+                    for row in rows
+                ],
+            }
 
     def receipt_ids(self, workspace: str) -> list[str]:
         from .receipts import ids

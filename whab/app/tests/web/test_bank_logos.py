@@ -109,3 +109,68 @@ def test_saved_logo_selection_waits_for_restart(imported_store, tmp_path, monkey
         page = client.get("/budgets/home/accounts/2026-10/usd")
         assert page.status_code == 200 and "data-bank-logo" not in page.text
         assert calls == [] and (tmp_path / "plugins.json").is_file()
+
+
+def test_optional_website_preview_is_guarded_cached_budget_scoped_and_does_not_save(store, tmp_path):
+    seen, fetched = [], []
+    plugin = Plugin("logos", "Fictional bank logos", bank_logos=BankLogos(
+        lambda _: None, lambda key: fetched.append(key) or LogoImage(PNG, "image/png"),
+        resolve_domain=lambda hostname: seen.append(hostname) or "manual-domain",
+        provider_name="Synthetic artwork", provider_url="https://icons.example.org",
+    ))
+    with client_for(store, tmp_path, plugin) as client:
+        endpoint = "/budgets/demo/api/plugins/bank-logo-preview"
+        for headers in (
+            {"host": "foreign.example"}, {"origin": "https://foreign.example"},
+            {"sec-fetch-site": "cross-site"},
+        ):
+            assert client.post(endpoint, json={"website": "Robinhood.com"}, headers=headers).status_code == 403
+        assert seen == fetched == []
+        before = store.accounts("demo")
+        response = client.post(endpoint, json={"website": " Robinhood.com/us/en/?ref=abc#top "})
+        assert response.status_code == 200 and response.headers["cache-control"] == "no-store"
+        result = response.json()
+        assert result == {
+            "available": True, "website": "https://robinhood.com",
+            "logoUrl": "/budgets/demo/api/plugins/logos/bank-logos/manual-domain",
+            "provider": {"id": "logos", "display_name": "Fictional bank logos", "provider_name": "Synthetic artwork", "provider_url": "https://icons.example.org"},
+        }
+        assert seen == ["robinhood.com"] and fetched == ["manual-domain"]
+        assert client.get(result["logoUrl"]).content == PNG
+        assert client.post(endpoint, json={"website": "http://Robinhood.com"}).json() == result
+        assert fetched == ["manual-domain"]
+        assert store.accounts("demo") == before
+        personal = client.post("/budgets/home/api/plugins/bank-logo-preview", json={"website": "Robinhood.com"}).json()
+        assert personal["logoUrl"].startswith("/budgets/home/api/")
+
+
+@pytest.mark.parametrize("website", [None, "", "random garbage", "localhost", "http://127.0.0.1", "bank.example.org:443", "https://user:secret@bank.example.org"])
+def test_unusable_preview_is_neutral_without_external_requests(store, tmp_path, website):
+    calls = []
+    plugin = Plugin("logos", "Fictional bank logos", bank_logos=BankLogos(
+        lambda _: None, lambda key: calls.append(key), resolve_domain=lambda host: calls.append(host),
+    ))
+    with client_for(store, tmp_path, plugin) as client:
+        result = client.post("/api/plugins/bank-logo-preview", json={"website": website})
+        assert result.status_code == 200
+        assert result.json()["available"] is False and result.json()["website"] is None
+        assert result.json()["logoUrl"] is None and calls == []
+
+
+@pytest.mark.parametrize("failure", ["disabled", "unknown", "fetch", "resolve"])
+def test_unavailable_preview_is_neutral_and_does_not_expose_plugin_errors(store, tmp_path, failure):
+    def resolve(_):
+        if failure == "resolve":
+            raise RuntimeError("PRIVATE_FIXTURE_PROVIDER_ERROR")
+        return None if failure == "unknown" else "manual-domain"
+
+    def fetch(_):
+        raise RuntimeError("PRIVATE_FIXTURE_PROVIDER_ERROR")
+
+    plugin = Plugin("logos", "Fictional bank logos", bank_logos=BankLogos(lambda _: None, fetch, resolve_domain=resolve))
+    with client_for(store, tmp_path, *((plugin,) if failure != "disabled" else ())) as client:
+        result = client.post("/api/plugins/bank-logo-preview", json={"website": "bank.example.org"})
+        assert result.status_code == 200 and "PRIVATE_FIXTURE_PROVIDER_ERROR" not in result.text
+        assert result.json()["available"] is False
+        assert result.json()["website"] == "https://bank.example.org" and result.json()["logoUrl"] is None
+        assert (result.json()["provider"] is None) == (failure == "disabled")

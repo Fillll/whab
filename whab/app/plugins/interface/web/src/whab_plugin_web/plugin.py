@@ -15,5 +15,6 @@ plugin = Plugin(
         static=resources / "static",
         build_context=build_context,
         budget_months=3,
+        lightweight_transactions=True,
     ),
 )

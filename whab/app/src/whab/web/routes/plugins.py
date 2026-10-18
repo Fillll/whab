@@ -4,15 +4,17 @@ import csv
 import io
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 
+from whab.domain.accounts import bank_website_entry
 from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.plugins import PluginError
 from whab.web.csv import safe_cell
+from whab.web.navigation import budget_key
 from whab.web.plugin_snapshot import build_snapshot
-from whab.web.schemas import PluginSelectionBody, Workspace, valid_month
+from whab.web.schemas import BankLogoPreviewBody, PluginSelectionBody, Workspace, valid_month
 
 
 def create_router(store, plugins, plugin_manager=None):
@@ -21,6 +23,26 @@ def create_router(store, plugins, plugin_manager=None):
     @router.get("")
     def describe():
         return {"plugins": [asdict(plugin) for plugin in plugins.describe()]}
+
+    @router.post("/bank-logo-preview")
+    def preview_bank_logo(request: Request, body: BankLogoPreviewBody):
+        website = bank_website_entry(body.website)
+        result = {
+            "available": False, "website": website, "logoUrl": None,
+            "provider": plugins.bank_logo_provider(),
+        }
+        if website is None:
+            return result
+        logo = plugins.bank_logo("", website=website)
+        if logo is None or plugins.logo_image(*logo) is None:
+            return result
+        identifier = request.scope.get("whab.budget_id")
+        prefix = f"/budgets/{budget_key(identifier)}" if identifier is not None else ""
+        return {
+            **result, "available": True,
+            "logoUrl": f"{prefix}/api/plugins/{logo[0]}/bank-logos/{logo[1]}",
+            "provider": plugins.bank_logo_provider(logo[0]),
+        }
 
     def settings_data(plugin_id):
         try:

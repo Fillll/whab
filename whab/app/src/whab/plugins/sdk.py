@@ -374,12 +374,15 @@ class UserInterface:
 
     A budget_months value above one requests a data["periods"] list of consecutive
     core projections on budget pages. The default retains the single-month shape.
+    lightweight_transactions opts into register metadata/rows without envelope
+    summaries on transaction pages; the default retains full workspace inputs.
     """
 
     templates: Path
     static: Path
     build_context: UIContextBuilder
     budget_months: int = 1
+    lightweight_transactions: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
@@ -388,6 +391,8 @@ class UserInterface:
             raise ValueError("User interface context builder must be callable.")
         if type(self.budget_months) is not int or not 1 <= self.budget_months <= 12:
             raise ValueError("User interface budget months must be an integer between 1 and 12.")
+        if type(self.lightweight_transactions) is not bool:
+            raise ValueError("User interface lightweight transactions must be a boolean.")
 
 
 class BankStore(Protocol):
@@ -638,6 +643,21 @@ class NextMonthFunding(Protocol):
     def assign_next_month(
         self, workspace: str, month: str, currency: str, assigned: int,
     ) -> None: ...
+
+
+class TransactionRegister(Protocol):
+    """Optional scoped public-row read, without calculating envelope projections.
+
+    Month None reads all dates; account_id None reads every account of currency.
+    Return accounts/categories metadata plus scoped transactions in one snapshot.
+    Preserve transactions() public fields and deterministic date/id order. Unknown
+    or other-currency account IDs mean all accounts of the addressed currency.
+    Do not expose deleted rows or provider state. Existing storage remains valid.
+    """
+
+    def transaction_register(
+        self, workspace: str, month: str | None, currency: str, account_id: str | None,
+    ) -> dict: ...
 
 
 class MonthlyRollover(Protocol):

@@ -62,6 +62,7 @@ def test_another_ui_supplies_its_views_templates_assets_and_keeps_host_guards(tm
             assert "Alternative UI &lt;script&gt;fictional&lt;/script&gt; 2026-10" in result.text
             assert seen[-1][1]["workspace"] == "demo"
             assert "periods" not in seen[-1][0]
+            assert {"summary", "budget", "trend", "budgetStartMonth"} <= seen[-1][0].keys()
         assert client.get("/static/custom.css").status_code == 200
         assert client.get("/static/app.js").status_code == 404
         assert client.get("/api/workspace?workspace=demo").status_code == 200
@@ -143,3 +144,31 @@ def test_ui_failure_is_sanitized_and_api_stays_usable(tmp_path, store, failure):
         assert "could not render" in response.text
         assert "FICTIONAL_PRIVATE" not in response.text
         assert client.get("/api/workspace?workspace=demo").status_code == 200
+
+
+@pytest.mark.parametrize("lightweight", [False, True])
+def test_transaction_ui_projection_is_opt_in_and_preserves_filters(tmp_path, store, lightweight):
+    templates, static = tmp_path / "templates", tmp_path / "static"
+    templates.mkdir()
+    static.mkdir()
+    (templates / "base.html").write_text("Register")
+    seen = []
+    account = store.add_account("personal", {"name": "One", "type": "depository", "balance": 0})
+    other = store.add_account("personal", {"name": "Two", "type": "depository", "balance": 0})
+    for identifier, month in ((account, "2026-09"), (account, "2026-10"), (other, "2026-10")):
+        store.add_transaction("personal", {
+            "accountId": identifier, "date": month + "-05", "merchant": "Purchase",
+            "amount": 100, "categoryId": None,
+        })
+    ui = UserInterface(templates, static, lambda data, *_args, **_kwargs: seen.append(data) or {},
+                       lightweight_transactions=lightweight)
+    with TestClient(
+        create_app(store=store, settings=settings(tmp_path, "alternate"),
+                   plugins=PluginRegistry((Plugin("alternate", "Alternate", ui=ui),))),
+        base_url="https://127.0.0.1:5173",
+    ) as client:
+        for suffix, expected in (("", 1), ("&all_dates=true", 2)):
+            assert client.get(f"/budgets/home/transactions/2026-10/usd?account={account}" + suffix).status_code == 200
+            assert len(seen[-1]["transactions"]) == expected
+            assert {row["accountId"] for row in seen[-1]["transactions"]} == {account}
+            assert ("summary" in seen[-1]) is not lightweight

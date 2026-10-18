@@ -149,6 +149,7 @@ def test_storage_backend_protocol_is_database_independent_and_preserves_public_s
 def test_user_interface_descriptor_is_frozen_and_matches_view_builder_signature(tmp_path):
     interface = UserInterface(tmp_path / "templates", tmp_path / "static", build_context)
     assert interface.budget_months == 1
+    assert interface.lightweight_transactions is False
     descriptor = Plugin("frontend", "Example UI", ui=interface)
     registry = load_plugins(("frontend",), (FakeEntryPoint("frontend", descriptor),))
     selected = registry.ui_plugin("frontend")
@@ -251,3 +252,13 @@ def test_empty_registry_remains_metadata_free_until_host_composes_selections(mon
     with pytest.raises(PluginError) as error:
         registry.storage_plugin("backend")
     assert error.value.code == "missing_storage_plugin"
+
+
+@pytest.mark.parametrize("value", [0, 1, None, "true", []])
+def test_user_interface_rejects_non_boolean_lightweight_transactions(tmp_path, value):
+    with pytest.raises(ValueError, match="lightweight transactions"):
+        UserInterface(tmp_path, tmp_path, build_context, lightweight_transactions=value)
+
+
+def test_user_interface_can_opt_into_lightweight_transactions(tmp_path):
+    assert UserInterface(tmp_path, tmp_path, build_context, lightweight_transactions=True).lightweight_transactions
