@@ -1,5 +1,13 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.2.0 — 2026-10-18
+
+PR: [#50](https://github.com/Fillll/whab/pull/50)
+
+- Move ZIP import into the plugin's Options dialog. Explain that each import creates and opens a new, separate budget, with a read-only preview first.
+- Use the host's isolated-budget import API and retain the import operation on a failed commit so retries open the same budget.
+- Require WHAB 2.10 or newer for the new-budget import workflow.
+
 ## 1.1.2 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)

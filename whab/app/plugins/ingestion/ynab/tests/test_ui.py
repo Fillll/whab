@@ -30,14 +30,17 @@ def client_for(store, home, *plugins, ui="web"):
     )
 
 
-def test_selected_import_renders_only_on_personal_accounts_and_serves_its_assets(store, tmp_path):
+def test_selected_import_lives_in_plugin_options_on_every_page_and_serves_its_assets(store, tmp_path):
     with client_for(store, tmp_path, web_plugin, ynab_plugin) as client:
         response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
         assert "Import from YNAB ZIP file" in response.text
         assert 'data-file-import="ynab"' in response.text
         assert "I confirm this export uses US dollars (USD)." in response.text
-        assert "Import into empty budget" in response.text
+        assert "Create budget and import" in response.text
+        assert "Each import creates and opens a new, separate budget." in response.text
+        assert response.text.index('id="plugin-options-ynab"') < response.text.index('data-file-import="ynab"')
+        assert response.text.count('data-file-import="ynab"') == 1
         assert "/imports/ynab/static/import.js" in response.text
         asset = client.get("/imports/ynab/static/import.js")
         assert asset.status_code == 200
@@ -45,8 +48,9 @@ def test_selected_import_renders_only_on_personal_accounts_and_serves_its_assets
         for workspace, page in (("demo", "accounts"), ("personal", "budget"), ("personal", "transactions")):
             response = client.get(f"/budgets/{workspace.replace('personal', 'home')}/{page}/current-month/usd")
             assert response.status_code == 200
-            assert "data-file-import" not in response.text
-            assert "/imports/ynab/static/import.js" not in response.text
+            assert response.text.index('id="plugin-options-ynab"') < response.text.index('data-file-import="ynab"')
+            assert response.text.count('data-file-import="ynab"') == 1
+            assert "/imports/ynab/static/import.js" in response.text
 
 
 def test_inactive_import_has_no_form_or_public_assets(store, tmp_path):

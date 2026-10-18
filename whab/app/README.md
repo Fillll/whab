@@ -4,7 +4,7 @@
 
 A highly extensible budgeting app built with Python, with monthly envelopes and rollover, transaction review, spending analytics and manual accounts. Plugins supply replaceable interfaces, storage, imports, reports and additional workflows.
 
-See the [architecture and Mermaid diagrams](../../README.md#architecture), [runtime architecture](../docs/architecture.md) and [budget and plugin model](../docs/target-architecture.md). Current host version: **2.9.3** ([changelog](CHANGELOG.md)).
+See the [architecture and Mermaid diagrams](../../README.md#architecture), [runtime architecture](../docs/architecture.md) and [budget and plugin model](../docs/target-architecture.md). Current host version: **2.10.0** ([changelog](CHANGELOG.md)).
 
 The [client/server deployment option](../../README.md#clientserver-deployment) uses the same architecture: a client plugin connects an interface to a server plugin exposing an API interface capability.
 
@@ -51,7 +51,7 @@ For bank imports, follow the [Plaid Sandbox guide](../docs/usage.md#connect-plai
 
 Plaid merchant logos are included with the existing **Plaid** plugin. Transactions display the artwork supplied by Plaid when available; missing artwork leaves the payee text visible. Only public logo files are downloaded, through guarded local image routes with a bounded memory cache (24 hours for successes, five minutes for failures). No merchant lookup service, LLM key or separate merchant-logo plugin is needed. Existing imported transactions receive artwork only when Plaid supplies them again in an import or update; enabling this feature does not reconnect a bank or automatically backfill history. See the [Plaid plugin guide](plugins/ingestion/plaid/README.md).
 
-For a YNAB ZIP dump, enable **ynab** in the plugin manager, save, and restart. In an empty **My budget → Accounts**, choose the ZIP, confirm USD, preview the counts and limitations, then explicitly import. Use a fresh `WHAB_HOME` for migration when your current budget already has financial data. Preview never saves financial records. See the [YNAB plugin guide](plugins/ingestion/ynab/README.md) for supported formats and migration limits.
+For a YNAB ZIP dump, enable **ynab** in the plugin manager, save, and restart. Open **Settings → Plugins → Import from YNAB ZIP file → Options**, choose the ZIP, confirm USD, and preview the counts and limitations. **Create budget and import** creates and opens a new isolated budget; your existing budget stays intact. Preview creates no budget or financial records. See the [YNAB plugin guide](plugins/ingestion/ynab/README.md) for supported formats and migration limits.
 
 ## Limits and data safety
 

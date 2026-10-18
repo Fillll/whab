@@ -55,6 +55,10 @@ class RequestBodyLimit:
 def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote=False):
     webhook_paths = frozenset(webhook_paths)
     file_import_paths = frozenset(file_import_paths)
+    new_budget_import_paths = frozenset(
+        path for path in file_import_paths
+        if path.endswith(("/import/new/preview", "/import/new/commit"))
+    )
     origins = {f"https://{host}:{port}" for host in ("localhost", "127.0.0.1")}
 
     @app.middleware("http")
@@ -108,7 +112,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
                 path = request.url.path
                 personal_only = (
                     path.startswith(("/api/banks/", "/api/plaid/", "/api/budget/plugins/"))
-                    or "/import/" in path
+                    or ("/import/" in path and path not in new_budget_import_paths)
                     or path in {"/api/budget/save", "/api/budget/copies"}
                     or (request.method not in {"GET", "HEAD", "OPTIONS"} and (
                         path == "/api/plugins/management" or "/settings/actions/" in path

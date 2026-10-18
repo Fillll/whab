@@ -67,6 +67,8 @@ def create_router(
         month_token: str,
         currency: str,
         category: str | None = None,
+        account: str | None = None,
+        all_dates: bool = False,
     ):
         if any(name in request.query_params for name in ("page", "workspace", "month", "currency")):
             raise HTTPException(400, "Routing values belong in the address path.")
@@ -85,6 +87,25 @@ def create_router(
             data = {**periods[0], "periods": periods}
         else:
             data = select_currency(service.workspace(workspace, month), currency)
+        selected_account = next((row for row in data["accounts"] if row["id"] == account), None)
+        transaction_all_dates = page == "transactions" and all_dates
+        if page == "transactions":
+            if transaction_all_dates:
+                account_ids = {row["id"] for row in data["accounts"]}
+                data = {
+                    **data,
+                    "transactions": [
+                        row for row in service.transactions(workspace)
+                        if row["accountId"] in account_ids
+                    ],
+                }
+            if selected_account is not None:
+                data = {
+                    **data,
+                    "transactions": [
+                        row for row in data["transactions"] if row["accountId"] == account
+                    ],
+                }
         status = public_status()
         try:
             context = ui.build_context(
@@ -125,6 +146,8 @@ def create_router(
             data=data, status=status, workspace=workspace, page=page, month=month,
             version=__version__,
             budget_name=budget_name, budget_id=service.budget_id,
+            selected_account=selected_account if page == "transactions" else None,
+            transaction_all_dates=transaction_all_dates,
         )
         from whab.web.bank_status import public_bank_status
 
@@ -150,7 +173,7 @@ def create_router(
                 "display_name": p.display_name,
             }
             for p in plugins.file_import_plugins()
-            if p.file_import.templates is not None and workspace == "personal" and page == "accounts"
+            if p.file_import.templates is not None
         ]
         context["plugin_scripts"].extend(
             f"{asset_prefix}/imports/{panel['id']}/static/import.js?v={context['version']}"

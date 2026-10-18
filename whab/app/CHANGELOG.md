@@ -4,11 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
-## 2.9.3 — 2026-10-18
+## 2.10.0 — 2026-10-18
 
 PR: [#50](https://github.com/Fillll/whab/pull/50)
 
-- Require web 1.12.2 in the supported bundle for clearer budget settings sections and an improved plugin category selector.
+- Add read-only file import previews and retry-safe commits that create isolated budgets, leaving the source budget intact. Keep the existing empty-budget import API available.
+- Support account-specific transaction views across all dates. Require web 1.13.0 and YNAB 1.2.0 in the supported bundle for the revised settings and import workflow.
 
 ## 2.9.2 — 2026-10-18
 

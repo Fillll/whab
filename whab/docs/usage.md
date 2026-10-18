@@ -113,6 +113,10 @@ For a portable budget, saving updates its plugin manifest and preserves disabled
 
 Disabling a bank plugin takes effect on restart and retains imported history and saved connections. Saving a selection does not disconnect a bank or activate new connections. Portable budget downloads include the saved feature setup. For the original local workspace, back up `plugins.json` with the runtime configuration; removing it restores the environment default.
 
+### YNAB import
+
+Enable **Import from YNAB ZIP file**, save and restart, then open its **Options**. Choose the ZIP, confirm USD and **Preview import**. **Create budget and import** creates a separate **Imported budget**, adds it to Settings → Budgets, and opens its Accounts page for classification. Preview creates nothing; retrying a failed commit opens the same new budget. The form is available in the plugin's settings from any page, including Demo.
+
 ### Optional bank logos
 
 The bundled **bank-logos** plugin is disabled by default. After upgrading a source checkout, refresh local package registrations with `.venv/bin/python scripts/install.py --dev`. In **Settings → Plugins → Installed**, enable **bank-logos**, save, and restart WHAB. When active it is named **Bank logos (Icon Horse)**. Without a saved selection, `WHAB_PLUGINS=plaid,bank-logos` selects it instead. Disable it through the same manager and restart to return to the existing icons and initials.
@@ -157,6 +161,8 @@ This prototype requests **Transactions**. Investments import is the next separat
 - Core supports multiple currencies with separate totals and no conversion; the bundled Plaid and YNAB importers currently accept USD only. CSV exports retain `amount_cents` for compatibility, containing integer currency minor units, and append a `currency` column. Text cells are protected against spreadsheet formula injection.
 
 ## Budget scope
+
+Choose an individual account in the sidebar to open its transaction register across **All dates**. Turn off All dates to filter by the displayed month. The account filter and selected date range stay in the address; switching currency clears the account filter. The main **Accounts** navigation remains the place to manage account classifications and connections.
 
 Accounts have a core `onBudget` flag, an account `type` and an optional `subtype`. On-budget checking, savings, cash and credit accounts participate in envelope funding, income and spending. Off-budget accounts track your wider finances: brokerage investments; retirement accounts such as traditional IRA, Roth IRA and 401(k); property such as a home or vehicle; mortgages, car loans and student loans; and fixed-term deposits such as CDs. You can also track other assets or liabilities and keep a cash or credit account off budget.
 

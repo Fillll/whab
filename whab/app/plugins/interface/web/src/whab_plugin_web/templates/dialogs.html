@@ -287,6 +287,9 @@
   </fieldset>
   {% endif %}
   <section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings>{% if not plugin.active %}<p class="settings-notice">{% if plugin.enabled %}Restart WHAB to view this plugin’s settings.{% else %}Enable this plugin, save your selection, and restart WHAB to view its settings.{% endif %}</p>{% endif %}</section>
+  {% for importer in import_panels if importer.id == plugin.id %}
+    {% include importer.template %}
+  {% endfor %}
   <p class="settings-notice" role="status" data-plugin-settings-status></p>
   <p class="field-error" role="alert" data-plugin-settings-error hidden></p>
 </dialog>

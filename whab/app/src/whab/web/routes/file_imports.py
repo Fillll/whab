@@ -2,6 +2,7 @@
 
 import hashlib
 import inspect
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
@@ -11,7 +12,7 @@ from whab.domain.money import currency_code
 from whab.plugins import StoreError
 
 
-def create_router(store, plugins):
+def create_router(store, plugins, budget_host=None, source_id="default"):
     router = APIRouter(prefix="/api/plugins")
 
     def descriptor(plugin_id):
@@ -47,6 +48,52 @@ def create_router(store, plugins):
 
         return hashlib.sha256(raw).hexdigest(), await run_in_threadpool(normalize)
 
+    def import_operation(request):
+        value = request.headers.get("x-import-operation")
+        try:
+            if str(UUID(value)) != value:
+                raise ValueError
+        except (ValueError, TypeError, AttributeError):
+            raise HTTPException(400, "Preview this export with a valid import operation ID before importing.") from None
+        return value
+
+    def preview_values(fingerprint, data):
+        return {
+            "fingerprint": fingerprint,
+            "accounts": len(data.accounts),
+            "categories": len(data.categories),
+            "transactions": len(data.transactions),
+            "assignments": len(data.assignments),
+            "budgetStartMonth": data.budget_start_month,
+            "currency": data.currency,
+            "warnings": data.warnings,
+        }
+
+    @router.post("/{plugin_id}/import/new/preview")
+    async def preview_new(plugin_id: str, request: Request):
+        plugin = descriptor(plugin_id)
+        import_operation(request)
+        fingerprint, data = await parse(request, plugin)
+        return {
+            **preview_values(fingerprint, data),
+            "canImport": True,
+            "reason": "Import creates a new budget. Your current budget is unchanged.",
+            "alreadyImported": False,
+            "createsNewBudget": True,
+        }
+
+    @router.post("/{plugin_id}/import/new/commit")
+    async def commit_new(plugin_id: str, request: Request):
+        plugin = descriptor(plugin_id)
+        operation = import_operation(request)
+        fingerprint, data = await parse(request, plugin)
+        if request.headers.get("x-import-fingerprint") != fingerprint:
+            raise HTTPException(409, "The file changed. Preview this export again before importing.")
+        if budget_host is None:
+            raise HTTPException(400, "New budget imports are unavailable in this application.")
+        origin_id = "demo" if request.scope.get("whab.workspace") == "demo" else source_id
+        return await budget_host.import_new(origin_id, plugin.id, fingerprint, data, operation)
+
     @router.post("/{plugin_id}/import/preview")
     async def preview(plugin_id: str, request: Request):
         plugin = descriptor(plugin_id)
@@ -68,17 +115,7 @@ def create_router(store, plugins):
             return store.preview_workspace_import("personal", plugin.id, fingerprint)
 
         availability = await run_in_threadpool(availability)
-        return {
-            "fingerprint": fingerprint,
-            "accounts": len(data.accounts),
-            "categories": len(data.categories),
-            "transactions": len(data.transactions),
-            "assignments": len(data.assignments),
-            "budgetStartMonth": data.budget_start_month,
-            "currency": data.currency,
-            "warnings": data.warnings,
-            **availability,
-        }
+        return {**preview_values(fingerprint, data), **availability}
 
     @router.post("/{plugin_id}/import/commit")
     async def commit(plugin_id: str, request: Request):

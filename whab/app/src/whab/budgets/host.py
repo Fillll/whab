@@ -5,6 +5,7 @@ import base64
 import binascii
 import copy
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 from typing import Literal
@@ -218,7 +219,89 @@ class BudgetHost:
         await self._start(session)
         return session
 
-    async def _start(self, session):
+    async def import_new(self, source_id, plugin_id, fingerprint, data, operation):
+        """Create an isolated import target; a durable operation identity makes retries safe."""
+        try:
+            if str(UUID(operation)) != operation:
+                raise ValueError
+        except (ValueError, TypeError, AttributeError):
+            raise StoreError("Choose a valid import operation ID.") from None
+        async with self._open_lock:
+            target = self.settings.home / "budgets" / operation / self.settings.plaid_env
+            receipt_path = target / "import-operation.json"
+            identity = {"source": source_id, "plugin": plugin_id, "fingerprint": fingerprint}
+            resumed = receipt_path.exists()
+            if resumed:
+                try:
+                    with receipt_path.open("rb") as source:
+                        saved = json.loads(source.read(4097))
+                except (OSError, ValueError):
+                    raise StoreError("The import operation record could not be read. Preserve this budget before trying another import.") from None
+                if saved != identity:
+                    raise HTTPException(409, "This import operation belongs to another export. Preview the intended export again.")
+            elif target.exists() or operation in self.applications or operation in self.recent:
+                raise HTTPException(409, "This import operation is already in use. Preview this export again.")
+
+            def load_session():
+                saved_path = target / "budget.whab"
+                if resumed and saved_path.exists():
+                    session = BudgetSession.open(self.settings.home, self.settings.plaid_env, saved_path)
+                    if session.id != operation or session.manifest["storage"] != "sqlite":
+                        raise StoreError("The import target no longer matches this operation.")
+                    return session
+                manifest_path = target / "manifest.json"
+                if resumed and manifest_path.exists():
+                    try:
+                        with manifest_path.open("rb") as source:
+                            manifest = json.loads(source.read(2 * 1024 * 1024 + 1))
+                    except (OSError, ValueError):
+                        raise StoreError("The import target's saved manifest could not be read.") from None
+                    if type(manifest) is not dict or manifest.get("id") != operation or manifest.get("storage") != "sqlite":
+                        raise StoreError("The import target no longer matches this operation.")
+                else:
+                    manifest = new_manifest("Imported budget", (*self.settings.plugins, plugin_id), "sqlite")
+                    manifest["id"] = operation
+                return BudgetSession(self.settings.home, self.settings.plaid_env, manifest)
+
+            result = None
+
+            async def populate(app):
+                nonlocal result
+                importer = getattr(app.state.tracked_store, "import_workspace", None)
+                if not callable(importer):
+                    raise StoreError("The new budget's storage plugin does not support file imports.")
+                result = await run_in_threadpool(importer, "personal", plugin_id, fingerprint, data)
+                if app.state.budget_session.status != "saved":
+                    raise StoreError("The imported budget could not be saved. Check this device's runtime directory and retry.")
+
+            if operation in self.applications:
+                await populate(self.applications[operation][0])
+            else:
+                try:
+                    session = await run_in_threadpool(load_session)
+                    if not resumed:
+                        await run_in_threadpool(atomic_write, receipt_path, json.dumps(identity).encode())
+                    await self._start(session, prepare=populate)
+                except Exception as error:
+                    # No catalog entry is published until parsing, importing and
+                    # checkpointing succeed. Preserve interrupted prior attempts.
+                    if not resumed:
+                        await run_in_threadpool(shutil.rmtree, target, True)
+                        try:
+                            await run_in_threadpool(target.parent.rmdir)
+                        except OSError:
+                            pass
+                    self._exports.pop(operation, None)
+                    if isinstance(error, OSError):
+                        raise StoreError("The imported budget could not be saved. Check this device's runtime directory and retry.") from None
+                    raise
+            return {
+                **result, "id": operation,
+                "url": page_url(budget_key(operation), "accounts", currency=data.currency),
+                "opened": True,
+            }
+
+    async def _start(self, session, prepare=None):
         from whab.app import create_app
 
         settings = replace(self.settings, budget_path=session.path, storage=session.manifest["storage"], plugins=session.selection, copy_paths=())
@@ -226,6 +309,8 @@ class BudgetHost:
         context = app.router.lifespan_context(app)
         await context.__aenter__()
         try:
+            if prepare is not None:
+                await prepare(app)
             await run_in_threadpool(self._remember, session)
         except Exception:
             await context.__aexit__(None, None, None)

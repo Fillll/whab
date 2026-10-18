@@ -65,7 +65,7 @@ def workspace_import(raw: bytes) -> WorkspaceImport:
             "Monthly assignments are preserved. WHAB recalculates activity and availability using its own rules; YNAB credit-card payment envelopes and rollover totals may differ.",
             "YNAB flags and clearing status are retained in transaction notes. Uncleared rows are imported as unreviewed, posted transactions.",
             "Payee labels longer than 200 characters are shortened for display and preserved in full in transaction notes.",
-            "Use an empty personal budget. This import cannot reconcile overlapping bank feeds or merge an existing ledger.",
+            "Each import creates a separate budget. It cannot reconcile overlapping bank feeds or merge an existing ledger.",
         ),
     )
 

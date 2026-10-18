@@ -38,15 +38,16 @@ for (const panel of document.querySelectorAll('[data-file-import]')) {
     error.hidden = false;
   }
 
-  async function request(action, file, fingerprint) {
+  async function request(action, file, fingerprint, operation) {
     let response;
     try {
-      response = await fetch(`${apiPrefix}/plugins/${encodeURIComponent(panel.dataset.fileImport)}/import/${action}`, {
+      response = await fetch(`${apiPrefix}/plugins/${encodeURIComponent(panel.dataset.fileImport)}/import/new/${action}`, {
         method: 'POST',
         body: file,
         headers: {
           'Content-Type': 'application/zip',
           'X-Import-Currency': 'USD',
+          'X-Import-Operation': operation,
           ...(fingerprint ? {'X-Import-Fingerprint': fingerprint} : {}),
         },
       });
@@ -75,21 +76,22 @@ for (const panel of document.querySelectorAll('[data-file-import]')) {
       return;
     }
     const current = revision;
+    const operation = crypto.randomUUID();
     busy = true;
     progress.textContent = 'Checking the export…';
     progress.hidden = false;
     controls();
     try {
-      const result = await request('preview', file);
+      const result = await request('preview', file, null, operation);
       if (current !== revision || archive.files[0] !== file || !usd.checked) return;
       if (!/^[a-f0-9]{64}$/.test(result.fingerprint) ||
           !['accounts', 'categories', 'transactions', 'assignments'].every(key => Number.isSafeInteger(result[key]) && result[key] >= 0) ||
-          typeof result.canImport !== 'boolean' || typeof result.reason !== 'string' ||
+          result.createsNewBudget !== true || typeof result.canImport !== 'boolean' || typeof result.reason !== 'string' ||
           typeof result.budgetStartMonth !== 'string' ||
           !Array.isArray(result.warnings) || !result.warnings.every(warning => typeof warning === 'string')) {
         throw new Error('The import preview could not be read. Please try again.');
       }
-      preview = {...result, file, revision: current};
+      preview = {...result, file, operation, revision: current};
       summary.textContent = `${result.accounts} accounts · ${result.categories} categories · ${result.transactions} transactions · ${result.assignments} monthly assignments`;
       month.textContent = `Budget starts in ${result.budgetStartMonth}. Earlier transactions are kept as history.`;
       warnings.replaceChildren();
@@ -118,15 +120,19 @@ for (const panel of document.querySelectorAll('[data-file-import]')) {
     }
     busy = true;
     error.hidden = true;
-    progress.textContent = 'Importing your budget…';
+    progress.textContent = 'Creating your imported budget…';
     progress.hidden = false;
     controls();
     try {
-      await request('commit', selected.file, selected.fingerprint);
-      location.reload();
+      const result = await request('commit', selected.file, selected.fingerprint, selected.operation);
+      const target = new URL(result.url, location.origin);
+      if (target.origin !== location.origin || typeof result.id !== 'string' ||
+          !/^[a-f0-9-]{36}$/.test(result.id) || !target.pathname.startsWith(`/budgets/${result.id}/`)) {
+        throw new Error('The imported budget could not be opened. Retry to open the same budget.');
+      }
+      location.assign(target.href);
     } catch (failure) {
-      invalidate();
-      showError(failure instanceof Error && failure.message ? failure.message : 'The import request could not be completed. Preview the export again.');
+      showError(failure instanceof Error && failure.message ? failure.message : 'The import request could not be completed. Retry to open the same budget.');
       busy = false;
       progress.hidden = true;
       controls();
