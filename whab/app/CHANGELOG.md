@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.21.0 — 2026-10-18
+
+PR: [#71](https://github.com/Fillll/whab/pull/71)
+
+- Accept an optional validated budget name when previewing and creating isolated file imports. Preserve the original saved name on retries and retain the default for existing integrations. Bundle YNAB import 1.3.0 with its required name field and readable completion redirects.
+
 ## 2.20.0 — 2026-10-18
 
 PR: [#70](https://github.com/Fillll/whab/pull/70)
