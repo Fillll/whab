@@ -1,6 +1,6 @@
 """SQLite-owned private images, committed with their transaction and portable ledger."""
 
-from whab.plugins import StoreError, receipt_media_type
+from whab.plugins import StoreError, receipt_media_type, validate_receipt_selection
 
 
 def transaction_exists(store, workspace, transaction_id):
@@ -30,6 +30,21 @@ def ids(store, workspace):
         return [row[0] for row in store.db.execute(
             "SELECT r.transaction_id FROM transaction_receipts r JOIN transactions t ON t.workspace=r.workspace AND t.id=r.transaction_id WHERE r.workspace=? AND t.deleted=0 ORDER BY r.transaction_id",
             (workspace,),
+        )]
+
+
+def ids_for(store, workspace, transaction_ids):
+    """Read visible markers with the same active-history scope as the full index."""
+    if type(workspace) is not str or workspace not in {"personal", "demo"}:
+        raise StoreError("Invalid workspace.")
+    selected = validate_receipt_selection(transaction_ids)
+    placeholders = ",".join("?" for _ in selected)
+    with store._lock:
+        return [row[0] for row in store.db.execute(
+            "SELECT r.transaction_id FROM transaction_receipts r JOIN transactions t "
+            "ON t.workspace=r.workspace AND t.id=r.transaction_id WHERE r.workspace=? "
+            f"AND r.transaction_id IN ({placeholders}) AND t.deleted=0 ORDER BY r.transaction_id",
+            (workspace, *selected),
         )]
 
 

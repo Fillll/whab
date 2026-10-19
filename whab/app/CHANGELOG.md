@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.17.0 — 2026-10-18
+
+PR: [#65](https://github.com/Fillll/whab/pull/65)
+
+- Add bounded local receipt-marker queries and optional storage selection indexes. Validate exact selected identities and provider responses, retain the full-index fallback for existing providers, and keep receipt images outside public ledger projections. Require SQLite 1.9.0 and Web 1.21.0 in the supported bundle.
+
 ## 2.16.0 — 2026-10-18
 
 PR: [#63](https://github.com/Fillll/whab/pull/63)

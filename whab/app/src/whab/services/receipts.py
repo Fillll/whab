@@ -1,7 +1,7 @@
 """Budget-scoped receipt access over an optional storage capability."""
 
 from whab.domain.errors import StoreError
-from whab.domain.receipts import receipt_media_type
+from whab.domain.receipts import receipt_media_type, validate_receipt_selection
 
 
 class ReceiptService:
@@ -36,6 +36,31 @@ class ReceiptService:
                 return {"supported": False, "transactionIds": []}
             self._check(workspace)
             return {"supported": True, "transactionIds": self.store.receipt_ids(workspace)}
+
+    def index_for(self, workspace, transaction_ids):
+        """Return receipt markers only for the bounded caller-selected identities."""
+        with self.lock:
+            if type(workspace) is not str or workspace not in {"personal", "demo"}:
+                raise StoreError("Invalid workspace.")
+            selected = validate_receipt_selection(transaction_ids)
+            if not self.supported:
+                return {"supported": False, "transactionIds": []}
+            read = getattr(self.store, "receipt_ids_for", None)
+            allowed = set(selected)
+            if callable(read):
+                result = read(workspace, selected)
+                if (
+                    type(result) is not list or len(result) > len(selected)
+                    or any(type(value) is not str or value not in allowed for value in result)
+                    or len(set(result)) != len(result)
+                ):
+                    raise StoreError("Storage returned an invalid receipt selection index.")
+            else:
+                full = self.store.receipt_ids(workspace)
+                if type(full) is not list or any(type(value) is not str for value in full):
+                    raise StoreError("Storage returned an invalid receipt selection index.")
+                result = allowed.intersection(full)
+            return {"supported": True, "transactionIds": sorted(result)}
 
     def get(self, workspace, transaction_id):
         with self.lock:

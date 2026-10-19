@@ -15,7 +15,7 @@ from whab.domain.file_imports import WorkspaceImport
 from whab.domain.formatting import format_date, format_money
 from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
 from whab.domain.money import SUPPORTED_CURRENCIES, currency_code, currency_minor_units
-from whab.domain.receipts import MAX_RECEIPT_BYTES, receipt_media_type
+from whab.domain.receipts import MAX_RECEIPT_BYTES, receipt_media_type, validate_receipt_selection
 from whab.domain.transactions import UNSET, validate_review_batch
 from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
 
@@ -54,6 +54,7 @@ from .sdk import (
     PluginDescription,
     PluginInsightResult,
     PluginSettings,
+    ReceiptSelectionIndex,
     ReceiptStorage,
     ReceiptTransactionLookup,
     StorageBackend,
@@ -91,6 +92,7 @@ __all__ = [
     "ENTRYPOINT_GROUP",
     "UNSET",
     "validate_review_batch",
+    "validate_receipt_selection",
     "LedgerService",
     "RequestConflict",
     "RevisionConflict",
@@ -127,6 +129,7 @@ __all__ = [
     "PluginError",
     "PluginInsightResult",
     "PluginRegistry",
+    "ReceiptSelectionIndex",
     "ReceiptStorage",
     "ReceiptTransactionLookup",
     "PluginSettings",

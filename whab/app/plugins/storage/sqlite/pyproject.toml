@@ -1,12 +1,12 @@
 [project]
 name = "whab_plugin_sqlite"
-version = "1.8.0"
+version = "1.9.0"
 description = "SQLite budget storage plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.16,<3"]
+dependencies = ["whab>=2.17,<3"]
 
 [project.entry-points."whab.plugins"]
 sqlite = "whab_plugin_sqlite.plugin:plugin"

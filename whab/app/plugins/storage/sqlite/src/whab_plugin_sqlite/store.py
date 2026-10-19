@@ -593,6 +593,11 @@ class Store:
 
         return ids(self, workspace)
 
+    def receipt_ids_for(self, workspace: str, transaction_ids: tuple[str, ...]) -> list[str]:
+        from .receipts import ids_for
+
+        return ids_for(self, workspace, transaction_ids)
+
     def get_receipt(self, workspace: str, transaction_id: str) -> bytes | None:
         from .receipts import get
 

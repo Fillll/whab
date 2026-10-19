@@ -17,6 +17,7 @@ from pydantic import (
 
 from whab.domain.accounts import bank_website_entry, normalize_account
 from whab.domain.money import currency_code
+from whab.domain.receipts import validate_receipt_selection
 from whab.domain.transactions import validate_review_batch
 
 Workspace = Literal["demo", "personal"]
@@ -55,6 +56,16 @@ class BulkReviewBody(Body):
         if "\x00" in self.requestId:
             raise ValueError("Invalid request ID")
         validate_review_batch(self.transactionIds, self.reviewed)
+        return self
+
+
+class ReceiptSelectionBody(Body):
+    workspace: Workspace
+    transactionIds: Annotated[list[Id], Field(min_length=1, max_length=100)]
+
+    @model_validator(mode="after")
+    def receipt_selection(self):
+        validate_receipt_selection(self.transactionIds)
         return self
 
 

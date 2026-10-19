@@ -1,4 +1,4 @@
-"""Bounded raster receipt validation shared by transports and storage adapters."""
+"""Bounded receipt selections and raster validation shared with storage adapters."""
 
 import struct
 import zlib
@@ -8,6 +8,22 @@ from .errors import StoreError
 MAX_RECEIPT_BYTES = 5 * 1024 * 1024
 MAX_RECEIPT_PIXELS = 25_000_000
 RECEIPT_TYPES = frozenset({"image/png", "image/jpeg", "image/webp"})
+
+
+def validate_receipt_selection(transaction_ids) -> tuple[str, ...]:
+    """Validate a bounded selection of exact identities without normalizing them."""
+    if type(transaction_ids) not in (list, tuple) or not 1 <= len(transaction_ids) <= 100:
+        raise StoreError("Receipt selection must contain between 1 and 100 transaction IDs.")
+    for value in transaction_ids:
+        if type(value) is not str or not 1 <= len(value) <= 200 or "\x00" in value:
+            raise StoreError("Invalid transaction ID.")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise StoreError("Invalid transaction ID.") from None
+    if len(set(transaction_ids)) != len(transaction_ids):
+        raise StoreError("Receipt selection transaction IDs must be distinct.")
+    return tuple(transaction_ids)
 
 
 def _dimensions(width, height):

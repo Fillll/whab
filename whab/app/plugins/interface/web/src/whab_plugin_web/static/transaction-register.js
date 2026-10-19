@@ -499,7 +499,9 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     receiptPromise = saveReceipt('PUT', file).finally(() => { receiptPromise = null; });
   });
   listen(removeReceipt, 'click', () => { receiptPromise = saveReceipt('DELETE').finally(() => { receiptPromise = null; }); });
-  api(`/receipts?workspace=${workspace}`).then(result => {
+  if (rows.length) (getContext().receiptIndexScoped === true ?
+    api('/receipts/index', {workspace, transactionIds: rows.map(row => row.dataset.transactionId)}, 'POST') :
+    api(`/receipts?workspace=${workspace}`)).then(result => {
     if (disposed) return;
     for (const id of result.transactionIds || []) receiptIds.add(id);
     for (const row of rows) {
