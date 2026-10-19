@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.21.1 — 2026-10-18
+
+PR: [#72](https://github.com/Fillll/whab/pull/72)
+
+- Isolate device-local categorization files by budget identity and reject mismatched budget contexts. Verify newly imported and blank budgets cannot use another budget's models, training sessions or history. Preserve existing default-workspace model files.
+- Bundle YNAB import 1.3.1, which selects the imported budget for the browser before opening it so later visits do not return to an older budget and its models.
+
 ## 2.21.0 — 2026-10-18
 
 PR: [#71](https://github.com/Fillll/whab/pull/71)

@@ -159,6 +159,13 @@ function bindPanel(panel) {
           target.search || target.hash) {
         throw new Error('The imported budget could not be opened. Retry to open the same budget.');
       }
+      const activation = await fetch(`${apiPrefix}/budgets/${encodeURIComponent(result.id)}/activate`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}',
+      });
+      const selectedBudget = await activation.json().catch(() => ({}));
+      if (!activation.ok || selectedBudget.id !== result.id || selectedBudget.opened !== true) {
+        throw new Error('The imported budget was saved but could not be selected. Retry to open the same budget.');
+      }
       location.assign(target.href);
     } catch (failure) {
       showError(failure instanceof Error && failure.message ? failure.message : 'The import request could not be completed. Retry to open the same budget.');

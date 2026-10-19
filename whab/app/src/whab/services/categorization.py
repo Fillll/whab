@@ -14,11 +14,14 @@ from whab.budgets.document import atomic_write
 from whab.domain.categorization import candidates, fingerprint
 from whab.domain.errors import StoreError
 from whab.plugins import BudgetContext
+from whab.plugins.sdk import valid_plugin_name
 
 
 def local_context(home, budget_id, plugin_id):
-    """Device-local fallback for the original workspace; no runtime files enter Git."""
-    root = home / "plugin-data" / plugin_id
+    """Keep legacy default files in place; isolate every other budget by identity."""
+    if not valid_plugin_name(budget_id) or not valid_plugin_name(plugin_id):
+        raise StoreError("Invalid budget or plugin data namespace.")
+    root = (home if budget_id == "default" else home / "budgets" / budget_id) / "plugin-data" / plugin_id
 
     def path(name):
         parts = name.split("/")
@@ -41,6 +44,8 @@ class CategorizationService:
     def __init__(self, ledger, plugins, context_factory, saved_ids=()):
         self.ledger = ledger
         self.contexts = {key: context_factory(key) for key in set(saved_ids) | {p.id for p in plugins if p.categorization}}
+        if any(context.budget_id != ledger.budget_id for context in self.contexts.values()):
+            raise StoreError("Categorization data belongs to another budget.")
         active = [p for p in plugins if p.categorization]
         if len(active) > 1:
             raise StoreError("Enable only one categorization plugin per budget.")

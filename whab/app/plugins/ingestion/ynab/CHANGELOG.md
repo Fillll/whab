@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.3.1 — 2026-10-18
+
+PR: [#72](https://github.com/Fillll/whab/pull/72)
+
+- Select the new budget for the browser before redirecting after import. Keep selection failures retryable with the same saved budget, and prevent reopening the previous budget's models through a stale selection.
+
 ## 1.3.0 — 2026-10-18
 
 PR: [#71](https://github.com/Fillll/whab/pull/71)
