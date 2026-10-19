@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.19.1 — 2026-10-18
+
+PR: [#69](https://github.com/Fillll/whab/pull/69)
+
+- Publish completed categorization models outside the generator exception handler so save failures cannot include private model contents in chained tracebacks. Bundle Random forest categorization 1.0.1 and Web 1.23.1 with compact models and recoverable training errors.
+
 ## 2.19.0 — 2026-10-18
 
 PR: [#68](https://github.com/Fillll/whab/pull/68)

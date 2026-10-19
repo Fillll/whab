@@ -78,20 +78,22 @@ export async function initCategorizationSettings(dialog, content) {
         const parameters = {};
         for (const [key, , type] of fields) if (key !== 'name') parameters[key] = type === 'number' ? Number(form.elements[key].value) : form.elements[key].value;
         parameters.balanced = check.checked;
-        let result = await call('train', {parameters, name: form.elements.name.value});
-        session = result.session;
-        progress.hidden = false; stop.hidden = false; stop.disabled = false;
-        for (const input of form.querySelectorAll('input')) input.disabled = true;
-        while (session && !stopped && dialog.open) {
-          status.textContent = result.stage; progress.value = result.progress;
-          // Yield a paint before advancing the next bounded block of trees.
-          await new Promise(resolve => requestAnimationFrame(resolve));
-          if (stopped || !dialog.open) break;
-          result = await call('step', {session});
-          if (result.complete) { session = null; progress.value = 100; status.textContent = result.stage; }
-        }
-        await cancel();
-        if (dialog.open) await render();
+        try {
+          let result = await call('train', {parameters, name: form.elements.name.value});
+          session = result.session;
+          progress.hidden = false; stop.hidden = false; stop.disabled = false;
+          for (const input of form.querySelectorAll('input')) input.disabled = true;
+          while (session && !stopped && dialog.open) {
+            status.textContent = result.stage; progress.value = result.progress;
+            // Yield a paint before advancing the next bounded block of trees.
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            if (stopped || !dialog.open) break;
+            result = await call('step', {session});
+            if (result.complete) { session = null; progress.value = 100; status.textContent = result.stage; }
+          }
+          await cancel();
+          if (dialog.open) await render();
+        } finally { progress.hidden = true; stop.hidden = true; }
       });
     });
     content.append(form, progress, stop, text('h3', 'Saved models'));

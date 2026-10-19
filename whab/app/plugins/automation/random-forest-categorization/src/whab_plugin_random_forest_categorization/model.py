@@ -82,7 +82,12 @@ def score(model, rows):
             while tree["left"][node] != -1:
                 node = tree["left"][node] if row[tree["feature"][node]] <= tree["threshold"][node] else tree["right"][node]
             leaf = tree["value"][node]
-            votes += np.asarray(leaf) / sum(leaf)
+            if model["format"] == 1:
+                votes += np.asarray(leaf) / sum(leaf)
+            else:
+                total = sum(weight for _, weight in leaf)
+                for index, weight in leaf:
+                    votes[index] += weight / total
         probabilities.append(votes / len(model["forest"]))
     return np.asarray(probabilities)
 
@@ -114,7 +119,7 @@ def decode(raw):
         if not raw or len(raw) > LIMIT:
             raise ValueError()
         model = json.loads(raw)
-        if model["format"] != 1 or len(model["features"]) > 20000 or not 2 <= len(model["classes"]) <= 1000:
+        if model["format"] not in (1, 2) or len(model["features"]) > 20000 or not 2 <= len(model["classes"]) <= 1000:
             raise ValueError()
         parameters(model["parameters"])
         if not all(type(value) is str and len(value) <= 1000 for value in model["features"] + model["vocabulary"] + model["classes"]):
@@ -130,12 +135,31 @@ def decode(raw):
                 if type(left) is not int or type(right) is not int or type(feature) is not int:
                     raise ValueError()
                 if left == -1:
-                    if right != -1 or len(tree["value"][i]) != len(model["classes"]):
+                    if right != -1:
                         raise ValueError()
-                    if any(type(x) not in (float, int) or not math.isfinite(x) or x < 0 for x in tree["value"][i]) or sum(tree["value"][i]) <= 0:
+                    leaf = tree["value"][i]
+                    if model["format"] == 1:
+                        if len(leaf) != len(model["classes"]) or any(type(x) not in (float, int) or not math.isfinite(x) or x < 0 for x in leaf) or sum(leaf) <= 0:
+                            raise ValueError()
+                    elif not valid_sparse_leaf(leaf, len(model["classes"])):
                         raise ValueError()
                 elif not i < left < size or not i < right < size or not 0 <= feature < len(model["features"]) or type(tree["threshold"][i]) not in (float, int) or not math.isfinite(tree["threshold"][i]):
                     raise ValueError()
         return model
     except (ValueError, KeyError, TypeError, OverflowError):
         raise ValueError("Saved model is incompatible or damaged. Train a new model.") from None
+
+
+def valid_sparse_leaf(leaf, classes):
+    """Only nonzero class weights at prediction leaves belong in the compact format."""
+    if type(leaf) is not list or not leaf:
+        return False
+    seen = set()
+    for pair in leaf:
+        if type(pair) is not list or len(pair) != 2:
+            return False
+        index, weight = pair
+        if type(index) is not int or not 0 <= index < classes or index in seen or type(weight) not in (float, int) or not math.isfinite(weight) or weight <= 0:
+            return False
+        seen.add(index)
+    return True

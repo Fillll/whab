@@ -1,5 +1,11 @@
 # Random forest categorization plugin changelog
 
+## 1.0.1 — 2026-10-18
+
+PR: [#69](https://github.com/Fillll/whab/pull/69)
+
+- Save only nonzero category weights at leaves to keep larger default-parameter forests within the 16 MiB limit without changing predictions; continue reading existing dense models. Report oversized models as actionable settings errors and leave the saved model list unchanged.
+
 ## 1.0.0 — 2026-10-18
 
 PR: [#68](https://github.com/Fillll/whab/pull/68)

@@ -13,7 +13,7 @@ from sklearn.feature_extraction import DictVectorizer
 from whab_plugin_random_forest_categorization import model
 from whab_plugin_random_forest_categorization.plugin import Engine, plugin
 
-from whab.plugins import Categorization
+from whab.plugins import Categorization, StoreError
 
 
 @pytest.fixture
@@ -104,6 +104,14 @@ def test_data_only_predictions_match_sklearn_and_saved_models(engine, trained, r
     assert len(predictions) == len(rows)
     restored = engine.load(record["id"])
     np.testing.assert_array_equal(model.score(restored, test), expected)
+    # Previously saved dense models remain readable and produce the same scores.
+    legacy = deepcopy(trained)
+    legacy['format'] = 1
+    for tree in legacy['forest']:
+        tree['value'] = [[dict(leaf).get(index, 0.0) for index in range(len(legacy['classes']))]
+                         for leaf in tree['value']]
+    restored_legacy = model.decode(model.encode(legacy))
+    np.testing.assert_array_equal(model.score(restored_legacy, test), expected)
     assert engine.predict([]) == []
     assert trained["test"]["accuracy"] == 1
     assert trained["validation"]["count"] == 12
@@ -134,6 +142,30 @@ def test_metrics_abstention_and_lifecycle_limits(engine, trained, rows, monkeypa
     monkeypatch.setattr(model, "LIMIT", 2)
     with pytest.raises(ValueError, match="too large"):
         model.encode(trained)
+    monkeypatch.setattr(engine, "index", lambda: {"models": []})
+    with pytest.raises(StoreError, match="too large"):
+        engine.save(trained, "Too large")
+
+
+def test_default_forest_saves_large_multicategory_history_with_sklearn_parity(engine):
+    # A realistic history size exceeded 16 MiB with dense scores at every node.
+    rows = [{'id': str(i), 'date': str(date(2020, 1, 1) + timedelta(days=i // 6)),
+             'merchant': f'Merchant {i % 127} branch {i % 31}', 'amount': ((i * 7919) % 200000) - 100000,
+             'accountId': f'account-{i % 5}', 'accountType': 'depository', 'accountSubtype': 'checking',
+             'currency': 'USD', 'reviewed': True, 'categoryId': f'category-{i % 60}'} for i in range(11022)]
+    trained = finish(engine.train(rows, {}))
+    dense_weights_lower_bound = sum(len(tree['left']) for tree in trained['forest']) * len(trained['classes']) * 4
+    assert dense_weights_lower_bound > model.LIMIT
+    assert len(model.encode(trained)) < model.LIMIT
+    record = engine.save(trained, 'Large history')
+    restored = engine.load(record['id'])
+    train, _, test = model.split(rows)
+    vectorizer = DictVectorizer()
+    matrix = vectorizer.fit_transform([model.features(row, set(trained['vocabulary'])) for row in train])
+    forest = RandomForestClassifier(n_estimators=300, max_depth=20, min_samples_leaf=2, random_state=42, n_jobs=1)
+    forest.fit(matrix, [row['categoryId'] for row in train])
+    expected = forest.predict_proba(vectorizer.transform([model.features(row, set(trained['vocabulary'])) for row in test[:50]]))
+    np.testing.assert_allclose(model.score(restored, test[:50]), expected, rtol=1e-14, atol=1e-15)
 
 
 @pytest.mark.parametrize("change", [
@@ -163,10 +195,19 @@ def test_reject_bad_container(raw):
         model.decode(raw)
 
 
-def test_leaf_validation(trained, monkeypatch):
+@pytest.mark.parametrize('format', [1, 2])
+def test_leaf_validation(trained, monkeypatch, format):
+    if format == 1:
+        trained['format'] = 1
+        for tree in trained['forest']:
+            tree['value'] = [[dict(leaf).get(index, 0.0) for index in range(len(trained['classes']))]
+                             for leaf in tree['value']]
     original = deepcopy(trained)
     leaf = trained["forest"][0]["left"].index(-1)
-    for value in ([], [-1, 2], [0, 0], [True, 1], [float("inf"), 1], ["x", 1]):
+    invalid = ([], [-1, 2], [0, 0], [True, 1], [float("inf"), 1], ["x", 1]) if format == 1 else (
+        None, [], [None], [[0]], [[True, 1]], [[-1, 1]], [[2, 1]], [[0, 1], [0, 2]],
+        [[0, True]], [[0, float('inf')]], [[0, 0]], [[0, -1]], [[0, 'x']])
+    for value in invalid:
         changed = deepcopy(original)
         changed["forest"][0]["value"][leaf] = value
         with pytest.raises(ValueError):

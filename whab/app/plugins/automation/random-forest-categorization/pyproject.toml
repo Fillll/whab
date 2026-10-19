@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_random_forest_categorization"
-version = "1.0.0"
+version = "1.0.1"
 description = "Local random forest category suggestions for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"

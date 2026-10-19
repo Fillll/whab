@@ -189,10 +189,12 @@ class CategorizationService:
             try:
                 return {"session": token, **next(run["iterator"])}
             except StopIteration as completed:
-                # No computation continues between requests. A final request publishes the model.
-                self.runs.pop(token)
-                model = engine.save(completed.value, run["name"])
-                return {"complete": True, "model": model, "progress": 100, "stage": "Training complete"}
+                trained = completed.value
             except Exception:
                 self.runs.pop(token)["iterator"].close()
                 raise
+            # Publish outside the StopIteration handler: save failures must not chain
+            # the generator's returned model (including private vocabulary) into logs.
+            self.runs.pop(token)
+            model = engine.save(trained, run["name"])
+            return {"complete": True, "model": model, "progress": 100, "stage": "Training complete"}
