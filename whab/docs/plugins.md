@@ -257,6 +257,8 @@ The host closes owned backends after bank cleanup on shutdown/startup failure; t
 
 ## User interfaces
 
+Canonical local page GETs accept `X-WHAB-Page-Fragment: 1` for a selected UI to render only its main-view fragment. Responses acknowledge the marker, remain uncached and vary on the fragment selectors; existing budget/register fragments remain available. The Web interface validates scope, route, query intent and the loaded asset manifest before replacing content. It retains the shell and shared dialogs within one budget/currency, and remounts view controllers after a successful replacement. Optional browser integrations can bind new controls idempotently on `whab:page-ready` and cancel the cancelable `whab:before-navigate` document event while an operation must retain its current view. These DOM events carry no banking data and add no ledger or remote API operation. Cross-budget/currency navigation uses a new document.
+
 The bundled visual descriptor is `web = "whab_plugin_web.plugin:plugin"`. It owns view models, icons, Jinja templates, styles and browser controls. Host code retains HTTP transport, validation, access middleware and business-service dispatch.
 
 ```python

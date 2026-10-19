@@ -1,7 +1,10 @@
 /* Archive bytes stay in this page; the host parses and validates every import. */
 const budgetUrl = location.pathname.split('/').slice(0, 3).join('/');
 const apiPrefix = `${budgetUrl}/api`;
-for (const panel of document.querySelectorAll('[data-file-import]')) {
+const bound = new WeakSet();
+let activeImports = 0;
+
+function bindPanel(panel) {
   const form = panel.querySelector('[data-import-form]');
   const archive = panel.querySelector('[data-import-file]');
   const usd = panel.querySelector('[data-import-usd]');
@@ -17,6 +20,12 @@ for (const panel of document.querySelectorAll('[data-file-import]')) {
   let revision = 0;
   let busy = false;
   let preview = null;
+
+  function setBusy(value) {
+    if (busy === value) return;
+    busy = value;
+    activeImports += value ? 1 : -1;
+  }
 
   function controls() {
     archive.disabled = busy;
@@ -77,7 +86,7 @@ for (const panel of document.querySelectorAll('[data-file-import]')) {
     }
     const current = revision;
     const operation = crypto.randomUUID();
-    busy = true;
+    setBusy(true);
     progress.textContent = 'Checking the export…';
     progress.hidden = false;
     controls();
@@ -105,7 +114,7 @@ for (const panel of document.querySelectorAll('[data-file-import]')) {
     } catch (failure) {
       if (current === revision) showError(failure instanceof Error && failure.message ? failure.message : 'The import request could not be completed.');
     } finally {
-      busy = false;
+      setBusy(false);
       progress.hidden = true;
       controls();
     }
@@ -118,7 +127,7 @@ for (const panel of document.querySelectorAll('[data-file-import]')) {
       invalidate();
       return;
     }
-    busy = true;
+    setBusy(true);
     error.hidden = true;
     progress.textContent = 'Creating your imported budget…';
     progress.hidden = false;
@@ -133,10 +142,23 @@ for (const panel of document.querySelectorAll('[data-file-import]')) {
       location.assign(target.href);
     } catch (failure) {
       showError(failure instanceof Error && failure.message ? failure.message : 'The import request could not be completed. Retry to open the same budget.');
-      busy = false;
+      setBusy(false);
       progress.hidden = true;
       controls();
     }
   });
   controls();
 }
+
+function bind() {
+  for (const panel of document.querySelectorAll('[data-file-import]')) {
+    if (bound.has(panel)) continue;
+    bound.add(panel);
+    bindPanel(panel);
+  }
+}
+bind();
+document.addEventListener('whab:page-ready', bind);
+document.addEventListener('whab:before-navigate', event => {
+  if (activeImports) event.preventDefault();
+});

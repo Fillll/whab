@@ -1,4 +1,6 @@
-{% if page=='budget' and request.headers.get('X-WHAB-Budget-Fragment')=='1' %}
+{% if request.headers.get('X-WHAB-Page-Fragment')=='1' %}
+{% include "page-fragment.html" %}
+{% elif page=='budget' and request.headers.get('X-WHAB-Budget-Fragment')=='1' %}
 {% include "budget.html" %}
 {% elif page=='transactions' and request.headers.get('X-WHAB-Transactions-Fragment')=='summary' %}
 {% include "transactions-summary.html" %}
@@ -47,7 +49,7 @@
   </div>
 </div>
 </aside>
-<main>
+<main data-page-assets="{{ dict(web=web_asset_version, plugins=plugin_scripts)|tojson|forceescape }}">
   <header class="topbar">
     <div class="breadcrumb">
       {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }} {{ icon('chevron-right', 14) }}<span>{{ page|capitalize }}</span>

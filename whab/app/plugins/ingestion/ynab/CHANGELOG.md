@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.2.1 — 2026-10-18
+
+PR: [#66](https://github.com/Fillll/whab/pull/66)
+
+- Bind import panels idempotently after partial view navigation and prevent navigation while preview or commit is active. Preserve selected files, import operation identity and cross-budget completion redirects.
+
 ## 1.2.0 — 2026-10-18
 
 PR: [#50](https://github.com/Fillll/whab/pull/50)

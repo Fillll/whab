@@ -3,7 +3,8 @@
 const context = JSON.parse(document.getElementById('whab-context').textContent);
 const toast = document.getElementById('toast');
 
-export function updateContext(next) {
+export function updateContext(next, replace = false) {
+  if (replace) for (const key of Object.keys(context)) delete context[key];
   Object.assign(context, next);
   document.getElementById('whab-context').textContent = JSON.stringify(context);
 }

@@ -24,14 +24,22 @@ async function flushEdits() {
 async function requireSavedEdits() {
   if (!(await flushEdits())) throw new Error('Save the transaction or budget edit before continuing.');
 }
+function navigationReady() {
+  return !document.querySelector('dialog[open]') &&
+    document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true}));
+}
 initBudgetSourceLinks();
 const accountNavigation = initAccountNavigation({
-  flush: flushEdits,
-  beforeReplace: () => budgetEdits.dispose(),
-  onReplace() {
+  flush: () => navigationReady() ? flushEdits() : false,
+  beforeReplace: () => navigationReady() &&
+    !currentRegister?.dirty && budgetEdits.dispose(),
+  onReplace({content}) {
     currentRegister?.dispose();
+    budgetEdits = initBudgetEdits({readForm: formBody, onDraft: () => accountNavigation.cancelPending()});
     currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination(), cancelNavigation: () => accountNavigation.cancelPending()});
+    initPageControls(content);
     bindLogos();
+    document.dispatchEvent(new CustomEvent('whab:page-ready'));
   },
   notify,
 });
@@ -64,7 +72,7 @@ function formBody(form, {authoritative = false} = {}) {
   return body;
 }
 
-const budgetEdits = initBudgetEdits({readForm: formBody, onDraft: () => accountNavigation.cancelPending()});
+let budgetEdits = initBudgetEdits({readForm: formBody, onDraft: () => accountNavigation.cancelPending()});
 for (const form of document.querySelectorAll('form[data-api]')) {
   if (form.hasAttribute('data-inline-assignment') || form.hasAttribute('data-budget-mutation') || form.hasAttribute('data-account-classification')) continue;
   const radioChoices = [...form.querySelectorAll('input[type="radio"]')];
@@ -147,6 +155,7 @@ initAccountSettings({
 document.addEventListener('click', event => {
   const button = event.target.closest('[data-dialog]');
   if (button && !button.disabled) {
+    accountNavigation.cancelPending();
     const dialog = document.getElementById(button.dataset.dialog);
     for (const select of dialog?.querySelectorAll('select[data-currency-choices-lazy]') || []) hydrateCurrencyChoices(select);
     dialog?.showModal();
@@ -536,30 +545,42 @@ for (const button of document.querySelectorAll('[data-plugin-options]')) button.
   }
 });
 
-for (const input of document.querySelectorAll('[data-navigation]')) {
-  if (input.closest('[data-transaction-register]')) continue;
-  const initialValue = input.value;
-  input.addEventListener('change', async () => {
-    if (!input.checkValidity()) {
-      input.reportValidity();
-      return;
-    }
-    const url = pageUrl({[input.dataset.navigation]: input.value});
-    if (currentRegister && !(await currentRegister.flush())) {
-      input.value = initialValue;
-      notify('Save the transaction edit before continuing.');
-      return;
-    }
-    if (!budgetEdits.navigate(url.href, () => { input.value = initialValue; })) location.assign(url);
-  });
+const pageControls = new WeakSet();
+function initPageControls(root = document) {
+  for (const input of root.querySelectorAll('[data-navigation]')) {
+    if (input.closest('[data-transaction-register]')) continue;
+    if (pageControls.has(input)) continue;
+    pageControls.add(input);
+    const initialValue = input.value;
+    let revision = 0;
+    input.addEventListener('change', async () => {
+      const current = ++revision;
+      if (!input.checkValidity()) {
+        input.reportValidity();
+        return;
+      }
+      const url = pageUrl({[input.dataset.navigation]: input.value});
+      const selectedValue = input.value;
+      const canceled = () => { if (input.isConnected && input.value === selectedValue) input.value = initialValue; };
+      if (await accountNavigation.navigate(url, {onCancel: canceled})) return;
+      if (!(await flushEdits())) {
+        input.value = initialValue;
+        notify('Save the transaction edit before continuing.');
+        return;
+      }
+      if (current !== revision) return;
+      location.assign(url);
+    });
+  }
+  for (const time of root.querySelectorAll('[data-local-time]')) time.textContent = new Date(time.dateTime).toISOString().slice(0, 10);
 }
+initPageControls();
 document.addEventListener('click', event => {
   const button = event.target.closest('[data-budget-group]');
   if (!button) return;
   button.setAttribute('aria-expanded', String(button.getAttribute('aria-expanded') !== 'true'));
   syncBudgetGroups(document);
 });
-for (const time of document.querySelectorAll('[data-local-time]')) time.textContent = new Date(time.dateTime).toISOString().slice(0, 10);
 
 currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination(), cancelNavigation: () => accountNavigation.cancelPending()});
 document.addEventListener('click', async event => {

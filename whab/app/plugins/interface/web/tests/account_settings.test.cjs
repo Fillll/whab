@@ -132,7 +132,7 @@ test('hydrated manual currency choices submit the selected JPY, KWD and CLF mino
   currency.disabled = false;
   const app = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/app.js'), 'utf8');
   const parser = {};
-  vm.runInNewContext(app.slice(app.indexOf('function minorAmount('), app.indexOf('\nconst budgetEdits =')), parser);
+  vm.runInNewContext(app.slice(app.indexOf('function minorAmount('), app.indexOf('\nlet budgetEdits =')), parser);
   const balance = {name: 'balance', value: '', disabled: false, dataset: {minorUnits: '2'},
     hasAttribute: name => name === 'data-cents'};
   currency.hasAttribute = () => false;
@@ -155,6 +155,7 @@ test('the dialog opener hydrates currency choices before showModal without reset
   const button = {dataset: {dialog: 'account-dialog'}};
   vm.runInNewContext(snippet, {
     document: {addEventListener: (_, callback) => {click = callback;}, getElementById: () => dialog},
+    accountNavigation: {cancelPending() {}},
     hydrateCurrencyChoices: select => {assert.equal(select, currency); order.push('hydrate');},
   });
   click({target: {closest: () => button}});

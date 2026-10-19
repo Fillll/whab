@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.1.4 — 2026-10-18
+
+PR: [#66](https://github.com/Fillll/whab/pull/66)
+
+- Bind controls idempotently when an Accounts view is inserted without reloading the document. Block partial navigation while Link, synchronization or disconnection is active, including asynchronous success persistence, while preserving budget scope and OAuth behavior.
+
 ## 1.1.3 — 2026-10-18
 
 PR: [#59](https://github.com/Fillll/whab/pull/59)

@@ -48,8 +48,8 @@ jobs:
         run: python scripts/check_plugin_coverage.py
       - name: Lint Python
         run: python -m ruff check src scripts tests plugins conftest.py
-      - name: Test browser budget save coordination
-        run: node --test plugins/interface/web/tests/*.test.cjs
+      - name: Test browser navigation and plugin controls
+        run: node --test plugins/*/*/tests/*.test.cjs
       - name: Lint launcher Python
         run: python -m ruff check --config pyproject.toml ../launchers/macos/manager ../launchers/macos/tests ../launchers/macos/scripts
       - name: Verify independently versioned application and plugin wheels

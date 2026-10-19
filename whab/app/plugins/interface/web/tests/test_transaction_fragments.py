@@ -163,6 +163,7 @@ def test_summary_returns_only_scoped_server_badge_and_canonical_validation_conte
     for markup in ("transaction-row", "data-transaction-register", "data-account-list", "<script", "<!DOCTYPE"):
         assert markup not in response.text
     context = RegisterMarkup(response.text).context
+    assert context["workspace"] == "personal"
     assert context["selectedAccountIds"] == [first, second]
     assert context["transactionSearch"] == "" and context["transactionRequestedPage"] == "1"
     assert context["reviewFilter"] == "all" and context["currency"] == "USD"
@@ -173,6 +174,26 @@ def test_summary_returns_only_scoped_server_badge_and_canonical_validation_conte
     other_page = client.get("/budgets/demo/accounts/2026-10/usd", headers=SUMMARY)
     assert "<!DOCTYPE html>" in other_page.text
     assert "X-WHAB-Transactions-Fragment" not in other_page.headers
+
+
+@pytest.mark.parametrize("key,workspace", [("home", "personal"), ("demo", "demo")])
+def test_summary_carries_the_same_workspace_and_validation_context_as_the_real_register(client, key, workspace):
+    path = (f"/budgets/{key}/transactions/2026-10/usd?period=custom&start_date=2026-09-02"
+            "&end_date=2026-10-29&review=needs-review&q=MiXeD+%26+quoted&tx_page=02")
+    full = client.get(path, headers=FRAGMENT)
+    summary = client.get(path, headers=SUMMARY)
+    assert full.status_code == summary.status_code == 200
+    register_context = RegisterMarkup(full.text).context
+    summary_context = RegisterMarkup(summary.text).context
+    fields = {
+        "workspace", "budgetUrl", "budgetAliases", "apiPrefix", "budgetId", "page", "monthToken",
+        "currency", "canonicalUrl", "selectedAccountId", "selectedAccountIds", "transactionPeriod",
+        "startDate", "endDate", "reviewFilter", "transactionSearch", "transactionRequestedPage",
+    }
+    assert summary_context == {name: register_context[name] for name in fields}
+    assert summary_context["workspace"] == workspace
+    assert summary_context["transactionSearch"] == "MiXeD & quoted"
+    assert summary_context["transactionRequestedPage"] == "02"
 
 
 @pytest.mark.parametrize("header,status", [

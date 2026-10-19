@@ -28,10 +28,6 @@ function notify(message) {
   if (document.dispatchEvent(event)) window.alert(message);
 }
 
-for (const button of document.querySelectorAll('[data-plaid-close-dialog]')) {
-  button.addEventListener('click', () => button.closest('dialog').close());
-}
-
 let plaidScript;
 async function loadPlaid() {
   if (window.Plaid) return;
@@ -51,6 +47,7 @@ async function loadPlaid() {
 }
 
 let linking = false;
+let activeRequests = 0;
 async function connect(itemId, resumeToken) {
   if (linking) return;
   linking = true;
@@ -98,6 +95,7 @@ async function connect(itemId, resumeToken) {
         receivedRedirectUri
       } : {}),
       onSuccess: async (publicToken, metadata) => {
+        activeRequests += 1;
         try {
           if (!itemId) {
             const existing = await api('/workspace?workspace=personal');
@@ -121,6 +119,7 @@ async function connect(itemId, resumeToken) {
           sessionStorage.setItem('whab-notice', failure.message);
           location.assign(accountsUrl());
         } finally {
+          activeRequests -= 1;
           setTimeout(() => handler.destroy(), 0);
         }
       },
@@ -138,34 +137,53 @@ async function connect(itemId, resumeToken) {
     notify(failure.message);
   }
 }
-for (const button of document.querySelectorAll('[data-plaid-connect]')) button.addEventListener('click', () => connect(button.dataset.plaidConnect || undefined));
-for (const button of document.querySelectorAll('[data-plaid-sync]')) button.addEventListener('click', async () => {
-  button.disabled = true;
-  try {
-    await api('/plaid/sync', {});
-    location.reload();
-  } catch (failure) {
-    notify(failure.message);
-    button.disabled = false;
-  }
-});
 let disconnectId;
-for (const button of document.querySelectorAll('[data-plaid-disconnect]')) button.addEventListener('click', () => {
-  disconnectId = button.dataset.plaidDisconnect;
-  document.querySelector('#plaid-disconnect-dialog h2').textContent = `Disconnect ${button.dataset.institution}?`;
-  document.getElementById('plaid-disconnect-dialog').showModal();
-});
-document.getElementById('plaid-confirm-disconnect')?.addEventListener('click', async event => {
-  event.target.disabled = true;
-  try {
-    await api(`/plaid/items/${encodeURIComponent(disconnectId)}`, {}, 'DELETE');
-    location.reload();
-  } catch (failure) {
-    notify(failure.message);
-    event.target.disabled = false;
+const bound = new WeakSet();
+function bindButtons(selector, callback) {
+  for (const button of document.querySelectorAll(selector)) {
+    if (bound.has(button)) continue;
+    bound.add(button);
+    button.addEventListener('click', event => callback(button, event));
   }
+}
+function bind() {
+  bindButtons('[data-plaid-close-dialog]', button => button.closest('dialog').close());
+  bindButtons('[data-plaid-connect]', button => connect(button.dataset.plaidConnect || undefined));
+  bindButtons('[data-plaid-sync]', async button => {
+    if (button.disabled) return;
+    button.disabled = true;
+    activeRequests += 1;
+    try {
+      await api('/plaid/sync', {});
+      location.reload();
+    } catch (failure) {
+      notify(failure.message);
+      button.disabled = false;
+    } finally {activeRequests -= 1;}
+  });
+  bindButtons('[data-plaid-disconnect]', button => {
+    disconnectId = button.dataset.plaidDisconnect;
+    document.querySelector('#plaid-disconnect-dialog h2').textContent = `Disconnect ${button.dataset.institution}?`;
+    document.getElementById('plaid-disconnect-dialog').showModal();
+  });
+  bindButtons('#plaid-confirm-disconnect', async button => {
+    if (button.disabled) return;
+    button.disabled = true;
+    activeRequests += 1;
+    try {
+      await api(`/plaid/items/${encodeURIComponent(disconnectId)}`, {}, 'DELETE');
+      location.reload();
+    } catch (failure) {
+      notify(failure.message);
+      button.disabled = false;
+    } finally {activeRequests -= 1;}
+  });
+}
+bind();
+document.addEventListener('whab:page-ready', bind);
+document.addEventListener('whab:before-navigate', event => {
+  if (linking || activeRequests) event.preventDefault();
 });
-
 
 if (new URL(location.href).searchParams.has('oauth_state_id')) {
   const token = sessionStorage.getItem('whab-link-token');
