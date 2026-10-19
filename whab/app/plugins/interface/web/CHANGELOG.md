@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.23.1 — 2026-10-18
+
+PR: [#69](https://github.com/Fillll/whab/pull/69)
+
+- Hide the training progress bar and cancel button after a failed request, preserving the error message and restoring parameter editing for a retry.
+
 ## 1.23.0 — 2026-10-18
 
 PR: [#68](https://github.com/Fillll/whab/pull/68)
