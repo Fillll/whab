@@ -411,6 +411,11 @@ def test_new_import_and_blank_budget_cannot_use_source_models_or_training_histor
         })
         assert imported.status_code == 200, imported.text
         imported_id = imported.json()['id']
+        selected = client.post(f'/budgets/home/api/budgets/{imported_id}/activate', json={})
+        assert selected.status_code == 200
+        assert client.get('/api/budget').json()['id'] == imported_id
+        assert 'httponly' in selected.headers['set-cookie'].lower()
+        assert 'secure' in selected.headers['set-cookie'].lower()
         blank = client.post('/api/budget/new', json={'name': 'Blank budget'}).json()['id']
 
         def scoped(key, action, **values):
