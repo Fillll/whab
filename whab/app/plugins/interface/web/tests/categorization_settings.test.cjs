@@ -27,11 +27,12 @@ async function fixture({pause = false, readOnly = false, fail = false, failStep 
   dialog.querySelector = selector => selector.includes('error') ? error : status;
   const api = async (_url, body) => {
     const payload = body.payload; requests.push(payload);
-    if (payload.action === 'status') return {defaults, models: [], eligible: 80};
+    if (payload.action === 'status') return {defaults, models: [], eligible: 80, previewAvailable: true};
     if (fail) throw new Error('Training could not start');
     if (payload.action === 'train') return {session: 'view-session', stage: 'Preparing reviewed transactions', progress: 0};
     if (payload.action === 'step' && failStep) throw new Error('Training step failed');
     if (payload.action === 'step') return {complete: true, stage: 'Training complete', progress: 100};
+    if (payload.action === 'preview') return {suggested: 10, lowScore: 10};
     return {ok: true};
   };
   globalThis.__categorizationTest = {api, apiUrl: value => value, getContext: () => ({workspace: 'personal'})};
@@ -100,4 +101,15 @@ test('a failed training step cancels the session and restores parameter editing'
   assert(form.querySelectorAll('input').every(control => !control.disabled));
   assert.equal(ui.content.children.find(child => child.tag === 'progress').hidden, true);
   assert.equal(ui.content.children.find(child => child.textContent === 'Cancel training').hidden, true);
+});
+
+test('low-score previews require an explicit action and explain the unchanged cutoff', async () => {
+  const ui = await fixture();
+  assert.equal(ui.requests.some(request => request.action === 'preview'), false);
+  ui.content.children.find(child => child.textContent === 'Preview low-score guesses').emit('click');
+  await settle();
+  assert.equal(ui.requests.filter(request => request.action === 'preview').length, 1);
+  assert.match(ui.status.textContent, /10 low-score guesses/);
+  assert.match(ui.status.textContent, /automatic score cutoff is unchanged/);
+  assert.equal(ui.requests.some(request => request.action === 'train'), false);
 });

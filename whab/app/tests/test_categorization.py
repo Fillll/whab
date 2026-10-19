@@ -53,8 +53,8 @@ def action(client, action, **values):
     return result.json()
 
 
-def train(client):
-    result = action(client, 'train', name='Synthetic model', parameters={'trees': 20, 'leaf': 1, 'vocabulary': 50, 'threshold': .5})
+def train(client, threshold=.5):
+    result = action(client, 'train', name='Synthetic model', parameters={'trees': 20, 'leaf': 1, 'vocabulary': 50, 'threshold': threshold})
     session = result['session']
     while not result.get('complete'):
         result = action(client, 'step', session=session)
@@ -335,3 +335,32 @@ def test_model_size_failure_is_actionable_and_does_not_publish_model(client, his
     assert response.json() == {'error': 'Model is too large. Reduce trees, depth, or vocabulary.'}
     assert action(client, 'status')['models'] == []
     assert not client.app.state.ledger_service.categorization.runs
+
+
+def test_explicit_low_score_preview_preserves_cutoff_and_ledger(client, store, history, monkeypatch):
+    import numpy as np
+    from whab_plugin_random_forest_categorization import plugin as module
+
+    model = train(client, threshold=.8)
+    service = client.app.state.ledger_service.categorization
+    engine = service.engines[PLUGIN]
+    original = engine.context.read_file(f"models/{model['id']}.json")
+    before = deepcopy(store.workspace('personal', '2026-10'))
+    monkeypatch.setattr(module, 'score', lambda _model, rows: np.array([[.4, .6]] * len(rows)))
+    assert action(client, 'suggest')['suggested'] == 0
+    assert action(client, 'status')['previewAvailable']
+    assert action(client, 'preview') == {'suggested': 1, 'lowScore': 1}
+    suggestion = service.suggestions('personal')[history[-1]]
+    assert suggestion['belowCutoff'] is True and suggestion['score'] == .6
+    page = client.get('/budgets/home/transactions/2026-10/usd').text
+    assert '60% · Low score' in page and 'class="ml-suggestion"' in page
+    assert '<svg width="13"' in page
+    assert engine.context.read_file(f"models/{model['id']}.json") == original
+    assert store.workspace('personal', '2026-10') == before
+    action(client, 'dismiss', transactionId=history[-1], suggestionId=suggestion['id'])
+    assert action(client, 'preview')['suggested'] == 0
+    assert action(client, 'suggest')['suggested'] == 0
+    monkeypatch.setattr(engine, 'preview', None)
+    assert not action(client, 'status')['previewAvailable']
+    response = client.post('/api/categorization', json={'workspace': 'personal', 'payload': {'action': 'preview', 'pluginId': PLUGIN}})
+    assert response.status_code == 400 and 'does not support' in response.json()['error']

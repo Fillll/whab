@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.20.0 — 2026-10-18
+
+PR: [#70](https://github.com/Fillll/whab/pull/70)
+
+- Add an explicit budget-scoped low-score preview command and optional categorization-engine hook. Keep previews provisional and preserve automatic import cutoffs, existing categories, review state and dismissed suggestions. Bundle Random forest categorization 1.1.0 and Web 1.24.0.
+
 ## 2.19.1 — 2026-10-18
 
 PR: [#69](https://github.com/Fillll/whab/pull/69)

@@ -129,14 +129,24 @@ class Engine:
         return record
 
     def predict(self, rows):
+        return self._predict(rows, False)
+
+    def preview(self, rows):
+        """Explicit manual guesses do not change the saved automatic cutoff."""
+        if not self.index()["active"]:
+            raise StoreError("Choose Use model before previewing low-score guesses.")
+        return self._predict(rows, True)
+
+    def _predict(self, rows, include_low_scores):
         identifier = self.index()["active"]
         if not identifier or not rows:
             return []
         model = self.load(identifier)
         probabilities = score(model, rows)
         return [{"transactionId": row["id"], "categoryId": model["classes"][int(p.argmax())],
-                 "score": float(p.max()), "modelId": identifier}
-                for row, p in zip(rows, probabilities) if p.max() >= model["parameters"]["threshold"]]
+                 "score": float(p.max()), "modelId": identifier,
+                 "belowCutoff": bool(p.max() < model["parameters"]["threshold"])}
+                for row, p in zip(rows, probabilities) if include_low_scores or p.max() >= model["parameters"]["threshold"]]
 
 
 plugin = Plugin(id="random-forest-categorization", display_name="Random forest categorization",

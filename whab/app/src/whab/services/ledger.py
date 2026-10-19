@@ -147,7 +147,7 @@ class LedgerService:
         if type(payload) is not dict or not required <= payload.keys() or payload.keys() - required - optional:
             raise StoreError("Invalid ledger command fields.")
         if operation == "categorization":
-            if type(payload["action"]) is not str or payload["action"] not in {"status", "suggest", "train", "step", "cancel", "select", "delete", "rename", "dismiss"}:
+            if type(payload["action"]) is not str or payload["action"] not in {"status", "suggest", "preview", "train", "step", "cancel", "select", "delete", "rename", "dismiss"}:
                 raise StoreError("Unknown categorization action.")
             for key in ("pluginId", "session", "modelId", "suggestionId"):
                 if key in payload:

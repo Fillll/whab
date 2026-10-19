@@ -793,6 +793,9 @@ class Categorization:
 
     Engines receive only their namespaced file context. Host-owned selectors supply
     reviewed training rows and eligible prediction rows; no backend is supplied.
+    Engines may additionally expose preview(rows) for explicitly requested
+    below-cutoff guesses. Automatic imports continue to use predict(rows).
+    Predictions can include a boolean belowCutoff marker for manual previews.
     """
 
     factory: Callable[[BudgetContext], object]
