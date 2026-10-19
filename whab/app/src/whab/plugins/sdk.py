@@ -239,6 +239,17 @@ class ReceiptStorage(Protocol):
     def delete_receipt(self, workspace: str, transaction_id: str) -> None: ...
 
 
+class ReceiptSelectionIndex(Protocol):
+    """Optional receipt markers for one to 100 distinct selected transaction IDs.
+
+    Return sorted distinct IDs only from the requested active transactions in
+    the workspace. Pending rows remain eligible. Read no image payloads and
+    preserve the full receipt index's workspace and missing-metadata semantics.
+    """
+
+    def receipt_ids_for(self, workspace: str, transaction_ids: tuple[str, ...]) -> list[str]: ...
+
+
 class ReceiptTransactionLookup(Protocol):
     """Optional scoped existence check before private receipt operations.
 

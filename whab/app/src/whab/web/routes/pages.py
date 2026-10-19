@@ -216,6 +216,7 @@ def create_router(
             endDate=transaction_range.end if transaction_range else None,
             reviewFilter=review,
             bulkReview=service.supports_bulk_review,
+            receiptIndexScoped=True,
             canonicalUrl=canonical_url,
             personalBudgetKey=personal_key, monthToken=month_token, page=page,
         )

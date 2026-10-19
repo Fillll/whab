@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.21.0 — 2026-10-18
+
+PR: [#65](https://github.com/Fillll/whab/pull/65)
+
+- Request receipt markers only for the current register page when supported by the host, and skip the index request on empty pages. Preserve older-host requests, disabled controls until confirmation, disposal guards and existing image operations.
+
 ## 1.20.1 — 2026-10-18
 
 PR: [#64](https://github.com/Fillll/whab/pull/64)

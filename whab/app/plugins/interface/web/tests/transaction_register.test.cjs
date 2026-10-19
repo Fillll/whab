@@ -20,7 +20,7 @@ function element(properties = {}) {
       remove(name) {classes.delete(name);}, contains(name) {return classes.has(name);}},
     setAttribute(name, value) {attributes[name] = value;},
     getAttribute(name) {return attributes[name];},
-    removeAttribute(name) {delete attributes[name];},
+    removeAttribute(name) {delete attributes[name]; if (name === 'src') this.src = '';},
     showModal() {this.open = true;},
     close() {this.open = false; this.emit('close');},
     addEventListener(type, callback) {(listeners[type] ||= []).push(callback);},
@@ -36,6 +36,8 @@ function element(properties = {}) {
 
 function harness(count = 5, options = {}) {
   const requests = [];
+  const receiptRequests = [], imageRequests = [], objectUrls = [], revokedUrls = [];
+  const workspace = options.workspace || 'personal';
   const navigations = [];
   const contexts = [], history = [];
   let pickerChoose, pickerDisposed = false, periodChoose, periodDisposed = false;
@@ -45,7 +47,9 @@ function harness(count = 5, options = {}) {
       .map(selector => [selector, element()]));
     controls['[data-select-transaction]'].checked = true;
     controls['[data-transaction-reviewed]'].setAttribute('aria-pressed', 'false');
-    return element({dataset: {transactionId: `transaction-${index}`, merchant: `Payee ${index}`,
+    controls['[data-transaction-receipt]'].disabled = true;
+    controls['[data-transaction-receipt]'].title = 'Receipt';
+    return element({dataset: {transactionId: options.transactionIds?.[index] || `transaction-${index}`, merchant: `Payee ${index}`,
       payee: `payee ${index}`, reviewed: 'false', pending: 'false', transfer: 'false'},
     querySelector: selector => controls[selector], controls});
   });
@@ -55,8 +59,14 @@ function harness(count = 5, options = {}) {
   const feedbackText = element(), feedback = element({hidden: true, querySelector: () => feedbackText});
   const receiptControls = Object.fromEntries(['[data-receipt-preview]', '[data-receipt-error]',
     '[data-receipt-status]', '[data-receipt-file]', '[data-receipt-remove]', '[data-receipt-close]',
-    '[data-receipt-form]', '[data-receipt-payee]', '[data-receipt-empty]'].map(selector => [selector, element()]));
-  const receiptDialog = element({querySelector: selector => receiptControls[selector]});
+    '[data-receipt-form]', '[data-receipt-payee]', '[data-receipt-empty]', '[data-receipt-save]'].map(selector => [selector, element()]));
+  receiptControls['[data-receipt-file]'].files = [];
+  receiptControls['[data-receipt-error]'].hidden = true;
+  receiptControls['[data-receipt-preview]'].hidden = true;
+  receiptControls['[data-receipt-remove]'].hidden = true;
+  const receiptDialog = element({querySelector: selector => receiptControls[selector],
+    querySelectorAll: selector => selector === 'button,input' ? ['[data-receipt-close]', '[data-receipt-remove]',
+      '[data-receipt-save]', '[data-receipt-file]'].map(key => receiptControls[key]) : []});
   const controls = Object.fromEntries(['#transaction-search', '#account-filter', '#review-filter',
     '#transaction-count', '[data-select-all]', '[data-transaction-save-status]', '#all-dates-filter',
     '[data-navigation="month"]', '[data-transaction-retry]'].map(selector => [selector, element()]));
@@ -66,7 +76,7 @@ function harness(count = 5, options = {}) {
   const reviewLabel = element();
   controls['#review-filter'].dataset.reviewState = options.review || 'all';
   controls['#review-filter'].querySelector = () => reviewLabel;
-  const root = element({dataset: {workspace: 'personal', ...(options.paged ? {transactionPaged: 'true', transactionPage: '1', transactionRequestedPage: '1'} : {})},
+  const root = element({dataset: {workspace, ...(options.paged ? {transactionPaged: 'true', transactionPage: '1', transactionRequestedPage: '1'} : {})},
     querySelectorAll: selector => selector === '.transaction-row' ? rowList : selector === '[data-transaction-page]' ? [pageLink] : [],
     querySelector: selector => ({...controls, '[data-transaction-selection-bar]': selectionBar,
       '[data-transaction-feedback]': feedback, '[data-transaction-receipt-dialog]': receiptDialog,
@@ -74,8 +84,13 @@ function harness(count = 5, options = {}) {
   const window = element();
   window.history = {state: {}, replaceState: (...args) => history.push(args)};
   let requestId = 0;
-  const context = {document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, queueMicrotask, URL,
-    crypto: {randomUUID: () => `review-request-${++requestId}`}, getContext: () => ({bulkReview: options.bulkReview === true}),
+  class ReceiptURL extends URL {
+    static createObjectURL(blob) {const url = `blob:fixture-${objectUrls.length + 1}`; objectUrls.push({url, blob}); return url;}
+    static revokeObjectURL(url) {revokedUrls.push(url);}
+  }
+  const context = {document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, queueMicrotask, URL: ReceiptURL,
+    crypto: {randomUUID: () => `review-request-${++requestId}`},
+    getContext: () => ({bulkReview: options.bulkReview === true, receiptIndexScoped: options.receiptIndexScoped}),
     encodeURIComponent, location: {href: 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
     updateContext: value => contexts.push(value),
@@ -88,10 +103,27 @@ function harness(count = 5, options = {}) {
       return {dispose() {periodDisposed = true;}};
     },
     api(path, body, method) {
-      if (path.startsWith('/receipts?')) return Promise.resolve({supported: false, transactionIds: []});
+      if (path === '/receipts/index' || path === `/receipts?workspace=${workspace}`) {
+        if (path === '/receipts/index') {
+          assert.equal(options.receiptIndexScoped, true);
+          assert.equal(method, 'POST');
+          assert.equal(body.workspace, workspace);
+        } else {
+          assert.notEqual(options.receiptIndexScoped, true);
+          assert.equal(body, undefined);
+          assert.equal(method, undefined);
+        }
+        receiptRequests.push({path, body: body === undefined ? undefined : JSON.parse(JSON.stringify(body)), method});
+        return options.receiptIndex?.promise || Promise.resolve({supported: false, transactionIds: []});
+      }
+      assert.equal(path.startsWith('/receipts'), false, 'Unexpected receipt index route.');
       const pending = deferred();
       requests.push({path, body: JSON.parse(JSON.stringify(body)), method, ...pending});
       return pending.promise;
+    },
+    fetch(path, details) {
+      assert.ok(rowList.some(row => path === `/transactions/${encodeURIComponent(row.dataset.transactionId)}/receipt?workspace=${workspace}`));
+      const pending = deferred(); imageRequests.push({path, details, ...pending}); return pending.promise;
     },
   };
   vm.runInNewContext(source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function '), context);
@@ -99,7 +131,8 @@ function harness(count = 5, options = {}) {
     navigations.push({url: JSON.parse(JSON.stringify(url)), details: JSON.parse(JSON.stringify(details))});
     return true;
   }, ...options});
-  return {register, requests, rows: rowList, bulk, window, feedback, feedbackText, controls, navigations,
+  return {register, requests, receiptRequests, imageRequests, receiptControls, objectUrls, revokedUrls,
+    rows: rowList, bulk, window, feedback, feedbackText, controls, navigations,
     chooseAccount: value => pickerChoose(value), isPickerDisposed: () => pickerDisposed,
     choosePeriod: value => periodChoose(value), isPeriodDisposed: () => periodDisposed, reviewLabel, contexts, history, searchForm, pageLink, document: context.document, receiptDialog};
 }

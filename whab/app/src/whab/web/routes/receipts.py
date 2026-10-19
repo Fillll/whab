@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
-from whab.web.schemas import Workspace
+from whab.web.schemas import ReceiptSelectionBody, Workspace
 
 
 def create_router(service):
@@ -13,6 +13,10 @@ def create_router(service):
     @router.get("/api/receipts")
     def index(workspace: Workspace):
         return service.index(workspace)
+
+    @router.post("/api/receipts/index")
+    def index_for(body: ReceiptSelectionBody):
+        return service.index_for(body.workspace, body.transactionIds)
 
     @router.get("/api/transactions/{transaction_id:path}/receipt")
     def get(transaction_id: str, workspace: Workspace):

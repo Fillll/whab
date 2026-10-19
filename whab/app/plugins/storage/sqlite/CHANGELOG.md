@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.9.0 — 2026-10-18
+
+PR: [#65](https://github.com/Fillll/whab/pull/65)
+
+- Return receipt markers for one to 100 selected transactions using existing keys, without loading images or full transaction history. Match the full index's active-row and workspace semantics with no schema or format migration.
+
 ## 1.8.0 — 2026-10-18
 
 PR: [#63](https://github.com/Fillll/whab/pull/63)
