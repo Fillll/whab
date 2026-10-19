@@ -10,9 +10,11 @@ export function createSaveQueue({save, refresh, onCommit = () => {}, onState = (
   const waiters = [];
   let active = null;
   let running = false;
+  let disposed = false;
   const queue = {
-    remember(key, payload) { saved.set(key, payload); },
+    remember(key, payload) { if (!disposed) saved.set(key, payload); },
     enqueue(key, payload) {
+      if (disposed) return Promise.resolve();
       const desired = pending.get(key) ?? (active?.key === key ? active.payload : saved.get(key));
       if (same(desired, payload) && !errors.has(key)) return queue.whenIdle();
       pending.delete(key);
@@ -26,6 +28,14 @@ export function createSaveQueue({save, refresh, onCommit = () => {}, onState = (
     hasPending() { return running || pending.size > 0; },
     hasErrors() { return errors.size > 0; },
     whenIdle() { return queue.hasPending() ? new Promise(resolve => waiters.push(resolve)) : Promise.resolve(); },
+    dispose() {
+      if (queue.hasPending() || queue.hasErrors()) return false;
+      disposed = true;
+      pending.clear();
+      saved.clear();
+      errors.clear();
+      return true;
+    },
   };
   async function drain() {
     if (running) return;
@@ -125,12 +135,27 @@ export function syncBudgetGroups(root) {
   }
 }
 
-export function initBudgetEdits({readForm}) {
-  const planner = document.querySelector('.budget-planner');
-  if (!planner) return {flush: async () => true, navigate: () => false};
+export function initBudgetEdits({readForm, onDraft = () => {}}) {
+  let planner = document.querySelector('.budget-planner');
+  if (!planner) return {flush: async () => true, navigate: () => false, dispose: () => true};
   const states = new Map();
+  const listeners = [];
   let navigation = null;
   let navigating = false;
+  let disposed = false;
+
+  function listen(target, event, callback) {
+    target.addEventListener(event, callback);
+    listeners.push(() => target.removeEventListener(event, callback));
+  }
+  function editStarted() {
+    if (navigation) {
+      const previous = navigation;
+      navigation = null;
+      previous.onCancel();
+    }
+    onDraft();
+  }
 
   const snapshot = form => [...form.querySelectorAll('input, textarea, select')].map(input =>
     [input.name, input.value, input.checked]);
@@ -245,33 +270,35 @@ export function initBudgetEdits({readForm}) {
       if (states.has(form)) continue;
       stateFor(form);
       const amount = form.querySelector('[data-cents]');
-      amount?.addEventListener('input', () => {
-        if (navigation) {
-          navigation.onCancel();
-          navigation = null;
-        }
+      if (amount) listen(amount, 'input', () => {
+        editStarted();
         delete stateFor(form).deferredFrom;
         delete stateFor(form).deferredValue;
         if (!['error', 'queued', 'saving'].includes(stateFor(form).status)) feedback(form, formDirty(form) ? 'unsaved' : '');
       });
-      form.addEventListener('submit', event => { event.preventDefault(); submit(form); });
-      if (form.hasAttribute('data-auto')) form.addEventListener('change', () => submit(form));
+      listen(form, 'submit', event => { event.preventDefault(); editStarted(); submit(form); });
+      if (form.hasAttribute('data-auto')) listen(form, 'change', () => { editStarted(); submit(form); });
       if (!amount) continue;
       const inline = form.hasAttribute('data-inline-assignment');
-      if (inline) amount.addEventListener('focus', () => amount.select());
-      amount.addEventListener('blur', () => {
+      if (inline) listen(amount, 'focus', () => amount.select());
+      listen(amount, 'blur', () => {
         const state = stateFor(form);
         if (state.deferredValue !== undefined && same(authoritative(form), state.deferredFrom)) amount.value = state.deferredValue;
         delete state.deferredFrom;
         delete state.deferredValue;
-        if (inline) submit(form);
+        if (inline) {
+          if (formDirty(form)) editStarted();
+          submit(form);
+        }
       });
-      amount.addEventListener('keydown', event => {
+      listen(amount, 'keydown', event => {
         if (event.key === 'Enter') {
           event.preventDefault();
+          editStarted();
           submit(form);
         } else if (event.key === 'Escape') {
           event.preventDefault();
+          editStarted();
           const state = stateFor(form);
           const saved = state.saved?.assigned;
           const digits = Number(amount.dataset.minorUnits);
@@ -290,6 +317,7 @@ export function initBudgetEdits({readForm}) {
   }
   bindForms();
   async function flush() {
+    if (disposed) return true;
     let valid = true;
     for (const [form, state] of states) {
       if (!form.isConnected) continue;
@@ -301,6 +329,7 @@ export function initBudgetEdits({readForm}) {
       form.isConnected && (state.status === 'error' || formDirty(form)));
   }
   function navigate(url, onCancel = () => {}) {
+    if (disposed) return false;
     navigation = {url, onCancel};
     if (navigating) return true;
     navigating = true;
@@ -315,7 +344,7 @@ export function initBudgetEdits({readForm}) {
     })();
     return true;
   }
-  document.addEventListener('click', event => {
+  listen(document, 'click', event => {
     if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     const link = event.target.closest('a[href]');
     if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
@@ -323,10 +352,22 @@ export function initBudgetEdits({readForm}) {
     event.preventDefault();
     navigate(link.href);
   });
-  window.addEventListener('beforeunload', event => {
+  listen(window, 'beforeunload', event => {
     if (!queue.hasPending() && !queue.hasErrors() && ![...states.keys()].some(form => form.isConnected && formDirty(form))) return;
     event.preventDefault();
     event.returnValue = '';
   });
-  return {flush, navigate};
+  return {
+    flush, navigate,
+    dispose() {
+      if (disposed) return true;
+      if ([...states].some(([form, state]) => state.status === 'error' || formDirty(form)) || !queue.dispose()) return false;
+      disposed = true;
+      navigation = null;
+      for (const remove of listeners.splice(0)) remove();
+      states.clear();
+      planner = null;
+      return true;
+    },
+  };
 }

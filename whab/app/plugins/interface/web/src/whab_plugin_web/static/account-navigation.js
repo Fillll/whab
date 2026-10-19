@@ -43,7 +43,7 @@ export function matchesTransactionFilters(target, context) {
   return context.reviewFilter === undefined || context.reviewFilter === (params.get('review') || 'all');
 }
 
-export function initAccountNavigation({onReplace = () => {}, flush = async () => true, notify = () => {}} = {}) {
+export function initAccountNavigation({onReplace = () => {}, beforeReplace = () => true, flush = async () => true, notify = () => {}} = {}) {
   let displayed = new URL(location.href);
   let request = 0;
   let controller = null;
@@ -194,6 +194,11 @@ export function initAccountNavigation({onReplace = () => {}, flush = async () =>
       const accountList = refresh && document.querySelector('.sidebar-accounts');
       const accountTemplate = refresh && parsed.querySelector('template[data-account-list]');
       if (refresh && accountList && !accountTemplate?.content) throw new Error('Account list unavailable.');
+      if (beforeReplace() === false) {
+        if (action === 'none') window.history.replaceState(window.history.state, '', displayed.href);
+        notify('Save the current edit before continuing.');
+        return true;
+      }
       current.replaceWith(fresh);
       if (accountList) accountList.replaceChildren(accountTemplate.content.cloneNode(true));
       updateContext(context);

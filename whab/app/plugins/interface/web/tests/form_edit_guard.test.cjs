@@ -68,3 +68,20 @@ test('a failed budget edit blocks the transaction flush and later mutation', asy
   assert.equal(state.requests.length, 0);
   assert.equal(state.navigations.length, 0);
 });
+
+test('the app wires budget draft cancellation and guarded editor disposal into partial navigation', () => {
+  const navigation = source.slice(source.indexOf('const accountNavigation = initAccountNavigation'), source.indexOf('function minorAmount'));
+  let options, drafts, releases = 0, cancellations = 0, allowRelease = false;
+  const context = {
+    document: {querySelectorAll: () => []}, formBody() {}, flushEdits() {}, notify() {},
+    initAccountNavigation(value) {options = value; return {cancelPending() {cancellations += 1;}};},
+    initBudgetEdits(value) {drafts = value.onDraft; return {dispose() {releases += 1; return allowRelease;}};},
+  };
+  vm.runInNewContext(navigation + genericForms, context);
+  drafts();
+  assert.equal(cancellations, 1);
+  assert.equal(options.beforeReplace(), false);
+  allowRelease = true;
+  assert.equal(options.beforeReplace(), true);
+  assert.equal(releases, 2);
+});

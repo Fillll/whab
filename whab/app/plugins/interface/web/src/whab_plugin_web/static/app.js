@@ -27,6 +27,7 @@ async function requireSavedEdits() {
 initBudgetSourceLinks();
 const accountNavigation = initAccountNavigation({
   flush: flushEdits,
+  beforeReplace: () => budgetEdits.dispose(),
   onReplace() {
     currentRegister?.dispose();
     currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination(), cancelNavigation: () => accountNavigation.cancelPending()});
@@ -63,7 +64,7 @@ function formBody(form, {authoritative = false} = {}) {
   return body;
 }
 
-const budgetEdits = initBudgetEdits({readForm: formBody});
+const budgetEdits = initBudgetEdits({readForm: formBody, onDraft: () => accountNavigation.cancelPending()});
 for (const form of document.querySelectorAll('form[data-api]')) {
   if (form.hasAttribute('data-inline-assignment') || form.hasAttribute('data-budget-mutation') || form.hasAttribute('data-account-classification')) continue;
   const radioChoices = [...form.querySelectorAll('input[type="radio"]')];

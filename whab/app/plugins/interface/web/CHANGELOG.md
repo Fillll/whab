@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.20.1 — 2026-10-18
+
+PR: [#64](https://github.com/Fillll/whab/pull/64)
+
+- Release detached budget editors after successful account navigation, including their saved-form references and listeners. Preserve save and validation barriers, and cancel pending account navigation when a new budget draft appears.
+
 ## 1.20.0 — 2026-10-18
 
 PR: [#63](https://github.com/Fillll/whab/pull/63)

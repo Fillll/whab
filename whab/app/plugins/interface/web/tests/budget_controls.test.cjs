@@ -195,6 +195,29 @@ test('discard removes an unsent draft without cancelling a different in-flight s
   assert.equal(state.queue.hasErrors(), false);
 });
 
+test('queue disposal keeps accepted saves and failed values until they finish successfully', async () => {
+  const state = harness();
+  state.queue.remember('rent', amount(1000));
+  const first = state.queue.enqueue('rent', amount(1200));
+  assert.equal(state.queue.dispose(), false);
+  state.saves[0].reject('Connection interrupted.');
+  await first;
+  assert.equal(state.queue.dispose(), false);
+  assert.equal(state.queue.hasErrors(), true);
+  const retry = state.queue.enqueue('rent', amount(1200));
+  assert.equal(state.saves.length, 2);
+  state.saves[1].resolve(); await tick();
+  assert.equal(state.queue.dispose(), false, 'the authoritative read is part of the save barrier');
+  state.refreshes[0].resolve(); await retry;
+  assert.equal(state.queue.dispose(), true);
+  assert.equal(state.queue.dispose(), true);
+  state.queue.remember('later', amount(2000));
+  await state.queue.enqueue('later', amount(2000));
+  assert.equal(state.saves.length, 2);
+  assert.equal(state.queue.hasPending(), false);
+  assert.equal(state.queue.hasErrors(), false);
+});
+
 // A small tree implements only the DOM operations used by patchBudget; real-browser
 // checks cover focus, selection and scrolling on actual rendered budget forms.
 class Node {
@@ -234,6 +257,7 @@ class Node {
     });
   }
   addEventListener(event, handler) { this.handlers.set(event, handler); }
+  removeEventListener(event, handler) { if (this.handlers.get(event) === handler) this.handlers.delete(event); }
   fire(event, values = {}) { return this.handlers.get(event)?.({preventDefault() {}, ...values}); }
   select() {}
   blur() { this.fire('blur'); }
@@ -353,18 +377,25 @@ function budgetForm(key, assigned, inline = true) {
     [inline ? 'data-inline-assignment' : 'data-budget-mutation']: ''});
 }
 
-function editorHarness({initialInline = 1000, validate = false} = {}) {
+function editorHarness({initialInline = 1000, validate = false, onDraft = () => {}, auto = false} = {}) {
   const tree = (inline = 1000, inspector = 1000) => element('div', 'budget-planner', [
     budgetForm('rent', inline), budgetForm('inspector', inspector, false),
+    ...(auto ? [element('form', 'rollover', [
+      element('select', 'mode', [], {name: 'mode', value: 'category'}),
+    ], {'data-budget-mutation': '', 'data-auto': '', 'data-api': '/budget/settings/rollover'})] : []),
   ], {class: 'budget-planner', 'data-month': '2026-10', 'data-currency': 'JPY',
     'data-workspace': 'demo', 'data-budget-id': 'demo', 'data-budget-route': 'demo'});
   const planner = tree(initialInline);
   const calls = [], refreshes = [], navigations = [];
-  const document = {activeElement: null, querySelector: () => planner, addEventListener() {}};
+  const document = {activeElement: null, querySelector: () => planner, handlers: new Map(),
+    addEventListener(event, handler) {this.handlers.set(event, handler);},
+    removeEventListener(event, handler) {if (this.handlers.get(event) === handler) this.handlers.delete(event);}};
   const state = {planner, document, calls, refreshes, navigations, fresh: tree(initialInline), tree};
   const runtime = {
     document,
-    window: {scrollY: 0, addEventListener() {}},
+    window: {scrollY: 0, handlers: new Map(),
+      addEventListener(event, handler) {this.handlers.set(event, handler);},
+      removeEventListener(event, handler) {if (this.handlers.get(event) === handler) this.handlers.delete(event);}},
     location: {href: 'https://localhost:5174/budgets/demo/budget/2026-10/jpy', assign: href => navigations.push(href)},
     api(apiPath, payload, method) {
       const pending = deferred();
@@ -381,7 +412,9 @@ function editorHarness({initialInline = 1000, validate = false} = {}) {
     },
   };
   vm.runInNewContext(source.replace(/^import .*$/m, '').replaceAll('export function ', 'function '), runtime);
-  state.controller = runtime.initBudgetEdits({readForm: (form, {authoritative = false} = {}) => {
+  state.runtime = runtime;
+  state.controller = runtime.initBudgetEdits({onDraft, readForm: (form, {authoritative = false} = {}) => {
+    if (!form.querySelector('[data-cents]')) return {workspace: 'demo', mode: form.querySelector('select').value};
     const assigned = Number(form.querySelector('[data-cents]').value);
     if (validate && (!Number.isSafeInteger(assigned) || !authoritative && assigned < 0)) {
       throw new Error('Enter a whole-number amount.');
@@ -395,6 +428,172 @@ async function refreshEditor(state, index = state.refreshes.length - 1) {
   state.refreshes[index].resolve({ok: true, text: async () => ''});
   await tick();
 }
+
+function listenerCount(node) {
+  return node.handlers.size + node.childNodes.reduce((total, child) => total + listenerCount(child), 0);
+}
+
+test('clean budget disposal releases its form and global listeners and stays safe on later flushes', async () => {
+  const state = editorHarness();
+  assert.ok(listenerCount(state.planner) > 0);
+  assert.equal(state.document.handlers.size, 1);
+  assert.equal(state.runtime.window.handlers.size, 1);
+  assert.equal(await state.controller.flush(), true);
+  assert.equal(state.controller.dispose(), true);
+  assert.equal(listenerCount(state.planner), 0);
+  assert.equal(state.document.handlers.size, 0);
+  assert.equal(state.runtime.window.handlers.size, 0);
+  assert.equal(state.controller.dispose(), true);
+  const input = state.planner.firstChild.querySelector('input');
+  input.value = '1300'; input.fire('input'); input.fire('blur');
+  state.planner.firstChild.fire('submit');
+  assert.equal(await state.controller.flush(), true);
+  assert.equal(state.controller.navigate('/next-month'), false);
+  assert.equal(state.calls.length, 0);
+  assert.deepEqual(state.navigations, []);
+});
+
+test('disposal refuses a fresh draft, an active write and its pending totals refresh', async () => {
+  const state = editorHarness();
+  const form = state.planner.firstChild;
+  const input = form.querySelector('input');
+  input.value = '1200'; input.fire('input');
+  assert.equal(state.controller.dispose(), false);
+  assert.ok(listenerCount(state.planner) > 0);
+  input.fire('blur');
+  assert.equal(state.controller.dispose(), false);
+  state.calls[0].resolve(); await tick();
+  assert.equal(state.controller.dispose(), false);
+  assert.equal(state.refreshes.length, 1);
+  state.fresh = state.tree(1200);
+  await refreshEditor(state);
+  assert.equal(state.controller.dispose(), true);
+  assert.equal(listenerCount(state.planner), 0);
+  assert.equal(state.calls.length, 1);
+});
+
+test('validation and rejected-write errors keep their editor and unload protection until reverted', async () => {
+  for (const invalid of [false, true]) {
+    const state = editorHarness({validate: true});
+    const form = state.planner.firstChild;
+    const input = form.querySelector('input');
+    input.value = invalid ? 'not an amount' : '1200';
+    input.fire('input'); input.fire('blur');
+    if (!invalid) {state.calls[0].reject(new Error('Rejected assignment.')); await tick();}
+    assert.equal(state.controller.dispose(), false);
+    assert.equal(form.querySelector('.field-error').hidden, false);
+    let prevented = false;
+    state.runtime.window.handlers.get('beforeunload')({preventDefault() {prevented = true;}});
+    assert.equal(prevented, true);
+    input.fire('keydown', {key: 'Escape'});
+    assert.equal(input.value, '1000');
+    assert.equal(form.querySelector('.field-error').hidden, true);
+    assert.equal(state.controller.dispose(), true);
+  }
+});
+
+test('a committed write with failed totals retains its editor and retries only the read before disposal', async () => {
+  const state = editorHarness();
+  const form = state.planner.firstChild;
+  const input = form.querySelector('input');
+  input.value = '1200'; input.fire('blur');
+  state.calls[0].resolve(); await tick();
+  state.refreshes[0].reject(new Error('Totals response was lost.')); await tick();
+  assert.equal(state.controller.dispose(), false);
+  assert.match(form.querySelector('.field-error').textContent, /Saved, but totals/);
+  form.fire('submit');
+  assert.equal(state.calls.length, 1);
+  assert.equal(state.refreshes.length, 2);
+  assert.equal(state.controller.dispose(), false);
+  state.fresh = state.tree(1200);
+  await refreshEditor(state, 1);
+  assert.equal(state.controller.dispose(), true);
+  assert.equal(state.calls.length, 1);
+});
+
+test('flush saves existing drafts without reporting a new user edit', async () => {
+  let drafts = 0;
+  const state = editorHarness({onDraft: () => {drafts += 1;}});
+  state.planner.firstChild.querySelector('input').value = '1200';
+  const flushing = state.controller.flush();
+  assert.equal(state.calls.length, 1);
+  assert.equal(drafts, 0);
+  state.calls[0].resolve(); await tick(); state.fresh = state.tree(1200);
+  await refreshEditor(state);
+  assert.equal(await flushing, true);
+  assert.equal(drafts, 0);
+  assert.equal(state.controller.dispose(), true);
+});
+
+for (const event of ['input', 'enter', 'blur', 'submit', 'auto']) test(`${event} notifies the draft hook before starting a new save`, async () => {
+  let drafts = 0;
+  const state = editorHarness({auto: true, onDraft: () => {drafts += 1;}});
+  const form = state.planner.childNodes[event === 'auto' ? 2 : 0];
+  const input = form.querySelector(event === 'auto' ? 'select' : 'input');
+  input.value = event === 'auto' ? 'balance' : '1200';
+  if (event === 'input') input.fire('input');
+  else if (event === 'enter') input.fire('keydown', {key: 'Enter'});
+  else if (event === 'blur') input.fire('blur');
+  else form.fire(event === 'auto' ? 'change' : 'submit');
+  assert.equal(drafts, 1);
+  assert.equal(state.calls.length, event === 'input' ? 0 : 1);
+  if (event === 'input') input.fire('keydown', {key: 'Escape'});
+  else {
+    state.calls[0].resolve(); await tick(); state.fresh = state.tree(1200);
+    if (event === 'auto') state.fresh.childNodes[2].querySelector('select').value = 'balance';
+    await refreshEditor(state);
+  }
+  assert.equal(state.controller.dispose(), true);
+});
+
+for (const event of ['input', 'submit', 'auto']) test(`a budget ${event} cancels an account response that arrives after the initial save barrier`, async () => {
+  const navigationHelpers = fs.readFileSync(path.join(__dirname, 'account_navigation.test.cjs'), 'utf8').split('\ntest(')[0];
+  const helper = {require, __dirname, URL, AbortController, setImmediate};
+  vm.runInNewContext(navigationHelpers + '\nglobalThis.makeNavigation = harness;', helper);
+  let navigator, releases = 0;
+  const state = editorHarness({auto: true, onDraft: () => navigator.cancelPending()});
+  const navigation = helper.makeNavigation({
+    href: 'https://localhost:5174/budgets/demo/budget/2026-10/jpy',
+    initialContext: {page: 'budget', budgetUrl: '/budgets/demo', currency: 'JPY'},
+    flush: () => state.controller.flush(),
+    beforeReplace: () => {releases += 1; return state.controller.dispose();},
+  });
+  navigator = navigation.navigator;
+  const changing = navigator.navigate('https://localhost:5174/budgets/demo/transactions/2026-10/jpy?account=first');
+  await tick();
+  assert.equal(navigation.requests.length, 1);
+  const form = state.planner.childNodes[event === 'auto' ? 2 : 0];
+  const input = form.querySelector(event === 'auto' ? 'select' : 'input');
+  input.value = event === 'auto' ? 'balance' : '1200';
+  if (event === 'input') input.fire('input');
+  else form.fire(event === 'auto' ? 'change' : 'submit');
+  assert.equal(navigation.requests[0].options.signal.aborted, true);
+  navigation.respond(0); await changing;
+  assert.equal(releases, 0);
+  assert.equal(navigation.replacements.length, 0);
+  assert.equal(navigation.histories.length, 0);
+  assert.equal(navigation.fallbacks.length, 0);
+  assert.equal(input.value, event === 'auto' ? 'balance' : '1200');
+  assert.ok(listenerCount(state.planner) > 0);
+  if (event === 'input') input.fire('keydown', {key: 'Escape'});
+  else {
+    state.calls[0].resolve(); await tick(); state.fresh = state.tree(event === 'auto' ? 1000 : 1200);
+    if (event === 'auto') state.fresh.childNodes[2].querySelector('select').value = 'balance';
+    await refreshEditor(state);
+  }
+  assert.equal(state.controller.dispose(), true);
+  navigator.dispose();
+});
+
+test('a page without a budget editor has an idempotent empty lifecycle', async () => {
+  const runtime = {document: {querySelector: () => null}};
+  vm.runInNewContext(source.replace(/^import .*$/m, '').replaceAll('export function ', 'function '), runtime);
+  const controller = runtime.initBudgetEdits({readForm() {throw new Error('No form expected.');}});
+  assert.equal(await controller.flush(), true);
+  assert.equal(controller.navigate('/other'), false);
+  assert.equal(controller.dispose(), true);
+  assert.equal(controller.dispose(), true);
+});
 
 test('an inactive unsaved inspector draft survives another field refresh without becoming its saved baseline', async () => {
   const state = editorHarness();
