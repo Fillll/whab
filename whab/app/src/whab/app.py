@@ -180,11 +180,11 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
         store.on_mutation = service.invalidate_revision
         if settings.storage != "client":
-            context_factory = budget_session.context if budget_session else lambda identifier: local_context(settings.home / settings.plaid_env, service.budget_id, identifier)
+            context_factory = budget_session.context if budget_session else lambda identifier: local_context(settings.home / "data" / "plugin-state" / settings.plaid_env, service.budget_id, identifier)
             saved_ids = [record["id"] for record in budget_session.manifest["plugins"]
                          if any(f"plugins/{record['id']}/suggestions-{workspace}.json" in budget_session.files
                                 for workspace in ("personal", "demo"))] if budget_session else [
-                    path.name for path in (settings.home / settings.plaid_env / "plugin-data").glob("*")
+                    path.name for path in (settings.home / "data" / "plugin-state" / settings.plaid_env / "plugin-data").glob("*")
                     if any((path / f"suggestions-{workspace}.json").is_file() for workspace in ("personal", "demo"))]
             if any(p.categorization for p in plugins.descriptors()) or saved_ids:
                 service.categorization = CategorizationService(service, plugins.descriptors(), context_factory, saved_ids)
