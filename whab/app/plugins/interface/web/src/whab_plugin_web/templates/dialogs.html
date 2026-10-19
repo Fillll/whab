@@ -265,7 +265,7 @@
           <div class="plugin-row">
             <label class="plugin-toggle">
               <input type="checkbox" value="{{ plugin.id }}"{% if not plugin.required %} name="plugin"{% endif %}{% if plugin.enabled %} checked{% endif %}{% if workspace=='demo' or plugin.required or (not plugin.manageable and not plugin.enabled) %} disabled{% endif %}>
-              <strong>{{ plugin.display_name }}</strong>
+              <strong>{% if plugin.id=='random-forest-categorization' %}{{ icon('forest', 16) }} {% endif %}{{ plugin.display_name }}</strong>
             </label>
             <small class="plugin-meta">{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</small>
             <span class="plugin-state">{{ plugin_status(plugin) }}</span>
