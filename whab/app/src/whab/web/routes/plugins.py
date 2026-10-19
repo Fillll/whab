@@ -51,7 +51,10 @@ def create_router(store, plugins, plugin_manager=None):
             if error.code == "unavailable":
                 raise HTTPException(404, "Plugin settings not found") from None
             raise
-        return {key: [asdict(record) for record in records] for key, records in settings.items()}
+        result = {key: [asdict(record) for record in records] for key, records in settings.items()}
+        if any(plugin.id == plugin_id and plugin.categorization for plugin in plugins.descriptors()):
+            result["categorization"] = True
+        return result
 
     @router.get("/{plugin_id}/settings")
     def plugin_settings(plugin_id: str):

@@ -5,6 +5,7 @@ import io
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict
 
 from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
@@ -88,6 +89,19 @@ def create_router(store):
             headers={"Content-Disposition": f'attachment; filename="whab-{workspace}.csv"'},
         )
 
+    class CategorizationBody(BaseModel):
+        model_config = ConfigDict(extra="forbid", strict=True)
+        workspace: Workspace
+        payload: dict
+
+    @router.get("/api/categorization/suggestions")
+    def category_suggestions(workspace: Workspace):
+        return store.category_suggestions(workspace)
+
+    @router.post("/api/categorization")
+    def categorize(body: CategorizationBody):
+        return store.categorize(body.workspace, body.payload)
+
     @router.patch("/api/transactions/{transaction_id}")
     def review(transaction_id: str, body: ReviewBody):
         if not body.model_fields_set.intersection({"categoryId", "reviewed", "note"}):
@@ -95,6 +109,7 @@ def create_router(store):
         category = body.categoryId if "categoryId" in body.model_fields_set else UNSET
         store.edit_transaction(
             body.workspace, transaction_id, category_id=category, reviewed=body.reviewed,
+            **({"suggestion_id": body.suggestionId} if body.suggestionId is not None else {}),
             **({"note": body.note} if "note" in body.model_fields_set else {}),
         )
         return {"ok": True}

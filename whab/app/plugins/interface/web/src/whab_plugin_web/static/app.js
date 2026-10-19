@@ -6,6 +6,7 @@ import {initAccountNavigation} from './account-navigation.js';
 import {initTransactionRegister} from './transaction-register.js';
 import {hydrateCurrencyChoices, initAccountSettings} from './account-settings.js';
 import {bindLogos} from './logo-images.js';
+import {initCategorizationSettings} from './categorization-settings.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -480,6 +481,13 @@ function renderPluginSettings(dialog, settings) {
   const readOnly = dialog.dataset.pluginReadOnly === 'true';
   const content = dialog.querySelector('[data-plugin-settings]');
   content.replaceChildren();
+  if (settings.categorization) {
+    void initCategorizationSettings(dialog, content).catch(failure => {
+      const error = dialog.querySelector('[data-plugin-settings-error]');
+      error.textContent = failure.message; error.hidden = false;
+    });
+    return;
+  }
   const insights = document.createElement('dl');
   insights.className = 'plugin-settings-insights';
   for (const insight of settings.insights) {

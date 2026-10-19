@@ -1,0 +1,19 @@
+# Random forest categorization
+
+An optional, local WHAB automation plugin that learns from your reviewed transactions and suggests categories for uncategorized imports. Suggestions carry an **ML suggested** badge. They affect category spending only when you manually review the transaction.
+
+Enable **Random forest categorization** under Settings → Plugins, save, and restart WHAB. Open its settings, enter a model name, adjust the parameters if needed, and click **Train new model**. Stay in settings while the progress bar advances; closing the view cancels the run. Choose **Use model** after training. Future successful bank syncs and file imports automatically generate suggestions. **Suggest for existing transactions** processes the eligible backlog.
+
+Training, validation, and testing use only categorized, reviewed, posted transactions from this budget. Transfers and unsupported splits are excluded. Chronological partitions target 60% training, 20% validation, and 20% testing, grouped by date. Vocabulary and encoders are fitted only on the training partition; the saved forest never fits on validation or test rows. Review at least two categories in older history and transactions across at least three dates. Low sample counts provide limited evidence. A training run supports at most 20,000 eligible rows; use history dates for larger ledgers.
+
+Features include normalized payee identity, word presence, word pairs, character fragments, account identity/type/subtype, absolute amount, direction, currency, day of month, weekday, month, and days until month-end. Transaction time, review-time notes, balances, and budget availability are excluded. The forest learns amount boundaries from exact integer minor-unit amounts.
+
+Defaults are 300 trees, depth 20, minimum leaf size 2, 1,500 payee text features, and a suggestion score cutoff of 0.80. Optional balanced weights give rare categories more influence. Scores are not calibrated probabilities. Settings show validation and test accuracy, macro F1, suggestion precision/coverage, category sample counts, and per-category F1. No model is activated automatically.
+
+Training is cooperative: each request from the open settings view builds at most ten trees. There is no scheduler or detached worker. Sessions expire after 20 seconds without another request. Models and preprocessing are bounded, validated JSON in the budget's plugin namespace, with no pickle/joblib deserialization. Up to 20 named models can be saved, selected, renamed, or deleted. Portable budgets carry models and suggestion history; disabled or unavailable plugins retain their files. Demo models are isolated from personal models.
+
+In Transactions, change a suggested selection locally, dismiss it, or click **R** to accept the selected category and review together. Multi-select review accepts only the displayed suggestion identities. Input changes invalidate stale suggestions. Dismissed and accepted suggestions are retained as history and do not immediately reappear. Disabling the plugin stops new predictions; saved suggestions can still be reviewed. Previously accepted predictions enter future training only after manual review.
+
+With this plugin active, provider category hints do not assign actual categories during bank ingestion. Explicit categories imported from budget exports and existing categories are preserved. Transfers retain their existing behavior. Prediction failures do not undo successful ingestion; retry suggestions from settings. Remote budgets train and predict on their budget host; install and enable the plugin there and use WHAB 2.19 or newer on both ends.
+
+The distribution is `whab_plugin_random_forest_categorization`, with runtime ID `random-forest-categorization`. It requires WHAB 2.19+, Python 3.14+, and scikit-learn 1.9.1. Install through `python scripts/install.py --dev` from `whab/app/`, or install this distribution independently. Installation does not enable it.

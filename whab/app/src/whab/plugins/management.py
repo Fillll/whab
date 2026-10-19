@@ -9,6 +9,7 @@ from .sdk import ENTRYPOINT_GROUP, valid_plugin_name
 
 # Registration identity is package metadata, so disabled plugins remain unloaded.
 _BUNDLED_METADATA = {
+    ("random-forest-categorization", "whab_plugin_random_forest_categorization.plugin:plugin"): ("automation", "Random forest categorization"),
     ("bank-logos", "whab_plugin_bank_logos.plugin:plugin"): ("interface", "Bank logos"),
     ("web", "whab_plugin_web.plugin:plugin"): ("interface", "WHAB web"),
     ("plaid", "whab_plugin_plaid.plugin:plugin"): ("ingestion", "Plaid"),

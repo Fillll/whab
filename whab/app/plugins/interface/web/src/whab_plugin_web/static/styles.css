@@ -4312,3 +4312,12 @@ strong {
 .account-settings-dialog [data-account-settings-status]:empty {display:none;}
 @media(max-width:760px) {.account-classification-fields {grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:540px) {.account-classification-fields {grid-template-columns:1fr;}}
+
+/* Category suggestions stay visibly provisional until manual review. */
+.ml-suggestion{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:650;color:var(--text-muted,#756233);background:var(--surface-alt,#fff1bf);border-radius:4px;padding:2px 5px;margin-top:3px}
+.ml-suggestion button{border:0;background:transparent;color:inherit;cursor:pointer;font-size:14px;line-height:1}
+.categorization-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0}
+.categorization-form label{display:flex;flex-direction:column;gap:5px;font-size:12px}
+.categorization-form input{min-width:0}.categorization-model{padding:16px 0;border-bottom:1px solid var(--border,#ddd)}
+.categorization-model .button{margin:8px 8px 0 0}.plugin-settings progress{width:100%;accent-color:var(--accent,#b32125)}
+@media(max-width:500px){.categorization-form{grid-template-columns:1fr}}

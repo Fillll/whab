@@ -26,6 +26,7 @@ from whab.plugins import (
 )
 from whab.plugins.management import PluginManager, installed_entrypoints
 from whab.plugins.storage import close_storage, open_storage
+from whab.services.categorization import CategorizationService, local_context
 from whab.services.receipts import ReceiptService
 from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
@@ -178,7 +179,17 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         store = TrackedStorage(store, budget_session)
         service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
         store.on_mutation = service.invalidate_revision
-        bank_stores = {plugin.id: BankStore(store, plugin.id) for plugin in descriptors}
+        if settings.storage != "client":
+            context_factory = budget_session.context if budget_session else lambda identifier: local_context(settings.home / settings.plaid_env, service.budget_id, identifier)
+            saved_ids = [record["id"] for record in budget_session.manifest["plugins"]
+                         if any(f"plugins/{record['id']}/suggestions-{workspace}.json" in budget_session.files
+                                for workspace in ("personal", "demo"))] if budget_session else [
+                    path.name for path in (settings.home / settings.plaid_env / "plugin-data").glob("*")
+                    if any((path / f"suggestions-{workspace}.json").is_file() for workspace in ("personal", "demo"))]
+            if any(p.categorization for p in plugins.descriptors()) or saved_ids:
+                service.categorization = CategorizationService(service, plugins.descriptors(), context_factory, saved_ids)
+                store.after_ingestion = service.categorization.after_import
+        bank_stores = {plugin.id: BankStore(store, plugin.id, suggestions_only=bool(service.categorization and service.categorization.engines)) for plugin in descriptors}
     except Exception:
         if owned_store:
             close_storage(store)

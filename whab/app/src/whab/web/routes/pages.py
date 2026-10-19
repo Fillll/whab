@@ -158,6 +158,7 @@ def create_router(
             ]}
         if page == "transactions" and selected_ids is None:
             selected_ids = [selected_account["id"]] if selected_account else []
+        category_suggestions = service.category_suggestions(workspace, data.get("transactions")) if page == "transactions" else {}
         status = public_status()
         try:
             context = ui.build_context(
@@ -192,6 +193,7 @@ def create_router(
                 target_currency, account_slug=target_slug, **overrides,
             )
 
+        context["category_suggestions"] = category_suggestions
         context["url"] = url
         context["asset_prefix"] = asset_prefix
         context["api_prefix"] = api_prefix

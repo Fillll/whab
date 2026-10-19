@@ -788,10 +788,26 @@ class WorkspaceImporter(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class Categorization:
+    """A budget-scoped engine with train iterator, saved models and prediction hooks.
+
+    Engines receive only their namespaced file context. Host-owned selectors supply
+    reviewed training rows and eligible prediction rows; no backend is supplied.
+    """
+
+    factory: Callable[[BudgetContext], object]
+
+    def __post_init__(self):
+        if not callable(self.factory):
+            raise ValueError("Categorization factory must be callable.")
+
+
+@dataclass(frozen=True, slots=True)
 class Plugin:
     id: str
     display_name: str
     api_version: int = API_VERSION
+    categorization: Categorization | None = None
     insights: InsightsHook | None = None
     export: ExportHook | None = None
     bank: BankFactory | None = None
@@ -810,6 +826,8 @@ class Plugin:
         if not valid_plugin_name(self.id):
             raise ValueError("Plugin ID must be a lowercase slug of at most 64 characters.")
         _text(self.display_name, "Plugin display name", limit=120, empty=False)
+        if self.categorization is not None and type(self.categorization) is not Categorization:
+            raise ValueError("Categorization must use a Categorization descriptor.")
         if self.interface is not None and type(self.interface) is not Interface:
             raise ValueError("Plugin interface must be an Interface descriptor or None.")
         if self.bind is not None and not callable(self.bind):
@@ -854,7 +872,8 @@ class Plugin:
             if self.bank is None:
                 raise ValueError("Plugin merchant logos require a bank factory.")
         if (
-            self.insights is None
+            self.categorization is None
+            and self.insights is None
             and self.export is None
             and self.bank is None
             and self.storage is None
@@ -885,6 +904,7 @@ class PluginDescription:
     has_file_import: bool = False
     has_settings: bool = False
     has_merchant_logos: bool = False
+    has_categorization: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -70,6 +70,7 @@ class LedgerService:
         self._revision = revision or str(uuid4())
         self._receipts = OrderedDict()
         self._lock = lock if lock is not None else RLock()
+        self.categorization = None
         self._on_commit = on_commit
 
     @property
@@ -109,7 +110,9 @@ class LedgerService:
         if month is not None:
             _month(month)
         with self._lock:
-            if operation == "portable":
+            if operation == "category_suggestions":
+                data = self.category_suggestions(workspace)
+            elif operation == "portable":
                 exporter = getattr(self._store, "export_budget", None)
                 if exporter is None:
                     raise StoreError("This storage plugin does not support portable budgets.")
@@ -131,7 +134,8 @@ class LedgerService:
             "add_transaction": (
                 {"accountId", "date", "merchant", "amount", "categoryId"}, {"note"},
             ),
-            "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed", "note"}),
+            "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed", "note", "suggestionId"}),
+            "categorization": ({"action", "pluginId"}, {"parameters", "modelId", "session", "name", "transactionId", "suggestionId"}),
             "review_transactions": ({"transactionIds", "reviewed"}, set()),
             "assign": ({"categoryId", "month", "assigned"}, set()),
             "assign_next_month": ({"month", "currency", "assigned"}, set()),
@@ -142,6 +146,18 @@ class LedgerService:
         required, optional = fields[operation]
         if type(payload) is not dict or not required <= payload.keys() or payload.keys() - required - optional:
             raise StoreError("Invalid ledger command fields.")
+        if operation == "categorization":
+            if type(payload["action"]) is not str or payload["action"] not in {"status", "suggest", "train", "step", "cancel", "select", "delete", "rename", "dismiss"}:
+                raise StoreError("Unknown categorization action.")
+            for key in ("pluginId", "session", "modelId", "suggestionId"):
+                if key in payload:
+                    _identifier(payload[key])
+            if "parameters" in payload and type(payload["parameters"]) is not dict:
+                raise StoreError("Model parameters must be an object.")
+            if "name" in payload:
+                payload = {**payload, "name": validate_label(payload["name"])[:100]}
+        if "suggestionId" in payload:
+            _identifier(payload["suggestionId"])
         if operation == "review_transactions":
             payload = {**payload, "transactionIds": list(validate_review_batch(
                 payload["transactionIds"], payload["reviewed"],
@@ -214,7 +230,15 @@ class LedgerService:
                 return deepcopy(response)
             if expected_revision != self._revision:
                 raise RevisionConflict("Budget changed. Refresh before making this change.")
-            if operation in {"add_account", "add_category", "add_transaction"}:
+            if operation == "categorization":
+                if self.categorization is not None:
+                    data = self.categorization.action(workspace, payload)
+                else:
+                    remote = getattr(self._store, "categorize", None)
+                    if not callable(remote):
+                        raise StoreError("Enable a categorization plugin on the budget host first.")
+                    data = remote(workspace, payload)
+            elif operation in {"add_account", "add_category", "add_transaction"}:
                 data = getattr(self._store, operation)(workspace, payload)
             elif operation == "update_account":
                 update = getattr(self._store, "update_account", None)
@@ -225,11 +249,21 @@ class LedgerService:
                     {key: value for key, value in payload.items() if key != "accountId"},
                 )
             elif operation == "edit_transaction":
+                suggestion_id = payload.get("suggestionId")
+                suggestion = None
+                if suggestion_id and self.categorization is not None:
+                    suggestion = self.categorization.verify(workspace, payload["transactionId"], suggestion_id)
+                    if payload.get("reviewed") is not True:
+                        raise StoreError("Review the transaction to accept a category suggestion.")
+                    payload.setdefault("categoryId", suggestion["categoryId"])
                 data = self._store.edit_transaction(
                     workspace, payload["transactionId"],
                     category_id=payload.get("categoryId", UNSET), reviewed=payload.get("reviewed"),
                     **({"note": payload["note"]} if "note" in payload else {}),
+                    **({"suggestion_id": suggestion_id} if suggestion_id and self.categorization is None else {}),
                 )
+                if suggestion is not None:
+                    self.categorization.accepted(workspace, payload["transactionId"], suggestion, payload["categoryId"])
             elif operation == "review_transactions":
                 review = getattr(self._store, "review_transactions", None)
                 if not callable(review):
@@ -581,8 +615,20 @@ class LedgerService:
             raise StoreError("Public commands only create manual transactions.")
         return self._local_command("add_transaction", workspace, transaction)
 
-    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET):
+    def category_suggestions(self, workspace, transactions=None):
+        self._workspace(workspace)
+        if self.categorization is not None:
+            return self.categorization.suggestions(workspace, transactions)
+        remote = getattr(self._store, "category_suggestions", None)
+        return remote(workspace) if callable(remote) else {}
+
+    def categorize(self, workspace, payload):
+        return self._local_command("categorization", workspace, payload)
+
+    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET, suggestion_id=None):
         payload = {"transactionId": transaction_id}
+        if suggestion_id is not None:
+            payload["suggestionId"] = suggestion_id
         if category_id is not UNSET:
             payload["categoryId"] = category_id
         if reviewed is not None:
