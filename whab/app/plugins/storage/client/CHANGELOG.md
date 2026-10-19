@@ -1,5 +1,11 @@
 # HTTPS remote budget client plugin changelog
 
+## 1.4.0 — 2026-10-18
+
+PR: [#68](https://github.com/Fillll/whab/pull/68)
+
+- Forward model settings actions and suggestion queries to the authoritative budget host. Preserve displayed suggestion identities with atomic category/review edits and keep existing register browsing usable against older hosts.
+
 ## 1.3.0 — 2026-10-18
 
 PR: [#51](https://github.com/Fillll/whab/pull/51)

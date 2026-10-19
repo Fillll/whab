@@ -80,7 +80,7 @@ Source comes only from the official `Fillll/whab` GitHub repository over verifie
 HTTPS at an exact commit. Archive extraction bounds file count and total size,
 and rejects links, traversal, devices and other nonregular entries. Installation
 directories contain a source snapshot and a fresh noneditable virtual environment
-at its final absolute path. Host and all seven supported plugins are installed
+at its final absolute path. Host and all maintained plugins discovered in the selected source are installed
 together. A bundled seed uses its matching offline wheelhouse; downloaded updates
 install matching source and its declared dependencies. Downloads contain only
 the chosen commit's source tree, with no Git clone or history. Before creating any

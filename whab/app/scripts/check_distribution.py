@@ -238,7 +238,7 @@ def main():
                 "distribution": metadata["name"], "version": metadata["version"],
                 "module": entrypoint.split(":", 1)[0].split(".", 1)[0],
             }
-        assert set(expected) == {"whab", "web", "sqlite", "plaid", "bank-logos", "ynab", "server", "client", "example"}
+        assert set(expected) == {"whab", "web", "sqlite", "plaid", "bank-logos", "ynab", "server", "client", "example", "random-forest-categorization"}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {
             f'{record["distribution"]}>={record["version"]},<2'

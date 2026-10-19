@@ -319,10 +319,19 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     const category = row.querySelector('[data-transaction-field="categoryId"]');
     const reviewed = row.querySelector('[data-transaction-reviewed]');
     const committed = {note: memo.value, categoryId: category.value || null, reviewed: row.dataset.reviewed === 'true'};
-    const writer = createTransactionWriter(patch => saveReview ? saveReview(row.dataset.transactionId, patch, bulkBusy) : saveOne(row.dataset.transactionId, patch), {
+    const prepareReview = patch => row.dataset.suggestionId && patch.reviewed === true ?
+      {...patch, categoryId: category.value || null, suggestionId: row.dataset.suggestionId} : patch;
+    const writer = createTransactionWriter(patch => {
+      const prepared = prepareReview(patch);
+      return saveReview ? saveReview(row.dataset.transactionId, prepared, bulkBusy) : saveOne(row.dataset.transactionId, prepared);
+    }, {
       saved(patch) {
         Object.assign(committed, patch);
         if ('reviewed' in patch) row.dataset.reviewed = String(patch.reviewed);
+        if (patch.reviewed === true && row.dataset.suggestionId) {
+          delete row.dataset.suggestionId;
+          row.querySelector('.ml-suggestion')?.remove();
+        }
         row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
         onMutation();
         if (!paged) filter();
@@ -352,7 +361,16 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     listen(category, 'change', () => {
       editStarted();
       category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
-      void writer.push({categoryId: category.value || null});
+      if (!row.dataset.suggestionId) void writer.push({categoryId: category.value || null});
+    });
+    if (row.dataset.suggestionId) listen(row.querySelector('[data-dismiss-suggestion]'), 'click', async () => {
+      try {
+        await api('/categorization', {workspace, payload: {action: 'dismiss', pluginId: row.dataset.suggestionPlugin,
+          transactionId: row.dataset.transactionId, suggestionId: row.dataset.suggestionId}});
+        delete row.dataset.suggestionId;
+        category.value = ''; row.querySelector('.ml-suggestion')?.remove();
+        onMutation();
+      } catch (failure) { error(failure.message); }
     });
     listen(memo, 'input', () => {
       editStarted();
@@ -388,7 +406,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     const work = [...selected];
     bulkPromise = (async () => {
       let failed = 0;
-      await Promise.all(Array.from({length: Math.min(nativeBulk ? 100 : 4, work.length)}, async () => {
+      await Promise.all(Array.from({length: Math.min(nativeBulk && !selected.some(row => row.dataset.suggestionId) ? 100 : 4, work.length)}, async () => {
         while (work.length) {
           const row = work.shift();
           const control = row.querySelector('[data-transaction-reviewed]');

@@ -84,7 +84,7 @@ dependency wheels; the resulting app does not require your checkout, a terminal,
 Git, a separately installed Python, or network access for its initial bundled version.
 
 The builder compiles the native app, copies only a source allowlist, bundles a
-private Python runtime, builds the host and seven maintained plugin wheels plus
+private Python runtime, builds the host and eight maintained plugin wheels plus
 dependencies, verifies Python after relocation, and signs the local bundle ad hoc.
 It rejects framework, system and Homebrew Python installations. Virtualenvs are
 accepted only when their underlying interpreter is suitable. Developer `.venv`

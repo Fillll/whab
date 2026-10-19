@@ -178,6 +178,26 @@ class IsolatedManagerTest(unittest.TestCase):
         self.assertEqual(installation["channel"], "alpha")
         self.assertFalse(installation["tested"])
 
+    def test_new_maintained_plugins_are_installed_but_examples_are_excluded(self):
+        self.config()
+        target = {"build": SHA, "channel": "alpha", "tested": False}
+
+        def source(_sha, destination):
+            app = destination / "whab/app"
+            (app / "src/whab").mkdir(parents=True)
+            (app / "src/whab/__init__.py").write_text('__version__ = "2.19.0"\n')
+            for package in [app, *(app / "plugins" / name for name in launcher.PLUGINS),
+                            app / "plugins/automation/random-forest-categorization",
+                            app / "plugins/example/teaching"]:
+                package.mkdir(parents=True, exist_ok=True)
+                (package / "pyproject.toml").write_text("[project]\n")
+
+        with patch.object(launcher, "download_source", side_effect=source), patch.object(self.manager, "stable_python", return_value=sys.executable), patch.object(self.manager, "run") as run, patch.object(self.manager, "smoke"):
+            self.manager.prepare(target)
+        install = [str(item) for item in run.call_args_list[1].args[0]]
+        self.assertTrue(any(item.endswith("plugins/automation/random-forest-categorization") for item in install))
+        self.assertFalse(any("plugins/example/" in item for item in install))
+
     def test_failed_alpha_local_smoke_preserves_previous_installation(self):
         self.config()
         old = self.installation()

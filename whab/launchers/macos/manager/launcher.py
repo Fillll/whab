@@ -630,7 +630,10 @@ class Manager:
             host_python = self.stable_python(config)
             self.run([host_python, "-I", "-B", "-m", "venv", directory / "venv"])
             python = directory / "venv/bin/python"
-            packages = [app] + [app / "plugins" / name for name in PLUGINS]
+            required = [app / "plugins" / name for name in PLUGINS]
+            optional = sorted(project.parent for project in app.glob("plugins/*/*/pyproject.toml")
+                              if project.parent.parent.name != "example" and project.parent not in required)
+            packages = [app, *required, *optional]
             if not all((path / "pyproject.toml").is_file() for path in packages):
                 raise LauncherError("unsupported_source", "This revision does not include the seven supported plugin packages.")
             options = ["--no-input", "--disable-pip-version-check"]

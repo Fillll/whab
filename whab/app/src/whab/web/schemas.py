@@ -39,6 +39,7 @@ class Body(BaseModel):
 
 
 class ReviewBody(Body):
+    suggestionId: Id | None = None
     workspace: Workspace
     categoryId: Id | None = None
     reviewed: StrictBool | None = None

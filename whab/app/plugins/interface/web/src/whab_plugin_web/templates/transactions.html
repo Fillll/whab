@@ -89,7 +89,9 @@
     <tbody>
     {% for transaction in register.rows %}
       {% set account = accounts_by_id.get(transaction.accountId) %}
-      <tr class="transaction-row" data-transaction-id="{{ transaction.id }}" data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
+      {% set suggestion = (category_suggestions|default({})).get(transaction.id) %}
+      {% set selected_category = transaction.categoryId or (suggestion.categoryId if suggestion else none) %}
+      <tr class="transaction-row" data-transaction-id="{{ transaction.id }}"{% if suggestion %} data-suggestion-id="{{ suggestion.id }}" data-suggestion-plugin="{{ suggestion.pluginId }}"{% endif %} data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
         <td class="transaction-select-cell"><input type="checkbox" data-select-transaction aria-label="Select {{ transaction.merchant }} on {{ date_label(transaction.date) }}"></td>
         <td class="date-cell">{{ date_label(transaction.date) }}</td>
         {% if show_account_column %}<td class="account-cell" title="{{ account.name if account else 'Disconnected account' }}">{{ account.name if account else 'Disconnected account' }}</td>{% endif %}
@@ -104,8 +106,8 @@
         </td>
         <td class="transaction-category-cell"><select name="categoryId" data-transaction-field="categoryId" data-category-options-lazy aria-label="Category for {{ transaction.merchant }}" class="{% if not transaction.categoryId and not transaction.isTransfer %}uncategorized{% endif %}">
           <option value="">{{ 'Transfer (excluded)' if transaction.inferredTransfer else 'Income / uncategorized' if transaction.amount<0 else 'Uncategorized' }}</option>
-          {% if transaction.categoryId %}<option value="{{ transaction.categoryId }}" selected>{{ category_labels.get(transaction.categoryId, 'Unknown category') }}</option>{% endif %}
-        </select></td>
+          {% if selected_category %}<option value="{{ selected_category }}" selected>{{ category_labels.get(selected_category, 'Unknown category') }}</option>{% endif %}
+        </select>{% if suggestion %}<span class="ml-suggestion" title="Suggested by {{ suggestion.pluginId }} · Model {{ suggestion.modelId }} · {{ suggestion.createdAt }}. Applied only when reviewed.">ML suggested<button type="button" data-dismiss-suggestion aria-label="Dismiss category suggestion for {{ transaction.merchant }}">×</button></span>{% endif %}</td>
         <td class="transaction-memo-cell"><textarea rows="1" maxlength="1000" class="transaction-memo" data-transaction-field="note" aria-label="Memo for {{ transaction.merchant }}" placeholder="Memo">{{ transaction.note }}</textarea></td>
         <td class="amount-cell {% if transaction.amount<0 %}inflow{% endif %}">{{ money(-transaction.amount) }}</td>
         <td class="transaction-currency-cell">{{ account.currency|default(currency) if account else currency }}</td>

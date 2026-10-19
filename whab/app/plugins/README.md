@@ -33,7 +33,7 @@ Category folders use singular names:
 | [`extension/`](extension/README.md) | Specialized financial models and workflows, such as mortgages or investments |
 | [`example/`](example/README.md) | Teaching and reference plugins |
 
-Categories identify the primary source ownership of a plugin. They do not change the SDK descriptor kinds (`user_interface`, `storage`, `data_ingestion`, `reporting` and `branding`) or add runtime capabilities. A plugin can expose multiple supported capabilities while keeping one category folder.
+Categories identify the primary source ownership of a plugin. They do not change the SDK descriptor kinds (`user_interface`, `storage`, `data_ingestion`, `reporting`, `branding` and `automation`) or add runtime capabilities. A plugin can expose multiple supported capabilities while keeping one category folder.
 
 Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-logos`. IDs must be unique across categories and match their entry-point names. Name both the Python package and the declared distribution `whab_plugin_<id>`, replacing ID hyphens with underscores: `sqlite` uses `whab_plugin_sqlite`, and `bank-logos` uses `whab_plugin_bank_logos`. Teaching plugins follow the same convention, including `whab_plugin_example`. Python packaging tools may display normalized distribution names with hyphens, such as `whab-plugin-sqlite`; this is the same distribution identity. Display names use readable words or the provider's brand, such as “Bank logos” or “Plaid”. Keep category prefixes out of plugin IDs: moving a folder or renaming a package must preserve its ID, saved settings and routes.
 
@@ -46,6 +46,7 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | `interface/bank-logos/` | `bank-logos` | `whab_plugin_bank_logos` | Curated institution lookup and public icon fetching |
 | `interface/server/` | `server` | `whab_plugin_server` | HTTPS bearer-authorized public ledger API interface |
 | `storage/client/` | `client` | `whab_plugin_client` | Remote storage and portable connection payload |
+| `automation/random-forest-categorization/` | `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Reviewed-history models and provisional category suggestions |
 | `example/example/` | `example` | `whab_plugin_example` | Separately installed developer teaching report/export |
 
 ## Test ownership
@@ -68,7 +69,7 @@ Every plugin must have **100% Python statement and branch coverage**. The covera
 
 ## Packaging and contracts
 
-The `whab` distribution contains only the host/core and public SDK. All seven supported plugins are independent distributions; each owns its `pyproject.toml` entry point, package data, dependency compatibility range and `project.version`. Their initial independent version is 1.0.0. The teaching example is an eighth separate distribution.
+The `whab` distribution contains only the host/core and public SDK. All eight supported plugins are independent distributions; each owns its `pyproject.toml` entry point, package data, dependency compatibility range and `project.version`. Their initial independent version is 1.0.0. The teaching example is a ninth separate distribution.
 
 | Plugin ID | Distribution | Default enablement |
 | --- | --- | --- |
@@ -79,6 +80,7 @@ The `whab` distribution contains only the host/core and public SDK. All seven su
 | `ynab` | `whab_plugin_ynab` | Disabled |
 | `server` | `whab_plugin_server` | Disabled |
 | `client` | `whab_plugin_client` | Not selected; choose as storage for a remote connection |
+| `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Disabled |
 | `example` | `whab_plugin_example` | Separately installed, hidden developer teaching plugin |
 
 From the application directory (`whab/app/`), install or refresh the complete local supported set:
@@ -87,7 +89,7 @@ From the application directory (`whab/app/`), install or refresh the complete lo
 .venv/bin/python scripts/install.py --dev
 ```
 
-Add `--example` to install the teaching package too; omit `--dev` when development dependencies are unnecessary. The helper supplies all local package paths together, so unpublished local plugin packages do not need to resolve from a package index. When compatible host/plugin distributions are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the seven supported plugins; the source helper works directly from this checkout without requiring those releases to be published. A single plugin can be installed from its own folder, such as `.venv/bin/python -m pip install -e plugins/interface/bank-logos`. Installing a package does not enable it; see the [developer-only example activation](../../docs/plugins.md#install-the-working-example).
+Add `--example` to install the teaching package too; omit `--dev` when development dependencies are unnecessary. The helper supplies all local package paths together, so unpublished local plugin packages do not need to resolve from a package index. When compatible host/plugin distributions are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the eight supported plugins; the source helper works directly from this checkout without requiring those releases to be published. A single plugin can be installed from its own folder, such as `.venv/bin/python -m pip install -e plugins/interface/bank-logos`. Installing a package does not enable it; see the [developer-only example activation](../../docs/plugins.md#install-the-working-example).
 
 To upgrade from the former `whab-<id>-plugin` distributions, rerun the source installer. It installs the standardized packages before removing detected legacy official distributions and preserves an installed teaching example by including its replacement. For wheel installations, use a fresh environment or remove the legacy distributions when installing the new packages; keeping both would register the same runtime IDs twice. Runtime IDs, enabled selections, saved settings and routes remain stable through the package rename.
 

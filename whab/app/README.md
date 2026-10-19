@@ -90,3 +90,7 @@ Tests use fictional data and mocked services. CI checks Python 3.14 and 3.15 and
 ## License
 
 WHAB's code, public plugin SDK, bundled plugins, example plugin, documentation and assets use the [MIT License](LICENSE). Commercial use, proprietary plugins and commercial forks are permitted with the required notices. Third-party dependencies, services and institution logos retain their own licenses or terms.
+
+### Optional category suggestions
+
+[Random forest categorization](plugins/automation/random-forest-categorization/README.md) trains locally on categorized, reviewed transactions. Enable it in plugin settings, train while that settings view stays open, and select a saved model. Automatic suggestions after ingestion remain provisional until manual review, with an ML badge in Transactions. Training, validation, and testing all exclude unreviewed transactions. Models, parameters, date limits, progress, and evaluation results live in the plugin's settings. Remote budgets run the model on their budget host.

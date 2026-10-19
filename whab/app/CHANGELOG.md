@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.19.0 — 2026-10-18
+
+PR: [#68](https://github.com/Fillll/whab/pull/68)
+
+- Add a public budget-scoped categorization capability, separate suggestions and provenance, atomic acceptance during manual review, and settings-bound cooperative training sessions. Generate suggestions after ingestion while preserving existing categories and reviewed state; keep models and suggestion files portable and demo-isolated.
+- Bundle optional Random forest categorization 1.0.0, Web 1.23.0 and remote client 1.4.0. Model training, validation and testing use reviewed, categorized transactions only.
+
 ## 2.18.0 — 2026-10-18
 
 PR: [#66](https://github.com/Fillll/whab/pull/66)

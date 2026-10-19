@@ -509,6 +509,7 @@ class TrackedStorage:
         self.session = session
         self.lock = session.lock if session else RLock()
         self.on_mutation = None
+        self.after_ingestion = None
 
     def __getattr__(self, name):
         member = getattr(self.store, name)
@@ -522,6 +523,8 @@ class TrackedStorage:
                     self.on_mutation()
                 if self.session:
                     self.session.checkpoint()
+                if name in {"apply_sync", "import_workspace"} and self.after_ingestion:
+                    self.after_ingestion()
                 return result
 
         return mutate

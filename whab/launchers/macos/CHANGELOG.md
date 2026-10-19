@@ -1,5 +1,11 @@
 # macOS launcher changelog
 
+## 1.1.2 — 2026-10-18
+
+PR: [#68](https://github.com/Fillll/whab/pull/68)
+
+- Install additional maintained plugin packages discovered in the selected application source, including random forest categorization. Preserve the required baseline for older supported revisions and exclude teaching examples.
+
 ## 1.1.1 — 2026-10-17
 
 PR: [#46](https://github.com/Fillll/whab/pull/46)

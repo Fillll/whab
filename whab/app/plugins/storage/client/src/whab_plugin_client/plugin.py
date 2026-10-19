@@ -92,6 +92,8 @@ class RemoteStore:
         if response.status_code in {400, 401, 403, 404, 422}:
             if command:
                 self._pending = None
+            if operation == "categorization":
+                raise StoreError("Category model settings require WHAB 2.19 or newer on the budget host.")
             if operation in {"assign_next_month", "set_rollover_mode"} and response.status_code in {400, 404, 422}:
                 raise StoreError("Remote server rejected this planning change. Check the inputs and update the server if it does not support this feature.")
             raise StoreError("Remote budget request rejected. Check connection settings and inputs.")
@@ -197,8 +199,20 @@ class RemoteStore:
             raise StoreError("Remote clients only create manual transactions.")
         return self._command("add_transaction", workspace, transaction)
 
-    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET):
+    def category_suggestions(self, workspace):
+        try:
+            return self._query("category_suggestions", workspace)
+        except StoreError:
+            # Existing ledger browsing remains usable with an older authority.
+            return {}
+
+    def categorize(self, workspace, payload):
+        return self._command("categorization", workspace, payload)
+
+    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET, suggestion_id=None):
         payload = {"transactionId": transaction_id}
+        if suggestion_id is not None:
+            payload["suggestionId"] = suggestion_id
         if category_id is not UNSET:
             payload["categoryId"] = category_id
         if reviewed is not None:

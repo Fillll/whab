@@ -96,6 +96,7 @@ class PluginRegistry:
                 id=plugin.id,
                 display_name=plugin.display_name,
                 api_version=plugin.api_version,
+                has_categorization=plugin.categorization is not None,
                 has_insights=plugin.insights is not None,
                 has_export=plugin.export is not None,
                 has_bank=plugin.bank is not None,
@@ -112,6 +113,7 @@ class PluginRegistry:
                         ("storage", plugin.storage is not None),
                         ("data_ingestion", plugin.bank is not None or plugin.file_import is not None),
                         ("reporting", plugin.insights is not None or plugin.export is not None),
+                        ("automation", plugin.categorization is not None),
                         ("branding", plugin.bank_logos is not None or plugin.merchant_logos is not None),
                     )
                     if enabled

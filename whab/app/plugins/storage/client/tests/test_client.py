@@ -274,3 +274,31 @@ def test_query_error_preserves_uncertain_command(status):
 def test_malformed_responses(response):
     with pytest.raises(StoreError, match="invalid response"):
         make(lambda request: response).workspace("personal")
+
+
+def test_categorization_queries_actions_and_atomic_suggestion_acceptance():
+    import json
+
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, json=body({"ok": True}))
+
+    remote = make(handler)
+    assert remote.category_suggestions('personal') == {"ok": True}
+    assert str(requests[-1].url).endswith('/queries/category_suggestions?workspace=personal')
+    remote.categorize('personal', {"action": "status", "pluginId": "categorizer"})
+    assert json.loads(requests[-1].content)['operation'] == 'categorization'
+    remote.edit_transaction('personal', 'tx', category_id='cat', reviewed=True, suggestion_id='suggestion')
+    payload = json.loads(requests[-1].content)['payload']
+    assert payload == {"transactionId": "tx", "categoryId": "cat", "reviewed": True, "suggestionId": "suggestion"}
+    remote.close()
+
+
+def test_older_authority_keeps_browsing_usable_and_explains_model_support():
+    remote = make(lambda request: httpx.Response(200, json=body({})) if request.url.path.endswith('/queries/workspace') else httpx.Response(400))
+    assert remote.category_suggestions('personal') == {}
+    with pytest.raises(StoreError, match='WHAB 2.19'):
+        remote.categorize('personal', {'action': 'status', 'pluginId': 'categorizer'})
+    remote.close()

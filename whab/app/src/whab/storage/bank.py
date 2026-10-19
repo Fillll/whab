@@ -20,7 +20,7 @@ from whab.plugins import StorageBackend
 
 
 class BankStore:
-    def __init__(self, store: StorageBackend, provider_id: str):
+    def __init__(self, store: StorageBackend, provider_id: str, *, suggestions_only=False):
         if (
             type(provider_id) is not str
             or len(provider_id) > 64
@@ -29,6 +29,7 @@ class BankStore:
         ):
             raise StoreError("Invalid bank provider.")
         self._store = store
+        self._suggestions_only = suggestions_only
         self._provider = provider_id
 
     @staticmethod
@@ -127,8 +128,13 @@ class BankStore:
             for account in accounts or []
         ]
 
+        existing = {row["id"]: row for row in self._store.transactions("personal")} if self._suggestions_only else {}
+
         def scoped_transaction(transaction: ImportedTransaction) -> ImportedTransaction:
             pending = transaction.get("pendingTransactionId")
+            previous = existing.get(self._record_identity("transaction", item_id, transaction["id"]))
+            if previous is None and pending:
+                previous = existing.get(self._record_identity("transaction", item_id, pending))
             return {
                 **transaction,
                 "id": self._record_identity("transaction", item_id, transaction["id"]),
@@ -137,6 +143,7 @@ class BankStore:
                 if pending
                 else None,
                 "source": self._provider,
+                **({"suggestedCategoryId": previous.get("categoryId") if previous else None} if self._suggestions_only else {}),
             }
 
         scoped_changes = {
