@@ -119,6 +119,13 @@ export async function initCategorizationSettings(dialog, content) {
     content.append(button('Suggest for existing transactions', async () => {
       const result = await call('suggest'); status.textContent = `${result.suggested} category suggestions available. Review them in Transactions.`;
     }));
+    if (data.previewAvailable) {
+      content.append(button('Preview low-score guesses', async () => {
+        const result = await call('preview');
+        status.textContent = `${result.suggested} category suggestions available, including ${result.lowScore} low-score guesses. Check them carefully in Transactions. Your automatic score cutoff is unchanged.`;
+      }));
+      content.append(text('p', 'Low-score previews include uncertain guesses below the saved cutoff. They stay unreviewed and are marked in Transactions. Automatic suggestions keep the saved cutoff.', 'settings-notice'));
+    }
     if (readOnly) for (const control of content.querySelectorAll('input,button')) control.disabled = true;
   }
   await render();

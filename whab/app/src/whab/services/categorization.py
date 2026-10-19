@@ -91,20 +91,23 @@ class CategorizationService:
                     result[identifier] = suggestion
         return result
 
-    def predict(self, workspace):
+    def predict(self, workspace, *, preview=False):
         with self.ledger._lock, self.lock:
             for identifier, engine in (self.demo_engines if workspace == "demo" else self.engines).items():
+                predict = getattr(engine, "preview", None) if preview else engine.predict
+                if not callable(predict):
+                    raise StoreError("This categorization plugin does not support low-score previews. Update it first.")
                 state = self.state(identifier, workspace)
                 rows = [row for row in self.rows(workspace, False) if row["id"] not in state or state[row["id"]]["fingerprint"] != fingerprint(row)]
                 categories = {row["id"]: row for row in self.ledger.categories(workspace)}
                 for batch in range(0, len(rows), 100):
                     chunk = rows[batch:batch + 100]
                     by_id = {row["id"]: row for row in chunk}
-                    for prediction in engine.predict(deepcopy(chunk)):
+                    for prediction in predict(deepcopy(chunk)):
                         row = by_id.get(prediction.get("transactionId"))
                         category = categories.get(prediction.get("categoryId"))
                         score = prediction.get("score")
-                        if row is None or category is None or category.get("currency", "USD") != row["currency"] or type(score) not in (float, int) or not math.isfinite(score) or not 0 <= score <= 1:
+                        if row is None or category is None or category.get("currency", "USD") != row["currency"] or type(score) not in (float, int) or not math.isfinite(score) or not 0 <= score <= 1 or type(prediction.get("belowCutoff", False)) is not bool:
                             raise StoreError("Categorizer returned an invalid suggestion.")
                         state[row["id"]] = {**prediction, "id": str(uuid4()), "pluginId": identifier,
                                             "fingerprint": fingerprint(row), "createdAt": datetime.now(timezone.utc).isoformat()}
@@ -113,7 +116,8 @@ class CategorizationService:
                 state = {key: value for key, value in state.items() if key in all_ids}
                 self._save(identifier, workspace, state)
             self.error = None
-        return {"suggested": len(self.suggestions(workspace))}
+        suggestions = self.suggestions(workspace)
+        return {"suggested": len(suggestions), "lowScore": sum(row.get("belowCutoff", False) for row in suggestions.values())}
 
     def after_import(self):
         try:
@@ -152,9 +156,10 @@ class CategorizationService:
             engine = (self.demo_engines if workspace == "demo" else self.engines)[identifier]
             if action == "status":
                 return {"defaults": engine.defaults, **engine.index(), "eligible": len(self.rows(workspace, True)), "error": self.error,
+                        "previewAvailable": callable(getattr(engine, "preview", None)),
                         "categoryLabels": {row["id"]: row["name"] for row in self.ledger.categories(workspace)}}
-            if action == "suggest":
-                return self.predict(workspace)
+            if action in {"suggest", "preview"}:
+                return self.predict(workspace, preview=action == "preview")
             if action in {"select", "delete", "rename"}:
                 model_id = values.get("modelId", "")
                 if len(model_id) != 36 or str(UUID(model_id)) != model_id:

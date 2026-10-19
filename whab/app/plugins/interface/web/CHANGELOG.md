@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.24.0 — 2026-10-18
+
+PR: [#70](https://github.com/Fillll/whab/pull/70)
+
+- Add an explicit low-score preview button with cutoff-preservation guidance. Mark uncertain guesses with their score and Low score label, and identify model predictions and the Random forest plugin with a forest icon.
+
 ## 1.23.1 — 2026-10-18
 
 PR: [#69](https://github.com/Fillll/whab/pull/69)

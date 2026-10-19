@@ -251,3 +251,11 @@ def test_train_limits_and_abstaining_prediction(engine, trained, rows, monkeypat
     trained['parameters']['threshold'] = .9
     engine.context.write_file(f"models/{trained['id']}.json", model.encode(trained))
     assert engine.predict(rows[:1]) == []
+    preview = engine.preview(rows[:1])
+    assert len(preview) == 1 and preview[0]['belowCutoff'] is True
+    assert preview[0]['score'] == .6
+    assert engine.load(trained['id'])['parameters']['threshold'] == .9
+    assert engine.preview([]) == []
+    engine.delete(trained['id'])
+    with pytest.raises(StoreError, match='Use model'):
+        engine.preview(rows[:1])
