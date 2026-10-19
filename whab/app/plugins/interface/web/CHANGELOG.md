@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.23.0 — 2026-10-18
+
+PR: [#68](https://github.com/Fillll/whab/pull/68)
+
+- Add random forest plugin settings with parameters, progress/cancellation, saved model selection, rename/delete and validation results. Show provisional ML category badges and apply the chosen category only during manual review, including selected-row review.
+
 ## 1.22.1 — 2026-10-18
 
 PR: [#67](https://github.com/Fillll/whab/pull/67)
