@@ -149,7 +149,7 @@ def test_reviewed_selector_and_fingerprint(history, store):
 def test_portable_saved_models_and_disabled_plugin(store, history, tmp_path):
     session = BudgetSession.create(tmp_path, 'sandbox', 'ML budget', (PLUGIN,))
     session.bind(store)
-    ledger = LedgerService(store)
+    ledger = LedgerService(store, budget_id=session.id)
     category_service = CategorizationService(ledger, (plugin,), session.context)
     ledger.categorization = category_service
     run = category_service.action('personal', {'action': 'train', 'pluginId': PLUGIN, 'parameters': {'trees': 10, 'threshold': .5}})
@@ -178,7 +178,7 @@ def test_local_paths_and_multiple_engines(store, tmp_path):
     context.delete_file('models/a.json')
     with pytest.raises(StoreError):
         context.read_file('../secret')
-    ledger = LedgerService(store)
+    ledger = LedgerService(store, budget_id='budget')
     with pytest.raises(StoreError, match='only one'):
         CategorizationService(ledger, (plugin, Plugin(id='second', display_name='Second', categorization=Categorization(lambda _: SimpleNamespace()))),
                               lambda key: local_context(tmp_path, 'budget', key))
@@ -364,3 +364,72 @@ def test_explicit_low_score_preview_preserves_cutoff_and_ledger(client, store, h
     assert not action(client, 'status')['previewAvailable']
     response = client.post('/api/categorization', json={'workspace': 'personal', 'payload': {'action': 'preview', 'pluginId': PLUGIN}})
     assert response.status_code == 400 and 'does not support' in response.json()['error']
+
+
+
+def test_local_context_isolates_budget_files_and_preserves_default_location(tmp_path):
+    legacy = tmp_path / 'plugin-data' / PLUGIN / 'models.json'
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b'legacy-model-index')
+    original = local_context(tmp_path, 'default', PLUGIN)
+    first = local_context(tmp_path, 'first', PLUGIN)
+    second = local_context(tmp_path, 'second', PLUGIN)
+    assert original.read_file('models.json') == b'legacy-model-index'
+    assert first.read_file('models.json') is second.read_file('models.json') is None
+    first.write_file('models.json', b'first-model-index')
+    assert second.read_file('models.json') is None
+    second.delete_file('models.json')
+    assert first.read_file('models.json') == b'first-model-index'
+    assert original.read_file('models.json') == b'legacy-model-index'
+    for budget_id, plugin_id in (('../other', PLUGIN), ('default', '../other')):
+        with pytest.raises(StoreError, match='namespace'):
+            local_context(tmp_path, budget_id, plugin_id)
+
+
+def test_categorization_rejects_context_from_another_budget(store, tmp_path):
+    ledger = LedgerService(store, budget_id='first')
+    with pytest.raises(StoreError, match='another budget'):
+        CategorizationService(ledger, (plugin,), lambda key: local_context(tmp_path, 'second', key))
+
+
+def test_new_import_and_blank_budget_cannot_use_source_models_or_training_history(store, history, tmp_path):
+    import hashlib
+
+    from tests.web.test_file_import_routes import payload
+    from whab.plugins import FileImport
+
+    configuration = Settings(tmp_path, 5173, 'sandbox', '', '', '', False, '', '', (PLUGIN,), ui='')
+    importer = Plugin('dump', 'Synthetic import', file_import=FileImport(lambda _: payload()))
+    app = create_app(store=store, settings=configuration, plugins=PluginRegistry((plugin, importer)))
+    with TestClient(app, base_url='https://127.0.0.1:5173') as client:
+        model = train(client)
+        run = action(client, 'train')
+        raw = b'synthetic-budget-export'
+        imported = client.post('/budgets/home/api/plugins/dump/import/new/commit', content=raw, headers={
+            'Content-Type': 'application/zip', 'X-Import-Currency': 'USD',
+            'X-Import-Operation': str(uuid4()), 'X-Import-Fingerprint': hashlib.sha256(raw).hexdigest(),
+        })
+        assert imported.status_code == 200, imported.text
+        imported_id = imported.json()['id']
+        blank = client.post('/api/budget/new', json={'name': 'Blank budget'}).json()['id']
+
+        def scoped(key, action, **values):
+            return client.post(f'/budgets/{key}/api/categorization', json={
+                'workspace': 'personal', 'payload': {'action': action, 'pluginId': PLUGIN, **values}})
+
+        # The cookie selects the blank budget; explicit addresses still own each request.
+        for key, eligible in ((imported_id, 1), (blank, 0)):
+            status = scoped(key, 'status').json()
+            assert status['models'] == [] and status['active'] is None and status['eligible'] == eligible
+            for operation in ('select', 'rename', 'delete'):
+                assert scoped(key, operation, modelId=model['id'], name='Wrong budget').status_code == 400
+            for operation in ('step', 'cancel'):
+                assert scoped(key, operation, session=run['session']).status_code == 400
+            own = scoped(key, 'train').json()
+            assert scoped(key, 'step', session=own['session']).status_code == 400
+            assert scoped(key, 'suggest').json()['suggested'] == 0
+            assert scoped(key, 'preview').json()['suggested'] == 0
+        source = scoped('home', 'status').json()
+        assert source['eligible'] == 60 and source['active'] == model['id']
+        assert source['models'][0]['id'] == model['id']
+        assert scoped('home', 'cancel', session=run['session']).status_code == 200

@@ -30,7 +30,7 @@ function panel() {
   controls['[data-import-preview]'].hidden = true;
   return new Target({dataset: {fileImport: 'ynab'}, controls, file, querySelector: selector => controls[selector]});
 }
-function harness(initialPanels = 0) {
+function harness(initialPanels = 0, activationOk = true) {
   const requests = [], redirects = [];
   let panels = Array.from({length: initialPanels}, panel), operation = 0;
   const document = new Target({querySelectorAll: () => panels, createElement: () => new Target()});
@@ -41,6 +41,9 @@ function harness(initialPanels = 0) {
       let resolve, reject;
       const promise = new Promise((yes, no) => {resolve = yes; reject = no;});
       requests.push({url, options, reject, reply: (result, ok = true) => resolve({ok, json: async () => result})});
+      if (url.endsWith('/activate')) resolve({ok: activationOk, json: async () => ({
+        id: url.split('/').at(-2), opened: true,
+      })});
       return promise;
     },
   });
@@ -142,6 +145,8 @@ test('commit uses the preview identity and retains its navigation guard through 
   assert.equal(state.requests[1].options.headers['X-Import-Operation'], state.requests[0].options.headers['X-Import-Operation']);
   const id = '11111111-1111-4111-8111-111111111111';
   state.requests[1].reply({id, url: `/budgets/${id}/accounts/current-month/usd`}); await creating;
+  assert.equal(state.requests[2].url, `/budgets/fictional/api/budgets/${id}/activate`);
+  assert.equal(state.requests[2].options.body, '{}');
   assert.deepEqual(state.redirects, [`https://localhost:5173/budgets/${id}/accounts/current-month/usd`]);
   assert.equal(state.canNavigate(), false);
 });
@@ -237,4 +242,17 @@ test('commit rejects unexpected same-origin destinations', async () => {
     assert.deepEqual(state.redirects, []);
     assert.equal(state.canNavigate(), true);
   }
+});
+
+
+test('failed selection keeps the saved import retryable without opening the previous budget', async () => {
+  const state = harness(1, false), controls = state.panels[0].controls;
+  await checked(state);
+  const creating = controls['[data-import-commit]'].emit('click');
+  state.requests[1].reply({id: '11111111-1111-4111-8111-111111111111', url: '/budgets/new-budget/accounts/current-month/usd'});
+  await creating;
+  assert.deepEqual(state.redirects, []);
+  assert.match(controls['[data-import-error]'].textContent, /saved but could not be selected/);
+  assert.equal(controls['[data-import-commit]'].disabled, false);
+  assert.equal(state.canNavigate(), true);
 });

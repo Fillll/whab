@@ -33,3 +33,5 @@ Run from `whab/app/`:
 .venv/bin/python -m pytest plugins/ingestion/ynab/tests
 .venv/bin/python scripts/check_plugin_coverage.py --plugin ynab
 ```
+
+After creation, the importer selects the new budget for this browser before opening its Accounts page. Reopening WHAB then returns to that budget; identically named older budgets retain their own models and history.
