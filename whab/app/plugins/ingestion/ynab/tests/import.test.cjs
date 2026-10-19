@@ -21,11 +21,12 @@ class Target {
   append(child) {(this.children ||= []).push(child);}
 }
 function panel() {
-  const controls = Object.fromEntries(['form', 'file', 'usd', 'preview-button', 'commit', 'preview',
+  const controls = Object.fromEntries(['form', 'file', 'name', 'usd', 'preview-button', 'commit', 'preview',
     'summary', 'month', 'warnings', 'reason', 'error', 'progress'].map(key => [`[data-import-${key}]`, new Target()]));
   const file = {name: 'fictional-export.zip', size: 1024};
   controls['[data-import-file]'].files = [file];
   controls['[data-import-usd]'].checked = true;
+  controls['[data-import-name]'].value = 'Fictional budget';
   controls['[data-import-preview]'].hidden = true;
   return new Target({dataset: {fileImport: 'ynab'}, controls, file, querySelector: selector => controls[selector]});
 }
@@ -140,8 +141,8 @@ test('commit uses the preview identity and retains its navigation guard through 
   assert.equal(state.requests[1].options.headers['X-Import-Fingerprint'], 'a'.repeat(64));
   assert.equal(state.requests[1].options.headers['X-Import-Operation'], state.requests[0].options.headers['X-Import-Operation']);
   const id = '11111111-1111-4111-8111-111111111111';
-  state.requests[1].reply({id, url: `/budgets/${id}/budget/current-month/usd`}); await creating;
-  assert.deepEqual(state.redirects, [`https://localhost:5173/budgets/${id}/budget/current-month/usd`]);
+  state.requests[1].reply({id, url: `/budgets/${id}/accounts/current-month/usd`}); await creating;
+  assert.deepEqual(state.redirects, [`https://localhost:5173/budgets/${id}/accounts/current-month/usd`]);
   assert.equal(state.canNavigate(), false);
 });
 
@@ -157,7 +158,7 @@ test('failed commits release navigation while preserving the same archive and op
   const retry = controls['[data-import-commit]'].emit('click');
   assert.equal(state.requests[2].options.body, item.file);
   assert.equal(state.requests[2].options.headers['X-Import-Operation'], state.requests[1].options.headers['X-Import-Operation']);
-  state.requests[2].reply({id: '11111111-1111-4111-8111-111111111111', url: 'https://external.invalid/budgets/11111111-1111-4111-8111-111111111111/budget/current-month/usd'});
+  state.requests[2].reply({id: '11111111-1111-4111-8111-111111111111', url: 'https://external.invalid/budgets/11111111-1111-4111-8111-111111111111/accounts/current-month/usd'});
   await retry;
   assert.equal(state.canNavigate(), true);
   assert.equal(state.redirects.length, 0);
@@ -174,4 +175,66 @@ test('changing a checked archive invalidates its preview without another request
   assert.equal(controls['[data-import-preview]'].hidden, true);
   assert.equal(controls['[data-import-commit]'].disabled, true);
   assert.equal(state.canNavigate(), true);
+});
+
+
+test('filename suggests an editable name, preserving a custom name across archive changes', async () => {
+  const state = harness(1), controls = state.panels[0].controls;
+  controls['[data-import-name]'].value = '';
+  controls['[data-import-file]'].files = [{name: 'YNAB Export - Fictional family as of 2026-10-18 21-09.zip', size: 10}];
+  await controls['[data-import-file]'].emit('change');
+  assert.equal(controls['[data-import-name]'].value, 'Fictional family');
+  controls['[data-import-file]'].files = [{name: 'Another family.zip', size: 10}];
+  await controls['[data-import-file]'].emit('change');
+  assert.equal(controls['[data-import-name]'].value, 'Another family');
+  controls['[data-import-name]'].value = 'Custom household';
+  await controls['[data-import-name]'].emit('input');
+  controls['[data-import-file]'].files = [{name: 'Third export.zip', size: 10}];
+  await controls['[data-import-file]'].emit('change');
+  assert.equal(controls['[data-import-name]'].value, 'Custom household');
+});
+
+test('blank and overlong names cannot preview and editing a name requires a fresh preview', async () => {
+  const state = harness(1), controls = state.panels[0].controls;
+  for (const invalid of ['   ', 'a'.repeat(101)]) {
+    controls['[data-import-name]'].value = invalid;
+    await controls['[data-import-name]'].emit('input');
+    assert.equal(controls['[data-import-preview-button]'].disabled, true);
+    await controls['[data-import-form]'].emit('submit');
+    assert.equal(state.requests.length, 0);
+  }
+  controls['[data-import-name]'].value = 'First name';
+  await checked(state);
+  controls['[data-import-name]'].value = 'Second name';
+  await controls['[data-import-name]'].emit('input');
+  await controls['[data-import-commit]'].emit('click');
+  assert.equal(state.requests.length, 1);
+  assert.equal(controls['[data-import-preview]'].hidden, true);
+});
+
+test('chosen Unicode name travels with preview and retries and readable Accounts URLs open', async () => {
+  const state = harness(1), controls = state.panels[0].controls;
+  controls['[data-import-name]'].value = '  Fictional café 家  ';
+  await checked(state);
+  assert.equal(state.requests[0].options.headers['X-Import-Budget-Name'], encodeURIComponent('Fictional café 家'));
+  const first = controls['[data-import-commit]'].emit('click');
+  state.requests[1].reject(new Error('Uncertain result')); await first;
+  assert.equal(controls['[data-import-name]'].disabled, true);
+  const retry = controls['[data-import-commit]'].emit('click');
+  assert.equal(state.requests[2].options.headers['X-Import-Budget-Name'], state.requests[0].options.headers['X-Import-Budget-Name']);
+  assert.equal(state.requests[2].options.headers['X-Import-Operation'], state.requests[1].options.headers['X-Import-Operation']);
+  state.requests[2].reply({id: '11111111-1111-4111-8111-111111111111', url: '/budgets/fictional-cafe/accounts/current-month/usd'});
+  await retry;
+  assert.deepEqual(state.redirects, ['https://localhost:5173/budgets/fictional-cafe/accounts/current-month/usd']);
+});
+
+test('commit rejects unexpected same-origin destinations', async () => {
+  for (const url of ['/settings', '/budgets/home/accounts/current-month/usd?unexpected=1', '/budgets/home/accounts/current-month/usd#unexpected']) {
+    const state = harness(1), controls = state.panels[0].controls;
+    await checked(state);
+    const creating = controls['[data-import-commit]'].emit('click');
+    state.requests[1].reply({id: '11111111-1111-4111-8111-111111111111', url}); await creating;
+    assert.deepEqual(state.redirects, []);
+    assert.equal(state.canNavigate(), true);
+  }
 });

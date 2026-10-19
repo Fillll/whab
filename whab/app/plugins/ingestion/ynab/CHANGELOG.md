@@ -1,5 +1,12 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.3.0 — 2026-10-18
+
+PR: [#71](https://github.com/Fillll/whab/pull/71)
+
+- Ask for a budget name before importing, with an editable suggestion from the ZIP filename. Validate names before preview, send Unicode names to WHAB 2.21 or newer, and preserve the name and operation for commit retries.
+- Open the returned readable Accounts URL after import instead of rejecting budget slugs as failed creation.
+
 ## 1.2.1 — 2026-10-18
 
 PR: [#66](https://github.com/Fillll/whab/pull/66)
