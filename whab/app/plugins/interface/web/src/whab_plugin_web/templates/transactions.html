@@ -1,6 +1,7 @@
 {% set merchant_logos = merchant_logos|default({}) %}
 {% set logos = account_logos|default({}) %}
 {% set selected_ids = selected_account_ids|default([selected_account.id] if selected_account else []) %}
+{% set show_account_column = (selected_ids|length if selected_ids else data.accounts|length) > 1 %}
 {% set filter_period = transaction_period|default('all' if transaction_all_dates else 'custom') %}
 {% set period_label = transaction_period_label|default('Custom dates' if transaction_all_dates else month_label(month)) %}
 {% set review_state = transaction_review_filter|default('all') %}
@@ -72,10 +73,11 @@
 <span class="sr-only" data-transaction-save-status aria-live="polite"></span>
 <template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</template>
 <div class="table-scroll transactions-scroll" role="region" aria-labelledby="transaction-title" tabindex="0">
-  <table class="transactions-table">
+  <table class="transactions-table{% if show_account_column %} transactions-table-multi-account{% endif %}">
     <thead><tr>
       <th class="transaction-select-cell" scope="col"><span class="sr-only">Multi-select</span><input type="checkbox" data-select-all aria-label="Select all transactions in this view" title="Multi-select"></th>
       <th scope="col" class="date-cell">Date</th>
+      {% if show_account_column %}<th scope="col" class="account-cell">Account</th>{% endif %}
       <th class="transaction-receipt-cell" scope="col"><span class="sr-only">Receipt</span><span title="Receipt">{{ icon('image', 14) }}</span></th>
       <th scope="col">Payee</th>
       <th scope="col" class="transaction-category-cell">Category</th>
@@ -90,6 +92,7 @@
       <tr class="transaction-row" data-transaction-id="{{ transaction.id }}" data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
         <td class="transaction-select-cell"><input type="checkbox" data-select-transaction aria-label="Select {{ transaction.merchant }} on {{ date_label(transaction.date) }}"></td>
         <td class="date-cell">{{ date_label(transaction.date) }}</td>
+        {% if show_account_column %}<td class="account-cell" title="{{ account.name if account else 'Disconnected account' }}">{{ account.name if account else 'Disconnected account' }}</td>{% endif %}
         <td class="transaction-receipt-cell"><button class="transaction-receipt-button" type="button" data-transaction-receipt aria-label="Receipt for {{ transaction.merchant }}" title="Receipt" disabled>{{ icon('image', 15) }}</button></td>
         <td class="transaction-payee-cell" title="{{ account.name if account else 'Disconnected account' }}{% if account and not is_on_budget(account) %} · Off-budget · excluded from budget{% endif %}{% if transaction.pending %} · Pending{% endif %}{% if transaction.isTransfer %} · Transfer{% endif %}">
           <div class="transaction-payee">

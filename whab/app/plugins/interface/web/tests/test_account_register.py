@@ -4,6 +4,8 @@ import re
 from html import unescape
 from urllib.parse import parse_qs, urlsplit
 
+import pytest
+
 
 def register_rows(text):
     return re.findall(r'<tr class="transaction-row"(.*?)</tr>', text, re.S)
@@ -142,3 +144,35 @@ def test_large_register_searches_unrendered_transactions_and_preserves_page_filt
     missing = client.get(path + "&q=unfindable").text
     assert not register_rows(missing) and "No matching transactions" in missing
     assert "0 matching transactions of 205" in missing
+
+
+@pytest.mark.parametrize("headers", [{}, {"X-WHAB-Transactions-Fragment": "1"}])
+def test_account_column_follows_date_only_for_multiple_selected_accounts(client, store, headers):
+    first = store.add_account("personal", {
+        "name": "Daily <wallet> & savings", "type": "depository", "balance": 0,
+    })
+    path = "/budgets/home/transactions/2026-10/usd"
+    assert 'scope="col" class="account-cell"' not in client.get(path, headers=headers).text
+    second = store.add_account("personal", {
+        "name": "Reserve wallet", "type": "depository", "balance": 0,
+    })
+    for account, merchant in ((first, "First purchase"), (second, "Second purchase")):
+        store.add_transaction("personal", {
+            "accountId": account, "date": "2026-10-05", "merchant": merchant,
+            "amount": 100, "categoryId": None,
+        })
+    for query in ("", f"?accounts={first}&accounts={second}", f"?accounts={first}&accounts={second}&q=First"):
+        text = client.get(path + query, headers=headers).text
+        assert re.search(r'class="date-cell">Date</th>\s*<th scope="col" class="account-cell">Account</th>', text)
+        rows = register_rows(text)
+        assert len(rows) == (1 if "q=First" in query else 2)
+        for row in rows:
+            expected = "Daily &lt;wallet&gt; &amp; savings" if "First purchase" in row else "Reserve wallet"
+            assert re.search(r'class="date-cell">2026-10-05</td>\s*<td class="account-cell"', row)
+            assert f'title="{expected}">{expected}</td>' in row
+            assert "Daily <wallet>" not in row
+    for query in (f"?account={first}", f"?accounts={first}"):
+        text = client.get(path + query, headers=headers).text
+        assert 'scope="col" class="account-cell"' not in text
+        assert '<td class="account-cell"' not in text
+        assert len(register_rows(text)) == 1

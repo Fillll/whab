@@ -1211,6 +1211,15 @@ strong {
 .transactions-table th.date-cell {
   width: 96px;
 }
+.transactions-table-multi-account {
+  min-width: 1100px;
+}
+.transactions-table .account-cell {
+  width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .transactions-table .transaction-receipt-cell {
   width: 36px;
   padding: 2px 3px;
@@ -1221,6 +1230,12 @@ strong {
 }
 .transactions-table .transaction-memo-cell {
   width: 24%;
+}
+.transactions-table-multi-account .transaction-category-cell {
+  width: 180px;
+}
+.transactions-table-multi-account .transaction-memo-cell {
+  width: 200px;
 }
 .transactions-table th.amount-cell {
   width: 108px;

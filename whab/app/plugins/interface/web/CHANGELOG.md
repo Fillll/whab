@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.22.1 — 2026-10-18
+
+PR: [#67](https://github.com/Fillll/whab/pull/67)
+
+- Show Account immediately after Date when multiple accounts are selected, including All accounts. Keep the column visible across search results and omit it in single-account registers.
+
 ## 1.22.0 — 2026-10-18
 
 PR: [#66](https://github.com/Fillll/whab/pull/66)
