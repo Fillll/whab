@@ -37,6 +37,8 @@ def test_selected_import_lives_in_plugin_options_on_every_page_and_serves_its_as
         assert "Import from YNAB ZIP file" in response.text
         assert 'data-file-import="ynab"' in response.text
         assert "I confirm this export uses US dollars (USD)." in response.text
+        assert 'Budget name' in response.text
+        assert 'type="text" maxlength="100" placeholder="My budget" data-import-name required' in response.text
         assert "Create budget and import" in response.text
         assert "Each import creates and opens a new, separate budget." in response.text
         assert response.text.index('id="plugin-options-ynab"') < response.text.index('data-file-import="ynab"')

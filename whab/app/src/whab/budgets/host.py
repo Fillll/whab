@@ -255,7 +255,7 @@ class BudgetHost:
         await self._start(session)
         return session
 
-    async def import_new(self, source_id, plugin_id, fingerprint, data, operation):
+    async def import_new(self, source_id, plugin_id, fingerprint, data, operation, name="Imported budget"):
         """Create an isolated import target; a durable operation identity makes retries safe."""
         try:
             if str(UUID(operation)) != operation:
@@ -295,7 +295,7 @@ class BudgetHost:
                     if type(manifest) is not dict or manifest.get("id") != operation or manifest.get("storage") != "sqlite":
                         raise StoreError("The import target no longer matches this operation.")
                 else:
-                    manifest = new_manifest("Imported budget", (*self.settings.plugins, plugin_id), "sqlite")
+                    manifest = new_manifest(name, (*self.settings.plugins, plugin_id), "sqlite")
                     manifest["id"] = operation
                 return BudgetSession(self.settings.home, self.settings.plaid_env, manifest)
 

@@ -2,11 +2,13 @@
 
 import hashlib
 import inspect
+from urllib.parse import unquote
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
+from whab.budgets.document import new_manifest
 from whab.domain.file_imports import validate_workspace_import
 from whab.domain.money import currency_code
 from whab.plugins import StoreError
@@ -57,6 +59,13 @@ def create_router(store, plugins, budget_host=None, source_id="default"):
             raise HTTPException(400, "Preview this export with a valid import operation ID before importing.") from None
         return value
 
+    def import_name(request):
+        try:
+            name = unquote(request.headers.get("x-import-budget-name", "Imported budget"), errors="strict")
+            return new_manifest(name)["name"]
+        except (UnicodeError, StoreError):
+            raise StoreError("Choose a budget name of 1–100 characters, without NUL characters.") from None
+
     def preview_values(fingerprint, data):
         return {
             "fingerprint": fingerprint,
@@ -73,6 +82,7 @@ def create_router(store, plugins, budget_host=None, source_id="default"):
     async def preview_new(plugin_id: str, request: Request):
         plugin = descriptor(plugin_id)
         import_operation(request)
+        import_name(request)
         fingerprint, data = await parse(request, plugin)
         return {
             **preview_values(fingerprint, data),
@@ -86,13 +96,14 @@ def create_router(store, plugins, budget_host=None, source_id="default"):
     async def commit_new(plugin_id: str, request: Request):
         plugin = descriptor(plugin_id)
         operation = import_operation(request)
+        name = import_name(request)
         fingerprint, data = await parse(request, plugin)
         if request.headers.get("x-import-fingerprint") != fingerprint:
             raise HTTPException(409, "The file changed. Preview this export again before importing.")
         if budget_host is None:
             raise HTTPException(400, "New budget imports are unavailable in this application.")
         origin_id = "demo" if request.scope.get("whab.workspace") == "demo" else source_id
-        return await budget_host.import_new(origin_id, plugin.id, fingerprint, data, operation)
+        return await budget_host.import_new(origin_id, plugin.id, fingerprint, data, operation, name)
 
     @router.post("/{plugin_id}/import/preview")
     async def preview(plugin_id: str, request: Request):

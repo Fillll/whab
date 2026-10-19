@@ -3,6 +3,7 @@
 import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import quote
 from uuid import uuid4
 
 import pytest
@@ -354,3 +355,36 @@ def test_new_import_routes_preserve_fingerprint_local_and_upload_guards(store, t
             assert client.post(path, content=larger, headers=new_headers(larger)).status_code == 200
     with client_for(store, tmp_path, enabled=False) as client:
         assert client.post(BASE + "new/preview", json={}).status_code == 404
+
+
+def test_named_import_persists_unicode_name_and_retries_preserve_it(store, tmp_path):
+    name = "Fictional café 家"
+    headers = {**new_headers(), "x-import-budget-name": quote("  " + name + "  ")}
+    target = headers["x-import-operation"]
+    with client_for(store, tmp_path) as client:
+        before = set(tmp_path.rglob("*"))
+        assert client.post(BASE + "new/preview", content=RAW, headers=headers).status_code == 200
+        assert set(tmp_path.rglob("*")) == before
+        response = client.post(BASE + "new/commit", content=RAW, headers=headers)
+        assert response.status_code == 200, response.text
+        assert response.json()["url"] == "/budgets/fictional-cafe/accounts/current-month/usd"
+        assert client.get(f"/budgets/{target}/api/budget").json()["name"] == name
+    with client_for(store, tmp_path) as client:
+        retry = client.post(BASE + "new/commit", content=RAW, headers={**headers, "x-import-budget-name": "Another name"})
+        assert retry.status_code == 200 and retry.json()["alreadyImported"]
+        assert retry.json()["id"] == target
+        assert retry.json()["url"] == response.json()["url"]
+        assert client.get(f"/budgets/{target}/api/budget").json()["name"] == name
+        assert len(client.get("/api/budgets").json()["budgets"]) == 2
+
+
+@pytest.mark.parametrize("name", ["", "   ", "a" * 101, "%00", "%FF"])
+def test_invalid_import_name_is_rejected_before_creating_budget(store, tmp_path, name):
+    headers = {**new_headers(), "x-import-budget-name": name}
+    with client_for(store, tmp_path) as client:
+        before = set(tmp_path.rglob("*"))
+        for action in ("preview", "commit"):
+            response = client.post(BASE + "new/" + action, content=RAW, headers=headers)
+            assert response.status_code == 400, response.text
+        assert set(tmp_path.rglob("*")) == before
+        assert len(client.get("/api/budgets").json()["budgets"]) == 1

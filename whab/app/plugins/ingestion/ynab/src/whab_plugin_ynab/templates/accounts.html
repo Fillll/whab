@@ -5,6 +5,9 @@
   <p>Each import creates and opens a new, separate budget. Choose the original YNAB ZIP export, up to 10 MiB. Preview checks the archive before creating anything.</p>
   <form data-import-form>
     <div class="modal-form">
+      <label for="{{ importer.id }}-name">Budget name
+        <input id="{{ importer.id }}-name" type="text" maxlength="100" placeholder="My budget" data-import-name required>
+      </label>
       <label for="{{ importer.id }}-archive">YNAB ZIP export
         <input id="{{ importer.id }}-archive" type="file" accept=".zip,application/zip,application/x-zip-compressed" data-import-file required>
       </label>
