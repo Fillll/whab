@@ -377,6 +377,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "today": today(),
         "client_context": {
             "workspace": workspace, "page": page, "month": month, "currency": currency,
+            "pageFragments": True,
         },
         "date_label": format_date,
     }

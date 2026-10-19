@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.18.0 — 2026-10-18
+
+PR: [#66](https://github.com/Fillll/whab/pull/66)
+
+- Negotiate uncached main-view fragments across Budget, Transactions, Insights and Accounts while preserving existing budget/register fragments and addressed-budget security. Bundle Web 1.22.0 and provider control lifecycle fixes in Plaid 1.1.4 and YNAB 1.2.1.
+
 ## 2.17.0 — 2026-10-18
 
 PR: [#65](https://github.com/Fillll/whab/pull/65)

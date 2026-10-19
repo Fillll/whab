@@ -138,6 +138,7 @@ export function syncBudgetGroups(root) {
 export function initBudgetEdits({readForm, onDraft = () => {}}) {
   let planner = document.querySelector('.budget-planner');
   if (!planner) return {flush: async () => true, navigate: () => false, dispose: () => true};
+  const displayedUrl = location.href;
   const states = new Map();
   const listeners = [];
   let navigation = null;
@@ -207,7 +208,7 @@ export function initBudgetEdits({readForm, onDraft = () => {}}) {
     },
     onState(form, {status, error}) { feedback(form, status === 'saved' && formDirty(form) ? 'unsaved' : status, error?.message); },
     async refresh() {
-      const response = await fetch(location.href, {headers: {'X-WHAB-Budget-Fragment': '1'}, cache: 'no-store'});
+      const response = await fetch(displayedUrl, {headers: {'X-WHAB-Budget-Fragment': '1'}, cache: 'no-store'});
       if (!response.ok) throw new Error('The budget totals could not be refreshed.');
       const html = await response.text();
       const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('.budget-planner');

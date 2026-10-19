@@ -1,0 +1,15 @@
+{% set fragment_context = client_context %}
+{% if page=='transactions' %}
+{% set register = transaction_window(transactions, request, data.get('transactionPage')) %}
+{% set fragment_context = dict(client_context, transactionSearch=register.search, transactionPage=register.page, transactionRequestedPage=register.requested_page) %}
+{% endif %}
+<div class="page-content" data-page-fragment data-page-context="{{ fragment_context|tojson|forceescape }}" data-page-assets="{{ dict(web=web_asset_version, plugins=plugin_scripts)|tojson|forceescape }}">
+  <template data-transaction-navigation-count>{% if to_review %}<span class="nav-count">{{ to_review }}</span>{% endif %}</template>
+  {% include page+".html" %}
+</div>
+<template data-account-list>{% include "sidebar-accounts.html" %}</template>
+<template data-page-options>
+  <select data-page-account-options>{% for account in manual_accounts %}<option value="{{ account.id }}">{{ account.name }}</option>{% endfor %}</select>
+  <select data-page-category-options><option value="">Income / uncategorized</option>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</select>
+  <datalist data-page-group-options>{% for group in groups %}<option value="{{ group.name }}">{% endfor %}</datalist>
+</template>

@@ -300,11 +300,18 @@ def create_router(
         )
         try:
             response = templates.TemplateResponse(request=request, name="base.html", context=context)
+            vary = ["X-WHAB-Page-Fragment"]
+            if page == "budget":
+                vary.append("X-WHAB-Budget-Fragment")
             if page == "transactions":
-                response.headers["Vary"] = "X-WHAB-Transactions-Fragment, X-WHAB-Transactions-Sidebar"
-                if request.headers.get("X-WHAB-Transactions-Fragment") in ("1", "summary"):
-                    response.headers["X-WHAB-Transactions-Fragment"] = request.headers["X-WHAB-Transactions-Fragment"]
-                    response.headers["Cache-Control"] = "no-store"
+                vary.extend(("X-WHAB-Transactions-Fragment", "X-WHAB-Transactions-Sidebar"))
+            response.headers["Vary"] = ", ".join(vary)
+            if request.headers.get("X-WHAB-Page-Fragment") == "1":
+                response.headers["X-WHAB-Page-Fragment"] = "1"
+                response.headers["Cache-Control"] = "no-store"
+            elif page == "transactions" and request.headers.get("X-WHAB-Transactions-Fragment") in ("1", "summary"):
+                response.headers["X-WHAB-Transactions-Fragment"] = request.headers["X-WHAB-Transactions-Fragment"]
+                response.headers["Cache-Control"] = "no-store"
             return response
         except Exception:
             raise PluginError(

@@ -8,6 +8,8 @@ WHAB requires HTTPS for local pages, bank endpoints, OAuth redirects in every en
 
 Tests use fictional credentials, in-memory storage, temporary homes and HTTP mock transports. Preserve encrypted-token compatibility, pending-to-posted annotations and atomic imports/cursors.
 
+Browser controls bind once per element on startup and on `whab:page-ready`, so inserted Accounts views remain usable. A cancelable `whab:before-navigate` event vetoes partial replacement while Link, synchronization or disconnection is active, including asynchronous exchange/sync after Link succeeds. The module remains independent of the selected visual plugin and preserves its original budget API scope.
+
 Synchronous storage operations and synchronization normalization run in the event loop's bounded executor so file writes and ledger locks do not block unrelated network requests. A cancelled request waits for already-started storage work to finish before releasing its per-connection lock; saves and cursor updates retain their synchronous, atomic storage contract. Request context propagates into storage workers.
 
 Imported checking, savings and credit accounts default on-budget. Investment, retirement, loan and CD accounts default off-budget, so their balances and transactions do not fund envelopes. Supported provider subtypes identify brokerage, IRA, Roth IRA, 401(k), 403(b), 457(b), pension, mortgage, auto loan, student loan and CD accounts. Unrecognized subtypes remain unspecified; unrecognized account types become unclassified off-budget accounts. Saved user account classifications survive subsequent bank refreshes.

@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.22.0 — 2026-10-18
+
+PR: [#66](https://github.com/Fillll/whab/pull/66)
+
+- Keep the app shell mounted when navigating between main views in the same budget and currency. Replace validated server-rendered content, remount editors and controls, refresh dialog choices, and preserve save barriers, history, scroll, focus and stale-response guards. Leave the old content visible while loading and retain full navigation for incompatible assets or scope changes.
+
 ## 1.21.0 — 2026-10-18
 
 PR: [#65](https://github.com/Fillll/whab/pull/65)

@@ -155,7 +155,10 @@ test('register replacement binds refreshed sidebar artwork as well as main conte
     flushEdits: async () => true, notify() {},
     initAccountNavigation(value) {options = value; return {};},
     initTransactionRegister: () => ({dispose() {}}),
+    initBudgetEdits: () => ({dispose() {return true;}}),
+    initPageControls() {}, formBody() {}, CustomEvent: class {},
   });
+  state.context.document.dispatchEvent = () => true;
   vm.runInNewContext(navigation, state.context);
   options.onReplace({content: {querySelectorAll: () => [main]}});
   assert.equal(disposed, true);

@@ -7,7 +7,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/app.js'), 'utf8');
 const guard = source.slice(source.indexOf('async function flushEdits()'), source.indexOf('initBudgetSourceLinks();'));
-const genericForms = source.slice(source.indexOf('const budgetEdits = initBudgetEdits'), source.indexOf('function updateAccountFields'));
+const genericForms = source.slice(source.indexOf('let budgetEdits = initBudgetEdits'), source.indexOf('function updateAccountFields'));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function deferred() {
   let resolve;
@@ -73,7 +73,9 @@ test('the app wires budget draft cancellation and guarded editor disposal into p
   const navigation = source.slice(source.indexOf('const accountNavigation = initAccountNavigation'), source.indexOf('function minorAmount'));
   let options, drafts, releases = 0, cancellations = 0, allowRelease = false;
   const context = {
-    document: {querySelectorAll: () => []}, formBody() {}, flushEdits() {}, notify() {},
+    document: {querySelectorAll: () => [], querySelector: () => null, dispatchEvent: () => true},
+    navigationReady: () => true, currentRegister: null, CustomEvent: class {},
+    formBody() {}, flushEdits() {}, notify() {},
     initAccountNavigation(value) {options = value; return {cancelPending() {cancellations += 1;}};},
     initBudgetEdits(value) {drafts = value.onDraft; return {dispose() {releases += 1; return allowRelease;}};},
   };
