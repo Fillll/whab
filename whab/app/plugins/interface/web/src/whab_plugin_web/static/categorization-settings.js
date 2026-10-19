@@ -35,8 +35,8 @@ export async function initCategorizationSettings(dialog, content) {
     busy = true; error.hidden = true;
     for (const button of content.querySelectorAll('button')) button.disabled = true;
     try { await work(); }
-    catch (failure) { error.textContent = failure.message; error.hidden = false; status.textContent = ''; }
-    finally { busy = false; for (const button of content.querySelectorAll('button')) button.disabled = false; }
+    catch (failure) { await cancel(); error.textContent = failure.message; error.hidden = false; status.textContent = ''; }
+    finally { busy = false; for (const control of content.querySelectorAll('input,button')) control.disabled = false; }
   }
   function button(label, handler) {
     const node = text('button', label, 'button secondary'); node.type = 'button';

@@ -15,7 +15,7 @@ class Element {
   emit(event) {for (const callback of this.listeners[event] || []) callback({preventDefault() {}});}
 }
 const defaults = {trees: 300, depth: 20, leaf: 2, vocabulary: 1500, threshold: .8};
-async function fixture({pause = false, readOnly = false, fail = false} = {}) {
+async function fixture({pause = false, readOnly = false, fail = false, failStep = false} = {}) {
   const requests = [];
   const frames = [];
   const status = new Element('p');
@@ -30,6 +30,7 @@ async function fixture({pause = false, readOnly = false, fail = false} = {}) {
     if (payload.action === 'status') return {defaults, models: [], eligible: 80};
     if (fail) throw new Error('Training could not start');
     if (payload.action === 'train') return {session: 'view-session', stage: 'Preparing reviewed transactions', progress: 0};
+    if (payload.action === 'step' && failStep) throw new Error('Training step failed');
     if (payload.action === 'step') return {complete: true, stage: 'Training complete', progress: 100};
     return {ok: true};
   };
@@ -86,4 +87,15 @@ test('read-only settings cannot start training and failures remain visible', asy
   assert.equal(failed.error.hidden, false);
   assert.equal(failed.error.textContent, 'Training could not start');
   assert.equal(failed.requests.some(request => request.action === 'step'), false);
+});
+
+
+test('a failed training step cancels the session and restores parameter editing', async () => {
+  const ui = await fixture({failStep: true});
+  const form = ui.content.children.find(child => child.tag === 'form');
+  form.emit('submit');
+  await settle();
+  assert.equal(ui.error.textContent, 'Training step failed');
+  assert.equal(ui.requests.filter(request => request.action === 'cancel').length, 1);
+  assert(form.querySelectorAll('input').every(control => !control.disabled));
 });
