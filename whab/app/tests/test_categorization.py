@@ -293,3 +293,45 @@ def test_register_suggestion_projection_does_not_read_entire_history(client, his
     monkeypatch.setattr(ledger, 'transactions', lambda *_: (_ for _ in ()).throw(AssertionError('Full history read')))
     response = client.get('/budgets/home/transactions/2026-10/usd')
     assert response.status_code == 200 and 'ML suggested' in response.text
+
+
+def test_save_failure_does_not_chain_private_model_and_allows_retry(client, history, monkeypatch):
+    import traceback
+
+    service = client.app.state.ledger_service.categorization
+    engine = service.engines[PLUGIN]
+
+    def completed(*_):
+        yield {'stage': 'Ready to save', 'progress': 98}
+        return {'vocabulary': ['private-model-marker']}
+
+    def fail_save(*_):
+        raise OSError('Cannot save model')
+
+    monkeypatch.setattr(engine, 'train', completed)
+    monkeypatch.setattr(engine, 'save', fail_save)
+    run = action(client, 'train')
+    action(client, 'step', session=run['session'])
+    with pytest.raises(OSError) as failure:
+        service.action('personal', {'action': 'step', 'pluginId': PLUGIN, 'session': run['session']})
+    assert failure.value.__context__ is None
+    assert 'private-model-marker' not in ''.join(traceback.format_exception(failure.value))
+    assert not service.runs
+    retry = action(client, 'train')
+    action(client, 'cancel', session=retry['session'])
+
+
+def test_model_size_failure_is_actionable_and_does_not_publish_model(client, history, monkeypatch):
+    from whab_plugin_random_forest_categorization import model
+
+    monkeypatch.setattr(model, 'LIMIT', 1)
+    run = action(client, 'train', parameters={'trees': 10})
+    result = {}
+    while result.get('progress', 0) < 98:
+        result = action(client, 'step', session=run['session'])
+    response = client.post('/api/categorization', json={'workspace': 'personal', 'payload': {
+        'action': 'step', 'pluginId': PLUGIN, 'session': run['session']}})
+    assert response.status_code == 400
+    assert response.json() == {'error': 'Model is too large. Reduce trees, depth, or vocabulary.'}
+    assert action(client, 'status')['models'] == []
+    assert not client.app.state.ledger_service.categorization.runs

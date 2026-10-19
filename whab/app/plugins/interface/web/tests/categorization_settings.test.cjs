@@ -98,4 +98,6 @@ test('a failed training step cancels the session and restores parameter editing'
   assert.equal(ui.error.textContent, 'Training step failed');
   assert.equal(ui.requests.filter(request => request.action === 'cancel').length, 1);
   assert(form.querySelectorAll('input').every(control => !control.disabled));
+  assert.equal(ui.content.children.find(child => child.tag === 'progress').hidden, true);
+  assert.equal(ui.content.children.find(child => child.textContent === 'Cancel training').hidden, true);
 });

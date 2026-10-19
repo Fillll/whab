@@ -99,12 +99,13 @@ class Engine:
             yield {"stage": f"Training trees {forest.n_estimators} / {config['trees']}",
                    "progress": 5 + int(80 * forest.n_estimators / config["trees"])}
         yield {"stage": "Evaluating reviewed transactions", "progress": 90}
-        model = {"format": 1, "id": str(uuid4()), "parameters": config, "sklearn": sklearn.__version__,
+        model = {"format": 2, "id": str(uuid4()), "parameters": config, "sklearn": sklearn.__version__,
                  "trainedAt": datetime.now(timezone.utc).isoformat(), "vocabulary": vocabulary,
                  "features": list(vectorizer.get_feature_names_out()), "classes": list(forest.classes_),
                  "forest": [{"left": tree.tree_.children_left.tolist(), "right": tree.tree_.children_right.tolist(),
                              "feature": tree.tree_.feature.tolist(), "threshold": tree.tree_.threshold.tolist(),
-                             "value": tree.tree_.value[:, 0, :].tolist()} for tree in forest.estimators_],
+                             "value": [[[int(index), float(weights[index])] for index in weights.nonzero()[0]] if left == -1 else []
+                                       for left, weights in zip(tree.tree_.children_left, tree.tree_.value[:, 0, :])]} for tree in forest.estimators_],
                  "partitions": {key: {"count": len(part), "start": part[0]["date"], "end": part[-1]["date"]}
                                 for key, part in (("train", train), ("validation", validation), ("test", test))}}
         model["validation"] = metrics(model, validation)
@@ -116,7 +117,10 @@ class Engine:
         index = self.index()
         if len(index["models"]) >= 20:
             raise StoreError("Delete an old model before saving another (maximum 20).")
-        raw = encode(model)
+        try:
+            raw = encode(model)
+        except ValueError as error:
+            raise StoreError(str(error)) from None
         self.context.write_file(f"models/{model['id']}.json", raw)
         record = {key: value for key, value in model.items() if key not in {"forest", "features", "vocabulary", "classes", "format"}}
         record["name"] = name
