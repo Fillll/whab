@@ -33,7 +33,7 @@ function badge(text) {
   return {...element(), textContent: text, cloneNode() {return badge(this.textContent);}};
 }
 
-function harness({flush = async () => true, initialContext = {}, href = first} = {}) {
+function harness({flush = async () => true, beforeReplace = () => true, initialContext = {}, href = first} = {}) {
   const requests = [], replacements = [], histories = [], fallbacks = [], notices = [];
   const listeners = {};
   const navigationLinks = [];
@@ -85,7 +85,7 @@ function harness({flush = async () => true, initialContext = {}, href = first} =
     .replaceAll('export async function ', 'async function '), context);
   vm.runInNewContext(source.replace(/^import .*$/m, '').replaceAll('export function ', 'function '), context);
   Object.defineProperty(context, 'updated', {get: () => context.getContext()});
-  const navigator = context.initAccountNavigation({flush,
+  const navigator = context.initAccountNavigation({flush, beforeReplace,
     onReplace: () => {sidebar.scrollTop = 0;}, notify: message => notices.push(message)});
   function respond(index, {marker = '1', ok = true, override = {}, url, reviewBadge} = {}) {
     nextBadge = reviewBadge;
@@ -120,6 +120,64 @@ test('ordinary account, search and page navigation omits the unused sidebar frag
   assert.equal(state.accountListReplacements.length, 0);
   assert.equal(state.sidebar.scrollTop, 480);
   assert.equal(state.fallbacks.length, 0);
+});
+
+test('a validated replacement keeps the original page when its editor cannot be released', async () => {
+  let allowed = false, releases = 0;
+  const budget = 'https://localhost:5173/budgets/home/budget/2026-10/usd';
+  const state = harness({href: budget, initialContext: {page: 'budget'},
+    beforeReplace: () => {releases += 1; return allowed;}});
+  const original = state.content();
+  const refused = state.navigator.navigate(second);
+  await tick(); state.respond(0); await refused;
+  assert.equal(releases, 1);
+  assert.equal(state.content(), original);
+  assert.equal(state.replacements.length, 0);
+  assert.equal(state.histories.length, 0);
+  assert.equal(state.location.href, budget);
+  assert.equal(state.navigator.pendingDestination(), null);
+  assert.equal(state.status.hidden, true);
+  assert.deepEqual(state.fallbacks, []);
+  assert.deepEqual(state.notices, ['Save the current edit before continuing.']);
+  allowed = true;
+  const accepted = state.navigator.navigate(second);
+  await tick(); state.respond(1); await accepted;
+  assert.equal(releases, 2);
+  assert.equal(state.replacements.length, 1);
+  assert.deepEqual(state.histories, [['push', second]]);
+});
+
+test('a declined history replacement restores the visible budget address and leaves its editor mounted', async () => {
+  const budget = 'https://localhost:5173/budgets/home/budget/2026-10/usd';
+  const state = harness({href: budget, initialContext: {page: 'budget'}, beforeReplace: () => false});
+  state.location.href = second;
+  const pending = state.navigator.navigate(second, {history: 'none'});
+  await tick(); state.respond(0); await pending;
+  assert.deepEqual(state.histories, [['replace', budget]]);
+  assert.equal(state.location.href, budget);
+  assert.equal(state.replacements.length, 0);
+  assert.equal(state.navigator.pendingDestination(), null);
+  assert.deepEqual(state.fallbacks, []);
+});
+
+test('failed saves, rejected contexts and count-only summaries never release the current editor', async () => {
+  let releases = 0;
+  const beforeReplace = () => {releases += 1; return true;};
+  const unsaved = harness({flush: async () => false, beforeReplace});
+  await unsaved.navigator.navigate(second);
+  assert.equal(unsaved.requests.length, 0);
+  assert.equal(releases, 0);
+  const changed = harness({beforeReplace});
+  const invalid = changed.navigator.navigate(second);
+  await tick(); changed.respond(0, {override: {currency: 'EUR'}}); await invalid;
+  assert.equal(releases, 0);
+  assert.equal(changed.replacements.length, 0);
+  const summary = harness({beforeReplace});
+  const refreshing = summary.navigator.navigate(first, {summary: true, refresh: true});
+  await tick(); summary.respond(0, {marker: 'summary', reviewBadge: '2'}); await refreshing;
+  assert.equal(releases, 0);
+  assert.equal(summary.replacements.length, 0);
+  assert.deepEqual(summary.fallbacks, []);
 });
 
 test('partial review refresh updates, removes and creates the server-rendered navigation badge', async () => {
