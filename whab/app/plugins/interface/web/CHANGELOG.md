@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.25.0 — 2026-10-20
+
+PR: [#73](https://github.com/Fillll/whab/pull/73)
+
+- Show signed YNAB transaction-derived balance estimates beside sidebar accounts instead of dashes. Mark estimates and stale snapshots with `≈` and accessible source descriptions, preserve current balances and unavailable snapshots, and keep amounts readable beside truncated account names.
+
 ## 1.24.0 — 2026-10-18
 
 PR: [#70](https://github.com/Fillll/whab/pull/70)
