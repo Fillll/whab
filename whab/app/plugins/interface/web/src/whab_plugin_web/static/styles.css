@@ -312,6 +312,7 @@ strong {
 }
 .sidebar-account {
   display: flex;
+  flex-wrap: wrap;
   width: 100%;
   align-items: center;
   justify-content: space-between;
@@ -329,7 +330,7 @@ strong {
   gap: 8px;
   align-items: center;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 70px;
   color: var(--text-secondary);
   font-size: 11px;
 }
@@ -357,6 +358,7 @@ strong {
 }
 .sidebar-account small {
   flex-shrink: 0;
+  margin-left: auto;
   font-size: 11px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
