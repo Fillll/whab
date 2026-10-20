@@ -329,6 +329,7 @@ strong {
   gap: 8px;
   align-items: center;
   min-width: 0;
+  flex: 1;
   color: var(--text-secondary);
   font-size: 11px;
 }
@@ -337,6 +338,10 @@ strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sidebar-account > span > .sidebar-account-name {
+  flex: 1;
+  max-width: none;
 }
 .sidebar-account > span > .sidebar-bank-mark {
   display: inline-flex;
@@ -351,6 +356,7 @@ strong {
   display: flex;
 }
 .sidebar-account small {
+  flex-shrink: 0;
   font-size: 11px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
