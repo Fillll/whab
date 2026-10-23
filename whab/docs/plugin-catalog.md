@@ -9,7 +9,7 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
-| [bank-logos](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.3.0` | `whab>=2.11,<3` | Legacy; restart required | maintained |
+| [bank-logos](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 | [client](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
 | [example](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
 | [example-branding](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
@@ -21,9 +21,9 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [server](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.0.1` | `whab>=2,<3` | Legacy; restart required | maintained |
 | [sqlite](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.11.0` | `whab>=2.30,<3` | restart-required | maintained |
 | [web](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.25.1` | `whab>=2.19,<3` | Legacy; restart required | maintained |
-| [ynab](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.3.1` | `whab>=2.21,<3` | Legacy; restart required | maintained |
+| [ynab](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
-Only explicit stateless report descriptors advertise live-worker compatibility. Other entries require restart; backend migration and copies are not inferred from package installation.
+Explicit stateless report, branding and file-parser descriptors advertise their supported live-worker adapters. Other entries require restart; backend migration and copies are not inferred from package installation.
 
 ## Recorded verification
 

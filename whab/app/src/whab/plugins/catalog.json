@@ -1,10 +1,10 @@
 {
   "format_version": 1,
-  "host_version": "2.30.0",
+  "host_version": "2.31.0",
   "plugins": [
     {
       "api_version": 1,
-      "authority": "unknown",
+      "authority": "local",
       "capabilities": [
         {
           "composition": "additive",
@@ -22,25 +22,21 @@
         "value": "whab_plugin_bank_logos.plugin:plugin"
       },
       "id": "bank-logos",
-      "legacy": true,
-      "lifecycle": "restart",
-      "live_support": "restart-required",
+      "legacy": false,
+      "lifecycle": "live",
+      "live_support": "stateless-optional-worker",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2.11,<3",
+      "requires_host": "whab>=2.31,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/interface/bank-logos",
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [
-        "pr82-installed-sqlite-web",
-        "pr86-installed-sqlite-web",
-        "pr86-installed-json-web"
-      ],
-      "version": "1.3.0"
+      "verifications": [],
+      "version": "1.4.0"
     },
     {
       "api_version": 1,
@@ -597,7 +593,7 @@
     },
     {
       "api_version": 1,
-      "authority": "unknown",
+      "authority": "local",
       "capabilities": [
         {
           "composition": "additive",
@@ -615,25 +611,21 @@
         "value": "whab_plugin_ynab.plugin:plugin"
       },
       "id": "ynab",
-      "legacy": true,
-      "lifecycle": "restart",
-      "live_support": "restart-required",
+      "legacy": false,
+      "lifecycle": "live",
+      "live_support": "stateless-optional-worker",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2.21,<3",
+      "requires_host": "whab>=2.31,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/ingestion/ynab",
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [
-        "pr82-installed-sqlite-web",
-        "pr86-installed-sqlite-web",
-        "pr86-installed-json-web"
-      ],
-      "version": "1.3.1"
+      "verifications": [],
+      "version": "1.4.0"
     }
   ],
   "publisher": {
