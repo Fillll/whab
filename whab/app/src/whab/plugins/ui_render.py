@@ -1,5 +1,7 @@
 """Data-only inputs for a visual worker; its Python/Jinja helpers stay inside it."""
 
+import json
+import math
 from dataclasses import fields
 from urllib.parse import urlencode
 
@@ -9,7 +11,7 @@ from whab.web.navigation import page_url
 
 from .contracts import Capability, Requirement
 from .sdk import Insight, PluginDescription, PluginInsightResult
-from .wire import Frame, WireError
+from .wire import MAX_METADATA_BYTES, Frame, WireError
 
 _RECORDS = (PluginDescription, PluginInsightResult, Insight, Capability, Requirement)
 _HEADERS = frozenset({"x-whab-page-fragment", "x-whab-budget-fragment",
@@ -18,23 +20,46 @@ _ROUTING = frozenset({"key", "personal_key", "workspace", "page", "month_token",
 _INPUT = frozenset({"data", "status", "items", "workspace", "page", "month", "selected"})
 
 
-def public_value(value, depth=0):
-    """Copy known presentation records, rejecting handles and arbitrary objects."""
-    if depth > 16:
+def _public(value, budget, depth=0):
+    budget[0] -= 1
+    if depth > 16 or budget[0] < 0:
         raise WireError()
     if type(value) in _RECORDS:
         value = {field.name: getattr(value, field.name) for field in fields(value)}
     if type(value) is dict:
-        if len(value) > 100000 or any(type(key) is not str for key in value):
+        if len(value) > 100000 or any(type(key) is not str or not key or len(key) > 200 for key in value):
             raise WireError()
-        return {key: public_value(item, depth + 1) for key, item in value.items()}
+        _reserve(budget, 2 + max(0, len(value) - 1) + len(value))
+        return {_public(key, budget, depth + 1): _public(item, budget, depth + 1) for key, item in value.items()}
     if type(value) in (tuple, list):
         if len(value) > 100000:
             raise WireError()
-        return [public_value(item, depth + 1) for item in value]
-    if value is None or type(value) in (str, int, float, bool):
-        return value
-    raise WireError()
+        _reserve(budget, 2 + max(0, len(value) - 1))
+        return [_public(item, budget, depth + 1) for item in value]
+    if type(value) is str:
+        if len(value) > 100000 or "\x00" in value:
+            raise WireError()
+    elif type(value) in (int, float):
+        if abs(value) > 2**53 - 1 or type(value) is float and not math.isfinite(value):
+            raise WireError()
+    elif value is not None and type(value) is not bool:
+        raise WireError()
+    try:
+        _reserve(budget, len(json.dumps(value, ensure_ascii=False, allow_nan=False).encode("utf-8")))
+    except (ValueError, UnicodeError):
+        raise WireError() from None
+    return value
+
+
+def _reserve(budget, size):
+    budget[1] -= size
+    if budget[1] < 0:
+        raise WireError()
+
+
+def public_value(value):
+    """Copy public records with aggregate allocation and encoded-byte budgets."""
+    return _public(value, [1000000, MAX_METADATA_BYTES])
 
 
 def render_arguments(inputs, context, routing, request, templates=None):
@@ -42,19 +67,20 @@ def render_arguments(inputs, context, routing, request, templates=None):
     if type(inputs) is not dict or inputs.keys() != _INPUT or type(routing) is not dict or routing.keys() != _ROUTING:
         raise WireError()
     value = {
-        "input": public_value(inputs), "context": public_value(context), "routing": public_value(routing),
+        "input": inputs, "context": context, "routing": routing,
         "request": {"path": request.url.path, "query": list(map(list, request.query_params.multi_items())),
                     "headers": {name: request.headers[name] for name in _HEADERS if name in request.headers}},
         "templates": dict(templates or {}),
     }
     # Reuse the negotiated frame's strict scalar/depth/size validation before
     # the parent allocates or writes a worker message.
-    Frame(value).encode()
+    value = public_value(value)
     read_arguments(value)
     return value
 
 
 def read_arguments(value):
+    value = public_value(value)
     if type(value) is not dict or value.keys() != {"input", "context", "routing", "request", "templates"}:
         raise WireError()
     inputs, routing, request = value["input"], value["routing"], value["request"]

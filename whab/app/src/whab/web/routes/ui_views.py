@@ -43,6 +43,10 @@ def create_router(resolve):
     async def update(identifier: UUID, body: ViewState):
         return invoke("update", str(identifier), body.generation, dirty=body.dirty, prepared=body.prepared)
 
+    @router.get("/{identifier}")
+    async def status(identifier: UUID):
+        return invoke("heartbeat", str(identifier))
+
     @router.delete("/{identifier}", status_code=204)
     async def unregister(identifier: UUID):
         invoke("unregister", str(identifier))

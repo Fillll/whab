@@ -22,6 +22,7 @@ def test_browser_state_is_bounded_opaque_and_origin_guarded():
         registered = http.post("/api/ui/views", json=body)
         assert registered.status_code == 201
         identifier = registered.json()["view"]
+        assert http.get(f"/api/ui/views/{identifier}").json()["dirty"] is True
         assert registered.json()["reload"] is False
         assert http.put(f"/api/ui/views/{identifier}", json={**body, "dirty": False}).status_code == 200
         assert http.post("/api/ui/views", json={**body, "draft": "private"}).status_code == 400

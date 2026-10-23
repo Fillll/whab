@@ -69,6 +69,11 @@ class BrowserViews:
         self._changed.set()
         return self.status(identifier)
 
+    def heartbeat(self, identifier):
+        status = self.status(identifier)
+        self.views[identifier]["seen"] = self.clock()
+        return status
+
     def unregister(self, identifier):
         self.views.pop(identifier, None)
         self._changed.set()

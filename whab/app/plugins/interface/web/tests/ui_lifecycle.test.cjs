@@ -37,8 +37,9 @@ test('an unsaved form defers the proposal and remains editable', async () => {
   const state = harness([{view: 'v', pending: {id: 'p'}}]);
   state.setDirty(true); state.setReady(false);
   await state.views.tick();
-  assert.equal(state.calls.length, 1);
+  assert.equal(state.calls.length, 2);
   assert.equal(state.calls[0].body.dirty, true);
+  assert.equal(state.calls[1].body.prepared, null);
   assert.deepEqual(state.holds, [true, false]);
   assert.equal(state.reloads, 0);
 });
@@ -67,26 +68,30 @@ test('an edit arriving during a flush prevents both acknowledgment and reload', 
   const state = harness([{view: 'v', pending: {id: 'p'}, reload: true}]);
   state.setReady(() => {state.setDirty(true); return true;});
   await state.views.tick();
-  assert.equal(state.calls.length, 1);
+  assert.equal(state.calls.length, 2);
+  assert.equal(state.calls[1].body.prepared, null);
   assert.equal(state.reloads, 0);
   assert.deepEqual(state.holds, [true, false]);
 });
-test('network failure after acknowledgment releases input; a later proposal is rechecked', async () => {
+test('a lost acknowledgment reply keeps input paused until commit or abort is confirmed', async () => {
   const state = harness([{view: 'v', pending: {id: 'p'}}, new Error('offline'),
-    {pending: {id: 'p'}}, {pending: {id: 'p'}}]);
+    {pending: {id: 'p'}}, {pending: null}]);
   await state.views.tick(); await state.views.tick();
-  assert.deepEqual(state.holds, [true, false, true]);
-  assert.equal(state.calls.filter(row => row.body.prepared === 'p').length, 2);
+  assert.deepEqual(state.holds, [true]);
+  assert.equal(state.calls.filter(row => row.body?.prepared === 'p').length, 1);
+  assert.equal(state.calls.at(-1).method, 'GET');
+  await state.views.tick();
+  assert.deepEqual(state.holds, [true, false]);
   state.views.stop();
   assert.equal(state.queued, null);
   assert.equal(state.holds.at(-1), false);
 });
 test('unknown expired views register again without changing their generation', async () => {
   const error = new Error('expired'); error.code = 'ui_view_unknown';
-  const state = harness([{view: 'v', pending: null}, error, {view: 'new', pending: null}]);
+  const state = harness([{view: 'v', pending: null}, {}, error, {view: 'new', pending: null}]);
   await state.views.tick(); await state.views.tick(); await state.views.tick();
-  assert.equal(state.calls.at(-1).method, 'POST');
-  assert.equal(state.calls.at(-1).body.generation, generation);
+  assert.equal(state.calls.at(-2).method, 'POST');
+  assert.equal(state.calls.at(-2).body.generation, generation);
 });
 test('legacy contexts do not start coordination and overlapping polls are serialized', async () => {
   const context = {setTimeout, clearTimeout};
@@ -94,5 +99,25 @@ test('legacy contexts do not start coordination and overlapping polls are serial
   assert.equal(context.create({generation: null}), null);
   const state = harness();
   await Promise.all([state.views.tick(), state.views.tick()]);
+  assert.equal(state.calls.length, 2);
+});
+
+test('stopping while a save is pending prevents a later acknowledgment or reload', async () => {
+  let finish;
+  const saved = new Promise(resolve => {finish = resolve;});
+  const state = harness([{view: 'v', pending: {id: 'p'}, reload: true}]);
+  state.setReady(() => saved);
+  const tick = state.views.tick();
+  await new Promise(resolve => setImmediate(resolve));
+  state.views.stop(); finish(true); await tick;
   assert.equal(state.calls.length, 1);
+  assert.equal(state.reloads, 0);
+  assert.deepEqual(state.holds, [true, false]);
+});
+
+test('stopping after an uncertain acknowledgment cannot unlock the acknowledged view', async () => {
+  const state = harness([{view: 'v', pending: {id: 'p'}}, new Error('lost reply')]);
+  await state.views.tick(); state.views.stop();
+  assert.deepEqual(state.holds, [true]);
+  assert.equal(state.reloads, 0);
 });

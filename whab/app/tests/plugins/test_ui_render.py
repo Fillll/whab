@@ -56,6 +56,20 @@ def test_only_known_public_presentation_records_cross_the_boundary():
             public_value(value)
 
 
+def test_aggregate_encoded_budget_stops_before_copying_or_serializing_large_fanout(monkeypatch):
+    import whab.plugins.ui_render as rendering
+    original = rendering.json.dumps
+    observed = []
+    def encode(value, **options):
+        observed.append(value)
+        assert len(observed) < 100
+        return original(value, **options)
+    monkeypatch.setattr(rendering.json, "dumps", encode)
+    with pytest.raises(WireError):
+        public_value(["x" * 100000] * 10000)
+    assert len(observed) < 90
+
+
 @pytest.mark.parametrize("change", [
     lambda value: value.update(extra=True),
     lambda value: value["request"]["headers"].update(authorization="private"),
