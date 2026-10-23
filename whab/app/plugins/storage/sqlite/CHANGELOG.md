@@ -1,5 +1,12 @@
 # SQLite budget storage plugin changelog
 
+## 1.10.0 — 2026-10-23
+
+PR: [#84](https://github.com/Fillll/whab/pull/84)
+
+- Persist local instance/epoch/generation authority, durable typed-operation receipts and role fencing atomically with financial changes. Adopt authority metadata transactionally and retain existing ledger semantics.
+- Transfer both workspaces, receipt history/import identities and protected encrypted provider checkpoints through the public same-device contract. Declare exact portable payload ownership, omit runtime authority from sanitized exports and require WHAB 2.27+.
+
 ## 1.9.0 — 2026-10-18
 
 PR: [#65](https://github.com/Fillll/whab/pull/65)
