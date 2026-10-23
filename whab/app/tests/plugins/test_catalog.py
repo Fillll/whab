@@ -20,7 +20,7 @@ def test_catalog_reads_packaged_data_without_discovery_and_returns_independent_p
     assert first["publisher"]["security"] == "https://github.com/Fillll/whab/security/advisories/new"
     entries = {row["id"]: row for row in first["plugins"]}
     assert entries["example"]["live_support"] == "stateless-report-worker"
-    assert entries["sqlite"]["legacy"] is True
+    assert entries["sqlite"]["legacy"] is False
     assert entries["client"]["authority"] == "remote"
     assert entries["json"]["legacy"] is False
     assert entries["plaid"]["lifecycle"] == "restart"

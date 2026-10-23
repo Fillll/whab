@@ -20,12 +20,10 @@ where = ["src"]
 include = ["whab_plugin_server", "whab_plugin_server.*"]
 
 [tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "interface.api", "version" = 1, "composition" = "additive" }]
 requires = []
 conflicts = []
-api-version = 1
-capabilities = [
-  { name = "interface.api", version = 1, composition = "additive" },
-]
 lifecycle = "restart"
 legacy = true
 authority = "unknown"

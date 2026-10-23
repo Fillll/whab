@@ -18,13 +18,10 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "reporting.export", "version" = 1, "composition" = "additive" }, { "name" = "reporting.insights", "version" = 1, "composition" = "additive" }]
 requires = []
 conflicts = []
-api-version = 1
-capabilities = [
-  { name = "reporting.export", version = 1, composition = "additive" },
-  { name = "reporting.insights", version = 1, composition = "additive" },
-]
 lifecycle = "live"
 legacy = false
 authority = "local"

@@ -204,6 +204,7 @@ def build_catalog(root=ROOT):
 def catalog_markdown(catalog):
     lines = ["# Curated plugin catalog", "", "Generated from package metadata, explicit static declarations and reviewed verification evidence.",
              "Catalog inspection imports no plugin and installs nothing. Installed plugins remain trusted Python code; workers contain failures without providing a security sandbox.", "",
+             "Inspect the packaged data through `GET /api/plugins/catalog` or `whab.plugins.catalog.catalog_snapshot()`. The endpoint retains the host's HTTPS and local-access guards and remains available while a budget transition is gated. A missing or damaged catalog returns a fixed diagnostic; discovery and installation are never fallback actions.", "",
              "See [the canonical supported set](../app/plugins/README.md#supported-plugins) and [security reporting](../../SECURITY.md).", "",
              "| Plugin | Distribution version | Host requirement | Lifecycle | Support |", "| --- | --- | --- | --- | --- |"]
     for row in catalog["plugins"]:

@@ -12,6 +12,7 @@ from whab.domain.accounts import bank_website_entry
 from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.plugins import PluginError
+from whab.plugins.catalog import CatalogError, catalog_snapshot
 from whab.web.csv import safe_cell
 from whab.web.navigation import budget_key
 from whab.web.plugin_snapshot import build_snapshot
@@ -31,6 +32,13 @@ def create_router(store, plugins, plugin_manager=None):
     @router.get("")
     def describe():
         return {"plugins": [asdict(plugin) for plugin in plugins.describe()]}
+
+    @router.get("/catalog")
+    def curated_catalog():
+        try:
+            return JSONResponse(catalog_snapshot(), headers={"Cache-Control": "no-store"})
+        except CatalogError as error:
+            raise HTTPException(503, str(error)) from None
 
     @router.get("/runtime")
     def runtime_status():

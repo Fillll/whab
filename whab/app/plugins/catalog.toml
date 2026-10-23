@@ -3,9 +3,9 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "b4c555cc437357a833a858d37d46938f93e6a48f"
+documentation_ref = "3a492a368d840a87836669e9670168c697585e3b"
 security = "https://github.com/Fillll/whab/security/advisories/new"
-security_policy = "https://github.com/Fillll/whab/security/policy"
+security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
 support_policy = "Security fixes target current main and independently maintained bundled packages under the repository security policy; older versions have no separate backport commitment. Teaching examples have developer support. Exact verification artifacts below are draft PR builds, not published releases."
 

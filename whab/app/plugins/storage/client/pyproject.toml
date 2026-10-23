@@ -20,13 +20,10 @@ where = ["src"]
 include = ["whab_plugin_client", "whab_plugin_client.*"]
 
 [tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "ledger.mutate", "version" = 1, "composition" = "singleton" }, { "name" = "ledger.read", "version" = 1, "composition" = "singleton" }]
 requires = []
 conflicts = []
-api-version = 1
-capabilities = [
-  { name = "ledger.mutate", version = 1, composition = "singleton" },
-  { name = "ledger.read", version = 1, composition = "singleton" },
-]
 lifecycle = "restart"
 legacy = false
 authority = "remote"

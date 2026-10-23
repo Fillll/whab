@@ -3,20 +3,25 @@
 Generated from package metadata, explicit static declarations and reviewed verification evidence.
 Catalog inspection imports no plugin and installs nothing. Installed plugins remain trusted Python code; workers contain failures without providing a security sandbox.
 
+Inspect the packaged data through `GET /api/plugins/catalog` or `whab.plugins.catalog.catalog_snapshot()`. The endpoint retains the host's HTTPS and local-access guards and remains available while a budget transition is gated. A missing or damaged catalog returns a fixed diagnostic; discovery and installation are never fallback actions.
+
 See [the canonical supported set](../app/plugins/README.md#supported-plugins) and [security reporting](../../SECURITY.md).
 
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
-| [bank-logos](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.3.0` | `whab>=2.11,<3` | Legacy; restart required | maintained |
-| [client](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
-| [example](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
-| [json](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.0.0` | `whab>=2.23,<3` | restart-required | maintained |
-| [plaid](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.1.4` | `whab>=2.5,<3` | Legacy; restart required | maintained |
-| [random-forest-categorization](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.1.0` | `whab>=2.19,<3` | Legacy; restart required | maintained |
-| [server](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.0.1` | `whab>=2,<3` | Legacy; restart required | maintained |
-| [sqlite](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.9.0` | `whab>=2.17,<3` | Legacy; restart required | maintained |
-| [web](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.25.1` | `whab>=2.19,<3` | Legacy; restart required | maintained |
-| [ynab](https://github.com/Fillll/whab/blob/b4c555cc437357a833a858d37d46938f93e6a48f/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.3.1` | `whab>=2.21,<3` | Legacy; restart required | maintained |
+| [bank-logos](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.3.0` | `whab>=2.11,<3` | Legacy; restart required | maintained |
+| [client](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
+| [example](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
+| [example-branding](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-categorization](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-file-import](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [json](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.1.0` | `whab>=2.27,<3` | restart-required | maintained |
+| [plaid](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
+| [random-forest-categorization](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.1.0` | `whab>=2.19,<3` | Legacy; restart required | maintained |
+| [server](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.0.1` | `whab>=2,<3` | Legacy; restart required | maintained |
+| [sqlite](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.10.0` | `whab>=2.27,<3` | restart-required | maintained |
+| [web](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.25.1` | `whab>=2.19,<3` | Legacy; restart required | maintained |
+| [ynab](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.3.1` | `whab>=2.21,<3` | Legacy; restart required | maintained |
 
 Only explicit stateless report descriptors advertise live-worker compatibility. Other entries require restart; backend migration and copies are not inferred from package installation.
 

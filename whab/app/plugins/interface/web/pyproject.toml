@@ -23,12 +23,10 @@ include = ["whab_plugin_web", "whab_plugin_web.*"]
 whab_plugin_web = ["templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]
 
 [tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "interface.ui", "version" = 1, "composition" = "singleton" }]
 requires = []
 conflicts = []
-api-version = 1
-capabilities = [
-  { name = "interface.ui", version = 1, composition = "singleton" },
-]
 lifecycle = "restart"
 legacy = true
 authority = "unknown"
