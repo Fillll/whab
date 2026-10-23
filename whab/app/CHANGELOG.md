@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.23.0 — 2026-10-23
+
+PR: [#79](https://github.com/Fillll/whab/pull/79)
+
+- Support independently packaged JSON 1.0.0 local storage alongside SQLite, using shared financial helpers and explicit selection. Preserve native encrypted provider state and backend-owned receipts; retain sanitized JSON ownership in personal and demo portable exports.
+- Verify installed JSON save/reopen and export paths. Publish bounded full-file persistence, stable writer locks, flushed atomic replacement and explicit uncertain-commit evidence with interruption tests.
+
 ## 2.22.0 — 2026-10-23
 
 PR: [#76](https://github.com/Fillll/whab/pull/76)

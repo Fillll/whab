@@ -10,7 +10,7 @@ not update the household installation or publish releases.
 | --- | --- | --- |
 | 1 | Versioned capabilities, deterministic resolution, authority policy, compatible manifests and staged saved-state upgrades | Initial implementation tested in draft PR #76; live commit controls pending |
 | 2 | Independent public conformance kit; capability applicability; ten distinct replayable configurations | Initial storage suites and minimum/candidate installed-wheel CI tested; random configurations pending |
-| 3 | Independent durable JSON storage, strict validation, interruption tests and fictional benchmarks | Pending |
+| 3 | Independent durable JSON storage, strict validation, interruption tests and fictional benchmarks | Implemented and tested in draft PR [#79](https://github.com/Fillll/whab/pull/79); migration/copy authority remains separate |
 | 4 | Per-budget generations, request/background leases, admission gates, draining and stable services | Coordinator in development; integration pending |
 | 5 | Bounded worker protocol, immutable versioned environments, readiness and durable mutation outcomes | Pending |
 | 6 | Live report/export, branding and parser replacement; then categorization/banks; then storage/UI/API interfaces | Pending |
