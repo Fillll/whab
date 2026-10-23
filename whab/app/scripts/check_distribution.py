@@ -61,7 +61,11 @@ assert settings.home == Path.cwd()
 assert settings.storage == "sqlite" and settings.ui == "web"
 assert settings.plugins == ("plaid", "example", "bank-logos", "ynab")
 registry = load_plugins(settings.enabled_plugins())
-assert [p.id for p in registry.describe()] == ["plaid", "example", "bank-logos", "ynab", "sqlite", "web"]
+assert [p.id for p in registry.describe()] == ["bank-logos", "example", "plaid", "sqlite", "web", "ynab"]
+assert all(p.lifecycle == "restart" and p.legacy for p in registry.describe())
+remote = load_plugins(("client",)).describe()[0]
+assert remote.authority == "remote" and not remote.legacy
+assert {row.name for row in remote.capabilities} == {"ledger.read", "ledger.mutate"}
 assert registry.bank_logo("Chase") == ("bank-logos", "chase")
 assert registry.bank_logo("Demo Bank") is None
 assert logo_key("https://plaid-merchant-logos.plaid.com/walmart_1100.png") == "merchant-walmart_1100"

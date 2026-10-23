@@ -1,5 +1,11 @@
 # HTTPS remote budget client plugin changelog
 
+## 1.5.0 — 2026-10-23
+
+PR: [#76](https://github.com/Fillll/whab/pull/76)
+
+- Declare remote authority through the versioned SDK contract, requiring WHAB 2.22 or newer. Host policy no longer depends on this plugin's implementation name; lifecycle remains restart-only.
+
 ## 1.4.0 — 2026-10-18
 
 PR: [#68](https://github.com/Fillll/whab/pull/68)
