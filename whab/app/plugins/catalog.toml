@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "188c008f6927682548d20dbe53bc93419d51e00b"
+documentation_ref = "e5ccbfda2dc5b32f239846a12d70a40a36dbddc1"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
