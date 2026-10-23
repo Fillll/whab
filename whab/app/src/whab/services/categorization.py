@@ -378,6 +378,9 @@ class CategorizationService:
                 model_id = values.get("modelId", "")
                 if len(model_id) != 36 or str(UUID(model_id)) != model_id:
                     raise StoreError("Choose a saved model.")
+                index = engine.index()
+                if not any(type(row) is dict and row.get("id") == model_id for row in index.get("models", ())):
+                    raise StoreError("Choose a saved model from this budget and workspace.")
                 if action == "rename":
                     engine.rename(model_id, values.get("name", "Random forest"))
                 else:

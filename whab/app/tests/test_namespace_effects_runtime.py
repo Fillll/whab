@@ -159,7 +159,7 @@ def test_native_state_persists_across_callbacks_and_unknown_files_survive_reopen
 @pytest.mark.parametrize("phase", ["hook", "before_replace", "after_replace"])
 @pytest.mark.parametrize("cleanup_failure", [False, True])
 def test_failed_worker_mutation_retires_cached_heap_before_any_workspace_can_predict(effects, phase, cleanup_failure):
-    from whab.plugins import Categorization, Plugin, PluginContract
+    from whab.plugins import Categorization, Plugin, PluginContract, PluginError
     from whab.plugins.categorization_worker import (
         CategorizationDispatcher,
         WorkerCategorizationFactory,
@@ -230,12 +230,12 @@ def test_failed_worker_mutation_retires_cached_heap_before_any_workspace_can_pre
     assert engine.closed and not child.healthy and child.closed == 1
     assert native().digest == original and not observed
     for candidate in (engine, other_workspace):
-        with pytest.raises((WireError, EffectError)):
+        with pytest.raises((WireError, EffectError, PluginError)):
             candidate.predict([])
     manager.journal.store.fault = None
     manager.recover()
     for candidate in (engine, other_workspace):
-        with pytest.raises(WireError):
+        with pytest.raises((WireError, PluginError)):
             candidate.predict([])
     replacement = Transport()
     reopened = WorkerCategorizationFactory(replacement, manager).create(context(), "personal")

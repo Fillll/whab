@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from .effect_store import encode
 from .namespace_effects import NamespaceDraft
+from .runtime import PluginError
 from .sdk import BudgetContext
 from .wire import WireError, _value
 from .worker_namespace import namespace_bundle, read_namespace
@@ -304,8 +305,9 @@ class WorkerCategorizer:
             self.preview = None
 
     def _call(self, command, values):
-        if self.closed:
-            raise WireError()
+        if self.closed or not self.factory.worker.healthy:
+            raise PluginError("The categorization worker requires an approved replacement or application reopen.",
+                              code="worker_unavailable", plugin_id=getattr(self.factory.worker, "plugin_id", None))
         if self.factory.access is not None:
             self.factory.access._check(command in _MUTATIONS)
         effects = self.factory.effects
