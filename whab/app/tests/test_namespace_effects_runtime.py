@@ -154,3 +154,95 @@ def test_native_state_persists_across_callbacks_and_unknown_files_survive_reopen
         assert reopened.snapshot.files["unknown.bin"] == b"unknown synthetic data"
     finally:
         reopened.close()
+
+
+@pytest.mark.parametrize("phase", ["hook", "before_replace", "after_replace"])
+@pytest.mark.parametrize("cleanup_failure", [False, True])
+def test_failed_worker_mutation_retires_cached_heap_before_any_workspace_can_predict(effects, phase, cleanup_failure):
+    from whab.plugins import Categorization, Plugin, PluginContract
+    from whab.plugins.categorization_worker import (
+        CategorizationDispatcher,
+        WorkerCategorizationFactory,
+    )
+    from whab.plugins.wire import WireError
+    from whab.plugins.worker_namespace import namespace_bundle, read_namespace
+
+    manager, context, _, observed, native = effects
+
+    class CachedEngine:
+        defaults = {}
+
+        def __init__(self, budget):
+            self.context = budget
+            self.active = budget.state.get("active", "original")
+
+        def index(self):
+            return {"active": self.active}
+
+        def select(self, identifier):
+            self.active = identifier
+            self.context.save_state({"active": identifier})
+            if phase == "hook":
+                raise ValueError("fictional model hook failed after changing its cache")
+
+        def predict(self, rows):
+            return [{"model": self.active}]
+
+        delete = rename = save = train = lambda *args: None
+
+    class Transport:
+        def __init__(self):
+            self.healthy = True
+            self.closed = 0
+            self.dispatcher = CategorizationDispatcher(Plugin(
+                "categorizer", "Fictional cached engine", categorization=Categorization(CachedEngine),
+                contract=PluginContract(lifecycle="live")))
+
+        def category(self, arguments, snapshot):
+            if not self.healthy:
+                raise WireError()
+            metadata, payload = namespace_bundle(snapshot)
+            result, raw = self.dispatcher.call({**arguments, "namespace": metadata}, payload)
+            return result["engine"], result["result"], read_namespace(result["namespace"], raw)
+
+        def close(self):
+            self.closed += 1
+            self.healthy = False
+            self.dispatcher.close()
+            if cleanup_failure:
+                raise WireError()
+
+    child = Transport()
+    factory = WorkerCategorizationFactory(child, manager)
+    engine = factory.create(context(), "personal")
+    other_workspace = factory.create(context(), "demo")
+    original = native().digest
+
+    def fail(boundary):
+        if boundary == phase:
+            raise OSError("fictional interrupted model publication")
+
+    manager.journal.store.fault = fail
+    with pytest.raises(ValueError if phase == "hook" else EffectError) as caught:
+        engine.select("uncommitted-cache")
+    if phase != "hook":
+        assert caught.value.code == ("effect_commit_failed" if phase == "before_replace" else "effect_commit_uncertain")
+    assert engine.closed and not child.healthy and child.closed == 1
+    assert native().digest == original and not observed
+    for candidate in (engine, other_workspace):
+        with pytest.raises((WireError, EffectError)):
+            candidate.predict([])
+    manager.journal.store.fault = None
+    manager.recover()
+    for candidate in (engine, other_workspace):
+        with pytest.raises(WireError):
+            candidate.predict([])
+    replacement = Transport()
+    reopened = WorkerCategorizationFactory(replacement, manager).create(context(), "personal")
+    try:
+        expected = "uncommitted-cache" if phase == "after_replace" else "original"
+        assert reopened.predict([]) == [{"model": expected}]
+        assert manager.snapshot.digest == native().digest
+    finally:
+        reopened.close()
+        replacement.dispatcher.close()

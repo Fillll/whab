@@ -320,9 +320,21 @@ class WorkerCategorizer:
             self.last_snapshot = changed
             return changed, output
 
-        return effects.execute("category:" + self.workspace + ":" + command,
-                               {"command": command, "values": values, "workspace": self.workspace},
-                               invoke, mutating=command in _MUTATIONS)
+        try:
+            return effects.execute("category:" + self.workspace + ":" + command,
+                                   {"command": command, "values": values, "workspace": self.workspace},
+                                   invoke, mutating=command in _MUTATIONS)
+        except BaseException:
+            if command in _MUTATIONS:
+                # A hook can change cached model objects before its namespace
+                # is committed, even when publication definitely failed. Retire
+                # the whole child so neither workspace can use that heap.
+                self.closed = True
+                try:
+                    self.factory.worker.close()
+                except Exception:
+                    pass  # Retain the original failure and owned cleanup state.
+            raise
 
     def index(self):
         return self._call("index", {})

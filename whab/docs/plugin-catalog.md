@@ -17,13 +17,13 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [example-file-import](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
 | [json](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.2.0` | `whab>=2.30,<3` | restart-required | maintained |
 | [plaid](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
-| [random-forest-categorization](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.2.0` | `whab>=2.32,<3` | categorization-host | maintained |
+| [random-forest-categorization](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.3.0` | `whab>=2.35,<3` | categorization-worker | maintained |
 | [server](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
 | [sqlite](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.11.0` | `whab>=2.30,<3` | restart-required | maintained |
 | [web](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.26.0` | `whab>=2.19,<3` | Legacy; restart required | maintained |
 | [ynab](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
-Explicit stateless report, branding, file-parser and declarative API interface descriptors advertise their supported live-worker adapters. Categorization supports host-process selection changes; its code upgrades still require an application restart. Other entries require restart; backend migration and copies are not inferred from package installation.
+Explicit stateless report, branding, file-parser, declarative API interface and pure categorization descriptors advertise their supported live-worker adapters. Other entries require restart; backend migration and copies are not inferred from package installation.
 
 ## Recorded verification
 

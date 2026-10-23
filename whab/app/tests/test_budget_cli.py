@@ -1,5 +1,6 @@
 """Portable-budget CLI arguments configure real isolated data without opening a listener."""
 
+import asyncio
 import os
 import sys
 
@@ -67,6 +68,32 @@ def test_create_applies_explicit_port_before_loading_existing_environment(launch
     monkeypatch.setenv("PORT", "80")
     invoke("--budget", tmp_path / "Budget.whab", "--create", "Budget", "--port", "5174")
     assert calls[-1][2].port == 5174
+
+
+def test_create_retires_unstarted_categorizer_before_opening_saved_budget(launch, tmp_path, monkeypatch):
+    from whab_plugin_random_forest_categorization.plugin import plugin
+
+    invoke, calls = launch
+    monkeypatch.setenv("WHAB_PLUGINS", plugin.id)
+    original_create = create_app
+    constructed = []
+
+    def capture(**arguments):
+        app = original_create(**arguments)
+        engine = app.state.ledger_service.categorization.engines[plugin.id]
+        constructed.append((app, engine, engine.factory.worker))
+        return app
+
+    monkeypatch.setattr("whab.app.create_app", capture)
+    invoke("--budget", tmp_path / "Fictional.whab", "--create", "Fictional")
+    _, engine, worker = constructed[0]
+    assert engine.closed and not worker.healthy and not worker.cleanup_pending
+    reopened = original_create(settings=calls[-1][2])
+    try:
+        assert reopened.state.ledger_service.categorization.engines[plugin.id].index()["models"] == []
+    finally:
+        asyncio.run(reopened.state.budget_runtime.shutdown())
+        reopened.state.store.close()
 
 
 def test_open_and_repeatable_copy_options_save_the_same_budget(launch, tmp_path):
