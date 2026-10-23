@@ -173,9 +173,22 @@
   {{ heading('Settings', 'Manage this local workspace.') }}
   <nav class="settings-menu" aria-label="Settings sections">
     <button type="button" data-dialog="budgets-dialog">{{ icon('budget', 18) }}<span><strong>Budgets</strong><small>Current budget · {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }}</small></span>{{ icon('chevron-right', 16) }}</button>
+    <button type="button" data-dialog="storage-copies-dialog">{{ icon('budget', 18) }}<span><strong>Storage copies</strong><small>Primary storage and synchronized copies</small></span>{{ icon('chevron-right', 16) }}</button>
     <button type="button" data-dialog="plugins-dialog">{{ icon('settings', 18) }}<span><strong>Plugins</strong><small>Installed plugins and their settings</small></span>{{ icon('chevron-right', 16) }}</button>
     <button type="button" data-dialog="about-dialog">{{ icon('help', 18) }}<span><strong>About this prototype</strong><small>WHAB · {{ version }}</small></span>{{ icon('chevron-right', 16) }}</button>
   </nav>
+</dialog>
+<dialog class="modal settings-modal" id="storage-copies-dialog" aria-label="Storage copies" data-workspace="{{ workspace }}">
+  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
+  {{ heading('Storage copies', 'One authoritative primary, with separately saved copies.') }}
+  {% if workspace=='personal' %}
+  <div class="storage-copy-toolbar"><p class="settings-notice" role="status" aria-live="polite" data-storage-copy-message>Open this dialog to check storage status.</p><button class="button secondary" type="button" data-storage-copy-refresh>Refresh status</button></div>
+  <p class="field-error" role="alert" data-storage-copy-error hidden></p>
+  <div data-storage-copy-panel></div>
+  {% else %}
+  <p class="settings-notice">Storage copies belong to your own budget. Demo data stays separate.</p>
+  <a class="button secondary" href="{{ url(workspace='personal', category=none) }}">Open my budget</a>
+  {% endif %}
 </dialog>
 <dialog class="modal settings-modal" id="budgets-dialog" aria-label="Budgets" data-workspace="{{ workspace }}">
   <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
