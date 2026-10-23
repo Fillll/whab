@@ -10,6 +10,15 @@ Successful logos, including explicitly configured bank websites, stay cached **i
 
 Open **Settings → Plugins → Installed → Bank logos → Settings** for cache duration, the in-memory cached logo count and artwork provider information. **Flush cache** removes downloaded logos and failed requests, while keeping saved bank websites and account settings. Logos download again automatically when next requested. An unavailable cache directory falls back to memory without interrupting the ledger.
 
+The descriptor explicitly supports live branding selection and approved worker
+upgrades through the [host lifecycle API](../../../../docs/plugin-workers.md).
+Its zero-argument `branding_factory` creates independent cache, hostname and
+settings closures for each budget. The original workspace retains the cache path
+above; secondary budgets use their own runtime cache directory. Approved worker
+versions use separate environment cache directories. Preparing a replacement or
+flushing one budget/version never clears another budget/version's artwork. The
+legacy direct helper functions remain available to provider tests.
+
 Resolution stays local. Icon Horse is the fixed artwork provider at `https://icon.horse`; each image request uses only `https://icon.horse/icon/<public-hostname>`. The plugin sends a curated bank hostname or the public bank hostname explicitly entered in account settings. It never fetches the entered bank URL directly or sends account names, balances, transactions or bank credentials. Fetches use bounded bytes, short timeouts, no redirects and no environment proxies. Provider tests must mock HTTP requests.
 
 From the application directory, use `.venv/bin/python -m pytest plugins/interface/bank-logos/tests` or `.venv/bin/python scripts/check.py --quick` during iteration. Run `.venv/bin/python scripts/check.py` before submitting; use `--docs` for documentation-only edits. See [plugin contribution rules](../../README.md#test-ownership) for the complete check contract.

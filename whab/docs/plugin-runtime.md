@@ -33,13 +33,22 @@ Other budgets have independent coordinators and remain available. A transition
 cannot run inside the request lease it needs to drain. Management schedules an
 owned transition outside that lease and returns an operation identifier.
 
-## Live report selection
+## Live optional selection
 
 The first integration supports already installed report/export plugins with an
 explicit `PluginContract(lifecycle="live")`. They must have no binder, settings,
 saved-state upgrade, or other capability. The maintained `example` 1.4.0 plugin
 demonstrates this contract. Legacy plugins and other families retain an accurate
 restart requirement until their adapters are implemented.
+
+Explicit stateless branding and file-parser descriptors also support live
+selection. Bank-logo settings actions have only their public cache authority;
+file parsers receive upload bytes and return a validated `WorkspaceImport`.
+General budget binders, saved-state upgrades, financial storage/provider factories
+and categorization remain outside these adapters. A zero-argument
+`branding_factory` can return independent artwork/settings hooks with the same
+identity and effective contract; it receives no budget context or credentials.
+The host resolves the selection before invoking factories during preparation.
 
 Send `POST /api/plugins/management/transition` with the complete optional selection,
 for example `{"plugins":["example"]}`. Successful scheduling returns HTTP 202.

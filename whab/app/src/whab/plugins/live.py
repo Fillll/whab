@@ -1,8 +1,7 @@
-"""Host integration for live selection of explicitly stateless report plugins.
+"""Generation-bound report, branding and file-parser optional services.
 
-The running environment is unchanged: this enables/disables selected installed
-report hooks, not plugin code upgrades or worker isolation. All other families
-retain their existing instances and restart-bound configuration behavior.
+Only explicit supported adapters participate; financial storage, bank services
+and other resource families keep their existing runtime instances.
 """
 
 import asyncio
@@ -18,12 +17,15 @@ from whab.budgets.runtime import RuntimeCandidate
 from .configuration import validate_selection
 from .contracts import contract_for
 from .runtime import PluginError, PluginRegistry, load_descriptors
+from .worker_adapters import LIVE_CAPABILITIES, supports_live_plugin
+from .worker_resources import capture_resources
 
 _REPORTS = frozenset({"reporting.insights", "reporting.export"})
 _METHODS = frozenset({
     "describe", "descriptors", "bank_plugins", "interface_plugins", "file_import_plugins",
     "storage_plugin", "ui_plugin", "settings", "settings_action", "bank_logo",
     "bank_logo_provider", "logo_image", "merchant_logo_image", "insights", "export",
+    "parser_identity", "parser_requires_identity", "import_resource",
 })
 
 
@@ -39,17 +41,45 @@ def live_report(plugin):
             "bind", "settings", "migrate_state", "budget_connection", "categorization",
             "bank", "bank_ui", "storage", "ui", "bank_logos", "file_import",
             "merchant_logos", "interface",
+            "branding_factory",
         ))
     )
 
 
 class RegistryGeneration:
-    """Replace report hooks while retaining unchanged providers and their caches."""
+    """Replace optional hooks while retaining stable financial/provider services."""
 
-    def __init__(self, registry, stable=None, workers=None):
+    def __init__(self, registry, stable=None, workers=None, previous=None, resources_enabled=None):
         self.registry = registry
         self.stable = stable or registry
         self.workers = dict(workers or {})
+        self.resources_enabled = previous.resources_enabled if resources_enabled is None and previous else (True if resources_enabled is None else resources_enabled)
+        self._parsers = {}
+        self._resources = dict(previous._resources) if previous else {}
+        self._legacy_tokens = dict(previous._legacy_tokens) if previous else {}
+        for plugin in registry.file_import_plugins():
+            before = previous._parsers.get(plugin.id) if previous else None
+            token = before[1] if before and before[0] is plugin.file_import else uuid4().hex
+            self._parsers[plugin.id] = plugin.file_import, token, supports_live_plugin(plugin)
+            if not before or before[0] is not plugin.file_import:
+                try:
+                    resources = capture_resources(plugin.file_import) if self.resources_enabled else None
+                except Exception:
+                    raise PluginError("Import plugin UI resources are missing or invalid. Reinstall or disable the plugin.",
+                                      code="missing_resources", plugin_id=plugin.id) from None
+                if resources is not None:
+                    self._resources[plugin.id, token] = resources
+                    self._legacy_tokens.setdefault(plugin.id, token)
+        # Old HTML keeps its exact public files or receives 404 after bounded
+        # retention. It can never fall through to a newer parser's JavaScript.
+        for identifier in {key[0] for key in self._resources}:
+            keys = [key for key in self._resources if key[0] == identifier]
+            while len(keys) > 8 or sum(sum(map(len, self._resources[key].files.values())) for key in keys) > 8 * 1024 * 1024:
+                removable = next((key for key in keys if key != (identifier, self._parsers.get(identifier, (None, None))[1])), None)
+                if removable is None:
+                    break
+                del self._resources[removable]
+                keys.remove(removable)
 
     def describe(self):
         return self.registry.describe()
@@ -66,13 +96,48 @@ class RegistryGeneration:
     def export(self, plugin_id, snapshot):
         return self.registry.export(plugin_id, snapshot)
 
+    def file_import_plugins(self):
+        return self.registry.file_import_plugins()
+
+    def parser_identity(self, plugin_id):
+        parser = self._parsers.get(plugin_id)
+        return parser[1] if parser else None
+
+    def parser_requires_identity(self, plugin_id):
+        parser = self._parsers.get(plugin_id)
+        return bool(parser and parser[2])
+
+    def import_resource(self, plugin_id, token, name):
+        token = token or self._legacy_tokens.get(plugin_id)
+        resources = self._resources.get((plugin_id, token))
+        return resources.files.get(name) if resources else None
+
+    def bank_logo(self, institution, *, website=None):
+        return self.registry.bank_logo(institution, website=website)
+
+    def bank_logo_provider(self, plugin_id=None):
+        return self.registry.bank_logo_provider(plugin_id)
+
+    def _live(self, plugin_id):
+        return any(plugin.id == plugin_id and supports_live_plugin(plugin) for plugin in self.descriptors())
+
+    def logo_image(self, plugin_id, key):
+        if not any(plugin.id == plugin_id for plugin in self.descriptors()):
+            return None
+        return (self.registry if self._live(plugin_id) else self.stable).logo_image(plugin_id, key)
+
+    def merchant_logo_image(self, plugin_id, key):
+        if not any(plugin.id == plugin_id for plugin in self.descriptors()):
+            return None
+        return (self.registry if self._live(plugin_id) else self.stable).merchant_logo_image(plugin_id, key)
+
     def settings(self, plugin_id):
-        if not any(plugin.id == plugin_id for plugin in self.descriptors()) or any(plugin.id == plugin_id and live_report(plugin) for plugin in self.descriptors()):
+        if not any(plugin.id == plugin_id for plugin in self.descriptors()) or self._live(plugin_id):
             return self.registry.settings(plugin_id)
         return self.stable.settings(plugin_id)
 
     def settings_action(self, plugin_id, action_id):
-        if not any(plugin.id == plugin_id for plugin in self.descriptors()) or any(plugin.id == plugin_id and live_report(plugin) for plugin in self.descriptors()):
+        if not any(plugin.id == plugin_id for plugin in self.descriptors()) or self._live(plugin_id):
             return self.registry.settings_action(plugin_id, action_id)
         return self.stable.settings_action(plugin_id, action_id)
 
@@ -95,7 +160,7 @@ class LeasedPluginRegistry:
 
 
 class LivePluginSelection:
-    """Validate report-only changes and publish saved selections under the gate."""
+    """Validate supported changes and publish saved selections under the gate."""
 
     def __init__(self, runtime, required, entrypoints, persist, session=None, nonlive=(), home=None):
         self.runtime = runtime
@@ -121,11 +186,11 @@ class LivePluginSelection:
                             "distribution": binding.environment.distribution,
                             "environment": binding.environment.identifier,
                             "health": "ready" if binding.worker.healthy else "failed"})
-        return {"families": ["reporting.insights", "reporting.export"],
+        return {"families": sorted(LIVE_CAPABILITIES),
                 "code_upgrades": self.home is not None, "runtime": self.runtime.status(),
                 "workers": sorted(workers, key=lambda item: item["plugin"]), "operations": operations}
 
-    def _candidate(self, selection, active):
+    def _candidate(self, selection, active, *, bind=False):
         selection = validate_selection(selection)
         if self.required & set(selection):
             raise PluginError("Storage and user interfaces remain selected by the host. Choose only optional plugins.", code="required_plugin")
@@ -137,9 +202,9 @@ class LivePluginSelection:
         loaded = {plugin.id: plugin for plugin in load_descriptors(added, self.entrypoints())}
         for identifier in sorted(changed):
             plugin = current.get(identifier) or loaded.get(identifier)
-            if plugin is None or identifier in self.nonlive or not live_report(plugin):
+            if plugin is None or identifier in self.nonlive or not supports_live_plugin(plugin):
                 raise PluginError(
-                    "This change requires a restart. Live selection currently supports only explicitly live, stateless reporting/export plugins without settings or binders.",
+                    "This change requires a restart. Live selection supports explicit stateless report, branding and file-parser adapters without binders or saved-state upgrades.",
                     code="restart_required", plugin_id=identifier,
                 )
         # Injectable host backends need not have a discovery descriptor. Do
@@ -148,6 +213,8 @@ class LivePluginSelection:
                          for name in sorted((self.required & set(current)) | set(selection))
                          if name not in unavailable)
         registry = PluginRegistry(selected)
+        if bind:
+            registry = registry.bind_branding(added)
         if self.session:
             from whab.budgets.plugin_state import check_saved_states
 
@@ -156,7 +223,7 @@ class LivePluginSelection:
                 record["enabled"] = record["id"] in self.required | set(selection)
             check_saved_states(manifest, registry.descriptors())
         return RegistryGeneration(registry, active.stable,
-                                  {name: binding for name, binding in active.workers.items() if name in selection})
+                                  {name: binding for name, binding in active.workers.items() if name in selection}, previous=active)
 
     def _preflight(self, selection):
         # The scheduling request already owns a generation. This scope also
@@ -232,7 +299,7 @@ class LivePluginSelection:
                 with self._lock:
                     self._tickets[identifier].update(state="failed", error={
                         "code": error.code if isinstance(error, PluginError) else "worker_upgrade_failed",
-                        "plugin_id": plugin_id, "message": "The report upgrade failed. Inspect runtime authority and preserve the active environment before retrying.",
+                        "plugin_id": plugin_id, "message": "The plugin upgrade failed. Inspect runtime authority and preserve the active environment before retrying.",
                     })
                 raise
             with self._lock:
@@ -250,15 +317,18 @@ class LivePluginSelection:
                 with self._lock:
                     self._tickets[ticket]["state"] = "running"
             active = preparation.active.services["plugins"]
-            candidate = await run_in_threadpool(self._candidate, selection, active)
+            candidate = await run_in_threadpool(partial(self._candidate, selection, active, bind=True))
             if self.home is not None:
                 from .worker_selection import restore_workers
 
                 registry, bindings = await run_in_threadpool(restore_workers, self.home, candidate.registry, candidate.workers)
-                candidate = RegistryGeneration(registry, active.stable, bindings)
+                candidate = RegistryGeneration(registry, active.stable, bindings, previous=active)
                 for name, binding in bindings.items():
                     if name not in active.workers:
                         preparation.own(binding.resource)
+            for plugin in candidate.descriptors():
+                if plugin.id not in {row.id for row in active.descriptors()} and plugin.id not in candidate.workers and plugin.bank_logos is not None and plugin.bank_logos.configure_cache is not None:
+                    await run_in_threadpool(plugin.bank_logos.configure_cache, self.home / "cache" / "plugins" / plugin.id)
             removed = {id(binding.resource) for name, binding in active.workers.items() if name not in candidate.workers}
             resources = tuple(resource for resource in preparation.active.resources if id(resource) not in removed)
             resources += tuple(binding.resource for name, binding in candidate.workers.items() if name not in active.workers)

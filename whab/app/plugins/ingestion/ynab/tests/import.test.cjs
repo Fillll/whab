@@ -55,7 +55,7 @@ function harness(initialPanels = 0, activationOk = true) {
   };
 }
 function preview(overrides = {}) {
-  return {fingerprint: 'a'.repeat(64), accounts: 1, categories: 2, transactions: 3, assignments: 4,
+  return {fingerprint: 'a'.repeat(64), parserIdentity: 'b'.repeat(32), accounts: 1, categories: 2, transactions: 3, assignments: 4,
     createsNewBudget: true, canImport: true, reason: 'Fictional preview', budgetStartMonth: '2026-10',
     warnings: ['Fictional warning'], ...overrides};
 }
@@ -142,6 +142,7 @@ test('commit uses the preview identity and retains its navigation guard through 
   assert.equal(state.requests[1].url, '/budgets/fictional/api/plugins/ynab/import/new/commit');
   assert.equal(state.requests[1].options.body, item.file);
   assert.equal(state.requests[1].options.headers['X-Import-Fingerprint'], 'a'.repeat(64));
+  assert.equal(state.requests[1].options.headers['X-Import-Parser'], 'b'.repeat(32));
   assert.equal(state.requests[1].options.headers['X-Import-Operation'], state.requests[0].options.headers['X-Import-Operation']);
   const id = '11111111-1111-4111-8111-111111111111';
   state.requests[1].reply({id, url: `/budgets/${id}/accounts/current-month/usd`}); await creating;

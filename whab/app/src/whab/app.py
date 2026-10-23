@@ -33,15 +33,17 @@ from whab.plugins.live import (
     LeasedPluginRegistry,
     LivePluginSelection,
     RegistryGeneration,
-    live_report,
 )
 from whab.plugins.management import PluginManager, installed_entrypoints
 from whab.plugins.storage import close_storage, open_storage
+from whab.plugins.worker_adapters import supports_live_plugin
 from whab.plugins.worker_selection import restore_workers
 from whab.services.categorization import CategorizationService, local_context
 from whab.services.receipts import ReceiptService
 from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
+from whab.web.import_resources import ImportResourceLoader
+from whab.web.import_resources import create_router as import_resources_router
 from whab.web.middleware import install_middleware
 from whab.web.routes.banks import create_router as banks_router
 from whab.web.routes.file_imports import create_router as file_imports_router
@@ -133,10 +135,11 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         settings = replace(settings, storage=budget_session.manifest["storage"], plugins=tuple(name for name in budget_session.selection if name in installed))
     budget_host = budget_host or BudgetHost(settings)
     plugins = plugins if plugins is not None else load_plugins(settings.enabled_plugins())
-    nonlive = {plugin.id for plugin in plugins.descriptors() if not live_report(plugin)}
+    nonlive = {plugin.id for plugin in plugins.descriptors() if not supports_live_plugin(plugin)}
     if budget_session:
         check_saved_states(budget_session.manifest, plugins.descriptors())
         plugins = plugins.bind_budget(budget_session.context)
+    plugins = plugins.bind_branding()
     ui_plugin = plugins.ui_plugin(settings.ui) if settings.ui else None
     ui = ui_plugin.ui if ui_plugin else None
     if not ui and any(description.has_ui for description in plugins.describe()):
@@ -177,7 +180,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 code="missing_resources",
                 plugin_id=plugin.id,
             )
-    plugins.configure_logo_caches(settings.home)
+    plugins.configure_logo_caches(budget_session.storage_home if budget_session else settings.home)
     owned_store = store is None
     selected_storage = plugins.storage_plugin(settings.storage) if owned_store else None
     resolved_config = storage_config(settings, budget_session, selected_storage) if owned_store else {}
@@ -233,7 +236,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             close_storage(store)
         raise
     runtime = BudgetRuntime(service.budget_id, {
-        "plugins": RegistryGeneration(plugins, workers=worker_bindings), "ledger": service,
+        "plugins": RegistryGeneration(plugins, workers=worker_bindings, resources_enabled=bool(ui)), "ledger": service,
         "storage": store.store, "banks": banks,
     }, tuple(binding.resource for binding in worker_bindings.values()))
     registry = LeasedPluginRegistry(runtime)
@@ -328,7 +331,6 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.add_middleware(BudgetRuntimeRequests, runtime=runtime)
     templates = Jinja2Templates(directory=ui.templates) if ui else None
     loaders = {}
-    import_loaders = {}
     for plugin in descriptors:
         if ui and plugin.bank_ui:
             loaders[plugin.id] = FileSystemLoader(plugin.bank_ui.templates)
@@ -337,21 +339,12 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 StaticFiles(directory=plugin.bank_ui.static),
                 name=f"plugin-{plugin.id}",
             )
-    for plugin in import_descriptors:
-        file_import = plugin.file_import
-        if ui and file_import.templates is not None:
-            import_loaders[plugin.id] = FileSystemLoader(file_import.templates)
-            app.mount(
-                f"/imports/{plugin.id}/static",
-                StaticFiles(directory=file_import.static),
-                name=f"import-{plugin.id}",
-            )
     if ui:
         templates.env.loader = ChoiceLoader(
             [
                 templates.env.loader,
                 PrefixLoader({"plugins": PrefixLoader(loaders)}),
-                PrefixLoader({"imports": PrefixLoader(import_loaders)}),
+                PrefixLoader({"imports": ImportResourceLoader(registry)}),
             ]
         )
         app.mount("/static", StaticFiles(directory=ui.static), name="static")
@@ -371,6 +364,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     )
     install_error_handlers(app)
     app.include_router(health_router())
+    if ui:
+        app.include_router(import_resources_router(registry))
     app.include_router(ledger_router(service))
     receipt_service = ReceiptService(store, store.lock)
     app.include_router(receipts_router(receipt_service))

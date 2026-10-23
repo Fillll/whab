@@ -1,4 +1,4 @@
-"""Approved local wheels in immutable, versioned report-worker environments.
+"""Approved local wheels in immutable, versioned optional-worker environments.
 
 This contains installation failures; installed Python remains trusted code, not
 a security sandbox. The host never installs into a published environment.
@@ -64,7 +64,7 @@ class EnvironmentPreparationError(ValueError):
             "environment_changed": "A prepared environment no longer matches its approved artifacts. Preserve it and prepare a new version.",
             "environment_cleanup_failed": "An incomplete candidate environment could not be cleaned up. Existing prepared environments are unchanged.",
             "unsupported_platform": "Versioned worker environments currently require macOS or Linux file locking.",
-            "unsupported_lifecycle": "Only explicitly live, stateless report plugins can be prepared for live upgrades.",
+            "unsupported_lifecycle": "Only explicitly live stateless reporting, branding and file-parser adapters can be prepared for live upgrades.",
         }
         super().__init__(messages[code])
         self.code, self.plugin_id = code, plugin_id
@@ -389,12 +389,12 @@ def _verify(path, python, manifest, deadline):
 
 
 def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, timeout=120) -> PreparedEnvironment:
-    """Prepare one approved report-plugin closure; publication grants no activation.
+    """Prepare one approved optional-plugin closure; publication grants no activation.
 
     A venv is created at its final content address because Python environments
     cannot safely be relocated. The lock and durable preparation receipt fence
     that incomplete directory; only ``ready.json`` publishes a usable result.
-    This initial adapter uses the current Python/host, one report plugin, and
+    This adapter uses the current Python/host, one selected optional plugin, and
     wheel 1.0 purelib/platlib layouts. Dependency extras and other wheel data
     schemes require an expanded installer contract and are rejected explicitly.
     """
@@ -497,6 +497,17 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                             raise EnvironmentPreparationError("incompatible_host", plugin_id)
                         if not probe.info["live"]:
                             raise EnvironmentPreparationError("unsupported_lifecycle", plugin_id)
+                        adapters = probe.info["adapters"]
+                        if adapters["bank_logos"] is not None:
+                            if adapters["bank_logos"]["cache"]:
+                                probe.configure_cache(destination / "probe-cache")
+                            probe.resolve("Unknown fictional institution")
+                        if adapters["settings"] is not None:
+                            probe.settings()
+                        if adapters["file_import"] is not None:
+                            resources = probe.resources()
+                            if (resources is not None) != adapters["file_import"]["ui"]:
+                                raise EnvironmentPreparationError("environment_failed", plugin_id)
                         snapshot = BudgetSnapshot("personal", "2000-01", (), (), ())
                         if probe.info["insights"]:
                             probe.timeout = min(60, _remaining(deadline))
@@ -507,6 +518,8 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                     finally:
                         probe.timeout = max(0.001, min(60, deadline - time.monotonic()))
                         probe.close()
+                    if (destination / "probe-cache").exists():
+                        shutil.rmtree(destination / "probe-cache")
                     _remaining(deadline)
                     # Once publication becomes possible, the directory may no
                     # longer be treated as a disposable interrupted install.

@@ -1,7 +1,8 @@
-"""Data-only report worker entry point and bounded parent process adapter.
+"""Data-only optional plugin workers with bounded typed parent adapters.
 
-Only immutable report snapshots cross this boundary. No financial mutation,
-router, backend handle, callable or pickle is accepted by this worker protocol.
+Immutable snapshots, public artwork, bounded imports and UI resource bytes cross
+this boundary. No financial mutation, router, backend handle, callable or pickle
+is accepted by this worker protocol.
 The caller chooses a Python interpreter from its approved versioned environment.
 """
 
@@ -12,6 +13,7 @@ import subprocess
 import sys
 from dataclasses import asdict
 from importlib import metadata
+from pathlib import Path
 from threading import Lock
 from time import monotonic
 from uuid import uuid4
@@ -27,17 +29,32 @@ from .sdk import (
     CategorySnapshot,
     ExportTable,
     Insight,
+    LogoImage,
     TransactionSnapshot,
     valid_plugin_name,
 )
 from .wire import HEADER, PROTOCOL_VERSION, Frame, WireError, frame_lengths
+from .worker_adapters import (
+    BINARY_OPERATIONS,
+    LIVE_CAPABILITIES,
+    OPERATIONS,
+    adapter_info,
+    contract_info,
+    dispatch,
+    read_contract,
+    read_import,
+    read_settings,
+    supports_live_plugin,
+    validate_adapter_info,
+)
+from .worker_resources import read_resource_bundle
 
 _ERRORS = {
     "worker_startup_failed": "The plugin worker could not start or negotiate a compatible protocol.",
     "worker_failed": "The plugin worker failed. The active plugin version must be checked before retrying.",
-    "worker_timeout": "The plugin worker timed out. Its report was not completed.",
+    "worker_timeout": "The plugin worker timed out. Its operation was not completed.",
     "worker_protocol": "The plugin worker returned an invalid response.",
-    "worker_hook_failed": "The plugin worker could not generate this report.",
+    "worker_hook_failed": "The plugin worker could not complete this operation.",
     "worker_closed": "The plugin worker has closed. Start a prepared replacement before using it.",
 }
 
@@ -77,6 +94,16 @@ def _blocking_read(source, size):
     return bytes(result)
 
 
+def _read_request(source):
+    header = _blocking_read(source, HEADER.size)
+    metadata_size, payload_size = frame_lengths(header)
+    magic, version, _, _ = HEADER.unpack(header)
+    metadata = Frame.decode(HEADER.pack(magic, version, metadata_size, 0) + _blocking_read(source, metadata_size)).metadata
+    if payload_size > (10 * 1024 * 1024 if metadata.get("operation") == "file.parse" else 0):
+        raise WireError()
+    return Frame(metadata, _blocking_read(source, payload_size))
+
+
 def supports_live_report(plugin):
     """Require an explicit live contract with only stateless report hooks."""
     contract = contract_for(plugin)
@@ -89,51 +116,61 @@ def supports_live_report(plugin):
             "bind", "settings", "migrate_state", "budget_connection", "categorization",
             "bank", "bank_ui", "storage", "ui", "bank_logos", "file_import",
             "merchant_logos", "interface",
+            "branding_factory",
         ))
     )
 
 
 def serve(plugin_id, source, target):
     """Worker loop; diagnostics and plugin exception details never enter frames."""
-    registry = load_plugins((plugin_id,))
+    registry = load_plugins((plugin_id,)).bind_branding()
     descriptor = registry.descriptors()[0]
-    if descriptor.bind is not None or not (descriptor.insights or descriptor.export):
+    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import)):
         raise WireError()
     entries = tuple(entry for entry in metadata.entry_points(group="whab.plugins") if entry.name == plugin_id)
     distribution = entries[0].dist
     package = distribution.metadata["Name"]
     version = distribution.version
 
-    def send(value):
-        target.write(Frame(value).encode())
+    def send(value, payload=b""):
+        target.write(Frame(value, payload).encode())
         target.flush()
 
     send({"kind": "ready", "worker": PROTOCOL_VERSION, "sdk": API_VERSION,
           "plugin": plugin_id, "distribution": package, "version": version,
-          "host": __version__, "live": supports_live_report(descriptor),
+          "host": __version__, "live": supports_live_plugin(descriptor),
           "capabilities": [{"name": capability.name, "version": capability.version}
                            for capability in contract_for(descriptor).provides
-                           if capability.name in {"reporting.insights", "reporting.export"}],
-          "insights": descriptor.insights is not None, "export": descriptor.export is not None})
+                           if capability.name in LIVE_CAPABILITIES],
+          "insights": descriptor.insights is not None, "export": descriptor.export is not None,
+          "adapters": adapter_info(descriptor), "contract": contract_info(descriptor)})
     while True:
         try:
-            header = _blocking_read(source, HEADER.size)
-            metadata_size, payload_size = frame_lengths(header)
-            frame = Frame.decode(header + _blocking_read(source, metadata_size + payload_size))
+            frame = _read_request(source)
         except EOFError:
             return
         request = frame.metadata
-        if frame.payload or set(request) != {"id", "operation", "snapshot"} or type(request["id"]) is not str or not 1 <= len(request["id"]) <= 64:
+        if not {"id", "operation"} <= request.keys() or type(request["id"]) is not str or not 1 <= len(request["id"]) <= 64:
             raise WireError()
         identifier = request["id"]
-        if request["operation"] == "shutdown" and request["snapshot"] is None:
+        operation = request["operation"]
+        if operation in {"insights", "export", "shutdown"}:
+            if frame.payload or set(request) != {"id", "operation", "snapshot"}:
+                raise WireError()
+        elif operation not in OPERATIONS or set(request) != {"id", "operation", "arguments"}:
+            raise WireError()
+        if operation == "shutdown" and request["snapshot"] is None:
             send({"id": identifier, "kind": "closed"})
             return
-        if request["operation"] not in {"insights", "export"}:
+        if operation == "shutdown":
             raise WireError()
         try:
+            if operation in OPERATIONS:
+                output, payload = dispatch(registry, descriptor, operation, request["arguments"], frame.payload)
+                send({"id": identifier, "kind": "result", "data": output}, payload)
+                continue
             snapshot = _snapshot(request["snapshot"])
-            if request["operation"] == "insights":
+            if operation == "insights":
                 results = registry.insights(snapshot)
                 if descriptor.insights is None or len(results) != 1 or results[0].error:
                     raise WireError()
@@ -194,20 +231,29 @@ class ReportWorker:
                 env=env, bufsize=0, start_new_session=True,
             )
             hello = self._read(timeout)
-            if hello.payload or set(hello.metadata) != {"kind", "worker", "sdk", "plugin", "distribution", "version", "host", "live", "capabilities", "insights", "export"}:
+            if hello.payload or set(hello.metadata) != {"kind", "worker", "sdk", "plugin", "distribution", "version", "host", "live", "capabilities", "insights", "export", "adapters", "contract"}:
                 raise WireError()
             value = hello.metadata
-            if value["kind"] != "ready" or type(value["worker"]) is not int or value["worker"] != PROTOCOL_VERSION or type(value["sdk"]) is not int or value["sdk"] != API_VERSION or value["plugin"] != plugin_id or type(value["insights"]) is not bool or type(value["export"]) is not bool or not (value["insights"] or value["export"]):
+            if value["kind"] != "ready" or type(value["worker"]) is not int or value["worker"] != PROTOCOL_VERSION or type(value["sdk"]) is not int or value["sdk"] != API_VERSION or value["plugin"] != plugin_id or type(value["insights"]) is not bool or type(value["export"]) is not bool:
                 raise WireError()
+            adapters = validate_adapter_info(value["adapters"])
             if type(value["distribution"]) is not str or not value["distribution"] or type(value["version"]) is not str or not value["version"]:
                 raise WireError()
             expected_capabilities = sorted(
-                [{"name": name, "version": 1} for name, enabled in (("reporting.insights", value["insights"]), ("reporting.export", value["export"])) if enabled],
+                [{"name": name, "version": 1} for name, enabled in (
+                    ("reporting.insights", value["insights"]), ("reporting.export", value["export"]),
+                    ("branding.bank", adapters["bank_logos"] is not None),
+                    ("branding.merchant", adapters["merchant_logos"]),
+                    ("ingestion.file", adapters["file_import"] is not None),
+                ) if enabled],
                 key=lambda item: item["name"],
             )
             if type(value["host"]) is not str or not value["host"] or type(value["live"]) is not bool or type(value["capabilities"]) is not list or any(type(item) is not dict or set(item) != {"name", "version"} or type(item["version"]) is not int for item in value["capabilities"]):
                 raise WireError()
-            if sorted(value["capabilities"], key=lambda item: item["name"]) != expected_capabilities:
+            if not expected_capabilities or sorted(value["capabilities"], key=lambda item: item["name"]) != expected_capabilities:
+                raise WireError()
+            self.contract = read_contract(value["contract"], value["capabilities"])
+            if value["live"] and (value["contract"]["legacy"] or self.contract.lifecycle != "live" or self.contract.state_version != 1 or self.contract.state_upgrades):
                 raise WireError()
             if expected_distribution is not None and value["distribution"] != expected_distribution or expected_version is not None and value["version"] != expected_version:
                 raise WireError()
@@ -235,7 +281,7 @@ class ReportWorker:
                     continue
         return max(0, deadline - monotonic())
 
-    def _read(self, timeout):
+    def _read(self, timeout, max_payload=0):
         deadline = monotonic() + timeout
         descriptor = self._process.stdout.fileno()
         with selectors.DefaultSelector() as selector:
@@ -255,6 +301,8 @@ class ReportWorker:
 
             header = read(HEADER.size)
             metadata_size, payload_size = frame_lengths(header)
+            if payload_size > max_payload:
+                raise WireError()
             return Frame.decode(header + read(metadata_size + payload_size))
 
     def _stop(self):
@@ -283,18 +331,27 @@ class ReportWorker:
     def healthy(self):
         return self._process is not None and self._process.poll() is None
 
-    def _request(self, operation, snapshot):
+    def _request(self, operation, snapshot=None, *, arguments=None, payload=b""):
         with self._lock:
             if self._process is None:
                 raise _error("worker_closed", self.plugin_id)
             identifier = uuid4().hex
             try:
-                raw = Frame({"id": identifier, "operation": operation, "snapshot": _snapshot_data(snapshot) if snapshot is not None else None}).encode()
-                frame = self._read(self._write(raw, self.timeout))
+                request = {"id": identifier, "operation": operation}
+                if operation in OPERATIONS:
+                    request["arguments"] = {} if arguments is None else arguments
+                else:
+                    request["snapshot"] = _snapshot_data(snapshot) if snapshot is not None else None
+                raw = Frame(request, payload).encode()
+                payload_limit = {"bank.fetch": 128 * 1024, "merchant.fetch": 128 * 1024,
+                                 "file.resources": 4 * 1024 * 1024, "file.parse": 50 * 1024 * 1024}.get(operation, 0)
+                frame = self._read(self._write(raw, self.timeout), payload_limit)
                 value = frame.metadata
-                if frame.payload or value.get("id") != identifier:
+                if (frame.payload and operation not in BINARY_OPERATIONS) or value.get("id") != identifier:
                     raise WireError()
                 if value == {"id": identifier, "kind": "error", "code": "hook_failed"}:
+                    if frame.payload:
+                        raise WireError()
                     raise _error("worker_hook_failed", self.plugin_id)
                 if operation == "shutdown":
                     if value != {"id": identifier, "kind": "closed"}:
@@ -302,7 +359,7 @@ class ReportWorker:
                     return None
                 if set(value) != {"id", "kind", "data"} or value["kind"] != "result":
                     raise WireError()
-                return value["data"]
+                return frame if operation in BINARY_OPERATIONS else value["data"]
             except PluginError:
                 raise
             except TimeoutError:
@@ -324,6 +381,9 @@ class ReportWorker:
         except Exception:
             self._stop()
             raise _error("worker_protocol", self.plugin_id) from None
+        except BaseException:
+            self._stop()
+            raise
 
     def export(self, snapshot):
         value = self._request("export", snapshot)
@@ -334,6 +394,70 @@ class ReportWorker:
         except Exception:
             self._stop()
             raise _error("worker_protocol", self.plugin_id) from None
+
+    def _typed(self, operation, arguments, decode, payload=b""):
+        value = self._request(operation, arguments=arguments, payload=payload)
+        try:
+            return decode(value)
+        except Exception:
+            self._stop()
+            raise _error("worker_protocol", self.plugin_id) from None
+        except BaseException:
+            self._stop()
+            raise
+
+    def resolve(self, text, *, domain=False):
+        def decode(value):
+            if value is not None and not valid_plugin_name(value):
+                raise WireError()
+            return value
+        return self._typed("bank.domain" if domain else "bank.resolve", {"text": text}, decode)
+
+    def fetch(self, key, *, merchant=False):
+        def decode(frame):
+            value = frame.metadata["data"]
+            if type(value) is not dict or set(value) != {"media_type"}:
+                raise WireError()
+            if value["media_type"] is None:
+                if frame.payload:
+                    raise WireError()
+                return None
+            return LogoImage(frame.payload, value["media_type"])
+        return self._typed("merchant.fetch" if merchant else "bank.fetch", {"key": key}, decode)
+
+    def configure_cache(self, directory):
+        def decode(value):
+            if value is not None:
+                raise WireError()
+        return self._typed("cache.configure", {"directory": str(Path(directory))}, decode)
+
+    def settings(self):
+        def decode(value):
+            result = read_settings(value)
+            if [asdict(row) for row in result["actions"]] != self.info["adapters"]["settings"]["actions"]:
+                raise WireError()
+            return result
+        return self._typed("settings.read", {}, decode)
+
+    def settings_action(self, action):
+        def decode(value):
+            if type(value) is not str or not 0 < len(value) <= 2000:
+                raise WireError()
+            return value
+        return self._typed("settings.act", {"action": action}, decode)
+
+    def parse(self, raw):
+        if type(raw) is not bytes or not 0 < len(raw) <= 10 * 1024 * 1024:
+            raise ValueError("Choose an import file no larger than 10 MiB.")
+
+        def decode(frame):
+            if frame.metadata["data"] != {"format": "workspace-import-v1"}:
+                raise WireError()
+            return read_import(frame.payload)
+        return self._typed("file.parse", {}, decode, raw)
+
+    def resources(self):
+        return self._typed("file.resources", {}, lambda frame: read_resource_bundle(frame.metadata["data"], frame.payload))
 
     def close(self):
         try:

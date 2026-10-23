@@ -22,6 +22,27 @@ network access or installation. It describes reviewed source artifacts rather
 than the active or installed selection. Report vulnerabilities through the
 [security policy](../../SECURITY.md).
 
+Live optional adapters also cover explicit branding and pure file parsers. A
+descriptor may set `branding_factory: Callable[[], Plugin]` to create independent
+bank/merchant artwork and settings hooks for each budget. It receives no context
+or credentials, must preserve identity and the effective contract, and must return
+a descriptor without another factory, binder or non-branding capability. General
+budget binders retain their separate restart/state contract.
+
+`PluginResources(files: Mapping[str, bytes])` copies a bounded immutable UI bundle
+under safe `templates/` and `static/` relative names. `FileImport` may use
+`resources=PluginResources(...)` instead of filesystem paths; the forms are mutually
+exclusive. Parser bundles require `templates/accounts.html` and `static/import.js`.
+The host captures one resource version with each parser, renders its matching
+templates and serves generation-specific asset URLs. See [worker bounds and
+handover behavior](plugin-workers.md#recovery-and-limits).
+
+File-import preview responses include `parserIdentity`. Commit clients must send
+that value as `X-Import-Parser` for explicitly live parsers. Missing/retired tokens
+return 409 before the replacement parser runs. A fresh preview preserves the
+original file fingerprint; import operation IDs and completed retry receipts
+remain unchanged.
+
 ## Trust and enablement
 
 Application source paths in this guide are relative to `whab/app/`. Each concrete implementation lives in `plugins/<category>/<id>/` and owns its source package, assets, README, tests, `pyproject.toml` and dated `CHANGELOG.md`. The canonical [plugin inventory](../app/plugins/README.md#supported-plugins) identifies the supported set and the separately installed teaching example. The `bundled` extra selects that supported set when compatible distributions are available in the chosen package index or local wheelhouse; source checkouts use `.venv/bin/python scripts/install.py --dev` from `whab/app/`. The host wheel contains no concrete plugin package or entry point. A material plugin-only change bumps that plugin's `project.version` and local changelog; only host/core/SDK changes bump the app, with spanning changes updating each affected owner. Keep implementation tests beside their plugin and shared SDK/host contracts in `tests/`. See [folder ownership and test commands](../app/plugins/README.md). The public `whab.plugins` SDK stays in core under `src/whab/plugins/`.

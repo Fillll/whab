@@ -51,7 +51,7 @@ function bindPanel(panel) {
     error.hidden = false;
   }
 
-  async function request(action, file, fingerprint, operation, budgetName) {
+  async function request(action, file, fingerprint, operation, budgetName, parserIdentity) {
     let response;
     try {
       response = await fetch(`${apiPrefix}/plugins/${encodeURIComponent(panel.dataset.fileImport)}/import/new/${action}`, {
@@ -63,6 +63,7 @@ function bindPanel(panel) {
           'X-Import-Budget-Name': encodeURIComponent(budgetName),
           'X-Import-Operation': operation,
           ...(fingerprint ? {'X-Import-Fingerprint': fingerprint} : {}),
+          ...(parserIdentity ? {'X-Import-Parser': parserIdentity} : {}),
         },
       });
     } catch {
@@ -112,6 +113,7 @@ function bindPanel(panel) {
       const result = await request('preview', file, null, operation, budgetName);
       if (current !== revision || archive.files[0] !== file || !usd.checked) return;
       if (!/^[a-f0-9]{64}$/.test(result.fingerprint) ||
+          !/^[a-f0-9]{32}$/.test(result.parserIdentity) ||
           !['accounts', 'categories', 'transactions', 'assignments'].every(key => Number.isSafeInteger(result[key]) && result[key] >= 0) ||
           result.createsNewBudget !== true || typeof result.canImport !== 'boolean' || typeof result.reason !== 'string' ||
           typeof result.budgetStartMonth !== 'string' ||
@@ -152,7 +154,7 @@ function bindPanel(panel) {
     progress.hidden = false;
     controls();
     try {
-      const result = await request('commit', selected.file, selected.fingerprint, selected.operation, selected.budgetName);
+      const result = await request('commit', selected.file, selected.fingerprint, selected.operation, selected.budgetName, selected.parserIdentity);
       const target = new URL(result.url, location.origin);
       if (target.origin !== location.origin || typeof result.id !== 'string' ||
           !/^[a-f0-9-]{36}$/.test(result.id) || !/^\/budgets\/[a-z0-9]+(?:-[a-z0-9]+)*\/accounts\/current-month\/usd$/.test(target.pathname) ||

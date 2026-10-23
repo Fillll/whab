@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from whab.plugins import FileImport, Plugin, StoreError, WorkspaceImport
+from whab.plugins import FileImport, Plugin, PluginContract, StoreError, WorkspaceImport
 
 from .parser import parse_dump
 
@@ -76,4 +76,5 @@ plugin = Plugin(
     file_import=FileImport(
         parse=workspace_import, templates=_ROOT / "templates", static=_ROOT / "static",
     ),
+    contract=PluginContract(lifecycle="live"),
 )

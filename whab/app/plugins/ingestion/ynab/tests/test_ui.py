@@ -43,7 +43,7 @@ def test_selected_import_lives_in_plugin_options_on_every_page_and_serves_its_as
         assert "Each import creates and opens a new, separate budget." in response.text
         assert response.text.index('id="plugin-options-ynab"') < response.text.index('data-file-import="ynab"')
         assert response.text.count('data-file-import="ynab"') == 1
-        assert "/imports/ynab/static/import.js" in response.text
+        assert f"/imports/ynab/{client.app.state.budget_runtime._active.services['plugins'].parser_identity('ynab')}/static/import.js" in response.text
         asset = client.get("/imports/ynab/static/import.js")
         assert asset.status_code == 200
         assert "X-Import-Fingerprint" in asset.text
@@ -52,7 +52,7 @@ def test_selected_import_lives_in_plugin_options_on_every_page_and_serves_its_as
             assert response.status_code == 200
             assert response.text.index('id="plugin-options-ynab"') < response.text.index('data-file-import="ynab"')
             assert response.text.count('data-file-import="ynab"') == 1
-            assert "/imports/ynab/static/import.js" in response.text
+            assert f"/imports/ynab/{client.app.state.budget_runtime._active.services['plugins'].parser_identity('ynab')}/static/import.js" in response.text
 
 
 def test_inactive_import_has_no_form_or_public_assets(store, tmp_path):
@@ -76,7 +76,7 @@ def test_alternate_ui_can_embed_import_without_bundled_interface_helpers(store, 
         response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
         assert "data-file-import" in response.text
-        assert "/imports/ynab/static/import.js" in response.text
+        assert f"/imports/ynab/{client.app.state.budget_runtime._active.services['plugins'].parser_identity('ynab')}/static/import.js" in response.text
         assert client.get("/imports/ynab/static/import.js").status_code == 200
         assert client.get("/static/client.js").status_code == 404
 

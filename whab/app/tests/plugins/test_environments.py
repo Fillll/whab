@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import signal
 import stat
@@ -17,6 +18,7 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
+from threading import Lock
 
 import pytest
 
@@ -147,7 +149,169 @@ def approve(path):
     return ApprovedWheel(path, hashlib.sha256(path.read_bytes()).hexdigest())
 
 
-def make_wheel(directory, version="1.0.0", *, source=None, metadata_suffix="", entrypoint="fictional_reports:plugin", extra_files=None):
+def parser_wheel(directory, version, *, broken_resources=False):
+    source = (
+        "from pathlib import Path\n"
+        "from whab.plugins import Plugin, PluginContract, FileImport, WorkspaceImport\n"
+        "def parse(raw):\n"
+        "    if raw != b'fictional archive': raise ValueError('synthetic-private-parser-detail')\n"
+        "    return WorkspaceImport(({'id':'wallet','name':'Parser " + version + "','institution':'Fictional',"
+        "'type':'other','balance':0,'source':'fictional','stale':True,'balanceUnknown':True,"
+        "'onBudget':False,'subtype':None},),(),(),(),'2026-10')\n"
+        "root=Path(__file__).parent\n"
+        "plugin=Plugin('fictional-reports','Fictional parser',file_import=FileImport(parse,root/'templates',root/'static'),contract=PluginContract(lifecycle='live'))\n"
+    )
+    files = {"fictional_reports/templates/accounts.html": f'<section data-fixture="{version}">Parser {version}</section>'.encode()}
+    if not broken_resources:
+        files["fictional_reports/static/import.js"] = f"/* parser {version} */".encode()
+    return make_wheel(directory, version, source=source, extra_files=files)
+
+
+def test_real_parser_upgrades_keep_versioned_assets_reject_stale_previews_and_reopen(tmp_path, local_closure, store, monkeypatch):
+    import asyncio
+    import re
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+    from whab_plugin_sqlite.plugin import plugin as sqlite_plugin
+    from whab_plugin_web.plugin import plugin as web_plugin
+
+    from whab.app import create_app
+    from whab.config import Settings
+    from whab.plugins import (
+        FileImport,
+        Plugin,
+        PluginContract,
+        PluginRegistry,
+        PluginResources,
+        WorkspaceImport,
+    )
+
+    initial = WorkspaceImport((), (), (), (), "2026-10")
+    template = Plugin("fictional-reports", "Fictional parser", file_import=FileImport(lambda _: initial, resources=PluginResources({
+        "templates/accounts.html": b"<section>Host parser</section>", "static/import.js": b"/* host parser */",
+    })), contract=PluginContract(lifecycle="live"))
+    entries = tuple(SimpleNamespace(name=plugin.id, group="whab.plugins", load=lambda plugin=plugin: plugin)
+                    for plugin in (template, sqlite_plugin, web_plugin))
+    monkeypatch.setattr("whab.plugins.management.installed_entrypoints", lambda: entries)
+    monkeypatch.setattr("whab.app.installed_entrypoints", lambda: entries)
+    configuration = Settings(tmp_path / "runtime", 5173, "sandbox", "", "", "", False, "", "", (template.id,), ui="web")
+
+    def application():
+        return create_app(store=store, settings=configuration, plugins=PluginRegistry((template, web_plugin)))
+
+    app = application()
+
+    def upgrade(client, wheel):
+        response = client.post("/api/plugins/management/upgrade", json={"pluginId": template.id,
+            "wheels": [{"path": str(item.path), "sha256": item.sha256} for item in (*local_closure, approve(wheel))]})
+        assert response.status_code == 202
+        async def settle():
+            await asyncio.gather(*tuple(app.state.live_plugins._tasks), return_exceptions=True)
+        client.portal.call(settle)
+        return next(row for row in client.get("/api/plugins/runtime").json()["operations"] if row["id"] == response.json()["id"])
+
+    def asset(client, version):
+        page = client.get("/budgets/home/accounts/current-month/usd")
+        assert page.status_code == 200 and f"Parser {version}" in page.text
+        url = re.search(r"/budgets/home/imports/fictional-reports/[0-9a-f]{32}/static/import.js", page.text)[0]
+        assert client.get(url).content == f"/* parser {version} */".encode()
+        return url
+
+    base = "/api/plugins/fictional-reports/import/"
+    headers = {"Content-Type": "application/zip", "X-Import-Currency": "USD"}
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        assert upgrade(client, parser_wheel(tmp_path, "4.0.0"))["state"] == "complete"
+        first = app.state.budget_runtime._active.services["plugins"].workers[template.id]
+        old_asset = asset(client, "4.0.0")
+        preview = client.post(base + "preview", content=b"fictional archive", headers=headers).json()
+        assert preview["canImport"] is True
+        before = client.get("/api/workspace?workspace=personal").json()
+        assert upgrade(client, parser_wheel(tmp_path, "4.1.0", broken_resources=True))["state"] == "failed"
+        assert first.worker.healthy and asset(client, "4.0.0") == old_asset
+        assert upgrade(client, parser_wheel(tmp_path, "5.0.0"))["state"] == "complete"
+        second = app.state.budget_runtime._active.services["plugins"].workers[template.id]
+        assert not first.worker.healthy and second.worker.healthy
+        new_asset = asset(client, "5.0.0")
+        assert new_asset != old_asset and client.get(old_asset).content == b"/* parser 4.0.0 */"
+        old_headers = {**headers, "X-Import-Fingerprint": preview["fingerprint"], "X-Import-Parser": preview["parserIdentity"]}
+        assert client.post(base + "commit", content=b"fictional archive", headers=old_headers).status_code == 409
+        assert client.post(base + "commit", content=b"fictional archive", headers={**headers, "X-Import-Fingerprint": preview["fingerprint"]}).status_code == 409
+        assert client.get("/api/workspace?workspace=personal").json() == before
+        fresh = client.post(base + "preview", content=b"fictional archive", headers=headers).json()
+        assert fresh["fingerprint"] == preview["fingerprint"] and fresh["parserIdentity"] != preview["parserIdentity"]
+        committed_headers = {**headers, "X-Import-Fingerprint": fresh["fingerprint"], "X-Import-Parser": fresh["parserIdentity"]}
+        assert client.post(base + "commit", content=b"fictional archive", headers=committed_headers).status_code == 200
+        assert client.post(base + "commit", content=b"fictional archive", headers=committed_headers).json()["alreadyImported"] is True
+        assert client.get("/api/workspace?workspace=personal").json()["accounts"][0]["name"] == "Parser 5.0.0"
+    app = application()
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        asset(client, "5.0.0")
+        assert client.get(old_asset).status_code == 404
+        assert client.post(base + "commit", content=b"fictional archive", headers=committed_headers).status_code == 409
+        fresh = client.post(base + "preview", content=b"fictional archive", headers=headers).json()
+        assert fresh["alreadyImported"] is True
+
+
+def test_real_branding_worker_versions_own_separate_caches_and_reopen(tmp_path, local_closure, store, monkeypatch):
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    from whab.app import create_app
+    from whab.config import Settings
+    from whab.plugins import BankLogos, Plugin, PluginContract, PluginRegistry
+
+    template = Plugin("fictional-reports", "Fictional artwork", bank_logos=BankLogos(lambda _: "fixture", lambda _: None),
+                      contract=PluginContract(lifecycle="live"))
+    entry = SimpleNamespace(name=template.id, group="whab.plugins", load=lambda: template)
+    monkeypatch.setattr("whab.plugins.management.installed_entrypoints", lambda: (entry,))
+    monkeypatch.setattr("whab.app.installed_entrypoints", lambda: (entry,))
+    configuration = Settings(tmp_path / "runtime", 5173, "sandbox", "", "", "", False, "", "", (template.id,), ui="")
+
+    def application():
+        return create_app(store=store, settings=configuration, plugins=PluginRegistry((template,)))
+
+    def wheel(version):
+        source = (
+            "from whab.plugins import Plugin, PluginContract, BankLogos, LogoImage, Insight, PluginAction, PluginSettings\n"
+            "directory=None\n"
+            "def configure(path):\n    global directory\n    directory=path\n    path.mkdir(parents=True,exist_ok=True)\n"
+            "def fetch(key):\n    image=LogoImage(bytes.fromhex('89504e470d0a1a0a')+b'" + version + "','image/png')\n    (directory/'artwork.public').write_bytes(image.data)\n    return image\n"
+            "def read():\n    return (Insight('Version','" + version + "'),)\n"
+            "def flush(action):\n    (directory/'artwork.public').unlink(missing_ok=True)\n    return 'Cleared " + version + "'\n"
+            "plugin=Plugin('fictional-reports','Artwork " + version + "',bank_logos=BankLogos(lambda text:'fixture',fetch,configure,lambda domain:'fixture','Fictional','https://bank.example.org'),settings=PluginSettings(read,(PluginAction('flush','Flush'),),flush),contract=PluginContract(lifecycle='live'))\n"
+        )
+        return make_wheel(tmp_path, version, source=source)
+
+    app = application()
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        def upgrade(version):
+            approvals = (*local_closure, approve(wheel(version)))
+            async def run():
+                return await app.state.live_plugins.upgrade(template.id, approvals)
+            client.portal.call(run)
+            return app.state.budget_runtime._active.services["plugins"].workers[template.id]
+
+        first = upgrade("6.0.0")
+        assert client.get("/api/plugins/fictional-reports/bank-logos/fixture").content.endswith(b"6.0.0")
+        cache = configuration.home / "cache/plugins/fictional-reports/environments"
+        old = cache / first.environment.identifier / "artwork.public"
+        original = old.read_bytes()
+        second = upgrade("7.0.0")
+        assert not first.worker.healthy and second.worker.healthy
+        assert client.get("/api/plugins/fictional-reports/bank-logos/fixture").content.endswith(b"7.0.0")
+        current = cache / second.environment.identifier / "artwork.public"
+        assert current.is_file() and old.read_bytes() == original
+        flushed = client.post("/api/plugins/fictional-reports/settings/actions/flush", json={})
+        assert flushed.status_code == 200 and not current.exists() and old.read_bytes() == original
+        assert client.get("/api/plugins/fictional-reports/settings").json()["insights"][0]["value"] == "7.0.0"
+    app = application()
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        assert client.get("/api/plugins/fictional-reports/bank-logos/fixture").content.endswith(b"7.0.0")
+
+
+def make_wheel(directory, version="1.0.0", *, source=None, metadata_suffix="", entrypoint="fictional_reports:plugin", extra_files=None, host_requirement=None):
     name = "whab_plugin_fictional_reports"
     prefix = f"{name}-{version}.dist-info/"
     source = source if source is not None else (
@@ -157,7 +321,7 @@ def make_wheel(directory, version="1.0.0", *, source=None, metadata_suffix="", e
         "plugin = Plugin('fictional-reports', 'Fictional reports', insights=insights, export=export, contract=PluginContract(lifecycle='live'))\n"
     )
     files = {"fictional_reports/__init__.py": source.encode(),
-             prefix + "METADATA": (f"Metadata-Version: 2.3\nName: {name}\nVersion: {version}\nRequires-Python: >=3.14\nRequires-Dist: whab=={__version__}\n" + metadata_suffix).encode(),
+             prefix + "METADATA": (f"Metadata-Version: 2.3\nName: {name}\nVersion: {version}\nRequires-Python: >=3.14\nRequires-Dist: whab{host_requirement or '==' + __version__}\n" + metadata_suffix).encode(),
              prefix + "WHEEL": b"Wheel-Version: 1.0\nGenerator: reviewed-test-fixture\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
              prefix + "entry_points.txt": f"[whab.plugins]\nfictional-reports = {entrypoint}\n".encode(),
              **(extra_files or {})}
@@ -172,6 +336,171 @@ def make_wheel(directory, version="1.0.0", *, source=None, metadata_suffix="", e
         for filename, raw in files.items():
             archive.writestr(filename, raw)
     return path
+
+
+_LEGACY_REPORT_WORKER = '''
+import importlib.metadata as metadata
+import sys
+from whab import __version__
+from whab.plugins import AccountSnapshot, BudgetSnapshot, CategorySnapshot, TransactionSnapshot, load_plugins
+from whab.plugins.wire import HEADER, Frame, frame_lengths
+from dataclasses import asdict
+
+plugin_id = sys.argv[1]
+registry = load_plugins((plugin_id,))
+plugin = registry.descriptors()[0]
+entry, = (entry for entry in metadata.entry_points(group='whab.plugins') if entry.name == plugin_id)
+def send(value):
+    sys.stdout.buffer.write(Frame(value).encode())
+    sys.stdout.buffer.flush()
+send({'kind':'ready','worker':1,'sdk':1,'plugin':plugin_id,'distribution':entry.dist.metadata['Name'],
+      'version':entry.dist.version,'host':__version__,'live':True,
+      'capabilities':[{'name':'reporting.export','version':1},{'name':'reporting.insights','version':1}],
+      'insights':True,'export':True})
+while True:
+    header = sys.stdin.buffer.read(HEADER.size)
+    if not header:
+        break
+    meta, payload = frame_lengths(header)
+    request = Frame.decode(header + sys.stdin.buffer.read(meta + payload)).metadata
+    identifier = request['id']
+    if request['operation'] == 'shutdown':
+        send({'id':identifier,'kind':'closed'})
+        break
+    value = request['snapshot']
+    snapshot = BudgetSnapshot(value['workspace'],value['month'],tuple(AccountSnapshot(**row) for row in value['accounts']),
+                              tuple(CategorySnapshot(**row) for row in value['categories']),
+                              tuple(TransactionSnapshot(**row) for row in value['transactions']),currency=value['currency'])
+    if request['operation'] == 'insights':
+        output = [asdict(row) for row in registry.insights(snapshot)[0].insights]
+    else:
+        table = registry.export(plugin_id,snapshot)
+        output = {'columns':list(table.columns),'rows':[list(row) for row in table.rows]}
+    send({'id':identifier,'kind':'result','data':output})
+'''
+
+
+def host_version_fixture(directory, approval, version, *, legacy_marker=None):
+    """Synthetic negotiation fixture; this is not a historical release artifact."""
+    directory.mkdir()
+    with zipfile.ZipFile(approval.path) as archive:
+        files = {name: archive.read(name) for name in archive.namelist() if not name.endswith("/")}
+    metadata, = (name for name in files if name.endswith(".dist-info/METADATA"))
+    prefix = metadata.removesuffix("METADATA")
+    replacement = "whab-" + version + ".dist-info/"
+    files = {name.replace(prefix, replacement, 1) if name.startswith(prefix) else name: raw for name, raw in files.items()}
+    files[replacement + "METADATA"] = re.sub(rb"(?m)^Version: [^\n]+", b"Version: " + version.encode(), files[replacement + "METADATA"])
+    files["whab/__init__.py"] = re.sub(rb"__version__ = ['\"][^'\"]+['\"]", b'__version__ = "' + version.encode() + b'"', files["whab/__init__.py"])
+    if legacy_marker is not None:
+        files["whab/plugins/wire.py"] = re.sub(rb"PROTOCOL_VERSION = [0-9]+", b"PROTOCOL_VERSION = 1", files["whab/plugins/wire.py"])
+        marker = "from pathlib import Path\nwith Path(" + repr(str(legacy_marker)) + ").open('ab') as marker: marker.write(b'started\\n')\n"
+        files["whab/plugins/report_worker.py"] = (marker + _LEGACY_REPORT_WORKER).encode()
+    record_name = replacement + "RECORD"
+    del files[record_name]
+    records = io.StringIO()
+    writer = csv.writer(records, lineterminator="\n")
+    for name, raw in files.items():
+        writer.writerow((name, "sha256=" + base64.urlsafe_b64encode(hashlib.sha256(raw).digest()).decode().rstrip("="), len(raw)))
+    writer.writerow((record_name, "", ""))
+    files[record_name] = records.getvalue().encode()
+    target = directory / ("whab-" + version + "-py3-none-any.whl")
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, raw in files.items():
+            archive.writestr(name, raw)
+    return approve(target)
+
+
+def test_synthetic_saved_protocol1_environment_is_fenced_then_explicitly_reprepared_for_current_host(tmp_path, local_closure, monkeypatch):
+    from whab.plugins import (
+        ExportTable,
+        Insight,
+        Plugin,
+        PluginContract,
+        PluginError,
+        PluginRegistry,
+        report_worker,
+        wire,
+        worker_selection,
+    )
+
+    host, = (wheel for wheel in local_closure if inspect_wheel(wheel).canonical_name == "whab")
+    dependencies = tuple(wheel for wheel in local_closure if wheel is not host)
+    marker = tmp_path / "legacy-worker-starts"
+    legacy_host = host_version_fixture(tmp_path / "legacy-wheel", host, "2.25.0", legacy_marker=marker)
+    current_host = host
+    report = approve(make_wheel(tmp_path, host_requirement=">=2.24,<3"))
+    home = tmp_path / "runtime"
+    root = home / "plugin-workers/environments"
+
+    class LegacyProbe(ReportWorker):
+        """A report-only protocol-1 client used solely to publish the old fixture."""
+        def __init__(self, plugin_id, *, python, timeout, expected_distribution, expected_version):
+            self.plugin_id, self.timeout, self._lock, self._retiring = plugin_id, timeout, Lock(), None
+            self._process = subprocess.Popen([str(python), "-I", "-B", "-m", "whab.plugins.report_worker", plugin_id],
+                                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                             env=environments._environment(), start_new_session=True, bufsize=0)
+            try:
+                self.info = self._read(timeout).metadata
+                assert self.info["worker"] == 1 and self.info["distribution"] == expected_distribution and self.info["version"] == expected_version
+                # New preparation uses this explicit shim only for constructing
+                # a genuine old-format fixture. Restoring later never uses it.
+                self.info["adapters"] = {"bank_logos": None, "merchant_logos": False, "file_import": None, "settings": None}
+            except BaseException:
+                self._stop()
+                raise
+
+    with monkeypatch.context() as previous:
+        previous.setattr(environments, "__version__", "2.25.0")
+        previous.setattr(report_worker, "PROTOCOL_VERSION", 1)
+        previous.setattr(wire, "PROTOCOL_VERSION", 1)
+        previous.setattr(environments, "ReportWorker", LegacyProbe)
+        old = prepare_environment(root, "fictional-reports", (*dependencies, legacy_host, report))
+        worker_selection.save_reference(home, old)
+    reference = home / "plugin-workers/active/fictional-reports.json"
+    original_reference, original_ready = reference.read_bytes(), (old.path / "ready.json").read_bytes()
+    original_installation = environments._installation_hash(old.path)
+    starts = marker.read_bytes()
+    revision = worker_selection.worker_reference_revision(home, "fictional-reports")
+
+    with monkeypatch.context() as refused:
+        refused.setattr(environments, "_run", lambda *_: pytest.fail("An incompatible old interpreter must never execute"))
+        with pytest.raises(PluginError) as raised:
+            worker_selection.reopen_environment(root, "fictional-reports", old.identifier)
+        assert raised.value.code == "worker_environment_unavailable"
+    assert reference.read_bytes() == original_reference and marker.read_bytes() == starts
+
+    approvals = (*dependencies, current_host, report)
+    original_publish = worker_selection._save_reference
+
+    def lost_publish_reply(home, prepared):
+        original_publish(home, prepared)
+        raise OSError("fictional lost response after durable replacement")
+
+    with monkeypatch.context() as interrupted:
+        interrupted.setattr(worker_selection, "_save_reference", lost_publish_reply)
+        with pytest.raises(PluginError) as raised:
+            worker_selection.replace_saved_worker(home, "fictional-reports", approvals, expected_reference_sha256=revision)
+        assert raised.value.code == "worker_replacement_failed" and "fictional" not in str(raised.value)
+    assert reference.read_bytes() != original_reference
+    # The original expected revision remains the retry identity after a lost
+    # reply; matching history and the already-published decision prove the result.
+    repaired = worker_selection.replace_saved_worker(home, "fictional-reports", approvals, expected_reference_sha256=revision)
+    assert repaired.identifier != old.identifier and repaired.version == old.version == "1.0.0"
+    assert (home / "plugin-workers/history/fictional-reports" / (revision + ".json")).read_bytes() == original_reference
+    assert reference.read_bytes() != original_reference
+    assert (old.path / "ready.json").read_bytes() == original_ready
+    assert environments._installation_hash(old.path) == original_installation and marker.read_bytes() == starts
+    # A lost successful response can retry the original expected revision; it
+    # returns the same new durable decision without rewriting the old version.
+    assert worker_selection.replace_saved_worker(home, "fictional-reports", approvals, expected_reference_sha256=revision) == repaired
+    template = Plugin("fictional-reports", "Fictional reports", insights=lambda _: (Insight("Version", "host"),),
+                      export=lambda _: ExportTable(("version",), (("host",),)), contract=PluginContract(lifecycle="live"))
+    registry, bindings = worker_selection.restore_workers(home, PluginRegistry((template,)))
+    try:
+        assert registry.insights(BudgetSnapshot("personal", "2000-01", (), (), ()))[0].insights[0].value == "1.0.0"
+    finally:
+        for binding in bindings.values():
+            binding.worker.close()
 
 
 def test_static_inspection_exposes_identity_requirements_and_hash_without_importing(tmp_path):
