@@ -6,10 +6,10 @@ readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.22,<3"]
+dependencies = ["whab>=__HOST_MINIMUM__,<3"]
 
 [project.optional-dependencies]
-test = ["pytest>=9,<10", "whab_plugin_devkit>=0.2,<1"]
+test = ["pytest>=9,<10", "whab_plugin_devkit>=__KIT_MINIMUM__,<1"__REFERENCE_TEST_REQUIREMENT__]
 
 [project.entry-points."whab.plugins"]
 __PLUGIN_ID__ = "__MODULE__:plugin"
@@ -24,3 +24,8 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.whab.plugin-devkit]
+minimum-host = "__HOST_MINIMUM__.0"
+
+__STATIC_METADATA__

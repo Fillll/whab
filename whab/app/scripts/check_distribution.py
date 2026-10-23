@@ -88,10 +88,11 @@ assert settings.storage == "sqlite" and settings.ui == "web"
 assert settings.plugins == ("plaid", "example", "bank-logos", "ynab")
 registry = load_plugins(settings.enabled_plugins())
 assert [p.id for p in registry.describe()] == ["bank-logos", "example", "plaid", "sqlite", "web", "ynab"]
-assert all(p.lifecycle == "restart" and p.legacy for p in registry.describe() if p.id not in {"example", "bank-logos", "ynab", "sqlite", "plaid", "web"})
-assert all(not p.legacy and p.lifecycle == "restart" for p in registry.describe() if p.id == "plaid")
-assert all(not p.legacy and p.lifecycle == "live" for p in registry.describe() if p.id in {"sqlite", "web"})
-assert all(p.lifecycle == "live" and not p.legacy for p in registry.describe() if p.id in {"example", "bank-logos", "ynab"})
+assert {p.id: (p.lifecycle, p.legacy) for p in registry.describe()} == {
+    "bank-logos": ("live", False), "example": ("live", False), "plaid": ("restart", False),
+    "sqlite": ("live", False), "web": ("live", False), "ynab": ("live", False),
+}
+assert registry.ui_plugin("web").ui.view_protocol == 1
 assert next(p for p in registry.describe() if p.id == "example").lifecycle == "live"
 assert not next(p for p in registry.describe() if p.id == "example").legacy
 remote = load_plugins(("client",)).describe()[0]
@@ -108,6 +109,12 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
         response = client.get(f"/budgets/demo/{page}/current-month/usd")
         assert response.status_code == 200, page
         assert f"WHAB · {whab.__version__}" in response.text
+        generation = response.headers.get("X-WHAB-UI-Generation", "")
+        assert len(generation) == 64 and all(value in "0123456789abcdef" for value in generation)
+        resource = f"/budgets/demo/ui/{generation}/static/app.js"
+        assert resource in response.text
+        asset = client.get(resource)
+        assert asset.status_code == 200 and asset.headers["cache-control"].endswith("immutable")
     for asset in ("styles.css", "theme.js", "app.js", "budget-edits.js", "client.js", "favicon.svg", "logo.svg"):
         assert client.get("/budgets/demo/static/" + asset).status_code == 200, asset
     assert client.get("/budgets/home/plugins/plaid/static/connect.js").status_code == 200
@@ -295,7 +302,7 @@ def main():
                 "distribution": metadata["name"], "version": metadata["version"],
                 "module": entrypoint.split(":", 1)[0].split(".", 1)[0],
             }
-        teaching = {"example", "example-branding", "example-file-import", "example-categorization"}
+        teaching = {"example", "example-api", "example-branding", "example-file-import", "example-categorization"}
         assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", *teaching}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {

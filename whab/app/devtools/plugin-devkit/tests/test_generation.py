@@ -7,6 +7,8 @@ import pytest
 from whab_plugin_devkit.configurations import exercise_candidate
 from whab_plugin_devkit.generator import FAMILIES, generate_project
 
+from whab import plugins as sdk
+
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_complete_generated_project_uses_public_sdk_and_has_working_fictional_hooks(tmp_path, family):
@@ -14,14 +16,22 @@ def test_complete_generated_project_uses_public_sdk_and_has_working_fictional_ho
     project = generate_project(identifier, family, tmp_path / identifier)
     module_name = "whab_plugin_" + identifier.replace("-", "_")
     source = project / "src" / module_name / "__init__.py"
+    minimum = "2.34" if family == "api" else "2.22"
+    assert f"whab>={minimum},<3" in (project / "pyproject.toml").read_text()
+    if family == "api" and not hasattr(sdk, "RemoteLedgerInterface"):
+        assert "minimum-host = \"2.34.0\"" in (project / "pyproject.toml").read_text()
+        return
     spec = importlib.util.spec_from_file_location(module_name, source)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.plugin.id == identifier
     assert exercise_candidate(module.plugin)
     assert (project / "LICENSE").is_file() and (project / "README.md").is_file()
-    assert "whab>=2.22,<3" in (project / "pyproject.toml").read_text()
     assert "whab.app" not in source.read_text() and "whab_plugin_sqlite" not in source.read_text()
+    if family == "api":
+        test = (project / "tests/test_plugin.py").read_text()
+        assert "NativeRuntime" in test and "assert_api_interface" in test
+        return  # Its installed-only native behavioral test runs in the wheel gate.
     # Run the generated ordinary tests too, with only its module registration.
     sys.modules[module_name] = module
     try:
@@ -77,3 +87,10 @@ def test_generator_rejects_mutable_or_malformed_ci_revision_before_creating_proj
     with pytest.raises(ValueError, match="published full"):
         generate_project("fictional", "reporting", tmp_path / "project", ci_ref=revision)
     assert not tuple(tmp_path.iterdir())
+
+
+def test_api_token_setting_matches_host_scoped_configuration_without_overwriting_selectors(tmp_path):
+    project = generate_project("whab-plaid", "api", tmp_path / "project")
+    source = (project / "src/whab_plugin_whab_plaid/__init__.py").read_text()
+    assert 'token_setting="WHAB_PLAID_TOKEN"' in source
+    assert 'minimum-host = "2.34.0"' in (project / "pyproject.toml").read_text()
