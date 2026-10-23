@@ -117,6 +117,12 @@ For a portable budget, saving updates its plugin manifest and preserves disabled
 
 Disabling a bank plugin takes effect on restart and retains imported history and saved connections. Saving a selection does not disconnect a bank or activate new connections. Portable budget downloads include the saved feature setup. For the original local workspace, back up `plugins.json` with the runtime configuration; removing it restores the environment default.
 
+If plugin startup fails before Settings is available, run `python -m whab --recover-plugins`
+with the affected runtime home and, when applicable, its `--budget` path. The
+[minimal plugin recovery page](plugin-recovery.md) inspects metadata without opening
+plugin factories, supports explicit optional-plugin disabling and worker-reference
+archival, and retries the full application on the same local HTTPS listener.
+
 ### YNAB import
 
 Enable **Import from YNAB ZIP file**, save and restart, then open its **Settings**. Choose the ZIP, enter a budget name (the filename supplies an editable suggestion), confirm USD and **Preview import**. **Create budget and import** creates a separate budget with that name, adds it to Settings → Budgets, and opens its Accounts page for classification. Preview creates nothing; retrying a failed commit opens the same new budget. The form is available in the plugin's settings from any page, including Demo. Imported account estimates appear in the sidebar with their source explained on hover and for screen readers; Accounts management still shows **Unavailable** for the unverified balance. Those estimates do not fund the budget or contribute to net-worth totals.

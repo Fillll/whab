@@ -81,6 +81,14 @@ The bundled Web UI's **Settings → Plugins → Installed** lists installed regi
 
 **Save plugin selection** loads and validates the proposed descriptors without calling storage/bank factories or reporting hooks. It rejects missing or ambiguous registrations, incompatible descriptors, and attempts to change the selected storage or interface. Saving leaves the running registry, provider services, connections and ledger unchanged; changes apply after restart. An imported bank's history and saved connections remain when its plugin is disabled.
 
+For failures that prevent the full application from starting, the explicit
+[`--recover-plugins` listener](plugin-recovery.md) reads package metadata without
+loading plugin targets. It offers revision-checked optional-plugin removal,
+archival of invalid global selections or saved report-worker references, and a
+full startup retry on the same guarded HTTPS listener. It preserves opaque budget
+namespaces and unopened financial payloads; it cannot disable required storage or
+the selected interface or repair an invalid budget manifest by guessing.
+
 For portable budgets, the host stores the optional selection in that budget’s manifest, preserving disabled entries and their settings/state. The original local workspace stores at most 100 unique optional IDs in an atomic `plugins.json` replacement in the runtime home (`WHAB_HOME`, or the launch directory). The file uses `{"version": 1, "plugins": ["plaid", "example"]}` and contains no credentials or ledger records. Its optional selection takes precedence over `WHAB_PLUGINS`, including an explicitly empty saved list. Removing this file restores environment defaults on the next start. Invalid or unreadable saved settings cause an actionable startup error; repair the file, or explicitly save a replacement while WHAB is still running.
 
 Host-owned endpoints expose this behavior to custom interfaces and headless clients:
