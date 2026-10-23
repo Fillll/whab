@@ -104,9 +104,11 @@ def test_pages_keep_currency_totals_and_categories_separate(client):
                   "merchant": f"{currency} market", "amount": target, "categoryId": categories[currency]},
         ).status_code == 200
 
-    for currency, money, amount_input in (("USD", "$734.56", "0.00"), ("JPY", "JPY 1,745", "0"), ("KWD", "KWD 3.567", "0.000")):
+    for currency, money, sidebar_amount, amount_input in (("USD", "$734.56", "$735", "0.00"), ("JPY", "JPY 1,745", "JPY 1,745", "0"), ("KWD", "KWD 3.567", "KWD 4", "0.000")):
         text = client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text
-        assert money in text
+        assert f'>{sidebar_amount}</small>' in text
+        account_details = client.get(f"/budgets/home/accounts/2026-10/{currency.lower()}").text
+        assert f'<strong>{money}</strong>' in account_details
         assert f'{currency} food' in text and f'{currency} wallet' in text
         assert f'value="{amount_input}"' in text
         assert f'/2026-10/{currency.lower()}' in text
