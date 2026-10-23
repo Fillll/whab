@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.33.0 — 2026-10-23
+
+PR: [#91](https://github.com/Fillll/whab/pull/91)
+
+- Add private atomic effect journals with stable-lock identity fencing, complete namespace decisions and recoverable materialization. Preserve original operation/result receipts after interrupted file publication.
+- Add scoped encrypted bank continuations that durably record external exchange intent, capture responses through host encryption and retain uncertain outcomes without automatic duplicate exchanges.
+- Verify filesystem faults, concurrency and nine process-termination boundaries. These foundations do not yet activate stateful worker families.
+
 ## 2.32.0 — 2026-10-23
 
 PR: [#89](https://github.com/Fillll/whab/pull/89)
