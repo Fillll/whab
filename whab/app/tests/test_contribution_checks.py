@@ -32,10 +32,15 @@ def test_full_gate_runs_python_suite_once_and_quick_gate_skips_it(checker, monke
     assert not any("pytest" in command for _, command in full)
     assert "scripts/check_distribution.py" in full[-1][1]
     assert sum("scripts/check_plugin_devkit.py" in command for _, command in full) == 1
+    assert sum("scripts/check_plugin_generation.py" in command for _, command in full) == 1
     assert all("coverage" not in " ".join(command) and "distribution" not in " ".join(command)
-               and "check_plugin_devkit" not in " ".join(command) for _, command in quick)
+               and "check_plugin_devkit" not in " ".join(command)
+               and "check_plugin_generation" not in " ".join(command) for _, command in quick)
     assert "devtools" in next(command for name, command in full if name == "Python lint")
     assert quick[-1][1] == ["node", "--test", str(test.relative_to(tmp_path))]
+    evidence = checker.commands(docs_only=False, quick=False, node="node", evidence_dir=tmp_path / "evidence")
+    generation = next(command for _, command in evidence if "scripts/check_plugin_generation.py" in command)
+    assert generation[-2:] == ["--artifacts-directory", str(tmp_path / "evidence/generated")]
 
 
 @pytest.mark.parametrize("checker", ["check"], indirect=True)

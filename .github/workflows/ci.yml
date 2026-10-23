@@ -16,7 +16,7 @@ jobs:
   checks:
     name: CI (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -50,7 +50,15 @@ jobs:
         with:
           node-version: "22"
       - name: Run contribution checks
-        run: python scripts/check.py
+        run: python scripts/check.py --evidence-dir "$RUNNER_TEMP/whab-plugin-evidence"
+      - name: Preserve reviewed plugin artifacts and replay manifests
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: plugin-evidence-python-${{ matrix.python-version }}
+          path: ${{ runner.temp }}/whab-plugin-evidence
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Lint launcher Python
         run: python -m ruff check --config pyproject.toml ../launchers/macos/manager ../launchers/macos/tests ../launchers/macos/scripts
 

@@ -1,0 +1,11 @@
+from whab.plugins import AccountSnapshot, BudgetSnapshot, PluginRegistry
+from __MODULE__ import plugin
+
+
+def test_report_and_export_keep_integer_money_and_currency():
+    snapshot = BudgetSnapshot("personal", "2026-10", (AccountSnapshot("a", "Fictional", "depository", "checking", 125),), (), (), "EUR")
+    registry = PluginRegistry((plugin,))
+    assert registry.insights(snapshot)[0].insights[0].value == "EUR 1.25"
+    assert registry.export(plugin.id, snapshot).rows == (("Fictional", 125, "EUR"),)
+    empty = BudgetSnapshot("demo", "2026-10", (), (), ())
+    assert registry.export(plugin.id, empty).rows == ()

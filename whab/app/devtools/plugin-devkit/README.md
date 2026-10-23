@@ -5,10 +5,66 @@ outside runtime plugin discovery directories and contributes no runtime entry po
 Install it beside the host SDK and the plugin being tested; it does not require
 the bundled plugin set, a SQLite implementation, a provider account, or pytest at runtime.
 
-This initial increment provides synchronous storage conformance through public
-`whab.plugins` contracts. It requires Python 3.14+ and WHAB 2.21.1+ within major 2.
+The toolkit provides synchronous storage conformance, four complete teaching
+project generators and constrained configuration replay through public
+`whab.plugins` contracts. It requires Python 3.14+ and WHAB 2.22+ within major 2.
 Compatibility ranges require testing the minimum supported host artifact and the
 current candidate; an API import alone does not establish compatibility.
+
+## Generate and check a teaching project
+
+The installed `whab-plugin` command creates a new directory and refuses to
+overwrite an existing project:
+
+```sh
+whab-plugin new household-report --capability reporting
+```
+
+Choose `reporting` for a one-currency report and CSV export, `branding` for an
+embedded fictional bank logo, `file-import` for a bounded USD account JSON parser,
+or `categorization` for a complete saved exact-merchant model lifecycle. Generated
+projects include packaging, public-SDK source, regression tests, a README and an
+MIT license. They declare restart-only lifecycle support. The categorizer learns
+only reviewed posted rows, keeps currency-specific matches in its budget namespace
+and reports rule matches rather than measured predictive confidence.
+
+Build and review the project wheel, then install it with the built host, toolkit,
+SQLite reference and their dependencies in a clean external environment. Run its
+ordinary tests before the configuration check:
+
+```sh
+python -m pytest tests
+whab-plugin check --plugin household-report --combinations 10 --seed 42 --wheelhouse /approved/local/wheels --output /tmp/household-report-check
+whab-plugin replay /tmp/household-report-check/configuration-00.json --wheelhouse /approved/local/wheels
+```
+
+The wheelhouse contains the exact approved installed artifacts. Matching compares
+installed package bytes with local wheel members before importing the candidate
+and SQLite entry points; editable installations cannot establish this evidence.
+The host, toolkit, candidate and reference runtime dependency closure must be
+present with matching versions and hashes. Requirement markers are evaluated for
+this interpreter; runtime URL requirements and extras are unsupported. Additional
+matching test-tool wheels may be recorded without becoming selected runtime code.
+The commands do not install, download or approve plugin code.
+
+Each check samples ten distinct selected peer sets from six reviewed synthetic
+report, branding and import descriptors. It uses the actual public capability
+resolver, varies discovery/configuration order, exercises the candidate and peer
+hooks, and runs the SQLite reference's advertised conformance suites. The saved
+manifests include the seed, Python version, exact wheel identities/hashes, selected
+order, a selection preflight sequence and an explicit fault choice. Deterministic
+negative cases require missing/version-incompatible capabilities, cycles,
+conflicting writers and unsupported state versions to reject. Injected report
+failures must be attributed; invalid imports must reject atomically. Results
+contain case outcomes and identifiers, without ledger snapshots or private
+exception text. Preserve a failed manifest for replay.
+
+Selection sequences resolve peer removal/restoration, replacement or reordering.
+They do not activate live processes, migrate schemas, copy budgets or promote
+financial authority. Those unimplemented slots are explicit in every manifest.
+The synthetic snapshot and account-file probes are deliberately small teaching
+formats; extend the project's own regression tests for other file formats or
+candidate-specific rules.
 
 ## Run from an external plugin project
 
@@ -92,7 +148,7 @@ This is a starting conformance suite, not certification of a backend. It does no
 yet provide worker/lifecycle barriers, controlled transports, injected disk faults,
 termination recovery, schema upgrade fixtures, protected same-device transfer,
 receipt transfer on pending/posting, copy authority/promotion, retry evidence for
-unknown mutation outcomes, ten randomized configurations, or generator/replay commands.
+unknown mutation outcomes, live configuration coordination or migration/copy replay.
 Those need the corresponding host contracts.
 The current tests observe cleanup calls; they cannot prove a backend released every
 OS resource. SQLite-specific SQL/schema/failure tests remain with that plugin.
@@ -123,8 +179,8 @@ The repository's full `scripts/check.py` runs this dedicated gate once:
 .venv/bin/python scripts/check_plugin_devkit.py --report /tmp/whab-devkit-artifacts.json
 ```
 
-It builds the genuine minimum host **2.21.1** from pinned repository commit
-`b6d4ca04fc71556d2c51b1f7ce286049162656af`, the current candidate host, the toolkit,
+It builds the genuine minimum host **2.22.0** from pinned repository commit
+`bac249ca0e62638a40a6effc44af741c283e83d7`, the current candidate host, the toolkit,
 and the SQLite reference. CI fetches complete Git history for that controlled
 baseline. Each host receives a fresh virtual environment outside the checkout,
 with only these WHAB distributions and their runtime/test dependency closures.
@@ -144,5 +200,28 @@ source modification status, exact wheel versions and SHA-256 hashes, test counts
 and coverage result. It contains no financial records, snapshots, credentials or
 temporary runtime paths. Dependencies/build tools may need network access while
 preparing wheels; no provider account or bank connection is used. This initial
-gate validates maintained artifacts and is separate from future generated-project
-or randomized-configuration checks.
+gate validates maintained artifacts. The separate generated-project gate builds
+all four projects using an installed toolkit and validates every project wheel
+outside the checkout:
+
+```sh
+.venv/bin/python scripts/check_plugin_generation.py --report /tmp/whab-generation-artifacts.json
+```
+
+Each family must pass its installed regression tests with 100% statement and
+branch coverage, ten distinct configurations and replay of all ten manifests on
+the minimum and candidate host artifacts. When those versions coincide, one
+artifact covers both roles. The optional report preserves the manifests and
+exact wheel evidence; it does not claim lifecycle, schema migration or budget
+copy coverage.
+
+The full repository gate runs both toolkit and generated-project checks. Use
+`scripts/check.py --evidence-dir /absolute/new/evidence` to retain the reviewed
+generated wheelhouse, reports and per-host replay files. The dedicated generator
+gate also accepts `--artifacts-directory /absolute/new/generated`; it preserves
+wheels and completed replay manifests on failure while omitting runtime homes.
+Existing evidence directories are never overwritten. CI archives this synthetic
+evidence for each Python version for 14 days, including failed runs that reached
+generation. Install the exact host/toolkit/reference/candidate artifacts listed in
+a chosen manifest, then replay it with that saved wheelhouse. Different artifacts
+or installed files fail verification before plugin hooks run.
