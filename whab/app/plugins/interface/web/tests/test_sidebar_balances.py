@@ -41,16 +41,17 @@ def test_sidebar_balances_include_import_estimates_without_inventing_unknown_sna
         assert response.status_code == 200
         rows = sidebar_rows(response.text)
         for identifier, amount, label in (
-            ("cash", "$1,234.56", "Current balance"),
-            ("debt", "-$567.89", "Current balance"),
-            ("zero", "$0.00", "Current balance"),
-            ("old", "≈ $900.00", "Last known balance"),
+            ("cash", "$1,235", "Current balance"),
+            ("debt", "-$568", "Current balance"),
+            ("zero", "$0", "Current balance"),
+            ("old", "$900", "Last known balance"),
             ("unknown", "—", "Balance unavailable"),
-            ("import-cash", "≈ $789.01", "Estimated from imported transactions"),
-            ("import-debt", "≈ -$234.56", "Estimated from imported transactions"),
-            ("verified-import", "-$400.00", "Current balance"),
+            ("import-cash", "$789", "Estimated from imported transactions"),
+            ("import-debt", "-$235", "Estimated from imported transactions"),
+            ("verified-import", "-$400", "Current balance"),
         ):
             assert f'>{amount}</small>' in rows[identifier]
+            assert "≈" not in rows[identifier]
             assert f'title="{label}"' in rows[identifier]
             assert f'aria-label="{label}' in rows[identifier]
     data = store.workspace("personal", "2026-10")
@@ -58,12 +59,26 @@ def test_sidebar_balances_include_import_estimates_without_inventing_unknown_sna
 
 
 @pytest.mark.parametrize('currency,balance,formatted', (
-    ("JPY", 123456, "JPY 123,456"), ("KWD", 123456, "KWD 123.456"),
+    ("JPY", 123456, "JPY 123,456"), ("KWD", 123456, "KWD 123"),
 ))
-def test_sidebar_balances_use_selected_currency_precision(client, store, currency, balance, formatted):
+def test_sidebar_balances_round_selected_currency_to_whole_units(client, store, currency, balance, formatted):
     account = store.add_account("personal", {
         "name": "Currency wallet", "type": "depository", "balance": balance,
         "currency": currency,
     })
     rows = sidebar_rows(client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text)
     assert f'>{formatted}</small>' in rows[account]
+
+
+@pytest.mark.parametrize('value,currency,expected', (
+    (49, "USD", "$0"), (-49, "USD", "$0"),
+    (50, "USD", "$1"), (-50, "USD", "-$1"),
+    (149, "USD", "$1"), (150, "USD", "$2"),
+    (123, "JPY", "JPY 123"), (-123, "JPY", "-JPY 123"),
+    (123500, "KWD", "KWD 124"), (-123500, "KWD", "-KWD 124"),
+    (9007199254740991, "USD", "$90,071,992,547,410"),
+))
+def test_sidebar_money_rounding(value, currency, expected):
+    from whab_plugin_web.views import sidebar_money
+
+    assert sidebar_money(value, currency) == expected
