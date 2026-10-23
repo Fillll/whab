@@ -40,6 +40,7 @@ from .durability import (
     fingerprint,
     flush_directory,
     preserve_schema_one,
+    preserve_schema_two,
     read_file,
 )
 
@@ -72,18 +73,23 @@ class Store(Authority):
                 self._data = codec.decode(raw)
                 if self._data["formatVersion"] == 1:
                     preserve_schema_one(self.path, raw)
-                    self._data.update(formatVersion=2, authority=fresh_metadata(
+                    self._data.update(formatVersion=3, authority=fresh_metadata(
                         budget_id, environment, "primary", empty=pristine_document(self._data),
                     ))
                     self._commit(self._data)
                 elif (self._data["authority"]["budgetId"] != budget_id
                       or self._data["authority"]["environment"] != environment):
                     raise StoreError("JSON storage identity belongs to another budget or environment.")
+                elif self._data["formatVersion"] == 2:
+                    preserve_schema_two(self.path, raw)
+                    self._data["authority"].update(replica=None, promotionId=None)
+                    self._data["formatVersion"] = 3
+                    self._commit(self._data)
             else:
                 selected = month or current_month()
                 validate_month(selected)
                 self._data = {
-                    "formatVersion": 2, "generation": 0, "operationId": str(uuid4()),
+                    "formatVersion": 3, "generation": 0, "operationId": str(uuid4()),
                     "authority": fresh_metadata(budget_id, environment, initial_role, empty=True),
                     "authorityEpoch": str(uuid4()), "workspaces": {
                         name: initial_state(name, selected) for name in ("personal", "demo")

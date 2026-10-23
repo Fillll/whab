@@ -2,9 +2,9 @@
 
 WHAB supports explicit, previewed same-device SQLite/JSON migration through the
 budget's storage management API. The SDK and coordinator contracts below also
-allow other local adapters to implement complete transfer. Native parallel copies
-and promotion remain a separate increment. Existing saved-file copies remain
-portable file destinations.
+allow other local adapters to implement complete transfer. [Native copies and
+explicit promotion](storage-replicas.md) use the same authority decision. Existing
+saved-file copies remain portable file destinations.
 
 ## Application controls
 
@@ -249,8 +249,7 @@ checkpoint saves. Closing a connection or changing file permissions alone is not
 a durable fence. These guarantees concern supported native adapters; trusted
 Python plugins and legacy binaries are not a security sandbox.
 
-Native parallel-copy jobs and promotion remain a separate integration increment.
-They require monotonic source watermarks, stale-job rejection and explicit
-promotion through the same authority decision. Namespace-only saves also require
-an immutable namespace generation tied to the primary's logical generation;
-hashing namespaces at migration time alone does not provide continuous replicas.
+Native parallel copies add monotonic financial and namespace watermarks, immutable
+private namespace artifacts and explicit promotion through the same authority
+decision. See [copy contracts and controls](storage-replicas.md). Hashing namespaces
+only at migration time does not provide continuous replicas.

@@ -17,11 +17,12 @@ from whab.plugins import BudgetContext
 from whab.plugins.sdk import valid_plugin_name
 
 
-def local_context(home, budget_id, plugin_id):
+def local_context(home, budget_id, plugin_id, *, lock=None, on_change=None):
     """Keep legacy default files in place; isolate every other budget by identity."""
     if not valid_plugin_name(budget_id) or not valid_plugin_name(plugin_id):
         raise StoreError("Invalid budget or plugin data namespace.")
     root = (home if budget_id == "default" else home / "budgets" / budget_id) / "plugin-data" / plugin_id
+    lock = lock if lock is not None else RLock()
 
     def path(name):
         parts = name.split("/")
@@ -30,12 +31,24 @@ def local_context(home, budget_id, plugin_id):
         return root.joinpath(*parts)
 
     def read(name):
-        target = path(name)
-        return target.read_bytes() if target.exists() else None
+        with lock:
+            target = path(name)
+            return target.read_bytes() if target.exists() else None
+
+    def change(name, raw=None, *, delete=False):
+        with lock:
+            if delete:
+                path(name).unlink(missing_ok=True)
+            else:
+                atomic_write(path(name), raw)
+            if on_change:
+                try:
+                    on_change()
+                except Exception:
+                    pass
 
     return BudgetContext(budget_id, MappingProxyType({}), MappingProxyType({}), lambda _: None,
-                         read, lambda name, raw: atomic_write(path(name), raw),
-                         lambda name: path(name).unlink(missing_ok=True))
+                         read, change, lambda name: change(name, delete=True))
 
 
 class CategorizationService:

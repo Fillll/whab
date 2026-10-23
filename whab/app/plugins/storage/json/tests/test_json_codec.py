@@ -27,7 +27,7 @@ def _item(value):
 
 @pytest.mark.parametrize("mutate", [
     lambda value: value.update(extra=True),
-    lambda value: value.update(formatVersion=3),
+    lambda value: value.update(formatVersion=4),
     lambda value: value.update(formatVersion=True),
     lambda value: value.update(generation=True),
     lambda value: value.update(generation=-1),

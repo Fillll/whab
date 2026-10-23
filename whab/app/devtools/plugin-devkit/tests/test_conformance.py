@@ -1,6 +1,7 @@
 import importlib.metadata
 from dataclasses import asdict
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import whab_plugin_devkit
@@ -36,6 +37,16 @@ def test_advertised_broken_optional_behavior_fails_instead_of_skipping():
     assert [(result.capability, result.detail) for result in failures] == [("receipts", "AttributeError")]
     with pytest.raises(ConformanceFailure, match="receipts/receipt-validation-and-reopen"):
         report.assert_success()
+
+
+def test_legacy_sdk_context_keeps_primary_suites_and_rejects_false_replica_advertisement(monkeypatch):
+    def legacy_context(home, environment, config):
+        return SimpleNamespace(home=home, environment=environment, config=config)
+    monkeypatch.setattr("whab_plugin_devkit.adapters.StorageContext", legacy_context)
+    run_conformance(BackendAdapter(SyntheticLedger)).assert_success()
+    report = run_conformance(BackendAdapter(SyntheticLedger, frozenset({Capability.NATIVE_REPLICA})))
+    failures = [result for result in report.results if result.status == "failed"]
+    assert [(result.capability, result.detail) for result in failures] == [("native-replica", "TypeError")]
 
 
 def test_failed_optional_hook_never_exposes_exception_payload():
@@ -155,6 +166,10 @@ def test_installed_sqlite_public_factory_conformance(capabilities):
         pytest.skip("Install the optional reference SQLite distribution to run this integration test.")
     entrypoint = next(point for point in distribution.entry_points if point.group == "whab.plugins")
     descriptor = entrypoint.load()
+    capabilities = set(capabilities)
+    provided = getattr(getattr(descriptor, "contract", None), "provides", ())
+    if not any(capability.name == "storage.replica" and capability.version == 1 for capability in provided):
+        capabilities.discard(Capability.NATIVE_REPLICA)
     run_conformance(BackendAdapter(
-        descriptor.storage, capabilities,
+        descriptor.storage, frozenset(capabilities),
     )).assert_success()

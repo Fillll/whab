@@ -17,6 +17,7 @@ from whab.budgets.host import BudgetDispatch, BudgetHost, BudgetRuntimeRequests
 from whab.budgets.plugin_state import check_saved_states
 from whab.budgets.runtime import BudgetRuntime
 from whab.budgets.session import BudgetSession, TrackedStorage
+from whab.budgets.storage_replicas import StorageReplicas
 from whab.budgets.storage_runtime import StorageRuntime, open_saved_storage, saved_storage_selection
 from whab.config import Settings
 from whab.plugins import (
@@ -207,7 +208,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
         store.on_mutation = service.invalidate_revision
         if not remote_authority:
-            context_factory = budget_session.context if budget_session else lambda identifier: local_context(settings.home / "data" / "plugin-state" / settings.plaid_env, service.budget_id, identifier)
+            context_factory = budget_session.context if budget_session else lambda identifier: local_context(
+                settings.home / "data" / "plugin-state" / settings.plaid_env, service.budget_id, identifier,
+                lock=store.lock, on_change=lambda: store.after_commit and store.after_commit())
             saved_ids = [record["id"] for record in budget_session.manifest["plugins"]
                          if any(f"plugins/{record['id']}/suggestions-{workspace}.json" in budget_session.files
                                 for workspace in ("personal", "demo"))] if budget_session else [
@@ -240,6 +243,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     plugin_manager.live = live
     storage_runtime = StorageRuntime(settings, budget_session, store, runtime, registry,
         lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin))
+    replicas = StorageReplicas(storage_runtime)
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -287,6 +291,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                         ) from None
             if not _child:
                 await budget_host.remember_current()
+            await replicas.start()
             yield
         finally:
             # Close every service even if another plugin's cleanup raises.
@@ -295,6 +300,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                     if not _child:
                         await budget_host.close()
                 finally:
+                    await replicas.close()
                     await storage_runtime.close()
                     await live.close()
             finally:
@@ -396,6 +402,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.state.storage_runtime = storage_runtime
     storage_runtime.attach(app, plugin_manager, live)
     app.include_router(storage_runtime.router())
+    app.state.storage_replicas = replicas
+    app.include_router(replicas.router())
     app.state.bank_ui_available = any(plugin.id == "plaid" and plugin.bank_ui for plugin in descriptors)
     app.state.plugin_manager = plugin_manager
     app.state.storage_plugin = settings.storage if owned_store else None

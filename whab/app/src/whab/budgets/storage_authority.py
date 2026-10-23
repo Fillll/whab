@@ -20,6 +20,7 @@ from uuid import uuid4
 
 from whab.domain.errors import StoreError
 from whab.plugins.sdk import valid_plugin_name
+from whab.plugins.storage_replica import read_replica_watermark, replica_record
 from whab.plugins.storage_transfer import (
     CommitEvidence,
     canonical_storage_json,
@@ -38,6 +39,7 @@ _JOURNAL_FIELDS = {
     "destination_plugin_id", "source", "destination", "stage", "authority_instance_id",
     "target_epoch", "namespace", "transfer_digest",
 }
+_JOURNAL_V2_FIELDS = _JOURNAL_FIELDS | {"kind", "replica"}
 
 
 class StorageAuthorityError(StoreError):
@@ -100,9 +102,11 @@ def _read_namespace(value):
 
 def _journal_record(value, budget_id, environment):
     try:
-        if type(value) is not dict or value.keys() != _JOURNAL_FIELDS:
+        if type(value) is not dict or type(value.get("formatVersion")) is not int:
             raise ValueError
-        if type(value["formatVersion"]) is not int or value["formatVersion"] != 1:
+        if value["formatVersion"] == 1 and value.keys() == _JOURNAL_FIELDS:
+            value = {**value, "formatVersion": 2, "kind": "migration", "replica": None}
+        if value["formatVersion"] != 2 or value.keys() != _JOURNAL_V2_FIELDS or value["kind"] not in {"migration", "promotion"}:
             raise ValueError
         if value["budget_id"] != budget_id or value["environment"] != environment:
             raise ValueError
@@ -125,6 +129,17 @@ def _journal_record(value, budget_id, environment):
         if not _hash(value["transfer_digest"]):
             raise ValueError
         _read_namespace(value["namespace"])
+        if value["kind"] == "promotion":
+            watermark = read_replica_watermark(value["replica"])
+            if (watermark.source_instance_id != source.instance_id
+                    or watermark.source_authority_epoch != source.authority_epoch
+                    or watermark.source_generation != source.generation
+                    or watermark.source_operation_id != source.operation_id
+                    or watermark.state_digest != source.state_digest
+                    or watermark.transfer_digest != value["transfer_digest"]):
+                raise ValueError
+        elif value["replica"] is not None:
+            raise ValueError
     except (KeyError, TypeError, ValueError, StoreError):
         raise StorageAuthorityError("invalid_journal") from None
     return value
@@ -344,6 +359,7 @@ def _resolve_authority(journal, source, destination, namespace):
     current_source = _identity(source.commit_evidence(), journal)
     current_destination = _identity(destination.commit_evidence(), journal)
     original_source, original_destination = read_evidence(record["source"]), read_evidence(record["destination"])
+    promotion = record["kind"] == "promotion"
     if current_source.instance_id != original_source.instance_id or current_destination.instance_id != original_destination.instance_id:
         raise StorageAuthorityError("identity_mismatch")
     if (current_source.authority_epoch != original_source.authority_epoch
@@ -354,8 +370,12 @@ def _resolve_authority(journal, source, destination, namespace):
         if ((not later_aborted_write and (current_source.generation != original_source.generation
                                          or current_source.state_digest != original_source.state_digest))
                 or current_source.role not in {"primary", "fenced"}
-                or current_destination.role != "staged"):
+                or current_destination.role != ("copy" if promotion else "staged")):
             raise StorageAuthorityError("recovery_required")
+        if promotion:
+            if record["stage"] != "aborted" and destination.replica_watermark() != read_replica_watermark(record["replica"]):
+                raise StorageAuthorityError("recovery_required")
+            destination.abort_promotion(record["transition_id"], current_destination)
         if current_source.role == "fenced":
             source.set_role(record["transition_id"], current_source, "primary")
         if record["stage"] != "aborted":
@@ -365,10 +385,12 @@ def _resolve_authority(journal, source, destination, namespace):
             or current_source.generation != original_source.generation
             or current_source.state_digest != original_source.state_digest):
         raise StorageAuthorityError("recovery_required")
-    if current_destination.role == "staged":
+    if current_destination.role == ("copy" if promotion else "staged"):
         if (current_destination.generation != original_source.generation
                 or current_destination.state_digest != original_source.state_digest
                 or current_destination.authority_epoch != original_source.authority_epoch):
+            raise StorageAuthorityError("recovery_required")
+        if promotion and destination.replica_watermark() != read_replica_watermark(record["replica"]):
             raise StorageAuthorityError("recovery_required")
         current_destination = destination.set_role(record["transition_id"], current_destination, "primary",
                                                    authority_epoch=record["target_epoch"])
@@ -437,7 +459,16 @@ class StorageAuthorityCoordinator:
         """
         return await self._owned(self._serialized_migrate(
             source_plugin_id, destination_plugin_id, prepare_destination, reopen_destination,
-            build_candidate, flush=flush, activate=activate, drain_timeout=drain_timeout))
+            build_candidate, flush=flush, activate=activate, drain_timeout=drain_timeout, promotion=None))
+
+    async def promote(self, source_plugin_id, destination_plugin_id, prepare_destination,
+                      reopen_destination, build_candidate, *, catch_up, flush=None, activate=None, drain_timeout=30):
+        """Catch up an explicit copy while drained, then commit one authority decision."""
+        if not callable(catch_up):
+            raise StorageAuthorityError("validation_failed")
+        return await self._owned(self._serialized_migrate(
+            source_plugin_id, destination_plugin_id, prepare_destination, reopen_destination,
+            build_candidate, flush=flush, activate=activate, drain_timeout=drain_timeout, promotion=catch_up))
 
     async def _serialized_migrate(self, *args, **kwargs):
         async with self._serial:
@@ -448,7 +479,7 @@ class StorageAuthorityCoordinator:
                 await asyncio.to_thread(self.journal.release_writer, descriptor)
 
     async def _migrate(self, source_plugin_id, destination_plugin_id, prepare_destination,
-                       reopen_destination, build_candidate, *, flush, activate, drain_timeout):
+                       reopen_destination, build_candidate, *, flush, activate, drain_timeout, promotion):
         if not valid_plugin_name(source_plugin_id) or not valid_plugin_name(destination_plugin_id):
             raise StorageAuthorityError("identity_mismatch")
         pending = {}
@@ -461,12 +492,16 @@ class StorageAuthorityCoordinator:
             destination = PreparedStorage(await asyncio.to_thread(prepare_destination))
             preparation.own(RuntimeResource(destination_plugin_id, destination.aclose))
             destination_evidence = _identity(await asyncio.to_thread(destination.commit_evidence), self.journal)
-            if destination_evidence.role != "staged" or destination_evidence.instance_id == source_evidence.instance_id:
+            if destination_evidence.role != ("copy" if promotion else "staged") or destination_evidence.instance_id == source_evidence.instance_id:
                 raise StorageAuthorityError("destination_not_empty")
-            snapshot = await asyncio.to_thread(source.export_local)
-            preview = await asyncio.to_thread(destination.preview_local, snapshot)
-            if preview.empty is not True or preview.supported is not True:
-                raise StorageAuthorityError("destination_not_empty")
+            if promotion:
+                if await asyncio.to_thread(destination.replica_watermark) is None:
+                    raise StorageAuthorityError("validation_failed")
+            else:
+                snapshot = await asyncio.to_thread(source.export_local)
+                preview = await asyncio.to_thread(destination.preview_local, snapshot)
+                if preview.empty is not True or preview.supported is not True:
+                    raise StorageAuthorityError("destination_not_empty")
             services = await _invoke(build_candidate, preparation.active, destination)
             candidate = services if type(services) is RuntimeCandidate else RuntimeCandidate(services, preparation.active.resources)
             if candidate.services.get("storage") is not destination:
@@ -479,7 +514,7 @@ class StorageAuthorityCoordinator:
             ))
             pending.update(source=source, destination=destination, source_evidence=source_evidence,
                            initial_destination=destination_evidence, transition_id=str(uuid4()),
-                           reopen_destination=reopen_destination, activate=activate)
+                           reopen_destination=reopen_destination, activate=activate, promotion=promotion)
             self._pending = pending
             return candidate
 
@@ -489,20 +524,31 @@ class StorageAuthorityCoordinator:
                 await _invoke(flush)
             namespace = await asyncio.to_thread(self.namespace_evidence)
             namespace_record(namespace)
+            watermark = await _invoke(promotion, source, destination) if promotion else None
             snapshot = await asyncio.to_thread(source.export_local)
             _identity(snapshot.source, self.journal)
             if snapshot.source.role != "primary":
                 raise StorageAuthorityError("recovery_required")
             destination_evidence = _identity(await asyncio.to_thread(destination.commit_evidence), self.journal)
-            preview = await asyncio.to_thread(destination.preview_local, snapshot)
-            if preview.empty is not True or preview.supported is not True:
-                raise StorageAuthorityError("destination_not_empty")
+            if promotion:
+                if (watermark != await asyncio.to_thread(destination.replica_watermark)
+                        or watermark.source_instance_id != snapshot.source.instance_id
+                        or watermark.source_authority_epoch != snapshot.source.authority_epoch
+                        or watermark.source_generation != snapshot.source.generation
+                        or watermark.state_digest != snapshot.source.state_digest or watermark.transfer_digest != snapshot.digest):
+                    raise StorageAuthorityError("validation_failed")
+            else:
+                preview = await asyncio.to_thread(destination.preview_local, snapshot)
+                if preview.empty is not True or preview.supported is not True:
+                    raise StorageAuthorityError("destination_not_empty")
             previous = await asyncio.to_thread(self.journal.read)
             if previous is not None and (previous["authority_instance_id"] != snapshot.source.instance_id
                                          or previous["stage"] not in {"active", "retired", "aborted"}):
                 raise StorageAuthorityError("recovery_required")
             record = {
-                "formatVersion": 1, "budget_id": self.journal.budget_id, "environment": self.journal.environment,
+                "formatVersion": 2, "kind": "promotion" if promotion else "migration",
+                "replica": replica_record(watermark) if promotion else None,
+                "budget_id": self.journal.budget_id, "environment": self.journal.environment,
                 "transition_id": pending["transition_id"], "source_plugin_id": source_plugin_id,
                 "destination_plugin_id": destination_plugin_id, "source": evidence_record(snapshot.source),
                 "destination": evidence_record(destination_evidence), "stage": "prepared",
@@ -511,7 +557,10 @@ class StorageAuthorityCoordinator:
             }
             pending.update(record=record, snapshot=snapshot, namespace=namespace)
             await asyncio.to_thread(self.journal.write, record)
-            destination_evidence = await asyncio.to_thread(destination.import_local, record["transition_id"], snapshot)
+            if promotion:
+                destination_evidence = await asyncio.to_thread(destination.prepare_promotion, record["transition_id"], destination_evidence, watermark)
+            else:
+                destination_evidence = await asyncio.to_thread(destination.import_local, record["transition_id"], snapshot)
             record = {**record, "stage": "imported", "destination": evidence_record(destination_evidence)}
             await asyncio.to_thread(self.journal.write, record)
             await asyncio.to_thread(destination.reopen, reopen_destination)
@@ -588,7 +637,7 @@ class StorageAuthorityCoordinator:
             if not new_journal:
                 current = await asyncio.to_thread(pending["source"].commit_evidence)
                 destination = await asyncio.to_thread(pending["destination"].commit_evidence)
-                return (current.role == "primary" and destination.role == "staged"
+                return (current.role == "primary" and destination.role == ("copy" if pending["promotion"] else "staged")
                         and current.instance_id == pending["source_evidence"].instance_id
                         and (record is None or record["authority_instance_id"] == current.instance_id))
             before_namespace = await asyncio.to_thread(self.namespace_evidence)

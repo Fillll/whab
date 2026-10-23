@@ -74,4 +74,25 @@ different destinations are refused. States exceeding the public local-transfer
 bounds are refused without restricting existing SQLite ledger writes. Runtime
 authority tables and protected records never enter the sanitized portable database.
 
+Authority metadata format 2 adds the version-1 `storage.replica` contract and a
+prepared promotion identity. Opening format 1 upgrades that metadata in one native
+transaction without changing the instance, epoch, generation or financial records.
+The replica watermark, both workspaces, protected records and durable command
+receipts commit together. A copy keeps its own instance identity while recording
+its source instance/epoch/generation/operation and the host-owned namespace
+generation/digest. Opaque plugin files remain the host's responsibility.
+
+`apply_replica()` accepts only a copy. Exact replay is harmless after a lost
+response; older financial or namespace generations, a different source/epoch and
+conflicting same-generation data cannot overwrite a newer copy. Native copy data
+must match its saved watermark on reopen. Copy failure cannot undo the primary's
+committed save.
+
+`prepare_promotion()` compares complete copy evidence and the exact watermark,
+persists the transition and blocks further replica updates. Its matching
+`abort_promotion()` clears that preparation. The host must first catch up, validate
+namespaces, fence the primary and durably choose authority. Only then may
+`set_role()` activate the prepared copy with a fresh epoch. Promotion and abort
+leave financial generation and data unchanged; new primary commands advance it.
+
 From `whab/app/`, use `.venv/bin/python -m pytest plugins/storage/sqlite/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. Documentation-only edits can use `--docs`. See [plugin contribution rules](../../README.md#test-ownership) for coverage/packaging requirements and [CHANGELOG.md](CHANGELOG.md) for the release history of these capabilities.
