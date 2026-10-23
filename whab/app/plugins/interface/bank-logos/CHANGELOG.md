@@ -1,5 +1,12 @@
 # Public bank artwork plugin changelog
 
+## 1.4.0 — 2026-10-23
+
+PR: [#88](https://github.com/Fillll/whab/pull/88)
+
+- Provide an explicit live branding contract and zero-authority factory so each budget/environment/version owns independent artwork caches and settings hooks. Preserve fixed/public bank-domain validation and existing cache behavior.
+- Require WHAB 2.31+ and verify live selection, approved worker upgrades, cache isolation/retirement and 100% statement/branch coverage with fictional transport.
+
 ## 1.3.0 — 2026-10-18
 
 PR: [#56](https://github.com/Fillll/whab/pull/56)

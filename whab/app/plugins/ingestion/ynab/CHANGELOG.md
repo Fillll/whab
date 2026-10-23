@@ -1,5 +1,12 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.4.0 — 2026-10-23
+
+PR: [#88](https://github.com/Fillll/whab/pull/88)
+
+- Declare live file-parser support and pass preview parser identity with commit requests. A retired or missing identity is rejected before parsing with replacement code; exact file fingerprints/import retry semantics remain host-owned.
+- Require WHAB 2.31+ and retain coherent generation-specific templates/assets across live replacement. Verify parsing/UI contracts and 100% statement/branch coverage.
+
 ## 1.3.1 — 2026-10-18
 
 PR: [#72](https://github.com/Fillll/whab/pull/72)
