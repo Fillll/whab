@@ -130,6 +130,15 @@ def money_number(value, currency="USD"):
     return f"{sign}{whole:,}.{fraction:0{digits}d}" if digits else f"{sign}{whole:,}"
 
 
+def sidebar_money(value, currency="USD"):
+    """Round sidebar balances to whole major units, half away from zero."""
+    unit = 10**currency_minor_units(currency)
+    whole = (abs(value) + unit // 2) // unit
+    sign = "-" if value < 0 and whole else ""
+    prefix = "$" if currency == "USD" else f"{currency} "
+    return f"{sign}{prefix}{whole:,}"
+
+
 def month_label(month, short=False):
     """The web skin gives core ISO periods readable month names."""
     names = (
@@ -301,6 +310,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "currency_choices": [(code, currency_minor_units(code)) for code in SUPPORTED_CURRENCIES],
         "minor_units": currency_minor_units(currency),
         "money": lambda value: format_money(value, currency),
+        "sidebar_money": lambda value: sidebar_money(value, currency),
         "money_input": lambda value: money_input(value, currency),
         "money_number": lambda value: money_number(value, currency),
         "valid_money": valid_money,

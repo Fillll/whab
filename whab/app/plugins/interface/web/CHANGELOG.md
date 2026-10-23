@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.25.1 — 2026-10-22
+
+PR: [#74](https://github.com/Fillll/whab/pull/74)
+
+- Display sidebar account balances as whole currency amounts without decimal places or approximation markers. Round half units away from zero and retain balance-source descriptions on hover and for screen readers.
+
 ## 1.25.0 — 2026-10-20
 
 PR: [#73](https://github.com/Fillll/whab/pull/73)
