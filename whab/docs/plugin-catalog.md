@@ -9,19 +9,19 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
-| [bank-logos](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.3.0` | `whab>=2.11,<3` | Legacy; restart required | maintained |
-| [client](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
-| [example](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
-| [example-branding](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-categorization](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-file-import](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [json](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.2.0` | `whab>=2.30,<3` | restart-required | maintained |
-| [plaid](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
-| [random-forest-categorization](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.1.0` | `whab>=2.19,<3` | Legacy; restart required | maintained |
-| [server](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.0.1` | `whab>=2,<3` | Legacy; restart required | maintained |
-| [sqlite](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.11.0` | `whab>=2.30,<3` | restart-required | maintained |
-| [web](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.25.1` | `whab>=2.19,<3` | Legacy; restart required | maintained |
-| [ynab](https://github.com/Fillll/whab/blob/3a492a368d840a87836669e9670168c697585e3b/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.3.1` | `whab>=2.21,<3` | Legacy; restart required | maintained |
+| [bank-logos](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.3.0` | `whab>=2.11,<3` | Legacy; restart required | maintained |
+| [client](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
+| [example](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
+| [example-branding](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-categorization](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-file-import](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [json](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.2.0` | `whab>=2.30,<3` | restart-required | maintained |
+| [plaid](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
+| [random-forest-categorization](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.1.0` | `whab>=2.19,<3` | Legacy; restart required | maintained |
+| [server](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.0.1` | `whab>=2,<3` | Legacy; restart required | maintained |
+| [sqlite](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.11.0` | `whab>=2.30,<3` | restart-required | maintained |
+| [web](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.25.1` | `whab>=2.19,<3` | Legacy; restart required | maintained |
+| [ynab](https://github.com/Fillll/whab/blob/a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.3.1` | `whab>=2.21,<3` | Legacy; restart required | maintained |
 
 Only explicit stateless report descriptors advertise live-worker compatibility. Other entries require restart; backend migration and copies are not inferred from package installation.
 
@@ -78,3 +78,13 @@ A separate installed-wheel runtime selected JSON/Web with optional plugins disab
 Tests: `scripts/check_distribution.py::SMOKE`.
 
 Review: [PR #86](https://github.com/Fillll/whab/pull/86).
+
+### pr87-installed-copy-promotion
+
+Verified 2026-10-23; host `2.30.0`. Selected: `sqlite`, `json`.
+
+Built the exact committed host and two backend wheels into a fresh environment outside the checkout. Native HTTPS explicitly trusted only each temporary runtime CA. Separate fictional named-budget runs alternated SQLite-primary/JSON-copy and JSON-primary/SQLite-copy; these are explicit primary/copy roles, never two authoritative registrations in one registry. Verified preview/attachment, saved watermark, namespace-only revision with financial generation unchanged, late acknowledged primary writes, explicit promotion with fresh epoch and source fence, acknowledged destination writes, two complete process reopens, opaque model/file and exact original-container preservation. No bank/provider plugin or connection was used. Source tests additionally exercised fourteen process-termination promotion boundaries. The full gate passed 4356 Python tests, all thirteen plugins at 100% statement/branch coverage, browser checks and external minimum/current artifacts; visual copy controls and storage-worker upgrades were not implemented.
+
+Tests: `tests/web/test_storage_replicas.py`, `tests/budgets/test_namespace_archives.py`, `installed native HTTPS copy/promotion/reopen verification`, `scripts/check.py`.
+
+Review: [PR #87](https://github.com/Fillll/whab/pull/87).

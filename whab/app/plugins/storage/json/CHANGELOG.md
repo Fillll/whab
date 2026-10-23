@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.2.0 — 2026-10-23
+
+PR: [#87](https://github.com/Fillll/whab/pull/87)
+
+- Add native schema 3 with atomic replica watermarks and promotion identity. Upgrade schemas 1/2 explicitly while retaining exact private recovery images; reject stale jobs and ordinary copy writes.
+- Preserve complete financial, encrypted provider and receipt state through promotion and restart, requiring WHAB 2.30+. Verify interrupted commits, both copy directions and public conformance at 100% statement and branch coverage.
+
 ## 1.1.0 — 2026-10-23
 
 PR: [#84](https://github.com/Fillll/whab/pull/84)
