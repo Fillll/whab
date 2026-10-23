@@ -33,6 +33,7 @@ def main(argv=None):
     new.add_argument("plugin_id")
     new.add_argument("--capability", choices=FAMILIES, required=True)
     new.add_argument("--directory", type=Path)
+    new.add_argument("--ci-ref", help="Add reusable CI pinned to this published full WHAB source commit.")
     check = commands.add_parser("check", help="Run distinct constrained resolver/hook configurations.")
     check.add_argument("--plugin", required=True)
     check.add_argument("--combinations", type=int, default=10)
@@ -45,7 +46,7 @@ def main(argv=None):
     arguments = parser.parse_args(argv)
     try:
         if arguments.command == "new":
-            project = generate_project(arguments.plugin_id, arguments.capability, arguments.directory or Path(arguments.plugin_id))
+            project = generate_project(arguments.plugin_id, arguments.capability, arguments.directory or Path(arguments.plugin_id), ci_ref=arguments.ci_ref)
             print(f"Created {project}")
             return 0
         if arguments.command == "check":

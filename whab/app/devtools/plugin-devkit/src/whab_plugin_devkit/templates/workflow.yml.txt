@@ -1,0 +1,15 @@
+name: WHAB plugin contracts
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    uses: Fillll/whab/.github/workflows/plugin-conformance.yml@__CI_REF__
+    with:
+      plugin-id: __PLUGIN_ID__
+      whab-ref: __CI_REF__

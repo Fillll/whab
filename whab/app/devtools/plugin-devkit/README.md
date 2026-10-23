@@ -20,6 +20,18 @@ overwrite an existing project:
 whab-plugin new household-report --capability reporting
 ```
 
+Add `--ci-ref "$WHAB_CI_COMMIT"` to include a complete reusable GitHub Actions
+workflow. Set `WHAB_CI_COMMIT` to a published, reviewed, full lowercase commit
+from this repository that contains `plugin-conformance.yml`; mutable branch/tag
+names are rejected. Both the workflow reference and its tooling/candidate source
+checkout use that exact commit. The generated YAML needs no source path changes
+when the project lives at the root of its own repository.
+
+```sh
+: "${WHAB_CI_COMMIT:?Set the reviewed published WHAB CI commit first}"
+whab-plugin new household-report --capability reporting --ci-ref "$WHAB_CI_COMMIT"
+```
+
 Choose `reporting` for a one-currency report and CSV export, `branding` for an
 embedded fictional bank logo, `file-import` for a bounded USD account JSON parser,
 or `categorization` for a complete saved exact-merchant model lifecycle. Generated
@@ -233,3 +245,67 @@ evidence for each Python version for 14 days, including failed runs that reached
 generation. Install the exact host/toolkit/reference/candidate artifacts listed in
 a chosen manifest, then replay it with that saved wheelhouse. Different artifacts
 or installed files fail verification before plugin hooks run.
+
+## Reusable external-author CI
+
+[The reusable workflow](../../../../.github/workflows/plugin-conformance.yml)
+uses GitHub's [`workflow_call` interface](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows).
+The generated `--ci-ref` workflow is a complete caller. Existing projects can use
+the same job with `plugin-id`, the full reviewed `whab-ref`, and optional
+`project-directory` relative to the caller checkout. The caller selects trusted
+source/build/test code to execute. The workflow has read-only repository access,
+does not inherit secrets, and does not provide security sandboxing.
+
+The selected WHAB commit supplies the current candidate host, toolkit and SQLite
+reference. The immutable `bac249ca0e62638a40a6effc44af741c283e83d7` source supplies
+the genuine 2.22.0 minimum host and a compatible SQLite reference. These are two
+distinct real host artifacts; their version metadata is never rewritten to test
+compatibility. The installed toolkit retains its declared minimum host floor.
+
+The shared runner builds the caller project once, then creates independent
+environments outside both source checkouts. Only candidate/reference plugin
+registrations are permitted. Before importing either descriptor it verifies exact
+installed wheel members, dependency closure and entry-point ownership. Each host
+runs the project's behavioral tests once, with every installed candidate Python
+file at 100% statement/branch coverage, ten distinct configurations, all advertised
+SQLite reference suites, and all ten exact-artifact replays. Missing/empty/skipped
+project tests and missing/broken advertised suites fail. Unsupported optional
+reference capabilities remain explicit `not-applicable` results; they are never
+used to hide failures. This profile covers the four generated teaching families
+and their fictional hook probes, not arbitrary provider formats or lifecycle
+certification. Add project-specific public-contract tests when extending them.
+
+Dependency preparation is separate from runtime capability selection. Only host,
+toolkit, SQLite reference, pinned test tools and pinned Setuptools build tools are
+downloaded during preparation. Candidate build/runtime/test dependencies must
+already exist in that closure or in `extra-wheelhouse-directory`, an optional
+caller-reviewed wheel directory. Prefer `extra-wheelhouse-artifact` when an
+earlier caller job prepares reviewed wheels: make the calling job depend on that
+preparation job, and upload only the wheel files at the artifact root. The reusable
+workflow downloads that one explicitly named artifact; it never fetches a plugin
+from an index. Choose either directory or artifact, and keep generated wheels out
+of Git. URL and extra dependency requirements are
+unsupported. Every project build and test-environment install uses `--no-index`;
+build isolation cannot silently download additional tools. Missing required wheels
+produce an installation failure and a clear wheelhouse diagnostic. No community
+plugin is discovered, downloaded or enabled automatically.
+
+For a local equivalent, from `whab/app/` in a reviewed tooling checkout and with
+`PLUGIN_PROJECT` set to the external project's absolute directory:
+
+```sh
+: "${PLUGIN_PROJECT:?Set the external project directory first}"
+python -m pip install packaging==26.3
+python scripts/check_plugin_generation.py \
+  --project "$PLUGIN_PROJECT" --plugin household-report \
+  --candidate-ref "$(git rev-parse HEAD)" \
+  --artifacts-directory /tmp/household-report-ci-evidence
+```
+
+The toolkit tests and their coverage remain in `check_plugin_devkit.py`; the
+external runner reuses the generation gate rather than duplicating those tests.
+Temporary build/test environments and runtime homes close and disappear on both
+success and failure. Archived evidence contains approved wheels, versions/hashes,
+source commit identities, test counts and fictional replay files, without runtime
+homes or ledger payloads. Preserve the wheelhouse for offline replay. The repository
+CI calls this same reusable workflow for its maintained fictional branding example.
