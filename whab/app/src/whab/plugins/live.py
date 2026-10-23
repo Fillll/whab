@@ -28,6 +28,7 @@ _METHODS = frozenset({
     "storage_plugin", "ui_plugin", "settings", "settings_action", "bank_logo",
     "bank_logo_provider", "logo_image", "merchant_logo_image", "insights", "export",
     "parser_identity", "parser_requires_identity", "import_resource",
+    "ui_templates",
 })
 
 
@@ -92,6 +93,28 @@ class RegistryGeneration:
 
     def storage_plugin(self, identifier):
         return self.registry.storage_plugin(identifier)
+
+    def ui_plugin(self, identifier):
+        return self.registry.ui_plugin(identifier)
+
+    def ui_templates(self):
+        """Bound public extension templates for the operation's visual worker."""
+        from .worker_resources import capture_resource_paths
+
+        templates = {}
+        for plugin in self.bank_plugins():
+            if plugin.bank_ui is not None:
+                resources = capture_resource_paths(plugin.bank_ui.templates, plugin.bank_ui.static)
+                templates.update({f"plugins/{plugin.id}/{name.removeprefix('templates/')}": raw.decode("utf-8")
+                                  for name, raw in resources.files.items() if name.startswith("templates/")})
+        for identifier, (_, token, _) in self._parsers.items():
+            resources = self._resources.get((identifier, token))
+            if resources is not None:
+                templates.update({f"imports/{identifier}/{token}/{name.removeprefix('templates/')}": raw.decode("utf-8")
+                                  for name, raw in resources.files.items() if name.startswith("templates/")})
+        if len(templates) > 256 or sum(len(raw.encode("utf-8")) for raw in templates.values()) > 4 * 1024 * 1024:
+            raise PluginError("The combined interface extension resources exceed their supported bounds.", code="missing_resources")
+        return templates
 
     def insights(self, snapshot):
         return self.registry.insights(snapshot)
