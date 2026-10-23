@@ -201,6 +201,8 @@ class LivePluginSelection:
         self.home = home
         self.categorization = None
         self.prepare_interfaces = None
+        self.visual_ids = frozenset()
+        self.visual = None
         self.initial_selection = frozenset(plugin.id for plugin in runtime._active.services["plugins"].descriptors()) - self.required
         self._lock = Lock()
         self._tickets = {}
@@ -217,18 +219,21 @@ class LivePluginSelection:
                             "distribution": binding.environment.distribution,
                             "environment": binding.environment.identifier,
                             "health": "ready" if binding.worker.healthy else "failed"})
-        families = set(LIVE_CAPABILITIES)
+        upgrades = set(LIVE_CAPABILITIES) - {"interface.ui"}
+        if self.visual is not None:
+            upgrades.add("interface.ui")
+        families = set(upgrades)
         if self.categorization is not None:
             families.add("categorization")
         return {"families": sorted(families),
-                "code_upgrade_families": sorted(LIVE_CAPABILITIES) if self.home is not None else [],
+                "code_upgrade_families": sorted(upgrades) if self.home is not None else [],
                 "host_only_families": [],
                 "code_upgrades": self.home is not None, "runtime": self.runtime.status(),
                 "workers": sorted(workers, key=lambda item: item["plugin"]), "operations": operations}
 
     def _candidate(self, selection, active, *, bind=False):
         selection = validate_selection(selection)
-        if self.required & set(selection):
+        if (self.required | self.visual_ids) & set(selection):
             raise PluginError("Storage and user interfaces remain selected by the host. Choose only optional plugins.", code="required_plugin")
         current = {plugin.id: plugin for plugin in active.descriptors()}
         unavailable = set(self.session.missing_plugins) if self.session else set()
@@ -238,6 +243,9 @@ class LivePluginSelection:
         loaded = {plugin.id: plugin for plugin in load_descriptors(added, self.entrypoints())}
         for identifier in sorted(changed):
             plugin = current.get(identifier) or loaded.get(identifier)
+            if plugin is not None and plugin.ui is not None:
+                raise PluginError("Use the dedicated visual interface controls to prepare browser views and resources.",
+                                  code="required_plugin", plugin_id=identifier)
             if plugin is None or identifier in self.nonlive or not (supports_live_plugin(plugin) or (self.categorization is not None and live_categorizer(plugin))):
                 raise PluginError(
                     "This plugin needs an available live capability adapter. Finish its active work or restart WHAB with a compatible plugin selection.",
@@ -260,7 +268,7 @@ class LivePluginSelection:
                 record["enabled"] = record["id"] in self.required | set(selection)
             check_saved_states(manifest, registry.descriptors())
         return RegistryGeneration(registry, active.stable,
-                                  {name: binding for name, binding in active.workers.items() if name in selection}, previous=active)
+                                  {name: binding for name, binding in active.workers.items() if name in set(selection) | self.required}, previous=active)
 
     def _preflight(self, selection):
         # The scheduling request already owns a generation. This scope also
@@ -309,6 +317,8 @@ class LivePluginSelection:
         from .worker_selection import validate_saved_generation
 
         async def validate(chosen, active, candidate):
+            if active.services.get("visual") is not candidate.services.get("visual"):
+                return False
             generation = active if chosen == "active" else candidate
             valid = await run_in_threadpool(validate_saved_generation, self, generation)
             if valid is True and self.categorization is not None:

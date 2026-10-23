@@ -17,7 +17,7 @@ from .worker_resources import capture_resource_paths, read_resource_bundle, reso
 
 _HEADER = struct.Struct("!4sII")
 _HASH = re.compile(r"[0-9a-f]{64}\Z")
-_FLAGS = ("budget_months", "lightweight_transactions", "lightweight_accounts", "transaction_page_size")
+_FLAGS = ("budget_months", "lightweight_transactions", "lightweight_accounts", "transaction_page_size", "view_protocol")
 _MAX_METADATA = 128 * 1024
 _MAX_PAYLOAD = 4 * 1024 * 1024
 

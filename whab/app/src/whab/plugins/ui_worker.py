@@ -11,7 +11,7 @@ from .worker_resources import capture_resource_paths, resource_bundle
 
 OPERATIONS = frozenset({"ui.resources", "ui.render"})
 MAX_HTML_BYTES = 16 * 1024 * 1024
-_FLAGS = frozenset({"budget_months", "lightweight_transactions", "lightweight_accounts", "transaction_page_size"})
+_FLAGS = frozenset({"budget_months", "lightweight_transactions", "lightweight_accounts", "transaction_page_size", "view_protocol"})
 
 
 def supports_live_visual(plugin):
@@ -20,7 +20,7 @@ def supports_live_visual(plugin):
         plugin.contract is not None and contract.lifecycle == "live"
         and [(row.name, row.version) for row in contract.provides] == [("interface.ui", 1)]
         and contract.state_version == 1 and not contract.state_upgrades
-        and plugin.ui is not None
+        and plugin.ui is not None and plugin.ui.view_protocol == 1
         and all(getattr(plugin, name) is None for name in (
             "bind", "settings", "migrate_state", "budget_connection", "categorization",
             "bank", "bank_ui", "storage", "interface", "bank_logos", "merchant_logos",

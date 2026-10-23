@@ -162,7 +162,7 @@ def test_real_visual_worker_versions_keep_code_resource_identity_and_failed_read
             "root = Path(__file__).parent\n"
             "def context(data, status, items, **values):\n"
             f"    return {{'data': data, 'amount': lambda amount: '{version}:' + str(amount)}}\n"
-            "plugin=Plugin('fictional-reports','Fictional visual',ui=UserInterface(root/'templates',root/'static',context),contract=PluginContract(lifecycle='live'))\n"
+            "plugin=Plugin('fictional-reports','Fictional visual',ui=UserInterface(root/'templates',root/'static',context,view_protocol=1),contract=PluginContract(lifecycle='live'))\n"
         )
         files = {"fictional_reports/templates/base.html": b"<p>{{ amount(data.summary.readyToAssign) }}</p>"}
         if not broken:
@@ -172,7 +172,7 @@ def test_real_visual_worker_versions_keep_code_resource_identity_and_failed_read
     template = Plugin("fictional-reports", "Fictional visual", ui=UserInterface(
         None, None, lambda *args, **values: {}, resources=PluginResources({
             "templates/base.html": b"host", "static/app.js": b"host",
-        })), contract=PluginContract(lifecycle="live"))
+        }), view_protocol=1), contract=PluginContract(lifecycle="live"))
     root = tmp_path / "approved"
     archive = UIResourceArchive(tmp_path / "runtime")
     first = prepare_environment(root, template.id, (*local_closure, wheel("1.0.0")))

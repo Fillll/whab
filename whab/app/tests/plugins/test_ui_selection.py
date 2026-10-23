@@ -34,6 +34,7 @@ def test_code_selection_and_resource_identity_are_one_durable_decision_with_exac
         disabled = decision(None, generation=DISABLED_GENERATION, worker=False)
         reopened.publish(disabled, reopened.revision(reopened.snapshot()))
         assert reopened.snapshot()["worker"] is None
+        assert reopened.snapshot()["workers"]["fictional-ui"] == chosen["worker"]
         assert reopened.publish(chosen, revision) == chosen
         assert reopened.snapshot()["selection"] is None
     with UISelectionStore(tmp_path, "fictional-budget", "sandbox", "web") as reopened:

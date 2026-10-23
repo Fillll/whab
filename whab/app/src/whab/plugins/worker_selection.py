@@ -407,7 +407,7 @@ async def upgrade_report(live, home, plugin_id, approvals):
     async def prepare(preparation):
         active = preparation.active.services["plugins"]
         template = next((plugin for plugin in active.descriptors() if plugin.id == plugin_id), None)
-        if template is None or not supports_live_plugin(template):
+        if template is None or template.ui is not None or not supports_live_plugin(template):
             raise PluginError("Enable an explicitly live supported optional adapter before upgrading it.",
                               code="restart_required", plugin_id=plugin_id)
         if template.categorization is not None:

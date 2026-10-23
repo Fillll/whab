@@ -49,6 +49,19 @@ def test_new_view_after_readiness_defers_commit_and_abort_resumes_old_views():
     asyncio.run(scenario())
 
 
+def test_durable_publication_preserves_a_late_dirty_view_without_changing_its_document():
+    async def scenario():
+        views = BrowserViews(OLD)
+        ticket = await views.prepare(NEW)
+        views.validate(ticket)
+        # The durable filesystem publication can yield to an offline browser.
+        late = views.register(OLD, dirty=True)["view"]
+        views.publish(ticket)
+        assert views.generation == NEW and not views.status(late)["reload"]
+        assert views.update(late, OLD, dirty=False)["reload"]
+    asyncio.run(scenario())
+
+
 def test_timeout_and_cancellation_clear_preparation_without_losing_view_edits():
     async def scenario():
         views = BrowserViews(OLD)

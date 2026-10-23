@@ -468,6 +468,7 @@ class UserInterface:
     transaction_page_size: int = 0
     resources: PluginResources | None = field(default=None, repr=False)
     render: Callable[[dict], bytes] | None = field(default=None, repr=False)
+    view_protocol: int = 0
 
     def __post_init__(self) -> None:
         if self.resources is None:
@@ -479,6 +480,8 @@ class UserInterface:
             raise ValueError("Use one complete immutable visual resource bundle instead of resource paths.")
         if self.render is not None and not callable(self.render):
             raise ValueError("User interface rendering must be callable.")
+        if type(self.view_protocol) is not int or self.view_protocol not in {0, 1}:
+            raise ValueError("Choose a supported browser participation protocol, or zero for restart-only views.")
         if not callable(self.build_context):
             raise ValueError("User interface context builder must be callable.")
         if type(self.budget_months) is not int or not 1 <= self.budget_months <= 12:

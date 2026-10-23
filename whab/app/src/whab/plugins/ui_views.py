@@ -110,6 +110,16 @@ class BrowserViews:
 
     def commit(self, identifier):
         self.validate(identifier)
+        self.publish(identifier)
+
+    def publish(self, identifier):
+        """Publish an already validated durable decision without a second vote.
+
+        A late/offline dirty view retains its old document and assets. It cannot
+        invalidate a decision which the host has already durably committed.
+        """
+        if not self.pending or self.pending["id"] != identifier:
+            raise PluginError("The prepared interface decision is unavailable.", code="ui_view_invalid")
         self.generation = self.pending["generation"]
         self.pending = None
         for view in self.views.values():

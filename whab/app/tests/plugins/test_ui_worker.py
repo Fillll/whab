@@ -29,7 +29,7 @@ def visual():
     return UserInterface(None, None, lambda data, status, items, **kw: {
         "amount": lambda value: f"fictional:{value}", "data": data,
     }, resources=PluginResources({"templates/base.html": b"<p>{{ amount(data.summary.readyToAssign) }}</p>",
-                                  "static/app.js": b"export const fictional = true;"}))
+                                  "static/app.js": b"export const fictional = true;"}), view_protocol=1)
 
 
 def test_explicit_visual_only_contract_and_projection_information():
@@ -38,6 +38,7 @@ def test_explicit_visual_only_contract_and_projection_information():
     assert supports_live_visual(plugin)
     assert not supports_live_visual(replace(plugin, contract=None))
     assert not supports_live_visual(replace(plugin, insights=lambda snapshot: ()))
+    assert not supports_live_visual(replace(plugin, ui=replace(plugin.ui, view_protocol=0)))
     assert not supports_live_visual(replace(plugin, contract=replace(plugin.contract, lifecycle="restart")))
     assert not supports_live_visual(replace(plugin, contract=replace(plugin.contract, state_version=2)))
     flags = adapter_info(plugin.ui)

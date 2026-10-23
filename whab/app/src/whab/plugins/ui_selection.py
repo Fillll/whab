@@ -51,7 +51,7 @@ def _decision(value):
 
 
 def _validate(value):
-    if (type(value) is not dict or value.keys() != {"format", "selection", "generation", "worker", "known", "decisions"}
+    if (type(value) is not dict or value.keys() != {"format", "selection", "generation", "worker", "known", "workers", "decisions"}
             or type(value["format"]) is not int or value["format"] != 1):
         invalid()
     if value["selection"] is not None and not valid_plugin_name(value["selection"]):
@@ -68,6 +68,12 @@ def _validate(value):
             or value["known"] != sorted(set(value["known"]))
             or value["selection"] is not None and value["selection"] not in value["known"]
             or type(value["decisions"]) is not list or len(value["decisions"]) > 32):
+        invalid()
+    if type(value["workers"]) is not dict or set(value["workers"]) != set(value["known"]):
+        invalid()
+    for identifier, worker in value["workers"].items():
+        _worker(worker, identifier)
+    if value["selection"] is not None and value["workers"][value["selection"]] != value["worker"]:
         invalid()
     for decision in value["decisions"]:
         _decision(decision)
@@ -86,7 +92,8 @@ class UISelectionStore:
         self.store = EffectStore(Path(home) / "visual-ui", "visual-selection.json",
             {"owner": "visual-ui", "budget_id": budget_id, "environment": environment},
             {"format": 1, "selection": initial, "generation": None, "worker": None,
-             "known": [initial] if initial else [], "decisions": []}, _validate, limit=128 * 1024, fault=fault)
+             "known": [initial] if initial else [], "workers": {initial: None} if initial else {},
+             "decisions": []}, _validate, limit=128 * 1024, fault=fault)
 
     @staticmethod
     def revision(value):
@@ -112,7 +119,9 @@ class UISelectionStore:
                     raise EffectError("effect_conflict")
                 known = sorted(set(current["known"]) | ({decision["selection"]} if decision["selection"] else set()))
                 candidate = {**current, **{name: decision[name] for name in ("selection", "generation", "worker")},
-                             "known": known, "decisions": [*current["decisions"], deepcopy(decision)][-32:]}
+                             "known": known, "workers": {**current["workers"], **(
+                                 {decision["selection"]: deepcopy(decision["worker"])} if decision["selection"] else {})},
+                             "decisions": [*current["decisions"], deepcopy(decision)][-32:]}
                 self.store.commit(candidate)
                 return deepcopy(decision)
         except EffectError:
