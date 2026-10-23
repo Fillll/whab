@@ -19,6 +19,7 @@ from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
 
 from .contracts import Capability, PluginContract, Requirement
+from .interface_adapter import RemoteLedgerInterface
 from .storage_replica import (
     ReplicaWatermark as ReplicaWatermark,
 )
@@ -405,7 +406,7 @@ class InterfaceContext:
     """A scoped command service and plugin configuration; never a banking store."""
 
     service: object
-    config: Mapping[str, str]
+    config: Mapping[str, str] = field(repr=False)
     environment: str
     budget_id: str
     budget: BudgetContext | None = None
@@ -415,11 +416,18 @@ class InterfaceContext:
 class Interface:
     """Trusted transport factory. The host owns shared access guards and lifecycle."""
 
-    factory: Callable[[InterfaceContext], object]
+    factory: Callable[[InterfaceContext], object] | None = None
+    adapter: RemoteLedgerInterface | None = None
 
     def __post_init__(self):
-        if not callable(self.factory):
+        if self.factory is None and self.adapter is None:
+            raise ValueError("Interface factory must be callable or use a supported host adapter.")
+        if self.factory is not None and self.adapter is not None:
+            raise ValueError("Choose one interface factory or host adapter.")
+        if self.factory is not None and not callable(self.factory):
             raise ValueError("Interface factory must be callable.")
+        if self.adapter is not None and type(self.adapter) is not RemoteLedgerInterface:
+            raise ValueError("Use a supported data-only interface adapter.")
 
 
 class UIContextBuilder(Protocol):
