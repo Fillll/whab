@@ -1,5 +1,9 @@
 # SQLite storage plugin
 
+This version requires WHAB 2.30 or newer for the public local-authority and
+single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
+for host-coordinated synchronization and explicit handover.
+
 Distributed independently as `whab_plugin_sqlite`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
 `src/whab_plugin_sqlite/` owns the bundled SQLite descriptor, ledger transactions, additive schema upgrades and fictional seeding. Keep its implementation and tests in this folder. The host uses the public storage protocol rather than importing this package.

@@ -6,7 +6,7 @@ personal and fictional demo workspaces in one versioned JSON data file at
 different files. It uses no database driver or other storage implementation.
 The host supplies financial commands, currency rules and workspace projections.
 
-Install its wheel with a compatible host (WHAB 2.23+ within major 2), then select
+Install its wheel with a compatible host (WHAB 2.30+ within major 2), then select
 `WHAB_STORAGE=json` for a new original runtime or initial CLI budget creation.
 An opened budget chooses its backend through its manifest. Selecting JSON does
 not migrate an existing ledger. JSON belongs to the supported bundled set;
@@ -56,7 +56,7 @@ bytes in a sibling `<active filename>.schema1-recovery` or `.schema2-recovery`
 artifact with private file
 permissions. It never overwrites that artifact: an existing different recovery
 file stops the upgrade and preserves both originals. Disk-full or backup-flush
-failure retains schema 1 as authoritative. The recovery artifact is never selected
+failure retains the original schema as authoritative. The recovery artifact is never selected
 as active storage or included in portable exports; protect it like the live ledger.
 An older JSON plugin must not open a newer native schema. Restore an
 appropriate preserved artifact before downgrading; it represents the state
