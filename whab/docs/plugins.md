@@ -201,6 +201,12 @@ After installing the package, select **plaid** and **my-summary** in Settings, s
 
 ### Versioned capabilities and saved state
 
+The independently packaged [plugin developer toolkit](../app/devtools/plugin-devkit/README.md)
+provides initial public storage conformance suites. External projects install
+only their host, toolkit and candidate/reference packages; optional advertised
+features fail explicitly when broken and unadvertised features report their
+applicability. The kit is development infrastructure outside runtime discovery.
+
 SDK API v1 remains supported. WHAB 2.22 adds immutable runtime metadata separately
 from Python distribution dependency resolution:
 

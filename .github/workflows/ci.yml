@@ -16,7 +16,7 @@ jobs:
   checks:
     name: CI (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -32,6 +32,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Toolkit compatibility builds the genuine pinned minimum-host artifact.
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -40,6 +42,7 @@ jobs:
           cache-dependency-path: |
             whab/app/pyproject.toml
             whab/app/plugins/**/pyproject.toml
+            whab/app/devtools/**/pyproject.toml
       - name: Install dependencies
         run: python scripts/install.py --dev --example
       - name: Set up Node for browser tests
