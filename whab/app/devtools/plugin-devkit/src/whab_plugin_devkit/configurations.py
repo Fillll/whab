@@ -236,10 +236,12 @@ def replay_configuration(manifest, candidate, reference):
         raise ValueError("Resolved behavior changed with configuration order.")
     candidate_result = exercise_candidate(candidate, PluginRegistry(baseline))
     peer_result = {plugin.id: exercise_candidate(plugin, PluginRegistry(baseline)) for plugin in baseline if plugin.id in _PEERS}
-    suites = set(Suite) - {Suite.NATIVE_REPLICA}
+    suites = set(Suite) - {Suite.NATIVE_REPLICA, Suite.DURABLE_COMMANDS}
     provided = getattr(getattr(reference, "contract", None), "provides", ())
     if any(capability.name == "storage.replica" and capability.version == 1 for capability in provided):
         suites.add(Suite.NATIVE_REPLICA)
+    if any(capability.name == "storage.commands" and capability.version == 1 for capability in provided):
+        suites.add(Suite.DURABLE_COMMANDS)
     report = run_conformance(BackendAdapter(reference.storage, frozenset(suites)), clock=SyntheticClock())
     report.assert_success()
     transitions = [tuple(plugin.id for plugin in baseline)]

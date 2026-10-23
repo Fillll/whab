@@ -170,6 +170,15 @@ def test_installed_sqlite_public_factory_conformance(capabilities):
     provided = getattr(getattr(descriptor, "contract", None), "provides", ())
     if not any(capability.name == "storage.replica" and capability.version == 1 for capability in provided):
         capabilities.discard(Capability.NATIVE_REPLICA)
+    if not any(capability.name == "storage.commands" and capability.version == 1 for capability in provided):
+        capabilities.discard(Capability.DURABLE_COMMANDS)
     run_conformance(BackendAdapter(
         descriptor.storage, frozenset(capabilities),
     )).assert_success()
+
+
+def test_false_durable_command_advertisement_fails_without_skipping_or_private_diagnostics():
+    report = run_conformance(BackendAdapter(SyntheticLedger, frozenset({Capability.DURABLE_COMMANDS})))
+    failures = [result for result in report.results if result.status == "failed"]
+    assert len(failures) == 1 and failures[0].capability == "durable-commands"
+    assert failures[0].detail in {"AttributeError", "ImportError"}

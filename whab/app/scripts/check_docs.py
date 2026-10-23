@@ -30,6 +30,9 @@ def source_document(name: str) -> bool:
     if len(parts) == 2 or parts[1] == "docs":
         return True
     if parts[1] == "app":
+        if name in {"whab/app/devtools/plugin-devkit/README.md",
+                    "whab/app/devtools/plugin-devkit/fixtures/runtime-peers/README.md"}:
+            return True
         return len(parts) == 3 or (
             len(parts) >= 4 and parts[2] == "plugins"
             and (len(parts) <= 6 or parts[5] == "docs")

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
-from json import dumps
+from json import dumps, loads
 from uuid import uuid4
 
 from whab.plugins import StoreError, WorkspaceImport
@@ -21,6 +21,7 @@ class Capability(StrEnum):
     MONTHLY_ROLLOVER = "monthly-rollover"
     NEUTRAL_TRANSFER = "neutral-transfer"
     NATIVE_REPLICA = "native-replica"
+    DURABLE_COMMANDS = "durable-commands"
 
 
 @dataclass(frozen=True)
@@ -285,6 +286,53 @@ def _neutral_transfer(harness, clock):
     _reject(lambda: destination.restore_budget("personal", exported))
 
 
+def _durable_commands(harness, clock):
+    # Lazy imports preserve the independently tested oldest SDK. A false
+    # advertisement on an older host fails this suite instead of skipping it.
+    from whab.plugins import OperationReceipt, StorageOperation
+    from whab.plugins.storage_transfer import canonical_storage_json
+
+    source = harness.open("durable-primary")
+    evidence = source.commit_evidence()
+    operation = StorageOperation("fictional-lost-result", evidence.authority_epoch, evidence.generation,
+                                 "personal", "add_account", canonical_storage_json({
+                                     "name": "Fictional durable account", "type": "depository", "balance": 125,
+                                 }))
+    source.execute_operation(operation)  # Deliberately discard the response.
+    receipt = source.operation_receipt(operation.operation_id)
+    _check(type(receipt) is OperationReceipt and receipt.fingerprint == operation.fingerprint,
+           "A committed command has no matching durable receipt.")
+    acknowledged = public_snapshot(source)
+    _check(len(acknowledged["accounts"]) == 1, "A durable command did not commit exactly once.")
+    _check(loads(receipt.result) == acknowledged["accounts"][0]["id"], "The durable result lost its generated financial identity.")
+    harness.close(source)
+    source = harness.open("durable-primary", reopen=True)
+    _check(source.operation_receipt(operation.operation_id) == receipt, "Reopen lost durable command evidence.")
+    replay = source.execute_operation(operation)
+    _check(replay.replayed and replay.receipt == receipt and public_snapshot(source) == acknowledged,
+           "An exact stale-generation retry repeated or changed the committed operation.")
+    changed = StorageOperation(operation.operation_id, operation.authority_epoch, operation.expected_generation,
+                               "personal", "add_account", canonical_storage_json({
+                                   "name": "Conflicting fictional account", "type": "depository", "balance": 125,
+                               }))
+    unknown = StorageOperation("fictional-unknown-stale", operation.authority_epoch, operation.expected_generation,
+                               "personal", "add_account", operation.payload)
+    current = source.commit_evidence()
+    _reject(lambda: source.execute_operation(changed))
+    _reject(lambda: source.execute_operation(unknown))
+    _check(source.commit_evidence() == current and source.operation_receipt(unknown.operation_id) is None,
+           "A rejected conflicting or stale operation changed durable evidence.")
+    invalid = StorageOperation("fictional-invalid", current.authority_epoch, current.generation,
+                               "personal", "add_account", canonical_storage_json({
+                                   "name": "Invalid fictional account", "type": "depository", "balance": True,
+                               }))
+    _reject(lambda: source.execute_operation(invalid))
+    _check(source.commit_evidence() == current and source.operation_receipt(invalid.operation_id) is None
+           and public_snapshot(source) == acknowledged, "Rejected durable commands changed data or evidence.")
+    other = harness.open("durable-other-budget")
+    _check(other.operation_receipt(operation.operation_id) is None, "A command receipt leaked across budget homes.")
+
+
 def _native_replica(harness, clock):
     # Deliberately duck type only public methods/returned records. Older SDKs
     # keep running their supported suites; false replica advertisements fail.
@@ -350,6 +398,7 @@ _SUITES = {
     Capability.MONTHLY_ROLLOVER: (("rollover-validation-and-reopen", _rollover),),
     Capability.NEUTRAL_TRANSFER: (("sanitized-financial-roundtrip", _neutral_transfer),),
     Capability.NATIVE_REPLICA: (("fenced-monotonic-copy-and-promotion", _native_replica),),
+    Capability.DURABLE_COMMANDS: (("lost-result-reopen-exact-retry-and-conflict", _durable_commands),),
 }
 
 

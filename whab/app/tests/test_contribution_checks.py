@@ -418,3 +418,11 @@ def test_toolkit_host_version_read_does_not_execute_controlled_source(checker, t
     source.write_text('raise RuntimeError("must not execute")\n')
     with pytest.raises(ValueError, match="literal version"):
         checker.host_version(tmp_path)
+
+
+@pytest.mark.parametrize("checker", ["check_docs"], indirect=True)
+def test_official_toolkit_and_reviewed_fixture_recipes_are_checked_without_private_tree_expansion(checker):
+    assert checker.source_document("whab/app/devtools/plugin-devkit/README.md")
+    assert checker.source_document("whab/app/devtools/plugin-devkit/fixtures/runtime-peers/README.md")
+    assert not checker.source_document("whab/app/devtools/plugin-devkit/runtime/private.md")
+    assert not checker.source_document("whab/app/devtools/plugin-devkit/.venv/README.md")

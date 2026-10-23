@@ -51,9 +51,13 @@ assert {(entry.group, entry.name, entry.value) for entry in metadata.distributio
     ("console_scripts", "whab-plugin", "whab_plugin_devkit.cli:main"),
 }
 entries = tuple(metadata.entry_points(group="whab.plugins"))
-assert len(entries) == 1 and entries[0].name == "sqlite"
-assert entries[0].dist.metadata["Name"] == "whab_plugin_sqlite"
-assert entries[0].load().storage is not None
+selected = {"sqlite"}
+if "whab_plugin_json" in expected:
+    selected |= {"json", "synthetic-report-a", "synthetic-report-b", "synthetic-brand-a", "synthetic-brand-b", "synthetic-import-a", "synthetic-import-b"}
+assert len(entries) == len(selected) and {entry.name for entry in entries} == selected
+reference, = (entry for entry in entries if entry.name == "sqlite")
+assert reference.dist.metadata["Name"] == "whab_plugin_sqlite"
+assert reference.load().storage is not None
 for entry in sys.path:
     assert not Path(entry).resolve().is_relative_to(repository), entry
 Path(destination).write_text(json.dumps(result))
@@ -125,8 +129,7 @@ def source_at_revision(base, environment, revision):
     with archive.open("wb") as output:
         run(["git", "archive", "--format=tar", revision, "--",
              "whab/app/src", "whab/app/pyproject.toml", "whab/app/README.md", "whab/app/LICENSE",
-             "whab/app/plugins/storage/sqlite/src", "whab/app/plugins/storage/sqlite/pyproject.toml",
-             "whab/app/plugins/storage/sqlite/README.md", "whab/app/plugins/storage/sqlite/LICENSE"],
+             "whab/app/plugins/storage"],
             cwd=ROOT.parents[1], env=environment, stdout=output)
     with tarfile.open(archive) as source:
         source.extractall(base / "candidate-source", filter="data")
@@ -194,7 +197,7 @@ def validate_toolkit_coverage(report, expected_sources, cwd, *, label="Toolkit")
         raise ValueError(f"{label} source requires 100% statement and branch coverage.")
 
 
-def check_host(label, host_wheel, toolkit_wheel, sqlite_wheel, wheelhouse, tests, base, environment):
+def check_host(label, host_wheel, toolkit_wheel, sqlite_wheel, wheelhouse, tests, base, environment, extra_wheels=()):
     project = base / f"external-{label}"
     project.mkdir()
     shutil.copytree(tests, project / "tests", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
@@ -205,9 +208,10 @@ def check_host(label, host_wheel, toolkit_wheel, sqlite_wheel, wheelhouse, tests
     run([sys.executable, "-I", "-m", "venv", str(virtual)], cwd=project, env=environment)
     python = virtual / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     run([str(python), "-I", "-m", "pip", "install", "--disable-pip-version-check", "--no-index",
-         "--find-links", str(wheelhouse), str(host_wheel), str(toolkit_wheel), str(sqlite_wheel), *TEST_REQUIREMENTS],
+         "--find-links", str(wheelhouse), str(host_wheel), str(toolkit_wheel), str(sqlite_wheel), *TEST_REQUIREMENTS,
+         *(str(wheel) for wheel in extra_wheels)],
         cwd=project, env=environment)
-    expected = {record["distribution"]: record["version"] for record in map(wheel_record, (host_wheel, toolkit_wheel, sqlite_wheel))}
+    expected = {record["distribution"]: record["version"] for record in map(wheel_record, (host_wheel, toolkit_wheel, sqlite_wheel, *extra_wheels))}
     installation_path = project / "installation.json"
     run([str(python), "-I", "-c", VERIFY_INSTALLATION, str(virtual), str(ROOT.parents[1]),
          json.dumps(expected), str(installation_path)], cwd=project, env=environment)
@@ -247,13 +251,19 @@ def main(argv=None):
             if candidate_version == MINIMUM_HOST_VERSION:
                 raise ValueError("Minimum and candidate host artifacts must represent distinct supported versions.")
             references = reference_projects(copy_project(sqlite, base / "sqlite-source"), minimum)
+            from packaging.version import Version
+
+            extras = [copy_project(ROOT / "plugins/storage/json", base / "json-source"),
+                      copy_project(toolkit / "fixtures/runtime-peers", base / "runtime-peers-source")] if Version(candidate_version) >= Version("2.32.0") else []
             projects = (minimum, candidate, copy_project(toolkit, base / "toolkit-source"),
-                        *dict.fromkeys(references.values()))
+                        *dict.fromkeys(references.values()), *extras)
             wheels = base / "wheelhouse"
             for project in projects:
                 run([sys.executable, "-I", "-m", "pip", "wheel", "--disable-pip-version-check", "--no-deps",
                      "--wheel-dir", str(wheels), str(project)], cwd=base, env=environment)
             toolkit_wheel = wheel_for(wheels, "whab_plugin_devkit", toolkit_version)
+            extra_wheels = [wheel_for(wheels, tomllib.loads((project / "pyproject.toml").read_text())["project"]["name"],
+                                     tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"]) for project in extras]
             sqlite_wheels = {label: wheel_for(wheels, "whab_plugin_sqlite",
                             tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"])
                             for label, project in references.items()}
@@ -271,7 +281,8 @@ def main(argv=None):
                       "wheels": [wheel_record(path) for path in sorted(wheels.glob("*.whl"))], "hosts": {}}
             for label in ("candidate", "minimum"):
                 report["hosts"][label] = check_host(label, hosts[label], toolkit_wheel, sqlite_wheels[label],
-                                                    wheels, toolkit / "tests", base, environment)
+                                                   wheels, toolkit / "tests", base, environment,
+                                                   extra_wheels if label == "candidate" else ())
             if args.report:
                 args.report.parent.mkdir(parents=True, exist_ok=True)
                 args.report.write_text(json.dumps(report, indent=2) + "\n")
