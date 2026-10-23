@@ -32,6 +32,7 @@ def live_categorizer(plugin):
         and plugin.categorization is not None
         and getattr(plugin, "branding_factory", None) is None
         and {record.name for record in contract.provides} <= {"categorization"}
+        and all(record.version == 1 for record in contract.provides)
         and not contract.state_upgrades
         and all(getattr(plugin, name) is None for name in (
             "bind", "settings", "migrate_state", "budget_connection", "insights", "export",

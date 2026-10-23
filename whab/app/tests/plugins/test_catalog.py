@@ -28,6 +28,7 @@ def test_catalog_reads_packaged_data_without_discovery_and_returns_independent_p
     assert entries["example"]["live_support"] == "stateless-report-worker"
     assert entries["bank-logos"]["live_support"] == "stateless-optional-worker"
     assert entries["ynab"]["live_support"] == "stateless-optional-worker"
+    assert entries["random-forest-categorization"]["live_support"] == "categorization-host"
     assert entries["sqlite"]["legacy"] is False
     assert entries["client"]["authority"] == "remote"
     assert entries["json"]["legacy"] is False

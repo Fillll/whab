@@ -17,13 +17,13 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [example-file-import](https://github.com/Fillll/whab/blob/692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
 | [json](https://github.com/Fillll/whab/blob/692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.2.0` | `whab>=2.30,<3` | restart-required | maintained |
 | [plaid](https://github.com/Fillll/whab/blob/692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
-| [random-forest-categorization](https://github.com/Fillll/whab/blob/692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.1.0` | `whab>=2.19,<3` | Legacy; restart required | maintained |
+| [random-forest-categorization](https://github.com/Fillll/whab/blob/692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.2.0` | `whab>=2.32,<3` | categorization-host | maintained |
 | [server](https://github.com/Fillll/whab/blob/692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.0.1` | `whab>=2,<3` | Legacy; restart required | maintained |
 | [sqlite](https://github.com/Fillll/whab/blob/692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.11.0` | `whab>=2.30,<3` | restart-required | maintained |
 | [web](https://github.com/Fillll/whab/blob/692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.25.1` | `whab>=2.19,<3` | Legacy; restart required | maintained |
 | [ynab](https://github.com/Fillll/whab/blob/692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
-Explicit stateless report, branding and file-parser descriptors advertise their supported live-worker adapters. Other entries require restart; backend migration and copies are not inferred from package installation.
+Explicit stateless report, branding and file-parser descriptors advertise their supported live-worker adapters. Categorization supports host-process selection changes; its code upgrades still require an application restart. Other entries require restart; backend migration and copies are not inferred from package installation.
 
 ## Recorded verification
 

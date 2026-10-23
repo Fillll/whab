@@ -135,7 +135,13 @@ def descriptor_metadata(module_path, attribute, root):
         and ("branding_factory" not in present or set(capabilities) <= {"branding.bank", "branding.merchant"})
         and ("settings" not in present or "file_import" not in present and bool({"bank_logos", "merchant_logos"} & present))
     )
-    if lifecycle == "live" and not (live or optional):
+    categorization = (
+        not legacy and lifecycle == "live" and "categorization" in present
+        and set(capabilities) == {"categorization"} and not upgrades
+        and all(row["version"] == 1 for row in capabilities.values())
+        and not (present - {"id", "display_name", "api_version", "contract", "categorization"})
+    )
+    if lifecycle == "live" and not (live or optional or categorization):
         raise ValueError("Live metadata requires an explicit supported stateless worker adapter.")
     return {"id": identifier, "display_name": display, "api_version": _literal(descriptor["api_version"]) if "api_version" in descriptor else 1,
             "capabilities": [capabilities[name] for name in sorted(capabilities)],
@@ -143,7 +149,8 @@ def descriptor_metadata(module_path, attribute, root):
             "conflicts": list(_literal(contract["conflicts"])) if "conflicts" in contract else [],
             "lifecycle": lifecycle, "legacy": legacy, "authority": authority,
             "state_version": state_version, "state_upgrades": [list(edge) for edge in upgrades],
-            "live_support": "stateless-report-worker" if live else "stateless-optional-worker" if optional else "restart-required"}
+            "live_support": ("stateless-report-worker" if live else "stateless-optional-worker" if optional
+                             else "categorization-host" if categorization else "restart-required")}
 
 
 def source_inventory(root=ROOT):
@@ -222,7 +229,7 @@ def catalog_markdown(catalog):
     for row in catalog["plugins"]:
         lifecycle = "Legacy; restart required" if row["legacy"] else row["live_support"]
         lines.append(f'| [{row["id"]}]({row["documentation"]}) | `{row["distribution"]} {row["version"]}` | `{row["requires_host"]}` | {lifecycle} | {row["support"]} |')
-    lines.extend(["", "Explicit stateless report, branding and file-parser descriptors advertise their supported live-worker adapters. Other entries require restart; backend migration and copies are not inferred from package installation.", "",
+    lines.extend(["", "Explicit stateless report, branding and file-parser descriptors advertise their supported live-worker adapters. Categorization supports host-process selection changes; its code upgrades still require an application restart. Other entries require restart; backend migration and copies are not inferred from package installation.", "",
                   "## Recorded verification", "", "Evidence applies only to its exact host, artifacts and selection. Installed-only artifacts are not proof that their capabilities executed. Draft PR/source verification is not a release or deployment claim.", ""])
     for item in catalog["verifications"]:
         lines.extend([f'### {item["id"]}', "", f'Verified {item["date"]}; host `{item["host_version"]}`. Selected: ' + ", ".join(f'`{value}`' for value in item["selection"]) + ".", "", item["scope"], "",
