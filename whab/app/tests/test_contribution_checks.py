@@ -83,6 +83,7 @@ def test_runner_scrubs_private_runtime_and_credentials_from_every_child(checker,
     hostile = {
         "WHAB_HOME": str(private), "WHAB_BUDGET": str(private / "private.whab"),
         "WHAB_BUDGET_PASSWORD_ENV": "HOUSEHOLD_PASSWORD", "WHAB_BUDGET_COPIES": str(private / "copy.whab"),
+        "HOUSEHOLD_PASSWORD": "private-budget-password",
         "WHAB_PLUGINS": "plaid,server", "WHAB_STORAGE": "client", "WHAB_ENV": "production",
         "PLAID_ENV": "production", "PLAID_CLIENT_ID": "private-client", "PLAID_SECRET": "private-secret",
         "SERVER_TOKEN": "private-server-token", "CLIENT_TOKEN": "private-client-token",

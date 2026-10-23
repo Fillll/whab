@@ -15,10 +15,12 @@ MIN_NODE_MAJOR = 22
 
 def check_environment(home: Path | None = None) -> dict[str, str]:
     """Do not pass a configured household runtime or credentials to check children."""
+    password_variable = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
     env = {
         key: value for key, value in os.environ.items()
         if not key.startswith(("WHAB_", "PLAID_", "SERVER_", "CLIENT_"))
         and key not in {"TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID", "PORT", "PYTHONPATH"}
+        and key != password_variable
     }
     env.update(WHAB_ENV="sandbox", PLAID_ENV="sandbox", ALLOW_LIVE_PLAID="false")
     if home is not None:
