@@ -76,6 +76,8 @@ def main():
         for project in (ROOT / "plugins").glob("*/*/pyproject.toml")
         if include_examples or project.parent.parent.name != "example"
     )
+    if args.dev:
+        projects.extend(sorted(project.parent for project in (ROOT / "devtools").glob("*/pyproject.toml")))
     command = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check"]
     command.extend(("-e", str(ROOT) + ("[dev]" if args.dev else "")))
     for project in projects:
