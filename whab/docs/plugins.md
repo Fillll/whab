@@ -4,6 +4,10 @@ WHAB provides **user-interface**, **storage**, **data-ingestion**, **reporting**
 
 The [budget and plugin model](target-architecture.md) groups capabilities by responsibility. This guide defines the executable API v1 contracts; category names do not add or rename SDK hooks.
 
+The [per-budget runtime](plugin-runtime.md) documents generation leases, controlled
+handover and the first explicit live reporting/export selection API. Other
+families retain their documented restart requirement until their adapters exist.
+
 ## Trust and enablement
 
 Application source paths in this guide are relative to `whab/app/`. Each concrete implementation lives in `plugins/<category>/<id>/` and owns its source package, assets, README, tests, `pyproject.toml` and dated `CHANGELOG.md`. The canonical [plugin inventory](../app/plugins/README.md#supported-plugins) identifies the supported set and the separately installed teaching example. The `bundled` extra selects that supported set when compatible distributions are available in the chosen package index or local wheelhouse; source checkouts use `.venv/bin/python scripts/install.py --dev` from `whab/app/`. The host wheel contains no concrete plugin package or entry point. A material plugin-only change bumps that plugin's `project.version` and local changelog; only host/core/SDK changes bump the app, with spanning changes updating each affected owner. Keep implementation tests beside their plugin and shared SDK/host contracts in `tests/`. See [folder ownership and test commands](../app/plugins/README.md). The public `whab.plugins` SDK stays in core under `src/whab/plugins/`.
