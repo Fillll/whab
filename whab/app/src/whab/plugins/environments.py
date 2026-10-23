@@ -500,6 +500,13 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                         adapters = probe.info["adapters"]
                         if adapters["interface"] is not None:
                             probe.interface()
+                        if adapters["ui"] is not None:
+                            from .ui_worker import readiness_arguments
+
+                            probe.visual_resources()
+                            for page in ("budget", "transactions", "accounts", "insights"):
+                                probe.timeout = min(60, _remaining(deadline))
+                                probe.render_ui(readiness_arguments(page))
                         if adapters["bank_logos"] is not None:
                             if adapters["bank_logos"]["cache"]:
                                 probe.configure_cache(destination / "probe-cache")

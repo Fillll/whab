@@ -11,7 +11,7 @@ import selectors
 import signal
 import subprocess
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from importlib import metadata
 from pathlib import Path
 from threading import Lock
@@ -34,6 +34,7 @@ from .sdk import (
     TransactionSnapshot,
     valid_plugin_name,
 )
+from .ui_worker import read_html, snapshot_ui
 from .wire import HEADER, PROTOCOL_VERSION, Frame, WireError, frame_lengths
 from .worker_adapters import (
     BINARY_OPERATIONS,
@@ -128,8 +129,12 @@ def serve(plugin_id, source, target):
     """Worker loop; diagnostics and plugin exception details never enter frames."""
     registry = load_plugins((plugin_id,)).bind_branding()
     descriptor = registry.descriptors()[0]
-    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.categorization, descriptor.interface and descriptor.interface.adapter)):
+    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.categorization, descriptor.interface and descriptor.interface.adapter, descriptor.ui)):
         raise WireError()
+    if descriptor.ui is not None:
+        if not supports_live_plugin(descriptor) or descriptor.ui.render is not None:
+            raise WireError()
+        descriptor = replace(descriptor, ui=snapshot_ui(descriptor.ui))
     entries = tuple(entry for entry in metadata.entry_points(group="whab.plugins") if entry.name == plugin_id)
     distribution = entries[0].dist
     package = distribution.metadata["Name"]
@@ -265,6 +270,7 @@ class ReportWorker:
                     ("ingestion.file", adapters["file_import"] is not None),
                     ("interface.api", adapters["interface"] is not None),
                     ("categorization", adapters["categorization"]),
+                    ("interface.ui", adapters["ui"] is not None),
                 ) if enabled],
                 key=lambda item: item["name"],
             )
@@ -272,7 +278,9 @@ class ReportWorker:
                 raise WireError()
             if not expected_capabilities or sorted(value["capabilities"], key=lambda item: item["name"]) != expected_capabilities:
                 raise WireError()
-            if (adapters["interface"] is not None or adapters["categorization"]) and value["host"] != __version__:
+            if (adapters["interface"] is not None or adapters["ui"] is not None or adapters["categorization"]) and value["host"] != __version__:
+                raise WireError()
+            if adapters["ui"] is not None and (value["insights"] or value["export"]):
                 raise WireError()
             self.contract = read_contract(value["contract"], value["capabilities"])
             if value["live"] and (value["contract"]["legacy"] or self.contract.lifecycle != "live" or self.contract.state_version != 1 or self.contract.state_upgrades):
@@ -367,7 +375,8 @@ class ReportWorker:
                 raw = Frame(request, payload).encode()
                 payload_limit = {"bank.fetch": 128 * 1024, "merchant.fetch": 128 * 1024,
                                  "file.resources": 4 * 1024 * 1024, "file.parse": 50 * 1024 * 1024,
-                                 "category.call": MAX_WORKER_NAMESPACE}.get(operation, 0)
+                                 "category.call": MAX_WORKER_NAMESPACE,
+                                 "ui.resources": 4 * 1024 * 1024, "ui.render": 16 * 1024 * 1024}.get(operation, 0)
                 frame = self._read(self._write(raw, self.timeout), payload_limit)
                 value = frame.metadata
                 if (frame.payload and operation not in BINARY_OPERATIONS) or value.get("id") != identifier:
@@ -481,6 +490,14 @@ class ReportWorker:
 
     def resources(self):
         return self._typed("file.resources", {}, lambda frame: read_resource_bundle(frame.metadata["data"], frame.payload))
+
+    def visual_resources(self):
+        return self._typed("ui.resources", {}, lambda frame: read_resource_bundle(frame.metadata["data"], frame.payload))
+
+    def render_ui(self, arguments):
+        from .ui_render import read_arguments
+
+        return self._typed("ui.render", read_arguments(arguments), lambda frame: read_html(frame.metadata["data"], frame.payload))
 
     def interface(self):
         from .interface_adapter import interface_record, read_interface_record

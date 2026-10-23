@@ -149,6 +149,63 @@ def approve(path):
     return ApprovedWheel(path, hashlib.sha256(path.read_bytes()).hexdigest())
 
 
+def test_real_visual_worker_versions_keep_code_resource_identity_and_failed_readiness_preserves_old(tmp_path, local_closure):
+    from whab.plugins import Plugin, PluginContract, PluginResources, UserInterface
+    from whab.plugins.ui_resources import UIResourceArchive, capture_visual
+    from whab.plugins.ui_worker import readiness_arguments
+    from whab.plugins.worker_selection import _start
+
+    def wheel(version, *, broken=False):
+        source = (
+            "from pathlib import Path\n"
+            "from whab.plugins import Plugin, PluginContract, UserInterface\n"
+            "root = Path(__file__).parent\n"
+            "def context(data, status, items, **values):\n"
+            f"    return {{'data': data, 'amount': lambda amount: '{version}:' + str(amount)}}\n"
+            "plugin=Plugin('fictional-reports','Fictional visual',ui=UserInterface(root/'templates',root/'static',context),contract=PluginContract(lifecycle='live'))\n"
+        )
+        files = {"fictional_reports/templates/base.html": b"<p>{{ amount(data.summary.readyToAssign) }}</p>"}
+        if not broken:
+            files["fictional_reports/static/app.js"] = f"export const version = '{version}';".encode()
+        return approve(make_wheel(tmp_path, version, source=source, extra_files=files))
+
+    template = Plugin("fictional-reports", "Fictional visual", ui=UserInterface(
+        None, None, lambda *args, **values: {}, resources=PluginResources({
+            "templates/base.html": b"host", "static/app.js": b"host",
+        })), contract=PluginContract(lifecycle="live"))
+    root = tmp_path / "approved"
+    archive = UIResourceArchive(tmp_path / "runtime")
+    first = prepare_environment(root, template.id, (*local_closure, wheel("1.0.0")))
+    old_proxy, old = _start(template, first)
+    try:
+        old_bundle = archive.store(capture_visual(template.id, old_proxy.ui, first.identifier))
+        assert old_proxy.ui.render(readiness_arguments("budget")) == b"<p>1.0.0:0</p>"
+        assert old_proxy.ui.build_context({}, {}, [], workspace="personal", page="budget", month="2000-01", selected=None)["_ui_inputs"]["page"] == "budget"
+        with pytest.raises(EnvironmentPreparationError):
+            prepare_environment(root, template.id, (*local_closure, wheel("1.1.0", broken=True)))
+        assert old.worker.healthy
+        assert old_proxy.ui.render(readiness_arguments("accounts")) == b"<p>1.0.0:0</p>"
+        second = prepare_environment(root, template.id, (*local_closure, wheel("2.0.0")))
+        new_proxy, new = _start(template, second)
+        try:
+            new_bundle = archive.store(capture_visual(template.id, new_proxy.ui, second.identifier))
+            assert new_bundle.generation != old_bundle.generation
+            assert new_proxy.ui.render(readiness_arguments("transactions")) == b"<p>2.0.0:0</p>"
+            assert archive.load(old_bundle.generation).resources.files["static/app.js"] == b"export const version = '1.0.0';"
+            old.worker.close()
+            assert not old.worker.healthy and new.worker.healthy
+            assert first.path != second.path and first.path.is_dir()
+        finally:
+            new.worker.close()
+        reopened = ReportWorker(template.id, python=second.python)
+        try:
+            assert reopened.render_ui(readiness_arguments("insights")) == b"<p>2.0.0:0</p>"
+        finally:
+            reopened.close()
+    finally:
+        old.worker.close()
+
+
 def parser_wheel(directory, version, *, broken_resources=False):
     source = (
         "from pathlib import Path\n"

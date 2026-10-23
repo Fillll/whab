@@ -20,7 +20,7 @@ def supports_live_visual(plugin):
         plugin.contract is not None and contract.lifecycle == "live"
         and [(row.name, row.version) for row in contract.provides] == [("interface.ui", 1)]
         and contract.state_version == 1 and not contract.state_upgrades
-        and plugin.ui is not None and plugin.ui.render is None
+        and plugin.ui is not None
         and all(getattr(plugin, name) is None for name in (
             "bind", "settings", "migrate_state", "budget_connection", "categorization",
             "bank", "bank_ui", "storage", "interface", "bank_logos", "merchant_logos",
@@ -47,6 +47,11 @@ def snapshot_ui(ui):
     """Render from exactly the immutable bytes advertised by this worker."""
     resources = ui.resources or capture_resource_paths(ui.templates, ui.static)
     return replace(ui, templates=None, static=None, resources=resources)
+
+
+def proxy_context(data, status, items, **values):
+    """The parent collects inputs; it never invokes the child's context helper."""
+    return {"_ui_inputs": {"data": data, "status": status, "items": items, **values}, "client_context": {}}
 
 
 def html_result(raw):

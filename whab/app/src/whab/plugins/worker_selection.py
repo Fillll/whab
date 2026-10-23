@@ -28,8 +28,10 @@ from .sdk import (
     MerchantLogos,
     PluginAction,
     PluginSettings,
+    UserInterface,
     valid_plugin_name,
 )
+from .ui_worker import proxy_context
 from .worker_adapters import supports_live_plugin
 
 _HASH = re.compile(r"[0-9a-f]{64}\Z")
@@ -334,6 +336,10 @@ def _start(template, prepared, home=None):
         resources = worker.resources() if adapters["file_import"] is not None else None
         if adapters["file_import"] is not None and (resources is not None) != adapters["file_import"]["ui"]:
             raise _error(template.id)
+        visual = None
+        if adapters["ui"] is not None:
+            visual = UserInterface(None, None, proxy_context, resources=worker.visual_resources(),
+                                   render=worker.render_ui, **adapters["ui"])
         proxy = replace(template, insights=worker.insights if worker.info["insights"] else None,
                         export=worker.export if worker.info["export"] else None,
                         bank_logos=None if bank is None else BankLogos(
@@ -348,7 +354,7 @@ def _start(template, prepared, home=None):
                             lambda: worker.settings()["insights"],
                             tuple(PluginAction(**row) for row in adapters["settings"]["actions"]), worker.settings_action,
                         ), interface=Interface(adapter=worker.interface()) if adapters["interface"] is not None else None,
-                        contract=worker.contract)
+                        ui=visual, contract=worker.contract)
         if not supports_live_plugin(proxy):
             raise _error(template.id)
     except BaseException:

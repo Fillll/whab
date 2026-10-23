@@ -38,7 +38,6 @@ def test_explicit_visual_only_contract_and_projection_information():
     assert supports_live_visual(plugin)
     assert not supports_live_visual(replace(plugin, contract=None))
     assert not supports_live_visual(replace(plugin, insights=lambda snapshot: ()))
-    assert not supports_live_visual(replace(plugin, ui=replace(plugin.ui, render=lambda _: b"html")))
     assert not supports_live_visual(replace(plugin, contract=replace(plugin.contract, lifecycle="restart")))
     assert not supports_live_visual(replace(plugin, contract=replace(plugin.contract, state_version=2)))
     flags = adapter_info(plugin.ui)
