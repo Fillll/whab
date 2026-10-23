@@ -1,6 +1,7 @@
 """Storage copy controls share the host API without exposing private namespace data."""
 
 import asyncio
+import json
 import re
 from html.parser import HTMLParser
 from importlib.metadata import version
@@ -56,7 +57,8 @@ def test_copy_management_is_addressed_accessible_and_demo_read_only(client, page
         assert ">Open my budget</a>" in copies
     for private in ("source_instance_id", "namespace_digest", "storage-instances/", "TOKEN_ENCRYPTION_KEY"):
         assert private not in copies
-    asset = f"/budgets/{key}/static/storage-copies.js"
+    context = json.loads(re.search(r'<script id="whab-context"[^>]*>(.*?)</script>', response.text, re.S)[1])
+    asset = f"/budgets/{key}/ui/{context['uiGeneration']}/static/storage-copies.js"
     assert f'{asset}?v={version("whab_plugin_web")}' in response.text
     module = client.get(asset)
     assert module.status_code == 200
