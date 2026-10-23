@@ -20,6 +20,7 @@ from uuid import uuid4
 
 from whab import __version__
 
+from .categorization_worker import CategorizationDispatcher
 from .contracts import contract_for
 from .runtime import PluginError, load_plugins
 from .sdk import (
@@ -47,6 +48,7 @@ from .worker_adapters import (
     supports_live_plugin,
     validate_adapter_info,
 )
+from .worker_namespace import MAX_WORKER_NAMESPACE, namespace_bundle, read_namespace
 from .worker_resources import read_resource_bundle
 
 _ERRORS = {
@@ -99,7 +101,8 @@ def _read_request(source):
     metadata_size, payload_size = frame_lengths(header)
     magic, version, _, _ = HEADER.unpack(header)
     metadata = Frame.decode(HEADER.pack(magic, version, metadata_size, 0) + _blocking_read(source, metadata_size)).metadata
-    if payload_size > (10 * 1024 * 1024 if metadata.get("operation") == "file.parse" else 0):
+    maximum = {"file.parse": 10 * 1024 * 1024, "category.call": MAX_WORKER_NAMESPACE}.get(metadata.get("operation"), 0)
+    if payload_size > maximum:
         raise WireError()
     return Frame(metadata, _blocking_read(source, payload_size))
 
@@ -125,7 +128,7 @@ def serve(plugin_id, source, target):
     """Worker loop; diagnostics and plugin exception details never enter frames."""
     registry = load_plugins((plugin_id,)).bind_branding()
     descriptor = registry.descriptors()[0]
-    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.interface and descriptor.interface.adapter)):
+    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.categorization, descriptor.interface and descriptor.interface.adapter)):
         raise WireError()
     entries = tuple(entry for entry in metadata.entry_points(group="whab.plugins") if entry.name == plugin_id)
     distribution = entries[0].dist
@@ -144,6 +147,15 @@ def serve(plugin_id, source, target):
                            if capability.name in LIVE_CAPABILITIES],
           "insights": descriptor.insights is not None, "export": descriptor.export is not None,
           "adapters": adapter_info(descriptor), "contract": contract_info(descriptor)})
+    categorization = CategorizationDispatcher(descriptor) if descriptor.categorization is not None else None
+    try:
+        _serve_requests(registry, descriptor, source, send, categorization)
+    finally:
+        if categorization is not None:
+            categorization.close()
+
+
+def _serve_requests(registry, descriptor, source, send, categorization):
     while True:
         try:
             frame = _read_request(source)
@@ -165,6 +177,12 @@ def serve(plugin_id, source, target):
         if operation == "shutdown":
             raise WireError()
         try:
+            if operation == "category.call":
+                if categorization is None:
+                    raise WireError()
+                output, payload = categorization.call(request["arguments"], frame.payload)
+                send({"id": identifier, "kind": "result", "data": output}, payload)
+                continue
             if operation in OPERATIONS:
                 output, payload = dispatch(registry, descriptor, operation, request["arguments"], frame.payload)
                 send({"id": identifier, "kind": "result", "data": output}, payload)
@@ -176,7 +194,7 @@ def serve(plugin_id, source, target):
                     raise WireError()
                 output = [asdict(row) for row in results[0].insights]
             else:
-                table = registry.export(plugin_id, snapshot)
+                table = registry.export(descriptor.id, snapshot)
                 output = {"columns": list(table.columns), "rows": [list(row) for row in table.rows]}
             send({"id": identifier, "kind": "result", "data": output})
         except Exception:
@@ -246,6 +264,7 @@ class ReportWorker:
                     ("branding.merchant", adapters["merchant_logos"]),
                     ("ingestion.file", adapters["file_import"] is not None),
                     ("interface.api", adapters["interface"] is not None),
+                    ("categorization", adapters["categorization"]),
                 ) if enabled],
                 key=lambda item: item["name"],
             )
@@ -253,7 +272,7 @@ class ReportWorker:
                 raise WireError()
             if not expected_capabilities or sorted(value["capabilities"], key=lambda item: item["name"]) != expected_capabilities:
                 raise WireError()
-            if adapters["interface"] is not None and value["host"] != __version__:
+            if (adapters["interface"] is not None or adapters["categorization"]) and value["host"] != __version__:
                 raise WireError()
             self.contract = read_contract(value["contract"], value["capabilities"])
             if value["live"] and (value["contract"]["legacy"] or self.contract.lifecycle != "live" or self.contract.state_version != 1 or self.contract.state_upgrades):
@@ -347,7 +366,8 @@ class ReportWorker:
                     request["snapshot"] = _snapshot_data(snapshot) if snapshot is not None else None
                 raw = Frame(request, payload).encode()
                 payload_limit = {"bank.fetch": 128 * 1024, "merchant.fetch": 128 * 1024,
-                                 "file.resources": 4 * 1024 * 1024, "file.parse": 50 * 1024 * 1024}.get(operation, 0)
+                                 "file.resources": 4 * 1024 * 1024, "file.parse": 50 * 1024 * 1024,
+                                 "category.call": MAX_WORKER_NAMESPACE}.get(operation, 0)
                 frame = self._read(self._write(raw, self.timeout), payload_limit)
                 value = frame.metadata
                 if (frame.payload and operation not in BINARY_OPERATIONS) or value.get("id") != identifier:
@@ -471,6 +491,22 @@ class ReportWorker:
                 raise WireError()
             return result
         return self._typed("interface.describe", {}, decode)
+
+    def category(self, arguments, snapshot):
+        namespace, payload = namespace_bundle(snapshot)
+
+        def decode(frame):
+            value = frame.metadata["data"]
+            if type(value) is not dict or value.keys() != {"engine", "result", "namespace"}:
+                raise WireError()
+            token = value["engine"]
+            if type(token) is not str or len(token) != 32 or any(character not in "0123456789abcdef" for character in token):
+                raise WireError()
+            if arguments["command"] != "open" and token != arguments["engine"]:
+                raise WireError()
+            return token, value["result"], read_namespace(value["namespace"], frame.payload)
+
+        return self._typed("category.call", {**arguments, "namespace": namespace}, decode, payload)
 
     def close(self):
         try:

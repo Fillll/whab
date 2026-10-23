@@ -8,16 +8,16 @@ security boundary. A candidate factory cannot publish files or state.
 from copy import deepcopy
 from dataclasses import replace
 from functools import partial
+from importlib import metadata
 from threading import RLock
 from types import MappingProxyType
 
 from starlette.concurrency import run_in_threadpool
 
 from whab.budgets.container import MAX_CONTAINER_FILES, validate_file_name
-from whab.budgets.document import MAX_BUNDLE_BYTES
+from whab.budgets.document import MAX_BUNDLE_BYTES, portable_values, validate_manifest
 from whab.budgets.runtime import RuntimeCandidate, RuntimeResource
 from whab.domain.errors import StoreError
-from whab.plugins.contracts import contract_for
 from whab.plugins.runtime import PluginError
 from whab.plugins.sdk import valid_plugin_name
 
@@ -26,20 +26,9 @@ from .categorization import CategorizationService
 
 def live_categorizer(plugin):
     """The current adapter supports one explicit, independently scoped engine."""
-    contract = contract_for(plugin)
-    return (
-        plugin.contract is not None and contract.lifecycle == "live"
-        and plugin.categorization is not None
-        and getattr(plugin, "branding_factory", None) is None
-        and {record.name for record in contract.provides} <= {"categorization"}
-        and all(record.version == 1 for record in contract.provides)
-        and not contract.state_upgrades
-        and all(getattr(plugin, name) is None for name in (
-            "bind", "settings", "migrate_state", "budget_connection", "insights", "export",
-            "bank", "bank_ui", "storage", "ui", "bank_logos", "file_import",
-            "merchant_logos", "interface",
-        ))
-    )
+    from whab.plugins.worker_adapters import supports_live_plugin
+
+    return plugin.categorization is not None and supports_live_plugin(plugin)
 
 
 class ReadinessNamespace:
@@ -116,8 +105,114 @@ class CategorizationLifecycle:
     publishing its RuntimeCandidate. No model migration is implied.
     """
 
-    def __init__(self, ledger, context_factory, snapshot):
+    def __init__(self, ledger, context_factory, snapshot, *, worker_home=None, environment="sandbox", materialization=None):
         self.ledger, self.context_factory, self.snapshot = ledger, context_factory, snapshot
+        self.worker_home, self.environment, self.materialization = worker_home, environment, materialization
+        self._effects = {}
+
+    def _namespace(self, owner):
+        from whab.plugins.namespace_effects import NamespaceScope
+
+        from .namespace_effects import NamespaceEffects
+
+        if owner not in self._effects:
+            self._effects[owner] = NamespaceEffects(
+                self.worker_home / "plugin-workers" / "namespace-effects" / self.environment / owner,
+                NamespaceScope(self.ledger.budget_id, self.environment, owner),
+                lambda: self.context_factory(owner), lambda: self.snapshot(owner),
+                lock=self.ledger._lock, materialization=self.materialization)
+        return self._effects[owner]
+
+    def _service(self, plugins, saved_ids=(), *, staged=False):
+        from whab.plugins import Categorization
+        from whab.plugins.categorization_worker import WorkerCategorizationFactory
+        from whab.plugins.report_worker import ReportWorker
+
+        factories, accesses, namespaces = [], {}, {}
+        selected = []
+        try:
+            for plugin in plugins:
+                factory = plugin.categorization.factory if plugin.categorization else None
+                if self.worker_home is not None and live_categorizer(plugin):
+                    if not isinstance(factory, WorkerCategorizationFactory):
+                        entries = tuple(entry for entry in metadata.entry_points(group="whab.plugins")
+                                        if entry.name == plugin.id and getattr(entry, "dist", None) is not None)
+                        if entries:
+                            entry, = entries
+                            worker = ReportWorker(plugin.id, expected_distribution=entry.dist.metadata["Name"], expected_version=entry.dist.version)
+                            factory = WorkerCategorizationFactory(worker, owns_worker=True)
+                    if isinstance(factory, WorkerCategorizationFactory):
+                        # Own an installed child before journal open/recovery can
+                        # fail; candidate worker bindings have their own owner.
+                        factories.append(factory)
+                        manager = self._namespace(plugin.id)
+                        manager.recover()
+                        accesses[plugin.id] = manager.context(writable=not staged)
+                        factory = factory.bind(manager, accesses[plugin.id])
+                        factories[-1] = factory
+                        plugin = replace(plugin, categorization=Categorization(factory))
+                selected.append(plugin)
+
+            def context(owner):
+                if self.worker_home is not None and owner in self._effects:
+                    if owner not in accesses:
+                        accesses[owner] = self._namespace(owner).context(writable=not staged)
+                    return accesses[owner].context()
+                base = self.context_factory(owner)
+                if staged:
+                    namespace = ReadinessNamespace(owner, base, self.snapshot(owner))
+                    namespaces[owner] = namespace
+                    return namespace.context()
+                return base
+
+            service = CategorizationService(self.ledger, selected, context, saved_ids)
+            service._worker_factories = tuple(factories)
+            service._namespace_access = tuple(accesses.values())
+            service._readiness_namespaces = tuple(namespaces.values())
+            return service
+        except BaseException:
+            for factory in factories:
+                try:
+                    factory.close()
+                except Exception:
+                    pass
+            for access in (*accesses.values(), *namespaces.values()):
+                access.close()
+            raise
+
+    def save_plugin_data(self, session, owner, *, settings=None, state=None):
+        """Keep accepted host state edits in a retained journal, even if disabled.
+
+        Configuration remains host-owned. Validate the complete manifest before
+        the namespace decision, then defer its checkpoint until the optional
+        settings save also finishes. Native materialization uses the original
+        context factory, so it never re-enters this route-level interception.
+        """
+        manager = self._effects.get(owner)
+        if manager is None or state is None:
+            return False
+        if session.id != self.ledger.budget_id:
+            raise StoreError("Plugin state belongs to another budget.")
+        with self.ledger._lock, self.materialization():
+            updated = deepcopy(session.manifest)
+            record = next(row for row in updated["plugins"] if row["id"] == owner)
+            for key, value in (("settings", settings), ("state", state)):
+                if value is not None:
+                    if type(value) is not dict:
+                        raise StoreError("Plugin settings and state must be objects.")
+                    record[key] = portable_values(value)
+            validate_manifest(updated)
+            from whab.plugins.namespace_effects import NamespaceSnapshot
+            manager.execute("host-state-edit", {"state": record["state"]},
+                lambda before: (NamespaceSnapshot(record["state"], dict(before.files)), None), mutating=True)
+            if settings is not None:
+                session.save_plugin_data(owner, settings=record["settings"])
+        return True
+
+    def close(self):
+        for manager in self._effects.values():
+            manager.close()
+        self._effects.clear()
 
     @staticmethod
     def resource(service, owner):
@@ -133,7 +228,17 @@ class CategorizationLifecycle:
         return resource
 
     def initial(self, plugins, saved_ids=()):
-        service = CategorizationService(self.ledger, plugins, self.context_factory, saved_ids)
+        if self.worker_home is not None:
+            directory = self.worker_home / "plugin-workers" / "namespace-effects" / self.environment
+            owners = []
+            if directory.exists():
+                for child in directory.iterdir():
+                    if len(owners) >= 100 or not valid_plugin_name(child.name) or child.is_symlink() or not child.is_dir():
+                        raise StoreError("Invalid saved categorization namespace.")
+                    owners.append(child.name)
+            for owner in sorted(owners):
+                self._namespace(owner).recover()
+        service = self._service(plugins, saved_ids)
         service.descriptor = _descriptor(plugins)
         resource = self.resource(service, service.descriptor.id) if service.descriptor else None
         return service, resource
@@ -151,7 +256,6 @@ class CategorizationLifecycle:
         self.preflight(active, plugins)
         if active.descriptor is descriptor:
             return candidate
-        namespaces = {}
         service = None
 
         async def close():
@@ -159,25 +263,17 @@ class CategorizationLifecycle:
                 if service is not None:
                     await run_in_threadpool(service.close)
             finally:
-                for namespace in namespaces.values():
-                    namespace.close()
+                if service is not None:
+                    for namespace in getattr(service, "_readiness_namespaces", ()):
+                        namespace.close()
 
         # Own callbacks before a factory can retain them or fail part way through.
         owner = descriptor.id if descriptor else active.descriptor.id
         resource = preparation.own(RuntimeResource(owner, close))
 
-        def context(identifier):
-            base = self.context_factory(identifier)
-            if descriptor is not None and identifier == descriptor.id:
-                namespace = ReadinessNamespace(identifier, base, self.snapshot(identifier))
-                namespaces[identifier] = namespace
-                return namespace.context()
-            return base
-
-        service = CategorizationService(self.ledger, plugins, context, tuple(active.contexts))
+        service = self._service(plugins, tuple(active.contexts), staged=True)
         service.descriptor = descriptor
         service.runtime_resource = resource
-        service._readiness_namespaces = tuple(namespaces.values())
         try:
             service.ready()
         except Exception:
@@ -193,6 +289,9 @@ class CategorizationLifecycle:
         for namespace in getattr(service, "_readiness_namespaces", ()):
             if namespace.mode == "staged":
                 namespace.activate()
+        for access in getattr(service, "_namespace_access", ()):
+            if not access.writable:
+                access.activate()
 
 
 class LeasedCategorization:

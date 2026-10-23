@@ -1,8 +1,9 @@
 # Private plugin effects and bank continuations
 
-These host components are foundations for stateful worker adapters. They do not
-enable categorization or bank code upgrades by themselves. The existing runtime
-lease, drain, provider transport, financial validation and authorization rules
+These host components support stateful worker adapters. The [categorization
+worker](plugin-workers.md#categorization-workers) uses complete namespace effects;
+bank continuations remain a foundation pending their provider/route integration.
+Runtime leases, drain, provider transport, financial validation and authorization
 still own admission and activation. No real provider is contacted by their tests.
 
 ## Namespace decisions

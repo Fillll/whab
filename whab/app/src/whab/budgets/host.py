@@ -366,7 +366,7 @@ class BudgetHost:
             entry for entry in entries.values()
         ]}
 
-    def router(self, store, settings, session, storage_config=None, *, storage_file_exports=False):
+    def router(self, store, settings, session, storage_config=None, *, storage_file_exports=False, namespace_effects=None):
         router = APIRouter()
         current_id = session.id if session else "default"
 
@@ -492,17 +492,22 @@ class BudgetHost:
 
         @router.get("/api/budget/plugins/{plugin_id}")
         def plugin_data(plugin_id: str):
-            record = session.plugin_record(plugin_id) if session else None
-            if record is None:
-                raise HTTPException(404, "Plugin is not part of this portable budget.")
-            return copy.deepcopy(record)
+            with store.lock:
+                record = session.plugin_record(plugin_id) if session else None
+                if record is None:
+                    raise HTTPException(404, "Plugin is not part of this portable budget.")
+                return copy.deepcopy(record)
 
         @router.put("/api/budget/plugins/{plugin_id}")
         def save_plugin_data(plugin_id: str, body: PluginDataBody):
             if session is None:
                 raise HTTPException(400, "Open a portable budget before saving its plugin data.")
-            session.save_plugin_data(plugin_id, settings=body.settings, state=body.state)
-            return copy.deepcopy(session.plugin_record(plugin_id))
+            with store.lock:
+                handled = namespace_effects is not None and namespace_effects.save_plugin_data(
+                    session, plugin_id, settings=body.settings, state=body.state)
+                if not handled:
+                    session.save_plugin_data(plugin_id, settings=body.settings, state=body.state)
+                return copy.deepcopy(session.plugin_record(plugin_id))
 
         return router
 

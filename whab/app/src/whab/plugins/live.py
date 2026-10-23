@@ -1,4 +1,4 @@
-"""Generation-bound report, branding and file-parser optional services.
+"""Generation-bound report, branding, parser and categorization services.
 
 Only explicit supported adapters participate; financial storage, bank services
 and other resource families keep their existing runtime instances.
@@ -199,7 +199,7 @@ class LivePluginSelection:
             families.add("categorization")
         return {"families": sorted(families),
                 "code_upgrade_families": sorted(LIVE_CAPABILITIES) if self.home is not None else [],
-                "host_only_families": ["categorization"] if self.categorization is not None else [],
+                "host_only_families": [],
                 "code_upgrades": self.home is not None, "runtime": self.runtime.status(),
                 "workers": sorted(workers, key=lambda item: item["plugin"]), "operations": operations}
 
