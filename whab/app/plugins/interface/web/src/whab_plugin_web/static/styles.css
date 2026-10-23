@@ -4345,3 +4345,11 @@ strong {
 .categorization-form input{min-width:0}.categorization-model{padding:16px 0;border-bottom:1px solid var(--border,#ddd)}
 .categorization-model .button{margin:8px 8px 0 0}.plugin-settings progress{width:100%;accent-color:var(--accent,#b32125)}
 @media(max-width:500px){.categorization-form{grid-template-columns:1fr}}
+
+/* Reviewed plugin changes keep their confirmation controls usable on compact screens. */
+[data-visual-settings] .settings-actions,
+[data-plugin-selection] .settings-actions {flex-wrap:wrap; gap:8px;}
+@media (max-width:480px) {
+  [data-visual-settings] .settings-actions > .button,
+  [data-plugin-selection] .settings-actions > .button {flex:1 1 140px;}
+}

@@ -62,6 +62,18 @@ HTTPS, local Host/origin and authorization controls still apply. Demo-scoped
 transition requests are rejected. The ordinary `PUT /api/plugins/management`
 continues to configure the next startup.
 
+Failed resource closes retain their private owner. Runtime status counts both
+ongoing cleanup and retained failures in `cleanup_pending`, and reports completed
+failed attempts in `cleanup_failed`; diagnostic messages contain no plugin data.
+An explicit local `POST /api/plugins/runtime/cleanup` with the strict empty JSON
+body `{}` makes one bounded retry of each retained failed owner. Re-read status:
+HTTP 200 confirms the retry finished, while remaining failures stay observable.
+Slow closes continue without cancellation. Demo requests are refused and the
+normal HTTPS, Host, origin and authorization guards apply even while admission is
+gated. Cleanup never repeats a financial mutation, decides transition authority,
+or clears a native financial recovery gate. Host shutdown retries retained owners;
+historical diagnostics may remain after cleanup succeeds.
+
 Live changes preserve the existing ledger revision, retry receipts, bank objects,
 storage and provider caches. Unknown/disabled optional namespaces remain in the
 saved budget. Failed candidate resolution or preparation leaves the active report

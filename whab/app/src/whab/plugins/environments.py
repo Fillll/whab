@@ -64,7 +64,7 @@ class EnvironmentPreparationError(ValueError):
             "environment_changed": "A prepared environment no longer matches its approved artifacts. Preserve it and prepare a new version.",
             "environment_cleanup_failed": "An incomplete candidate environment could not be cleaned up. Existing prepared environments are unchanged.",
             "unsupported_platform": "Versioned worker environments currently require macOS or Linux file locking.",
-            "unsupported_lifecycle": "Only explicitly live reporting, branding, file-parser and scoped categorization adapters can be prepared for live upgrades.",
+            "unsupported_lifecycle": "Only explicitly live plugins with supported versioned capability adapters can be prepared for live upgrades.",
         }
         super().__init__(messages[code])
         self.code, self.plugin_id = code, plugin_id

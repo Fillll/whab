@@ -18,12 +18,17 @@ from whab.web.navigation import budget_key
 from whab.web.plugin_snapshot import build_snapshot
 from whab.web.schemas import (
     BankLogoPreviewBody,
+    Body,
     PluginRecoveryBody,
     PluginSelectionBody,
     PluginUpgradeBody,
     Workspace,
     valid_month,
 )
+
+
+class RuntimeCleanupBody(Body):
+    pass
 
 
 def create_router(store, plugins, plugin_manager=None):
@@ -45,6 +50,19 @@ def create_router(store, plugins, plugin_manager=None):
         if plugin_manager is None or plugin_manager.live is None:
             raise HTTPException(404, "Live plugin management is unavailable")
         return plugin_manager.live.status()
+
+    @router.post("/runtime/cleanup")
+    async def cleanup(request: Request, body: RuntimeCleanupBody):
+        if request.scope.get("whab.workspace") == "demo" or "demo" in request.query_params.getlist("workspace"):
+            raise HTTPException(403, "This operation requires your own budget")
+        if plugin_manager is None or plugin_manager.live is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        try:
+            await plugin_manager.live.runtime.retry_cleanup(timeout=5)
+        except PluginError as error:
+            return JSONResponse({"error": str(error), "code": error.code,
+                                 "plugin_id": error.plugin_id}, status_code=409)
+        return {"status": plugin_manager.live.status()}
 
     @router.post("/management/transition", status_code=202)
     async def transition(request: Request, body: PluginSelectionBody):

@@ -110,6 +110,16 @@ class RuntimePreparation:
             self._resources.append(resource)
         return resource
 
+    def release(self, resource):
+        """Transfer only this registered owner after its cleanup is confirmed."""
+        if type(resource) is not RuntimeResource:
+            raise RuntimeTransitionError("invalid_runtime")
+        for index, previous in enumerate(self._resources):
+            if previous is resource:
+                self._resources.pop(index)
+                return True
+        return False
+
     def candidate(self, services):
         return RuntimeCandidate(services, tuple(self._resources))
 
@@ -193,7 +203,8 @@ class BudgetRuntime:
         self._closed = False
         self._serial = asyncio.Lock()
         self._tasks = set()
-        self._cleanup = set()
+        self._cleanup = {}
+        self._cleanup_failed = {}
         self._cleanup_errors = []
         self._pending = None
         self._error = None
@@ -217,7 +228,8 @@ class BudgetRuntime:
                 "pending": dict(self._pending) if self._pending else None,
                 "error": dict(self._error) if self._error else None,
                 "cleanup_errors": [dict(error) for error in self._cleanup_errors],
-                "cleanup_pending": len(self._cleanup),
+                "cleanup_pending": len(self._cleanup) + len(self._cleanup_failed),
+                "cleanup_failed": len(self._cleanup_failed),
                 "health": "recovery_required" if self._uncertain else "degraded" if self._cleanup_errors else "ready",
             }
 
@@ -397,35 +409,58 @@ class BudgetRuntime:
         for resource in reversed(resources):
             if id(resource) in retained:
                 continue
-            task = asyncio.create_task(_invoke(resource.close))
-            self._cleanup.add(task)
+            with self._condition:
+                task = next((task for task, owner in self._cleanup.items() if owner is resource), None)
+                if task is None:
+                    self._cleanup_failed.pop(id(resource), None)
+                    task = asyncio.create_task(_invoke(resource.close))
+                    self._cleanup[task] = resource
+                    task.add_done_callback(lambda finished, owner=resource: self._cleanup_finished(finished, owner))
             try:
                 await asyncio.wait_for(asyncio.shield(task), timeout)
             except TimeoutError:
                 with self._condition:
                     self._cleanup_errors.append(self._diagnostic("retirement_timeout", resource.plugin_id))
+                    self._cleanup_errors[:] = self._cleanup_errors[-128:]
             except (Exception, asyncio.CancelledError):
-                with self._condition:
-                    self._cleanup_errors.append(self._diagnostic("retirement_failed", resource.plugin_id))
+                pass  # The completion callback retains failed ownership.
             finally:
                 if task.done():
-                    self._cleanup.discard(task)
-                else:
-                    task.add_done_callback(lambda finished, owner=resource.plugin_id: self._cleanup_finished(finished, owner))
+                    self._cleanup_finished(task, resource)
                 with self._condition:
                     self._notify()
 
-    def _cleanup_finished(self, task, plugin_id):
+    def _cleanup_finished(self, task, resource):
         with self._condition:
-            self._cleanup.discard(task)
+            if task not in self._cleanup:
+                return
+            self._cleanup.pop(task)
             if task.cancelled() or task.exception() is not None:
-                self._cleanup_errors.append(self._diagnostic("retirement_failed", plugin_id))
+                self._cleanup_failed[id(resource)] = resource
+                self._cleanup_errors.append(self._diagnostic("retirement_failed", resource.plugin_id))
+            self._cleanup_errors[:] = self._cleanup_errors[-128:]
             self._notify()
 
     async def wait_cleanup(self, timeout=30):
         """Wait for tracked slow cleanup without cancelling it on a deadline."""
         await self._wait(lambda: not self._cleanup, timeout, "retirement_timeout")
+        if self._cleanup_failed:
+            raise RuntimeTransitionError("retirement_failed")
         return self.status()
+
+    async def retry_cleanup(self, *, timeout=5):
+        """Attempt each retained failed close once; never cancel ongoing cleanup."""
+        if self._inherited() is not None:
+            raise RuntimeTransitionError("transition_in_operation")
+        _timeout(timeout)
+        return await self._owned(self._retry_cleanup(timeout))
+
+    async def _retry_cleanup(self, timeout):
+        async with self._serial:
+            with self._condition:
+                resources = tuple(reversed(tuple(self._cleanup_failed.values())))
+            await self._retire(resources, (), timeout)
+            return self.status()
 
     def _check_transition(self):
         if self._inherited() is not None:
@@ -599,12 +634,15 @@ class BudgetRuntime:
         async with self._serial:
             with self._condition:
                 if self._closed:
-                    return
-                self._gate = True
-                resources = list(self._active.resources)
-                if self._uncertain:
-                    resources.extend(resource for resource in self._uncertain[1].resources
-                                     if all(resource is not previous for previous in resources))
+                    resources = []
+                else:
+                    self._gate = True
+                    resources = list(self._active.resources)
+                    if self._uncertain:
+                        resources.extend(resource for resource in self._uncertain[1].resources
+                                         if all(resource is not previous for previous in resources))
+                pending = (*reversed(tuple(self._cleanup_failed.values())), *self._cleanup.values())
+                resources.extend(resource for resource in pending if all(resource is not previous for previous in resources))
             self._progress("draining", 50)
             await self._wait(lambda: not self._leases, drain_timeout, "drain_timeout")
             with self._condition:
@@ -625,5 +663,7 @@ class BudgetRuntime:
                 raise
             with self._condition:
                 self._closed = True
+                pending = tuple(reversed(tuple(self._cleanup_failed.values())))
+            await self._retire(pending, (), retirement_timeout)
             await self._retire(self._active.resources, (), retirement_timeout)
             self._progress("closed", 100)

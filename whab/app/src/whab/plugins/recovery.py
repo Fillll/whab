@@ -34,6 +34,7 @@ _MESSAGES = {
     "visual_decision_unreadable": "The saved visual interface decision is unavailable. Stop its owning budget and preserve its files before repairing it.",
     "write_failed": "The recovery change could not be confirmed. Refresh and inspect its preserved records before retrying.",
     "startup_failed": "The full application could not start. Recovery remains available; repair or disable the failing optional plugin and retry.",
+    "startup_cleanup_pending": "This budget's previous startup resources are still closing. Retry cleanup before starting another instance.",
     "recovery_closed": "The recovery listener has stopped.",
     "already_active": "The full application is already active. Use its plugin settings for further changes.",
     "shutdown_failed": "The application could not confirm cleanup. Preserve this runtime and inspect its plugin recovery controls.",
@@ -453,6 +454,12 @@ class RecoveryApplication:
                         await self._context.__aexit__(None, None, None)
                     except Exception:
                         raise RecoveryError("shutdown_failed") from None
+                _, session, root, _ = await run_in_threadpool(self.controller.inspect)
+                from whab.app import retry_startup_cleanup
+
+                if not await run_in_threadpool(retry_startup_cleanup, root,
+                        session.id if session else "default", self.settings.plaid_env):
+                    raise RecoveryError("shutdown_failed")
 
         shell = self.shell = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
         install_middleware(shell, settings.port)
@@ -532,10 +539,22 @@ class RecoveryApplication:
         async with self._serial:
             self._inactive()
             with _decision_lock(self.settings.home):
-                public, session, _, _ = await run_in_threadpool(self.controller._current, revision)
+                public, session, root, _ = await run_in_threadpool(self.controller._current, revision)
                 if any(error["code"] in {"selection_unreadable", "budget_unreadable"} for error in public["errors"]):
                     raise RecoveryError("budget_unreadable" if self.settings.budget_path else "selection_unreadable")
                 from dataclasses import replace
+
+                from whab.app import retry_startup_cleanup
+
+                if not await run_in_threadpool(retry_startup_cleanup, root,
+                        session.id if session else "default", self.settings.plaid_env):
+                    safe = RecoveryError("startup_cleanup_pending")
+                    self.error = safe.public()
+                    raise safe
+                # Releasing a retained journal may make its visual decision
+                # readable again. Require a fresh inspection/revision instead
+                # of silently approving a different recovered selection.
+                public, session, _, _ = await run_in_threadpool(self.controller._current, revision)
 
                 factory = self.factory
                 if factory is None:

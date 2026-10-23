@@ -9,6 +9,7 @@ import pytest
 from whab.budgets.runtime import (
     BudgetRuntime,
     RuntimeCandidate,
+    RuntimePreparation,
     RuntimeResource,
     RuntimeTransitionError,
 )
@@ -456,9 +457,11 @@ def test_retirement_continues_in_reverse_order_after_failure_and_preserves_share
         assert status["health"] == "degraded"
         assert status["cleanup_errors"][0]["plugin_id"] == "branding"
         assert status["cleanup_errors"][0]["code"] == "retirement_failed"
+        assert status["cleanup_pending"] == status["cleanup_failed"] == 1
         assert "synthetic secret" not in str(status)
         await runtime.close()
-        assert closed == ["broken", "first", "shared"]
+        assert closed == ["broken", "first", "broken", "shared"]
+        assert runtime.status()["cleanup_pending"] == 1
 
     asyncio.run(scenario())
 
@@ -486,12 +489,105 @@ def test_slow_retirement_is_bounded_tracked_and_never_forcibly_cancelled(fails):
             await runtime.wait_cleanup(timeout=0)
         assert caught.value.code == "retirement_timeout"
         finish.set()
-        status = await runtime.wait_cleanup()
-        assert status["cleanup_pending"] == 0
+        if fails:
+            with pytest.raises(RuntimeTransitionError) as caught:
+                await runtime.wait_cleanup()
+            assert caught.value.code == "retirement_failed"
+            status = runtime.status()
+        else:
+            status = await runtime.wait_cleanup()
+        assert status["cleanup_pending"] == int(fails)
         assert [row["code"] for row in status["cleanup_errors"]] == (
             ["retirement_timeout", "retirement_failed"] if fails else ["retirement_timeout"]
         )
 
+    asyncio.run(scenario())
+
+
+def test_failed_retirement_owner_survives_bounded_explicit_retry_and_shutdown_retry():
+    async def scenario():
+        attempts, released = [], asyncio.Event()
+
+        async def close():
+            attempts.append(len(attempts) + 1)
+            if len(attempts) == 1:
+                raise OSError("fictional private child cleanup")
+            await released.wait()
+
+        resource = RuntimeResource("report", close)
+        runtime = BudgetRuntime("fictional-budget", {}, (resource,))
+        other = BudgetRuntime("fictional-other-budget", {"report": service("available")})
+        await runtime.transition(lambda _: RuntimeCandidate({}))
+        assert runtime.status()["cleanup_pending"] == 1
+        assert runtime._cleanup_failed[id(resource)] is resource
+        status = await runtime.retry_cleanup(timeout=0)
+        assert status["cleanup_pending"] == 1 and status["cleanup_failed"] == 0
+        async with other.request() as lease:
+            assert lease.service("report").read() == "available"
+        # A second retry does not invoke an already-running close again.
+        await runtime.retry_cleanup(timeout=0)
+        assert attempts == [1, 2]
+        released.set()
+        await runtime.wait_cleanup()
+        assert runtime.status()["cleanup_pending"] == 0
+        assert "fictional private" not in str(runtime.status())
+        await runtime.shutdown()
+
+        attempts.clear()
+        def transient():
+            attempts.append(True)
+            if len(attempts) == 1:
+                raise OSError("fictional retained writer")
+        closed = BudgetRuntime("fictional-shutdown", {}, (RuntimeResource("report", transient),))
+        await closed.shutdown()
+        assert closed.status()["cleanup_pending"] == 1
+        await closed.shutdown()
+        assert attempts == [True, True] and closed.status()["cleanup_pending"] == 0
+        await closed.shutdown()
+        assert attempts == [True, True]
+
+    asyncio.run(scenario())
+
+
+def test_preparation_release_disowns_only_identical_registered_closed_resource():
+    closed = []
+    def callback():
+        closed.append("equal-owner")
+    first, second, absent = (RuntimeResource("report", callback) for _ in range(3))
+    assert first == second == absent
+    preparation = RuntimePreparation(None)
+    preparation.own(first)
+    preparation.own(second)
+    first.close()
+    assert preparation.release(first) is True
+    assert preparation.release(absent) is False
+    assert preparation.candidate({}).resources == (second,)
+    assert preparation.candidate({}).resources[0] is second
+    with pytest.raises(RuntimeTransitionError):
+        preparation.release(SimpleNamespace(close=callback))
+    second.close()
+    assert closed == ["equal-owner", "equal-owner"]
+
+
+def test_failed_preparation_keeps_cleanup_owner_when_probe_cannot_be_released():
+    async def scenario():
+        attempts = []
+        def close():
+            attempts.append(True)
+            if len(attempts) == 1:
+                raise OSError("fictional probe cleanup pending")
+        resource = RuntimeResource("report", close)
+        runtime = BudgetRuntime("fictional-budget", {})
+        def prepare(preparation):
+            preparation.own(resource)
+            raise RuntimeError("fictional startup hello failure")
+        with pytest.raises(RuntimeTransitionError):
+            await runtime.transition(prepare)
+        assert runtime.status()["generation"] == 1
+        assert runtime.status()["admission"] == "open"
+        assert runtime._cleanup_failed[id(resource)] is resource
+        assert (await runtime.retry_cleanup())["cleanup_pending"] == 0
+        assert attempts == [True, True]
     asyncio.run(scenario())
 
 
