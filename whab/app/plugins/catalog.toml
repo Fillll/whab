@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "eb7bcc573e28c9e1d452e48cc277e0be55a382a9"
+documentation_ref = "6285f907174f85596537e7f31010422e7d0dfb77"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -171,3 +171,32 @@ scope = "The exact source passed 4561 Python tests, all thirteen runtime plugins
 [verification.artifacts]
 whab = "2.34.0"
 whab_plugin_server = "1.1.0"
+
+[[verification]]
+id = "pr92-installed-native-api"
+date = "2026-10-23"
+host_version = "2.34.0"
+source_commit = "ebbff0d464dd67c0269428a6d4a339778e21ec57"
+selection = ["server", "sqlite"]
+method = "installed-wheel"
+tests = ["installed native HTTPS API interface upgrade/drain/reopen verification"]
+pull_requests = ["https://github.com/Fillll/whab/pull/92"]
+scope = "Archived the exact committed source and installed genuine host2.34/server1.1/SQLite1.11 wheels outside the checkout. Native TLS1.3 explicitly trusted only the temporary runtime CA and rejected an untrusted CA. Verified bearer/Host/origin/budget guards and the bundled server worker, then four separately approved reviewed synthetic server versions: failed missing-token binding preserved the active environment/reference and exact same-host retry; query-only and command-only declarations rejected the other operation; all-command declarations enabled replacement and disable/re-enable. A test-only launcher paused an admitted public ledger command at an event-file barrier before financial dispatch; disabling drained until it acknowledged, preserving both accounts. Ordinary installed stock CLI restart restored the exact saved synthetic worker environment and both acknowledged accounts. Exact artifact/closure hashes and 17 HTTP outcomes were recorded. All listeners, workers and fictional homes were removed. This does not establish retry durability across host restart or provider/household connectivity."
+[verification.artifacts]
+whab = "2.34.0"
+whab_plugin_server = "1.1.0"
+whab_plugin_sqlite = "1.11.0"
+
+[[verification]]
+id = "pr94-storage-copy-controls"
+date = "2026-10-23"
+host_version = "2.34.0"
+source_commit = "6285f907174f85596537e7f31010422e7d0dfb77"
+selection = ["web"]
+method = "source-tests"
+tests = ["plugins/interface/web/tests/storage_copies.test.cjs", "plugins/interface/web/tests/test_storage_copies.py", "plugins/interface/web/tests/test_plugin_settings.py", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/94"]
+scope = "The exact integrated source passed 4576 Python tests, all thirteen runtime plugins at 100% statement/branch coverage, 304 browser tests, 130 toolkit tests on each genuine minimum/current host, external generated native-runtime configurations and exact replays, and installed distribution checks. Storage-copy controls exercised current-primary status, financial and namespace watermarks, explicit empty-destination attachment and reviewed promotion, pending operation tracking, unknown-response reconciliation without mutation replay, stale-response guards, focus/edit barriers, unsupported hosts and demo read-only behavior. Browser visual inspection was unavailable; source/template and browser interaction checks do not establish visual acceptance or household installation."
+[verification.artifacts]
+whab = "2.34.0"
+whab_plugin_web = "1.26.0"
