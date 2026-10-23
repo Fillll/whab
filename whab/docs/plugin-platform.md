@@ -13,11 +13,11 @@ not update the household installation or publish releases.
 | 3 | Independent durable JSON storage, strict validation, interruption tests and fictional benchmarks | Implemented and tested in draft PR [#79](https://github.com/Fillll/whab/pull/79); migration/copy authority remains separate |
 | 4 | Per-budget generations, request/background leases, admission gates, draining and stable services | Coordinator and report integration tested in draft PR [#80](https://github.com/Fillll/whab/pull/80); remaining family adapters pending |
 | 5 | Bounded worker protocol, immutable versioned environments, readiness and durable mutation outcomes | Stateless report upgrades and recovery tested in draft PR [#81](https://github.com/Fillll/whab/pull/81); financial mutation workers pending |
-| 6 | Live report/export, branding and parser replacement; then categorization/banks; then storage/UI/API interfaces | Already installed stateless reports tested in draft PR [#80](https://github.com/Fillll/whab/pull/80); code upgrades and other families pending |
+| 6 | Live report/export, branding and parser replacement; then categorization/banks; then storage/UI/API interfaces | Stateless report selection and code upgrades tested in draft PRs [#80](https://github.com/Fillll/whab/pull/80) and [#81](https://github.com/Fillll/whab/pull/81); other families pending |
 | 7 | Previewed SQLite/JSON migration, protected same-device transfer, authority journal and restart recovery | Pending |
 | 8 | Single-primary backend copies, monotonic watermarks, retry and explicit validated promotion in both directions | Pending |
-| 9 | Independently installed generator/examples, clean external wheel CI, static metadata and compatibility docs | Four independent project generators and external wheel/replay CI tested in draft PR [#82](https://github.com/Fillll/whab/pull/82); static catalog and remaining maintained examples pending |
-| 10 | Recovery controls, attributed diagnostics, curated static catalog and verified private security-reporting route | Pending |
+| 9 | Independently installed generator/examples, clean external wheel CI, static metadata and compatibility docs | Four independent project generators and external wheel/replay CI tested in draft PR [#82](https://github.com/Fillll/whab/pull/82); maintained branding/parser/categorization examples tested in [#83](https://github.com/Fillll/whab/pull/83); static catalog and broader family examples pending |
+| 10 | Recovery controls, attributed diagnostics, curated static catalog and verified private security-reporting route | Private route enabled and policy prepared in draft PR [#77](https://github.com/Fillll/whab/pull/77); startup recovery and static catalog pending |
 
 Dependencies: contracts precede the conformance kit; JSON storage and runtime
 coordination can then advance in parallel. Workers and capability-family
