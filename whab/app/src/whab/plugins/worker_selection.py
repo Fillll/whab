@@ -315,14 +315,56 @@ class WorkerBinding:
     resource: RuntimeResource
 
 
-def _start(template, prepared, home=None, *, worker_owner=None):
+async def _close_worker(worker, plugin_id):
+    await run_in_threadpool(worker.close)
+    if worker.cleanup_pending:
+        raise PluginError("The report worker still has pending cleanup.", code="worker_cleanup_pending", plugin_id=plugin_id)
+
+
+class PreparationWorkers:
+    """Own environment probes from allocation until confirmed synchronous exit."""
+
+    def __init__(self, preparation, plugin_id):
+        self.preparation, self.plugin_id, self.resources = preparation, plugin_id, {}
+
+    def own(self, worker):
+        async def close():
+            await _close_worker(worker, self.plugin_id)
+        resource = RuntimeResource(self.plugin_id, close)
+        self.resources[id(worker)] = resource
+        self.preparation.own(resource)
+
+    def retired(self, worker):
+        if worker.cleanup_pending or worker.healthy:
+            raise _error(self.plugin_id)
+        self.preparation.release(self.resources.pop(id(worker)))
+
+
+def _start(template, prepared, home=None, *, worker_owner=None, resource_owner=None):
     from .categorization_worker import WorkerCategorizationFactory
 
     if not supports_live_plugin(template):
         raise PluginError("This optional plugin does not declare a supported live adapter.",
                           code="restart_required", plugin_id=template.id)
+    worker = None
+
+    async def close():
+        if worker is not None:
+            await _close_worker(worker, template.id)
+
+    resource = RuntimeResource(template.id, close)
+    if resource_owner is not None:
+        resource_owner(resource)
+
+    def created(allocated):
+        nonlocal worker
+        worker = allocated
+        if worker_owner is not None:
+            worker_owner(allocated)
+
     worker = ReportWorker(template.id, python=prepared.python, expected_distribution=prepared.distribution,
-                          expected_version=prepared.version, **({"on_create": worker_owner} if worker_owner else {}))
+                          expected_version=prepared.version,
+                          **({"on_create": created} if worker_owner or resource_owner else {}))
     try:
         if not worker.info["live"]:
             raise PluginError("The candidate does not declare a compatible live lifecycle.",
@@ -361,16 +403,11 @@ def _start(template, prepared, home=None, *, worker_owner=None):
         worker.close()
         raise
 
-    async def close():
-        await run_in_threadpool(worker.close)
-        if worker.cleanup_pending:
-            raise PluginError("The report worker still has pending cleanup.", code="worker_cleanup_pending", plugin_id=template.id)
-
-    binding = WorkerBinding(prepared, worker, RuntimeResource(template.id, close))
+    binding = WorkerBinding(prepared, worker, resource)
     return proxy, binding
 
 
-def restore_workers(home, registry, existing=None):
+def restore_workers(home, registry, existing=None, *, worker_owner=None, resource_owner=None):
     """Restore selected approved versions; failure never silently selects host code."""
     existing = existing or {}
     selected, bindings = [], {}
@@ -393,7 +430,7 @@ def restore_workers(home, registry, existing=None):
                     prepared = reopen_environment(Path(home) / "plugin-workers" / "environments", plugin.id, value["environment"])
                     if (prepared.distribution, prepared.version) != (value["distribution"], value["version"]):
                         raise ValueError()
-                    plugin, binding = _start(plugin, prepared, home)
+                    plugin, binding = _start(plugin, prepared, home, worker_owner=worker_owner, resource_owner=resource_owner)
                     bindings[plugin.id] = binding
                 except Exception:
                     raise _error(plugin.id) from None
@@ -416,9 +453,10 @@ async def upgrade_report(live, home, plugin_id, approvals):
                               code="restart_required", plugin_id=plugin_id)
         if template.categorization is not None:
             preparation.active.services["categorization"].ensure_idle()
+        probes = PreparationWorkers(preparation, plugin_id)
         prepared = await run_in_threadpool(prepare_environment, Path(home) / "plugin-workers" / "environments",
-                                          plugin_id, approvals)
-        proxy, binding = await run_in_threadpool(_start, template, prepared, home)
+                                          plugin_id, approvals, worker_owner=probes.own, worker_retired=probes.retired)
+        proxy, binding = await run_in_threadpool(_start, template, prepared, home, resource_owner=preparation.own)
         preparation.own(binding.resource)
         registry = PluginRegistry(tuple(proxy if plugin.id == plugin_id else plugin for plugin in active.descriptors()))
         bindings = {**active.workers, plugin_id: binding}

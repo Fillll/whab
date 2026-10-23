@@ -396,7 +396,7 @@ def _verify(path, python, manifest, deadline):
 
 
 def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, timeout=120,
-                        worker_owner=None) -> PreparedEnvironment:
+                        worker_owner=None, worker_retired=None) -> PreparedEnvironment:
     """Prepare one approved optional-plugin closure; publication grants no activation.
 
     A venv is created at its final content address because Python environments
@@ -555,6 +555,8 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                         probe.close()
                         if probe.cleanup_pending:
                             raise EnvironmentPreparationError("environment_cleanup_failed", plugin_id)
+                        if worker_retired is not None:
+                            worker_retired(probe)
                     if (destination / "probe-cache").exists():
                         shutil.rmtree(destination / "probe-cache")
                     _remaining(deadline)

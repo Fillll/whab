@@ -54,7 +54,7 @@ def apply_visual_choice(settings, choice):
                    plugins=tuple(name for name in settings.plugins if name not in choice["known"]))
 
 
-def restore_visual_worker(home, registry, choice):
+def restore_visual_worker(home, registry, choice, *, worker_owner=None):
     """The single UI decision owns this exact worker; never read optional refs."""
     if not choice or choice["worker"] is None:
         return registry, {}
@@ -63,7 +63,7 @@ def restore_visual_worker(home, registry, choice):
     prepared = reopen_environment(Path(home) / "plugin-workers" / "environments", identifier, reference["environment"])
     if (prepared.distribution, prepared.version) != (reference["distribution"], reference["version"]):
         raise _error("ui_recovery_required", identifier)
-    proxy, binding = _start(template, prepared, home)
+    proxy, binding = _start(template, prepared, home, worker_owner=worker_owner)
     try:
         visual = VisualGeneration.prepare(proxy, UIResourceArchive(home), code_identity=prepared.identifier)
         if visual.generation != choice["generation"]:
@@ -172,7 +172,8 @@ class VisualController:
         if sum(row["state"] in {"queued", "running"} for row in self.operations.values()) >= 8:
             raise _error("ui_preview_unavailable")
         identifier = str(uuid4())
-        self.operations[identifier] = {"id": identifier, "plugin_id": plan["selection"], "state": "queued", "error": None}
+        self.operations[identifier] = {"id": identifier, "preview_id": preview_id,
+                                      "plugin_id": plan["selection"], "state": "queued", "error": None}
         self.preview_operations[preview_id] = identifier
         while len(self.operations) > 32:
             removable = next((key for key, row in self.operations.items() if row["state"] not in {"queued", "running"}), None)
@@ -214,9 +215,13 @@ class VisualController:
             template = await run_in_threadpool(self._template, plan["selection"])
             binding, proxy = None, template
             if template is not None:
+                from .worker_selection import PreparationWorkers
+
+                probes = PreparationWorkers(preparation, template.id)
                 reference = record["workers"].get(template.id) if not plan["use_installed"] else None
                 if plan["approvals"]:
-                    prepared = await run_in_threadpool(prepare_environment, self.home / "plugin-workers" / "environments", template.id, plan["approvals"])
+                    prepared = await run_in_threadpool(prepare_environment, self.home / "plugin-workers" / "environments", template.id,
+                                                      plan["approvals"], worker_owner=probes.own, worker_retired=probes.retired)
                 elif reference is not None:
                     prepared = await run_in_threadpool(reopen_environment, self.home / "plugin-workers" / "environments", template.id, reference["environment"])
                     if (prepared.distribution, prepared.version) != (reference["distribution"], reference["version"]):
@@ -224,7 +229,8 @@ class VisualController:
                 else:
                     prepared = None
                 if prepared is not None:
-                    proxy, binding = await run_in_threadpool(_start, template, prepared, self.home)
+                    proxy, binding = await run_in_threadpool(_start, template, prepared, self.home,
+                                                            resource_owner=preparation.own)
                     preparation.own(binding.resource)
             previous_ui = {plugin.id for plugin in active.descriptors() if plugin.ui is not None}
             descriptors = tuple(plugin for plugin in active.descriptors() if plugin.ui is None) + ((proxy,) if proxy else ())

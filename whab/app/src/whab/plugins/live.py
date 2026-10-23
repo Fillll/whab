@@ -382,7 +382,8 @@ class LivePluginSelection:
             if self.home is not None:
                 from .worker_selection import restore_workers
 
-                registry, bindings = await run_in_threadpool(restore_workers, self.home, candidate.registry, candidate.workers)
+                registry, bindings = await run_in_threadpool(restore_workers, self.home, candidate.registry, candidate.workers,
+                                                            resource_owner=preparation.own)
                 candidate = RegistryGeneration(registry, active.stable, bindings, previous=active)
                 for name, binding in bindings.items():
                     if name not in active.workers:

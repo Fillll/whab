@@ -26,6 +26,7 @@ def handover(client, app, plugin_id):
     assert duplicate.json()["id"] == accepted.json()["id"]
     client.portal.call(settle, app)
     operation = client.get("/api/ui/status").json()["operations"][-1]
+    assert operation["preview_id"] == preview.json()["preview_id"]
     assert operation["id"] == accepted.json()["id"] and operation["state"] == "complete", operation
 
 
