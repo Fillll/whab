@@ -154,10 +154,10 @@ def test_preparation_accepts_reordered_equivalent_payload_without_replacing_live
     document = json.loads(json_store.export_budget_files()["budget.json"])
     for name in ("accounts", "categories", "transactions", "assignments", "futureFunding", "rolloverModes"):
         document["ledger"][name].reverse()
-    before = json_store.commit_evidence()
+    before = json_store.commit_status()
     raw = json_store.path.read_bytes()
     json_store.prepare_budget_files("personal", {"budget.json": json.dumps(document, sort_keys=True).encode()})
-    assert json_store.commit_evidence() == before
+    assert json_store.commit_status() == before
     assert json_store.path.read_bytes() == raw
 
 
@@ -188,14 +188,14 @@ def test_invalid_public_requests_leave_file_untouched(json_store, operation):
 def test_import_retry_eligibility_and_generation(json_store, json_import):
     assert json_store.preview_workspace_import("demo", "fictional", "hash")["canImport"] is False
     assert json_store.preview_workspace_import("personal", "fictional", "hash")["canImport"]
-    before = json_store.commit_evidence()
+    before = json_store.commit_status()
     result = json_store.import_workspace("personal", "fictional", "hash", json_import)
     assert result["counts"]["transactions"] == 1
-    committed = json_store.commit_evidence()
+    committed = json_store.commit_status()
     assert committed["generation"] == before["generation"] + 1
     assert committed["authorityEpoch"] == before["authorityEpoch"]
     assert json_store.import_workspace("personal", "fictional", "hash", json_import)["alreadyImported"]
-    assert json_store.commit_evidence() == committed
+    assert json_store.commit_status() == committed
     assert json_store.preview_workspace_import("personal", "fictional", "hash")["alreadyImported"]
     assert not json_store.preview_workspace_import("personal", "fictional", "other-hash")["canImport"]
 

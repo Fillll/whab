@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Protocol, TypeAlias
 from urllib.parse import urlsplit
@@ -19,6 +19,33 @@ from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
 
 from .contracts import Capability, PluginContract, Requirement
+from .storage_transfer import (
+    CommitEvidence as CommitEvidence,
+)
+from .storage_transfer import (
+    LocalTransferSnapshot as LocalTransferSnapshot,
+)
+from .storage_transfer import (
+    LocalTransferStorage as LocalTransferStorage,
+)
+from .storage_transfer import (
+    OperationReceipt as OperationReceipt,
+)
+from .storage_transfer import (
+    OperationResult as OperationResult,
+)
+from .storage_transfer import (
+    StorageAuthority as StorageAuthority,
+)
+from .storage_transfer import (
+    StorageCommands as StorageCommands,
+)
+from .storage_transfer import (
+    StorageOperation as StorageOperation,
+)
+from .storage_transfer import (
+    TransferPreview as TransferPreview,
+)
 
 API_VERSION = 1
 ENTRYPOINT_GROUP = "whab.plugins"
@@ -335,12 +362,15 @@ class StorageContext:
     environment: str
     config: Mapping[str, str] = field(repr=False)
     budget: BudgetContext | None = None
+    initial_role: str = "primary"
 
     def __post_init__(self) -> None:
         if not isinstance(self.home, Path):
             raise ValueError("Storage home must be a pathlib.Path directory.")
         if type(self.environment) is not str or self.environment not in {"sandbox", "production"}:
             raise ValueError("Storage environment must be sandbox or production.")
+        if type(self.initial_role) is not str or self.initial_role not in {"primary", "staged", "copy"}:
+            raise ValueError("New storage instances must start as primary, staged, or copy.")
         if not isinstance(self.config, Mapping) or any(
             type(key) is not str or type(value) is not str for key, value in self.config.items()
         ):
@@ -478,6 +508,7 @@ class BankContext:
     environment: str
     encryption_key: str = field(repr=False)
     budget: BudgetContext | None = None
+    background_scope: Callable[[], object] | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if type(self.environment) is not str or self.environment not in {"sandbox", "production"}:
@@ -488,6 +519,8 @@ class BankContext:
             raise ValueError("Bank plugin configuration must be a mapping of plain strings.")
         if type(self.encryption_key) is not str:
             raise ValueError("Bank plugin encryption key must be a plain string.")
+        if self.background_scope is not None and not callable(self.background_scope):
+            raise ValueError("Bank background scope must be an asynchronous context factory.")
         object.__setattr__(self, "config", MappingProxyType(dict(self.config)))
 
 
@@ -830,8 +863,24 @@ class Plugin:
     # The host invokes one declared edge with detached staged namespace access.
     # Callbacks must use that namespace only; active state is published by the host.
     migrate_state: Callable[[BudgetContext, int, int], None] | None = None
+    storage_payload_paths: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if (type(self.storage_payload_paths) is not tuple or len(self.storage_payload_paths) > 32
+                or (self.storage_payload_paths and self.storage is None)):
+            raise ValueError("Storage payload paths require a storage factory and a bounded tuple.")
+        for name in self.storage_payload_paths:
+            if (type(name) is not str or not 1 <= len(name) <= 200 or "\\" in name or ":" in name
+                    or any(ord(character) < 32 or ord(character) == 127 for character in name)
+                    or PurePosixPath(name).is_absolute() or ".." in PurePosixPath(name).parts
+                    or str(PurePosixPath(name)) != name or name == "."):
+                raise ValueError("Storage payload paths must be exact relative file names.")
+            try:
+                name.encode("utf-8")
+            except UnicodeError:
+                raise ValueError("Storage payload paths must be exact relative file names.") from None
+        if len(set(self.storage_payload_paths)) != len(self.storage_payload_paths):
+            raise ValueError("Storage payload paths must be unique.")
         if self.contract is not None:
             if type(self.contract) is not PluginContract:
                 raise ValueError("Plugin contract must use the public PluginContract record.")

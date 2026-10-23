@@ -3,7 +3,7 @@
 from contextlib import closing
 
 from whab.domain.errors import StoreError
-from whab.plugins import Plugin, StorageBackend, StorageContext
+from whab.plugins import Capability, Plugin, PluginContract, StorageBackend, StorageContext
 
 
 def create_storage(context: StorageContext) -> StorageBackend:
@@ -74,7 +74,16 @@ def create_storage(context: StorageContext) -> StorageBackend:
             raise StoreError(
                 "The existing SQLite file could not be opened as a WHAB ledger."
             ) from None
-    return Store(path)
+    return Store(path, budget_id=context.budget.budget_id if context.budget is not None else "default",
+                 environment=context.environment, initial_role=context.initial_role)
 
 
-plugin = Plugin(id="sqlite", display_name="SQLite", storage=create_storage)
+plugin = Plugin(
+    id="sqlite", display_name="SQLite", storage=create_storage,
+    storage_payload_paths=("budget.sqlite",),
+    contract=PluginContract(
+        provides=tuple(Capability(name) for name in (
+            "receipts", "transfer.neutral", "transfer.prepare", "storage.authority", "storage.commands", "transfer.local",
+        )), authority="local", lifecycle="restart",
+    ),
+)

@@ -17,6 +17,7 @@ from whab.budgets.host import BudgetDispatch, BudgetHost, BudgetRuntimeRequests
 from whab.budgets.plugin_state import check_saved_states
 from whab.budgets.runtime import BudgetRuntime
 from whab.budgets.session import BudgetSession, TrackedStorage
+from whab.budgets.storage_runtime import StorageRuntime, open_saved_storage, saved_storage_selection
 from whab.config import Settings
 from whab.plugins import (
     BankContext,
@@ -117,7 +118,15 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     settings = settings or Settings.load()
     if budget_session is None and settings.budget_path:
         budget_session = BudgetSession.open(settings.home, settings.plaid_env, settings.budget_path, password=settings.budget_password)
+    if budget_session is None and store is None:
+        authority = saved_storage_selection(settings.home, "default", settings.plaid_env)
+        if authority:
+            authority[0].check_key(settings.encryption_key)
+            settings = replace(settings, storage=authority[2]["plugin_id"],
+                               plugins=tuple(name for name in settings.plugins if name != settings.storage))
     if budget_session:
+        if budget_session.storage_authority:
+            budget_session.storage_authority[0].check_key(settings.encryption_key)
         installed = {entry.name for entry in installed_entrypoints()}
         budget_session.missing_plugins = [name for name in budget_session.selection if name not in installed]
         settings = replace(settings, storage=budget_session.manifest["storage"], plugins=tuple(name for name in budget_session.selection if name in installed))
@@ -174,10 +183,12 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     if budget_session:
         budget_session.storage_config = resolved_config
     if owned_store:
-        store = open_storage(
+        store = open_saved_storage(settings, budget_session,
+            lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin))
+        store = store or open_storage(
             selected_storage,
             StorageContext(
-                home=budget_session.storage_home if budget_session else settings.home,
+                home=budget_session.backend_home if budget_session else settings.home,
                 environment=settings.plaid_env,
                 config=resolved_config,
                 budget=budget_session.context(settings.storage) if budget_session else None,
@@ -185,12 +196,14 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         )
     try:
         if budget_session:
+            budget_session.storage_payload_paths = selected_storage.storage_payload_paths if selected_storage else ()
             budget_session.bind(store)
             for path in settings.copy_paths:
                 target = path.resolve()
                 if not any(item["path"] == str(target) for item in budget_session.destinations):
                     budget_session.add_copy(path.stem, str(target))
         store = TrackedStorage(store, budget_session)
+        store.storage_plugin_id = settings.storage if owned_store else None
         service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
         store.on_mutation = service.invalidate_revision
         if not remote_authority:
@@ -218,13 +231,15 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         raise
     runtime = BudgetRuntime(service.budget_id, {
         "plugins": RegistryGeneration(plugins, workers=worker_bindings), "ledger": service,
-        "storage": store, "banks": banks,
+        "storage": store.store, "banks": banks,
     }, tuple(binding.resource for binding in worker_bindings.values()))
     registry = LeasedPluginRegistry(runtime)
     plugin_manager = PluginManager(settings, registry, budget_session=budget_session)
     live = LivePluginSelection(runtime, plugin_manager.required, installed_entrypoints,
                                plugin_manager.persist_live, budget_session, nonlive, worker_home)
     plugin_manager.live = live
+    storage_runtime = StorageRuntime(settings, budget_session, store, runtime, registry,
+        lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin))
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -242,6 +257,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                                 environment=settings.plaid_env,
                                 encryption_key=settings.encryption_key,
                                 budget=budget_session.context(plugin.id) if budget_session else None,
+                                background_scope=runtime.background,
                             )
                         )
                         service = banks[plugin.id]
@@ -279,6 +295,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                     if not _child:
                         await budget_host.close()
                 finally:
+                    await storage_runtime.close()
                     await live.close()
             finally:
                 try:
@@ -376,6 +393,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.state.plugins = registry
     app.state.budget_runtime = runtime
     app.state.live_plugins = live
+    app.state.storage_runtime = storage_runtime
+    storage_runtime.attach(app, plugin_manager, live)
+    app.include_router(storage_runtime.router())
     app.state.bank_ui_available = any(plugin.id == "plaid" and plugin.bank_ui for plugin in descriptors)
     app.state.plugin_manager = plugin_manager
     app.state.storage_plugin = settings.storage if owned_store else None

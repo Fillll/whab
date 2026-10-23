@@ -30,6 +30,7 @@ from .runtime import RuntimeTransitionError
 from .session import BudgetSession, container_digest
 
 COOKIE = "whab-budget"
+_CONTROL_PATHS = frozenset({"/api/plugins/runtime", "/api/storage/status", "/api/storage/recover"})
 
 
 def request_password(request):
@@ -370,6 +371,7 @@ class BudgetHost:
         current_id = session.id if session else "default"
 
         def bundle_bytes(workspace, include_credentials, password):
+            storage_id = session.manifest["storage"] if session else (store.storage_plugin_id or settings.storage)
             if workspace == "demo":
                 if include_credentials:
                     raise StoreError("Demo budget downloads cannot include connection credentials.")
@@ -383,9 +385,9 @@ class BudgetHost:
                         raise StoreError("This storage plugin cannot export receipt images with the demo budget.")
                     # The storage capability exports a sanitized workspace image;
                     # a fresh identity never carries personal plugin data or credentials.
-                    manifest = new_manifest("Demo budget", storage=settings.storage)
+                    manifest = new_manifest("Demo budget", storage=storage_id)
                     return encode_container(manifest, {
-                        f"plugins/{settings.storage}/{name}": raw
+                        f"plugins/{storage_id}/{name}": raw
                         for name, raw in exporter("demo").items()
                     })
                 # Demo is a separate ledger, not the active portable budget's
@@ -393,8 +395,8 @@ class BudgetHost:
                 return encode_bundle(new_manifest("Demo budget"), snapshot("demo"))
             document = session
             if document is None:
-                if self._legacy_export is None:
-                    self._legacy_export = BudgetSession.create(settings.home, settings.plaid_env, "My budget", settings.plugins, settings.storage)
+                if self._legacy_export is None or self._legacy_export.manifest["storage"] != storage_id:
+                    self._legacy_export = BudgetSession.create(settings.home, settings.plaid_env, "My budget", settings.plugins, storage_id)
                 document = self._legacy_export
                 document.store = store
                 document.storage_config = storage_config or {}
@@ -433,11 +435,12 @@ class BudgetHost:
 
         @router.get("/api/budget")
         def current(request: Request):
+            storage_id = session.manifest["storage"] if session else (store.storage_plugin_id or settings.storage)
             if request.scope.get("whab.budget_key") == "demo":
-                return {"id": "demo", "name": "Demo budget", "portable": False, "storage": settings.storage, "copies": [], "plugins": [], "missingPlugins": []}
+                return {"id": "demo", "name": "Demo budget", "portable": False, "storage": storage_id, "copies": [], "plugins": [], "missingPlugins": []}
             if session:
                 return session.projection()
-            return {"id": "default", "name": "My budget", "portable": False, "storage": settings.storage, "copies": [], "plugins": list(settings.plugins), "missingPlugins": []}
+            return {"id": "default", "name": "My budget", "portable": False, "storage": storage_id, "copies": [], "plugins": list(settings.plugins), "missingPlugins": []}
 
         @router.post("/api/budget/new")
         async def new(body: NameBody):
@@ -512,7 +515,7 @@ class BudgetRuntimeRequests:
         self.runtime = runtime
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope["path"] in {"/api/plugins/runtime", "/api/plugins/management/recover"}:
+        if scope["type"] != "http" or scope["path"] in _CONTROL_PATHS:
             await self.app(scope, receive, send)
             return
         try:
@@ -529,7 +532,7 @@ class BudgetDispatch:
         self.host = host
 
     async def _dispatch(self, target, identifier, scope, receive, send):
-        if scope["type"] != "http" or scope["path"] in {"/api/plugins/runtime", "/api/plugins/management/recover"}:
+        if scope["type"] != "http" or scope["path"] in _CONTROL_PATHS:
             await target(scope, receive, send)
             return
         # A catalog download deliberately reaches the default controller before

@@ -57,6 +57,9 @@ class RegistryGeneration:
     def descriptors(self):
         return self.registry.descriptors()
 
+    def storage_plugin(self, identifier):
+        return self.registry.storage_plugin(identifier)
+
     def insights(self, snapshot):
         return self.registry.insights(snapshot)
 
