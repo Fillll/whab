@@ -1,5 +1,5 @@
 /* WHAB controls. Business rules live in Python; bank UI is loaded by enabled plugins. */
-import {api, apiUrl, notify, pageUrl} from './client.js';
+import {api, apiUrl, getContext, notify, pageUrl} from './client.js';
 import {initBudgetEdits, syncBudgetGroups} from './budget-edits.js';
 import {initBudgetSourceLinks} from './budget-source-links.js';
 import {initAccountNavigation} from './account-navigation.js';
@@ -8,6 +8,7 @@ import {hydrateCurrencyChoices, initAccountSettings} from './account-settings.js
 import {bindLogos} from './logo-images.js';
 import {initCategorizationSettings} from './categorization-settings.js';
 import {initStorageCopies} from './storage-copies.js';
+import {createUIViews} from './ui-lifecycle.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -606,3 +607,29 @@ initStorageCopies({beforeChange: async () => {
   if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'storage-copies'}}))) return false;
   await requireSavedEdits();
 }});
+
+const uiViews = createUIViews({
+  generation: getContext().uiGeneration,
+  async request(suffix, body, method) {
+    const response = await fetch(apiUrl('/ui/views' + suffix), {
+      method, cache: 'no-store', headers: {'Content-Type': 'application/json'},
+      ...(body === null ? {} : {body: JSON.stringify(body)}),
+    });
+    const result = await response.json();
+    if (!response.ok) throw Object.assign(new Error(result.error || 'Interface status is unavailable.'), {code: result.code});
+    return result;
+  },
+  isDirty: () => Boolean(currentRegister?.dirty || budgetEdits.dirty ||
+    document.querySelector('dialog[open], form[data-busy], [data-save-state="saving"], [data-save-state="error"]') || !navigationReady()),
+  async ready() {
+    accountNavigation.cancelPending();
+    return navigationReady() && await flushEdits();
+  },
+  freeze(value) {
+    const shell = document.querySelector('.app-shell');
+    if (shell) { shell.inert = value; shell.setAttribute('aria-busy', String(value)); }
+  },
+  reload: () => location.reload(),
+});
+void uiViews?.start();
+window.addEventListener('pagehide', () => uiViews?.stop());

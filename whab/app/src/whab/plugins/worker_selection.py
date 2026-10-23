@@ -380,6 +380,10 @@ def restore_workers(home, registry, existing=None):
                 selected.append(plugin)
                 bindings[plugin.id] = existing[plugin.id]
                 continue
+            if plugin.ui is not None:
+                # Only the visual decision selects UI code and resources.
+                selected.append(plugin)
+                continue
             reference = Path(home) / "plugin-workers" / "active" / (plugin.id + ".json")
             if reference.exists() or reference.is_symlink():
                 try:

@@ -3,6 +3,7 @@
 WHAB 2.25 introduced explicitly live stateless reporting/export upgrades. The
 current adapter also replaces branding, file-parser, declarative API interface
 and explicitly scoped categorization code without restarting its listener.
+WHAB 2.36 adds the separate visual adapter with coherent assets and browser participation.
 Other families require their own adapters. The parent
 retains TLS, authorization, local-access guards, budget identity and financial
 validation. These data protocols accept no financial mutation, backend handle,
@@ -11,8 +12,8 @@ router, callable or pickle.
 API workers advertise `adapters.interface` as a strict `RemoteLedgerInterface`
 record and answer only `interface.describe` for that capability. The parent
 compares the readiness response with the startup declaration and requires an
-exact current-host version. The reserved `adapters.ui` value remains `null` in
-this adapter. Private interface configuration and financial commands remain in
+exact current-host version. Visual workers advertise a separate strict
+`adapters.ui` projection record; other workers keep it `null`. Private interface configuration and financial commands remain in
 the host; the worker does not implement an HTTP router. See the
 [API interface lifecycle](plugins.md#remote-interface-and-client).
 
@@ -231,6 +232,49 @@ model formats. The installed-version upgrade test uses distinct fictional v1/v2
 wheels, both workspaces and a failed candidate, then reopens from the saved v2
 reference. Random forest host tests also run the actual installed engine child.
 
-UI rendering, API interfaces and protected bank flows still need their own
-adapters. Tests use reviewed fictional wheels, temporary homes and mocked
-providers; worker processes are not a security sandbox.
+Protected bank flows and storage require their own adapters. Tests use reviewed
+fictional wheels, temporary homes and mocked providers; worker processes are not
+a security sandbox.
+
+## Visual interface workers
+
+An explicitly live pure `UserInterface` descriptor opts into `view_protocol=1`.
+Protocol zero remains supported for legacy startup rendering and requires a
+restart for visual changes. A visual worker owns only presentation code. Its
+`ui.resources` reply captures bounded immutable UTF-8 templates and static bytes;
+`ui.render` accepts bounded public page projections and returns validated HTML
+bytes. Python/Jinja helpers execute inside the child. Cookies, bearer headers,
+application/backend objects, routers and callables never cross these messages.
+Startup declarations negotiate the exact current host and projection flags.
+
+The host retains complete resource generations under its private runtime home;
+their public URLs include the content/code generation. Old URLs always serve
+their exact retained bytes, including after disabling or reopening. Missing old
+resources fail without falling through to current assets. All four page kinds
+render fictional readiness projections before activation. The same generation
+owns projection flags, templates, helpers and browser module imports throughout
+one request lease. Bank/import extension templates remain bounded public data.
+
+Local controls are `GET /api/ui/status`, `POST /api/ui/preview` with `pluginId`
+(or `null` to disable), optional approved `wheels` and `useInstalled`, then
+`POST /api/ui/commit` with the returned `previewId`. Duplicate commits return
+the same operation. Inspect the operation's terminal status rather than treating
+HTTP 202 as completion. Demo controls refuse mutations. HTTPS, Host/origin checks
+and local access remain required, including while runtime admission is gated.
+
+Preparation keeps financial admission open while `/api/ui/views` participants
+flush edits and acknowledge an opaque preparation. Dirty, failed or busy views
+defer handover. After drain the host rechecks participation, durably selects
+code/resources in one private `visual-selection.json` decision and publishes the
+generation. A lost decision reply keeps admission gated and views paused until
+`POST /api/ui/recover` validates the exact active or candidate decision. Optional
+plugin recovery cannot decide a visual transition. Only the retired visual
+worker/resources retire; ledger revision/retry state and unrelated services stay
+owned by the stable budget runtime.
+
+The choice is device-local and overrides initial `WHAB_UI` on reopen. Disabled
+and unavailable interface records remain preserved. An existing saved worker
+must reopen its exact approved environment; incompatibility or missing files
+never selects native code automatically. Host SDK upgrades remain application
+upgrades. The resources and worker processes provide coherence and failure
+containment, not protection from malicious installed Python.

@@ -441,7 +441,7 @@ To show bank controls, include each `bank_panels` template with its scoped `stat
 
 Bank scripts announce feedback through a cancelable document event, `whab:notice`, with `detail.message`. An interface can display this plain text and call `event.preventDefault()` to mark it handled. The bundled Web interface uses its toast; the provider falls back to a browser alert if unhandled.
 
-`WHAB_UI=` selects headless mode: `/` and core visual assets are absent, while guarded APIs and required storage remain. Disabling visuals does not delete data or disable bank services. Storage and UI selection are independent.
+`WHAB_UI=` initially selects headless mode: `/` and current visual assets are absent, while guarded APIs and required storage remain. Disabling visuals does not delete data or disable bank services. Storage and UI selection are independent. From WHAB 2.36, a private device-local visual decision overrides that initial value after an explicit live selection. `UserInterface` may supply one complete immutable `PluginResources` bundle instead of template/static paths; a template-only interface may have no static assets. `view_protocol=1` opts into the host's browser participation contract and requires a pure explicit live visual descriptor. Existing descriptors default to protocol zero and retain restart-required compatibility. Presentation helpers execute inside approved visual workers from bounded public projections; the host retains financial rules and transport guards. See [visual interface workers](plugin-workers.md#visual-interface-workers) for preparation, generation URLs, unsaved edits, commit/recovery and exact saved-worker behavior.
 
 ## Privileged bank capability
 

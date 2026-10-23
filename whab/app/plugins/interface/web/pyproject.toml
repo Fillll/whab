@@ -1,12 +1,12 @@
 [project]
 name = "whab_plugin_web"
-version = "1.26.0"
+version = "1.27.0"
 description = "Web interface plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.19,<3", "MarkupSafe>=2,<4"]
+dependencies = ["whab>=2.36,<3", "MarkupSafe>=2,<4"]
 
 [project.entry-points."whab.plugins"]
 web = "whab_plugin_web.plugin:plugin"
@@ -27,9 +27,9 @@ api-version = 1
 capabilities = [{ "name" = "interface.ui", "version" = 1, "composition" = "singleton" }]
 requires = []
 conflicts = []
-lifecycle = "restart"
-legacy = true
-authority = "unknown"
+lifecycle = "live"
+legacy = false
+authority = "local"
 state-version = 1
 state-upgrades = []
 support = "maintained"

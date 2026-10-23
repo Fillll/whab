@@ -475,8 +475,7 @@ class UserInterface:
             if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
                 raise ValueError("User interface resources must be pathlib.Path directories.")
         elif (type(self.resources) is not PluginResources or self.templates is not None or self.static is not None
-              or "templates/base.html" not in self.resources.files
-              or not any(name.startswith("static/") for name in self.resources.files)):
+              or "templates/base.html" not in self.resources.files):
             raise ValueError("Use one complete immutable visual resource bundle instead of resource paths.")
         if self.render is not None and not callable(self.render):
             raise ValueError("User interface rendering must be callable.")

@@ -83,6 +83,7 @@ class VisualController:
         self.browser_timeout, self.clock = browser_timeout, clock
         self.previews, self.operations, self.preview_operations, self.tasks = {}, {}, {}, set()
         self._uncertain = None
+        self.on_change = None
         self.closed = False
         visual = runtime._active.services["visual"]
         current = selection.snapshot()
@@ -111,6 +112,8 @@ class VisualController:
             self.live.required = frozenset(self.manager.required)
             self.live.visual_ids = frozenset(record["known"])
         self.configured = deepcopy(record)
+        if self.on_change is not None:
+            self.on_change(record["selection"])
 
     def status(self):
         visual = self.runtime._active.services["visual"]

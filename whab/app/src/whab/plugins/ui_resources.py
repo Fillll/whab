@@ -61,7 +61,7 @@ class VisualBundle:
             raise _invalid(self.plugin_id)
         try:
             resources = PluginResources(self.resources.files)
-            if "templates/base.html" not in resources.files or not any(name.startswith("static/") for name in resources.files):
+            if "templates/base.html" not in resources.files:
                 raise ValueError()
             flags = _flags(dict(self.flags))
             metadata, payload = resource_bundle(resources)

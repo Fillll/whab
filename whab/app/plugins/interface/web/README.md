@@ -6,6 +6,14 @@ Distributed independently as `whab_plugin_web`. Bounded register and account met
 
 Templates and static files must ship in the wheel. Use demo data for browser checks and preserve escaping and visual fallbacks.
 
+## Live interface handover
+
+WHAB 2.36 and Web 1.27 support the explicit visual lifecycle. The host captures a complete template/asset generation and serves its resources at `/budgets/{id}/ui/{generation}/static/`. Import maps use the same generation. Page and transaction fragments refuse a different generation, and budget autosaves retain the editor if a later totals fragment belongs to different code.
+
+The browser registers opaque generation/edit flags with `/api/ui/views`; draft values stay local. Before handover it temporarily pauses shell input, flushes acknowledged edits, checks open dialogs/provider/import barriers and acknowledges readiness. Dirty or failed views defer the change while financial saving remains admitted. A clean committed view refreshes; an offline view keeps its old assets and drafts until it can safely refresh. Closed views expire from participation after 60 seconds. This coordination is not a browser security sandbox.
+
+The host's local `/api/ui/status`, `/preview`, `/commit` and `/recover` controls prepare, review, schedule and reconcile the selection. A scheduled operation remains pending until its status confirms completion. Approved compatible code uses immutable worker environments; templates/helpers render inside the child from bounded public projections. Financial rules, HTTPS and access guards remain host-owned. Legacy visual descriptors with browser protocol zero retain restart-required behavior. The private device-local visual decision overrides initial `WHAB_UI` on reopen and preserves disabled interfaces and exact retained worker references; see [visual worker lifecycle](../../../../docs/plugin-workers.md#visual-interface-workers).
+
 ## UI acceptance criteria
 
 For a material layout or interaction redesign, prepare a reviewable preview before implementation and retain the accepted layout/filtering feedback with the change. Use desktop and compact viewports, both appearances, and fictional data. Keep financial calculations in Python and preserve these interactions:

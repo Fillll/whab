@@ -52,7 +52,7 @@ def native_code_identity(plugin):
     digest = hashlib.sha256(("native-ui-v1\n" + __version__ + "\n" + plugin.id).encode("utf-8"))
     try:
         entries = tuple(entry for entry in metadata.entry_points(group="whab.plugins") if entry.name == plugin.id)
-        if len(entries) == 1 and entries[0].dist is not None:
+        if len(entries) == 1 and getattr(entries[0], "dist", None) is not None:
             digest.update((entries[0].value + "\n" + entries[0].dist.version).encode("utf-8"))
         source = inspect.getsourcefile(plugin.ui.build_context)
         if source is not None:
@@ -162,7 +162,7 @@ class VisualTemplates:
             return templates.TemplateResponse(request=request, name=name, context=context)
 
 
-def create_resource_router(home):
+def create_resource_router(home, runtime=None):
     """Only exact retained generations; a missing old asset never serves new code."""
     archive = UIResourceArchive(home)
     router = APIRouter()
@@ -184,5 +184,16 @@ def create_resource_router(home):
     @router.get("/ui/{generation}/static/{name:path}")
     def versioned(generation: str, name: str):
         return resource(generation, name)
+
+    if runtime is not None:
+        @router.get("/static/{name:path}")
+        def current(name: str):
+            with runtime.lease() as lease:
+                visual = lease.service("visual")
+                if visual.ui is None:
+                    raise HTTPException(404, "Visual resource not available")
+                response = resource(visual.generation, name)
+                response.headers["Cache-Control"] = "no-store"
+                return response
 
     return router

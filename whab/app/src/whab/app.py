@@ -9,8 +9,6 @@ from urllib.parse import urlsplit
 import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from jinja2 import ChoiceLoader, FileSystemLoader, PrefixLoader
 from starlette.concurrency import run_in_threadpool
 
 from whab import __version__
@@ -38,6 +36,14 @@ from whab.plugins.live import (
 )
 from whab.plugins.management import PluginManager, installed_entrypoints
 from whab.plugins.storage import close_storage, open_storage
+from whab.plugins.ui_resources import UIResourceArchive
+from whab.plugins.ui_runtime import (
+    VisualController,
+    apply_visual_choice,
+    read_visual_choice,
+    restore_visual_worker,
+)
+from whab.plugins.ui_selection import UISelectionStore
 from whab.plugins.worker_adapters import supports_live_plugin
 from whab.plugins.worker_selection import restore_workers
 from whab.services.categorization import local_context, local_files
@@ -50,7 +56,6 @@ from whab.services.namespace_effects import NamespaceNotifications
 from whab.services.receipts import ReceiptService
 from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
-from whab.web.import_resources import ImportResourceLoader
 from whab.web.import_resources import create_router as import_resources_router
 from whab.web.interface_adapter import create_remote_router, prepare_interfaces
 from whab.web.middleware import RequireHTTPS, install_middleware
@@ -61,6 +66,10 @@ from whab.web.routes.ledger import create_router as ledger_router
 from whab.web.routes.pages import create_router as pages_router
 from whab.web.routes.plugins import create_router as plugins_router
 from whab.web.routes.receipts import create_router as receipts_router
+from whab.web.routes.ui_views import create_router as ui_views_router
+from whab.web.routes.visual_ui import create_router as visual_ui_router
+from whab.web.visual_interface import LeasedVisualUI, VisualGeneration, VisualTemplates
+from whab.web.visual_interface import create_resource_router as visual_resources_router
 
 
 def plugin_config(settings, session, plugin_id, *, remote_authority=False):
@@ -128,6 +137,8 @@ def storage_config(settings, session, plugin):
 
 def create_app(store=None, settings=None, plugins=None, bank_services=None, *, budget_session=None, budget_host=None, _child=False):
     settings = settings or Settings.load()
+    if plugins is not None:
+        validate_interface_owners(plugins.descriptors())
     if budget_session is None and settings.budget_path:
         budget_session = BudgetSession.open(settings.home, settings.plaid_env, settings.budget_path, password=settings.budget_password)
     if budget_session is None and store is None:
@@ -142,6 +153,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         installed = {entry.name for entry in installed_entrypoints()}
         budget_session.missing_plugins = [name for name in budget_session.selection if name not in installed]
         settings = replace(settings, storage=budget_session.manifest["storage"], plugins=tuple(name for name in budget_session.selection if name in installed))
+    worker_home = budget_session.storage_home if budget_session else settings.home
+    visual_choice = read_visual_choice(worker_home, budget_session.id if budget_session else "default",
+                                       settings.plaid_env, settings.ui)
+    settings = apply_visual_choice(settings, visual_choice)
     budget_host = budget_host or BudgetHost(settings)
     plugins = plugins if plugins is not None else load_plugins(settings.enabled_plugins())
     validate_interface_owners(plugins.descriptors())
@@ -157,7 +172,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             "Remove user interface plugins from WHAB_PLUGINS when WHAB_UI is empty.",
             code="invalid_configuration",
         )
-    if ui and (not (ui.templates / "base.html").is_file() or not ui.static.is_dir()):
+    if ui and ui.resources is None and (not (ui.templates / "base.html").is_file() or not ui.static.is_dir()):
         raise PluginError(
             "User interface resources are missing. Reinstall the selected interface.",
             code="missing_resources",
@@ -208,7 +223,6 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 budget=budget_session.context(settings.storage) if budget_session else None,
             ),
         )
-    worker_home = budget_session.storage_home if budget_session else settings.home
     categorization_lifecycle, categorization, categorization_resource = None, None, None
     worker_bindings, banks = {}, {}
     try:
@@ -225,7 +239,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             store.storage_plugin_id = settings.storage if owned_store else None
             service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
             store.on_mutation = service.invalidate_revision
-            plugins, worker_bindings = restore_workers(worker_home, plugins)
+            plugins, worker_bindings = restore_visual_worker(worker_home, plugins, visual_choice)
+            plugins, worker_bindings = restore_workers(worker_home, plugins, worker_bindings)
+            ui_plugin = plugins.ui_plugin(settings.ui) if settings.ui else None
+            ui = ui_plugin.ui if ui_plugin else None
             notifications = NamespaceNotifications(store.lock, lambda: store.after_commit and store.after_commit())
             if not remote_authority:
                 state_home = settings.home / "data" / "plugin-state" / settings.plaid_env
@@ -277,6 +294,28 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         if owned_store:
             close_storage(store)
         raise
+    visual_selection = None
+    try:
+        visual = VisualGeneration.prepare(ui_plugin, UIResourceArchive(worker_home),
+            code_identity=worker_bindings[ui_plugin.id].environment.identifier
+            if ui_plugin is not None and ui_plugin.id in worker_bindings else None)
+        visual_selection = UISelectionStore(worker_home, service.budget_id, settings.plaid_env, settings.ui or None)
+    except BaseException:
+        if visual_selection is not None:
+            visual_selection.close()
+        for binding in reversed(tuple(worker_bindings.values())):
+            binding.worker.close()
+        if categorization is not None:
+            categorization.close()
+        if categorization_lifecycle is not None:
+            categorization_lifecycle.close()
+        if owned_store:
+            close_storage(store)
+        raise
+
+    async def close_visual_selection():
+        await run_in_threadpool(visual_selection.close)
+
     async def close_namespaces():
         if categorization_lifecycle is not None:
             await run_in_threadpool(categorization_lifecycle.close)
@@ -285,8 +324,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                            if categorization_lifecycle is not None else ())
     runtime = BudgetRuntime(service.budget_id, {
         "plugins": RegistryGeneration(plugins, workers=worker_bindings, resources_enabled=bool(ui)), "ledger": service,
-        "storage": store.store, "banks": banks, "categorization": categorization, "interfaces": interfaces,
-    }, (*namespace_resources, *tuple(binding.resource for binding in worker_bindings.values()),
+        "storage": store.store, "banks": banks, "categorization": categorization, "interfaces": interfaces, "visual": visual,
+    }, (RuntimeResource("visual-selection", close_visual_selection), *namespace_resources, *tuple(binding.resource for binding in worker_bindings.values()),
         *((categorization_resource,) if categorization_resource else ()),
         *((interfaces.resource,) if interfaces.resource is not None else ())))
     if categorization is not None:
@@ -299,6 +338,21 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     live.categorization = categorization_lifecycle
     live.prepare_interfaces = lambda registry, previous: prepare_interfaces(registry, interface_context, previous)
     plugin_manager.live = live
+    try:
+        visual_controller = VisualController(runtime, visual_selection, worker_home, installed_entrypoints,
+                                             plugin_manager, live, session=budget_session)
+    except BaseException:
+        visual_selection.close()
+        for binding in reversed(tuple(worker_bindings.values())):
+            binding.worker.close()
+        if categorization is not None:
+            categorization.close()
+        if categorization_lifecycle is not None:
+            categorization_lifecycle.close()
+        if owned_store:
+            close_storage(store)
+        raise
+    live.visual = visual_controller
     storage_runtime = StorageRuntime(settings, budget_session, store, runtime, registry,
         lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin))
     replicas = StorageReplicas(storage_runtime)
@@ -361,6 +415,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                     await replicas.close()
                     await storage_runtime.close()
                     try:
+                        await visual_controller.settle()
                         await live.close()
                     finally:
                         if categorization_lifecycle is not None:
@@ -385,25 +440,16 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         openapi_url=None,
         lifespan=lifespan,
     )
-    templates = Jinja2Templates(directory=ui.templates) if ui else None
-    loaders = {}
+    visual_ui = LeasedVisualUI(runtime)
+    templates = VisualTemplates(runtime, registry)
     for plugin in descriptors:
-        if ui and plugin.bank_ui:
-            loaders[plugin.id] = FileSystemLoader(plugin.bank_ui.templates)
+        if plugin.bank_ui and plugin.bank_ui.static.is_dir():
             app.mount(
                 f"/plugins/{plugin.id}/static",
                 StaticFiles(directory=plugin.bank_ui.static),
                 name=f"plugin-{plugin.id}",
             )
-    if ui:
-        templates.env.loader = ChoiceLoader(
-            [
-                templates.env.loader,
-                PrefixLoader({"plugins": PrefixLoader(loaders)}),
-                PrefixLoader({"imports": ImportResourceLoader(registry)}),
-            ]
-        )
-        app.mount("/static", StaticFiles(directory=ui.static), name="static")
+    app.include_router(visual_resources_router(worker_home, runtime))
     webhook_paths = {f"/api/banks/{p.id}/webhook" for p in descriptors}
     if "plaid" in bank_stores:
         webhook_paths.add("/api/plaid/webhook")  # Existing documented callback URL.
@@ -423,8 +469,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.add_middleware(BudgetRuntimeRequests, runtime=runtime)
     install_error_handlers(app)
     app.include_router(health_router())
-    if ui:
-        app.include_router(import_resources_router(registry))
+    app.include_router(import_resources_router(registry))
+    app.include_router(ui_views_router(lambda: visual_controller.views))
+    app.include_router(visual_ui_router(visual_controller))
     app.include_router(ledger_router(service))
     receipt_service = ReceiptService(store, store.lock)
     app.include_router(receipts_router(receipt_service))
@@ -441,7 +488,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.include_router(plugins_router(store, registry, plugin_manager))
     app.include_router(
         pages_router(
-            store, banks, bank_stores, registry, templates, settings.plaid_env, ui,
+            store, banks, bank_stores, registry, templates, settings.plaid_env, visual_ui,
             plugin_manager=plugin_manager,
             budget_name=budget_session.name if budget_session else "My budget",
             service=service,
@@ -462,6 +509,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.state.plugin_manager = plugin_manager
     app.state.storage_plugin = settings.storage if owned_store else None
     app.state.ui_plugin = ui_plugin.id if ui_plugin else None
+    app.state.visual_controller = visual_controller
+    visual_controller.on_change = lambda identifier: setattr(app.state, "ui_plugin", identifier)
     app.state.ledger_service = service
     app.state.budget_session = budget_session
     storage_contract = contract_for(selected_storage) if selected_storage else None

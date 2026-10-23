@@ -231,6 +231,7 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
           previous.apiPrefix && context.apiPrefix !== previous.apiPrefix ||
           previous.budgetId && context.budgetId !== previous.budgetId ||
           previous.workspace && context.workspace !== previous.workspace ||
+          previous.uiGeneration && context.uiGeneration !== previous.uiGeneration ||
           context.page !== expected.page || actual.page !== expected.page || context.monthToken !== expected.month ||
           actual.month !== expected.month || context.currency.toLowerCase() !== expected.currency ||
           actual.currency !== expected.currency || expected.page === 'transactions' && !matchesTransactionFilters(target, context) ||

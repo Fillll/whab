@@ -18,6 +18,8 @@ function deferred() {
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
+
+
 function element() {
   return {
     attributes: {}, hidden: false, dataset: {},
@@ -615,4 +617,16 @@ test('the pending destination is transient, copied and retained until the newest
   state.respond(2);
   await closing;
   assert.equal(state.replacements.length, 1);
+});
+
+test('transaction navigation refuses a different visual generation before replacing content', async () => {
+  const state = harness({initialContext: {uiGeneration: 'a'.repeat(64)}});
+  const pending = state.navigator.navigate(second);
+  await tick();
+  state.respond(0, {override: {uiGeneration: 'b'.repeat(64)}});
+  await pending;
+  assert.equal(state.replacements.length, 0);
+  assert.equal(state.context.getContext().uiGeneration, 'a'.repeat(64));
+  assert.ok(state.fallbacks.length);
+  state.navigator.dispose();
 });

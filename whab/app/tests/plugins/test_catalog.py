@@ -129,3 +129,18 @@ def test_declarative_api_label_requires_the_exact_interface_capability():
         next(row for row in malformed["plugins"] if row["id"] == "server").update(change)
         with pytest.raises(catalog.CatalogError):
             catalog.validate_catalog(malformed)
+
+
+def test_visual_worker_label_requires_the_singleton_visual_capability():
+    value = catalog.catalog_snapshot()
+    web = next(row for row in value["plugins"] if row["id"] == "web")
+    assert web["live_support"] == "visual-ui-worker" and not web["legacy"]
+    for change in (
+        {"live_support": "declarative-api-worker"},
+        {"capabilities": [{"name": "interface.api", "version": 1, "composition": "additive"}]},
+        {"state_version": 2},
+    ):
+        malformed = copy.deepcopy(value)
+        next(row for row in malformed["plugins"] if row["id"] == "web").update(change)
+        with pytest.raises(catalog.CatalogError):
+            catalog.validate_catalog(malformed)
