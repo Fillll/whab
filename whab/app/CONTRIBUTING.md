@@ -8,69 +8,72 @@ WHAB supports Python 3.14 and newer; CI exercises Python 3.14 and 3.15. Run all 
 
 ```sh
 python3.14 -m venv .venv
-.venv/bin/python scripts/install.py --dev
+.venv/bin/python scripts/install.py --dev --example
 .venv/bin/python -m whab --version
 ```
 
-The source installer installs the host and all seven supported plugins as editable local distributions; add `--example` for the teaching plugin. For wheel installations, `pip install 'whab[bundled]'` selects the supported set when compatible distributions are available in the chosen package index or local wheelhouse; this does not imply these releases have been published. The host alone contains the core and SDK and needs installed storage/UI plugins for the default launch. There is no Node build or React runtime. The bundled visual interface's templates and static files belong to the installed `whab_plugin_web` package.
+The source installer installs the host and the [supported plugin set](plugins/README.md#supported-plugins) as editable local distributions; `--example` includes the teaching plugin used by development checks. For wheel installations, `pip install 'whab[bundled]'` selects the supported set when compatible distributions are available in the chosen package index or local wheelhouse; this does not imply these releases have been published. The host alone contains the core and SDK and needs installed storage/UI plugins for the default launch. Install Node.js 22 or newer for browser tests. There is no Node build or React runtime. The bundled visual interface's templates and static files belong to the installed `whab_plugin_web` package.
 
 When upgrading an older checkout, rerun `.venv/bin/python scripts/install.py --dev`. The helper installs the new `whab_plugin_<id>` distributions before uninstalling detected legacy official plugin distributions, avoiding duplicate entry-point registrations. If the legacy teaching example is installed, the helper includes its replacement even without `--example`. After successful installation and legacy-package removal, it also removes verified obsolete generated plugin `src/whab_<id>_plugin.egg-info` and application-root `whab.egg-info` metadata that could mask current registrations; it preserves current per-distribution metadata. No manual metadata deletion is needed for the standard source upgrade. For direct wheel installations, use a fresh environment or uninstall the old `whab-<id>-plugin` distributions when installing their `whab_plugin_<id>` replacements.
 
-Runtime configuration lives under `WHAB_HOME`, or the launch directory when that setting is absent. Run from the application directory (`whab/app/`) for its local `.env` and `data/`, or set `WHAB_HOME` to an existing runtime home, including an older checkout root. Preserve that home's configuration, data and encryption key together. After the source move into `whab/app/`, follow the [existing-checkout migration instructions](../README.md#existing-development-checkouts) to keep private files under the previous `whab/` runtime home and reinstall editable packages in a fresh virtual environment. The app reads that directory's `.env` and passes its home/environment to the selected storage plugin. `WHAB_STORAGE=sqlite` is the default for the original workspace and new command-line budgets; an existing portable budget selects storage from its manifest and Settings creates new SQLite budgets. For the original workspace, its factory reopens a single `data/*-{environment}.sqlite` file in place, validating the base schema for a noncanonical filename. It creates `data/whab-{environment}.sqlite` only when no matching file exists. Multiple matches fail safely, even if one has the canonical filename. For the original workspace without `plugins.json`, `WHAB_PLUGINS=` disables optional bank/report plugins; portable budgets use their saved manifest. `WHAB_UI=web` selects the visual interface; `WHAB_UI=` runs headlessly with APIs and storage. Changing storage does not migrate data between backends. Every listener requires TLS; run `scripts/setup.py` to provision local certificates, then [trust its CA explicitly](../docs/usage.md#local-https). Setup never changes OS trust, and the launcher rejects missing or invalid TLS material. For experiments, use a fresh temporary home and fictional data. Never copy private credentials or a household database into test fixtures.
+Runtime configuration lives under `WHAB_HOME`, or the launch directory when absent. Prefer the [isolated preview helper](../docs/development.md#isolated-preview) for experiments; it supplies explicit settings and fictional data without opening an existing runtime. For persistent development, choose a separate absolute runtime home. Preserve existing configuration, data and encryption/TLS keys together; follow the [checkout migration instructions](../README.md#existing-development-checkouts) after a source move. Never copy household credentials or private databases into fixtures.
+
+Read [runtime setup and HTTPS](../docs/usage.md#runtime-setup), [budget-owned storage](../docs/target-architecture.md#installation-and-budget-ownership) and the owning plugin README before changing configuration, storage selection, saved paths or migrations. Setup provisions certificates but never changes OS trust. Storage selection does not migrate data between backends. The standard source installer owns scoped legacy distribution/metadata cleanup; no manual metadata deletion is needed for a standard upgrade.
 
 ## Tests and checks
 
-Run these checks before submitting code:
+Use the same runner locally and in CI. During iteration, run focused regression tests for the changed behavior and the fast checks:
 
 ```sh
-.venv/bin/python -m pytest
-.venv/bin/python scripts/check_changelog_prs.py
-.venv/bin/python scripts/check_plugin_coverage.py
-.venv/bin/python -m ruff check src scripts tests plugins conftest.py
+.venv/bin/python scripts/check.py --quick
+.venv/bin/python -m pytest plugins/ingestion/plaid/tests
 ```
 
-For packaging or plugin changes, also run:
+Replace the focused path with the owning tests from the task map. Quick mode checks Python lint, changelog provenance, local documentation links/inventory and browser JavaScript; it does not run Python regressions, coverage or installed-wheel verification. It is not the submission gate.
+
+Before submitting code, run:
 
 ```sh
-.venv/bin/python scripts/check_distribution.py
+.venv/bin/python scripts/check.py
 ```
 
-That script builds the host, all seven supported plugins and the teaching example, installs their independent wheels into a temporary target, and checks pages, packaged assets, version metadata, runtime paths and entry-point loading from an unrelated directory. It uses fictional data and does not connect a financial institution. Building may require downloading build dependencies.
+The full command runs quick checks, the complete central/plugin Python suite **once** through `check_plugin_coverage.py`, and isolated distribution verification. It requires Python 3.14+, the development dependencies and Node.js 22+. It does not install missing dependencies. Child checks run with a fresh temporary `WHAB_HOME`, Sandbox defaults and inherited WHAB/banking/remote runtime settings removed. CI uses this command on its supported Python matrix and additionally lints launcher Python and runs the separate macOS launcher job. Native launcher changes also require the [platform checks](../launchers/macos/README.md#development-and-diagnostics).
 
-Tests are grouped by the contract they verify:
+For documentation iteration, `.venv/bin/python scripts/check.py --docs` checks local paths, anchors, fences and the canonical supported-plugin inventory without network requests. Run the changelog check as well if editing changelogs. The full command remains required for contribution tooling or code changes. Documentation-only changes need the docs/changelog checks and any checks for executable examples they change.
 
-| Location | Responsibility |
-| --- | --- |
-| `tests/domain/` | Money validation and budgeting rules without database or HTTP dependencies |
-| `plugins/storage/sqlite/tests/` | SQLite ledger, rollback, migrations and saved-data compatibility |
-| `plugins/ingestion/plaid/tests/` | Mocked Plaid pagination, update mode, token encryption, signed webhooks and connection UI |
-| `plugins/interface/web/tests/` | Bundled Web rendering, escaping and visual fallbacks |
-| `plugins/interface/bank-logos/tests/` | Curated institution lookup and bounded mocked icon requests |
-| `plugins/ingestion/ynab/tests/` | Local archive parsing, migration preview/import and import controls |
-| `plugins/interface/server/tests/` | HTTPS bearer authorization, remote routes, revisions and retries |
-| `plugins/storage/client/tests/` | Remote commands, connection payloads and credential-target binding |
-| `plugins/example/example/tests/` | Example reporting/export implementation |
-| `tests/storage/` | Shared provider-scoping and bank-facade contracts |
-| `tests/web/` | Host HTTP validation, local access checks, CSV, selection and plugin routes |
-| `tests/plugins/` | Public SDK, discovery, hook validation and plugin management |
-| `tests/test_cli.py` | Application launch and version contract |
-| `tests/test_architecture.py` | Pure domain boundaries and core independence from concrete storage/bank implementations |
+The distribution check builds the host, supported plugin set and teaching example, installs independent wheels into an isolated temporary target and checks pages, packaged assets, version metadata, runtime paths and entry points outside the checkout. It uses fictional data and no financial institution; build dependencies may require a download.
 
-Keep an existing plugin's source, assets, documentation and implementation tests in its own `plugins/<category>/<id>/` folder. Keep shared API contracts and interactions between plugins in `tests/`; a host-contract change may require edits there too. Every concrete plugin owns its entry point, package data, dependency compatibility range and version in its own `pyproject.toml`, together with a local dated `CHANGELOG.md`. Changes to the supported default set also need maintainer wiring in the host's `bundled` extra. The source installer discovers plugin `pyproject.toml` files automatically and includes the teaching example with `--example` or when replacing its installed legacy distribution; concrete packages never move into the host wheel. See [plugin folder ownership](plugins/README.md).
+Every plugin must retain **100% Python statement and branch coverage** across its complete `src/` tree, including unimported source. `scripts/check_plugin_coverage.py --plugin plaid` measures one plugin using the same full suite; it does not select only that plugin's tests. Keep coverage regressions in the owning plugin. Type-only imports are outside runtime coverage; do not exclude runtime code or add coverage pragmas. Rendering, Node behavior tests, browser review and installed-wheel checks cover templates/assets beyond Python coverage.
 
-The application-root `conftest.py` provides shared isolated fixtures to both test locations. Plugin-specific records and mock transports belong in that plugin's `tests/conftest.py`. Tests must not read `.env`, open the user's database, need a Plaid account or make live provider requests. Use `tmp_path` for compatibility fixtures and explicitly set `WHAB_HOME` when testing configuration. Make a regression test demonstrate an observable failure or invariant; avoid tests that merely reproduce implementation steps.
+### Task ownership
 
-Run all tests with `.venv/bin/python -m pytest`, or just one plugin with `.venv/bin/python -m pytest plugins/ingestion/plaid/tests` (replace `ingestion/plaid` with its category and plugin ID). CI discovers both the central and plugin-local suites and lints all plugin sources. Run these commands from the application directory (`whab/app/`).
+Read the owner guide before changing its contract. Each material change updates its owner's version/changelog; documentation and contribution-tooling maintenance alone need no invented release version.
 
-Every plugin must maintain **100% Python statement and branch coverage** across its complete `src/` tree. Run `.venv/bin/python scripts/check_plugin_coverage.py` before submitting; it uses the full local/shared test suite and fails for any missing line, missing branch or unmeasured source file. It discovers source roots automatically, including independently distributed plugins. Use `--plugin plaid` to measure one plugin against the same suite. Keep new regressions with their plugin. Static type-only imports are outside runtime coverage; do not exclude runtime code or add coverage pragmas to meet the gate. Templates and browser assets remain covered by rendering, behavior and installed-wheel checks.
+| Task | Source owner and current contract | Relevant tests/checks | Documentation and version owner |
+| --- | --- | --- | --- |
+| Money, assignments or rollover | `src/whab/domain/`; [financial invariants](../docs/architecture.md#financial-invariants) | `tests/domain/`, `tests/test_ledger_service.py`, `tests/test_architecture.py` | Usage/architecture; host |
+| HTTP schemas, routing, sessions or budget creation | `src/whab/web/`, `src/whab/budgets/`; [budget addresses](../docs/usage.md#budget-addresses) | `tests/web/`, `tests/budgets/`; [two-budget verification](../docs/architecture.md#budget-isolation-verification) | Usage/SDK; host |
+| Web layout, navigation, filters or controls | [Web plugin](plugins/interface/web/README.md#ui-acceptance-criteria) | `plugins/interface/web/tests/`, shared transport tests, Node tests, fictional browser preview | Web README; Web plugin |
+| SQLite persistence, migrations or portable saves | [SQLite plugin](plugins/storage/sqlite/README.md) plus `src/whab/budgets/` for containers | SQLite plugin tests, `tests/test_budget_container.py`, `tests/test_portable.py` | SQLite/SDK/usage; affected plugin and host when shared contracts change |
+| Plaid ingestion or artwork | [Plaid](plugins/ingestion/plaid/README.md), [Bank logos](plugins/interface/bank-logos/README.md) | Owning plugin tests, `tests/storage/`, shared bank/branding SDK tests | Owning plugin README/version; host for shared contracts |
+| YNAB import or categorization | [YNAB](plugins/ingestion/ynab/README.md), [Random Forest](plugins/automation/random-forest-categorization/README.md) | Owning plugin tests, `tests/test_categorization.py`, import routes and two-budget verification | Owning plugin guides/versions; host for shared eligibility or SDK changes |
+| Remote protocol or storage client | [API interface plugin](plugins/interface/server/README.md), [Client](plugins/storage/client/README.md) | Owning plugin tests, `tests/test_remote_protocol.py`, `tests/test_account_scope_remote.py` | SDK/owning guides; each affected owner |
+| Plugin SDK, discovery or lifecycle | `src/whab/plugins/`; [public SDK](../docs/plugins.md) | `tests/plugins/`, architecture and affected plugin tests, isolated distribution check | SDK/architecture; host and affected plugins |
+| Teaching plugin | [Example](plugins/example/example/README.md) | `plugins/example/example/tests/`, distribution verification | Example README/version |
+| Launcher lifecycle or native UI | [macOS launcher](../launchers/macos/README.md) | Manager lifecycle tests, bundle checks and native tests in platform guide | Launcher guides/version |
+| Guidance or contribution tooling | This guide and [documentation ownership](../docs/development.md#documentation-ownership) | Docs/changelog checks; focused tooling tests and full runner for scripts/CI | Owning guide; no application version bump for tooling alone |
 
-Browser checks should use demo or Sandbox data. Verify the particular flow affected by a UI change, including its saved result. A successful Link screen alone does not prove successful synchronization or production access.
+Keep concrete implementations, assets, docs and implementation tests in their `plugins/<category>/<id>/` folder. Shared host, SDK and cross-plugin contracts belong in `tests/`. Each plugin owns package data, entry points, compatibility and its local version/changelog; supported-set changes update the host's `bundled` extra and [canonical inventory](plugins/README.md#supported-plugins). The source installer discovers plugin packages automatically; concrete packages never move into the host wheel.
+
+Application-root `conftest.py` supplies shared isolated fixtures. Plugin-specific records and mock transports belong in that plugin's tests. Tests must not read `.env`, open private databases, require a Plaid account or make live provider requests. Use `tmp_path` and explicit `WHAB_HOME` when testing configuration. Regression tests should demonstrate an observable failure or invariant, rather than mirror implementation steps.
+
+Browser checks use fictional or Sandbox data. Follow the [UI acceptance criteria](plugins/interface/web/README.md#ui-acceptance-criteria) and [completion verification](../docs/development.md#completion-and-running-version-verification), including the saved result. A successful Link screen alone does not establish successful synchronization or production access.
 
 ## Code boundaries
 
 Keep money and envelope rules in `whab.domain`; they must not import web, storage, interfaces, configuration, provider or plugin runtimes. Keep SQLite transactions, additive schema upgrades and demo seeding in `whab_plugin_sqlite`, provider HTTP and normalization in `whab_plugin_plaid`, and visual presentation/assets in `whab_plugin_web`. The `whab.web` package owns transport, request schemas, middleware and safe projections. `whab.storage.bank` scopes providers over the SDK's `StorageBackend` protocol. App, host web and generic plugin-runtime code must not import concrete storage, bank or visual implementations. Assemble selected descriptors/factories in `whab.app.create_app` with injectable backends/services for tests.
 
-External extensions use the documented [`whab.plugins` API v1](../docs/plugins.md). Descriptors support visual `ui`, transport `interface`, `storage`, `bank`, `file_import`, `insights`, `export` and `bank_logos` capabilities, with optional `bind`, `settings` and bank-owned `merchant_logos` hooks. Computed kinds are `user_interface` (including transport interfaces), `storage`, `data_ingestion`, `reporting` and `branding`. Reports receive immutable snapshots; bank factories receive a privileged scoped store; storage factories return a complete backend; server-rendered UI descriptors provide trusted resources and a presentation builder. The bundled Web, SQLite and Plaid plugins use those same boundaries. Storage must preserve integer currency minor units, isolation, annotations, budgeting and atomic imports/cursors. Do not silently fall back when a selected plugin fails. Arbitrary imports, native UI runtimes and general mutation hooks are not provided. Enabled Python plugins are trusted code, not sandboxed code.
+External extensions use the documented [`whab.plugins` API](../docs/plugins.md); that guide owns capability records, hooks and lifecycle contracts. Reports use immutable snapshots, bank factories use scoped persistence, and storage owns backend lifetime. Preserve the [accepted architectural decisions](../docs/architecture.md) and budget context boundaries. Enabled Python plugins are trusted code running in the server process, not sandboxed code. Never silently substitute a backend or selected plugin after a load failure.
 
 Preserve these invariants when changing the corresponding layer:
 
@@ -90,6 +93,21 @@ Use a feature branch and pull request for every change to `main`. Describe the c
 Version the owner of the material change in the same PR. Host/core/public-SDK changes bump `src/whab/__init__.py::__version__` and add a dated entry to the application `CHANGELOG.md`. Each independently packaged plugin instead owns `plugins/<category>/<id>/pyproject.toml::project.version` and its local `CHANGELOG.md`; a plugin-only change does not bump the app or change the app changelog. Changes spanning owners update each affected owner. Apply SemVer separately to each distribution: patch for compatible fixes or maintenance, minor for compatible features, major for a breaking documented contract. Runtime and dependency support changes require the owning distribution's version bump. Small documentation-only changes may wait for its next version bump.
 
 The host package version, `python -m whab --version`, FastAPI metadata and About dialog derive from the host version source; installed plugin versions come from their own distribution metadata. Review the final diff and pass CI before requesting a squash merge. Final approval and merging belong to the human maintainer @Fillll. Agents must not approve or merge a PR unless @Fillll explicitly delegates that action for that specific PR. Create an immutable `vX.Y.Z` tag and GitHub release on the merged commit only when the user explicitly requests a release; version bumps and merges do not require publishing one. Do not reuse or move an existing release tag.
+
+### Authorization and completion stages
+
+Keep the intended outcome concrete and carry existing authorization through its stated scope. Technical repository/admin access does not itself authorize merging, deployment, production banking or releases.
+
+| Request | Work covered |
+| --- | --- |
+| Review, discuss or propose | Inspect and return findings or a concrete preview/proposal. Honor an explicit request to discuss before implementation |
+| Implement or fix | Make the focused change, update owning docs, validate, commit/push the feature branch and open a reviewable PR. Final merge remains with the maintainer |
+| Merge and deploy an identified PR | Treat this as explicit delegation for that PR. Complete required checks, merge through the allowed PR workflow, update the intended installation and verify the running result; do not ask for the same delegation again |
+| Publish a release | Only an explicit release request authorizes creating the version tag/GitHub release. A version bump, merge or deployment request alone does not |
+
+Resolve the identified PR and target from the current task context. Ask only when a material target or required authorization is genuinely missing, after completing independent reviewable work. New unrelated PRs do not inherit a prior PR's merge authorization. Never bypass failing CI, unresolved substantive findings, protected direct-push restrictions or an explicit request to wait. Certificate trust and creation of live banking connections retain their separate explicit-action boundaries.
+
+Use the [PR template](../../.github/pull_request_template.md) to record the problem/result, affected owners, checks, previews, version/changelog provenance and completed delivery stages. Before reporting completion, apply the [running-version and saved-result checklist](../docs/development.md#completion-and-running-version-verification). State unverified stages directly; documentation/tooling changes do not require deployment into a household runtime.
 
 ### Changelog PR links
 

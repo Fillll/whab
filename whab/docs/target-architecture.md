@@ -10,7 +10,7 @@ The core depends on no HTTP framework, interface, database, bank provider or plu
 
 ## Installation and budget ownership
 
-Plugin code is installed once in the WHAB environment. The host/core and seven supported plugin distributions have independent versions and changelogs; the host's `bundled` extra and source installer install the supported set together. The teaching example is separate and hidden from ordinary Settings. No concrete Automation, Extension or production Insight plugin ships yet. A budget records which of those plugins it uses, along with compatible API requirements, settings and plugin-owned saved state. Opening a budget restores that selection; disabling a plugin preserves its saved state so it can be enabled again.
+Plugin code is installed once in the WHAB environment. The host/core and [supported plugin distributions](../app/plugins/README.md#supported-plugins) have independent versions and changelogs; the host's `bundled` extra and source installer install that set together. The teaching example is separate and hidden from ordinary Settings. Random forest categorization ships as an optional Automation plugin; no concrete Extension or production Insight plugin ships yet. A budget records which plugins it uses, along with compatible API requirements, settings and plugin-owned saved state. Opening a budget restores that selection; disabling a plugin preserves its saved state so it can be enabled again. The [budget-isolation invariant and verification recipe](architecture.md#budget-isolation-verification) apply to all of those capabilities.
 
 | Owner | Responsibilities |
 | --- | --- |

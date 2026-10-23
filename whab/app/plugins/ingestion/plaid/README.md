@@ -18,4 +18,4 @@ The existing Plaid plugin also displays merchant artwork when a transaction supp
 
 Artwork downloads happen only through a local image request, separately from synchronization and page rendering. They use public Plaid CDN URLs without banking credentials, accept at most 128 KiB of PNG data, and reject redirects. The host caches successful artwork for 24 hours and unavailable artwork for 5 minutes in memory. No new token or secret is required. Previously saved transactions receive artwork only when Plaid supplies them again in an added or modified sync record.
 
-From the application directory, run `.venv/bin/python -m pytest plugins/ingestion/plaid/tests`. See [plugin contribution rules](../../README.md) for all checks and packaging.
+From the application directory, use `.venv/bin/python -m pytest plugins/ingestion/plaid/tests` or `.venv/bin/python scripts/check.py --quick` during iteration. Run `.venv/bin/python scripts/check.py` before submitting; use `--docs` for documentation-only edits. See [plugin contribution rules](../../README.md#test-ownership) for the complete check contract.

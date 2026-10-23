@@ -55,3 +55,7 @@ The adapter also forwards `set_rollover_mode(workspace, source_month, currency, 
 Transaction memo edits forward through the existing revision and idempotency boundary. Omitted notes remain unchanged, empty notes clear the memo, and unsupported remote commands fail clearly. Account metadata edits use the same command path. The adapter does not advertise `ReceiptStorage`; attachment controls remain unavailable rather than saving an unrelated local copy.
 
 Category suggestions and model settings are forwarded through public ledger operations to a WHAB 2.19+ budget host. Training and inference execute only at that authority. Reviewing a suggestion forwards its displayed identity together with the selected category and review flag.
+
+## Development checks
+
+From `whab/app/`, use `.venv/bin/python -m pytest plugins/storage/client/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. Documentation-only edits can use `--docs`. Follow the [two-budget isolation recipe](../../../../docs/architecture.md#budget-isolation-verification) for changes to remote targets, contexts, retry state or plugin files. See [plugin contribution rules](../../README.md#test-ownership) for the complete check contract.

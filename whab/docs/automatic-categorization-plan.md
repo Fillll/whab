@@ -1,8 +1,12 @@
-# WHAB automatic categorization plugin plan
+# WHAB automatic categorization delivery record
 
-Implementation plan approved October 18, 2026. Numerical defaults and details described as proposed remain open to adjustment.
+**Implemented.** The approved October 18, 2026 plan shipped in [PR #68](https://github.com/Fillll/whab/pull/68). Follow-ups delivered [compact model storage (#69)](https://github.com/Fillll/whab/pull/69), [explicit low-score previews (#70)](https://github.com/Fillll/whab/pull/70), and [budget/model isolation after import (#72)](https://github.com/Fillll/whab/pull/72).
 
-Build an optional Random Forest Categorization plugin that learns from the current budget's reviewed transactions and suggests categories for future imports. Suggestions remain separate from ledger categories until the user reviews them. Training runs only through an explicit interaction in plugin settings.
+Use the [Random forest categorization README](../app/plugins/automation/random-forest-categorization/README.md) for current behavior, defaults, limits and compatibility; use the [SDK categorization contract](plugins.md#categorization-capability) for public operations and the [budget-isolation recipe](architecture.md#budget-isolation-verification) when changing state ownership. The original plan below preserves the rationale and acceptance criteria at approval time. Its imperative wording describes the delivered work, not an outstanding implementation backlog. Numerical defaults and details labeled proposed are historical proposals; the current plugin guide is authoritative. Recurrence and history-derived features remain possible experiments, not approved delivery work.
+
+The original objective was an optional Random Forest Categorization plugin that learns from the current budget's reviewed transactions and suggests categories for future imports. Suggestions remain separate from ledger categories until the user reviews them. Training runs only through an explicit interaction in plugin settings.
+
+## Original approved plan
 
 **1. Agreed requirements**
 
@@ -96,7 +100,7 @@ Proposed convenience action: Suggest for existing transactions applies the activ
 
 **8. Existing import behavior and ownership**
 
-The current [import normalization](../app/src/whab/domain/imports.py) can place a provider's suggested category into the actual category field. Proposed integration: when this plugin is enabled, retain provider hints separately for newly imported transactions lacking an explicit category instead of allowing those hints to preempt ML eligibility or bypass review. Preserve explicit categories from imported budget history and all existing user categories. Leave existing provider behavior unchanged in budgets where this plugin is disabled. Provider hints are not training labels unless a user has reviewed the actual category.
+At planning time, [import normalization](../app/src/whab/domain/imports.py) could place a provider's suggested category into the actual category field. The proposed integration was: when this plugin is enabled, retain provider hints separately for newly imported transactions lacking an explicit category instead of allowing those hints to preempt ML eligibility or bypass review. Preserve explicit categories from imported budget history and all existing user categories. Leave existing provider behavior unchanged in budgets where this plugin is disabled. Provider hints are not training labels unless a user has reviewed the actual category.
 
 Create `plugins/automation/random-forest-categorization/` as an independent optional distribution named `whab_plugin_random_forest_categorization`. It owns feature extraction, model training, prediction, serialization, settings definitions, documentation, and its tests. Confirm the numerical dependencies install on supported Python 3.14 environments before committing to their versions.
 
@@ -104,7 +108,7 @@ Extend the public SDK with budget-scoped immutable categorization inputs and str
 
 Extend the API interface plugin and remote storage client through public commands/queries so review and suggestion behavior do not depend on SQLite internals. Execute categorization once at the budget authority rather than separately on each remote viewer. If a remote host lacks the required capability, report that limitation explicitly. Keep existing HTTPS, origin, and budget-access safeguards.
 
-**9. Implementation sequence after review**
+**9. Historical implementation sequence**
 
 1. Prepare reviewable settings and transaction-register previews, including progress, validation results, model selection, and the suggestion badge.
 2. Add core suggestion records, eligibility rules, atomic acceptance, and storage migrations, with contract tests proving budget totals do not change on prediction.
@@ -122,7 +126,7 @@ Extend the API interface plugin and remote storage client through public command
 - Exercise insufficient history, unfamiliar payees/accounts, rare and deleted categories, multiple currencies, abstention, cancellation, navigation, disconnected settings views, concurrent edits, repeat imports, and failed inference.
 - Verify model persistence and predictions survive restart and portable export/import; disabled or missing plugins preserve data; malformed or incompatible models fail safely.
 - Test local and remote flows through public contracts. Check demo UI behavior, progress, badge visibility, keyboard interaction, and selected-row bulk acceptance.
-- From `whab/app/`, run `.venv/bin/python -m pytest`, `.venv/bin/python -m ruff check src scripts tests plugins conftest.py`, `.venv/bin/python scripts/check_plugin_coverage.py`, `.venv/bin/python scripts/check_distribution.py`, and `.venv/bin/python scripts/check_changelog_prs.py`, plus relevant browser/JavaScript checks. Every affected plugin must retain 100% Python statement and branch coverage.
+- The current equivalent of the original delivery checks is `.venv/bin/python scripts/check.py` from `whab/app/`, plus the relevant browser acceptance checks. Use `--quick` during iteration and `--docs` for documentation-only edits; see the [development runbook](development.md). Every affected plugin must retain 100% Python statement and branch coverage.
 - Use a feature branch and draft PR. Update each materially changed owner's version and changelog using the real originating PR URL, and pass CI. Final approval and merge remain with the maintainer. Tags and releases require a separate explicit release request.
 
 Technical references: [RandomForestClassifier](https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html), [text feature extraction](https://scikit-learn.org/stable/modules/feature_extraction.html#text-feature-extraction), [data leakage](https://scikit-learn.org/stable/common_pitfalls.html#data-leakage), and [model persistence](https://scikit-learn.org/stable/model_persistence.html).

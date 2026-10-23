@@ -8,7 +8,7 @@ WHAB combines a Python budgeting application with platform launchers that make i
 | [`launchers/`](launchers/README.md) | Platform companions for installation, process control and updates |
 | [`docs/`](docs/usage.md) | Shared product usage, architecture and plugin contracts |
 
-Start with the [repository overview](../README.md), [application setup](app/README.md), or [macOS launcher](launchers/macos/README.md). Application development commands run from `whab/app/`; native launcher builds run from their own platform directory.
+Start with the [repository overview](../README.md), [application setup](app/README.md), [development runbook](docs/development.md), or [macOS launcher](launchers/macos/README.md). Application development commands run from `whab/app/`; native launcher builds run from their own platform directory.
 
 ## Existing development checkouts
 
