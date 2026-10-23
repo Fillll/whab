@@ -581,13 +581,8 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [
-        "pr82-installed-sqlite-web",
-        "pr82-installed-json-web",
-        "pr86-installed-sqlite-web",
-        "pr86-installed-json-web"
-      ],
-      "version": "1.25.1"
+      "verifications": [],
+      "version": "1.26.0"
     },
     {
       "api_version": 1,
