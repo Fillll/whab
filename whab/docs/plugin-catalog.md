@@ -58,3 +58,23 @@ Installed host 2.23.0, JSON 1.0.0 and toolkit 0.1.0 were tested in an isolated t
 Tests: `plugins/storage/json/tests/test_json_https.py::test_json_https_save_export_fresh_restore_restart_and_demo_storage`.
 
 Review: [PR #79](https://github.com/Fillll/whab/pull/79).
+
+### pr86-installed-sqlite-web
+
+Verified 2026-10-23; host `2.29.0`. Selected: `bank-logos`, `example`, `plaid`, `sqlite`, `web`, `ynab`.
+
+The exact committed candidate built and installed host, all thirteen plugins and their MIT resources outside the checkout. The selected six-plugin SQLite/Web application saved fictional accounts, served pages/assets, checked settings, exported CSV and containers, and used mocked bank-logo transport. Packaged catalog rows were compared against installed public contracts without entry-point discovery during catalog reads. Other installed packages were discovered but not selected; no bank connection was created. HTTP used an HTTPS TestClient scheme rather than a native TLS listener. This evidence does not claim migration/copy or other-family live behavior.
+
+Tests: `scripts/check_distribution.py::SMOKE`.
+
+Review: [PR #86](https://github.com/Fillll/whab/pull/86).
+
+### pr86-installed-json-web
+
+Verified 2026-10-23; host `2.29.0`. Selected: `json`, `web`.
+
+A separate installed-wheel runtime selected JSON/Web with optional plugins disabled. Fictional account/transaction save, balance, native personal/demo exports and saved-state reopen passed without SQLite files. Packaged catalog inspection executed no plugin hook. HTTP used an HTTPS TestClient scheme, not native TLS. Other installed packages were not selected in this runtime; no migration/copy or other-family live claim.
+
+Tests: `scripts/check_distribution.py::SMOKE`.
+
+Review: [PR #86](https://github.com/Fillll/whab/pull/86).

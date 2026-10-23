@@ -36,7 +36,9 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [
-        "pr82-installed-sqlite-web"
+        "pr82-installed-sqlite-web",
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
       ],
       "version": "1.3.0"
     },
@@ -79,7 +81,9 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [
-        "pr82-installed-sqlite-web"
+        "pr82-installed-sqlite-web",
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
       ],
       "version": "1.5.0"
     },
@@ -122,7 +126,9 @@
       "state_version": 1,
       "support": "teaching",
       "verifications": [
-        "pr82-installed-sqlite-web"
+        "pr82-installed-sqlite-web",
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
       ],
       "version": "1.4.0"
     },
@@ -159,7 +165,10 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "teaching",
-      "verifications": [],
+      "verifications": [
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
+      ],
       "version": "1.0.0"
     },
     {
@@ -195,7 +204,10 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "teaching",
-      "verifications": [],
+      "verifications": [
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
+      ],
       "version": "1.0.0"
     },
     {
@@ -231,7 +243,10 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "teaching",
-      "verifications": [],
+      "verifications": [
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
+      ],
       "version": "1.0.0"
     },
     {
@@ -312,7 +327,10 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [],
+      "verifications": [
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
+      ],
       "version": "1.1.0"
     },
     {
@@ -358,7 +376,10 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [],
+      "verifications": [
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
+      ],
       "version": "1.2.0"
     },
     {
@@ -395,7 +416,9 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [
-        "pr82-installed-sqlite-web"
+        "pr82-installed-sqlite-web",
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
       ],
       "version": "1.1.0"
     },
@@ -433,7 +456,9 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [
-        "pr82-installed-sqlite-web"
+        "pr82-installed-sqlite-web",
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
       ],
       "version": "1.0.1"
     },
@@ -515,7 +540,10 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [],
+      "verifications": [
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
+      ],
       "version": "1.10.0"
     },
     {
@@ -553,7 +581,9 @@
       "support": "maintained",
       "verifications": [
         "pr82-installed-sqlite-web",
-        "pr82-installed-json-web"
+        "pr82-installed-json-web",
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
       ],
       "version": "1.25.1"
     },
@@ -591,7 +621,9 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [
-        "pr82-installed-sqlite-web"
+        "pr82-installed-sqlite-web",
+        "pr86-installed-sqlite-web",
+        "pr86-installed-json-web"
       ],
       "version": "1.3.1"
     }
@@ -687,6 +719,78 @@
       "source_commit": "6f9703ce90d0bcf918575dc0d7ee3e87de072d3e",
       "tests": [
         "plugins/storage/json/tests/test_json_https.py::test_json_https_save_export_fresh_restore_restart_and_demo_storage"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.29.0",
+        "whab_plugin_bank_logos": "1.3.0",
+        "whab_plugin_client": "1.5.0",
+        "whab_plugin_example": "1.4.0",
+        "whab_plugin_example_branding": "1.0.0",
+        "whab_plugin_example_categorization": "1.0.0",
+        "whab_plugin_example_file_import": "1.0.0",
+        "whab_plugin_json": "1.1.0",
+        "whab_plugin_plaid": "1.2.0",
+        "whab_plugin_random_forest_categorization": "1.1.0",
+        "whab_plugin_server": "1.0.1",
+        "whab_plugin_sqlite": "1.10.0",
+        "whab_plugin_web": "1.25.1",
+        "whab_plugin_ynab": "1.3.1"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.29.0",
+      "id": "pr86-installed-sqlite-web",
+      "method": "installed-wheel",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/86"
+      ],
+      "scope": "The exact committed candidate built and installed host, all thirteen plugins and their MIT resources outside the checkout. The selected six-plugin SQLite/Web application saved fictional accounts, served pages/assets, checked settings, exported CSV and containers, and used mocked bank-logo transport. Packaged catalog rows were compared against installed public contracts without entry-point discovery during catalog reads. Other installed packages were discovered but not selected; no bank connection was created. HTTP used an HTTPS TestClient scheme rather than a native TLS listener. This evidence does not claim migration/copy or other-family live behavior.",
+      "selection": [
+        "bank-logos",
+        "example",
+        "plaid",
+        "sqlite",
+        "web",
+        "ynab"
+      ],
+      "source_commit": "1c16d728da5824351e994882424cc98e516691d2",
+      "tests": [
+        "scripts/check_distribution.py::SMOKE"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.29.0",
+        "whab_plugin_bank_logos": "1.3.0",
+        "whab_plugin_client": "1.5.0",
+        "whab_plugin_example": "1.4.0",
+        "whab_plugin_example_branding": "1.0.0",
+        "whab_plugin_example_categorization": "1.0.0",
+        "whab_plugin_example_file_import": "1.0.0",
+        "whab_plugin_json": "1.1.0",
+        "whab_plugin_plaid": "1.2.0",
+        "whab_plugin_random_forest_categorization": "1.1.0",
+        "whab_plugin_server": "1.0.1",
+        "whab_plugin_sqlite": "1.10.0",
+        "whab_plugin_web": "1.25.1",
+        "whab_plugin_ynab": "1.3.1"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.29.0",
+      "id": "pr86-installed-json-web",
+      "method": "installed-wheel",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/86"
+      ],
+      "scope": "A separate installed-wheel runtime selected JSON/Web with optional plugins disabled. Fictional account/transaction save, balance, native personal/demo exports and saved-state reopen passed without SQLite files. Packaged catalog inspection executed no plugin hook. HTTP used an HTTPS TestClient scheme, not native TLS. Other installed packages were not selected in this runtime; no migration/copy or other-family live claim.",
+      "selection": [
+        "json",
+        "web"
+      ],
+      "source_commit": "1c16d728da5824351e994882424cc98e516691d2",
+      "tests": [
+        "scripts/check_distribution.py::SMOKE"
       ]
     }
   ]
