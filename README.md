@@ -44,7 +44,7 @@ Each surrounding box is a plugin family. A plugin can provide several capabiliti
 
 Plugin code is installed in WHAB. A portable `.whab` container owns its plugin manifest, settings and plugin data. A local budget carries its storage data; remote storage contributes connection information alongside the manifest and saved plugin state, with financial records staying on the server. Credentials stay with the machine by default; remote access credentials can optionally travel encrypted with a password. Bank-provider tokens stay on the machine or server. See the [architecture guide](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md) for the implemented contracts and capability boundaries.
 
-The `whab` host/core wheel and its seven supported plugins have independent distributions, versions and changelogs. The `bundled` extra selects the supported plugin set when compatible host/plugin distributions are available in the chosen package index or local wheelhouse; the source installer above installs the checkout's local packages together without requiring those plugin releases to be published. Installation and enablement are separate: Web and SQLite are selected defaults, Plaid is optional and enabled by default, and the other supported plugins start disabled. The teaching example is separately installed and hidden from ordinary Settings. Concrete plugins live under `whab/app/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/app/plugins/README.md).
+The `whab` host/core wheel and its [supported plugins](whab/app/plugins/README.md#supported-plugins) have independent distributions, versions and changelogs. The `bundled` extra selects the supported plugin set when compatible host/plugin distributions are available in the chosen package index or local wheelhouse; the source installer above installs the checkout's local packages together without requiring those plugin releases to be published. Installation and enablement are separate: Web and SQLite are selected defaults, Plaid is optional and enabled by default, and the other supported plugins start disabled. The teaching example is separately installed and hidden from ordinary Settings. Concrete plugins live under `whab/app/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/app/plugins/README.md).
 
 ### Client/server deployment
 
@@ -71,7 +71,7 @@ A plugin's primary category describes its role; its capabilities can include con
 - [Usage, bank imports, portable budgets and backups](whab/docs/usage.md)
 - [Architecture](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md)
 - [Plugin API](whab/docs/plugins.md) and [plugin folders](whab/app/plugins/README.md)
-- [Contributing and checks](whab/app/CONTRIBUTING.md) · [Changelog](whab/app/CHANGELOG.md)
+- [Contributing and checks](whab/app/CONTRIBUTING.md) · [Previews, verification and troubleshooting](whab/docs/development.md) · [Changelog](whab/app/CHANGELOG.md)
 
 ## Privacy and control
 

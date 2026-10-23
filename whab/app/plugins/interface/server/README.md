@@ -31,3 +31,7 @@ provisioning are outside this plugin contract. Host setup can create a local CA
 and localhost certificate, but trust requires explicit user action. Server configuration stays on the machine.
 A client can deliberately export its remote access credential in a
 password-protected container; bank-provider tokens are never carried.
+
+## Development checks
+
+From `whab/app/`, use `.venv/bin/python -m pytest plugins/interface/server/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. Documentation-only edits can use `--docs`. Changes to budget targeting, authorization or command identity also need the [two-budget isolation checks](../../../../docs/architecture.md#budget-isolation-verification). See [plugin contribution rules](../../README.md#test-ownership) for the complete check contract.

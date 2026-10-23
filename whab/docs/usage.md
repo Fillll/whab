@@ -19,7 +19,7 @@ Detailed operating guidance for WHAB. Start with the [quick start](../app/README
 
 Run the commands below from the application directory (`whab/app/`).
 
-Requires **Python 3.14 or newer**. Older Python versions are unsupported and rejected by package installation. For development, use an editable source install as shown below. The source installer installs the host and all seven supported plugin distributions together. Templates and static assets belong to their owning plugin wheels. When compatible host/plugin wheels are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the same supported set; a wheel deployment must also provision the private runtime configuration and valid TLS certificate/key described below.
+Requires **Python 3.14 or newer**. Older Python versions are unsupported and rejected by package installation. For development, use an editable source install as shown below. The source installer installs the host and the [supported plugin set](../app/plugins/README.md#supported-plugins) together. Templates and static assets belong to their owning plugin wheels. When compatible host/plugin wheels are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the same set; a wheel deployment must also provision the private runtime configuration and valid TLS certificate/key described below. Use the [development runbook](development.md) for disposable runtimes, iteration checks and verification of the running installation.
 
 ```sh
 python3.14 -m venv .venv
@@ -119,7 +119,7 @@ Disabling a bank plugin takes effect on restart and retains imported history and
 
 ### YNAB import
 
-Enable **Import from YNAB ZIP file**, save and restart, then open its **Settings**. Choose the ZIP, confirm USD and **Preview import**. **Create budget and import** creates a separate **Imported budget**, adds it to Settings → Budgets, and opens its Accounts page for classification. Preview creates nothing; retrying a failed commit opens the same new budget. The form is available in the plugin's settings from any page, including Demo.
+Enable **Import from YNAB ZIP file**, save and restart, then open its **Settings**. Choose the ZIP, enter a budget name (the filename supplies an editable suggestion), confirm USD and **Preview import**. **Create budget and import** creates a separate budget with that name, adds it to Settings → Budgets, and opens its Accounts page for classification. Preview creates nothing; retrying a failed commit opens the same new budget. The form is available in the plugin's settings from any page, including Demo. Imported account estimates appear in the sidebar with their source explained on hover and for screen readers; Accounts management still shows **Unavailable** for the unverified balance. Those estimates do not fund the budget or contribute to net-worth totals.
 
 ### Optional bank logos
 

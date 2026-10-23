@@ -42,18 +42,14 @@ jobs:
             whab/app/plugins/**/pyproject.toml
       - name: Install dependencies
         run: python scripts/install.py --dev --example
-      - name: Require originating PR links in all changelogs
-        run: python scripts/check_changelog_prs.py
-      - name: Test and require 100% plugin statement and branch coverage
-        run: python scripts/check_plugin_coverage.py
-      - name: Lint Python
-        run: python -m ruff check src scripts tests plugins conftest.py
-      - name: Test browser navigation and plugin controls
-        run: node --test plugins/*/*/tests/*.test.cjs
+      - name: Set up Node for browser tests
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "22"
+      - name: Run contribution checks
+        run: python scripts/check.py
       - name: Lint launcher Python
         run: python -m ruff check --config pyproject.toml ../launchers/macos/manager ../launchers/macos/tests ../launchers/macos/scripts
-      - name: Verify independently versioned application and plugin wheels
-        run: python scripts/check_distribution.py
 
   macos-launcher:
     name: macOS launcher

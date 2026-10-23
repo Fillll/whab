@@ -9,7 +9,10 @@ The example is developer-only and hidden from ordinary Settings, including Optio
 ```sh
 .venv/bin/python scripts/install.py --dev --example
 .venv/bin/python -m pytest plugins/example/example/tests
+.venv/bin/python scripts/check.py --quick
 ```
+
+Run `.venv/bin/python scripts/check.py` before submitting; use `--docs` for documentation-only edits. See [plugin contribution rules](../../README.md#test-ownership) for the full check contract.
 
 Use a fresh isolated runtime with `WHAB_PLUGINS=example`, provision its TLS certificate and trust its local CA explicitly, or use the selection API for an existing saved budget. Follow the complete [working-example instructions](../../../../docs/plugins.md#install-the-working-example); environment changes do not override saved `plugins.json` or portable manifests. Ordinary Settings saves preserve valid hidden example selections. See [plugin contribution rules](../../README.md).
 

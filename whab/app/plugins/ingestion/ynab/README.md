@@ -21,7 +21,7 @@ The destination is a new empty SQLite budget, so the current budget can already 
 
 ## Migration limits
 
-The dump omits account types, on-budget/off-budget scope, verified balance snapshots, currency metadata, closed status, targets and scheduled transactions. Register-derived account balances are retained internally but displayed as unavailable; all imported accounts begin as unclassified off-budget accounts and supply no spendable budget funding. Use WHAB's account classification controls after import to choose the account type and budget scope; a balance that remains unavailable still supplies no funding. The importer cannot infer tracking accounts safely from account names or transaction categories. This importer is useful for history and assignments; it is not a complete replacement for a live YNAB budget.
+The dump omits account types, on-budget/off-budget scope, verified balance snapshots, currency metadata, closed status, targets and scheduled transactions. Register-derived account balances are retained as unverified estimates. The sidebar displays those estimates as whole currency amounts, preserving the exported sign, with their source explained on hover and for screen readers. Accounts management still displays **Unavailable** for the balance, and the estimates are excluded from spendable funding and net-worth totals. All imported accounts begin as unclassified off-budget accounts. Use WHAB's account classification controls after import to choose the account type and budget scope; classification alone does not verify the balance or make the estimate fund the budget. The importer cannot infer tracking accounts safely from account names or transaction categories. This importer is useful for history and assignments; it is not a complete replacement for a live YNAB budget.
 
 YNAB's exported Activity and Available values are validated but are not stored as envelope balances: WHAB calculates those values under its own rules. Credit-card payment envelopes and rollover totals can differ. The export lacks original category and transaction IDs; identifiers are deterministic hashes of source fields, with an occurrence number preserving identical rows. Renamed categories and overlapping bank transactions cannot be reconciled automatically. Split rows stay separate; no editable parent/split model is reconstructed. Notes that cannot retain the original memo, status and any long payee within WHAB's 1,000-character limit are rejected instead of truncated.
 
@@ -31,7 +31,10 @@ Run from `whab/app/`:
 
 ```sh
 .venv/bin/python -m pytest plugins/ingestion/ynab/tests
-.venv/bin/python scripts/check_plugin_coverage.py --plugin ynab
+.venv/bin/python scripts/check.py --quick
+.venv/bin/python scripts/check.py
 ```
+
+Use focused pytest or `--quick` during iteration and the full runner before submitting. Documentation-only edits can use `--docs`. See [plugin contribution rules](../../README.md#test-ownership) and the [budget-isolation verification recipe](../../../../docs/architecture.md#budget-isolation-verification).
 
 After creation, the importer selects the new budget for this browser before opening its Accounts page. Reopening WHAB then returns to that budget; identically named older budgets retain their own models and history.

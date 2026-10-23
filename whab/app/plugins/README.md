@@ -57,19 +57,21 @@ Run from the application directory (`whab/app/`):
 
 ```sh
 .venv/bin/python -m pytest plugins/ingestion/plaid/tests
-.venv/bin/python -m pytest
-.venv/bin/python scripts/check_plugin_coverage.py
-.venv/bin/python -m ruff check src scripts tests plugins conftest.py
-.venv/bin/python scripts/check_distribution.py
+.venv/bin/python scripts/check.py --quick
+.venv/bin/python scripts/check.py
 ```
 
-Replace `ingestion/plaid` with the category and plugin folder being changed. The complete pytest command discovers central and plugin-local tests; CI runs both. Shared composition fixtures live in application-root `conftest.py`; provider payloads and transports stay in the owning plugin's test fixtures. Use fictional data, temporary homes and mocked remote requests.
+Replace `ingestion/plaid` with the category and plugin folder being changed. Focused pytest and `--quick` support iteration; the full runner is the final source of required application checks. It includes central/plugin tests, lint, browser-module tests, plugin coverage, isolated distributions and documentation checks. Use `--docs` for documentation-only changes; see the [development runbook](../../docs/development.md) for prerequisites and check selection. Shared composition fixtures live in application-root `conftest.py`; provider payloads and transports stay in the owning plugin's test fixtures. Use fictional data, temporary homes and mocked remote requests.
 
-Every plugin must have **100% Python statement and branch coverage**. The coverage command measures every file in each `plugins/*/*/src/` tree using the complete local/shared suite; an unimported module or any missed branch fails the gate. It discovers new plugin folders automatically. Use `scripts/check_plugin_coverage.py --plugin plaid` to measure only that plugin against the same suite. Keep the regression tests that close gaps inside the owning plugin's `tests/` folder. Type-only imports are outside runtime coverage; runtime exclusions and coverage pragmas are unsupported. Rendering, browser behavior and distribution checks verify templates and static assets.
+Every plugin must have **100% Python statement and branch coverage**. The full runner's coverage gate measures every file in each `plugins/*/*/src/` tree using the complete local/shared suite; an unimported module or any missed branch fails the gate. It discovers new plugin folders automatically. Keep the regression tests that close gaps inside the owning plugin's `tests/` folder. Type-only imports are outside runtime coverage; runtime exclusions and coverage pragmas are unsupported. Rendering, browser behavior and distribution checks verify templates and static assets. Budget creation/import, routing, binders and plugin persistence also need the [two-budget isolation checks](../../docs/architecture.md#budget-isolation-verification); UI changes need the owning [web acceptance checks](interface/web/README.md#ui-acceptance-criteria).
 
 ## Packaging and contracts
 
-The `whab` distribution contains only the host/core and public SDK. All eight supported plugins are independent distributions; each owns its `pyproject.toml` entry point, package data, dependency compatibility range and `project.version`. Their initial independent version is 1.0.0. The teaching example is a ninth separate distribution.
+The `whab` distribution contains only the host/core and public SDK. Supported plugins are independent distributions; each owns its `pyproject.toml` entry point, package data, dependency compatibility range and `project.version`. Their initial independent version is 1.0.0. The teaching example is a separate distribution.
+
+## Supported plugins
+
+This is the canonical supported-set inventory. Keep it aligned with the host's `bundled` extra and each plugin's package metadata; other guides link here instead of repeating a package count.
 
 | Plugin ID | Distribution | Default enablement |
 | --- | --- | --- |
@@ -81,7 +83,12 @@ The `whab` distribution contains only the host/core and public SDK. All eight su
 | `server` | `whab_plugin_server` | Disabled |
 | `client` | `whab_plugin_client` | Not selected; choose as storage for a remote connection |
 | `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Disabled |
-| `example` | `whab_plugin_example` | Separately installed, hidden developer teaching plugin |
+
+## Teaching example
+
+`example` is distributed separately as `whab_plugin_example`. It is a hidden developer teaching plugin, excluded from the supported bundled set and ordinary Settings. See [the example README](example/example/README.md) and [activation instructions](../../docs/plugins.md#install-the-working-example).
+
+## Installation and compatibility
 
 From the application directory (`whab/app/`), install or refresh the complete local supported set:
 
@@ -89,7 +96,7 @@ From the application directory (`whab/app/`), install or refresh the complete lo
 .venv/bin/python scripts/install.py --dev
 ```
 
-Add `--example` to install the teaching package too; omit `--dev` when development dependencies are unnecessary. The helper supplies all local package paths together, so unpublished local plugin packages do not need to resolve from a package index. When compatible host/plugin distributions are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the eight supported plugins; the source helper works directly from this checkout without requiring those releases to be published. A single plugin can be installed from its own folder, such as `.venv/bin/python -m pip install -e plugins/interface/bank-logos`. Installing a package does not enable it; see the [developer-only example activation](../../docs/plugins.md#install-the-working-example).
+Add `--example` to install the teaching package too; omit `--dev` when development dependencies are unnecessary. The helper supplies all local package paths together, so unpublished local plugin packages do not need to resolve from a package index. When compatible host/plugin distributions are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the [supported plugins](#supported-plugins); the source helper works directly from this checkout without requiring those releases to be published. A single plugin can be installed from its own folder, such as `.venv/bin/python -m pip install -e plugins/interface/bank-logos`. Installing a package does not enable it; see the [developer-only example activation](../../docs/plugins.md#install-the-working-example).
 
 To upgrade from the former `whab-<id>-plugin` distributions, rerun the source installer. It installs the standardized packages before removing detected legacy official distributions and preserves an installed teaching example by including its replacement. For wheel installations, use a fresh environment or remove the legacy distributions when installing the new packages; keeping both would register the same runtime IDs twice. Runtime IDs, enabled selections, saved settings and routes remain stable through the package rename.
 
