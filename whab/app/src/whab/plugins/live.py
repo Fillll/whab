@@ -13,6 +13,7 @@ from uuid import uuid4
 from starlette.concurrency import run_in_threadpool
 
 from whab.budgets.runtime import RuntimeCandidate
+from whab.services.categorization_runtime import live_categorizer
 
 from .configuration import validate_selection
 from .contracts import contract_for
@@ -170,6 +171,7 @@ class LivePluginSelection:
         self.session = session
         self.nonlive = frozenset(nonlive)
         self.home = home
+        self.categorization = None
         self.initial_selection = frozenset(plugin.id for plugin in runtime._active.services["plugins"].descriptors()) - self.required
         self._lock = Lock()
         self._tickets = {}
@@ -186,7 +188,12 @@ class LivePluginSelection:
                             "distribution": binding.environment.distribution,
                             "environment": binding.environment.identifier,
                             "health": "ready" if binding.worker.healthy else "failed"})
-        return {"families": sorted(LIVE_CAPABILITIES),
+        families = set(LIVE_CAPABILITIES)
+        if self.categorization is not None:
+            families.add("categorization")
+        return {"families": sorted(families),
+                "code_upgrade_families": sorted(LIVE_CAPABILITIES) if self.home is not None else [],
+                "host_only_families": ["categorization"] if self.categorization is not None else [],
                 "code_upgrades": self.home is not None, "runtime": self.runtime.status(),
                 "workers": sorted(workers, key=lambda item: item["plugin"]), "operations": operations}
 
@@ -202,9 +209,9 @@ class LivePluginSelection:
         loaded = {plugin.id: plugin for plugin in load_descriptors(added, self.entrypoints())}
         for identifier in sorted(changed):
             plugin = current.get(identifier) or loaded.get(identifier)
-            if plugin is None or identifier in self.nonlive or not supports_live_plugin(plugin):
+            if plugin is None or identifier in self.nonlive or not (supports_live_plugin(plugin) or (self.categorization is not None and live_categorizer(plugin))):
                 raise PluginError(
-                    "This change requires a restart. Live selection supports explicit stateless report, branding and file-parser adapters without binders or saved-state upgrades.",
+                    "This plugin needs an available live capability adapter. Finish its active work or restart WHAB with a compatible plugin selection.",
                     code="restart_required", plugin_id=identifier,
                 )
         # Injectable host backends need not have a discovery descriptor. Do
@@ -229,7 +236,9 @@ class LivePluginSelection:
         # The scheduling request already owns a generation. This scope also
         # permits direct host callers to validate without retaining raw services.
         with self.runtime.lease() as lease:
-            self._candidate(selection, lease.service("plugins"))
+            candidate = self._candidate(selection, lease.service("plugins"))
+            if self.categorization is not None:
+                self.categorization.preflight(lease.service("categorization"), candidate.descriptors())
 
     def preflight(self, selection):
         self._preflight(validate_selection(selection))
@@ -271,7 +280,10 @@ class LivePluginSelection:
 
         async def validate(chosen, active, candidate):
             generation = active if chosen == "active" else candidate
-            return await run_in_threadpool(validate_saved_generation, self, generation)
+            valid = await run_in_threadpool(validate_saved_generation, self, generation)
+            if valid is True and self.categorization is not None:
+                self.categorization.committed(generation)
+            return valid
 
         # Recovery itself cannot hold a request lease from the gated budget.
         task = self.runtime.schedule(self.runtime.recover(authority, validate))
@@ -337,9 +349,16 @@ class LivePluginSelection:
         async def commit(candidate, _number):
             registry = candidate.services["plugins"]
             await run_in_threadpool(self.persist, selection, registry.descriptors())
+            if self.categorization is not None:
+                self.categorization.committed(candidate)
+
+        async def finalize(preparation, candidate):
+            if self.categorization is None:
+                return candidate
+            return await run_in_threadpool(self.categorization.finalize, preparation, candidate)
 
         try:
-            generation = await self.runtime.transition(prepare, commit=commit)
+            generation = await self.runtime.transition(prepare, finalize=finalize, commit=commit)
         except (PluginError, asyncio.CancelledError) as error:
             if ticket:
                 diagnostic = ({"code": error.code, "plugin_id": error.plugin_id, "message": str(error)}

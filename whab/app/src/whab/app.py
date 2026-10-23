@@ -38,7 +38,12 @@ from whab.plugins.management import PluginManager, installed_entrypoints
 from whab.plugins.storage import close_storage, open_storage
 from whab.plugins.worker_adapters import supports_live_plugin
 from whab.plugins.worker_selection import restore_workers
-from whab.services.categorization import CategorizationService, local_context
+from whab.services.categorization import local_context, local_files
+from whab.services.categorization_runtime import (
+    CategorizationLifecycle,
+    LeasedCategorization,
+    live_categorizer,
+)
 from whab.services.receipts import ReceiptService
 from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
@@ -135,7 +140,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         settings = replace(settings, storage=budget_session.manifest["storage"], plugins=tuple(name for name in budget_session.selection if name in installed))
     budget_host = budget_host or BudgetHost(settings)
     plugins = plugins if plugins is not None else load_plugins(settings.enabled_plugins())
-    nonlive = {plugin.id for plugin in plugins.descriptors() if not supports_live_plugin(plugin)}
+    nonlive = {plugin.id for plugin in plugins.descriptors() if not (supports_live_plugin(plugin) or live_categorizer(plugin))}
     if budget_session:
         check_saved_states(budget_session.manifest, plugins.descriptors())
         plugins = plugins.bind_budget(budget_session.context)
@@ -210,19 +215,21 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         store.storage_plugin_id = settings.storage if owned_store else None
         service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
         store.on_mutation = service.invalidate_revision
+        categorization_lifecycle, categorization, categorization_resource = None, None, None
         if not remote_authority:
+            state_home = settings.home / "data" / "plugin-state" / settings.plaid_env
             context_factory = budget_session.context if budget_session else lambda identifier: local_context(
-                settings.home / "data" / "plugin-state" / settings.plaid_env, service.budget_id, identifier,
-                lock=store.lock, on_change=lambda: store.after_commit and store.after_commit())
+                state_home, service.budget_id, identifier, lock=store.lock,
+                on_change=lambda: store.after_commit and store.after_commit())
             saved_ids = [record["id"] for record in budget_session.manifest["plugins"]
                          if any(f"plugins/{record['id']}/suggestions-{workspace}.json" in budget_session.files
                                 for workspace in ("personal", "demo"))] if budget_session else [
                     path.name for path in (settings.home / "data" / "plugin-state" / settings.plaid_env / "plugin-data").glob("*")
                     if any((path / f"suggestions-{workspace}.json").is_file() for workspace in ("personal", "demo"))]
-            if any(p.categorization for p in plugins.descriptors()) or saved_ids:
-                service.categorization = CategorizationService(service, plugins.descriptors(), context_factory, saved_ids)
-                store.after_ingestion = service.categorization.after_import
-        bank_stores = {plugin.id: BankStore(store, plugin.id, suggestions_only=bool(service.categorization and service.categorization.engines)) for plugin in descriptors}
+            snapshot = budget_session.files_for if budget_session else lambda identifier: local_files(state_home, service.budget_id, identifier)
+            categorization_lifecycle = CategorizationLifecycle(service, context_factory, snapshot)
+            categorization, categorization_resource = categorization_lifecycle.initial(plugins.descriptors(), saved_ids)
+        bank_stores = {plugin.id: BankStore(store, plugin.id, suggestions_only=lambda: bool(service.categorization and service.categorization.enabled())) for plugin in descriptors}
     except Exception:
         if owned_store:
             close_storage(store)
@@ -232,17 +239,27 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     try:
         plugins, worker_bindings = restore_workers(worker_home, plugins)
     except BaseException:
+        if categorization is not None:
+            try:
+                categorization.close()
+            except Exception:
+                pass
         if owned_store:
             close_storage(store)
         raise
     runtime = BudgetRuntime(service.budget_id, {
         "plugins": RegistryGeneration(plugins, workers=worker_bindings, resources_enabled=bool(ui)), "ledger": service,
-        "storage": store.store, "banks": banks,
-    }, tuple(binding.resource for binding in worker_bindings.values()))
+        "storage": store.store, "banks": banks, "categorization": categorization,
+    }, tuple(binding.resource for binding in worker_bindings.values()) +
+       ((categorization_resource,) if categorization_resource else ()))
+    if categorization is not None:
+        service.categorization = LeasedCategorization(runtime)
+        store.after_ingestion = service.categorization.after_import
     registry = LeasedPluginRegistry(runtime)
     plugin_manager = PluginManager(settings, registry, budget_session=budget_session)
     live = LivePluginSelection(runtime, plugin_manager.required, installed_entrypoints,
                                plugin_manager.persist_live, budget_session, nonlive, worker_home)
+    live.categorization = categorization_lifecycle
     plugin_manager.live = live
     storage_runtime = StorageRuntime(settings, budget_session, store, runtime, registry,
         lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin))

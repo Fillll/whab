@@ -876,6 +876,12 @@ class Categorization:
     Engines may additionally expose preview(rows) for explicitly requested
     below-cutoff guesses. Automatic imports continue to use predict(rows).
     Predictions can include a boolean belowCutoff marker for manual previews.
+    Factories and engine methods are synchronous. Engines expose a defaults
+    mapping and index/select/delete/rename/train/save/predict methods; optional
+    close() releases owned resources. Live candidate factories receive detached
+    read-only namespace callbacks until the host commits activation. Callbacks
+    expire on retirement. Unfinished training defers replacement until the user
+    finishes or cancels it; unchanged engines retain their continuations.
     """
 
     factory: Callable[[BudgetContext], object]
