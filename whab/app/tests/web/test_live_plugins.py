@@ -125,9 +125,13 @@ def test_live_change_preserves_public_revision_and_command_replay(tmp_path, stor
 
 def test_default_and_secondary_cookie_addressed_requests_have_independent_generations(tmp_path, monkeypatch):
     async def scenario():
+        from whab.budgets.host import BudgetHost
+
         first, second = report("first", "old"), report("second", "new")
         install(monkeypatch, first, second)
-        app = create_app(settings=settings(tmp_path))
+        configuration = settings(tmp_path)
+        budget_host = BudgetHost(configuration)
+        app = create_app(settings=configuration, budget_host=budget_host)
         async with running(app) as client:
             created = await client.post("/api/budget/new", json={"name": "Fictional second budget"})
             assert created.status_code == 200
@@ -139,6 +143,7 @@ def test_default_and_secondary_cookie_addressed_requests_have_independent_genera
             child_id = identifier
             response = await client.post("/api/plugins/management/transition", json={"plugins": ["second"]})
             assert response.status_code == 202
+            await settled(budget_host.applications[child_id][0])
             # The canonical export pins the selected child's generation. It
             # waits for any accepted handover before reading the new registry.
             new = await client.get(export_url("second", f"/budgets/{child_id}"))
