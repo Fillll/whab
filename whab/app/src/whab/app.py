@@ -14,6 +14,7 @@ from jinja2 import ChoiceLoader, FileSystemLoader, PrefixLoader
 
 from whab import __version__
 from whab.budgets.host import BudgetDispatch, BudgetHost
+from whab.budgets.plugin_state import check_saved_states
 from whab.budgets.session import BudgetSession, TrackedStorage
 from whab.config import Settings
 from whab.plugins import (
@@ -24,6 +25,7 @@ from whab.plugins import (
     StorageContext,
     load_plugins,
 )
+from whab.plugins.contracts import contract_for
 from whab.plugins.management import PluginManager, installed_entrypoints
 from whab.plugins.storage import close_storage, open_storage
 from whab.services.categorization import CategorizationService, local_context
@@ -40,9 +42,9 @@ from whab.web.routes.plugins import create_router as plugins_router
 from whab.web.routes.receipts import create_router as receipts_router
 
 
-def plugin_config(settings, session, plugin_id):
+def plugin_config(settings, session, plugin_id, *, remote_authority=False):
     """Portable public settings plus machine-local credentials for one plugin."""
-    if plugin_id == "client":
+    if remote_authority:
         # A data file must never choose the destination of this machine's bearer
         # credential. Bind the URL, credential and remote budget together locally.
         return settings.plugin_configuration(plugin_id)
@@ -86,7 +88,7 @@ def storage_config(settings, session, plugin):
     """Bind a data-only connection to one complete approved credential profile."""
     device = settings.storage_configuration()
     if not session or plugin.budget_connection is None:
-        return plugin_config(settings, session, plugin.id)
+        return plugin_config(settings, session, plugin.id, remote_authority=contract_for(plugin).authority == "remote")
     files = session.files_for(plugin.id)
     if not files:
         return device
@@ -114,6 +116,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     budget_host = budget_host or BudgetHost(settings)
     plugins = plugins if plugins is not None else load_plugins(settings.enabled_plugins())
     if budget_session:
+        check_saved_states(budget_session.manifest, plugins.descriptors())
         plugins = plugins.bind_budget(budget_session.context)
     ui_plugin = plugins.ui_plugin(settings.ui) if settings.ui else None
     ui = ui_plugin.ui if ui_plugin else None
@@ -129,7 +132,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             plugin_id=ui_plugin.id,
         )
     descriptors = plugins.bank_plugins()
-    if settings.storage == "client" and descriptors:
+    storage_descriptor = next((plugin for plugin in plugins.descriptors() if plugin.id == settings.storage and plugin.storage is not None), None)
+    remote_authority = bool(storage_descriptor and contract_for(storage_descriptor).authority == "remote")
+    if remote_authority and descriptors:
         raise PluginError("Bank ingestion belongs on the server. Disable bank plugins in a client budget.", code="invalid_configuration")
     for plugin in descriptors:
         if ui and plugin.bank_ui and (
@@ -179,7 +184,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         store = TrackedStorage(store, budget_session)
         service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
         store.on_mutation = service.invalidate_revision
-        if settings.storage != "client":
+        if not remote_authority:
             context_factory = budget_session.context if budget_session else lambda identifier: local_context(settings.home / "data" / "plugin-state" / settings.plaid_env, service.budget_id, identifier)
             saved_ids = [record["id"] for record in budget_session.manifest["plugins"]
                          if any(f"plugins/{record['id']}/suggestions-{workspace}.json" in budget_session.files

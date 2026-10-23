@@ -47,9 +47,9 @@ def test_bank_only_descriptor_is_discovered_without_constructing_service():
         ("report", "bank"),
         (FakeEntryPoint("bank", bank), FakeEntryPoint("report", report)),
     )
-    descriptions = registry.describe()
-    assert descriptions[0].has_insights and not descriptions[0].has_bank
-    assert descriptions[1].has_bank and not descriptions[1].has_export
+    descriptions = {row.id: row for row in registry.describe()}
+    assert descriptions["report"].has_insights and not descriptions["report"].has_bank
+    assert descriptions["bank"].has_bank and not descriptions["bank"].has_export
     assert len(registry.bank_plugins()) == 1
     assert registry.bank_plugins()[0].id == "bank"
     assert contexts == []  # Host supplies the scoped context and owns startup/cleanup.

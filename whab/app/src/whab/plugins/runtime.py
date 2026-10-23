@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 from whab.domain.accounts import bank_website
 
+from .contracts import CapabilityError, contract_for, resolve_plugins
 from .sdk import (
     API_VERSION,
     ENTRYPOINT_GROUP,
@@ -61,10 +62,13 @@ def copy_snapshot(snapshot: BudgetSnapshot) -> BudgetSnapshot:
 
 
 class PluginRegistry:
-    """A fixed set of enabled plugins; host code owns rendering and CSV downloads."""
+    """A resolved set of enabled plugins; host code owns rendering and CSV downloads."""
 
     def __init__(self, plugins: tuple[Plugin, ...] = ()) -> None:
-        self._plugins = plugins
+        try:
+            self._plugins = resolve_plugins(plugins)
+        except CapabilityError as error:
+            raise PluginError(str(error), code=error.code, plugin_id=error.plugin_id) from None
         self._logo_cache = OrderedDict()
         self._logo_generations = {plugin.id: 0 for plugin in plugins}
         self._logo_lock = Lock()
@@ -85,6 +89,12 @@ class PluginRegistry:
                 resolved = plugin.bind(context_factory(plugin.id))
                 if type(resolved) is not Plugin or resolved.id != plugin.id or resolved.api_version != plugin.api_version or resolved.bind is not None:
                     raise ValueError("Invalid bound plugin")
+                if resolved.contract != plugin.contract:
+                    raise ValueError("A budget binder cannot change declared capabilities")
+                if plugin.contract is not None and contract_for(resolved) != contract_for(plugin):
+                    raise ValueError("A budget binder cannot change effective capabilities")
+                if resolved.migrate_state is not plugin.migrate_state:
+                    raise ValueError("A budget binder cannot replace state migration behavior")
             except Exception:
                 raise PluginError("Plugin could not open its budget settings. Check its compatibility.", code="budget_plugin_startup_failed", plugin_id=plugin.id) from None
             bound.append(resolved)
@@ -118,8 +128,15 @@ class PluginRegistry:
                     )
                     if enabled
                 ),
+                capabilities=contract.provides,
+                requirements=contract.requires,
+                lifecycle=contract.lifecycle,
+                authority=contract.authority,
+                state_version=contract.state_version,
+                legacy=plugin.contract is None,
             )
             for plugin in self._plugins
+            for contract in (contract_for(plugin),)
         )
 
     def bank_plugins(self) -> tuple[Plugin, ...]:
@@ -406,11 +423,16 @@ class PluginRegistry:
             ) from None
 
 
-def load_plugins(
+def load_descriptors(
     enabled: tuple[str, ...],
     entrypoints: Sequence[metadata.EntryPoint] | None = None,
-) -> PluginRegistry:
-    """Load named whab.plugins descriptors only; an empty tuple imports no plugins."""
+) -> tuple[Plugin, ...]:
+    """Validate named descriptors without resolving an incomplete capability selection.
+
+    Composition must call ``resolve_plugins`` or construct ``PluginRegistry``
+    with the complete selection before binding budgets or invoking factories.
+    An empty tuple imports no plugins.
+    """
     if type(enabled) is not tuple or any(not valid_plugin_name(name) for name in enabled):
         raise PluginError(
             "WHAB_PLUGINS must contain comma-separated lowercase plugin names.",
@@ -422,7 +444,7 @@ def load_plugins(
             code="duplicate_configuration",
         )
     if not enabled:
-        return PluginRegistry()
+        return ()
     if entrypoints is None:
         try:
             entrypoints = metadata.entry_points(group=ENTRYPOINT_GROUP)
@@ -490,4 +512,12 @@ def load_plugins(
                 plugin_id=name,
             )
         plugins.append(descriptor)
-    return PluginRegistry(tuple(plugins))
+    return tuple(plugins)
+
+
+def load_plugins(
+    enabled: tuple[str, ...],
+    entrypoints: Sequence[metadata.EntryPoint] | None = None,
+) -> PluginRegistry:
+    """Load and resolve one complete selection before hooks or factories execute."""
+    return PluginRegistry(load_descriptors(enabled, entrypoints))
