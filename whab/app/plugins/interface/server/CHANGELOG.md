@@ -1,5 +1,11 @@
 # Remote budget server plugin changelog
 
+## 1.1.0 — 2026-10-23
+
+PR: [#92](https://github.com/Fillll/whab/pull/92)
+
+- Declare the remote ledger protocol through the host's live API adapter instead of constructing routers. Keep server configuration, authorization, financial validation and request leases in WHAB; support compatible worker upgrades and require host 2.34 or newer.
+
 ## 1.0.1 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)

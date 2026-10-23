@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "91442a81c9d0233241ed5a033d49d48c2ee96cbe"
+documentation_ref = "eb7bcc573e28c9e1d452e48cc277e0be55a382a9"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -157,3 +157,17 @@ scope = "The exact implementation passed 4430 Python tests with all thirteen run
 [verification.artifacts]
 whab = "2.32.0"
 whab_plugin_random_forest_categorization = "1.2.0"
+
+[[verification]]
+id = "pr92-live-api-interface"
+date = "2026-10-23"
+host_version = "2.34.0"
+source_commit = "eb7bcc573e28c9e1d452e48cc277e0be55a382a9"
+selection = ["server"]
+method = "source-tests"
+tests = ["tests/web/test_live_api_interfaces.py", "tests/plugins/test_environments.py::test_real_api_worker_upgrade_failed_preparation_disable_reenable_and_reopen", "tests/test_remote_protocol.py", "plugins/interface/server/tests", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/92"]
+scope = "The exact source passed 4561 Python tests, all thirteen runtime plugins at 100% statement/branch coverage, 280 browser checks, genuine minimum/current toolkit tests and external artifact/replay/distribution gates. HTTPS ASGI tests exercised live API selection, replacement, disabling, failed private token binding, full request draining, host-owned authorization and local guards, stable ledger revisions/retry responses, resource revocation and preserved categorization services. Actual separately approved immutable API worker versions exercised failed candidates, disable/re-enable and saved-version reopen. The bundled server declares the same host-owned adapter and has complete owning coverage; synthetic versioned fixtures separately exercise worker upgrade behavior. This source evidence does not establish native TLS transport, financial retry durability across host restart, household installation or bank connectivity."
+[verification.artifacts]
+whab = "2.34.0"
+whab_plugin_server = "1.1.0"
