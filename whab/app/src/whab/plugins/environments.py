@@ -37,7 +37,7 @@ from packaging.version import Version
 from whab import __version__
 
 from .report_worker import ReportWorker, _stop_process_group
-from .sdk import API_VERSION, valid_plugin_name
+from .sdk import API_VERSION, BudgetSnapshot, valid_plugin_name
 
 MAX_WHEEL_BYTES = 100 * 1024 * 1024
 MAX_EXPANDED_BYTES = 300 * 1024 * 1024
@@ -497,6 +497,13 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                             raise EnvironmentPreparationError("incompatible_host", plugin_id)
                         if not probe.info["live"]:
                             raise EnvironmentPreparationError("unsupported_lifecycle", plugin_id)
+                        snapshot = BudgetSnapshot("personal", "2000-01", (), (), ())
+                        if probe.info["insights"]:
+                            probe.timeout = min(60, _remaining(deadline))
+                            probe.insights(snapshot)
+                        if probe.info["export"]:
+                            probe.timeout = min(60, _remaining(deadline))
+                            probe.export(snapshot)
                     finally:
                         probe.timeout = max(0.001, min(60, deadline - time.monotonic()))
                         probe.close()

@@ -94,6 +94,14 @@ def test_application_upgrades_real_reports_without_losing_ledger_or_reopen_versi
         assert upgrade(client, broken)["state"] == "failed"
         assert "1.0.0" in exported(client) and first.worker.healthy
         assert app.state.budget_runtime.status()["generation"] == 2
+        broken_hook = make_wheel(tmp_path, "3.1.0", source=(
+            "from whab.plugins import Plugin, PluginContract, Insight\n"
+            "def broken(snapshot):\n    raise RuntimeError('synthetic-private-hook-detail')\n"
+            "plugin=Plugin('fictional-reports','Fictional reports',insights=broken,contract=PluginContract(lifecycle='live'))\n"
+        ))
+        assert upgrade(client, broken_hook)["state"] == "failed"
+        assert "1.0.0" in exported(client) and first.worker.healthy
+        assert app.state.budget_runtime.status()["generation"] == 2
         from whab.plugins import worker_selection
 
         original_save = worker_selection.save_reference
