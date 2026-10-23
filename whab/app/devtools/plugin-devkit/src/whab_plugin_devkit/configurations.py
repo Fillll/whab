@@ -130,8 +130,13 @@ def exercise_candidate(plugin, registry=None):
         engine.delete(saved["id"])
         exercised.append("categorization")
     if plugin.interface:
-        api_declaration(plugin)
-        exercised.append("interface.api")
+        interface = plugin.interface
+        # Preserve the original hook-only path for mixed legacy factory plugins.
+        # A present declarative adapter must pass; unrelated hooks cannot hide it.
+        if (getattr(interface, "adapter", None) is not None
+                or not callable(getattr(interface, "factory", None)) or not exercised):
+            api_declaration(plugin)
+            exercised.append("interface.api")
     if not exercised:
         raise ValueError("This increment checks reporting, branding, file import, categorization and declarative API candidates.")
     return exercised

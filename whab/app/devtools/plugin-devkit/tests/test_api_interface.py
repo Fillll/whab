@@ -165,3 +165,18 @@ def test_api_worker_refuses_unapproved_or_incompatible_dependency_closures(monke
     else:
         with pytest.raises(ValueError):
             api.api_worker_wheels(SimpleNamespace(id="fictional-api"), records, None if failure == "wheelhouse" else tmp_path)
+
+
+def test_an_unrelated_report_cannot_hide_a_broken_advertised_declarative_api():
+    plugin = descriptor()
+    if plugin is None:
+        assert api.MINIMUM_API_HOST == "2.34.0"
+        return
+    from dataclasses import replace
+
+    from whab_plugin_devkit.configurations import exercise_candidate
+
+    object.__setattr__(plugin.interface.adapter, "token_setting", "UNRELATED_TOKEN")
+    plugin = replace(plugin, insights=lambda _: (sdk.Insight("Fictional", "1"),))
+    with pytest.raises(ValueError, match="configuration prefix"):
+        exercise_candidate(plugin)
