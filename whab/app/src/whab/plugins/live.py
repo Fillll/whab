@@ -332,8 +332,11 @@ class LivePluginSelection:
 
     async def _activate(self, selection, ticket=None):
         def changed_owner():
-            with self.runtime.lease() as lease:
-                current_ids = {plugin.id for plugin in lease.service("plugins").descriptors()} - self.required
+            # Diagnostic IDs come from an immutable generation, without invoking
+            # hooks or admission. Awaiting a thread here could reorder already
+            # scheduled transitions before they reach the serial coordinator.
+            active = self.runtime._active
+            current_ids = {plugin.id for plugin in active.services["plugins"].descriptors()} - self.required
             changed = set(selection) - current_ids or current_ids - set(selection)
             return next(iter(changed)) if len(changed) == 1 else None
 
@@ -382,9 +385,7 @@ class LivePluginSelection:
             return await run_in_threadpool(self.categorization.finalize, preparation, candidate)
 
         try:
-            # A preceding transition may have gated admission after preflight.
-            # Never block the event loop while obtaining diagnostic ownership.
-            owner = await run_in_threadpool(changed_owner)
+            owner = changed_owner()
             generation = await self.runtime.transition(prepare, finalize=finalize, commit=commit, plugin_id=owner)
         except (PluginError, asyncio.CancelledError) as error:
             if ticket:
