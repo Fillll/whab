@@ -19,3 +19,23 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["whab_plugin_json", "whab_plugin_json.*"]
+
+[tool.whab.plugin]
+requires = []
+conflicts = []
+api-version = 1
+capabilities = [
+  { name = "ledger.mutate", version = 1, composition = "singleton" },
+  { name = "ledger.read", version = 1, composition = "singleton" },
+  { name = "provider.state", version = 1, composition = "singleton" },
+  { name = "provider.sync", version = 1, composition = "singleton" },
+  { name = "receipts", version = 1, composition = "additive" },
+  { name = "transfer.neutral", version = 1, composition = "additive" },
+  { name = "transfer.prepare", version = 1, composition = "additive" },
+]
+lifecycle = "restart"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "maintained"

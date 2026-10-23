@@ -21,3 +21,17 @@ include = ["whab_plugin_web", "whab_plugin_web.*"]
 
 [tool.setuptools.package-data]
 whab_plugin_web = ["templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]
+
+[tool.whab.plugin]
+requires = []
+conflicts = []
+api-version = 1
+capabilities = [
+  { name = "interface.ui", version = 1, composition = "singleton" },
+]
+lifecycle = "restart"
+legacy = true
+authority = "unknown"
+state-version = 1
+state-upgrades = []
+support = "maintained"

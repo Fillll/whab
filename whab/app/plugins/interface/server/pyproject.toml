@@ -18,3 +18,17 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["whab_plugin_server", "whab_plugin_server.*"]
+
+[tool.whab.plugin]
+requires = []
+conflicts = []
+api-version = 1
+capabilities = [
+  { name = "interface.api", version = 1, composition = "additive" },
+]
+lifecycle = "restart"
+legacy = true
+authority = "unknown"
+state-version = 1
+state-upgrades = []
+support = "maintained"

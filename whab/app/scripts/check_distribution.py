@@ -22,14 +22,15 @@ import importlib.metadata as metadata
 import importlib
 import json
 import sys
-from dataclasses import replace
+from dataclasses import asdict, replace
 from unittest.mock import patch
 sys.path.insert(0, sys.argv[1])
 expected = json.loads(sys.argv[2])
 import whab
 from whab.app import create_app
 from whab.config import Settings
-from whab.plugins import LogoImage, load_plugins
+from whab.plugins import LogoImage, contract_for, load_plugins
+from whab.plugins.catalog import catalog_snapshot
 from whab_plugin_plaid.logos import logo_key
 from fastapi.testclient import TestClient
 
@@ -37,6 +38,15 @@ target = Path(sys.argv[1]).resolve()
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]
 assert not metadata.distribution("whab").entry_points
+with patch.object(metadata, "entry_points", side_effect=AssertionError("Catalog must not discover code")):
+    catalog = catalog_snapshot()
+assert catalog["host_version"] == whab.__version__
+assert {row["id"] for row in catalog["plugins"]} == set(expected) - {"whab"}
+for row in catalog["plugins"]:
+    assert row["version"] == expected[row["id"]]["version"]
+    assert row["distribution"] == expected[row["id"]]["distribution"]
+catalog["plugins"].clear()
+assert catalog_snapshot()["plugins"]
 assert {entry.name for entry in metadata.entry_points(group="whab.plugins")} == set(expected) - {"whab"}
 for identifier, record in expected.items():
     assert metadata.version(record["distribution"]) == record["version"], identifier
@@ -47,6 +57,21 @@ for identifier, record in expected.items():
     assert entries[0].dist.metadata["Name"] == record["distribution"], identifier
     module = importlib.import_module(record["module"])
     assert Path(module.__file__).resolve().is_relative_to(target), identifier
+for row in catalog_snapshot()["plugins"]:
+    descriptor = load_plugins((row["id"],)).descriptors()[0]
+    contract = contract_for(descriptor)
+    assert row["display_name"] == descriptor.display_name
+    assert row["api_version"] == descriptor.api_version
+    assert row["capabilities"] == sorted((asdict(value) for value in contract.provides), key=lambda value: value["name"])
+    assert row["requires"] == [
+        {key: value for key, value in asdict(requirement).items() if value is not None}
+        for requirement in contract.requires
+    ]
+    assert row["conflicts"] == list(contract.conflicts)
+    assert row["lifecycle"] == contract.lifecycle and row["authority"] == contract.authority
+    assert row["state_version"] == contract.state_version
+    assert row["state_upgrades"] == [list(edge) for edge in contract.state_upgrades]
+    assert row["legacy"] == (descriptor.contract is None)
 assert {"server", "client"} <= {entry.name for entry in metadata.entry_points(group="whab.plugins")}
 assert load_plugins(("server",)).interface_plugins()[0].id == "server"
 assert load_plugins(("client",)).storage_plugin("client").id == "client"
@@ -176,7 +201,7 @@ with TestClient(create_app(settings=json_settings), base_url="https://127.0.0.1:
     assert account["id"] == account_id and account["balance"] == 12220
 assert (json_settings.home / "data" / "whab-sandbox.json").is_file()
 assert not tuple(json_settings.home.rglob("*.sqlite"))
-print("Installed wheels: independent versions, MIT licenses, pages, assets and plugin discovery passed.")
+print("Installed wheels: curated catalog resource/contracts, independent versions, MIT licenses, pages, assets and plugin discovery passed.")
 """
 
 INDEPENDENT_VERSION = """

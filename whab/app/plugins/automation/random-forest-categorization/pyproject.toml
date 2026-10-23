@@ -17,3 +17,17 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.whab.plugin]
+requires = []
+conflicts = []
+api-version = 1
+capabilities = [
+  { name = "categorization", version = 1, composition = "additive" },
+]
+lifecycle = "restart"
+legacy = true
+authority = "unknown"
+state-version = 1
+state-upgrades = []
+support = "maintained"

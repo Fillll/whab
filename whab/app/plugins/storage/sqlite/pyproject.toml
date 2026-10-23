@@ -18,3 +18,20 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["whab_plugin_sqlite", "whab_plugin_sqlite.*"]
+
+[tool.whab.plugin]
+requires = []
+conflicts = []
+api-version = 1
+capabilities = [
+  { name = "ledger.mutate", version = 1, composition = "singleton" },
+  { name = "ledger.read", version = 1, composition = "singleton" },
+  { name = "provider.state", version = 1, composition = "singleton" },
+  { name = "provider.sync", version = 1, composition = "singleton" },
+]
+lifecycle = "restart"
+legacy = true
+authority = "unknown"
+state-version = 1
+state-upgrades = []
+support = "maintained"
