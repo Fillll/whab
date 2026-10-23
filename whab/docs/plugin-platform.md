@@ -12,7 +12,7 @@ not update the household installation or publish releases.
 | 2 | Independent public conformance kit; capability applicability; ten distinct replayable configurations | Initial storage suites and minimum/candidate installed-wheel CI tested; random configurations pending |
 | 3 | Independent durable JSON storage, strict validation, interruption tests and fictional benchmarks | Implemented and tested in draft PR [#79](https://github.com/Fillll/whab/pull/79); migration/copy authority remains separate |
 | 4 | Per-budget generations, request/background leases, admission gates, draining and stable services | Coordinator and report integration tested in draft PR [#80](https://github.com/Fillll/whab/pull/80); remaining family adapters pending |
-| 5 | Bounded worker protocol, immutable versioned environments, readiness and durable mutation outcomes | Pending |
+| 5 | Bounded worker protocol, immutable versioned environments, readiness and durable mutation outcomes | Stateless report upgrades and recovery tested in draft PR [#81](https://github.com/Fillll/whab/pull/81); financial mutation workers pending |
 | 6 | Live report/export, branding and parser replacement; then categorization/banks; then storage/UI/API interfaces | Already installed stateless reports tested in draft PR [#80](https://github.com/Fillll/whab/pull/80); code upgrades and other families pending |
 | 7 | Previewed SQLite/JSON migration, protected same-device transfer, authority journal and restart recovery | Pending |
 | 8 | Single-primary backend copies, monotonic watermarks, retry and explicit validated promotion in both directions | Pending |

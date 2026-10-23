@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.25.0 — 2026-10-23
+
+PR: [#81](https://github.com/Fillll/whab/pull/81)
+
+- Upgrade explicitly live stateless reports through bounded protocol-1 workers in separately prepared, immutable approved-wheel environments. Inspect metadata and hashes before activation, install explicit closures offline, negotiate readiness and retain prior versions after failed candidates.
+- Persist and validate device-local active worker versions across disable/re-enable and restart. Expose active version/health and explicit recovery that checks durable selection and version evidence before resuming an uncertain handover.
+- Contain malformed responses and timeouts; clean up owned process groups on cancellation and shutdown, including descendants. Add exact packaging metadata tooling dependency and document that trusted Python workers provide failure containment rather than a security sandbox.
+
 ## 2.24.0 — 2026-10-23
 
 PR: [#80](https://github.com/Fillll/whab/pull/80)
