@@ -1,0 +1,9 @@
+"""Declare an API interface; the host owns HTTPS, credentials and ledger commands."""
+
+from whab.plugins import Interface, Plugin, PluginContract, RemoteLedgerInterface
+
+plugin = Plugin(
+    "__PLUGIN_ID__", "Fictional API interface",
+    interface=Interface(adapter=RemoteLedgerInterface(token_setting="__TOKEN_SETTING__")),
+    contract=PluginContract(lifecycle="live"),
+)

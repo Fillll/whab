@@ -24,6 +24,7 @@ _BUNDLED_METADATA = {
     ("example-branding", "whab_plugin_example_branding:plugin"): ("example", "Fictional branding"),
     ("example-file-import", "whab_plugin_example_file_import:plugin"): ("example", "Fictional account import"),
     ("example-categorization", "whab_plugin_example_categorization:plugin"): ("example", "Exact merchant teaching model"),
+    ("example-api", "whab_plugin_example_api:plugin"): ("example", "Fictional API interface"),
 }
 
 

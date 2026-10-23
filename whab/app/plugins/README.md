@@ -52,6 +52,7 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | `example/example-branding/` | `example-branding` | `whab_plugin_example_branding` | Offline fictional institution branding |
 | `example/example-file-import/` | `example-file-import` | `whab_plugin_example_file_import` | Bounded fictional account parser |
 | `example/example-categorization/` | `example-categorization` | `whab_plugin_example_categorization` | Currency-scoped saved teaching model |
+| `example/example-api/` | `example-api` | `whab_plugin_example_api` | Declarative API interface with host-owned HTTPS and financial dispatch |
 
 ## Test ownership
 
@@ -91,7 +92,7 @@ This is the canonical supported-set inventory. Keep it aligned with the host's `
 
 ## Teaching examples
 
-The [teaching category](example/README.md) contains four independently packaged public-SDK examples: reporting/export, branding, file import and categorization. They are excluded from the supported bundled set and hidden from ordinary Settings. Install them with `scripts/install.py --dev --example`, then explicitly select the desired IDs; installation does not activate them. See the category guide and [activation instructions](../../docs/plugins.md#install-the-working-example).
+The [teaching category](example/README.md) contains five independently packaged public-SDK examples: reporting/export, branding, file import, categorization and a WHAB 2.34+ declarative API interface. They are excluded from the supported bundled set and hidden from ordinary Settings. Install them with `scripts/install.py --dev --example`, then explicitly select the desired IDs; installation does not activate them. See the category guide and [activation instructions](../../docs/plugins.md#install-the-working-example).
 
 ## Installation and compatibility
 

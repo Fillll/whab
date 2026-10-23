@@ -110,3 +110,29 @@ def test_generation_gate_sanitizes_unexpected_build_failures(checker, monkeypatc
     assert checker.main([]) == 1
     output = capsys.readouterr().err
     assert "RuntimeError" in output and "synthetic-private" not in output
+
+
+def test_project_minimum_recipe_is_explicit_and_must_match_actual_declared_host_floor(checker, tmp_path):
+    project = tmp_path / "api"
+    project.mkdir()
+    path = project / "pyproject.toml"
+    path.write_text('[project]\ndependencies=["whab>=2.34,<3"]\n[tool.whab.plugin-devkit]\nminimum-host="2.34.0"\n')
+    assert checker.project_minimum(project) == "2.34.0"
+    assert checker.MINIMUM_RECIPES["2.34.0"] == "ebbff0d464dd67c0269428a6d4a339778e21ec57"
+    for dependency, floor in [("whab>=2.22,<3", "2.34.0"), ("whab>=2.30,<3", "2.34.0"), ("whab>=2.34,<3", "2.22.0"), ("whab>=2.34,<3", "2.30.0"), ("whab[optional]>=2.34", "2.34.0")]:
+        path.write_text(f'[project]\ndependencies=["{dependency}"]\n[tool.whab.plugin-devkit]\nminimum-host="{floor}"\n')
+        with pytest.raises(ValueError):
+            checker.project_minimum(project)
+
+
+def test_api_minimum_uses_its_genuine_immutable_source_recipe_without_version_rewriting(checker, tmp_path):
+    calls = []
+    helper = SimpleNamespace(minimum_host_source=lambda base, env: calls.append(("legacy", base)) or "legacy-source",
+                             source_at_revision=lambda base, env, revision: calls.append(("api", revision)) or "api-source",
+                             host_version=lambda _: "2.34.0")
+    assert checker.minimum_source(helper, tmp_path / "older", {}, "2.22.0") == "legacy-source"
+    assert checker.minimum_source(helper, tmp_path / "api", {}, "2.34.0") == "api-source"
+    assert calls[-1] == ("api", checker.API_MINIMUM_HOST_COMMIT)
+    helper.host_version = lambda _: "2.22.0"
+    with pytest.raises(ValueError, match="advertised host"):
+        checker.minimum_source(helper, tmp_path / "wrong", {}, "2.34.0")

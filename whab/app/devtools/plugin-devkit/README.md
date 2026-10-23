@@ -5,7 +5,7 @@ outside runtime plugin discovery directories and contributes no runtime entry po
 Install it beside the host SDK and the plugin being tested; it does not require
 the bundled plugin set, a SQLite implementation, a provider account, or pytest at runtime.
 
-The toolkit provides synchronous storage conformance, four complete teaching
+The toolkit provides synchronous storage conformance, five complete teaching
 project generators and constrained configuration replay through public
 `whab.plugins` contracts. It requires Python 3.14+ and WHAB 2.22+ within major 2.
 Compatibility ranges require testing the minimum supported host artifact and the
@@ -34,9 +34,11 @@ whab-plugin new household-report --capability reporting --ci-ref "$WHAB_CI_COMMI
 
 Choose `reporting` for a one-currency report and CSV export, `branding` for an
 embedded fictional bank logo, `file-import` for a bounded USD account JSON parser,
-or `categorization` for a complete saved exact-merchant model lifecycle. Generated
+`categorization` for a complete saved exact-merchant model lifecycle, or `api` for
+a declarative API interface requiring WHAB 2.34+. Generated
 projects include packaging, public-SDK source, regression tests, a README and an
-MIT license. They declare restart-only lifecycle support. The categorizer learns
+MIT license. The four original templates declare restart-only lifecycle support;
+the API template declares the host-supported live lifecycle. The categorizer learns
 only reviewed posted rows, keeps currency-specific matches in its budget namespace
 and reports rule matches rather than measured predictive confidence.
 
@@ -68,11 +70,27 @@ migration, process restart and acknowledged-data checks. It exercises the
 candidate's applicable public hooks before and after; candidate disable/enable
 runs only when its declaration and peer dependencies permit it. Restart-only
 generated candidates remain selected, with that limitation recorded explicitly.
-Candidates with provider factories, interfaces or context binders are explicitly
+Candidates with provider factories, legacy API factories, or context binders are explicitly
 inapplicable to this bounded native profile; those factories are never started.
 Hook probes use the public SDK with fictional inputs. The profile verifies active
 candidate selection after reopen; it does not yet train and preserve an opaque
 host-owned model through these transitions.
+
+The separate `native-api-v1` recipe requires WHAB 2.34 and a validated data-only
+`RemoteLedgerInterface` enabling both queries and commands. It retains the format-2
+reader while naming a new versioned profile, so `native-local-v1` manifests keep
+their exact meaning. In every API configuration the kit generates an ephemeral
+host token, activates the exact approved candidate wheel in an immutable worker,
+then tests native HTTPS authorization, host/origin and budget guards, financial
+validation and identical request retries. The worker closure includes only the
+host, candidate and their runtime dependencies; SQLite, JSON, toolkit and peer
+registrations stay outside that child. The same candidate participates in the
+recorded live selections and local migration/copy steps, and authenticated queries
+and the exact saved worker are checked after restart. Token values and financial
+records never enter replay artifacts. This tests worker execution of one exact
+artifact; it does not claim a distinct-version code upgrade or retry durability
+across a host restart. Query-only/command-only declarations can use the direct
+public API probe but remain inapplicable to this complete financial profile.
 
 Precise faults are invalid selection preflight, consumed-preview reuse, stale
 copy authority requiring reattachment, and SIGKILL after an acknowledged primary
@@ -271,7 +289,7 @@ and coverage result. It contains no financial records, snapshots, credentials or
 temporary runtime paths. Dependencies/build tools may need network access while
 preparing wheels; no provider account or bank connection is used. This initial
 gate validates maintained artifacts. The separate generated-project gate builds
-all four projects using an installed toolkit and validates every project wheel
+all five projects using an installed toolkit and validates every project wheel
 outside the checkout:
 
 ```sh
@@ -280,10 +298,13 @@ outside the checkout:
 
 Each family must pass its installed regression tests with 100% statement and
 branch coverage, ten distinct configurations and replay of all ten manifests on
-the minimum and candidate host artifacts. When those versions coincide, one
-artifact covers both roles. The optional report preserves the manifests and
-exact wheel evidence; it does not claim lifecycle, schema migration or budget
-copy coverage.
+the each project’s genuine minimum and candidate host artifacts. The four original
+families retain the 2.22.0 recipe; API uses genuine 2.34.0 source pinned at
+`ebbff0d464dd67c0269428a6d4a339778e21ec57`. When a project’s minimum and candidate
+versions coincide, one actual artifact is recorded with both roles. API is never
+installed on 2.22 or counted as an old-host runtime pass. The optional report preserves the manifests and
+exact wheel evidence; the versioned native-profile results distinguish actual lifecycle/migration/copy
+execution from unsupported-host N/A results.
 
 The full repository gate runs both toolkit and generated-project checks. Use
 `scripts/check.py --evidence-dir /absolute/new/evidence` to retain the reviewed
@@ -307,10 +328,12 @@ source/build/test code to execute. The workflow has read-only repository access,
 does not inherit secrets, and does not provide security sandboxing.
 
 The selected WHAB commit supplies the current candidate host, toolkit and SQLite
-reference. The immutable `bac249ca0e62638a40a6effc44af741c283e83d7` source supplies
-the genuine 2.22.0 minimum host and a compatible SQLite reference. These are two
-distinct real host artifacts; their version metadata is never rewritten to test
-compatibility. The installed toolkit retains its declared minimum host floor.
+reference. The project’s `[tool.whab.plugin-devkit] minimum-host` selects a known immutable
+recipe matching its declared WHAB floor: `bac249ca0e62638a40a6effc44af741c283e83d7`
+for 2.22.0, or `ebbff0d464dd67c0269428a6d4a339778e21ec57` for the API family’s
+2.34.0. A compatible actual SQLite reference accompanies each host. Different
+minimum/current versions produce distinct real artifacts; equal versions share
+one artifact with both roles. Version metadata is never rewritten for compatibility. The installed toolkit retains its declared minimum host floor.
 
 The shared runner builds the caller project once, then creates independent
 environments outside both source checkouts. Only candidate/reference plugin
@@ -321,9 +344,9 @@ file at 100% statement/branch coverage, ten distinct configurations, all adverti
 SQLite reference suites, and all ten exact-artifact replays. Missing/empty/skipped
 project tests and missing/broken advertised suites fail. Unsupported optional
 reference capabilities remain explicit `not-applicable` results; they are never
-used to hide failures. This profile covers the four generated teaching families
-and their fictional hook probes, not arbitrary provider formats or lifecycle
-certification. Add project-specific public-contract tests when extending them.
+used to hide failures. The installed profile covers the five generated teaching families and their
+explicit public probes. The API native recipe also tests its scoped HTTP/worker
+behavior; this is not arbitrary provider or all-family lifecycle certification. Add project-specific public-contract tests when extending them.
 
 Dependency preparation is separate from runtime capability selection. Only host,
 toolkit, SQLite reference, pinned test tools and pinned Setuptools build tools are
