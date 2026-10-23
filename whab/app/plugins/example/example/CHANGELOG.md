@@ -1,5 +1,11 @@
 # Example report and export plugin changelog
 
+## 1.4.0 — 2026-10-23
+
+PR: [#80](https://github.com/Fillll/whab/pull/80)
+
+- Declare the stateless report/export live lifecycle contract and require WHAB 2.24+. Document live enable/disable, generation status and saved selection without changing integer-currency reports or exports.
+
 ## 1.3.1 — 2026-10-16
 
 PR: [#40](https://github.com/Fillll/whab/pull/40)

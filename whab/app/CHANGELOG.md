@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.24.0 — 2026-10-23
+
+PR: [#80](https://github.com/Fillll/whab/pull/80)
+
+- Add per-budget runtime generations, request/background leases, stable service handles, admission gating, serialized draining and reverse resource retirement. Preserve admitted work on cancellation; gate uncertain commits for explicit validated recovery.
+- Pin default and secondary-budget dispatch to one generation. Enable explicit live selection of stateless report/export plugins while preserving ledger revisions, command retry state, bank services and storage; expose transition progress, health and attributed diagnostics.
+- Update the independent teaching report to 1.4.0 with its explicit live contract. Other families and legacy plugins retain their documented restart requirement pending adapters.
+
 ## 2.23.0 — 2026-10-23
 
 PR: [#79](https://github.com/Fillll/whab/pull/79)
