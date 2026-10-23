@@ -32,6 +32,109 @@ from whab.plugins.environments import (
 from whab.plugins.report_worker import ReportWorker
 
 
+def test_application_upgrades_real_reports_without_losing_ledger_or_reopen_version(tmp_path, local_closure, store, monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    from whab.app import create_app
+    from whab.config import Settings
+    from whab.plugins import (
+        ExportTable,
+        Insight,
+        Plugin,
+        PluginContract,
+        PluginError,
+        PluginRegistry,
+    )
+
+    template = Plugin("fictional-reports", "Fictional reports",
+                      insights=lambda _: (Insight("Version", "host"),),
+                      export=lambda _: ExportTable(("version",), (("host",),)),
+                      contract=PluginContract(lifecycle="live"))
+    entry = SimpleNamespace(name=template.id, group="whab.plugins", load=lambda: template)
+    monkeypatch.setattr("whab.plugins.management.installed_entrypoints", lambda: (entry,))
+    monkeypatch.setattr("whab.app.installed_entrypoints", lambda: (entry,))
+    configuration = Settings(tmp_path / "runtime", 5173, "sandbox", "", "", "", False,
+                             "", "", (template.id,), ui="")
+    def registry():
+        return PluginRegistry((template,))
+    app = create_app(store=store, settings=configuration, plugins=registry())
+
+    def settle(client):
+        async def wait():
+            if app.state.live_plugins._tasks:
+                await asyncio.gather(*tuple(app.state.live_plugins._tasks), return_exceptions=True)
+        client.portal.call(wait)
+
+    def upgrade(client, wheel):
+        response = client.post("/api/plugins/management/upgrade", json={
+            "pluginId": template.id,
+            "wheels": [{"path": str(item.path), "sha256": item.sha256} for item in (*local_closure, approve(wheel))],
+        })
+        assert response.status_code == 202
+        settle(client)
+        return next(item for item in client.get("/api/plugins/runtime").json()["operations"] if item["id"] == response.json()["id"])
+
+    def exported(client):
+        response = client.get("/api/plugins/fictional-reports/export?workspace=personal&month=2026-10")
+        assert response.status_code == 200
+        return response.text
+
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        account = client.post("/api/accounts", json={"workspace": "personal", "name": "Fictional stable account",
+                                                   "type": "depository", "balance": 12345}).json()["accountId"]
+        ledger, revision = app.state.ledger_service, app.state.ledger_service.revision
+        assert "host" in exported(client)
+        assert upgrade(client, make_wheel(tmp_path, "1.0.0"))["state"] == "complete"
+        first = app.state.budget_runtime._active.services["plugins"].workers[template.id]
+        assert "1.0.0" in exported(client) and first.worker.healthy
+        broken = make_wheel(tmp_path, "3.0.0", source="raise RuntimeError('synthetic-private-startup')\n")
+        assert upgrade(client, broken)["state"] == "failed"
+        assert "1.0.0" in exported(client) and first.worker.healthy
+        assert app.state.budget_runtime.status()["generation"] == 2
+        from whab.plugins import worker_selection
+
+        original_save = worker_selection.save_reference
+
+        def lost_response(home, prepared):
+            original_save(home, prepared)
+            raise OSError("synthetic failure after durable report decision")
+
+        monkeypatch.setattr(worker_selection, "save_reference", lost_response)
+        assert upgrade(client, make_wheel(tmp_path, "2.0.0"))["state"] == "failed"
+        assert app.state.budget_runtime.status()["health"] == "recovery_required"
+        monkeypatch.setattr(worker_selection, "save_reference", original_save)
+        refused = client.post("/api/plugins/management/recover", json={"authority": "active"})
+        assert refused.status_code == 409 and refused.json()["code"] == "recovery_failed"
+        recovered = client.post("/api/plugins/management/recover", json={"authority": "candidate"})
+        assert recovered.status_code == 200 and recovered.json()["generation"] == 3
+        second = app.state.budget_runtime._active.services["plugins"].workers[template.id]
+        assert "2.0.0" in exported(client) and not first.worker.healthy
+        assert app.state.ledger_service is ledger and ledger.revision == revision
+        for selection in ([], [template.id]):
+            response = client.post("/api/plugins/management/transition", json={"plugins": selection})
+            assert response.status_code == 202
+            settle(client)
+        assert not second.worker.healthy and "2.0.0" in exported(client)
+        versions = client.get("/api/plugins/runtime").json()["workers"]
+        assert versions[0]["version"] == "2.0.0" and versions[0]["health"] == "ready"
+        assert "fictional_reports" not in sys.modules
+    # A fresh application loads its saved content-addressed environment rather
+    # than the host's still-installed report implementation.
+    app = create_app(store=store, settings=configuration, plugins=registry())
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        assert "2.0.0" in exported(client)
+        found = client.get("/api/workspace?workspace=personal").json()["accounts"][0]
+        assert found["id"] == account and found["balance"] == 12345
+    code, = second.environment.path.glob("environment/lib/python*/site-packages/fictional_reports/__init__.py")
+    code.write_text("raise RuntimeError('tampered environment must not execute')\n")
+    with pytest.raises(PluginError) as raised:
+        create_app(store=store, settings=configuration, plugins=registry())
+    assert raised.value.code == "worker_environment_unavailable"
+
+
 def approve(path):
     return ApprovedWheel(path, hashlib.sha256(path.read_bytes()).hexdigest())
 

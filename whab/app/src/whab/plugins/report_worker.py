@@ -279,6 +279,10 @@ class ReportWorker:
     def cleanup_pending(self):
         return self._retiring is not None
 
+    @property
+    def healthy(self):
+        return self._process is not None and self._process.poll() is None
+
     def _request(self, operation, snapshot):
         with self._lock:
             if self._process is None:

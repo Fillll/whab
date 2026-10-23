@@ -46,9 +46,10 @@ def live_report(plugin):
 class RegistryGeneration:
     """Replace report hooks while retaining unchanged providers and their caches."""
 
-    def __init__(self, registry, stable=None):
+    def __init__(self, registry, stable=None, workers=None):
         self.registry = registry
         self.stable = stable or registry
+        self.workers = dict(workers or {})
 
     def describe(self):
         return self.registry.describe()
@@ -93,13 +94,15 @@ class LeasedPluginRegistry:
 class LivePluginSelection:
     """Validate report-only changes and publish saved selections under the gate."""
 
-    def __init__(self, runtime, required, entrypoints, persist, session=None, nonlive=()):
+    def __init__(self, runtime, required, entrypoints, persist, session=None, nonlive=(), home=None):
         self.runtime = runtime
         self.required = frozenset(required)
         self.entrypoints = entrypoints
         self.persist = persist
         self.session = session
         self.nonlive = frozenset(nonlive)
+        self.home = home
+        self.initial_selection = frozenset(plugin.id for plugin in runtime._active.services["plugins"].descriptors()) - self.required
         self._lock = Lock()
         self._tickets = {}
         self._tasks = set()
@@ -107,8 +110,17 @@ class LivePluginSelection:
     def status(self):
         with self._lock:
             operations = [dict(ticket) for ticket in self._tickets.values()]
+        workers = []
+        # Status must remain available while admission is gated. The immutable
+        # active generation is safe to inspect here; no hook is invoked.
+        for identifier, binding in self.runtime._active.services["plugins"].workers.items():
+            workers.append({"plugin": identifier, "version": binding.environment.version,
+                            "distribution": binding.environment.distribution,
+                            "environment": binding.environment.identifier,
+                            "health": "ready" if binding.worker.healthy else "failed"})
         return {"families": ["reporting.insights", "reporting.export"],
-                "code_upgrades": False, "runtime": self.runtime.status(), "operations": operations}
+                "code_upgrades": self.home is not None, "runtime": self.runtime.status(),
+                "workers": sorted(workers, key=lambda item: item["plugin"]), "operations": operations}
 
     def _candidate(self, selection, active):
         selection = validate_selection(selection)
@@ -140,7 +152,8 @@ class LivePluginSelection:
             for record in manifest["plugins"]:
                 record["enabled"] = record["id"] in self.required | set(selection)
             check_saved_states(manifest, registry.descriptors())
-        return RegistryGeneration(registry, active.stable)
+        return RegistryGeneration(registry, active.stable,
+                                  {name: binding for name, binding in active.workers.items() if name in selection})
 
     def _preflight(self, selection):
         # The scheduling request already owns a generation. This scope also
@@ -176,6 +189,58 @@ class LivePluginSelection:
         await run_in_threadpool(self._preflight, selection)
         return await self._activate(selection)
 
+    async def upgrade(self, plugin_id, approvals):
+        from .worker_selection import upgrade_report
+
+        if self.home is None:
+            raise PluginError("This runtime cannot persist worker environments.", code="restart_required", plugin_id=plugin_id)
+        return await upgrade_report(self, self.home, plugin_id, approvals)
+
+    async def recover(self, authority):
+        from .worker_selection import validate_saved_generation
+
+        async def validate(chosen, active, candidate):
+            generation = active if chosen == "active" else candidate
+            return await run_in_threadpool(validate_saved_generation, self, generation)
+
+        # Recovery itself cannot hold a request lease from the gated budget.
+        task = self.runtime.schedule(self.runtime.recover(authority, validate))
+        return await asyncio.shield(task)
+
+    def schedule_upgrade(self, plugin_id, approvals):
+        identifier = str(uuid4())
+        with self._lock:
+            if sum(ticket["state"] in {"queued", "running"} for ticket in self._tickets.values()) >= 32:
+                raise PluginError("Too many live transitions are pending.", code="transition_busy", plugin_id=plugin_id)
+            self._tickets[identifier] = {"id": identifier, "state": "queued", "error": None}
+
+            for previous in tuple(self._tickets):
+                if len(self._tickets) <= 32:
+                    break
+                if self._tickets[previous]["state"] not in {"queued", "running"}:
+                    self._tickets.pop(previous)
+
+        async def run():
+            with self._lock:
+                self._tickets[identifier]["state"] = "running"
+            try:
+                result = await self.upgrade(plugin_id, approvals)
+            except (Exception, asyncio.CancelledError) as error:
+                with self._lock:
+                    self._tickets[identifier].update(state="failed", error={
+                        "code": error.code if isinstance(error, PluginError) else "worker_upgrade_failed",
+                        "plugin_id": plugin_id, "message": "The report upgrade failed. Inspect runtime authority and preserve the active environment before retrying.",
+                    })
+                raise
+            with self._lock:
+                self._tickets[identifier]["state"] = "complete"
+            return result
+
+        task = self.runtime.schedule(run())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return identifier
+
     async def _activate(self, selection, ticket=None):
         async def prepare(preparation):
             if ticket:
@@ -183,7 +248,18 @@ class LivePluginSelection:
                     self._tickets[ticket]["state"] = "running"
             active = preparation.active.services["plugins"]
             candidate = await run_in_threadpool(self._candidate, selection, active)
-            return RuntimeCandidate({**preparation.active.services, "plugins": candidate}, preparation.active.resources)
+            if self.home is not None:
+                from .worker_selection import restore_workers
+
+                registry, bindings = await run_in_threadpool(restore_workers, self.home, candidate.registry, candidate.workers)
+                candidate = RegistryGeneration(registry, active.stable, bindings)
+                for name, binding in bindings.items():
+                    if name not in active.workers:
+                        preparation.own(binding.resource)
+            removed = {id(binding.resource) for name, binding in active.workers.items() if name not in candidate.workers}
+            resources = tuple(resource for resource in preparation.active.resources if id(resource) not in removed)
+            resources += tuple(binding.resource for name, binding in candidate.workers.items() if name not in active.workers)
+            return RuntimeCandidate({**preparation.active.services, "plugins": candidate}, resources)
 
         async def commit(candidate, _number):
             registry = candidate.services["plugins"]
@@ -210,5 +286,4 @@ class LivePluginSelection:
         # caller disconnected. Settle them before retiring host services.
         if self._tasks:
             await asyncio.gather(*tuple(self._tasks), return_exceptions=True)
-        if self.runtime.status()["health"] != "recovery_required":
-            await self.runtime.close()
+        await self.runtime.shutdown()

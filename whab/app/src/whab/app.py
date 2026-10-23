@@ -35,6 +35,7 @@ from whab.plugins.live import (
 )
 from whab.plugins.management import PluginManager, installed_entrypoints
 from whab.plugins.storage import close_storage, open_storage
+from whab.plugins.worker_selection import restore_workers
 from whab.services.categorization import CategorizationService, local_context
 from whab.services.receipts import ReceiptService
 from whab.storage.bank import BankStore
@@ -208,14 +209,21 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             close_storage(store)
         raise
     banks = {}
+    worker_home = budget_session.storage_home if budget_session else settings.home
+    try:
+        plugins, worker_bindings = restore_workers(worker_home, plugins)
+    except BaseException:
+        if owned_store:
+            close_storage(store)
+        raise
     runtime = BudgetRuntime(service.budget_id, {
-        "plugins": RegistryGeneration(plugins), "ledger": service,
+        "plugins": RegistryGeneration(plugins, workers=worker_bindings), "ledger": service,
         "storage": store, "banks": banks,
-    })
+    }, tuple(binding.resource for binding in worker_bindings.values()))
     registry = LeasedPluginRegistry(runtime)
     plugin_manager = PluginManager(settings, registry, budget_session=budget_session)
     live = LivePluginSelection(runtime, plugin_manager.required, installed_entrypoints,
-                               plugin_manager.persist_live, budget_session, nonlive)
+                               plugin_manager.persist_live, budget_session, nonlive, worker_home)
     plugin_manager.live = live
 
     @asynccontextmanager
@@ -387,6 +395,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 budget=budget_session.context(plugin.id) if budget_session else None,
             )))
         except Exception:
+            for binding in reversed(tuple(worker_bindings.values())):
+                binding.worker.close()
             if owned_store:
                 close_storage(store)
             raise PluginError("Interface plugin could not start. Check its configuration.", code="interface_startup_failed", plugin_id=plugin.id) from None

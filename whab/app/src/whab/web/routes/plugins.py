@@ -15,7 +15,14 @@ from whab.plugins import PluginError
 from whab.web.csv import safe_cell
 from whab.web.navigation import budget_key
 from whab.web.plugin_snapshot import build_snapshot
-from whab.web.schemas import BankLogoPreviewBody, PluginSelectionBody, Workspace, valid_month
+from whab.web.schemas import (
+    BankLogoPreviewBody,
+    PluginRecoveryBody,
+    PluginSelectionBody,
+    PluginUpgradeBody,
+    Workspace,
+    valid_month,
+)
 
 
 def create_router(store, plugins, plugin_manager=None):
@@ -45,6 +52,32 @@ def create_router(store, plugins, plugin_manager=None):
             return JSONResponse({"error": str(error), "code": error.code,
                                  "plugin_id": error.plugin_id}, status_code=409)
         return {"id": identifier, "accepted": True, "status": plugin_manager.live.status()}
+
+    @router.post("/management/upgrade", status_code=202)
+    async def upgrade(request: Request, body: PluginUpgradeBody):
+        if request.scope.get("whab.workspace") == "demo":
+            raise HTTPException(403, "This operation requires your own budget")
+        if plugin_manager is None or plugin_manager.live is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        from whab.plugins.environments import ApprovedWheel
+
+        identifier = plugin_manager.live.schedule_upgrade(body.pluginId, tuple(
+            ApprovedWheel(wheel.path, wheel.sha256) for wheel in body.wheels
+        ))
+        return {"id": identifier, "accepted": True}
+
+    @router.post("/management/recover")
+    async def recover(request: Request, body: PluginRecoveryBody):
+        if request.scope.get("whab.workspace") == "demo":
+            raise HTTPException(403, "This operation requires your own budget")
+        if plugin_manager is None or plugin_manager.live is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        try:
+            generation = await plugin_manager.live.recover(body.authority)
+        except PluginError as error:
+            return JSONResponse({"error": str(error), "code": error.code,
+                                 "plugin_id": error.plugin_id}, status_code=409)
+        return {"generation": generation, "status": plugin_manager.live.status()}
 
     @router.post("/bank-logo-preview")
     def preview_bank_logo(request: Request, body: BankLogoPreviewBody):
