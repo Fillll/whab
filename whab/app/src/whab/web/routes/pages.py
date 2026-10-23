@@ -60,7 +60,7 @@ def create_router(
                 '<!doctype html><html lang="en"><meta charset="utf-8">'
                 '<title>Continue bank connection</title>'
                 '<p id="oauth-status">Returning to the budget that started this connection…</p>'
-                f'<script src="{prefix}/plugins/plaid/static/oauth.js"></script></html>'
+                f'<script src="{prefix}/banks/plaid/{plugins.bank_identity("plaid")}/static/oauth.js"></script></html>'
             )
         return RedirectResponse(target, status_code=303)
 
@@ -250,7 +250,7 @@ def create_router(
 
         context["bank_panels"] = [
             {
-                "template": f"plugins/{p.id}/accounts.html",
+                "template": f"banks/{p.id}/{plugins.bank_identity(p.id)}/accounts.html",
                 "status": public_bank_status(banks[p.id], environment),
                 "items": bank_stores[p.id].items() if workspace == "personal" else [],
             }
@@ -259,7 +259,7 @@ def create_router(
         ]
         context["bank_source_ids"] = tuple(p.id for p in plugins.bank_plugins())
         context["plugin_scripts"] = [
-            f"{asset_prefix}/plugins/{p.id}/static/connect.js?v={context['version']}"
+            f"{asset_prefix}/banks/{p.id}/{plugins.bank_identity(p.id)}/static/connect.js"
             for p in plugins.bank_plugins()
             if p.bank_ui and p.id in banks and workspace == "personal"
         ]

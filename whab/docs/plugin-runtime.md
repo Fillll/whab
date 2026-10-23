@@ -48,8 +48,11 @@ restart requirement until their adapters are implemented.
 Explicit stateless branding and file-parser descriptors also support live
 selection. Bank-logo settings actions have only their public cache authority;
 file parsers receive upload bytes and return a validated `WorkspaceImport`.
-General budget binders, saved-state upgrades, financial storage/provider factories
-remain outside these stateless adapters. A zero-argument
+General budget binders, saved-state upgrades, financial storage and legacy provider factories
+remain outside these stateless adapters. Explicit `BankAdapter` providers use the
+separate [bank worker lifecycle](plugin-workers.md#bank-provider-workers): active
+requests/background synchronization drain, pending/uncertain connection flows
+defer replacement, and native writes retain public atomic command receipts. A zero-argument
 `branding_factory` can return independent artwork/settings hooks with the same
 identity and effective contract; it receives no budget context or credentials.
 The host resolves the selection before invoking factories during preparation.
@@ -74,7 +77,7 @@ gated. Cleanup never repeats a financial mutation, decides transition authority,
 or clears a native financial recovery gate. Host shutdown retries retained owners;
 historical diagnostics may remain after cleanup succeeds.
 
-Live changes preserve the existing ledger revision, retry receipts, bank objects,
+Unrelated live changes preserve the existing ledger revision, retry receipts, bank objects,
 storage and provider caches. Unknown/disabled optional namespaces remain in the
 saved budget. Failed candidate resolution or preparation leaves the active report
 selection unchanged. Persisting selection happens only after the affected budget

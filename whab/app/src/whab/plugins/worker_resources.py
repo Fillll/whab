@@ -5,7 +5,7 @@ import os
 import stat
 from pathlib import Path
 
-from .sdk import FileImport, PluginResources
+from .sdk import BankUI, FileImport, PluginResources
 from .wire import WireError
 
 
@@ -17,6 +17,14 @@ def capture_resources(parser):
     if result is not None:
         FileImport(parser.parse, resources=result)
     return result
+
+
+def capture_bank_resources(ui):
+    if ui is None:
+        return None
+    resources = ui.resources or capture_resource_paths(ui.templates, ui.static)
+    BankUI(resources=resources)
+    return resources
 
 
 def capture_resource_paths(templates, static):
