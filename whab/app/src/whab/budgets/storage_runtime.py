@@ -475,7 +475,8 @@ class StorageRuntime:
             return open_storage(target, plan["context"])
         def build(active, prepared):
             descriptors = tuple(target if plugin.id == plan["source"] else plugin for plugin in active.services["plugins"].descriptors())
-            registry = RegistryGeneration(PluginRegistry(descriptors), stable=active.services["plugins"])
+            registry = RegistryGeneration(PluginRegistry(descriptors), stable=active.services["plugins"],
+                                          workers=active.services["plugins"].workers)
             return RuntimeCandidate({**active.services, "storage": prepared, "plugins": registry}, active.resources)
         async def flush():
             await asyncio.to_thread(self.locations.freeze_original, self.session)
