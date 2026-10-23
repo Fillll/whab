@@ -3,14 +3,18 @@
 import os
 import stat
 import tempfile
+from copy import deepcopy
+from functools import partial
 from pathlib import Path
 from threading import RLock
 from uuid import NAMESPACE_URL, uuid5
 
+from packaging.utils import parse_wheel_filename
+
 from whab.web.visual_interface import VisualGeneration
 
 from .effect_store import EffectError, _mkdir, digest, encode, fsync_directory
-from .environments import prepare_environment
+from .environments import MAX_WHEELS, ApprovedWheel, prepare_environment
 from .runtime import PluginError
 from .sdk import Plugin, PluginContract, PluginResources, UserInterface, valid_plugin_name
 from .ui_resources import UIResourceArchive
@@ -20,6 +24,13 @@ from .worker_selection import _start
 
 _CLEANUP = {}
 _CLEANUP_LOCK = RLock()
+
+
+def _track(home, worker):
+    with _CLEANUP_LOCK:
+        retained = _CLEANUP.setdefault(str(Path(home).resolve()), [])
+        if all(worker is not prior for prior in retained):
+            retained.append(worker)
 
 
 def _retire(home, worker):
@@ -93,7 +104,7 @@ def _preserve(selected, revision):
     raw = selected.store._raw
     descriptor, temporary = tempfile.mkstemp(prefix=".visual-choice-", dir=directory)
     try:
-        with os.fdopen(descriptor, "wb") as target:
+        with os.fdopen(descriptor, "wb", closefd=False) as target:
             target.write(raw)
             target.flush()
             os.fsync(target.fileno())
@@ -104,14 +115,17 @@ def _preserve(selected, revision):
                 raise _failed()
         fsync_directory(directory)
     finally:
-        Path(temporary).unlink(missing_ok=True)
+        try:
+            os.close(descriptor)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
 
 
-def _publish(selected, expected_revision, selection, generation, worker):
+def _publish(selected, expected_revision, selection, generation, worker, *, decision_id=None):
     _revision(expected_revision)
     identity = digest(encode({"scope": selected.store.scope, "expected": expected_revision,
                              "selection": selection, "generation": generation, "worker": worker}, 4096))
-    decision = {"id": str(uuid5(NAMESPACE_URL, "whab-visual-repair-v1:" + identity)),
+    decision = {"id": decision_id or str(uuid5(NAMESPACE_URL, "whab-visual-repair-v1:" + identity)),
                 "selection": selection, "generation": generation, "worker": worker}
     with selected.store.lock:
         current = selected.snapshot()
@@ -127,24 +141,44 @@ def _publish(selected, expected_revision, selection, generation, worker):
 def _candidate(home, plugin_id, approvals):
     """Only fresh approved code executes; the native/saved descriptor is unused."""
     _reap(home)
-    prepared = prepare_environment(Path(home) / "plugin-workers" / "environments", plugin_id, approvals)
-    template = Plugin(plugin_id, plugin_id, contract=PluginContract(lifecycle="live"), ui=UserInterface(
-        None, None, proxy_context, resources=PluginResources({"templates/base.html": b""}), view_protocol=1))
-    proxy, binding = _start(template, prepared, home)
     try:
+        prepared = prepare_environment(Path(home) / "plugin-workers" / "environments", plugin_id, approvals,
+                                       worker_owner=partial(_track, home))
+        template = Plugin(plugin_id, plugin_id, contract=PluginContract(lifecycle="live"), ui=UserInterface(
+            None, None, proxy_context, resources=PluginResources({"templates/base.html": b""}), view_protocol=1))
+        proxy, binding = _start(template, prepared, home, worker_owner=partial(_track, home))
         if not supports_live_visual(proxy):
             raise _failed()
         visual = VisualGeneration.prepare(proxy, UIResourceArchive(home), code_identity=prepared.identifier)
         for page in ("budget", "transactions", "insights", "accounts"):
             binding.worker.render_ui(readiness_arguments(page))
-        _retire(home, binding.worker)
+        _reap(home)
         return visual, {"environment": prepared.identifier, "distribution": prepared.distribution, "version": prepared.version}
     except BaseException:
         try:
-            _retire(home, binding.worker)
+            _reap(home)
         except Exception:
             pass
         raise
+
+
+def _request_id(selected, expected_revision, plugin_id, approvals):
+    # An acknowledged retry needs only its bounded public artifact identity.
+    # Do not reopen wheel files or execute code to read a durable receipt.
+    if type(approvals) is not tuple or not 1 <= len(approvals) <= MAX_WHEELS:
+        raise _failed()
+    artifacts = []
+    for approval in approvals:
+        if type(approval) is not ApprovedWheel or len(approval.path.name) > 255:
+            raise _failed()
+        parse_wheel_filename(approval.path.name)
+        artifacts.append({"filename": approval.path.name, "sha256": approval.sha256})
+    artifacts.sort(key=lambda row: row["filename"])
+    if len({row["filename"] for row in artifacts}) != len(artifacts):
+        raise _failed()
+    identity = digest(encode({"scope": selected.store.scope, "expected": expected_revision,
+                             "plugin": plugin_id, "artifacts": artifacts}, 64 * 1024))
+    return str(uuid5(NAMESPACE_URL, "whab-visual-approved-repair-v1:" + identity))
 
 
 def replace_saved_visual_worker(home, budget_id, environment, plugin_id, approvals, *, expected_revision):
@@ -160,15 +194,18 @@ def replace_saved_visual_worker(home, budget_id, environment, plugin_id, approva
             raise _failed()
         with _owner(home, budget_id, environment) as selected:
             current = selected.snapshot()
+            decision_id = _request_id(selected, expected_revision, plugin_id, approvals)
+            previous = next((row for row in current["decisions"] if row["id"] == decision_id), None)
+            if previous is not None:
+                _history(selected, expected_revision)
+                return deepcopy(previous)
             if selected.revision(current) != expected_revision:
                 _history(selected, expected_revision)
+                raise EffectError("effect_conflict")
             if current["selection"] != plugin_id:
-                # A completed exact retry can be recognized by its receipt even
-                # after a later explicit disable; no older code is executed.
-                if selected.revision(current) == expected_revision:
-                    raise EffectError("effect_conflict")
+                raise EffectError("effect_conflict")
             visual, worker = _candidate(home, plugin_id, approvals)
-            return _publish(selected, expected_revision, plugin_id, visual.generation, worker)
+            return _publish(selected, expected_revision, plugin_id, visual.generation, worker, decision_id=decision_id)
     except EffectError:
         raise
     except Exception:

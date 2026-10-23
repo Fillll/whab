@@ -18,8 +18,9 @@ changes financial authority or selects another storage backend.
 Open the listener's root page. Initially it reads installed entry-point/package
 metadata and validated saved configuration. It does not load plugin entry-point
 targets, open a storage backend, start workers, fetch artwork or connect to a bank.
-Disabled or unavailable names remain visible. Storage and the configured interface
-remain required; repair their installed packages separately if they cannot start.
+Disabled or unavailable names remain visible. Storage and the selected interface
+remain required until an explicit recovery decision changes the visual selection.
+Repair unavailable storage packages separately.
 The catalog cannot establish a disabled plugin's runtime capability compatibility.
 
 Select optional plugins and choose **Disable checked plugins** to remove them from
@@ -43,6 +44,16 @@ worker-version decision; a later successful startup uses the reviewed descriptor
 installed in the host environment. It does not choose or download a replacement.
 Worker reference inspection does not execute an environment interpreter or claim
 that an environment is healthy.
+
+The separate saved visual decision appears with its selected plugin, resource
+generation and approved worker identity. **Select headless startup** preserves its
+exact prior decision in `visual-ui/history/` and explicitly selects no visual
+interface for the next full startup. Retained worker references, resources and
+opaque plugin state survive. This action never executes old UI code, opens a
+backend or chooses another interface. It requires the current recovery revision
+and refuses a running visual owner, invalid scope or unreadable journal. To
+replace a stopped visual worker with approved current-host wheels, use the
+[stopped visual repair helpers](plugin-workers.md#visual-interface-workers).
 
 Choose **Retry full startup** after making the intended repairs. WHAB explicitly
 constructs the full application and enters its complete startup lifespan. Only a
@@ -87,6 +98,7 @@ revision token:
 | `POST /api/recovery/disable` | `{"revision": "…", "plugins": ["fictional-report"]}` |
 | `POST /api/recovery/selection/clear-invalid` | `{"revision": "…"}` |
 | `POST /api/recovery/workers/fictional-report/reset` | `{"revision": "…"}` |
+| `POST /api/recovery/visual/disable` | `{"revision": "…"}` |
 | `POST /api/recovery/retry` | `{"revision": "…"}` |
 
 Stale revisions reject with HTTP 409. Recovery decisions use a local POSIX file

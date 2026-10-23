@@ -34,6 +34,21 @@ from whab.plugins.environments import (
 from whab.plugins.report_worker import ReportWorker
 
 
+def test_pending_preparation_child_preserves_its_environment_until_owner_retires_it(tmp_path):
+    from types import SimpleNamespace
+
+    environment = tmp_path / "unpublished-environment"
+    environment.mkdir()
+    sentinel = environment / "preserved.py"
+    sentinel.write_bytes(b"fictional approved code")
+    created = [environment]
+    with pytest.raises(EnvironmentPreparationError) as caught:
+        with environments._candidate_cleanup(created, "fictional", [SimpleNamespace(cleanup_pending=True)]):
+            raise RuntimeError("fictional preparation failure")
+    assert caught.value.code == "environment_cleanup_failed"
+    assert sentinel.read_bytes() == b"fictional approved code" and not created
+
+
 def test_application_upgrades_real_reports_without_losing_ledger_or_reopen_version(tmp_path, local_closure, store, monkeypatch):
     import asyncio
     from types import SimpleNamespace
@@ -150,7 +165,7 @@ def approve(path):
 
 
 def test_real_visual_worker_versions_keep_code_resource_identity_and_failed_readiness_preserves_old(tmp_path, local_closure):
-    from whab.plugins import Plugin, PluginContract, PluginResources, UserInterface
+    from whab.plugins import Plugin, PluginContract, PluginRegistry, PluginResources, UserInterface
     from whab.plugins.ui_resources import UIResourceArchive, capture_visual
     from whab.plugins.ui_worker import readiness_arguments
     from whab.plugins.worker_selection import _start
@@ -185,7 +200,8 @@ def test_real_visual_worker_versions_keep_code_resource_identity_and_failed_read
             prepare_environment(root, template.id, (*local_closure, wheel("1.1.0", broken=True)))
         assert old.worker.healthy
         assert old_proxy.ui.render(readiness_arguments("accounts")) == b"<p>1.0.0:0</p>"
-        second = prepare_environment(root, template.id, (*local_closure, wheel("2.0.0")))
+        approved_second = wheel("2.0.0")
+        second = prepare_environment(root, template.id, (*local_closure, approved_second))
         new_proxy, new = _start(template, second)
         try:
             new_bundle = archive.store(capture_visual(template.id, new_proxy.ui, second.identifier))
@@ -204,6 +220,37 @@ def test_real_visual_worker_versions_keep_code_resource_identity_and_failed_read
             reopened.close()
     finally:
         old.worker.close()
+
+    # A stopped recovery publishes only fresh approved code. The old saved
+    # interpreter is deliberately unavailable at the runtime's expected path.
+    from uuid import uuid4
+
+    from whab.plugins.ui_repair import replace_saved_visual_worker, visual_worker_revision
+    from whab.plugins.ui_runtime import read_visual_choice, restore_visual_worker
+    from whab.plugins.ui_selection import UISelectionStore
+
+    home = tmp_path / "runtime"
+    reference = {"environment": first.identifier, "distribution": first.distribution, "version": first.version}
+    with UISelectionStore(home, "fictional", "sandbox", template.id) as selected:
+        selected.publish({"id": str(uuid4()), "selection": template.id, "generation": old_bundle.generation,
+                          "worker": reference}, selected.revision(selected.snapshot()))
+    path = home / "visual-ui/visual-selection.json"
+    original = path.read_bytes()
+    before = environments._installation_hash(first.path)
+    assert not (home / "plugin-workers/environments" / first.identifier).exists()
+    revision = visual_worker_revision(home, "fictional", "sandbox")
+    decision = replace_saved_visual_worker(home, "fictional", "sandbox", template.id,
+        (*local_closure, approved_second), expected_revision=revision)
+    assert decision["worker"]["version"] == "2.0.0"
+    assert environments._installation_hash(first.path) == before
+    assert (home / "visual-ui/history" / (revision + ".json")).read_bytes() == original
+    choice = read_visual_choice(home, "fictional", "sandbox", template.id)
+    restored, bindings = restore_visual_worker(home, PluginRegistry((template,)), choice)
+    try:
+        assert restored.ui_plugin(template.id).ui.render(readiness_arguments("budget")) == b"<p>2.0.0:0</p>"
+        assert archive.load(old_bundle.generation).resources.files["static/app.js"] == b"export const version = '1.0.0';"
+    finally:
+        bindings[template.id].worker.close()
 
 
 def parser_wheel(directory, version, *, broken_resources=False):
@@ -491,8 +538,11 @@ def test_synthetic_saved_protocol1_environment_is_fenced_then_explicitly_reprepa
 
     class LegacyProbe(ReportWorker):
         """A report-only protocol-1 client used solely to publish the old fixture."""
-        def __init__(self, plugin_id, *, python, timeout, expected_distribution, expected_version):
+        def __init__(self, plugin_id, *, python, timeout, expected_distribution, expected_version, on_create=None):
             self.plugin_id, self.timeout, self._lock, self._retiring = plugin_id, timeout, Lock(), None
+            self._process = None
+            if on_create is not None:
+                on_create(self)
             self._process = subprocess.Popen([str(python), "-I", "-B", "-m", "whab.plugins.report_worker", plugin_id],
                                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                              env=environments._environment(), start_new_session=True, bufsize=0)

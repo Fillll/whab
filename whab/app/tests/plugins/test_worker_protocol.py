@@ -419,12 +419,12 @@ def test_startup_reap_failure_still_closes_pipes_and_exposes_only_authored_error
     monkeypatch.setattr(report_worker.subprocess, "Popen", lambda *_, **__: process)
 
     def reject_hello(self, timeout):
-        workers.append(self)
+        assert workers == [self]
         raise WireError()
 
     monkeypatch.setattr(ReportWorker, "_read", reject_hello)
     with pytest.raises(PluginError) as raised:
-        ReportWorker("fixture", timeout=5)
+        ReportWorker("fixture", timeout=5, on_create=workers.append)
     assert raised.value.code == "worker_startup_failed"
     assert "synthetic-private" not in str(raised.value)
     assert process.stdin.closed and process.stdout.closed
@@ -433,6 +433,29 @@ def test_startup_reap_failure_still_closes_pipes_and_exposes_only_authored_error
     worker.close()
     assert not worker.cleanup_pending and calls == ["wait", "wait", "wait", "wait"]
     assert signals == [(process.pid, requested) for requested in (signal.SIGTERM, signal.SIGKILL, signal.SIGTERM, signal.SIGKILL)]
+
+
+@pytest.mark.parametrize("group", ["missing", "live", "unobservable"])
+def test_exited_leader_permission_error_requires_proof_the_whole_group_is_absent(monkeypatch, group):
+    signals = []
+    def signal_group(pid, requested):
+        signals.append(requested)
+        if requested == 0:
+            if group == "missing":
+                raise ProcessLookupError()
+            if group == "unobservable":
+                raise PermissionError()
+            return
+        raise PermissionError()
+    monkeypatch.setattr(report_worker.os, "killpg", signal_group)
+    process = SimpleNamespace(pid=321234, poll=lambda: 1, wait=lambda **_: 1)
+    if group == "missing":
+        report_worker._stop_process_group(process)
+        assert signals == [signal.SIGTERM, 0, signal.SIGKILL, 0]
+    else:
+        with pytest.raises(PermissionError):
+            report_worker._stop_process_group(process)
+        assert signals == [signal.SIGTERM, 0]
 
 
 @pytest.mark.parametrize("during_startup", [True, False])

@@ -315,14 +315,14 @@ class WorkerBinding:
     resource: RuntimeResource
 
 
-def _start(template, prepared, home=None):
+def _start(template, prepared, home=None, *, worker_owner=None):
     from .categorization_worker import WorkerCategorizationFactory
 
     if not supports_live_plugin(template):
         raise PluginError("This optional plugin does not declare a supported live adapter.",
                           code="restart_required", plugin_id=template.id)
     worker = ReportWorker(template.id, python=prepared.python, expected_distribution=prepared.distribution,
-                          expected_version=prepared.version)
+                          expected_version=prepared.version, **({"on_create": worker_owner} if worker_owner else {}))
     try:
         if not worker.info["live"]:
             raise PluginError("The candidate does not declare a compatible live lifecycle.",

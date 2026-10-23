@@ -31,6 +31,7 @@ _MESSAGES = {
     "budget_unreadable": "This budget's metadata could not be validated. Preserve its files before repairing the budget.",
     "metadata_unreadable": "Installed package metadata could not be read. Repair this Python installation before retrying.",
     "worker_reference_invalid": "A saved report-worker reference is invalid. Preserve its environment and explicitly archive the reference if it should no longer be used.",
+    "visual_decision_unreadable": "The saved visual interface decision is unavailable. Stop its owning budget and preserve its files before repairing it.",
     "write_failed": "The recovery change could not be confirmed. Refresh and inspect its preserved records before retrying.",
     "startup_failed": "The full application could not start. Recovery remains available; repair or disable the failing optional plugin and retry.",
     "recovery_closed": "The recovery listener has stopped.",
@@ -195,6 +196,24 @@ class RecoveryController:
                         fingerprints.append(None if raw is None else digest(raw))
                     except Exception:
                         fingerprints.append("unreadable")
+            visual = None
+            try:
+                raw = _read(self.settings.home, root / "visual-ui" / "visual-selection.json", 128 * 1024)
+                fingerprints.append(None if raw is None else digest(raw))
+                if raw is not None:
+                    from .ui_selection import UISelectionStore
+
+                    with UISelectionStore(root, session.id if session else "default", self.settings.plaid_env, None) as selected:
+                        record = selected.snapshot()
+                        visual = {"plugin_id": record["selection"], "generation": record["generation"],
+                                  "worker": record["worker"], "revision": selected.revision(record),
+                                  "can_disable": record["selection"] is not None}
+                    required.discard(self.settings.ui)
+                    if record["selection"] is not None:
+                        required.add(record["selection"])
+                    configured = tuple(name for name in configured if name not in record["known"])
+            except Exception:
+                errors.append(RecoveryError("visual_decision_unreadable").public())
             installed = {}
             try:
                 for entry in installed_entrypoints():
@@ -233,10 +252,10 @@ class RecoveryController:
                                 "installed": len(entries) == 1, "duplicate": len(entries) > 1,
                                 "enabled": name in configured or name in required, "required": name in required})
             identity = [sorted(required), list(configured), fingerprints, catalog,
-                        sorted((name, digest(raw)) for name, raw in references.items())]
+                        sorted((name, digest(raw)) for name, raw in references.items()), visual]
             revision = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
             public = {"mode": "recovery", "host_version": __version__, "revision": revision,
-                      "plugins": catalog, "configured": list(configured), "workers": workers, "errors": errors,
+                      "plugins": catalog, "configured": list(configured), "workers": workers, "visual": visual, "errors": errors,
                       "can_clear_selection": not self.settings.budget_path and any(error["code"] == "selection_unreadable" for error in errors)}
             return public, session, root, references
 
@@ -247,6 +266,21 @@ class RecoveryController:
         if inspected[0]["revision"] != revision:
             raise RecoveryError("revision_conflict")
         return inspected
+
+    def disable_visual(self, revision):
+        with self._lock, _decision_lock(self.settings.home):
+            public, session, root, _ = self._current(revision)
+            if (not public["visual"] or not public["visual"]["can_disable"]
+                    or any(error["code"] in {"budget_unreadable", "visual_decision_unreadable"} for error in public["errors"])):
+                raise RecoveryError("visual_decision_unreadable")
+            from .ui_repair import disable_saved_visual
+
+            try:
+                disable_saved_visual(root, session.id if session else "default", self.settings.plaid_env,
+                                     expected_revision=public["visual"]["revision"])
+            except Exception:
+                raise RecoveryError("write_failed") from None
+            return self.inspect()[0]
 
     def disable(self, revision, plugins):
         if type(plugins) is not list:
@@ -331,6 +365,7 @@ Budget views become available when the full application starts successfully.</p>
 <p id="status" role="status">Reading local metadata…</p>
 <ul id="plugins"></ul><button id="disable" disabled>Disable checked plugins</button>
 <button id="clear" hidden disabled>Archive and clear invalid selection</button>
+<button id="disable-visual" hidden disabled>Select headless startup</button>
 <h2>Saved report workers</h2><ul id="workers"></ul>
 <button id="retry" disabled>Retry full startup</button>
 <script>
@@ -361,8 +396,10 @@ async function refresh() {
   document.querySelector('#clear').hidden = !state.can_clear_selection;
   document.querySelector('#clear').disabled = state.starting;
   document.querySelector('#disable').disabled = state.starting;
+  document.querySelector('#disable-visual').hidden = !state.visual?.can_disable;
+  document.querySelector('#disable-visual').disabled = state.starting;
   document.querySelector('#retry').disabled = state.starting || state.errors.some(
-    error => error.code === 'budget_unreadable' || error.code === 'selection_unreadable'
+    error => ['budget_unreadable', 'selection_unreadable', 'visual_decision_unreadable'].includes(error.code)
   );
   const workers = document.querySelector('#workers');
   workers.replaceChildren();
@@ -383,6 +420,7 @@ document.querySelector('#disable').onclick = () => act('/api/recovery/disable', 
   plugins:[...document.querySelectorAll('#plugins input:checked')].map(input => input.value)
 });
 document.querySelector('#clear').onclick = () => act('/api/recovery/selection/clear-invalid');
+document.querySelector('#disable-visual').onclick = () => act('/api/recovery/visual/disable');
 document.querySelector('#retry').onclick = async () => {
   status.textContent = 'Preparing the full application…';
   try { await call('/api/recovery/retry', {revision:state.revision}); location.href = '/'; }
@@ -455,6 +493,13 @@ class RecoveryApplication:
             async with self._serial:
                 self._inactive()
                 return await run_in_threadpool(self.controller.clear_invalid, value["revision"])
+
+        @shell.post("/api/recovery/visual/disable")
+        async def disable_visual(request: Request):
+            value = await body(request, {"revision"})
+            async with self._serial:
+                self._inactive()
+                return await run_in_threadpool(self.controller.disable_visual, value["revision"])
 
         @shell.post("/api/recovery/workers/{plugin_id}/reset")
         async def reset_worker(plugin_id: str, request: Request):

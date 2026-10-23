@@ -223,6 +223,18 @@ def _stop_process_group(process):
                 process.kill()
         except ProcessLookupError:
             pass
+        except PermissionError:
+            # Some POSIX kernels reject signalling an unreaped exited leader.
+            # Reap it, then require proof that its complete group is absent;
+            # a live or unobservable group still retains cleanup ownership.
+            if process.poll() is None:
+                raise
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                pass
+            else:
+                raise
         if requested == signal.SIGTERM:
             try:
                 process.wait(timeout=1)
@@ -238,13 +250,16 @@ class ReportWorker:
     replaces an active worker. Environment provisioning belongs to the host.
     """
 
-    def __init__(self, plugin_id, *, python=sys.executable, timeout=10, expected_distribution=None, expected_version=None):
+    def __init__(self, plugin_id, *, python=sys.executable, timeout=10, expected_distribution=None, expected_version=None,
+                 on_create=None):
         if not valid_plugin_name(plugin_id) or type(timeout) not in {int, float} or not 0 < timeout <= 60:
             raise ValueError("Choose a valid report worker and a timeout within 60 seconds.")
         self.plugin_id, self.timeout = plugin_id, timeout
         self._lock = Lock()
         self._process = None
         self._retiring = None
+        if on_create is not None:
+            on_create(self)
         try:
             password_variable = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
             env = {key: value for key, value in os.environ.items() if not key.startswith(("WHAB_", "PLAID_", "CLIENT_", "SERVER_", plugin_id.upper().replace("-", "_") + "_")) and key not in {"PYTHONPATH", "TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID"} and key != password_variable and not key.upper().endswith(("_TOKEN", "_SECRET", "_PASSWORD", "_KEY", "_AUTHORIZATION"))}

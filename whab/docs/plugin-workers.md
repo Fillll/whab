@@ -278,3 +278,23 @@ must reopen its exact approved environment; incompatibility or missing files
 never selects native code automatically. Host SDK upgrades remain application
 upgrades. The resources and worker processes provide coherence and failure
 containment, not protection from malicious installed Python.
+
+After stopping the affected budget, `visual_worker_revision(home, budget_id,
+environment)` in `whab.plugins.ui_repair` returns an opaque compare-and-set token.
+`replace_saved_visual_worker(..., plugin_id, approvals,
+expected_revision=token)` prepares only the supplied approved current-host wheels,
+checks all four page projections, and closes its candidate before publishing one
+new visual decision. It never executes the saved environment or opens a financial
+backend. Pending child cleanup blocks another candidate. The exact old decision
+bytes are retained privately under `visual-ui/history/`; resource and environment
+generations remain intact. An exact completed request returns its original receipt
+without reading wheels or executing code, including after a later explicit disable.
+It does not select that older decision again.
+
+`disable_saved_visual(..., expected_revision=token)` explicitly selects headless
+startup and retains saved worker references. The minimal recovery listener offers
+the same **Select headless startup** action with its own current recovery revision.
+A running owner, changed decision, invalid scope or unsupported journal version
+refuses repair; preserve those files instead of removing a journal or choosing a
+different interface automatically. A host upgrade requires approved wheels built
+for that actual host before a worker can resume.

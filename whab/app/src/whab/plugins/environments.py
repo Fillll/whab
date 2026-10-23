@@ -308,12 +308,19 @@ def _lock(path, deadline):
 
 
 @contextmanager
-def _candidate_cleanup(created, plugin_id):
+def _candidate_cleanup(created, plugin_id, probes=()):
     # This context exits before the preparation lock, so another preparer can
     # never observe or replace a directory while failure cleanup removes it.
     try:
         yield
-    except BaseException:
+    except BaseException as error:
+        if any(probe.cleanup_pending for probe in probes):
+            # A retained child may still execute these files. Its owner must
+            # finish cleanup before another preparation can replace them.
+            created.clear()
+            if not isinstance(error, Exception):
+                raise
+            raise EnvironmentPreparationError("environment_cleanup_failed", plugin_id) from None
         if created:
             try:
                 shutil.rmtree(created.pop())
@@ -388,7 +395,8 @@ def _verify(path, python, manifest, deadline):
     _run([str(python), "-I", "-B", "-c", _VERIFY, str(path), str(expected), str(Path(__file__).resolve().parents[2])], deadline)
 
 
-def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, timeout=120) -> PreparedEnvironment:
+def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, timeout=120,
+                        worker_owner=None) -> PreparedEnvironment:
     """Prepare one approved optional-plugin closure; publication grants no activation.
 
     A venv is created at its final content address because Python environments
@@ -404,6 +412,12 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
         raise ValueError("Environment preparation requires a timeout within 600 seconds.")
     deadline = time.monotonic() + timeout
     created = []
+    probes = []
+
+    def own_probe(worker):
+        probes.append(worker)
+        if worker_owner is not None:
+            worker_owner(worker)
     try:
         root = Path(root).resolve()
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -457,7 +471,7 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
             destination = root / identifier
             python = destination / "environment/bin/python"
             receipt = {"format": 1, "identifier": identifier}
-            with _lock(locks / (identifier + ".lock"), deadline), _candidate_cleanup(created, plugin_id):
+            with _lock(locks / (identifier + ".lock"), deadline), _candidate_cleanup(created, plugin_id, probes):
                 if destination.is_symlink():
                     raise EnvironmentPreparationError("environment_changed", plugin_id)
                 ready = destination / "ready.json"
@@ -491,7 +505,8 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                           "--no-index", "--no-deps", *(str(destination / "wheels" / item.filename) for item in records)], deadline)
                     _verify(destination, python, manifest, deadline)
                     probe = ReportWorker(plugin_id, python=python, timeout=min(60, _remaining(deadline)),
-                                         expected_distribution=plugin.distribution, expected_version=plugin.version)
+                                         expected_distribution=plugin.distribution, expected_version=plugin.version,
+                                         on_create=own_probe)
                     try:
                         if probe.info["host"] != __version__:
                             raise EnvironmentPreparationError("incompatible_host", plugin_id)
@@ -538,6 +553,8 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                     finally:
                         probe.timeout = max(0.001, min(60, deadline - time.monotonic()))
                         probe.close()
+                        if probe.cleanup_pending:
+                            raise EnvironmentPreparationError("environment_cleanup_failed", plugin_id)
                     if (destination / "probe-cache").exists():
                         shutil.rmtree(destination / "probe-cache")
                     _remaining(deadline)
