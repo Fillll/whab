@@ -17,6 +17,7 @@ from whab.plugins import (
     PluginError,
     PluginRegistry,
     RemoteLedgerInterface,
+    load_plugins,
 )
 from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
 
@@ -167,3 +168,39 @@ def test_portable_settings_cannot_supply_a_machine_bearer_credential(tmp_path, m
         create_app(settings=settings, budget_session=session)
     assert rejected.value.code == "interface_startup_failed" and rejected.value.plugin_id == "first"
     assert session.plugin_record("first")["settings"] == {"FIRST_CREDENTIAL": TOKEN}
+
+
+def test_api_handover_preserves_categorization_and_failed_startup_closes_its_resources(tmp_path, store, monkeypatch):
+    from whab.services.categorization import CategorizationService
+
+    category = load_plugins(("random-forest-categorization",)).descriptors()[0]
+    closed = []
+    original_close = CategorizationService.close
+
+    def close(service):
+        closed.append(service)
+        original_close(service)
+
+    monkeypatch.setattr(CategorizationService, "close", close)
+
+    async def run():
+        app = setup(monkeypatch, tmp_path / "active", store, api(), category, selected=(category.id,))
+        runtime = app.state.budget_runtime
+        service = runtime._active.services["categorization"]
+        async with app.router.lifespan_context(app):
+            await app.state.live_plugins.activate((category.id, "first"))
+            assert runtime._active.services["categorization"] is service
+            await app.state.live_plugins.activate((category.id,))
+            assert runtime._active.services["categorization"] is service
+            assert service not in closed
+        assert service in closed
+
+    asyncio.run(run())
+    previous = len(closed)
+    # An unconfigured credential fails after categorization was prepared.
+    descriptor = api("broken")
+    settings = Settings(tmp_path / "failed", 5173, "sandbox", "", "", "", False, "", "", (category.id, descriptor.id), ui="")
+    with pytest.raises(PluginError) as rejected:
+        create_app(store=store, settings=settings, plugins=PluginRegistry((sqlite_plugin, category, descriptor)))
+    assert rejected.value.code == "interface_startup_failed"
+    assert len(closed) == previous + 1

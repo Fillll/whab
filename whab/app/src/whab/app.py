@@ -262,6 +262,11 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     except BaseException:
         for binding in reversed(tuple(worker_bindings.values())):
             binding.worker.close()
+        if categorization is not None:
+            try:
+                categorization.close()
+            except Exception:
+                pass
         if owned_store:
             close_storage(store)
         raise

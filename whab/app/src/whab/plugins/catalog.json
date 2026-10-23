@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "host_version": "2.33.0",
+  "host_version": "2.34.0",
   "plugins": [
     {
       "api_version": 1,
@@ -448,19 +448,15 @@
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2,<3",
+      "requires_host": "whab>=2.34,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/interface/server",
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [
-        "pr82-installed-sqlite-web",
-        "pr86-installed-sqlite-web",
-        "pr86-installed-json-web"
-      ],
-      "version": "1.0.1"
+      "verifications": [],
+      "version": "1.1.0"
     },
     {
       "api_version": 1,
