@@ -7,18 +7,20 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from whab_plugin_client.plugin import RemoteStore
-from whab_plugin_server.plugin import create_interface
+from whab_plugin_server.plugin import plugin as server_plugin
 
 from whab.plugins import LedgerService, StoreError
+from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
 
 
 def test_client_server_commands_export_and_concurrent_conflict(store):
     token = "synthetic-protocol-token-" + "x" * 32
     service = LedgerService(store, budget_id="household")
     app = FastAPI()
-    app.include_router(create_interface(SimpleNamespace(
+    binding = BoundRemoteInterface(server_plugin.interface.adapter, SimpleNamespace(
         config={"SERVER_TOKEN": token}, service=service, budget_id="household",
-    )))
+    ))
+    app.include_router(create_remote_router(lambda: binding))
     server = TestClient(app, base_url="https://budget.example")
 
     def forward(request):

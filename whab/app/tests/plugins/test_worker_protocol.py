@@ -156,7 +156,7 @@ if mode == 'startup-timeout':
     sys.stdin.buffer.read()
     raise SystemExit(0)
 hello = {'kind':'ready','worker':PROTOCOL_VERSION,'sdk':1,'plugin':'fixture','distribution':'fixture-package','version':'1.0.0','host':__version__,'live':True,'capabilities':[{'name':'reporting.insights','version':1},{'name':'reporting.export','version':1}],'insights':True,'export':True,
-         'adapters':{'bank_logos':None,'merchant_logos':False,'file_import':None,'settings':None},
+         'adapters':{'bank_logos':None,'merchant_logos':False,'file_import':None,'settings':None,'interface':None,'ui':None},
          'contract':{'requires':[],'conflicts':[],'authority':'local','state_version':1,'state_upgrades':[],'lifecycle':'live','legacy':False}}
 if mode.startswith('hello:'):
     hello.update(json.loads(mode.removeprefix('hello:')))
@@ -557,3 +557,34 @@ def test_worker_loop_accepts_only_report_operations_and_sanitizes_hook_errors(mo
         with pytest.raises(WireError):
             serve("fixture", io.BytesIO(request), target)
         assert len(decode_sequence(target.getvalue())) == 1
+
+
+@pytest.mark.parametrize("host", ["different-host", "2.22.0"])
+def test_api_worker_requires_current_host_before_any_dispatch(host, fixture_process):
+    adapter = {"protocol_version": 1, "token_setting": "FIXTURE_TOKEN", "queries": True, "commands": True}
+    processes, _ = fixture_process("hello:" + json.dumps({
+        "host": host, "insights": False, "export": False,
+        "capabilities": [{"name": "interface.api", "version": 1}],
+        "adapters": {"bank_logos": None, "merchant_logos": False, "file_import": None,
+                     "settings": None, "interface": adapter, "ui": None},
+    }))
+    with pytest.raises(PluginError) as rejected:
+        ReportWorker("fixture", timeout=5)
+    assert rejected.value.code == "worker_startup_failed"
+    assert processes[0].poll() is not None
+
+
+def test_api_parent_rejects_worker_spec_drift_and_retires_process(fixture_process):
+    adapter = {"protocol_version": 1, "token_setting": "FIXTURE_TOKEN", "queries": True, "commands": True}
+    processes, _ = fixture_process("hello:" + json.dumps({
+        "insights": False, "export": False, "capabilities": [{"name": "interface.api", "version": 1}],
+        "adapters": {"bank_logos": None, "merchant_logos": False, "file_import": None,
+                     "settings": None, "interface": adapter, "ui": None},
+    }))
+    worker = ReportWorker("fixture", timeout=5)
+    # This reviewed fixture deliberately returns report-shaped data to a spec
+    # request. It cannot become a router, service or executable return value.
+    with pytest.raises(PluginError) as rejected:
+        worker.interface()
+    assert rejected.value.code == "worker_protocol"
+    assert processes[0].poll() is not None

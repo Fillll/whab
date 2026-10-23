@@ -18,12 +18,12 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [json](https://github.com/Fillll/whab/blob/91442a81c9d0233241ed5a033d49d48c2ee96cbe/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.2.0` | `whab>=2.30,<3` | restart-required | maintained |
 | [plaid](https://github.com/Fillll/whab/blob/91442a81c9d0233241ed5a033d49d48c2ee96cbe/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
 | [random-forest-categorization](https://github.com/Fillll/whab/blob/91442a81c9d0233241ed5a033d49d48c2ee96cbe/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.2.0` | `whab>=2.32,<3` | categorization-host | maintained |
-| [server](https://github.com/Fillll/whab/blob/91442a81c9d0233241ed5a033d49d48c2ee96cbe/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.0.1` | `whab>=2,<3` | Legacy; restart required | maintained |
+| [server](https://github.com/Fillll/whab/blob/91442a81c9d0233241ed5a033d49d48c2ee96cbe/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.0.1` | `whab>=2,<3` | declarative-api-worker | maintained |
 | [sqlite](https://github.com/Fillll/whab/blob/91442a81c9d0233241ed5a033d49d48c2ee96cbe/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.11.0` | `whab>=2.30,<3` | restart-required | maintained |
 | [web](https://github.com/Fillll/whab/blob/91442a81c9d0233241ed5a033d49d48c2ee96cbe/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.25.1` | `whab>=2.19,<3` | Legacy; restart required | maintained |
 | [ynab](https://github.com/Fillll/whab/blob/91442a81c9d0233241ed5a033d49d48c2ee96cbe/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
-Explicit stateless report, branding and file-parser descriptors advertise their supported live-worker adapters. Categorization supports host-process selection changes; its code upgrades still require an application restart. Other entries require restart; backend migration and copies are not inferred from package installation.
+Explicit stateless report, branding, file-parser and declarative API interface descriptors advertise their supported live-worker adapters. Categorization supports host-process selection changes; its code upgrades still require an application restart. Other entries require restart; backend migration and copies are not inferred from package installation.
 
 ## Recorded verification
 

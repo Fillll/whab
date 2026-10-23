@@ -498,6 +498,8 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                         if not probe.info["live"]:
                             raise EnvironmentPreparationError("unsupported_lifecycle", plugin_id)
                         adapters = probe.info["adapters"]
+                        if adapters["interface"] is not None:
+                            probe.interface()
                         if adapters["bank_logos"] is not None:
                             if adapters["bank_logos"]["cache"]:
                                 probe.configure_cache(destination / "probe-cache")

@@ -43,3 +43,14 @@ def read_interface_record(value):
     if type(value) is not dict or value.keys() != set(RemoteLedgerInterface.__slots__):
         raise ValueError("Invalid remote interface adapter metadata.")
     return RemoteLedgerInterface(**value)
+
+
+def validate_interface_owners(plugins):
+    """Reject ambiguous v1 ownership before binding any plugin configuration."""
+    from .runtime import PluginError
+
+    interfaces = sorted((plugin for plugin in plugins if plugin.interface is not None), key=lambda row: row.id)
+    declarative = [plugin for plugin in interfaces if plugin.interface.adapter is not None]
+    if declarative and len(interfaces) != 1:
+        raise PluginError("Select exactly one declarative API interface and remove other API interfaces before retrying.",
+                          code="interface_conflict", plugin_id=declarative[0].id)

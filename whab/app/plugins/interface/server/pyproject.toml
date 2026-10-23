@@ -24,9 +24,9 @@ api-version = 1
 capabilities = [{ "name" = "interface.api", "version" = 1, "composition" = "additive" }]
 requires = []
 conflicts = []
-lifecycle = "restart"
-legacy = true
-authority = "unknown"
+lifecycle = "live"
+legacy = false
+authority = "local"
 state-version = 1
 state-upgrades = []
 support = "maintained"

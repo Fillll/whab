@@ -424,7 +424,7 @@
     },
     {
       "api_version": 1,
-      "authority": "unknown",
+      "authority": "local",
       "capabilities": [
         {
           "composition": "additive",
@@ -442,9 +442,9 @@
         "value": "whab_plugin_server.plugin:plugin"
       },
       "id": "server",
-      "legacy": true,
-      "lifecycle": "restart",
-      "live_support": "restart-required",
+      "legacy": false,
+      "lifecycle": "live",
+      "live_support": "declarative-api-worker",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
