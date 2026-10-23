@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.5.0 — 2026-10-23
+
+PR: [#93](https://github.com/Fillll/whab/pull/93)
+
+- Add versioned native HTTPS conformance profiles with ten distinct peer selections, lifecycle changes, local migration/copy/promotion directions, public controlled failures and exact-artifact replay. Preserve v1 manifests and report genuine older-host runtime applicability separately.
+- Add public durable-command receipt/reopen/retry checks, exact reviewed fixture wheels, isolated process cleanup and generated external runtime-profile CI. Keep worker upgrades, private commit faults and provider traffic outside this profile's evidence.
+
 ## 0.4.0 — 2026-10-23
 
 PR: [#90](https://github.com/Fillll/whab/pull/90)
