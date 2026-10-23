@@ -1,5 +1,12 @@
 # Random forest categorization plugin changelog
 
+## 1.2.0 — 2026-10-23
+
+PR: [#89](https://github.com/Fillll/whab/pull/89)
+
+- Declare explicit host-process live categorization selection support with a budget-scoped engine factory. Preserve saved models and require unfinished training to finish or be cancelled before changing engines.
+- Require WHAB 2.32+; retain reviewed-only training, integer-currency isolation and existing 80% automatic cutoff. Code upgrades remain application restarts until the stateful worker adapter is available; verify owning runtime at 100% statement/branch coverage.
+
 ## 1.1.0 — 2026-10-18
 
 PR: [#70](https://github.com/Fillll/whab/pull/70)
