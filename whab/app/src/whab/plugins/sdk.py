@@ -370,6 +370,8 @@ class StorageContext:
     config: Mapping[str, str] = field(repr=False)
     budget: BudgetContext | None = None
     initial_role: str = "primary"
+    read_only: bool = False
+    expected_instance_id: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.home, Path):
@@ -378,6 +380,12 @@ class StorageContext:
             raise ValueError("Storage environment must be sandbox or production.")
         if type(self.initial_role) is not str or self.initial_role not in {"primary", "staged", "copy"}:
             raise ValueError("New storage instances must start as primary, staged, or copy.")
+        if type(self.read_only) is not bool:
+            raise ValueError("Storage read-only mode must be a plain boolean.")
+        if self.expected_instance_id is not None:
+            from uuid import UUID
+            if type(self.expected_instance_id) is not str or str(UUID(self.expected_instance_id)) != self.expected_instance_id:
+                raise ValueError("An existing storage instance requires its canonical UUID identity.")
         if not isinstance(self.config, Mapping) or any(
             type(key) is not str or type(value) is not str for key, value in self.config.items()
         ):

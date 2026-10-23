@@ -141,6 +141,20 @@ def test_supported_live_families_are_inspected_without_executing_factories(metad
     assert metadata_tool.descriptor_metadata(path, "plugin", root)["live_support"] == support
 
 
+@pytest.mark.parametrize("extra", ["", ",authority='remote'", ",state_version=2"])
+def test_local_storage_worker_static_contract_is_explicit(metadata_tool, static_repository, extra):
+    root, _, module = static_repository
+    path = module / "__init__.py"
+    path.write_text("raise RuntimeError('must not execute')\nplugin=Plugin('fictional','Fictional',storage=factory,"
+                    "contract=PluginContract(lifecycle='live',provides=(Capability('storage.worker'),"
+                    "Capability('storage.authority'),Capability('storage.commands'))" + extra + "))\n")
+    if extra:
+        with pytest.raises(ValueError):
+            metadata_tool.descriptor_metadata(path, "plugin", root)
+    else:
+        assert metadata_tool.descriptor_metadata(path, "plugin", root)["live_support"] == "local-storage-worker"
+
+
 @pytest.mark.parametrize("hooks, contract", [
     ("categorization=engine", ",state_version=2"),
     ("file_import=parser,settings=settings", ""),

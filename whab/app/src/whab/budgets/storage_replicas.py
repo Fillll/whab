@@ -275,7 +275,7 @@ class StorageReplicas:
                 raise _failure("Another copy coordinator owns this budget, or its ownership lock changed.") from None
 
     def _plugin(self, identifier):
-        plugin = load_descriptors((identifier,), installed_entrypoints())[0]
+        plugin = self.storage.descriptor_for(load_descriptors((identifier,), installed_entrypoints())[0])
         self.storage._supported(plugin)
         if not any(cap.name == "storage.replica" and cap.version == 1 for cap in contract_for(plugin).provides):
             raise _failure("This storage plugin does not support native synchronized copies.")
@@ -286,7 +286,7 @@ class StorageReplicas:
         location = self.storage.locations.data["instances"][entry["instance_id"]]
         return open_storage(plugin, StorageContext(self.storage.locations.home(location), self.storage.settings.plaid_env,
             self.storage.config_for(plugin), self.storage.session.context(plugin.id) if self.storage.session else None,
-            initial_role="copy"))
+            initial_role="copy", expected_instance_id=entry["instance_id"]))
 
     def _entry(self, identifier):
         _uuid(identifier)
@@ -594,6 +594,9 @@ class StorageReplicas:
             return
         async with self._serial:
             def build(active, prepared):
+                upgrades = getattr(self.storage.app.state, "storage_upgrade", None) if self.storage.app else None
+                if upgrades is not None:
+                    return upgrades.build_generation(active, prepared, target, source_id)
                 descriptors = tuple(target if plugin.id == source_id else plugin for plugin in active.services["plugins"].descriptors())
                 registry = RegistryGeneration(PluginRegistry(descriptors), stable=active.services["plugins"],
                                               workers=active.services["plugins"].workers)

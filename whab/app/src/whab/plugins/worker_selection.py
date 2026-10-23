@@ -61,7 +61,7 @@ def _read(path, limit=1024 * 1024):
 
 
 def _error(plugin_id):
-    return PluginError("The saved report-worker environment could not be validated. Preserve its files and prepare an approved replacement.",
+    return PluginError("The saved plugin-worker environment could not be validated. Preserve its files and prepare an approved replacement.",
                        code="worker_environment_unavailable", plugin_id=plugin_id)
 
 
@@ -88,7 +88,13 @@ def reopen_environment(root, plugin_id, identifier):
             if type(name) is not str or Path(name).name != name or "\\" in name:
                 raise ValueError()
             approvals.append(ApprovedWheel(path / "wheels" / name, wheel["sha256"]))
-        prepared = prepare_environment(root, plugin_id, tuple(approvals))
+        if ready.get("format") == 1 and "family" not in ready:
+            family = "optional"
+        elif ready.get("format") == 2 and ready.get("family") == "storage":
+            family = "storage"
+        else:
+            raise ValueError()
+        prepared = prepare_environment(root, plugin_id, tuple(approvals), family=family)
         if prepared.identifier != identifier:
             raise ValueError()
         return prepared
