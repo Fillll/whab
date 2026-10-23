@@ -186,4 +186,9 @@ class UIResourceArchive:
             raise _invalid(bundle.plugin_id) from None
         finally:
             if temporary is not None:
-                Path(temporary).unlink(missing_ok=True)
+                try:
+                    Path(temporary).unlink(missing_ok=True)
+                except OSError:
+                    # A private orphan does not undo a durable immutable bundle
+                    # or replace its fixed diagnostic with a filesystem path.
+                    pass

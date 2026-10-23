@@ -90,3 +90,23 @@ def test_worker_visual_renderer_accepts_a_resource_bundle_without_filesystem_pat
                  "context": {}, "routing": {"key": "home", "personal_key": "home", "workspace": "personal", "page": "budget", "month_token": "current-month", "currency": "USD", "account_slugs": {}},
                  "request": {"path": "/", "query": [], "headers": {}}, "templates": {}}
     assert render_page(interface(), arguments) == b"Fictional"
+
+
+def test_private_temporary_cleanup_failure_cannot_override_durable_store_or_authored_error(tmp_path, monkeypatch):
+    bundle = capture_visual("fictional", interface(), "a" * 64)
+    archive = UIResourceArchive(tmp_path)
+    original = Path.unlink
+    def fail_cleanup(path, *args, **kwargs):
+        if path.name.startswith(".visual-"):
+            raise PermissionError(f"private filesystem path: {path}")
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "unlink", fail_cleanup)
+    assert archive.store(bundle).generation == bundle.generation
+    assert archive.load(bundle.generation).encoded() == bundle.encoded()
+    failing = UIResourceArchive(tmp_path / "other")
+    def fail_publication(path):
+        raise PermissionError(f"private filesystem path: {path}")
+    monkeypatch.setattr(failing, "_sync", fail_publication)
+    with pytest.raises(PluginError) as raised:
+        failing.store(bundle)
+    assert str(tmp_path) not in str(raised.value) and "private filesystem" not in str(raised.value)
