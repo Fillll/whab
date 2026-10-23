@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MINIMUM_HOST_VERSION = "2.22.0"
 MINIMUM_HOST_COMMIT = "bac249ca0e62638a40a6effc44af741c283e83d7"
-MINIMUM_TEST_COUNT = 13
+MINIMUM_TEST_COUNT = 92
 TEST_REQUIREMENTS = ("pytest==9.1.1", "pytest-cov==7.1.0", "coverage==7.16.2")
 
 VERIFY_INSTALLATION = """
