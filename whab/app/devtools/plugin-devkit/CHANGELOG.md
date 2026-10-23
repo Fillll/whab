@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.4.0 — 2026-10-23
+
+PR: [#90](https://github.com/Fillll/whab/pull/90)
+
+- Add reusable external-project CI against pinned genuine minimum/current host artifacts, approved offline build closures, installed import ownership and complete candidate coverage.
+- Generate opt-in workflows pinned to an explicit reviewed WHAB commit, retain exact wheel/replay evidence, and exercise the shared workflow from repository CI.
+
 ## 0.3.0 — 2026-10-23
 
 PR: [#87](https://github.com/Fillll/whab/pull/87)
