@@ -63,7 +63,9 @@ assert settings.storage == "sqlite" and settings.ui == "web"
 assert settings.plugins == ("plaid", "example", "bank-logos", "ynab")
 registry = load_plugins(settings.enabled_plugins())
 assert [p.id for p in registry.describe()] == ["bank-logos", "example", "plaid", "sqlite", "web", "ynab"]
-assert all(p.lifecycle == "restart" and p.legacy for p in registry.describe())
+assert all(p.lifecycle == "restart" and p.legacy for p in registry.describe() if p.id != "example")
+assert next(p for p in registry.describe() if p.id == "example").lifecycle == "live"
+assert not next(p for p in registry.describe() if p.id == "example").legacy
 remote = load_plugins(("client",)).describe()[0]
 assert remote.authority == "remote" and not remote.legacy
 assert {row.name for row in remote.capabilities} == {"ledger.read", "ledger.mutate"}
