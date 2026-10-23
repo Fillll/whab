@@ -1,0 +1,21 @@
+[project]
+name = "whab_plugin_json"
+version = "1.0.0"
+description = "Independent persistent local JSON budget storage for WHAB"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2.23,<3"]
+classifiers = ["Operating System :: POSIX", "Operating System :: MacOS"]
+
+[project.entry-points."whab.plugins"]
+json = "whab_plugin_json.plugin:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["whab_plugin_json", "whab_plugin_json.*"]

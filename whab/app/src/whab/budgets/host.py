@@ -364,7 +364,7 @@ class BudgetHost:
             entry for entry in entries.values()
         ]}
 
-    def router(self, store, settings, session, storage_config=None):
+    def router(self, store, settings, session, storage_config=None, *, storage_file_exports=False):
         router = APIRouter()
         current_id = session.id if session else "default"
 
@@ -376,7 +376,7 @@ class BudgetHost:
                 if not callable(snapshot):
                     raise StoreError("This storage plugin cannot export the demo budget.")
                 images = getattr(store, "receipt_ids", None)
-                if callable(images) and images("demo"):
+                if storage_file_exports or (callable(images) and images("demo")):
                     exporter = getattr(store, "export_budget_files", None)
                     if not callable(exporter):
                         raise StoreError("This storage plugin cannot export receipt images with the demo budget.")
