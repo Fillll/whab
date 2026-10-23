@@ -232,3 +232,14 @@ def test_import_fault_detects_acceptance_and_non_atomic_public_writes(candidate,
 
     with pytest.raises(ValueError, match="was accepted|changed its fictional ledger"):
         replay_configuration(manifest, candidate, replace(reference, storage=FaultyImport))
+
+
+def test_mixed_legacy_interface_keeps_its_public_hooks_without_executing_a_router(candidate, reference, artifacts):
+    from whab.plugins import Interface
+
+    legacy = Interface(lambda _: pytest.fail("A legacy router factory must never execute in hook conformance"))
+    plugin = replace(candidate, interface=legacy)
+    manifest, = sample_configurations(plugin, reference, artifacts, combinations_count=1)
+    assert replay_configuration(manifest, plugin, reference)["candidate_hooks"] == ["insights", "export"]
+    with pytest.raises(ValueError, match="declarative API"):
+        configurations.exercise_candidate(Plugin("legacy-only", "Legacy", interface=legacy))

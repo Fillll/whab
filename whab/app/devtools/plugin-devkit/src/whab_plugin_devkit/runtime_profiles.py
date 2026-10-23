@@ -7,6 +7,12 @@ from packaging.version import Version
 from whab.plugins import PluginRegistry, resolve_plugins
 from whab.plugins.contracts import CapabilityError
 
+from .api_interface import (
+    MINIMUM_API_HOST,
+    api_declaration,
+    api_worker_wheels,
+    assert_api_interface,
+)
 from .configurations import (
     _PEERS,
     _dump,
@@ -21,15 +27,39 @@ from .runtime_harness import NativeRuntime
 MINIMUM_RUNTIME_HOST = "2.32.0"
 _FAULTS = ("invalid-selection", "consumed-preview", "copy-source-changed", "kill-after-acknowledged-write")
 _RUNTIME_KEYS = {"profile", "minimum_host", "host", "applicability", "candidate_applicability", "primary", "destination", "sequence", "selections", "candidate_selection", "fault", "steps"}
+_API_PROFILE = "native-api-v1"
 _STEPS = ["candidate-public-hooks", "live-selections", "attach-copy", "acknowledged-write", "copy-catch-up", "promote-copy", "migrate-back", "restart", "verify-data", "cleanup"]
+
+
+
+def _api_candidate(plugin):
+    if getattr(plugin, "interface", None) is None:
+        return None
+    try:
+        declaration = api_declaration(plugin)
+    except ValueError:
+        return None
+    return declaration if declaration["queries"] and declaration["commands"] else None
+
+
+def _profile(plugin):
+    return _API_PROFILE if _api_candidate(plugin) is not None else "native-local-v1"
+
+
+def _minimum(profile):
+    return MINIMUM_API_HOST if profile == _API_PROFILE else MINIMUM_RUNTIME_HOST
+
+
+def _steps(profile):
+    return ["api-worker-readiness", "api-auth-command-retry", *_STEPS, "api-reopen-query"] if profile == _API_PROFILE else _STEPS.copy()
 
 
 def _candidate_support(plugin):
     # The initial profile must not start providers, interfaces or arbitrary
     # context binders as a side effect of testing a separate public hook.
     return ("not-applicable: unsupported candidate hooks" if any(getattr(plugin, name) is not None for name in (
-        "bank", "bank_ui", "storage", "ui", "interface", "bind", "budget_connection", "migrate_state",
-    )) else "supported")
+        "bank", "bank_ui", "storage", "ui", "bind", "budget_connection", "migrate_state",
+    )) or (getattr(plugin, "interface", None) is not None and _api_candidate(plugin) is None) else "supported")
 
 
 def _host(artifacts):
@@ -48,6 +78,8 @@ def _base(manifest):
 def sample_runtime_configurations(candidate, reference, artifacts, *, combinations_count=10, seed=42):
     manifests = sample_configurations(candidate, reference, artifacts, combinations_count=combinations_count, seed=seed)
     host = _host(artifacts)
+    profile = _profile(candidate)
+    minimum = _minimum(profile)
     for manifest in manifests:
         initial = [name for name in manifest["configuration_order"] if name != reference.id]
         available = {plugin.id: plugin for plugin in (reference, *(_peer(name) for name in _PEERS), candidate)}
@@ -79,12 +111,12 @@ def sample_runtime_configurations(candidate, reference, artifacts, *, combinatio
         primary = "sqlite" if manifest["index"] % 2 == 0 else "json"
         manifest.update(formatVersion=2, scope="runtime-lifecycle-storage",
                         unsupported=["worker-code-upgrade", "private-durable-boundary-injection", "provider-network"],
-                        runtime={"profile": "native-local-v1", "minimum_host": MINIMUM_RUNTIME_HOST, "host": host,
-                                 "applicability": "supported" if Version(host) >= Version(MINIMUM_RUNTIME_HOST) else "not-applicable: host predates runtime profile",
+                        runtime={"profile": profile, "minimum_host": minimum, "host": host,
+                                 "applicability": "supported" if Version(host) >= Version(minimum) else "not-applicable: host predates runtime profile",
                                  "candidate_applicability": _candidate_support(candidate),
                                  "primary": primary, "destination": "json" if primary == "sqlite" else "sqlite",
                                  "sequence": sequence, "selections": selections, "candidate_selection": candidate_selection,
-                                 "fault": _FAULTS[manifest["index"] % len(_FAULTS)], "steps": _STEPS.copy()})
+                                 "fault": _FAULTS[manifest["index"] % len(_FAULTS)], "steps": _steps(profile)})
     return manifests
 
 
@@ -95,10 +127,10 @@ def validate_runtime_manifest(manifest):
     runtime = manifest.get("runtime")
     if type(runtime) is not dict or set(runtime) != _RUNTIME_KEYS:
         raise ValueError("Unsupported runtime profile fields.")
-    if runtime["profile"] != "native-local-v1" or runtime["minimum_host"] != MINIMUM_RUNTIME_HOST or runtime["host"] != _host(manifest["artifacts"]):
+    if runtime["profile"] not in {"native-local-v1", _API_PROFILE} or runtime["minimum_host"] != _minimum(runtime["profile"]) or runtime["host"] != _host(manifest["artifacts"]):
         raise ValueError("Runtime profile and recorded host artifact differ.")
-    expected = "supported" if Version(runtime["host"]) >= Version(MINIMUM_RUNTIME_HOST) else "not-applicable: host predates runtime profile"
-    if runtime["applicability"] != expected or runtime["steps"] != _STEPS or runtime["fault"] not in _FAULTS:
+    expected = "supported" if Version(runtime["host"]) >= Version(_minimum(runtime["profile"])) else "not-applicable: host predates runtime profile"
+    if runtime["applicability"] != expected or runtime["steps"] != _steps(runtime["profile"]) or runtime["fault"] not in _FAULTS:
         raise ValueError("Runtime profile makes an unsupported applicability or execution claim.")
     if runtime["candidate_applicability"] not in {"supported", "not-applicable: unsupported candidate hooks"}:
         raise ValueError("Record the candidate's actual supported runtime family.")
@@ -154,12 +186,12 @@ def _migrate(runtime, destination):
     return preview["preview_id"]
 
 
-def replay_runtime_configuration(manifest, candidate, reference, *, native=NativeRuntime):
+def replay_runtime_configuration(manifest, candidate, reference, *, native=NativeRuntime, wheelhouse=None):
     """Run installed SDK hooks plus actual public HTTPS runtime operations."""
     manifest = validate_runtime_manifest(manifest)
     baseline = replay_configuration(_base(manifest), candidate, reference)
     profile = manifest["runtime"]
-    if profile["candidate_applicability"] != _candidate_support(candidate):
+    if profile["profile"] != _profile(candidate) or profile["candidate_applicability"] != _candidate_support(candidate):
         raise ValueError("The installed candidate does not match its runtime applicability declaration.")
     if profile["applicability"] != "supported":
         return {**baseline, "runtime": {"status": "not-applicable", "reason": profile["applicability"]}}
@@ -170,14 +202,31 @@ def replay_runtime_configuration(manifest, candidate, reference, *, native=Nativ
     available = {row.id: row for row in (reference, *(_peer(name) for name in _PEERS), candidate)}
     for selection in profile["selections"]:
         resolve_plugins(tuple(available[name] for name in [reference.id, *selection]))
-    with native(profile["primary"], profile["selections"][0]) as runtime:
+    api = _api_candidate(candidate) if profile["profile"] == _API_PROFILE else None
+    options = {"api_token_setting": api["token_setting"]} if api is not None else {}
+    with native(profile["primary"], profile["selections"][0], **options) as runtime:
         _check(runtime.expect("GET", "/api/health")["version"] == profile["host"])
         registry = PluginRegistry(tuple(available[name] for name in [reference.id, *profile["selections"][0]]))
         candidate_hooks = exercise_candidate(candidate, registry)
+        api_evidence = None
+        if api is not None:
+            ticket = runtime.expect("POST", "/api/plugins/management/upgrade", {
+                "pluginId": candidate.id, "wheels": api_worker_wheels(candidate, manifest["artifacts"], wheelhouse),
+            }, status=202)
+            runtime.operation("/api/plugins/runtime", ticket["id"])
+            worker, = (row for row in runtime.expect("GET", "/api/plugins/runtime")["workers"] if row["plugin"] == candidate.id)
+            _check(worker["health"] == "ready")
+            api_evidence = {**assert_api_interface(runtime, candidate), "worker": worker}
         if profile["fault"] == "invalid-selection":
             runtime.expect("POST", "/api/plugins/management/transition", {"plugins": [*profile["selections"][0], "synthetic-not-installed"]}, status=409)
         for selection in profile["selections"][1:]:
             _selection(runtime, selection)
+            if api is not None:
+                identifier = runtime.expect("GET", "/api/budget")["id"]
+                query = f"/remote/v1/budgets/{identifier}/queries/accounts?workspace=personal"
+                runtime.expect("GET", query, authenticated=True, status=200 if candidate.id in selection else 404)
+                if candidate.id not in selection:
+                    runtime.expect("GET", query, authenticated=True, headers={"Host": "fictional.remote.example"}, status=403)
         preview = runtime.expect("POST", "/api/storage/copies/preview", {"destination": profile["destination"]})
         attached = runtime.expect("POST", "/api/storage/copies/transition", {"preview_id": preview["preview_id"]}, status=202)
         copy_id = attached["id"]
@@ -203,6 +252,12 @@ def replay_runtime_configuration(manifest, candidate, reference, *, native=Nativ
         _check(runtime.expect("GET", "/api/workspace?workspace=personal&month=2026-10") == before)
         _check(candidate.id in {row["id"] for row in runtime.expect("GET", "/api/plugins")["plugins"]})
         _check(exercise_candidate(candidate, registry) == candidate_hooks)
+        if api is not None:
+            identifier = runtime.expect("GET", "/api/budget")["id"]
+            result = runtime.expect("GET", f"/remote/v1/budgets/{identifier}/queries/accounts?workspace=personal", authenticated=True)
+            _check(result["data"] == before["accounts"])
+            worker, = (row for row in runtime.expect("GET", "/api/plugins/runtime")["workers"] if row["plugin"] == candidate.id)
+            _check(worker == api_evidence["worker"])
         runtime.stop()
         cleanups = runtime.cleanups
     _check(not runtime.home.exists() and runtime.process is None)
@@ -211,4 +266,4 @@ def replay_runtime_configuration(manifest, candidate, reference, *, native=Nativ
                         "destination": profile["destination"], "fault": profile["fault"],
                         "steps": profile["steps"], "sequence": profile["sequence"], "selections": profile["selections"],
                         "candidate_selection": profile["candidate_selection"], "cleanup_count": cleanups,
-                        "cleanup_complete": True}}
+                        "cleanup_complete": True, **({"api": api_evidence} if api_evidence is not None else {})}}

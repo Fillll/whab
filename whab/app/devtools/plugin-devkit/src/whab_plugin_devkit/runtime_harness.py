@@ -3,6 +3,8 @@
 import http.client
 import json
 import os
+import re
+import secrets
 import signal
 import socket
 import ssl
@@ -17,10 +19,20 @@ from tempfile import TemporaryDirectory
 class NativeRuntime:
     """Launch one installed host in an entirely new disposable Sandbox home."""
 
-    def __init__(self, storage, selection, *, timeout=30):
+    def __init__(self, storage, selection, *, timeout=30, api_token_setting=None):
         if storage not in {"sqlite", "json"} or type(timeout) not in {int, float} or not 0 < timeout <= 60:
             raise ValueError("Choose a reviewed local backend and a bounded startup deadline.")
         self.storage, self.selection, self.timeout = storage, tuple(selection), timeout
+        reserved = {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG", "PORT", "VIRTUAL_ENV", "ALLOW_LIVE_PLAID"}
+        if api_token_setting is not None and (
+            type(api_token_setting) is not str or len(api_token_setting) > 100
+            or re.fullmatch(r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*", api_token_setting) is None
+            or api_token_setting in reserved
+            or not api_token_setting.endswith("_TOKEN")
+        ):
+            raise ValueError("Choose a dedicated host API token setting, separate from runtime selectors.")
+        self.api_token_setting = api_token_setting
+        self._api_token = secrets.token_urlsafe(48) if api_token_setting else None
         self._temporary = TemporaryDirectory(prefix="whab-native-conformance-")
         self.home = Path(self._temporary.name)
         self.process = None
@@ -44,6 +56,8 @@ class NativeRuntime:
         result.update(WHAB_HOME=str(self.home), WHAB_ENV="sandbox", PLAID_ENV="sandbox",
                       WHAB_UI="", WHAB_STORAGE=self.storage, WHAB_PLUGINS=",".join(self.selection),
                       ALLOW_LIVE_PLAID="false")
+        if self.api_token_setting is not None:
+            result[self.api_token_setting] = self._api_token
         return result
 
     def start(self):
@@ -72,11 +86,17 @@ class NativeRuntime:
             return body if status == 200 and body.get("ready") is True and body.get("version") == expected else None
         self.wait(ready)
 
-    def request(self, method, path, body=None):
+    def request(self, method, path, body=None, *, headers=None, authenticated=False):
+        if authenticated and (self._api_token is None or not path.startswith("/remote/v1/")):
+            raise ValueError("Fictional API authentication requires the configured remote protocol path.")
         connection = http.client.HTTPSConnection("127.0.0.1", self.port, context=self.context, timeout=min(5, self.timeout))
         try:
             raw = None if body is None else json.dumps(body, allow_nan=False).encode()
-            connection.request(method, path, body=raw, headers={} if raw is None else {"Content-Type": "application/json"})
+            supplied = {} if raw is None else {"Content-Type": "application/json"}
+            if authenticated:
+                supplied["Authorization"] = "Bearer " + self._api_token
+            supplied.update(headers or {})
+            connection.request(method, path, body=raw, headers=supplied)
             response = connection.getresponse()
             value = response.read(2 * 1024 * 1024 + 1)
             if len(value) > 2 * 1024 * 1024:
@@ -85,8 +105,9 @@ class NativeRuntime:
         finally:
             connection.close()
 
-    def expect(self, method, path, body=None, *, status=200):
-        actual, value = self.request(method, path, body)
+    def expect(self, method, path, body=None, *, status=200, headers=None, authenticated=False):
+        options = {"headers": headers, "authenticated": authenticated} if headers is not None or authenticated else {}
+        actual, value = self.request(method, path, body, **options)
         if actual != status:
             raise AssertionError("A public runtime operation returned an unexpected status.")
         return value

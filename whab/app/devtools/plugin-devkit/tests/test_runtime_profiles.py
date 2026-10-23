@@ -178,7 +178,7 @@ def test_cli_runtime_check_and_replay_use_the_versioned_profile(tmp_path, monkey
 
     candidate, reference, artifacts = inputs()
     monkeypatch.setattr(cli, "_selected", lambda *_, **__: (candidate, reference, artifacts))
-    monkeypatch.setattr(profiles, "replay_runtime_configuration", lambda *_: {"runtime": {"status": "passed"}})
+    monkeypatch.setattr(profiles, "replay_runtime_configuration", lambda *_, **__: {"runtime": {"status": "passed"}})
     output = tmp_path / "runtime-check"
     assert cli.main(["check", "--runtime", "--plugin", candidate.id, "--combinations", "1", "--wheelhouse", "unused", "--output", str(output)]) == 0
     assert cli.main(["replay", str(output / "configuration-00.json"), "--wheelhouse", "unused"]) == 0
