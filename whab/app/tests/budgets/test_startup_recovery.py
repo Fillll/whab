@@ -189,3 +189,52 @@ def test_metadata_write_failure_keeps_portable_original_and_refresh_reads_actual
     assert path.read_bytes() == original
     refreshed = BudgetSession.open(home, "sandbox", path)
     assert refreshed.selection == () and refreshed._source["restoreRequired"]
+
+
+def test_recovery_disable_and_real_retry_preserve_migrated_authority_late_writes_and_original(tmp_path):
+    import asyncio
+    from dataclasses import replace
+
+    from tests.web.test_budget_sessions import settings as migration_settings
+    from tests.web.test_live_plugins import running
+    from tests.web.test_storage_migration import migrate
+    from whab.app import create_app
+
+    async def migrated():
+        session = BudgetSession.create(tmp_path, "sandbox", "Fictional recovered migration", plugins=("example",))
+        session.manifest["plugins"].append({"id": "unavailable", "enabled": False, "apiVersion": 1,
+                                            "settings": {"minimumScore": 0.8}, "state": {"weight": 0.25}})
+        session.files["plugins/unavailable/model.bin"] = b"fictional-opaque-model"
+        app = create_app(settings=migration_settings(tmp_path), budget_session=session)
+        async with running(app) as client:
+            response = await client.post("/api/accounts", json={"workspace": "personal", "name": "Before", "type": "depository", "balance": 10})
+            assert response.status_code == 200
+            original_path = session.path
+            original = original_path.read_bytes()
+            status = await migrate(client, app, "json")
+            assert status["operations"][-1]["state"] == "complete"
+            response = await client.post("/api/accounts", json={"workspace": "personal", "name": "Acknowledged after", "type": "depository", "balance": 20})
+            assert response.status_code == 200
+            expected = app.state.tracked_store.export_budget()
+        return original_path, original, expected
+
+    path, original, expected = asyncio.run(migrated())
+    config = replace(migration_settings(tmp_path), budget_path=path)
+    app = RecoveryApplication(config)
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        projection = client.get("/api/recovery").json()
+        assert next(row for row in projection["plugins"] if row["id"] == "json")["required"]
+        response = client.post("/api/recovery/disable", json={"revision": projection["revision"], "plugins": ["example"]})
+        assert response.status_code == 200
+        assert path.read_bytes() == original
+        repaired = BudgetSession.open(tmp_path, "sandbox", path)
+        assert repaired.manifest["storage"] == "json" and repaired.selection == ()
+        assert repaired.files["plugins/unavailable/model.bin"] == b"fictional-opaque-model"
+        started = client.post("/api/recovery/retry", json={"revision": response.json()["revision"]})
+        assert started.status_code == 200, started.text
+        assert app._candidate.state.tracked_store.export_budget() == expected
+        assert app._candidate.state.storage_plugin == "json"
+    reopened = BudgetSession.open(tmp_path, "sandbox", path)
+    assert reopened.manifest["storage"] == "json" and reopened.selection == ()
+    assert reopened.plugin_record("unavailable")["settings"] == {"minimumScore": 0.8}
+    assert path.read_bytes() == original
