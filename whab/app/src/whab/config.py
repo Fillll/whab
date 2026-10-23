@@ -35,7 +35,7 @@ class Settings:
     tls_key_file: Path | None = None
 
     @classmethod
-    def load(cls):
+    def load(cls, *, read_plugin_selection=True):
         home = Path(os.environ.get("WHAB_HOME", ROOT)).expanduser().resolve()
         load_dotenv(home / ".env", override=False)
         environment = os.getenv("WHAB_ENV", os.getenv("PLAID_ENV", "sandbox"))
@@ -51,7 +51,7 @@ class Settings:
         )
         # A portable budget has its own manifest; an unrelated legacy selection
         # must not prevent that budget from opening.
-        saved = None if os.getenv("WHAB_BUDGET") else read_selection(home)
+        saved = None if os.getenv("WHAB_BUDGET") or not read_plugin_selection else read_selection(home)
         if saved is not None:
             optional = saved
         password_variable = os.getenv("WHAB_BUDGET_PASSWORD_ENV")
