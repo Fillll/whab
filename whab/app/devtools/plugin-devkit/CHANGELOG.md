@@ -10,6 +10,14 @@ PR: [#106](https://github.com/Fillll/whab/pull/106)
 - Use genuine WHAB 2.40 for this family while retaining the toolkit's lazy 2.22 import floor. Verify maintained and generated projects on separate minimum/current host artifacts with native CA-verified fictional authorities and an explicit public-transport test overlay.
 - Restrict source/build/test subprocess environments to explicit standard variables and exclude caller configuration. Set overall CI ceilings to 180 minutes for the expanded matrix and 60 minutes for one reusable project after observing a 34-minute source phase; production readiness, RPC and transition deadlines remain unchanged.
 
+## 0.8.0 — 2026-10-23
+
+PR: [#105](https://github.com/Fillll/whab/pull/105)
+
+- Add public bank conformance, a complete bank project generator and the native-bank-v1 profile. Require explicit fictional-provider approval and exercise five continuation/reopen/retry variants across SQLite and JSON with distinct peer selections and exact-artifact replay.
+- Use the genuine WHAB 2.38 BankAdapter floor while retaining the toolkit's lazy 2.22 compatibility. Include an independently packaged offline teaching provider whose owning tests call the public native HTTPS helper.
+- Build historical reference wheels in staging. Reuse an approved wheel only after complete member payload, mode and flag equivalence, and preserve its bytes when a conflicting or failed build refuses validation.
+
 ## 0.7.0 — 2026-10-23
 
 PR: [#99](https://github.com/Fillll/whab/pull/99)
@@ -62,3 +70,4 @@ PR: [#78](https://github.com/Fillll/whab/pull/78)
 
 - Add public storage factory/reopen adapters, isolated fictional homes, detached snapshots, required ledger tests and six explicitly applicable optional suites.
 - Gate independent toolkit wheels against the actual minimum WHAB 2.21.1 artifact and current candidate. Verify installed imports outside the checkout, zero skipped reference tests and 100% toolkit statement/branch coverage.
+

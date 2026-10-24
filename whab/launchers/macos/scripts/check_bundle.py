@@ -29,13 +29,52 @@ def environment():
     return {key: os.environ[key] for key in ("HOME", "PATH", "TMPDIR", "LANG") if key in os.environ}
 
 
+_BACKUP_PROBE = r"""
+import hashlib, importlib.util, json, pathlib, subprocess, sys
+manager_file, root, home = (pathlib.Path(value).resolve() for value in sys.argv[1:])
+spec = importlib.util.spec_from_file_location('bundle_manager_backup', manager_file)
+manager = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(manager)
+markers = ['plugin-workers/probe.private', 'visual-ui/probe.private', 'remote-client/probe.private',
+           'storage-authority/probe.private', 'storage-instances/probe.private']
+for name in markers:
+    path = home / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b'fictional backup marker')
+baseline = manager.runtime_fingerprint(home)
+for name in markers:
+    path = home / name
+    path.write_bytes(b'changed fictional marker')
+    assert manager.runtime_fingerprint(home) != baseline
+    path.write_bytes(b'fictional backup marker')
+manifest = {'format': 1, 'plugin': 'launcher-probe', 'host_sdk': 1,
+            'python': {'version': sys.version.split()[0]}, 'wheels': []}
+identifier = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+code = home / 'plugin-workers/environments' / identifier
+code.mkdir(parents=True)
+manager.write_json(code / 'ready.json', {**manifest, 'identifier': identifier, 'installation_sha256': 'a' * 64})
+subprocess.run([sys.executable, '-I', '-B', '-m', 'venv', '--without-pip', str(code / 'environment')], check=True,
+               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+result = manager.Manager(root).backup(home, manager.read_json(root / 'active.json'))
+archive = pathlib.Path(result['directory'])
+record = manager.read_json(archive / 'backup.json')
+assert result['format'] == 2 and record['requires_environment_rebuild'] and record['code_links']
+assert all((archive / 'runtime' / name).read_bytes() == b'fictional backup marker' for name in markers)
+assert not any(path.is_symlink() for path in archive.rglob('*'))
+assert manager.runtime_fingerprint(archive / 'runtime', archived_links=record['code_links']) == record['fingerprint']
+print(json.dumps({'format': 2, 'owned_roots': len(markers), 'code_aliases': len(record['code_links'])}))
+"""
+
+
 class BundleCheck:
-    def __init__(self, bundle, directory):
+    def __init__(self, bundle, directory, *, storage="sqlite"):
+        directory = directory.resolve()
         self.bundle = bundle
         self.resources = bundle / "Contents/Resources"
         self.python = self.resources / "python/bin/python3.14"
         self.root = directory / "launcher"
         self.runtime = directory / "runtime"
+        self.storage = storage
         self.origin = None
         self.context = None
         self.http = None
@@ -101,6 +140,19 @@ class BundleCheck:
             require(not path.is_symlink() and stat.S_IMODE(path.stat().st_mode) == expected,
                     "A transition backup file or directory is not private.")
 
+    def verify_runtime_backup(self):
+        result = subprocess.run([str(self.python), "-I", "-B", "-c", _BACKUP_PROBE,
+                                 str(self.resources / "manager/launcher.py"), str(self.root), str(self.runtime)],
+                                capture_output=True, text=True, timeout=120, env=environment(), check=False)
+        if result.returncode:
+            diagnostics = self.root.parent / "backup-probe.stderr"
+            diagnostics.write_text(result.stderr)
+            diagnostics.chmod(0o600)
+        require(result.returncode == 0, "The stopped runtime backup contract failed its isolated native bundle check.")
+        value = json.loads(result.stdout)
+        require(value.get("format") == 2 and value.get("owned_roots") == 5 and value.get("code_aliases", 0) > 0,
+                "The bundle did not archive complete runtime state and inert code aliases.")
+
     def run(self):
         for path in (self.python, self.resources / "manager/launcher.py",
                      self.resources / "manager/server.py", self.resources / "seed/build.json"):
@@ -111,6 +163,11 @@ class BundleCheck:
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
+        if self.storage == "json":
+            self.runtime.mkdir(mode=0o700)
+            configuration = self.runtime / ".env"
+            configuration.write_text(f"PORT={port}\nWHAB_STORAGE=json\nWHAB_UI=web\nWHAB_PLUGINS=\n")
+            configuration.chmod(0o600)
         self.command("configure", "--runtime-home", str(self.runtime), "--port", str(port))
         first = self.command("start", "--offline")
         require(first.get("running") is True and bool(first.get("version")), "Offline first installation did not start.")
@@ -135,6 +192,11 @@ class BundleCheck:
         with self.http.open(request, timeout=15) as response:
             require(response.status == 200, "Creating the fictional manual account failed.")
         self.fictional_account()
+        if self.storage == "json":
+            require((self.runtime / "data/whab-sandbox.json").is_file()
+                    and not any((self.runtime / "data").glob("*.sqlite")),
+                    "The JSON runtime did not persist through its genuine local backend.")
+            self.checks.append("genuine local JSON persistence")
         repeated = self.command("start", "--offline")
         require(self.health(repeated)["instance"] == initial_health["instance"], "Repeated Start created another server instance.")
         self.checks.append("idempotent start")
@@ -163,16 +225,19 @@ class BundleCheck:
         require((self.runtime / ".env").read_bytes() == configuration, "Offline relaunch changed runtime configuration.")
         require(self.command("stop").get("running") is False, "Final Stop did not stop WHAB.")
         self.checks.append("offline relaunch preserves ledger and configuration")
+        self.verify_runtime_backup()
+        self.checks.append("complete runtime backup and inert worker code aliases")
         self.permissions()
         self.checks.append("private state and backup permissions")
         self.verify_signature()
         self.checks.append("bundle signature preserved after lifecycle")
-        return {"ok": True, "version": first["version"], "build": first["build"], "checks": self.checks}
+        return {"ok": True, "version": first["version"], "build": first["build"], "storage": self.storage, "checks": self.checks}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", required=True, type=Path, help="Complete locally signed WHAB.app bundle.")
+    parser.add_argument("--storage", choices=("sqlite", "json"), default="sqlite", help="Reviewed local backend for the disposable runtime.")
     parser.add_argument("--keep-test-dir", action="store_true", help="Keep disposable data and private logs for diagnosis.")
     args = parser.parse_args()
     bundle = args.bundle.expanduser().resolve()
@@ -181,7 +246,7 @@ def main():
     # permits retaining diagnostics if an owned process cannot stop gracefully.
     temporary = tempfile.TemporaryDirectory(prefix="whab-bundle-check-", delete=False)
     directory = Path(temporary.name)
-    check = BundleCheck(bundle, directory)
+    check = BundleCheck(bundle, directory, storage=args.storage)
     stopped = False
     failure = None
     summary = None
