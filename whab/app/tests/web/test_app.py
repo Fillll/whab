@@ -1,7 +1,5 @@
 """Headless host transport and ledger behavior with an isolated backend."""
 
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 from whab_plugin_sqlite import Store
@@ -12,10 +10,10 @@ from whab.plugins import PluginRegistry
 
 
 @pytest.fixture
-def client():
+def client(tmp_path):
     store = Store(":memory:", month="2026-10")
     settings = Settings(
-        home=Path(":memory:"),
+        home=tmp_path,
         port=5173,
         plaid_env="sandbox",
         plaid_client_id="",

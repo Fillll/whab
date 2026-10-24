@@ -1,5 +1,5 @@
 /* Save budget edits in order; Python remains the source of every displayed total. */
-import {api} from './client.js';
+import {api, getContext} from './client.js';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
@@ -210,6 +210,10 @@ export function initBudgetEdits({readForm, onDraft = () => {}}) {
     async refresh() {
       const response = await fetch(displayedUrl, {headers: {'X-WHAB-Budget-Fragment': '1'}, cache: 'no-store'});
       if (!response.ok) throw new Error('The budget totals could not be refreshed.');
+      const generation = getContext().uiGeneration;
+      if (generation && response.headers.get('X-WHAB-UI-Generation') !== generation) {
+        throw new Error('The interface changed. Save or cancel edits before refreshing this page.');
+      }
       const html = await response.text();
       const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('.budget-planner');
       if (!fresh || ['month', 'currency', 'workspace', 'budgetId', 'budgetRoute'].some(key => !fresh.dataset[key] || fresh.dataset[key] !== planner.dataset[key])) {
@@ -360,6 +364,10 @@ export function initBudgetEdits({readForm, onDraft = () => {}}) {
   });
   return {
     flush, navigate,
+    get dirty() {
+      return !disposed && (queue.hasPending() || queue.hasErrors() ||
+        [...states.keys()].some(form => form.isConnected && formDirty(form)));
+    },
     dispose() {
       if (disposed) return true;
       if ([...states].some(([form, state]) => state.status === 'error' || formDirty(form)) || !queue.dispose()) return false;

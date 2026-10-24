@@ -258,13 +258,32 @@
 <dialog class="modal settings-modal" id="plugins-dialog" aria-label="Plugins">
   <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
   {{ heading('Plugins', 'Choose the plugins for this budget.') }}
+  <section class="plugin-settings" aria-labelledby="visual-settings-title" data-visual-settings data-workspace="{{ workspace }}">
+    <h3 id="visual-settings-title">Visual interface</h3>
+    {% if workspace=='personal' %}
+    <p class="settings-notice">Current: <strong data-visual-current>Checking host status…</strong></p>
+    <p class="settings-notice" data-visual-runtime></p>
+    <form class="modal-form" data-visual-form>
+      <label>Target<select data-visual-mode><option value="installed">Installed visual interface</option><option value="headless">Headless · no browser interface</option></select></label>
+      <label>Installed plugin ID<input data-visual-target value="{{ ui_plugin_id|default('web', true) }}" pattern="[a-z][a-z0-9-]{0,63}" maxlength="64" required autocomplete="off" spellcheck="false" aria-describedby="visual-target-hint"></label>
+      <p class="settings-notice" id="visual-target-hint">Enter the exact visual plugin ID, such as web. API interface plugins use the optional selection below. Preview checks the target before you apply it.</p>
+      <button class="button secondary" type="submit" disabled>Preview interface change</button>
+    </form>
+    <p class="settings-notice" data-visual-review hidden></p>
+    <div class="settings-actions"><button class="button primary" type="button" data-visual-apply hidden disabled>Apply reviewed change</button><button class="button secondary" type="button" data-visual-dismiss hidden>Cancel review</button><button class="button secondary" type="button" data-visual-refresh>Refresh status</button><button class="button secondary" type="button" data-visual-cleanup hidden>Retry cleanup</button><button class="button secondary" type="button" data-visual-unknown hidden>Review refreshed status</button></div>
+    <p class="settings-notice" role="status" aria-live="polite" data-visual-message>Open this dialog to check the active generation.</p>
+    <p class="field-error" role="alert" data-visual-error hidden></p>
+    {% else %}
+    <p class="settings-notice">Interface changes belong to your own budget. Demo is read-only. <a class="text-link" href="{{ url(workspace='personal', category=none) }}">Open my budget</a></p>
+    {% endif %}
+  </section>
   <section class="plugin-manager" aria-labelledby="plugin-manager-title">
     <div class="plugin-list-heading">
       <h3 id="plugin-manager-title">Installed</h3>
       <label class="plugin-category-filter">Category<select data-plugin-category-filter aria-label="Plugin category"><option value="all" selected>All categories</option>{% for category, label in plugin_categories.items() %}<option value="{{ category }}">{{ label }}</option>{% endfor %}</select></label>
     </div>
     {% if workspace=='demo' %}<p class="settings-notice">Plugin changes are available in your own budget. <a class="text-link" href="{{ url(workspace='personal', category=none) }}">Open my budget</a></p>
-    {% else %}<p class="settings-notice">Saved selections apply when you restart WHAB. Use Settings to manage each plugin.</p>{% endif %}
+    {% else %}<p class="settings-notice">Review supported live changes below, or save your selection for the next restart. Use Settings to manage each plugin.</p>{% endif %}
     {% if manager.error %}<p class="field-error" role="alert">{{ manager.error }}</p>{% endif %}
     <form data-plugin-selection{% if workspace=='demo' %} data-read-only{% endif %}>
       {% for plugin in manager.plugins if (plugin.category=='example' or plugin.id=='example') and plugin.enabled and plugin.manageable and not plugin.required %}<input type="hidden" name="plugin" value="{{ plugin.id }}">{% endfor %}
@@ -294,7 +313,7 @@
       </div>
       <p class="plugin-restart-notice" role="status"{% if not manager.restart_required %} hidden{% endif %}>Restart WHAB to apply your saved plugin selection. Running plugins stay active until then.</p>
       <p class="field-error" role="alert" hidden></p>
-      <div class="settings-actions"><button class="button primary" type="submit"{% if workspace=='demo' %} disabled{% endif %}>Save plugin selection</button></div>
+      <div class="settings-actions"><button class="button primary" type="submit"{% if workspace=='demo' %} disabled{% endif %}>Save selection for restart</button><button class="button secondary" type="button" data-plugin-live-review{% if workspace=='demo' %} disabled{% endif %}>Review live selection</button></div>
     </form>
   </section>
 </dialog>
@@ -320,7 +339,7 @@
     <p class="settings-notice" data-appearance-status role="status" aria-live="polite">Changes apply immediately and are remembered in this browser.</p>
   </fieldset>
   {% endif %}
-  <section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings>{% if not plugin.active %}<p class="settings-notice">{% if plugin.enabled %}Restart WHAB to view this plugin’s settings.{% else %}Enable this plugin, save your selection, and restart WHAB to view its settings.{% endif %}</p>{% endif %}</section>
+  <section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings>{% if not plugin.active %}<p class="settings-notice">{% if plugin.enabled %}Apply a supported live selection or restart WHAB to view this plugin’s settings.{% else %}Enable this plugin, then review a supported live selection or save it for restart to view its settings.{% endif %}</p>{% endif %}</section>
   {% for importer in import_panels if importer.id == plugin.id %}
     {% include importer.template %}
   {% endfor %}

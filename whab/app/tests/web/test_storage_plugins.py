@@ -228,7 +228,10 @@ print(json.dumps({
     assert json.loads(result.stdout) == {
         "backend": False, "schema": False, "seeding": False, "driver_imports": [],
     }
-    assert list(tmp_path.iterdir()) == []
+    assert {path.name for path in tmp_path.iterdir()} == {"visual-ui"}
+    assert {path.name for path in (tmp_path / "visual-ui").iterdir()} == {
+        "visual-selection.json", "visual-selection.json.lock",
+    }
 
 
 @pytest.mark.parametrize("fail_bank_close", [False, True])

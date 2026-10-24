@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from threading import Event, get_ident
 from types import SimpleNamespace
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -17,6 +18,7 @@ from whab import __main__ as cli
 from whab.config import Settings
 from whab.plugins import Plugin, PluginError, PluginRegistry, recovery
 from whab.plugins.configuration import read_selection, write_selection
+from whab.plugins.ui_selection import DISABLED_GENERATION, UISelectionStore
 
 
 def settings(home, **changes):
@@ -32,6 +34,92 @@ def status(client):
     response = client.get("/api/recovery")
     assert response.status_code == 200
     return response.json()
+
+
+def saved_visual(home):
+    reference = {"environment": "a" * 64, "distribution": "fictional-ui", "version": "1.0.0"}
+    with UISelectionStore(home, "default", "sandbox", "fictional-ui") as selected:
+        selected.publish({"id": str(uuid4()), "selection": "fictional-ui", "generation": "b" * 64,
+                          "worker": reference}, selected.revision(selected.snapshot()))
+        revision = selected.revision(selected.snapshot())
+    return home / "visual-ui/visual-selection.json", revision, reference
+
+
+def test_minimal_visual_disable_preserves_decision_and_retries_real_headless_app(tmp_path, monkeypatch):
+    from whab.app import create_app
+
+    path, revision, reference = saved_visual(tmp_path)
+    original = path.read_bytes()
+    monkeypatch.setattr(recovery, "installed_entrypoints", lambda: (entry("fictional-ui"), entry("sqlite")))
+    factory_calls = []
+    def factory(**arguments):
+        factory_calls.append(True)
+        return create_app(**arguments)
+    app = recovery.RecoveryApplication(settings(tmp_path, ui="web"), factory=factory)
+    before = {item: item.read_bytes() for item in tmp_path.rglob("*") if item.is_file()}
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        state = status(client)
+        assert not factory_calls and state["visual"]["worker"] == reference
+        assert state["visual"]["revision"] == revision and state["visual"]["can_disable"]
+        assert {row["id"] for row in state["plugins"] if row["required"]} == {"fictional-ui", "sqlite"}
+        assert {item: item.read_bytes() for item in tmp_path.rglob("*") if item.is_file()} == before
+        assert client.post("/api/recovery/visual/disable", json={"revision": "0" * 64}).status_code == 409
+        assert path.read_bytes() == original
+        response = client.post("/api/recovery/visual/disable", json={"revision": state["revision"]})
+        assert response.status_code == 200 and not factory_calls
+        assert response.json()["visual"]["plugin_id"] is None
+        assert response.json()["visual"]["generation"] == DISABLED_GENERATION
+        assert not response.json()["visual"]["can_disable"]
+        assert (tmp_path / "visual-ui/history" / (revision + ".json")).read_bytes() == original
+        with UISelectionStore(tmp_path, "default", "sandbox", None) as selected:
+            assert selected.snapshot()["workers"]["fictional-ui"] == reference
+        assert client.post("/api/recovery/retry", json={"revision": response.json()["revision"]}).status_code == 200
+        assert factory_calls == [True] and client.get("/api/plugins").status_code == 200
+        assert client.get("/budget/current-month/usd").status_code == 404
+
+
+def test_visual_recovery_disable_retains_tls_host_origin_and_strict_request_guards(tmp_path):
+    path, _, _ = saved_visual(tmp_path)
+    original = path.read_bytes()
+    with TestClient(recovery.RecoveryApplication(settings(tmp_path)), base_url="https://127.0.0.1:5173") as client:
+        state = status(client)
+        body = {"revision": state["revision"]}
+        assert client.post("http://127.0.0.1:5173/api/recovery/visual/disable", json=body,
+                           headers={"X-Forwarded-Proto": "https"}).status_code == 400
+        for headers in ({"Host": "outside.example"}, {"Origin": "https://outside.example"},
+                        {"Sec-Fetch-Site": "cross-site"}):
+            assert client.post("/api/recovery/visual/disable", json=body, headers=headers).status_code == 403
+        assert client.post("/api/recovery/visual/disable", json={**body, "plugin": "other"}).status_code == 400
+        assert client.post("/api/recovery/visual/disable", content=b"{}",
+                           headers={"Content-Type": "text/plain"}).status_code == 415
+    assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("invalid", ["busy", "schema", "scope", "missing-lock"])
+def test_unavailable_visual_decision_never_chooses_another_ui_or_executes_code(tmp_path, monkeypatch, invalid):
+    path, _, _ = saved_visual(tmp_path)
+    if invalid == "schema":
+        path.write_bytes(path.read_bytes().replace(b'"format":1', b'"format":99', 1))
+    elif invalid == "scope":
+        path.write_bytes(path.read_bytes().replace(b'"budget_id":"default"', b'"budget_id":"other"'))
+    elif invalid == "missing-lock":
+        path.with_name(path.name + ".lock").unlink()
+    owner = UISelectionStore(tmp_path, "default", "sandbox", None) if invalid == "busy" else None
+    before = {item: item.read_bytes() for item in tmp_path.rglob("*") if item.is_file()}
+    monkeypatch.setattr(recovery, "installed_entrypoints", lambda: (entry("fictional-ui"),))
+    try:
+        with TestClient(recovery.RecoveryApplication(settings(tmp_path), factory=lambda **_: pytest.fail("No code")),
+                        base_url="https://127.0.0.1:5173") as client:
+            state = status(client)
+            assert state["visual"] is None
+            assert any(error["code"] == "visual_decision_unreadable" for error in state["errors"])
+            assert client.post("/api/recovery/visual/disable", json={"revision": state["revision"]}).status_code == 400
+    finally:
+        if owner is not None:
+            owner.close()
+    after = {item: item.read_bytes() for item in tmp_path.rglob("*") if item.is_file()}
+    assert after.pop(tmp_path / ".plugin-recovery.lock") == b""
+    assert after == before
 
 
 def test_static_inspection_reads_package_metadata_without_importing_disabled_plugins_or_creating_backends(tmp_path, monkeypatch):
