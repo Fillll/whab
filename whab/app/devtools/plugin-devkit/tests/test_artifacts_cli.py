@@ -235,3 +235,9 @@ def test_cli_module_entrypoint_has_a_real_exit_status(tmp_path, monkeypatch):
         with pytest.raises(SystemExit) as raised:
             runpy.run_module("whab_plugin_devkit.cli", run_name="__main__")
     assert raised.value.code == 0
+
+
+def test_bank_fixture_requires_explicit_runtime_consent_before_descriptor_load(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_selected", lambda *_args, **_kwargs: pytest.fail("No bank descriptor is loaded without runtime consent"))
+    assert cli.main(["check", "--plugin", "fictional-bank", "--wheelhouse", "unused", "--bank-fixture", "fictional-v1"]) == 1
+    assert "Plugin check failed" in capsys.readouterr().err

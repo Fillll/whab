@@ -1,7 +1,7 @@
 """Public HTTPS contracts for reviewed offline bank fixtures, without backend imports.
 
-This additive helper is not wired into the CLI's native-local-v1 sampler. Callers
-must install their reviewed fictional provider and a supported local backend.
+The native-bank-v1 profile requires an explicit reviewed fictional-v1 fixture.
+It never treats an arbitrary provider as an offline test implementation.
 """
 
 import re
@@ -12,9 +12,28 @@ from urllib.parse import quote
 
 from packaging.version import Version
 
+from whab import plugins as sdk
+
 from .runtime_harness import NativeRuntime
 
 MINIMUM_BANK_HOST = "2.38.0"
+BANK_VARIANTS = ("standard", "ready-restart", "ready-defer", "update-restart", "completion-replay")
+
+
+def bank_declaration(plugin):
+    """Check the public pure adapter shape without constructing a provider."""
+    contract = getattr(plugin, "contract", None)
+    if (type(getattr(plugin, "bank", None)) is not getattr(sdk, "BankAdapter", None)
+            or contract is None or contract.lifecycle != "live" or contract.authority != "local"
+            or contract.state_version != 1 or contract.state_upgrades
+            or any(getattr(plugin, name, None) is not None for name in (
+                "bind", "settings", "migrate_state", "budget_connection", "categorization", "storage", "ui",
+                "interface", "bank_logos", "merchant_logos", "branding_factory", "file_import", "insights", "export"))):
+        raise ValueError("Use a pure explicit live local BankAdapter and an offline fixture.")
+    provided = {capability.name: capability.version for capability in contract.provides}
+    if provided != {"ingestion.bank": 1, "lifecycle.background": 1}:
+        raise ValueError("Declare the bank and background capabilities for the fictional fixture.")
+    return {"fixture": "fictional-v1", "minimum_host": MINIMUM_BANK_HOST}
 
 
 def bank_applicability(host_version):
@@ -60,10 +79,10 @@ class BankRuntime(NativeRuntime):
     This process boundary is not a network sandbox.
     """
 
-    def __init__(self, storage, selection, *, timeout=30):
+    def __init__(self, storage, selection, *, timeout=30, transition_timeout=180):
         if bank_applicability(metadata.version("whab")) != "supported":
             raise ValueError("The native bank profile requires WHAB 2.38 or newer.")
-        super().__init__(storage, selection, timeout=timeout)
+        super().__init__(storage, selection, timeout=timeout, transition_timeout=transition_timeout)
         self._fictional_key = secrets.token_hex(32)
 
     def environment(self):
@@ -75,7 +94,13 @@ def _check(value):
         raise AssertionError("The offline bank violated its advertised public runtime contract.")
 
 
-def exercise_bank_runtime(runtime, scenario):
+def fictional_scenario(plugin_id):
+    """The versioned offline fixture shared by maintained/generated projects."""
+    return BankScenario(plugin_id, "fictional-item", "Fictional checking", "Fictional grocer", 725,
+                        "fictional-public-token", "fictional-link-token")
+
+
+def exercise_bank_runtime(runtime, scenario, *, variant="standard", disconnect=True):
     """Exercise one new empty budget through the installed host's public HTTPS API.
 
     The fixture must expose one pending transaction on its first background sync,
@@ -83,7 +108,7 @@ def exercise_bank_runtime(runtime, scenario):
     lookup identities are learned from public responses, never native internals.
     The caller owns runtime teardown, including when an assertion fails.
     """
-    if type(scenario) is not BankScenario:
+    if type(scenario) is not BankScenario or variant not in BANK_VARIANTS or type(disconnect) is not bool:
         raise ValueError("Supply one explicit reviewed fictional scenario.")
     prefix = "/api/banks/" + scenario.plugin_id
     workspace_path = "/api/workspace?workspace=personal&month=" + scenario.month
@@ -94,12 +119,32 @@ def exercise_bank_runtime(runtime, scenario):
     _check(ready["stage"] == "ready" and ready["kind"] == "link" and ready["link_token"] == scenario.link_token)
     _check(runtime.expect("POST", prefix + "/link-token", {}) == ready)
     flow = prefix + "/continuations/" + ready["flow_id"]
+    if variant == "ready-restart":
+        runtime.stop()
+        runtime.start()
+        _check(runtime.expect("GET", flow)["stage"] == "ready")
+        _check(runtime.expect("POST", prefix + "/link-token", {}) == ready)
+    if variant == "ready-defer":
+        selected = [row["id"] for row in runtime.expect("GET", "/api/plugins")["plugins"]
+                    if row["id"] not in {scenario.plugin_id, "sqlite", "json"}]
+        ticket = runtime.expect("POST", "/api/plugins/management/transition", {"plugins": selected}, status=202)
+        def refused():
+            rows = runtime.expect("GET", "/api/plugins/runtime")["operations"]
+            row = next((row for row in rows if row["id"] == ticket["id"]), None)
+            if row is not None and row["state"] == "complete":
+                raise AssertionError("An unfinished fictional connection did not defer provider retirement.")
+            return row if row is not None and row["state"] == "failed" else None
+        _check(runtime.wait(refused, timeout=runtime.transition_timeout)["error"]["code"] == "continuation_busy")
+        _check(runtime.expect("GET", flow)["stage"] == "ready")
     _check(runtime.expect("DELETE", flow)["stage"] == "cancelled")
     ready = runtime.expect("POST", prefix + "/link-token", {})
     _check(ready["flow_id"] != flow.rsplit("/", 1)[-1])
     flow = prefix + "/continuations/" + ready["flow_id"]
-    _check(runtime.expect("POST", prefix + "/exchange", {"flowId": ready["flow_id"],
-        "publicToken": scenario.public_token, "institutionName": "Fictional Bank"})["stage"] == "complete")
+    complete = {"flowId": ready["flow_id"], "publicToken": scenario.public_token, "institutionName": "Fictional Bank"}
+    completed = runtime.expect("POST", prefix + "/exchange", complete)
+    _check(completed["stage"] == "complete")
+    if variant == "completion-replay":
+        _check(runtime.expect("POST", prefix + "/exchange", complete) == completed)
     _check(runtime.expect("GET", flow)["stage"] == "complete")
 
     def pending():
@@ -126,12 +171,22 @@ def exercise_bank_runtime(runtime, scenario):
            == {"ok": True, "added": 0, "modified": 0, "removed": 0})
     update = runtime.expect("POST", prefix + "/link-token", {"itemId": scenario.item_id})
     _check(update["kind"] == "update")
+    if variant == "update-restart":
+        runtime.stop()
+        runtime.start()
+        _check(runtime.expect("GET", prefix + "/continuations/" + update["flow_id"])["stage"] == "ready")
     _check(runtime.expect("POST", prefix + "/exchange", {"flowId": update["flow_id"]})["stage"] == "complete")
-    runtime.expect("DELETE", prefix + "/items/" + quote(scenario.item_id, safe=""))
-    # Disconnect is idempotent and preserves financial history.
-    runtime.expect("DELETE", prefix + "/items/" + quote(scenario.item_id, safe=""))
-    _check(runtime.expect("GET", workspace_path)["transactions"] == data["transactions"])
+    if disconnect:
+        disconnect_bank(runtime, scenario)
+        _check(runtime.expect("GET", workspace_path)["transactions"] == data["transactions"])
     _check(runtime.expect("GET", demo_path) == demo_before)
-    return {"status": "passed", "profile": "offline-bank-v1", "plugin": scenario.plugin_id,
+    return {"status": "passed", "profile": "offline-bank-v1", "plugin": scenario.plugin_id, "variant": variant,
             "steps": ["begin-retry", "cancel", "complete", "pending-annotations", "posted", "reopen",
-                      "cursor-retry", "update", "disconnect", "demo-isolation"]}
+                      "cursor-retry", "update", *(["disconnect"] if disconnect else []), "demo-isolation"]}
+
+
+def disconnect_bank(runtime, scenario):
+    """Disconnect the fictional item twice; keep its acknowledged history."""
+    path = "/api/banks/" + scenario.plugin_id + "/items/" + quote(scenario.item_id, safe="")
+    runtime.expect("DELETE", path)
+    runtime.expect("DELETE", path)

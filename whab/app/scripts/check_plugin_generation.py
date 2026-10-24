@@ -22,9 +22,11 @@ API_MINIMUM_HOST_VERSION = "2.34.0"
 API_MINIMUM_HOST_COMMIT = "ebbff0d464dd67c0269428a6d4a339778e21ec57"
 UI_MINIMUM_HOST_VERSION = "2.36.0"
 UI_MINIMUM_HOST_COMMIT = "a866eda580c6e363a20636785bc4b4003db0652f"
+BANK_MINIMUM_HOST_VERSION = "2.38.0"
+BANK_MINIMUM_HOST_COMMIT = "75ede3d6639b716b7110a69b5e8ec99334842799"
 MINIMUM_RECIPES = {MINIMUM_HOST_VERSION: MINIMUM_HOST_COMMIT, API_MINIMUM_HOST_VERSION: API_MINIMUM_HOST_COMMIT,
-                   UI_MINIMUM_HOST_VERSION: UI_MINIMUM_HOST_COMMIT}
-FAMILIES = ("reporting", "branding", "file-import", "categorization", "api", "ui")
+                   UI_MINIMUM_HOST_VERSION: UI_MINIMUM_HOST_COMMIT, BANK_MINIMUM_HOST_VERSION: BANK_MINIMUM_HOST_COMMIT}
+FAMILIES = ("reporting", "branding", "file-import", "categorization", "api", "ui", "bank")
 BUILD_REQUIREMENTS = ("setuptools==84.2.1",)
 
 
@@ -110,7 +112,7 @@ def project_minimum(project):
     value = tomllib.loads((project / "pyproject.toml").read_text())
     minimum = value.get("tool", {}).get("whab", {}).get("plugin-devkit", {}).get("minimum-host", MINIMUM_HOST_VERSION)
     if type(minimum) is not str or minimum not in MINIMUM_RECIPES:
-        raise ValueError("Choose a supported genuine minimum-host recipe: 2.22.0, 2.34.0 or 2.36.0.")
+        raise ValueError("Choose a supported genuine minimum-host recipe: 2.22.0, 2.34.0, 2.36.0 or 2.38.0.")
     hosts = [requirement for text in value["project"].get("dependencies", ())
              if canonicalize_name((requirement := Requirement(text)).name) == "whab"]
     if (len(hosts) != 1 or hosts[0].url or hosts[0].marker or hosts[0].extras
@@ -119,6 +121,17 @@ def project_minimum(project):
                        for spec in hosts[0].specifier)):
         raise ValueError("Declare the project's actual WHAB floor and matching minimum-host source recipe.")
     return minimum
+
+
+def bank_fixture_arguments(project):
+    """Read the author's explicit offline-fixture approval without plugin imports."""
+    value = tomllib.loads((project / "pyproject.toml").read_text())
+    fixture = value.get("tool", {}).get("whab", {}).get("plugin-devkit", {}).get("offline-bank-fixture")
+    if fixture is None:
+        return []
+    if fixture != "fictional-v1" or project_minimum(project) != BANK_MINIMUM_HOST_VERSION:
+        raise ValueError("Use the reviewed fictional-v1 bank fixture on its genuine 2.38 host floor.")
+    return ["--bank-fixture", fixture]
 
 
 def minimum_source(helper, base, environment, version):
@@ -209,7 +222,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, help="Write exact artifacts and complete replay manifests to this JSON file.")
     parser.add_argument("--artifacts-directory", type=Path, help="Preserve approved wheels and replay files in a new directory, including on failure.")
-    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the six projects.")
+    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the seven projects.")
     parser.add_argument("--plugin", help="The external project's single public plugin entry-point ID.")
     parser.add_argument("--candidate-ref", help="Full source commit for the external CI candidate host; never downloads a host wheel from an index.")
     parser.add_argument("--extra-wheelhouse", type=Path, help="Additional caller-approved dependency wheels; no candidate dependencies are downloaded.")
@@ -237,7 +250,7 @@ def main(argv=None):
                                     helper.copy_project(ROOT / "devtools/plugin-devkit/fixtures/runtime-peers", base / "runtime-peers")]
                 projects.extend(runtime_projects)
             requested_floors = ({project_minimum(args.project.resolve())} if args.project is not None
-                                else {MINIMUM_HOST_VERSION, API_MINIMUM_HOST_VERSION, UI_MINIMUM_HOST_VERSION})
+                                else {MINIMUM_HOST_VERSION, API_MINIMUM_HOST_VERSION, UI_MINIMUM_HOST_VERSION, BANK_MINIMUM_HOST_VERSION})
             if any(Version(candidate_version) < Version(floor) for floor in requested_floors):
                 raise ValueError("The candidate host predates an advertised project minimum.")
             if args.project is not None and candidate_version == MINIMUM_HOST_VERSION:
@@ -352,7 +365,8 @@ def main(argv=None):
                     helper.validate_toolkit_coverage(json.loads((work / "coverage.json").read_text()), installed["sources"], work, label="Candidate plugin")
                     output = work / "configurations"
                     subprocess.run([str(python), "-I", "-m", "whab_plugin_devkit.cli", "check", "--plugin", identifier,
-                                    "--runtime", "--combinations", "10", "--seed", "2026", "--wheelhouse", str(wheels), "--output", str(output)],
+                                    "--runtime", "--combinations", "10", "--seed", "2026", "--wheelhouse", str(wheels), "--output", str(output),
+                                    *bank_fixture_arguments(project)],
                                    cwd=work, env=env, check=True)
                     manifests = configuration_manifests(output)
                     for path in sorted(output.glob("configuration-*.json")):

@@ -1,7 +1,6 @@
 """Strict reusable fixture checks and actual installed public HTTPS bank flows."""
 
 from dataclasses import replace
-from importlib import metadata
 
 import pytest
 from whab_plugin_devkit.bank_conformance import (
@@ -64,19 +63,3 @@ def test_older_host_is_explicitly_inapplicable_and_never_allocates_a_runtime(mon
     monkeypatch.setattr("whab_plugin_devkit.bank_conformance.metadata.version", lambda _: "2.22.0")
     with pytest.raises(ValueError, match="requires WHAB 2.38"):
         BankRuntime("sqlite", ())
-
-
-@pytest.mark.parametrize("storage", ["sqlite", "json"])
-def test_actual_installed_offline_bank_over_native_https(storage):
-    # The additive helper has its own explicit fixture prerequisite. It never
-    # downloads, selects or executes an arbitrary community provider.
-    if bank_applicability(metadata.version("whab")) != "supported":
-        return  # Explicit profile N/A; no provider or host process was started.
-    entries = {entry.name for entry in metadata.entry_points(group="whab.plugins")}
-    if "example-bank" not in entries:
-        pytest.fail("Install the reviewed plugins/example/example-bank fixture before running this new bank suite.")
-    with BankRuntime(storage, ("example-bank",)) as runtime:
-        result = exercise_bank_runtime(runtime, scenario())
-        assert result["status"] == "passed" and result["profile"] == "offline-bank-v1"
-        assert result["steps"][-1] == "demo-isolation"
-    assert not runtime.home.exists() and runtime.process is None and runtime.cleanups == 2

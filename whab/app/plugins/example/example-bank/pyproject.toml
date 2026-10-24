@@ -28,6 +28,10 @@ where = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
 
+[tool.whab.plugin-devkit]
+minimum-host = "2.38.0"
+offline-bank-fixture = "fictional-v1"
+
 [tool.whab.plugin]
 api-version = 1
 capabilities = [
