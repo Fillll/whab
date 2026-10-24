@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "0ad5d25e680ee4499648d23149d87114ced6d0a0"
+documentation_ref = "a3f47419af56c0e9052770054dc23ecbbfc34eb2"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -336,3 +336,48 @@ scope = "Genuine installed host 2.37 at this source and genuine host 2.38 at a28
 whab = "2.37.0"
 whab_plugin_sqlite = "1.12.0"
 whab_plugin_json = "1.3.0"
+
+[[verification]]
+id = "pr101-live-bank-source"
+date = "2026-10-23"
+host_version = "2.38.0"
+source_commit = "dd52ec9554ee3c36395f8f2a7c1d2ab5ff00353f"
+selection = ["plaid"]
+method = "source-tests"
+tests = ["tests/test_bank_runtime.py", "tests/test_bank_native.py", "tests/test_bank_lifecycle.py", "tests/plugins/test_provider_worker.py", "tests/plugins/test_provider_upgrade.py", "tests/web/test_bank_continuations.py", "tests/budgets/test_bank_storage_barriers.py", "plugins/ingestion/plaid/tests", "scripts/check.py", "GitHub Actions run 40055955522"]
+pull_requests = ["https://github.com/Fillll/whab/pull/101"]
+scope = "The exact source completed the complete contribution command in GitHub CI on Python 3.14 and 3.15, including genuine minimum/current installed toolkit and generated-project tests, exact-artifact replays and installed distributions. An independent macOS run passed 5143 Python tests, all fourteen runtime plugins at 100% statement/branch coverage and 354 browser checks, then stopped during an old toolkit 0.6 API replay after its ten native checks passed; that separate failure is preserved and was not attributed to a cause. An independent installed rerun passed all ten original API replays with the exact artifact hashes and unchanged 30-second operation deadlines. Bank tests used fictional homes and mocked provider transports for typed worker operations, Item/cursor and annotation preservation, startup/cleanup ownership, active work draining, scoped OAuth flows, encrypted capture and native receipt recovery. Bundled Plaid has complete owning coverage; distinct-version native worker behavior is recorded separately with a reviewed fictional provider. No real provider connection or household deployment was used."
+[verification.artifacts]
+whab = "2.38.0"
+whab_plugin_plaid = "1.3.0"
+
+[[verification]]
+id = "pr101-native-outcome-phases"
+date = "2026-10-23"
+host_version = "2.38.0"
+source_commit = "2194635cccfa7f0d05ece36b13981eca12692aa1"
+selection = ["sqlite", "json"]
+method = "source-tests"
+tests = ["tests/plugins/test_storage_proxy_outcomes.py", "tests/plugins/test_storage_worker.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/101"]
+scope = "A separate follow-up changes only the storage proxy outcome phases and adds fourteen controlled regressions. All sixty focused SQLite/JSON proxy and native worker tests passed. A direct execution rejection permits definite noncommit only after exact unchanged native proof; intent-publication failure, failed proof, malformed evidence/receipt and post-result completion failure retain pending intent and the unknown-write fence. Controlled reproductions preserved original false-rejection evidence and verified the corrected unknown outcome. This is focused follow-up validation, distinct from the earlier source's complete CI and native bank evidence."
+[verification.artifacts]
+whab = "2.38.0"
+whab_plugin_sqlite = "1.12.0"
+whab_plugin_json = "1.3.0"
+
+[[verification]]
+id = "pr101-installed-native-bank"
+date = "2026-10-23"
+host_version = "2.38.0"
+source_commit = "a28ab71cf013039e36fbf4842cb96ce7a1644de6"
+selection = ["sqlite", "json", "web"]
+method = "installed-wheel"
+tests = ["installed native HTTPS v1/failed-candidate/v2 bank worker verification", "installed native HTTPS exchange-uncertain and captured-native-apply recovery", "ordinary stock CLI reopen after acknowledged-write process termination"]
+pull_requests = ["https://github.com/Fillll/whab/pull/101"]
+scope = "Built genuine host 2.38, SQLite 1.12, JSON 1.3 and Web 1.27 wheels from the exact source and installed them outside the checkout. Three fictional native HTTPS cases explicitly trusted only their temporary runtime CA: a reviewed offline bank provider 1.0 to failed 1.5 to 2.0 upgrade with ready-flow deferral, disable/re-enable, pending-to-posted annotations and acknowledged-write SIGKILL/stock-CLI reopen; an exchange response lost before encrypted capture with no automatic repeat after reopen; and encrypted captured native application refused by a controlled directory-permission fault, then explicitly finished using the original native command and receipt. A separately reviewed fictional JSON 1.3.1 code-only fixture preserved the native UUID/epoch/generation and captured Item/cursor while recovering the original request. Synthetic provider and JSON patch versions are test fixtures, not bundled Plaid or published backend releases. The helper was extracted candidate source alongside toolkit 0.6, not a released toolkit 0.8 claim. Exact wheel/closure hashes were retained; all owned homes/listeners were removed, and no external provider HTTP or household data was used."
+[verification.artifacts]
+whab = "2.38.0"
+whab_plugin_sqlite = "1.12.0"
+whab_plugin_json = "1.3.0"
+whab_plugin_web = "1.27.0"

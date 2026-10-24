@@ -59,7 +59,11 @@ def test_bundled_plaid_is_loaded_through_entry_point_and_keeps_legacy_routes(tmp
             assert client.post(prefix + "/webhook", json={}).status_code == 401
         page = client.get("/budgets/home/accounts/current-month/usd")
         assert "Finish Plaid setup" in page.text
-        assert "/plugins/plaid/static/connect.js" in page.text
+        assert 'data-bank-environment="sandbox"' in page.text
+        assert "data-plaid-check-link" in page.text
+        assert "data-plaid-cancel-link" in page.text
+        assert "data-plaid-finish-link" in page.text
+        assert "/banks/plaid/" in page.text and "/static/connect.js" in page.text
         assert client.get("/plugins/plaid/static/connect.js").status_code == 200
 
 
@@ -82,7 +86,7 @@ def test_alternate_ui_can_embed_plaid_without_default_ui_helpers(tmp_path, store
         response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
         assert "Finish Plaid setup" in response.text
-        assert "/plugins/plaid/static/connect.js" in response.text
+        assert "/banks/plaid/" in response.text and "/static/connect.js" in response.text
         assert client.get("/plugins/plaid/static/connect.js").status_code == 200
         assert client.get("/static/client.js").status_code == 404
 
@@ -112,7 +116,7 @@ def test_oauth_callback_uses_provider_asset_with_an_alternate_visual_interface(t
         state = "synthetic-private-state"
         response = client.get("/", params={"oauth_state_id": state})
         assert response.status_code == 200
-        assert '/budgets/home/plugins/plaid/static/oauth.js' in response.text
+        assert '/budgets/home/banks/plaid/' in response.text and '/static/oauth.js' in response.text
         assert state not in response.text
         assert client.get('/budgets/home/plugins/plaid/static/oauth.js').status_code == 200
         assert client.get('/budgets/home/static/oauth.js').status_code == 404

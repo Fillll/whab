@@ -10,6 +10,10 @@ from whab.domain.receipts import MAX_RECEIPT_BYTES, RECEIPT_TYPES
 _IMPORT_PATH = re.compile(r"/api/plugins/[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*/import/(?:new/)?(?:preview|commit)\Z")
 
 
+def _webhook(path, explicit):
+    return explicit(path) if callable(explicit) else path in explicit
+
+
 def _file_import(path, explicit):
     parts = path.split("/")
     return path in explicit or bool(len(parts) >= 4 and len(parts[3]) <= 64 and _IMPORT_PATH.fullmatch(path))
@@ -24,7 +28,7 @@ class RequestBodyLimit:
 
     def __init__(self, app, webhook_paths, file_import_paths=()):
         self.app = app
-        self.webhook_paths = frozenset(webhook_paths)
+        self.webhook_paths = webhook_paths if callable(webhook_paths) else frozenset(webhook_paths)
         self.file_import_paths = frozenset(file_import_paths)
 
     async def __call__(self, scope, receive, send):
@@ -37,7 +41,7 @@ class RequestBodyLimit:
             return
         limit = MAX_RECEIPT_BYTES if _receipt_upload(scope["path"], scope["method"]) else (
             (50 * 1024 * 1024 if scope["path"] == "/api/budget/open" else 10 * 1024 * 1024) if _file_import(scope["path"], self.file_import_paths)
-            else 128 * 1024 if scope["path"] in self.webhook_paths else 32 * 1024
+            else 128 * 1024 if _webhook(scope["path"], self.webhook_paths) else 32 * 1024
         )
         chunks = []
         size = 0
@@ -81,7 +85,7 @@ class RequireHTTPS:
 
 
 def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote=False):
-    webhook_paths = frozenset(webhook_paths)
+    webhook_paths = webhook_paths if callable(webhook_paths) else frozenset(webhook_paths)
     file_import_paths = frozenset(file_import_paths)
     new_budget_import_paths = frozenset(
         path for path in file_import_paths
@@ -93,7 +97,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
     async def local_access(request, call_next):
         if request.url.scheme != "https":
             return JSONResponse({"error": "HTTPS is required"}, status_code=400, headers={"Cache-Control": "no-store"})
-        webhook = request.url.path in webhook_paths
+        webhook = _webhook(request.url.path, webhook_paths)
         remote_request = (request.url.path == "/remote/v1" or request.url.path.startswith("/remote/v1/")) and (remote() if callable(remote) else remote)
         if not webhook and not remote_request:
             try:

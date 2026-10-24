@@ -10,7 +10,7 @@ from whab_plugin_plaid.plugin import create_bank, plugin
 from whab_plugin_plaid.service import PlaidError, PlaidService
 
 from whab.budgets.runtime import BudgetRuntime, RuntimeCandidate
-from whab.plugins import BankContext, Capability
+from whab.plugins import BankAdapter, BankContext, Capability
 
 
 def test_factory_retains_host_background_scope_and_truthful_descriptor_contract(store, plaid_env):
@@ -22,7 +22,8 @@ def test_factory_retains_host_background_scope_and_truthful_descriptor_contract(
     service = create_bank(context)
     assert service._background_scope is scope
     assert Capability("lifecycle.background") in plugin.contract.provides
-    assert plugin.contract.lifecycle == "restart" and plugin.contract.authority == "local"
+    assert type(plugin.bank) is BankAdapter
+    assert plugin.contract.lifecycle == "live" and plugin.contract.authority == "local"
     asyncio.run(service.close())
 
 
@@ -151,4 +152,17 @@ def test_close_cancellation_keeps_background_lease_until_native_commit_finishes(
             assert not service._queued and not client.is_closed
             assert store.get_item("item")["cursor"] == "fictional-committed-cursor"
 
+    asyncio.run(scenario())
+
+
+def test_legacy_service_without_configuration_rejects_link_and_unsigned_webhook(store, plaid_client):
+    async def scenario():
+        async with plaid_client(lambda _: pytest.fail('Unconfigured legacy service cannot send HTTP')) as client:
+            service = PlaidService(store, {}, client)
+            with pytest.raises(PlaidError, match='not configured'):
+                await service.link_token()
+            assert await service.verify_webhook(b'{}', None) is False
+            result = await service.webhook(b'{}', {})
+            assert result.ok is False and result.status_code == 401
+            await service.close()
     asyncio.run(scenario())

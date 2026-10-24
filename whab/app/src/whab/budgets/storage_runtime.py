@@ -551,7 +551,7 @@ class StorageRuntime:
         except (StoreError, PluginError) as error:
             operation.update(state="recovery_required" if self.runtime.status()["health"] == "recovery_required" else "failed",
                              error={"code": getattr(error, "code", "storage_transition_failed"),
-                                    "message": str(error), "plugin_id": target.id})
+                                    "message": str(error), "plugin_id": getattr(error, "plugin_id", None) or target.id})
             raise
 
     def _activate(self, prepared, plugin_id):
