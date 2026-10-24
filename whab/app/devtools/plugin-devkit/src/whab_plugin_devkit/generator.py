@@ -4,7 +4,7 @@ import re
 from importlib.resources import files
 from pathlib import Path
 
-FAMILIES = ("reporting", "branding", "file-import", "categorization", "api")
+FAMILIES = ("reporting", "branding", "file-import", "categorization", "api", "ui")
 
 
 def generate_project(plugin_id, capability, destination, *, ci_ref=None):
@@ -12,7 +12,7 @@ def generate_project(plugin_id, capability, destination, *, ci_ref=None):
     if type(plugin_id) is not str or len(plugin_id) > 64 or re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*", plugin_id) is None:
         raise ValueError("Choose a lowercase hyphen-separated plugin ID.")
     if capability not in FAMILIES:
-        raise ValueError("Choose reporting, branding, file-import, categorization, or api.")
+        raise ValueError("Choose reporting, branding, file-import, categorization, api, or ui.")
     if ci_ref is not None and (type(ci_ref) is not str or re.fullmatch(r"[0-9a-f]{40}", ci_ref) is None):
         raise ValueError("Choose a published full lowercase WHAB CI source commit.")
     destination = Path(destination)
@@ -24,15 +24,15 @@ def generate_project(plugin_id, capability, destination, *, ci_ref=None):
     tests.mkdir()
     template = files("whab_plugin_devkit").joinpath("templates")
     replacements = {"__PLUGIN_ID__": plugin_id, "__MODULE__": module,
-                    "__HOST_MINIMUM__": "2.34" if capability == "api" else "2.22",
-                    "__KIT_MINIMUM__": "0.6" if capability == "api" else "0.2",
-                    "__REFERENCE_TEST_REQUIREMENT__": template.joinpath("api_test_dependencies.txt").read_text().strip() if capability == "api" else "",
+                    "__HOST_MINIMUM__": {"api": "2.34", "ui": "2.36"}.get(capability, "2.22"),
+                    "__KIT_MINIMUM__": {"api": "0.6", "ui": "0.7"}.get(capability, "0.2"),
+                    "__REFERENCE_TEST_REQUIREMENT__": template.joinpath("api_test_dependencies.txt").read_text().strip() if capability in {"api", "ui"} else "",
                     "__TOKEN_SETTING__": plugin_id.replace("-", "_").upper() + "_TOKEN",
-                    "__STATIC_METADATA__": ('[tool.whab.plugin]\napi-version = 1\ncapabilities = [{ name = "interface.api", version = 1, composition = "additive" }]\nrequires = []\nconflicts = []\nlifecycle = "live"\nlegacy = false\nauthority = "local"\nstate-version = 1\nstate-upgrades = []\nsupport = "teaching"' if capability == "api" else "") }
+                    "__STATIC_METADATA__": (f'[tool.whab.plugin]\napi-version = 1\ncapabilities = [{{ name = "interface.{capability}", version = 1, composition = "{"singleton" if capability == "ui" else "additive"}" }}]\nrequires = []\nconflicts = []\nlifecycle = "live"\nlegacy = false\nauthority = "local"\nstate-version = 1\nstate-upgrades = []\nsupport = "teaching"' if capability in {"api", "ui"} else "") }
     for resource, path in ((capability + ".py.txt", source / "__init__.py"),
                            (capability + "_test.py.txt", tests / "test_plugin.py"),
                            ("project.toml.txt", destination / "pyproject.toml"),
-                           (("api_README.md.txt" if capability == "api" else "README.md.txt"), destination / "README.md")):
+                           ((capability + "_README.md.txt" if capability in {"api", "ui"} else "README.md.txt"), destination / "README.md")):
         value = template.joinpath(resource).read_text()
         for old, new in replacements.items():
             value = value.replace(old, new)

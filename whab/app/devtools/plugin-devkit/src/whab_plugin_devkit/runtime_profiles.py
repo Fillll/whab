@@ -23,11 +23,18 @@ from .configurations import (
     validate_manifest,
 )
 from .runtime_harness import NativeRuntime
+from .visual_interface import (
+    MINIMUM_UI_HOST,
+    assert_visual_interface,
+    visual_change,
+    visual_declaration,
+)
 
 MINIMUM_RUNTIME_HOST = "2.32.0"
 _FAULTS = ("invalid-selection", "consumed-preview", "copy-source-changed", "kill-after-acknowledged-write")
 _RUNTIME_KEYS = {"profile", "minimum_host", "host", "applicability", "candidate_applicability", "primary", "destination", "sequence", "selections", "candidate_selection", "fault", "steps"}
 _API_PROFILE = "native-api-v1"
+_UI_PROFILE = "native-ui-v1"
 _STEPS = ["candidate-public-hooks", "live-selections", "attach-copy", "acknowledged-write", "copy-catch-up", "promote-copy", "migrate-back", "restart", "verify-data", "cleanup"]
 
 
@@ -43,18 +50,34 @@ def _api_candidate(plugin):
 
 
 def _profile(plugin):
-    return _API_PROFILE if _api_candidate(plugin) is not None else "native-local-v1"
+    return _API_PROFILE if _api_candidate(plugin) is not None else _UI_PROFILE if _ui_candidate(plugin) else "native-local-v1"
+
+
+def _ui_candidate(plugin):
+    if getattr(plugin, "ui", None) is None:
+        return False
+    try:
+        visual_declaration(plugin)
+    except ValueError:
+        return False
+    return True
 
 
 def _minimum(profile):
-    return MINIMUM_API_HOST if profile == _API_PROFILE else MINIMUM_RUNTIME_HOST
+    return {_API_PROFILE: MINIMUM_API_HOST, _UI_PROFILE: MINIMUM_UI_HOST}.get(profile, MINIMUM_RUNTIME_HOST)
 
 
 def _steps(profile):
-    return ["api-worker-readiness", "api-auth-command-retry", *_STEPS, "api-reopen-query"] if profile == _API_PROFILE else _STEPS.copy()
+    if profile == _API_PROFILE:
+        return ["api-worker-readiness", "api-auth-command-retry", *_STEPS, "api-reopen-query"]
+    if profile == _UI_PROFILE:
+        return ["ui-worker-readiness", "ui-pages-assets", "ui-dirty-view-ack", *_STEPS, "ui-reopen-generation"]
+    return _STEPS.copy()
 
 
 def _candidate_support(plugin):
+    if _ui_candidate(plugin):
+        return "supported"
     # The initial profile must not start providers, interfaces or arbitrary
     # context binders as a side effect of testing a separate public hook.
     return ("not-applicable: unsupported candidate hooks" if any(getattr(plugin, name) is not None for name in (
@@ -127,7 +150,7 @@ def validate_runtime_manifest(manifest):
     runtime = manifest.get("runtime")
     if type(runtime) is not dict or set(runtime) != _RUNTIME_KEYS:
         raise ValueError("Unsupported runtime profile fields.")
-    if runtime["profile"] not in {"native-local-v1", _API_PROFILE} or runtime["minimum_host"] != _minimum(runtime["profile"]) or runtime["host"] != _host(manifest["artifacts"]):
+    if runtime["profile"] not in {"native-local-v1", _API_PROFILE, _UI_PROFILE} or runtime["minimum_host"] != _minimum(runtime["profile"]) or runtime["host"] != _host(manifest["artifacts"]):
         raise ValueError("Runtime profile and recorded host artifact differ.")
     expected = "supported" if Version(runtime["host"]) >= Version(_minimum(runtime["profile"])) else "not-applicable: host predates runtime profile"
     if runtime["applicability"] != expected or runtime["steps"] != _steps(runtime["profile"]) or runtime["fault"] not in _FAULTS:
@@ -161,8 +184,8 @@ def _check(condition):
         raise AssertionError("A runtime profile violated its public contract.")
 
 
-def _selection(runtime, selection):
-    ticket = runtime.expect("POST", "/api/plugins/management/transition", {"plugins": selection}, status=202)
+def _selection(runtime, selection, *, visual=None):
+    ticket = runtime.expect("POST", "/api/plugins/management/transition", {"plugins": [name for name in selection if name != visual]}, status=202)
     runtime.operation("/api/plugins/runtime", ticket["id"])
     actual = runtime.expect("GET", "/api/plugins")["plugins"]
     _check({row["id"] for row in actual} - {"sqlite", "json"} == set(selection))
@@ -204,11 +227,16 @@ def replay_runtime_configuration(manifest, candidate, reference, *, native=Nativ
         resolve_plugins(tuple(available[name] for name in [reference.id, *selection]))
     api = _api_candidate(candidate) if profile["profile"] == _API_PROFILE else None
     options = {"api_token_setting": api["token_setting"]} if api is not None else {}
-    with native(profile["primary"], profile["selections"][0], **options) as runtime:
+    visual = candidate.id if profile["profile"] == _UI_PROFILE else None
+    initial = [name for name in profile["selections"][0] if name != visual]
+    if visual is not None:
+        options["ui"] = visual
+    with native(profile["primary"], initial, **options) as runtime:
         _check(runtime.expect("GET", "/api/health")["version"] == profile["host"])
         registry = PluginRegistry(tuple(available[name] for name in [reference.id, *profile["selections"][0]]))
         candidate_hooks = exercise_candidate(candidate, registry)
         api_evidence = None
+        visual_evidence = None
         if api is not None:
             ticket = runtime.expect("POST", "/api/plugins/management/upgrade", {
                 "pluginId": candidate.id, "wheels": api_worker_wheels(candidate, manifest["artifacts"], wheelhouse),
@@ -217,10 +245,19 @@ def replay_runtime_configuration(manifest, candidate, reference, *, native=Nativ
             worker, = (row for row in runtime.expect("GET", "/api/plugins/runtime")["workers"] if row["plugin"] == candidate.id)
             _check(worker["health"] == "ready")
             api_evidence = {**assert_api_interface(runtime, candidate), "worker": worker}
+        if visual is not None:
+            active = visual_change(runtime, visual, wheels=api_worker_wheels(candidate, manifest["artifacts"], wheelhouse), dirty=True)
+            resources = candidate.ui.resources
+            asset = next((name.removeprefix("static/") for name in sorted(resources.files) if name.startswith("static/")), None) if resources is not None else None
+            visual_evidence = {**assert_visual_interface(runtime, candidate, asset_name=asset), "worker": active["worker"]}
         if profile["fault"] == "invalid-selection":
             runtime.expect("POST", "/api/plugins/management/transition", {"plugins": [*profile["selections"][0], "synthetic-not-installed"]}, status=409)
         for selection in profile["selections"][1:]:
-            _selection(runtime, selection)
+            if visual is not None:
+                selected = visual if visual in selection else None
+                if runtime.expect("GET", "/api/ui/status")["active"]["plugin_id"] != selected:
+                    visual_change(runtime, selected)
+            _selection(runtime, selection, visual=visual)
             if api is not None:
                 identifier = runtime.expect("GET", "/api/budget")["id"]
                 query = f"/remote/v1/budgets/{identifier}/queries/accounts?workspace=personal"
@@ -258,6 +295,9 @@ def replay_runtime_configuration(manifest, candidate, reference, *, native=Nativ
             _check(result["data"] == before["accounts"])
             worker, = (row for row in runtime.expect("GET", "/api/plugins/runtime")["workers"] if row["plugin"] == candidate.id)
             _check(worker == api_evidence["worker"])
+        if visual is not None:
+            _check(runtime.expect("GET", "/api/ui/status")["active"]["worker"] == visual_evidence["worker"])
+            _check(assert_visual_interface(runtime, candidate, asset_name=asset)["generation"] == visual_evidence["generation"])
         runtime.stop()
         cleanups = runtime.cleanups
     _check(not runtime.home.exists() and runtime.process is None)
@@ -266,4 +306,5 @@ def replay_runtime_configuration(manifest, candidate, reference, *, native=Nativ
                         "destination": profile["destination"], "fault": profile["fault"],
                         "steps": profile["steps"], "sequence": profile["sequence"], "selections": profile["selections"],
                         "candidate_selection": profile["candidate_selection"], "cleanup_count": cleanups,
-                        "cleanup_complete": True, **({"api": api_evidence} if api_evidence is not None else {})}}
+                        "cleanup_complete": True, **({"api": api_evidence} if api_evidence is not None else {}),
+                        **({"visual": visual_evidence} if visual_evidence is not None else {})}}

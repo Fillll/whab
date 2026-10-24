@@ -134,7 +134,11 @@ This check uses the bundle's own Python, manager, server, source seed and wheels
 It creates a temporary runtime and fictional manual account, verifies the rendered
 demo page and HTTPS build identity, checks restart/relaunch persistence, exercises
 native diagnostics, and verifies private state/backup permissions and the final
-app signature. It never uses your existing runtime or modifies certificate trust.
+app signature. After stopping, it also verifies all private runtime roots,
+versioned backup fingerprints and inert immutable-worker interpreter aliases.
+It never uses your existing runtime or modifies certificate trust.
+Repeat with `--storage json` to verify the same native lifecycle, acknowledged
+save and reopen using the bundled genuine JSON backend.
 It always attempts a graceful stop before cleanup. Add `--keep-test-dir` to retain
 its disposable files and private logs; a failed stop also retains them.
 
