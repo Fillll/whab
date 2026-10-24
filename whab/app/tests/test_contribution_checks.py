@@ -32,10 +32,15 @@ def test_full_gate_runs_python_suite_once_and_quick_gate_skips_it(checker, monke
     assert not any("pytest" in command for _, command in full)
     assert "scripts/check_distribution.py" in full[-1][1]
     assert sum("scripts/check_plugin_devkit.py" in command for _, command in full) == 1
+    assert sum("scripts/check_plugin_generation.py" in command for _, command in full) == 1
     assert all("coverage" not in " ".join(command) and "distribution" not in " ".join(command)
-               and "check_plugin_devkit" not in " ".join(command) for _, command in quick)
+               and "check_plugin_devkit" not in " ".join(command)
+               and "check_plugin_generation" not in " ".join(command) for _, command in quick)
     assert "devtools" in next(command for name, command in full if name == "Python lint")
     assert quick[-1][1] == ["node", "--test", str(test.relative_to(tmp_path))]
+    evidence = checker.commands(docs_only=False, quick=False, node="node", evidence_dir=tmp_path / "evidence")
+    generation = next(command for _, command in evidence if "scripts/check_plugin_generation.py" in command)
+    assert generation[-2:] == ["--artifacts-directory", str(tmp_path / "evidence/generated")]
 
 
 @pytest.mark.parametrize("checker", ["check"], indirect=True)
@@ -336,15 +341,15 @@ def test_toolkit_external_environment_cannot_select_household_data_or_source_imp
 
 
 @pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
-@pytest.mark.parametrize("counts", [(12, 0, 0, 0), (13, 0, 0, 1), (13, 1, 0, 0), (13, 0, 1, 0)])
+@pytest.mark.parametrize("counts", [(91, 0, 0, 0), (92, 0, 0, 1), (92, 1, 0, 0), (92, 0, 1, 0)])
 def test_toolkit_reference_coverage_cannot_pass_with_missing_skipped_or_failed_tests(checker, tmp_path, counts):
     report = tmp_path / "tests.xml"
     tests, failures, errors, skipped = counts
     report.write_text(f'<testsuites><testsuite tests="{tests}" failures="{failures}" errors="{errors}" skipped="{skipped}"/></testsuites>')
     with pytest.raises(ValueError, match="run completely"):
         checker.validate_test_results(report)
-    report.write_text('<testsuites><testsuite tests="13" failures="0" errors="0" skipped="0"/></testsuites>')
-    assert checker.validate_test_results(report)["tests"] == 13
+    report.write_text('<testsuites><testsuite tests="92" failures="0" errors="0" skipped="0"/></testsuites>')
+    assert checker.validate_test_results(report)["tests"] == 92
 
 
 @pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)

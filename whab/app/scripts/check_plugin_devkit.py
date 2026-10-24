@@ -17,9 +17,9 @@ from email.parser import BytesParser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MINIMUM_HOST_VERSION = "2.21.1"
-MINIMUM_HOST_COMMIT = "b6d4ca04fc71556d2c51b1f7ce286049162656af"
-MINIMUM_TEST_COUNT = 13
+MINIMUM_HOST_VERSION = "2.22.0"
+MINIMUM_HOST_COMMIT = "bac249ca0e62638a40a6effc44af741c283e83d7"
+MINIMUM_TEST_COUNT = 92
 TEST_REQUIREMENTS = ("pytest==9.1.1", "pytest-cov==7.1.0", "coverage==7.16.2")
 
 VERIFY_INSTALLATION = """
@@ -43,7 +43,9 @@ for name, version in expected.items():
     result["versions"][name] = metadata.version(name)
     if name == "whab_plugin_devkit":
         result["toolkit_source_files"] = [str(path.resolve()) for path in module_path.parent.rglob("*.py")]
-assert not metadata.distribution("whab_plugin_devkit").entry_points
+assert {(entry.group, entry.name, entry.value) for entry in metadata.distribution("whab_plugin_devkit").entry_points} == {
+    ("console_scripts", "whab-plugin", "whab_plugin_devkit.cli:main"),
+}
 entries = tuple(metadata.entry_points(group="whab.plugins"))
 assert len(entries) == 1 and entries[0].name == "sqlite"
 assert entries[0].dist.metadata["Name"] == "whab_plugin_sqlite"
