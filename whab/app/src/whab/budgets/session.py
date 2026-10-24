@@ -704,7 +704,8 @@ class TrackedStorage:
                     self.on_mutation()
                 if self.session:
                     self.session.checkpoint()
-                if name in {"apply_sync", "import_workspace"} and self.after_ingestion:
+                effective_name = args[0].name if name == "execute_operation" else name
+                if effective_name in {"apply_sync", "import_workspace"} and self.after_ingestion:
                     self.after_ingestion()
                 if self.after_commit:
                     try:

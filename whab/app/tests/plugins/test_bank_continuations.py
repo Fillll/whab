@@ -471,3 +471,114 @@ def test_native_result_publication_fault_replays_receipt_without_another_native_
     assert journal.apply(SCOPE, token, native_fingerprint=NATIVE_FINGERPRINT, lookup=native.lookup, commit=native.commit) == b"fictional saved result"
     assert native.calls == 1
     journal.close()
+
+
+def test_version2_native_request_is_encrypted_exact_scoped_and_immutable_on_replay(tmp_path):
+    journal = coordinator(tmp_path)
+    token = captured(journal)
+    command = b'{"operation":"synthetic-exchange","epoch":"fictional","G":7,"payload":"fictional encrypted token"}'
+    assert journal.prepare_native(SCOPE, token, NATIVE_FINGERPRINT, command) == command
+    assert journal.prepare_native(SCOPE, token, NATIVE_FINGERPRINT, command) == command
+    assert journal.native_request(SCOPE, token) == (NATIVE_FINGERPRINT, command)
+    assert journal.captured_response(SCOPE, token) == b'fictional provider access secret'
+    assert journal.exchange_request(SCOPE, token) == b'fictional public secret'
+    assert journal.scope_for(token) == SCOPE and journal.statuses()[0].generation == 7
+    with pytest.raises(EffectError) as changed:
+        journal.prepare_native(SCOPE, token, NATIVE_FINGERPRINT, command + b'changed')
+    assert changed.value.code == 'effect_conflict'
+    with pytest.raises(EffectError):
+        journal.native_request(replace(SCOPE, generation=8), token)
+    native = Native()
+    journal.apply(SCOPE, token, native_fingerprint=NATIVE_FINGERPRINT, lookup=native.lookup, commit=native.commit)
+    record = json.loads((tmp_path / 'bank-continuations.json').read_bytes())['body']
+    assert record['formatVersion'] == 2 and record['records'][0]['native_request']
+    assert command not in (tmp_path / 'bank-continuations.json').read_bytes()
+    journal.close()
+    reopened = coordinator(tmp_path)
+    try:
+        assert reopened.native_request(SCOPE, token) == (NATIVE_FINGERPRINT, command)
+        assert reopened.status(SCOPE, token).stage == 'complete'
+        assert reopened.apply(SCOPE, token, native_fingerprint=NATIVE_FINGERPRINT,
+                              lookup=lambda *_: pytest.fail('Original completed outcome must replay'),
+                              commit=native.commit) == b'fictional saved result'
+        assert native.calls == 1
+    finally:
+        reopened.close()
+
+
+def test_explicit_version1_upgrade_preserves_original_encrypted_capture_and_native_result(tmp_path):
+    journal = coordinator(tmp_path)
+    token = captured(journal)
+    native = Native()
+    journal.apply(SCOPE, token, native_fingerprint=NATIVE_FINGERPRINT, lookup=native.lookup, commit=native.commit)
+    journal.close()
+    path = tmp_path / 'bank-continuations.json'
+    old = json.loads(path.read_bytes())
+    old['body'].pop('formatVersion')
+    old['body']['records'][0].pop('native_request')
+    path.write_bytes(json.dumps(old).encode())
+    original = old['body']['records'][0]
+    upgraded = coordinator(tmp_path)
+    try:
+        current = json.loads(path.read_bytes())['body']
+        assert current['formatVersion'] == 2
+        assert {key: value for key, value in current['records'][0].items() if key != 'native_request'} == original
+        assert current['records'][0]['native_request'] is None
+        assert upgraded.apply(SCOPE, token, native_fingerprint=NATIVE_FINGERPRINT,
+                              lookup=lambda *_: pytest.fail('Historical completed result must replay'),
+                              commit=native.commit) == b'fictional saved result'
+    finally:
+        upgraded.close()
+
+
+@pytest.mark.parametrize('phase', ['before_replace', 'after_replace', 'after_directory_fsync'])
+def test_version1_upgrade_publication_failure_leaves_exact_old_or_complete_new_schema(tmp_path, monkeypatch, phase):
+    from whab.plugins import bank_continuations as module
+
+    journal = coordinator(tmp_path)
+    token = captured(journal)
+    journal.close()
+    path = tmp_path / 'bank-continuations.json'
+    old = json.loads(path.read_bytes())
+    old['body'].pop('formatVersion')
+    old['body']['records'][0].pop('native_request')
+    original = json.dumps(old).encode()
+    path.write_bytes(original)
+    construct = module.EffectStore
+    def faulted(*args, **kwargs):
+        store = construct(*args, **kwargs)
+        def fault(boundary):
+            if phase == boundary:
+                raise OSError('synthetic private schema publication failure')
+        store.fault = fault
+        return store
+    with monkeypatch.context() as patched:
+        patched.setattr(module, 'EffectStore', faulted)
+        with pytest.raises(EffectError):
+            coordinator(tmp_path)
+    if phase == 'before_replace':
+        assert path.read_bytes() == original
+    else:
+        assert json.loads(path.read_bytes())['body']['formatVersion'] == 2
+    reopened = coordinator(tmp_path)
+    try:
+        assert reopened.captured_response(SCOPE, token) == b'fictional provider access secret'
+        assert reopened.native_request(SCOPE, token) is None
+    finally:
+        reopened.close()
+
+
+def test_native_request_ciphertext_cannot_move_to_another_field(tmp_path):
+    journal = coordinator(tmp_path)
+    token = captured(journal)
+    journal.prepare_native(SCOPE, token, NATIVE_FINGERPRINT, b'fictional captured native request')
+    journal.close()
+    path = tmp_path / 'bank-continuations.json'
+    record = json.loads(path.read_bytes())
+    row = record['body']['records'][0]
+    row['native_request'] = row['response']
+    raw = json.dumps(record).encode()
+    path.write_bytes(raw)
+    with pytest.raises(EffectError) as bad:
+        coordinator(tmp_path)
+    assert bad.value.code == 'effect_unavailable' and path.read_bytes() == raw

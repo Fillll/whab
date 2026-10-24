@@ -4,6 +4,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
+from .bank_adapter import BankAdapter
 from .contracts import Capability, PluginContract, Requirement, contract_for
 from .interface_adapter import interface_record, read_interface_record
 from .remote_client_adapter import (
@@ -27,9 +28,9 @@ from .ui_worker import validate_adapter_info as validate_ui_info
 from .wire import MAX_PAYLOAD_BYTES, WireError, _unique, _value
 from .worker_resources import capture_resources, resource_bundle
 
-LIVE_CAPABILITIES = frozenset({"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file", "categorization", "interface.api", "interface.ui", "ledger.read", "ledger.mutate"})
-OPERATIONS = frozenset({"bank.resolve", "bank.domain", "bank.fetch", "merchant.fetch", "cache.configure", "settings.read", "settings.act", "file.parse", "file.resources", "category.call", "interface.describe", "ui.resources", "ui.render", "client.describe"})
-BINARY_OPERATIONS = frozenset({"bank.fetch", "merchant.fetch", "file.parse", "file.resources", "category.call", "ui.resources", "ui.render"})
+LIVE_CAPABILITIES = frozenset({"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file", "categorization", "interface.api", "interface.ui", "ledger.read", "ledger.mutate", "ingestion.bank", "lifecycle.background"})
+OPERATIONS = frozenset({"bank.resolve", "bank.domain", "bank.fetch", "merchant.fetch", "cache.configure", "settings.read", "settings.act", "file.parse", "file.resources", "category.call", "interface.describe", "ui.resources", "ui.render", "client.describe", "provider.call", "provider.resources"})
+BINARY_OPERATIONS = frozenset({"bank.fetch", "merchant.fetch", "file.parse", "file.resources", "category.call", "ui.resources", "ui.render", "provider.call", "provider.resources"})
 
 
 def supports_live_plugin(plugin):
@@ -39,6 +40,18 @@ def supports_live_plugin(plugin):
         return supports_remote_client(plugin)
     contract = contract_for(plugin)
     capabilities = {row.name for row in contract.provides}
+    if type(plugin.bank) is BankAdapter:
+        return (
+            plugin.contract is not None and contract.lifecycle == "live" and contract.authority == "local"
+            and {'ingestion.bank', 'lifecycle.background'} <= capabilities
+            and capabilities <= {'ingestion.bank', 'lifecycle.background', 'branding.bank', 'branding.merchant'}
+            and all(row.version == 1 for row in contract.provides)
+            and contract.state_version == 1 and not contract.state_upgrades
+            and all(getattr(plugin, name) is None for name in (
+                'bind', 'migrate_state', 'budget_connection', 'settings', 'insights', 'export', 'categorization',
+                'storage', 'ui', 'file_import', 'interface', 'branding_factory',
+            ))
+        )
     if plugin.categorization is not None:
         return (
             plugin.contract is not None and contract.lifecycle == "live"
@@ -51,7 +64,7 @@ def supports_live_plugin(plugin):
         )
     return (
         plugin.contract is not None and contract.lifecycle == "live"
-        and bool(capabilities) and capabilities <= LIVE_CAPABILITIES
+        and bool(capabilities) and capabilities <= LIVE_CAPABILITIES - {'categorization', 'ingestion.bank', 'lifecycle.background'}
         and all(row.version == 1 for row in contract.provides)
         and contract.state_version == 1 and not contract.state_upgrades
         and (plugin.branding_factory is None or capabilities <= {"branding.bank", "branding.merchant"})
@@ -78,7 +91,8 @@ def adapter_info(plugin):
             "interface": None if plugin.interface is None or plugin.interface.adapter is None else interface_record(plugin.interface.adapter),
             "ui": ui_info(plugin.ui),
             "categorization": plugin.categorization is not None,
-            "remote_client": client_record(plugin.storage) if type(plugin.storage) is RemoteLedgerClient else None}
+            "remote_client": client_record(plugin.storage) if type(plugin.storage) is RemoteLedgerClient else None,
+            "bank": {"ui": plugin.bank_ui is not None} if type(plugin.bank) is BankAdapter else None}
 
 
 def contract_info(plugin):
@@ -105,19 +119,22 @@ def read_contract(value, capabilities):
 
 
 def validate_adapter_info(value):
-    if type(value) is not dict or set(value) != {"bank_logos", "merchant_logos", "file_import", "settings", "interface", "ui", "categorization", "remote_client"}:
+    if type(value) is not dict or set(value) != {"bank_logos", "merchant_logos", "file_import", "settings", "interface", "ui", "categorization", "remote_client", "bank"}:
         raise WireError()
     if value["remote_client"] is not None:
         read_client_record(value["remote_client"])
-        if value["merchant_logos"] is not False or any(value[name] is not None for name in ("bank_logos", "file_import", "settings", "interface", "ui")) or value["categorization"] is not False:
+        if value["merchant_logos"] is not False or any(value[name] is not None for name in ("bank_logos", "file_import", "settings", "interface", "ui", "bank")) or value["categorization"] is not False:
             raise WireError()
     if value["ui"] is not None:
         validate_ui_info(value["ui"])
-        if any(value[name] is not None for name in ("bank_logos", "file_import", "settings", "interface")) or value["merchant_logos"] or value["categorization"]:
+        if any(value[name] is not None for name in ("bank_logos", "file_import", "settings", "interface", "bank", "remote_client")) or value["merchant_logos"] or value["categorization"]:
             raise WireError()
     if value["interface"] is not None:
         read_interface_record(value["interface"])
     if type(value["merchant_logos"]) is not bool or type(value["categorization"]) is not bool:
+        raise WireError()
+    provider = value['bank']
+    if provider is not None and (type(provider) is not dict or provider.keys() != {'ui'} or type(provider['ui']) is not bool):
         raise WireError()
     bank = value["bank_logos"]
     if bank is not None:

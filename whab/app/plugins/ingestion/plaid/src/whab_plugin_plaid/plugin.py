@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from whab.plugins import BankUI, Capability, MerchantLogos, Plugin, PluginContract
+from whab.plugins import BankAdapter, BankUI, Capability, MerchantLogos, Plugin, PluginContract
 
 from .logos import fetch
 
@@ -22,12 +22,17 @@ def create_bank(context):
     )
 
 
+def create_provider(context):
+    from .provider import PlaidProvider
+    return PlaidProvider(context)
+
+
 assets = Path(__file__).parent
 plugin = Plugin(
     id="plaid",
     display_name="Plaid",
-    bank=create_bank,
+    bank=BankAdapter(create_provider),
     bank_ui=BankUI(templates=assets / "templates", static=assets / "static"),
     merchant_logos=MerchantLogos(fetch=fetch),
-    contract=PluginContract(provides=(Capability("lifecycle.background"),), authority="local", lifecycle="restart"),
+    contract=PluginContract(provides=(Capability("ingestion.bank"), Capability("lifecycle.background")), authority="local", lifecycle="live"),
 )

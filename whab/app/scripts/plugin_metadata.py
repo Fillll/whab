@@ -229,7 +229,21 @@ def descriptor_metadata(module_path, attribute, root):
         and all(row["version"] == 1 and row["composition"] == "singleton" for row in capabilities.values())
         and _remote_client_adapter(descriptor["storage"], identifier)
     )
-    if lifecycle == "live" and not (live or optional or categorization or visual or storage or remote_client):
+    bank_node = descriptor.get("bank")
+    bank_factory = None
+    if isinstance(bank_node, ast.Call) and isinstance(bank_node.func, ast.Name) and bank_node.func.id == "BankAdapter":
+        fields = _constructor(bank_node, "BankAdapter", ("factory",))
+        if fields.keys() == {"factory"} and isinstance(fields["factory"], ast.Name):
+            bank_factory = fields["factory"].id
+    bank = (
+        not legacy and lifecycle == "live" and bank_factory is not None and authority == "local"
+        and type(state_version) is int and state_version == 1 and not upgrades
+        and {"ingestion.bank", "lifecycle.background"} <= set(capabilities)
+        and set(capabilities) <= {"ingestion.bank", "lifecycle.background", "branding.bank", "branding.merchant"}
+        and all(row["version"] == 1 for row in capabilities.values())
+        and not (present - {"id", "display_name", "api_version", "contract", "bank", "bank_ui", "bank_logos", "merchant_logos"})
+    )
+    if lifecycle == "live" and not (live or optional or categorization or visual or storage or remote_client or bank):
         raise ValueError("Live metadata requires an explicit supported capability adapter.")
     return {"id": identifier, "display_name": display, "api_version": _literal(descriptor["api_version"]) if "api_version" in descriptor else 1,
             "capabilities": [capabilities[name] for name in sorted(capabilities)],
@@ -240,7 +254,7 @@ def descriptor_metadata(module_path, attribute, root):
             "live_support": ("declarative-remote-client-worker" if remote_client else
                              "declarative-api-worker" if optional and "interface" in present else
                              "stateless-report-worker" if live else "stateless-optional-worker" if optional
-                             else "categorization-worker" if categorization else "visual-ui-worker" if visual else "local-storage-worker" if storage else "restart-required")}
+                             else "categorization-worker" if categorization else "visual-ui-worker" if visual else "bank-provider-worker" if bank else "local-storage-worker" if storage else "restart-required")}
 
 
 def source_inventory(root=ROOT):
@@ -319,7 +333,7 @@ def catalog_markdown(catalog):
     for row in catalog["plugins"]:
         lifecycle = "Legacy; restart required" if row["legacy"] else row["live_support"]
         lines.append(f'| [{row["id"]}]({row["documentation"]}) | `{row["distribution"]} {row["version"]}` | `{row["requires_host"]}` | {lifecycle} | {row["support"]} |')
-    lines.extend(["", "Explicit stateless report, branding, file-parser, declarative API interface, pure categorization and participating visual descriptors advertise their supported live-worker adapters. Declarative remote-client workers return metadata only; the host retains their exact HTTPS authority, credentials, transport and financial intent. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.", "",
+    lines.extend(["", "Explicit stateless report, branding, file-parser, declarative API interface, pure categorization, typed bank-provider and participating visual descriptors advertise their supported live-worker adapters. Declarative remote-client workers return metadata only; the host retains their exact HTTPS authority, credentials, transport and financial intent. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.", "",
                   "## Recorded verification", "", "Evidence applies only to its exact host, artifacts and selection. Installed-only artifacts are not proof that their capabilities executed. Draft PR/source verification is not a release or deployment claim.", ""])
     for item in catalog["verifications"]:
         lines.extend([f'### {item["id"]}', "", f'Verified {item["date"]}; host `{item["host_version"]}`. Selected: ' + ", ".join(f'`{value}`' for value in item["selection"]) + ".", "", item["scope"], "",

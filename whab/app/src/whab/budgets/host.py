@@ -599,7 +599,7 @@ class BudgetDispatch:
         try:
             if not valid_route_key(key):
                 raise ValueError
-            if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/", "/ui/")):
+            if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/", "/banks/", "/ui/")):
                 if tail.endswith("/webhook"):
                     raise ValueError
             else:
@@ -642,7 +642,7 @@ class BudgetDispatch:
         scoped["whab.workspace"] = "demo" if key == "demo" else "personal"
         scoped["whab.personal_key"] = self.host.route_key(self.host.default_id)
         scoped["whab.routing"] = self.host
-        if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/", "/ui/")):
+        if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/", "/banks/", "/ui/")):
             scoped["path"] = tail
             scoped["raw_path"] = tail.encode("utf-8")
             if tail.startswith("/api/"):

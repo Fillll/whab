@@ -32,7 +32,8 @@ def test_catalog_reads_packaged_data_without_discovery_and_returns_independent_p
     assert entries["sqlite"]["legacy"] is False
     assert entries["client"]["authority"] == "remote"
     assert entries["json"]["legacy"] is False
-    assert entries["plaid"]["lifecycle"] == "restart"
+    assert entries["plaid"]["lifecycle"] == "live"
+    assert entries["plaid"]["live_support"] == "bank-provider-worker"
     first["plugins"].clear()
     assert catalog.catalog_snapshot()["plugins"]
 
@@ -161,6 +162,22 @@ def test_remote_client_label_requires_exact_remote_ledger_contract():
         next(row for row in malformed["plugins"] if row["id"] == "client").update(change)
         with pytest.raises(catalog.CatalogError):
             catalog.validate_catalog(malformed)
+
+
+@pytest.mark.parametrize('change', [
+    lambda row: row.update(authority='remote'),
+    lambda row: row.update(state_version=2),
+    lambda row: row.update(state_upgrades=[[1, 2]]),
+    lambda row: row.update(legacy=True),
+    lambda row: row.update(capabilities=[cap for cap in row['capabilities'] if cap['name'] != 'lifecycle.background']),
+    lambda row: row['capabilities'].append({'name': 'interface.api', 'version': 1, 'composition': 'additive'}),
+])
+def test_catalog_rejects_false_bank_worker_support_without_loading_code(change):
+    value = catalog.catalog_snapshot()
+    row = next(item for item in value['plugins'] if item['id'] == 'plaid')
+    change(row)
+    with pytest.raises(catalog.CatalogError):
+        catalog.validate_catalog(value)
 
 
 @pytest.mark.parametrize("identifier", ["sqlite", "json"])

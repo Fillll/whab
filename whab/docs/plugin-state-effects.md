@@ -2,7 +2,8 @@
 
 These host components support stateful worker adapters. The [categorization
 worker](plugin-workers.md#categorization-workers) uses complete namespace effects;
-bank continuations remain a foundation pending their provider/route integration.
+the [typed bank worker](plugin-workers.md#bank-provider-workers) uses encrypted
+continuations and the native storage command receipt broker.
 Runtime leases, drain, provider transport, financial validation and authorization
 still own admission and activation. No real provider is contacted by their tests.
 
@@ -102,6 +103,22 @@ storage apply. An exception, cancellation or process death after intent but befo
 capture becomes `exchange_uncertain`, even when the process may have died before
 HTTP began. Recovery never exchanges again. Repeating an operation inspects its
 existing status; changing its input or identity refuses.
+
+The bank-continuation body is now format 2. The explicit format 1 reader first
+validates and authenticates every retained ciphertext, then atomically publishes
+format 2 with a nullable `native_request` field. Existing input, response, result
+and operation identity bytes are preserved. An interrupted upgrade leaves the
+exact old body or a complete new body, with the ordinary uncertainty fence. This
+is separate from the outer private EffectStore envelope's format.
+
+`prepare_native(scope, id, fingerprint, request)` seals a complete exact native
+request before its first dispatch. It includes budget/provider ownership, original
+instance/epoch/generation evidence, stable operation ID, command bytes and the
+recomputed command fingerprint. Each request retains the 64 KiB field bound.
+`native_request` returns the same authenticated recovery input after reopen. A
+legacy flow that already began native apply without such an input cannot invent
+one; it requires independent operator reconciliation. Version 1 records are never
+silently reinterpreted as safely repeatable commands.
 
 The separate `apply` step requires a stable native command fingerprint and
 host-owned lookup/commit callbacks. `NativeApplyEvidence` binds the command ID and

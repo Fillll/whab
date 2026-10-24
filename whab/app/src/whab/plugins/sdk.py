@@ -18,6 +18,14 @@ from whab.domain.imports import ImportedAccount, SyncChanges
 from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
 
+from .bank_adapter import BankAdapter as BankAdapter
+from .bank_adapter import BankContinuationService as BankContinuationService
+from .bank_adapter import BankContinuationStatus as BankContinuationStatus
+from .bank_adapter import BankLinkReady as BankLinkReady
+from .bank_adapter import BankProvider as BankProvider
+from .bank_adapter import BankProviderContext as BankProviderContext
+from .bank_adapter import ProviderFailure as ProviderFailure
+from .bank_adapter import ProviderWebhook as ProviderWebhook
 from .contracts import Capability, PluginContract, Requirement
 from .interface_adapter import RemoteLedgerInterface
 from .remote_client_adapter import RemoteLedgerClient, client_record
@@ -596,18 +604,24 @@ class BankService(Protocol):
     async def close(self) -> None: ...
 
 
-BankFactory: TypeAlias = Callable[[BankContext], BankService]
+BankFactory: TypeAlias = Callable[[BankContext], BankService] | BankAdapter
 
 
 @dataclass(frozen=True, slots=True)
 class BankUI:
     """Trusted provider UI resources. The host owns mounting and validates directories."""
 
-    templates: Path
-    static: Path
+    templates: Path | None = None
+    static: Path | None = None
+    resources: PluginResources | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
+        if self.resources is not None:
+            if type(self.resources) is not PluginResources or self.templates is not None or self.static is not None:
+                raise ValueError("Bank UI resources require one coherent path or byte bundle.")
+            if 'templates/accounts.html' not in self.resources.files or 'static/connect.js' not in self.resources.files:
+                raise ValueError("Bank UI resources require accounts.html and connect.js.")
+        elif not isinstance(self.templates, Path) or not isinstance(self.static, Path):
             raise ValueError("Bank UI resources must be pathlib.Path directories.")
 
 

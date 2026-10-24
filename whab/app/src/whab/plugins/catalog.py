@@ -129,12 +129,15 @@ def validate_catalog(value):
                     allowed = {"ledger.read", "ledger.mutate"}
                     _require(row["authority"] == "remote" and capability_names == allowed
                              and all(capability["composition"] == "singleton" for capability in row["capabilities"]))
+                if support == "bank-provider-worker":
+                    allowed = {"ingestion.bank", "lifecycle.background", "branding.bank", "branding.merchant"}
+                    _require(row["authority"] == "local" and {"ingestion.bank", "lifecycle.background"} <= capability_names)
                 if support == "local-storage-worker":
                     allowed = {"ledger.read", "ledger.mutate", "provider.state", "provider.sync", "receipts",
                                "transfer.neutral", "transfer.prepare", "transfer.local", "storage.authority",
                                "storage.commands", "storage.replica", "storage.worker"}
                     _require(row["authority"] == "local" and {"storage.worker", "storage.authority", "storage.commands"} <= capability_names)
-                _require(not row["legacy"] and support in {"local-storage-worker", "declarative-remote-client-worker", "stateless-report-worker", "stateless-optional-worker", "declarative-api-worker", "categorization-host", "categorization-worker", "visual-ui-worker"}
+                _require(not row["legacy"] and support in {"local-storage-worker", "declarative-remote-client-worker", "stateless-report-worker", "stateless-optional-worker", "declarative-api-worker", "categorization-host", "categorization-worker", "visual-ui-worker", "bank-provider-worker"}
                          and (support == "categorization-host" or row["state_version"] == 1)
                          and not row["state_upgrades"] and bool(capability_names)
                          and capability_names <= allowed and all(capability["version"] == 1 for capability in row["capabilities"]))

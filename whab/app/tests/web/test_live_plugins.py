@@ -219,7 +219,7 @@ def test_held_export_keeps_old_generation_and_new_requests_use_new_report(tmp_pa
             projection = (await client.get("/api/plugins/management")).json()
             assert projection["active"] == projection["configured"] == ["second"]
             assert not projection["restart_required"]
-            assert projection["live"]["families"] == ["branding.bank", "branding.merchant", "categorization", "ingestion.file", "interface.api", "interface.ui", "ledger.mutate", "ledger.read", "reporting.export", "reporting.insights"]
+            assert projection["live"]["families"] == ["branding.bank", "branding.merchant", "categorization", "ingestion.bank", "ingestion.file", "interface.api", "interface.ui", "ledger.mutate", "ledger.read", "lifecycle.background", "reporting.export", "reporting.insights"]
             assert projection["live"]["code_upgrades"] is True
 
     asyncio.run(scenario())
@@ -521,10 +521,10 @@ def test_unchanged_bank_instances_and_branding_caches_are_retained(tmp_path, sto
         app = create_app(store=store, settings=settings(tmp_path, ("first", "bank", "branding")),
                          plugins=PluginRegistry((sqlite_plugin, first, ingestion, branding)))
         async with running(app) as client:
-            active_bank = app.state.banks["bank"]
+            active_bank = app.state.budget_runtime._active.services["banks"]["bank"]
             before = (await client.get("/api/plugins/branding/settings")).json()
             assert await app.state.live_plugins.activate(("second", "bank", "branding")) == 2
-            assert app.state.banks["bank"] is active_bank is bank
+            assert app.state.budget_runtime._active.services["banks"]["bank"] is active_bank is bank
             assert not closed and len(configured) == 1
             assert (await client.get("/api/plugins/branding/settings")).json() == before
         assert closed == [True]

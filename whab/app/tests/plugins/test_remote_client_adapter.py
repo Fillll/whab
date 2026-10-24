@@ -71,8 +71,9 @@ def test_strict_codec_contains_only_configuration_key_names_and_rejects_financia
     for arguments, binary in (({"config": {}}, b""), ({}, b"private-budget-payload")):
         with pytest.raises(WireError):
             dispatch(None, plugin, "client.describe", arguments, binary)
-    with pytest.raises(WireError):
-        validate_adapter_info({**info, "merchant_logos": True})
+    for change in ({"merchant_logos": True}, {"bank": {"ui": False}}):
+        with pytest.raises(WireError):
+            validate_adapter_info({**info, **change})
     with pytest.raises(WireError):
         validate_adapter_info({**info, "private": {}})
     capabilities = [{"name": "ledger.read", "version": 1}, {"name": "ledger.mutate", "version": 1}]

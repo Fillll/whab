@@ -288,3 +288,35 @@ def test_remote_factory_dynamic_invalid_or_mixed_shapes_cannot_claim_live(metada
                     + ",contract=PluginContract(authority='remote',lifecycle='live'" + contract + "))\n")
     with pytest.raises(ValueError, match="supported capability adapter"):
         metadata_tool.descriptor_metadata(path, "plugin", root)
+
+
+@pytest.mark.parametrize("factory", ["BankAdapter(provider)", "BankAdapter(factory=provider)"])
+def test_static_typed_bank_marker_and_private_top_level_code_are_never_executed(metadata_tool, static_repository, factory):
+    root, _, module = static_repository
+    path = module / '__init__.py'
+    path.write_text("raise RuntimeError('must never execute provider')\n" +
+        "plugin=Plugin('fictional','Fictional',bank=" + factory +
+        ",bank_ui=ui,merchant_logos=logos,contract=PluginContract(lifecycle='live',authority='local'," +
+        "provides=(Capability('lifecycle.background'),)))\n")
+    row = metadata_tool.descriptor_metadata(path, 'plugin', root)
+    assert row['live_support'] == 'bank-provider-worker'
+    assert {item['name'] for item in row['capabilities']} == {'ingestion.bank', 'lifecycle.background', 'branding.merchant'}
+
+
+@pytest.mark.parametrize('bank,extra,contract', [
+    ('legacy_factory', '', ''), ('make_adapter()', '', ''), ('BankAdapter(make_factory())', '', ''),
+    ('BankAdapter(None)', '', ''), ('BankAdapter(provider, extra=True)', '', ''),
+    ('BankAdapter(provider)', ',settings=settings', ''), ('BankAdapter(provider)', ',bind=binder', ''),
+    ('BankAdapter(provider)', ',categorization=engine', ''), ('BankAdapter(provider)', ',file_import=parser', ''),
+    ('BankAdapter(provider)', '', ",authority='remote'"), ('BankAdapter(provider)', '', ',state_version=2'),
+    ('BankAdapter(provider)', '', ',state_version=True'), ('BankAdapter(provider)', '', ',state_upgrades=((1,2),)'),
+    ('BankAdapter(provider)', '', ",provides=(Capability('lifecycle.background',2),)"),
+])
+def test_unsupported_or_dynamic_bank_metadata_refuses_without_execution(metadata_tool, static_repository, bank, extra, contract):
+    root, _, module = static_repository
+    path = module / '__init__.py'
+    declared = contract if 'provides=' in contract else ",provides=(Capability('lifecycle.background'),)" + contract
+    path.write_text("raise RuntimeError('must never execute provider')\nplugin=Plugin('fictional','Fictional',bank=" + bank + extra +
+                    ",contract=PluginContract(lifecycle='live'" + declared + "))\n")
+    with pytest.raises(ValueError, match="supported capability adapter"):
+        metadata_tool.descriptor_metadata(path, 'plugin', root)
