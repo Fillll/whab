@@ -749,16 +749,11 @@ def test_offline_installation_and_readiness_do_not_inherit_custom_plugin_configu
         else:
             stage = "setup"
         environment = options["env"]
-        if stage == "probe":
-            # The selected descriptor worker additionally strips its own
-            # prefix, independently of the offline provisioning policy.
-            assert "FICTIONAL_REPORTS_URL" not in environment
-            assert "FICTIONAL_REPORTS_TOKEN" not in environment
-        else:
-            assert not blocked.keys() & environment.keys()
-            assert environment["LANG"] == environment["LC_ALL"] == "C"
-            assert environment["TMPDIR"] == str(tmp_path)
-            assert environment.get("PATH") == expected_path
+        assert not blocked.keys() & environment.keys()
+        assert not set(blocked.values()) & set(environment.values())
+        assert environment["LANG"] == environment["LC_ALL"] == "C"
+        assert environment["TMPDIR"] == str(tmp_path)
+        assert environment.get("PATH") == expected_path
         stages.append(stage)
         return original(command, **options)
 
