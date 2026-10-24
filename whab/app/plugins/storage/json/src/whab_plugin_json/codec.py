@@ -13,6 +13,9 @@ from whab.domain.ledger_state import initial_state, portable_snapshot, restore_s
 from whab.domain.money import MAX_SAFE_INTEGER
 from whab.domain.portable import validate_portable_budget
 from whab.domain.receipts import MAX_RECEIPT_BYTES, receipt_media_type
+from whab.plugins.storage_transfer import encode_local_state, local_state_digest, storage_identifier
+
+from .authority import validate_metadata
 
 MAX_FILE_BYTES = 64 * 1024 * 1024
 MAX_PORTABLE_BYTES = 50 * 1024 * 1024
@@ -146,14 +149,14 @@ def _import_receipt(value):
     return {**value, "counts": value["counts"].copy()}
 
 
-def _read_ledger(value, workspace, *, portable=False):
+def _read_ledger(value, workspace, *, portable=False, complete_associations=False):
     _exact(value, {"ledger", "items", "associations", "receipts", "importReceipt"})
     snapshot = validate_portable_budget(value["ledger"])
     state = initial_state(workspace, snapshot["budgetStartMonth"])
     restore_snapshot(state, snapshot, mark_external_stale=portable)
     state["receipts"] = _images(value["receipts"], state)
     state["importReceipt"] = _import_receipt(value["importReceipt"])
-    if workspace == "demo" and (value["items"] or value["associations"]):
+    if workspace == "demo" and (value["items"] or (value["associations"] and not complete_associations)):
         _invalid()
     for record in _records(value["items"], 1000):
         _exact(record, _ITEM_FIELDS)
@@ -181,23 +184,27 @@ def _read_ledger(value, workspace, *, portable=False):
         _exact(record, {"accountId", "itemId", "mask"})
         account_id, item_id = record["accountId"], record["itemId"]
         _text(account_id, limit=200)
-        _text(item_id, limit=4096)
-        _text(record["mask"], limit=200, empty=True)
+        _text(item_id, limit=4096, nullable=complete_associations)
+        _text(record["mask"], limit=200, empty=True, nullable=complete_associations)
         account, item = state["accounts"].get(account_id), state["items"].get(item_id)
-        if account_id in seen or account is None or item is None or account["source"] != item["provider"]:
+        if (account_id in seen or account is None
+                or (item_id is not None and (workspace == "demo" or item is None or account["source"] != item["provider"]))):
             _invalid()
         seen.add(account_id)
         account.update(itemId=item_id, mask=record["mask"])
+    if complete_associations and seen != state["accounts"].keys():
+        _invalid()
     return state
 
 
-def _pack_ledger(state, *, portable=False):
+def _pack_ledger(state, *, portable=False, complete_associations=True):
     return {
         "ledger": portable_snapshot(state),
         "items": [] if portable else list(state["items"].values()),
         "associations": [] if portable else [
-            {"accountId": row["id"], "itemId": row["itemId"], "mask": row.get("mask", "")}
-            for row in state["accounts"].values() if row.get("itemId") is not None
+            {"accountId": row["id"], "itemId": row.get("itemId"),
+             "mask": row.get("mask") if complete_associations else row.get("mask", "")}
+            for row in state["accounts"].values() if complete_associations or row.get("itemId") is not None
         ],
         "receipts": [
             {"transactionId": identifier, "image": base64.b64encode(image).decode("ascii")}
@@ -209,21 +216,37 @@ def _pack_ledger(state, *, portable=False):
 
 def decode(raw):
     value = parse(raw)
-    _exact(value, {"formatVersion", "generation", "operationId", "authorityEpoch", "workspaces"})
-    if type(value["formatVersion"]) is not int or value["formatVersion"] != 1:
+    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2}:
         raise StoreError("This JSON storage schema is newer or unsupported; install a compatible plugin.")
+    fields = {"formatVersion", "generation", "operationId", "authorityEpoch", "workspaces"}
+    _exact(value, fields | ({"authority"} if value["formatVersion"] == 2 else set()))
     _integer(value["generation"])
-    _uuid(value["operationId"])
+    if value["formatVersion"] == 1:
+        _uuid(value["operationId"])
+    else:
+        if value["operationId"] is not None:
+            storage_identifier(value["operationId"])
+        value["authority"] = validate_metadata(value["authority"])
+        if any(read["evidence"]["generation"] > value["generation"] for read in value["authority"]["receipts"]):
+            _invalid()
     _uuid(value["authorityEpoch"])
     _exact(value["workspaces"], {"personal", "demo"})
-    return {**value, "workspaces": {
-        name: _read_ledger(value["workspaces"][name], name) for name in ("personal", "demo")
+    document = {**value, "workspaces": {
+        name: _read_ledger(value["workspaces"][name], name, complete_associations=value["formatVersion"] == 2)
+        for name in ("personal", "demo")
     }}
+    if value["formatVersion"] == 2 and value["authority"]["receipts"]:
+        digest = local_state_digest(*encode_local_state(document["workspaces"], validate=False))
+        if any(record["evidence"]["generation"] == value["generation"] and record["evidence"]["state_digest"] != digest
+               for record in value["authority"]["receipts"]):
+            _invalid()
+    return document
 
 
 def encode(document):
     value = {**document, "workspaces": {
-        name: _pack_ledger(state) for name, state in document["workspaces"].items()
+        name: _pack_ledger(state, complete_associations=document["formatVersion"] == 2)
+        for name, state in document["workspaces"].items()
     }}
     raw = serialize(value)
     # Full reference/type validation is part of every detached candidate commit.

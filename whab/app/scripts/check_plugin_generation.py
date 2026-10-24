@@ -80,22 +80,29 @@ def main(argv=None):
                         helper.copy_project(ROOT / "plugins/storage/sqlite", base / "sqlite")]
             candidate_version = helper.host_version(projects[0])
             host_versions = [candidate_version]
+            minimum = projects[0]
             if candidate_version != MINIMUM_HOST_VERSION:
-                projects.append(helper.minimum_host_source(base, env))
+                minimum = helper.minimum_host_source(base, env)
+                projects.append(minimum)
                 host_versions.append(MINIMUM_HOST_VERSION)
+            references = helper.reference_projects(projects[2], minimum)
+            projects.extend(project for project in dict.fromkeys(references.values()) if project not in projects)
             wheels = base / "wheels"
             for project in projects:
                 helper.run([sys.executable, "-I", "-m", "pip", "wheel", "--disable-pip-version-check", "--no-deps", "--wheel-dir", str(wheels),
                             str(project)], cwd=base, env=env)
             all_wheels = [helper.wheel_record(path) for path in wheels.glob("*.whl")]
             toolkit_version = next(record["version"] for record in all_wheels if record["distribution"] == "whab_plugin_devkit")
-            sqlite_version = next(record["version"] for record in all_wheels if record["distribution"] == "whab_plugin_sqlite")
             toolkit = helper.wheel_for(wheels, "whab_plugin_devkit", toolkit_version)
-            sqlite = helper.wheel_for(wheels, "whab_plugin_sqlite", sqlite_version)
+            reference_versions = {label: helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"]
+                                  for label, project in references.items()}
+            sqlite_wheels = {version: helper.wheel_for(wheels, "whab_plugin_sqlite",
+                              reference_versions["minimum" if version == MINIMUM_HOST_VERSION else "candidate"])
+                             for version in host_versions}
             host_wheels = {version: helper.wheel_for(wheels, "whab", version) for version in host_versions}
-            for host in host_wheels.values():
+            for version, host in host_wheels.items():
                 helper.run([sys.executable, "-I", "-m", "pip", "download", "--disable-pip-version-check", "--only-binary=:all:", "--dest", str(wheels),
-                            str(host), str(toolkit), str(sqlite), *helper.TEST_REQUIREMENTS], cwd=base, env=env)
+                            str(host), str(toolkit), str(sqlite_wheels[version]), *helper.TEST_REQUIREMENTS], cwd=base, env=env)
             bootstrap = base / "generator-environment"
             helper.run([sys.executable, "-I", "-m", "venv", str(bootstrap)], cwd=base, env=env)
             generator_python = bootstrap / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
@@ -116,6 +123,8 @@ def main(argv=None):
             evidence = {"minimum_host_commit": MINIMUM_HOST_COMMIT, "host_versions": host_versions,
                         "wheels": [helper.wheel_record(path) for path in sorted(wheels.glob("*.whl"))], "projects": []}
             for version, host in host_wheels.items():
+                sqlite = sqlite_wheels[version]
+                sqlite_version = helper.wheel_record(sqlite)["version"]
                 for family, identifier, project in generated:
                     work = base / f"external-{version}-{family}"
                     work.mkdir()

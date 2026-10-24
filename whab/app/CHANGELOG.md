@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.27.0 — 2026-10-23
+
+PR: [#84](https://github.com/Fillll/whab/pull/84)
+
+- Add explicit previewed same-device SQLite/JSON migration with per-budget draining, reopened destination validation, payload-free authority journaling, source fencing and explicit recovery. Preserve stable ledger/retry services, protected connection checkpoints, original containers and opaque plugin state.
+- Expose typed durable storage commands, commit evidence and local transfer contracts; declare exact backend payload paths so unknown files and finite plugin settings survive handover. Keep upgraded report-worker ownership across storage generations.
+- Test process termination at durable boundaries and installed CA-verified HTTPS round trips/restarts. Pair minimum-host developer checks with genuine compatible pinned reference artifacts.
+
 ## 2.26.0 — 2026-10-23
 
 PR: [#83](https://github.com/Fillll/whab/pull/83)

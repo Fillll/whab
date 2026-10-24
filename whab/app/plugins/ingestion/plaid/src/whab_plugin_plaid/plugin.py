@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from whab.plugins import BankUI, MerchantLogos, Plugin
+from whab.plugins import BankUI, Capability, MerchantLogos, Plugin, PluginContract
 
 from .logos import fetch
 
@@ -18,6 +18,7 @@ def create_bank(context):
             "PLAID_ENV": context.environment,
             "TOKEN_ENCRYPTION_KEY": context.encryption_key,
         },
+        background_scope=context.background_scope,
     )
 
 
@@ -28,4 +29,5 @@ plugin = Plugin(
     bank=create_bank,
     bank_ui=BankUI(templates=assets / "templates", static=assets / "static"),
     merchant_logos=MerchantLogos(fetch=fetch),
+    contract=PluginContract(provides=(Capability("lifecycle.background"),), authority="local", lifecycle="restart"),
 )

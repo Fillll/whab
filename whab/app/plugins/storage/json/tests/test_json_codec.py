@@ -27,14 +27,14 @@ def _item(value):
 
 @pytest.mark.parametrize("mutate", [
     lambda value: value.update(extra=True),
-    lambda value: value.update(formatVersion=2),
+    lambda value: value.update(formatVersion=3),
     lambda value: value.update(formatVersion=True),
     lambda value: value.update(generation=True),
     lambda value: value.update(generation=-1),
     lambda value: value.update(generation=2**54),
-    lambda value: value.update(operationId=None),
-    lambda value: value.update(operationId="not-a-uuid"),
-    lambda value: value.update(operationId="AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"),
+    lambda value: value.update(operationId=True),
+    lambda value: value.update(operationId=""),
+    lambda value: value.update(operationId="\ud800"),
     lambda value: value.update(authorityEpoch=1),
     lambda value: value.update(workspaces={}),
     lambda value: _personal(value).update(items=None),

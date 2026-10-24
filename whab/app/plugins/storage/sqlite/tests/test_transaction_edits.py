@@ -41,7 +41,8 @@ def test_targeted_edit_matches_core_without_changing_other_records(store, annota
     commands.edit_transaction(expected, annotated_transaction, **changes)
     count = store.db.total_changes
     assert edit_transaction(store, "personal", annotated_transaction, **changes) is None
-    assert store.db.total_changes == count + 1
+    # The addressed annotation and its durable authority generation commit together.
+    assert store.db.total_changes == count + 2
     assert store.state("personal") == expected
     assert store.db.execute(
         "SELECT image FROM transaction_receipts WHERE workspace='personal' AND transaction_id=?",

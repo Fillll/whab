@@ -46,9 +46,13 @@ def initial_state(workspace, month):
     return state
 
 
-def portable_snapshot(state):
-    """Allowlist all ledger history while excluding bank records and associations."""
-    return validate_portable_budget({
+def portable_snapshot(state, *, validate=True):
+    """Allowlist history, excluding bank records and associations.
+
+    Native adapters may use ``validate=False`` only to hash already-trusted
+    native state that exceeds portable transfer limits. Export paths validate.
+    """
+    snapshot = {
         "formatVersion": 1, "budgetStartMonth": state["budgetStartMonth"],
         "accounts": [
             {**{key: account[key] for key in ACCOUNT_FIELDS},
@@ -70,7 +74,8 @@ def portable_snapshot(state):
             {"month": month, "currency": currency, "mode": mode}
             for month, rows in state.get("rolloverModes", {}).items() for currency, mode in rows.items()
         ],
-    })
+    }
+    return validate_portable_budget(snapshot) if validate else snapshot
 
 
 def require_pristine(state):

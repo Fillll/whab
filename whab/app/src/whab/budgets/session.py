@@ -90,6 +90,7 @@ class BudgetSession:
         self.credential_blob = credential_blob
         self.password = password
         self.storage_config = {}
+        self.storage_payload_paths = ()
         self._has_payload = files is not None
         self.storage_home = self.home / "budgets" / self.id / environment
         self.lock = RLock()
@@ -98,15 +99,26 @@ class BudgetSession:
         self.destinations = []
         self.status = "saved"
         self._file_digest = digest(_read_bytes(self.path)) if self.path and self.path.exists() else None
+        from .storage_runtime import prepare_session_authority, storage_manifest
+        incoming_manifest = self.manifest
+        preserved_original = prepare_session_authority(self)
         self._source = _read_source(self.storage_home / "source.json")
+        if self.storage_authority and (
+            self._source is None
+            or not (self.storage_home / "manifest.json").is_file()
+            or not (self.storage_home / "plugin-data.whab").is_file()
+        ):
+            raise StoreError("The migrated budget's local plugin recovery state is unavailable; restore it before opening this budget.")
         if (self.ledger is not None or self._has_payload) and self._source is not None:
-            incoming = content_digest(self.manifest, self.ledger if self.ledger is not None else self.files, self.credential_blob)
-            if incoming not in (self._source["content"], self._source.get("pending")):
+            incoming = content_digest(incoming_manifest, self.ledger if self.ledger is not None else self.files, self.credential_blob)
+            if not preserved_original and incoming not in (self._source["content"], self._source.get("pending")):
                 raise StoreError("This budget differs from the copy already opened on this device. Export the recovered budget before opening a different revision.")
             saved_manifest = self.storage_home / "manifest.json"
             if "restorePending" not in self._source and saved_manifest.exists():
                 try:
                     recovered = validate_manifest(json.loads(_read_bytes(saved_manifest, MAX_MANIFEST_BYTES)))
+                    if self.storage_authority:
+                        recovered = storage_manifest(recovered, self.manifest["storage"])
                     if recovered["id"] != self.id or recovered["storage"] != self.manifest["storage"]:
                         raise ValueError()
                     self.manifest = recovered
@@ -115,9 +127,14 @@ class BudgetSession:
             saved_files = self.storage_home / "plugin-data.whab"
             if "restorePending" not in self._source and saved_files.exists():
                 recovered = decode_container(_read_bytes(saved_files))
-                if recovered.manifest["id"] != self.id or recovered.manifest["storage"] != self.manifest["storage"]:
+                if recovered.manifest["id"] != self.id or (not self.storage_authority and recovered.manifest["storage"] != self.manifest["storage"]):
                     raise StoreError("The budget's saved plugin files are unreadable.")
                 self.files = recovered.files
+        if self.storage_authority:
+            # Native authority was explicitly journalled. Its data is validated
+            # before bind; portable source snapshots cannot overwrite it.
+            self.ledger = None
+            self._has_payload = False
         self._load_copies()
 
     @classmethod
@@ -192,6 +209,9 @@ class BudgetSession:
     def bind(self, store):
         """Restore only into a new isolated backend; never replace an existing ledger."""
         self.store = store
+        if self.storage_authority:
+            self.checkpoint()
+            return
         if self.ledger is None and self._has_payload:
             prepare = getattr(store, "prepare_budget_files", None)
             if not callable(prepare):
@@ -205,7 +225,10 @@ class BudgetSession:
                 except OSError:
                     raise StoreError("The budget's recovery record could not be saved; its files were not restored.") from None
                 self._source = initial
-            prepare("personal", self.files_for(self.manifest["storage"]), existing=existing)
+            payload = self.files_for(self.manifest["storage"])
+            if self.storage_payload_paths:
+                payload = {name: raw for name, raw in payload.items() if name in self.storage_payload_paths}
+            prepare("personal", payload, existing=existing)
         if self.ledger is not None and (self._source is None or "restorePending" in self._source):
             incoming = content_digest(self.manifest, self.ledger)
             restore = getattr(store, "restore_budget", None)
@@ -352,10 +375,14 @@ class BudgetSession:
             with self.lock:
                 plugin_id = self.manifest["storage"]
                 prefix = f"plugins/{plugin_id}/"
-                files = {key: value for key, value in self.files.items() if not key.startswith(prefix)}
+                generated = {prefix + name for name in self.storage_payload_paths}
+                files = {key: value for key, value in self.files.items()
+                         if key not in generated and (self.storage_payload_paths or not key.startswith(prefix))}
                 payload = export_files("personal")
                 if type(payload) is not dict:
                     raise StoreError("This storage plugin returned invalid budget files.")
+                if self.storage_payload_paths and payload.keys() != set(self.storage_payload_paths):
+                    raise StoreError("The storage export does not match its declared payload paths.")
                 files.update({prefix + name: raw for name, raw in payload.items()})
                 blob = self.credential_blob if preserve_credentials else None
                 if include_credentials:
@@ -508,7 +535,7 @@ class BudgetSession:
 class TrackedStorage:
     """Checkpoint portable files after committed writes, including bank synchronization."""
 
-    MUTATIONS = frozenset({"add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "review_transactions", "assign", "apply_sync", "import_workspace", "save_item", "set_item_status", "disconnect_item", "save_receipt", "delete_receipt"})
+    MUTATIONS = frozenset({"add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "apply_sync", "import_workspace", "save_item", "set_item_status", "disconnect_item", "save_receipt", "delete_receipt", "restore_budget", "restore_budget_files", "execute_operation"})
 
     def __init__(self, store, session=None):
         self.store = store
@@ -516,15 +543,29 @@ class TrackedStorage:
         self.lock = session.lock if session else RLock()
         self.on_mutation = None
         self.after_ingestion = None
+        self.storage_plugin_id = None
+
+    def retarget(self, backend, runtime, plugin_id):
+        """Control-plane replacement after the entire budget has gated/drained."""
+        status = runtime.status()
+        if status["admission"] != "gated" or status["active_leases"]:
+            raise StoreError("Storage replacement requires a drained budget runtime.")
+        with self.lock:
+            self.store = backend
+            self.storage_plugin_id = plugin_id
+            if self.session:
+                self.session.store = backend
 
     def __getattr__(self, name):
         member = getattr(self.store, name)
-        if name not in self.MUTATIONS or not callable(member):
+        if not callable(member):
             return member
 
-        def mutate(*args, **kwargs):
+        def invoke(*args, **kwargs):
             with self.lock:
-                result = member(*args, **kwargs)
+                result = getattr(self.store, name)(*args, **kwargs)
+                if name not in self.MUTATIONS or (name == "execute_operation" and result.replayed):
+                    return result
                 if self.on_mutation:
                     self.on_mutation()
                 if self.session:
@@ -533,4 +574,4 @@ class TrackedStorage:
                     self.after_ingestion()
                 return result
 
-        return mutate
+        return invoke

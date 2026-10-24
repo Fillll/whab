@@ -30,17 +30,55 @@ The complete candidate's types, references and bounds are validated before writi
 a private temporary file, flushing it, atomically replacing the data file, flushing
 the parent directory, and publishing the candidate in memory. Imports batch all
 records into one commit. The native file records an authority epoch, increasing
-generation and unique operation identity. `commit_evidence()` exposes only those
-identities and commit status, never financial records or credentials.
+generation and unique operation identity. `commit_evidence()` returns the public
+`CommitEvidence` record: budget/environment and instance identities, authority epoch,
+logical generation, last operation, role and complete-state digest. It exposes no
+financial records or credentials. The diagnostic `commit_status()` reports the
+last committed or uncertain operation/generation.
 
 A failure before replacement leaves the previous committed generation authoritative.
 A failure after attempting replacement raises `CommitUncertain`, fences subsequent
 reads and writes, and exposes the attempted operation/generation through that error
-and `commit_evidence()`. Close and reopen to inspect the durable identity before
+and `commit_status()`. Close and reopen to inspect the durable identity before
 retrying. Do not treat that financial change as rolled back or blindly repeat it.
 Interrupted replacement leaves one complete old or new file; temporary files are
 not authoritative. Host migration/copy journals and promotion fencing remain a
 separate coordination requirement.
+
+## Local authority and complete transfer
+
+Native schema 2 adds persistent instance identity, role, transition identity and
+durable command receipts. Opening native schema 1 adds that metadata through the
+same atomic commit path, preserving its epoch, generation and financial records.
+Before changing the active file, the upgrader durably saves its exact private
+bytes in a sibling `<active filename>.schema1-recovery` artifact with private file
+permissions. It never overwrites that artifact: an existing different recovery
+file stops the upgrade and preserves both originals. Disk-full or backup-flush
+failure retains schema 1 as authoritative. The recovery artifact is never selected
+as active storage or included in portable exports; protect it like the live ledger.
+An older JSON plugin that supports only schema 1 must not open schema 2. Restore an
+appropriate preserved schema-1 artifact before downgrading; it represents the state
+before upgrading and excludes later changes. Runtime keys remain outside both
+files. Portable `budget.json` payloads retain their sanitized format 1.
+
+Version-1 `storage.authority`, `storage.commands` and `transfer.local` capabilities
+support host-coordinated same-device migration. A fresh destination must be created
+as `staged`; import refuses active primary storage and saved destination data.
+Complete transfer preserves both workspaces, deleted history and images, import
+identity, exact encrypted tokens, provider associations, masks and cursors. Runtime
+keys stay with the host. This protected snapshot is never a portable export.
+
+Role changes compare the complete expected evidence under the writer lock. Staged,
+copy, fenced and retired instances reject every ordinary mutation; reopening cannot
+reset that role. Activation requires the host's matching transition identity and a
+fresh authority epoch. Role-only changes retain logical generation and state digest.
+
+`execute_operation()` commits a fixed data command, result receipt, generation and
+financial/provider state together. Exact retries return the original result before
+checking the old generation. Conflicting operation identities fail. At most 4,096
+receipts are retained; an expired or unknown operation with stale evidence is
+rejected instead of executed. The host owns migration decisions, copy promotion and
+recovery orchestration through these optional public contracts.
 
 Serialization and durability are synchronous I/O. The host's existing blocking-I/O
 execution path must call storage methods; do not call a full-file mutation directly

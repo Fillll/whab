@@ -28,8 +28,10 @@ from whab.domain.ledger_state import (
 from whab.domain.receipts import receipt_media_type, validate_receipt_selection
 from whab.domain.transactions import UNSET, transaction_rows, validate_review_batch
 from whab.domain.validation import validate_label, validate_month
+from whab.plugins.storage_transfer import require_primary
 
 from . import codec
+from .authority import Authority, fresh_metadata, pristine_document
 from .durability import (
     CommitUncertain,
     ExternalChange,
@@ -37,11 +39,12 @@ from .durability import (
     ensure_durable_directory,
     fingerprint,
     flush_directory,
+    preserve_schema_one,
     read_file,
 )
 
 
-class Store:
+class Store(Authority):
     """One exclusive writer with detached validated candidates and durable evidence.
 
     ``commit_hook`` is a deterministic observation/fault barrier for synthetic
@@ -49,7 +52,9 @@ class Store:
     Synchronous methods must be called on the host's existing blocking-I/O pool.
     """
 
-    def __init__(self, path, *, month=None, commit_hook=None):
+    def __init__(self, path, *, month=None, commit_hook=None, budget_id="default", environment="sandbox", initial_role="primary"):
+        if type(initial_role) is not str or initial_role not in {"primary", "staged", "copy"}:
+            raise StoreError("New storage requires a primary, staged or copy role.")
         self.path = Path(path).absolute()
         ensure_durable_directory(self.path.parent)
         self._lock = RLock()
@@ -57,6 +62,7 @@ class Store:
         self._uncertain = None
         self._changed = False
         self._hook = commit_hook
+        self._pending = None
         self._writer = WriterLock(self.path.with_name(self.path.name + ".lock"))
         try:
             raw = read_file(self.path)
@@ -64,11 +70,21 @@ class Store:
             self._disk_identity = self._identity() if raw is not None else None
             if raw is not None:
                 self._data = codec.decode(raw)
+                if self._data["formatVersion"] == 1:
+                    preserve_schema_one(self.path, raw)
+                    self._data.update(formatVersion=2, authority=fresh_metadata(
+                        budget_id, environment, "primary", empty=pristine_document(self._data),
+                    ))
+                    self._commit(self._data)
+                elif (self._data["authority"]["budgetId"] != budget_id
+                      or self._data["authority"]["environment"] != environment):
+                    raise StoreError("JSON storage identity belongs to another budget or environment.")
             else:
                 selected = month or current_month()
                 validate_month(selected)
                 self._data = {
-                    "formatVersion": 1, "generation": 0, "operationId": str(uuid4()),
+                    "formatVersion": 2, "generation": 0, "operationId": str(uuid4()),
+                    "authority": fresh_metadata(budget_id, environment, initial_role, empty=True),
                     "authorityEpoch": str(uuid4()), "workspaces": {
                         name: initial_state(name, selected) for name in ("personal", "demo")
                     },
@@ -111,7 +127,7 @@ class Store:
             self._changed = True
             raise ExternalChange("JSON storage or its lock changed outside this writer; preserve it before reopening.") from None
 
-    def commit_evidence(self):
+    def commit_status(self):
         """Operation/generation evidence contains no financial or credential payload."""
         with self._lock:
             if self._uncertain is not None:
@@ -177,17 +193,21 @@ class Store:
         self._workspace_name(workspace)
         with self._lock:
             self._check_current()
-            return copy.deepcopy(self._data["workspaces"][workspace])
+            return copy.deepcopy((self._pending or self._data)["workspaces"][workspace])
 
     def _mutate(self, workspace, operation, *, write_if=None):
         self._workspace_name(workspace)
         with self._lock:
             self._check_current()
+            require_primary(self._evidence(self._data))
+            if self._pending is not None:
+                return operation(self._pending["workspaces"][workspace])
             candidate = copy.deepcopy(self._data)
             result = operation(candidate["workspaces"][workspace])
             if write_if is None or write_if(result):
                 candidate["generation"] += 1
                 candidate["operationId"] = str(uuid4())
+                candidate["authority"]["empty"] = False
                 self._commit(candidate)
             return result
 

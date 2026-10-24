@@ -3,6 +3,7 @@
 import hashlib
 import os
 import stat
+import tempfile
 from pathlib import Path
 
 from whab.domain.errors import StoreError
@@ -55,6 +56,47 @@ def flush_directory(directory):
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
+
+
+def preserve_schema_one(path, raw):
+    """Keep exact private recovery bytes before acknowledging native schema 2.
+
+    A hard-link publication refuses to replace an existing recovery artifact.
+    That artifact is never selected as an active file or a portable payload.
+    """
+    recovery = path.with_name(path.name + ".schema1-recovery")
+    temporary = None
+    try:
+        previous = read_file(recovery)
+        if previous is not None:
+            if previous != raw:
+                raise StoreError("The existing schema-1 recovery artifact differs; preserve both files before upgrading JSON storage.")
+            descriptor = os.open(recovery, os.O_RDONLY | os.O_NOFOLLOW)
+            try:
+                os.fchmod(descriptor, 0o600)
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        else:
+            descriptor, temporary = tempfile.mkstemp(prefix=".whab-schema1-", dir=path.parent)
+            try:
+                with os.fdopen(descriptor, "wb", closefd=False) as target:
+                    target.write(raw)
+                    target.flush()
+                    os.fsync(target.fileno())
+            finally:
+                os.close(descriptor)
+            os.link(temporary, recovery, follow_symlinks=False)
+            Path(temporary).unlink()
+        flush_directory(path.parent)
+    except OSError:
+        raise StoreError("JSON schema-1 recovery could not be durably saved; the original file remains authoritative.") from None
+    finally:
+        if temporary is not None:
+            try:
+                Path(temporary).unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def ensure_durable_directory(path):

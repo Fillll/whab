@@ -29,7 +29,7 @@ def export_files(store, workspace):
     with store._snapshot():
         snapshot = store.export_budget(workspace)
         images = [(transaction_id, store.get_receipt(workspace, transaction_id)) for transaction_id in store.receipt_ids(workspace)]
-    clean = Store(":memory:", month=snapshot["budgetStartMonth"])
+    clean = Store(":memory:", month=snapshot["budgetStartMonth"], _authority=False)
     try:
         # Portable images are data containers. Rebuild runtime-only indexes when
         # restoring into a live Store rather than storing and compressing them.
@@ -97,7 +97,7 @@ def read_files(files, *, with_receipts=False):
         or not raw.startswith(b"SQLite format 3\x00")
     ):
         raise StoreError("This SQLite budget payload is invalid or exceeds the size limit.")
-    reader = Store(":memory:", month="2026-10")
+    reader = Store(":memory:", month="2026-10", _authority=False)
     try:
         expected_schema = _schema(reader.db)
         # Earlier format-1 images predate account scope. Keep their exact trusted

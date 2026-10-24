@@ -26,7 +26,7 @@ def test_overview_counts_selected_month_currency_without_materializing_history(s
             store.db.execute(f"UPDATE transactions SET {state}=1 WHERE workspace=? AND id=?", ("personal", key))
     accounts, categories = store.accounts("personal"), store.categories("personal")
     monkeypatch.setattr(store, "state", lambda *_: pytest.fail("Metadata must not load full ledger state"))
-    result = account_overview(store, "personal", "2026-10", "USD")
+    result = store.account_overview("personal", "2026-10", "USD")
     assert result == {"accounts": accounts, "categories": categories, "toReview": 2}
     assert account_overview(store, "personal", "2026-10", "EUR")["toReview"] == 1
     assert account_overview(store, "personal", "2026-10", "JPY")["toReview"] == 0
@@ -43,7 +43,7 @@ def test_settings_history_includes_deleted_and_earlier_transactions_and_is_works
     store.db.execute("UPDATE transactions SET deleted=1 WHERE workspace=? AND id=?", ("personal", key))
     monkeypatch.setattr(store, "state", lambda *_: pytest.fail("Settings must not load full ledger state"))
     assert account_settings(store, "personal", empty)["currencyEditable"] is True
-    result = account_settings(store, "personal", historic)
+    result = store.account_settings("personal", historic)
     assert result["account"]["id"] == historic and result["currencyEditable"] is False
     for workspace, account in (("personal", "missing"), ("demo", historic)):
         with pytest.raises(StoreError, match="Account not found"):
