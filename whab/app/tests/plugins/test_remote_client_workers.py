@@ -201,9 +201,16 @@ def test_installed_host_client_uses_native_https_verified_runtime_ca_and_public_
     for name, source in (("sqlite", root / "plugins/storage/sqlite"), ("server", root / "plugins/interface/server")):
         target = tmp_path / (name + "-source")
         shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info", "build", "dist"))
-        subprocess.run([sys.executable, "-I", "-m", "pip", "wheel", "--no-deps", "--no-build-isolation", "--disable-pip-version-check",
-                        "--wheel-dir", str(wheelhouse), str(target)], cwd=tmp_path, check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=90)
+        built = subprocess.run([sys.executable, "-I", "-B", "-m", "pip", "--isolated", "wheel", "--no-deps",
+                                "--index-url", "https://pypi.org/simple", "--disable-pip-version-check",
+                                "--wheel-dir", str(wheelhouse), str(target)], cwd=tmp_path,
+                               capture_output=True, timeout=90)
+        if built.returncode:
+            # Keep authored fixture-build diagnostics available without printing
+            # arbitrary subprocess output or caller configuration into CI logs.
+            (tmp_path / f"{name}-wheel-build.stdout").write_bytes(built.stdout)
+            (tmp_path / f"{name}-wheel-build.stderr").write_bytes(built.stderr)
+            built.check_returncode()
         additional.extend(wheelhouse.glob("whab_plugin_" + name + "-*.whl"))
     environment = tmp_path / "installed"
     subprocess.run([sys.executable, "-I", "-m", "venv", str(environment)], cwd=tmp_path, check=True,
