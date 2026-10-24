@@ -178,3 +178,17 @@ class PluginSelectionBody(Body):
     plugins: Annotated[
         list[Annotated[str, StringConstraints(min_length=1, max_length=64)]], Field(max_length=100)
     ]
+
+
+class ApprovedPluginWheel(Body):
+    path: Annotated[str, StringConstraints(min_length=1, max_length=4096)]
+    sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+
+
+class PluginUpgradeBody(Body):
+    pluginId: Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9-]{0,63}$")]
+    wheels: Annotated[list[ApprovedPluginWheel], Field(min_length=1, max_length=128)]
+
+
+class PluginRecoveryBody(Body):
+    authority: Literal["active", "candidate"]
