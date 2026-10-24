@@ -3,6 +3,17 @@
 from .adapters import BackendAdapter, BackendHarness, public_snapshot
 from .api_interface import api_declaration, assert_api_interface
 from .conformance import Capability, ConformanceFailure, Report, Result, run_conformance
+from .remote_client import (
+    RemoteClientRuntime,
+    assert_lost_remote_result,
+    assert_remote_client,
+    remote_declaration,
+)
+from .remote_profiles import (
+    replay_remote_configuration,
+    sample_remote_configurations,
+    validate_remote_manifest,
+)
 from .runtime_harness import NativeRuntime
 from .runtime_profiles import (
     replay_runtime_configuration,
@@ -19,4 +30,6 @@ __all__ = [
     "public_snapshot", "receipt_png", "replay_runtime_configuration", "run_conformance",
     "sample_runtime_configurations", "validate_runtime_manifest",
     "assert_visual_interface", "visual_change", "visual_declaration",
+    "RemoteClientRuntime", "assert_lost_remote_result", "assert_remote_client", "remote_declaration",
+    "replay_remote_configuration", "sample_remote_configurations", "validate_remote_manifest",
 ]

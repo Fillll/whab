@@ -1,0 +1,20 @@
+from whab_plugin_devkit.remote_client import (
+    RemoteClientRuntime,
+    assert_lost_remote_result,
+    assert_remote_client,
+    remote_declaration,
+)
+from __MODULE__ import plugin
+
+
+def test_example_remote_client_owns_only_a_declaration_and_uses_fictional_native_https():
+    assert remote_declaration(plugin)["token_setting"] == "__TOKEN_SETTING__"
+    with RemoteClientRuntime(plugin) as runtime:
+        evidence = assert_remote_client(runtime, plugin)
+        assert evidence["read_write"] == evidence["pause_enable"] == evidence["reopen"] == "passed"
+        assert evidence["migration_copies"].startswith("not-applicable")
+        lost = assert_lost_remote_result(runtime)
+        assert lost["unknown_after_client_restart"] == lost["explicit_original_finish"] == "passed"
+        server_home = runtime.server.home
+    assert runtime.process is None and runtime.server.process is None
+    assert not runtime.home.exists() and not server_home.exists()

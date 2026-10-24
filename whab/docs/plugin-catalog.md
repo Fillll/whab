@@ -17,6 +17,7 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [example-branding](https://github.com/Fillll/whab/blob/14ff3d586c3f0ad673a3db0865f8c7bf3a2d60e0/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
 | [example-categorization](https://github.com/Fillll/whab/blob/14ff3d586c3f0ad673a3db0865f8c7bf3a2d60e0/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
 | [example-file-import](https://github.com/Fillll/whab/blob/14ff3d586c3f0ad673a3db0865f8c7bf3a2d60e0/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-remote-client](https://github.com/Fillll/whab/blob/14ff3d586c3f0ad673a3db0865f8c7bf3a2d60e0/whab/app/plugins/example/example-remote-client/README.md) | `whab_plugin_example_remote_client 1.0.0` | `whab>=2.40,<3` | declarative-remote-client-worker | teaching |
 | [example-ui](https://github.com/Fillll/whab/blob/14ff3d586c3f0ad673a3db0865f8c7bf3a2d60e0/whab/app/plugins/example/example-ui/README.md) | `whab_plugin_example_ui 1.0.0` | `whab>=2.36,<3` | visual-ui-worker | teaching |
 | [json](https://github.com/Fillll/whab/blob/14ff3d586c3f0ad673a3db0865f8c7bf3a2d60e0/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.3.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
 | [plaid](https://github.com/Fillll/whab/blob/14ff3d586c3f0ad673a3db0865f8c7bf3a2d60e0/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.3.0` | `whab>=2.38,<3` | bank-provider-worker | maintained |
@@ -311,3 +312,13 @@ The public generator created an independent generated-bank project outside the c
 Tests: `scripts/check_plugin_generation.py`, `generated bank project owning tests`, `whab_plugin_devkit.bank_conformance`.
 
 Review: [PR #105](https://github.com/Fillll/whab/pull/105).
+
+### pr106-remote-client-teaching
+
+Verified 2026-10-23; host `2.41.0`. Selected: `example-remote-client`.
+
+The exact clean committed source passed 290 installed toolkit tests on genuine WHAB 2.22 and current 2.41 with zero skips; candidate toolkit statement/branch coverage was complete. The maintained remote-client example and a separately generated project each passed installed owning behavior and complete plugin coverage on separate genuine WHAB 2.40 minimum and 2.41 current artifacts. Each of those four rows passed ten distinct native configurations and ten exact approved-artifact replays, with all fictional homes/listeners/workers cleaned up. The genuine 2.40 source was e8fa8585c16d2f8a93b1966315c0fee34eb11d35. Native profiles used host-owned authorization/financial services, two fictional HTTPS hosts and a reviewed public-transport overlay that explicitly trusted the temporary authority CA. They exercised candidate workers, varied peers/order/transitions, pause/resume, exact-version reopen and client restart after a dropped acknowledged result; explicit Finish retained the original request/CAS identity. This does not establish stock client CLI private-CA configuration, remote-server restart retry durability, public receipt lookup, automatic unknown reconciliation, distinct-version upgrades from a single candidate artifact, local migration/copy support or household deployment. The toolkit's genuine 2.22 import compatibility is separate from this optional family's 2.40 floor. The interrupted source canonical run is not certified as a complete pass.
+
+Tests: `devtools/plugin-devkit/tests`, `plugins/example/example-remote-client/tests`, `scripts/check_plugin_devkit.py`, `scripts/check_plugin_generation.py`.
+
+Review: [PR #106](https://github.com/Fillll/whab/pull/106).

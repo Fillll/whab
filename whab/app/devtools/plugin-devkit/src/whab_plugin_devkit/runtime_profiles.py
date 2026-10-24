@@ -127,6 +127,10 @@ def _base(manifest):
 def sample_runtime_configurations(candidate, reference, artifacts, *, combinations_count=10, seed=42, bank_fixture=None):
     if bank_fixture is not None and (bank_fixture != "fictional-v1" or not _bank_candidate(candidate)):
         raise ValueError("Opt in only a reviewed pure offline fictional-v1 bank fixture.")
+    if getattr(candidate, "storage", None) is not None and not callable(candidate.storage):
+        from .remote_profiles import sample_remote_configurations
+
+        return sample_remote_configurations(candidate, reference, artifacts, combinations_count=combinations_count, seed=seed)
     manifests = sample_configurations(candidate, reference, artifacts, combinations_count=combinations_count, seed=seed)
     host = _host(artifacts)
     profile = _profile(candidate)
@@ -174,6 +178,10 @@ def sample_runtime_configurations(candidate, reference, artifacts, *, combinatio
 
 
 def validate_runtime_manifest(manifest):
+    if type(manifest) is dict and manifest.get("formatVersion") == 3:
+        from .remote_profiles import validate_remote_manifest
+
+        return validate_remote_manifest(manifest)
     if type(manifest) is not dict or manifest.get("formatVersion") != 2 or type(manifest["formatVersion"]) is not int or manifest.get("scope") != "runtime-lifecycle-storage":
         raise ValueError("Unsupported runtime manifest schema.")
     validate_manifest(_base(manifest))
@@ -246,6 +254,10 @@ def _migrate(runtime, destination):
 
 
 def replay_runtime_configuration(manifest, candidate, reference, *, native=NativeRuntime, wheelhouse=None):
+    if type(manifest) is dict and manifest.get("formatVersion") == 3:
+        from .remote_profiles import replay_remote_configuration
+
+        return replay_remote_configuration(manifest, candidate, reference, wheelhouse=wheelhouse)
     """Run installed SDK hooks plus actual public HTTPS runtime operations."""
     manifest = validate_runtime_manifest(manifest)
     baseline = replay_configuration(_base(manifest), candidate, reference)
