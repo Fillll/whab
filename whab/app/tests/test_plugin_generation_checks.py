@@ -131,6 +131,7 @@ def test_project_minimum_recipe_is_explicit_and_must_match_actual_declared_host_
 @pytest.mark.parametrize(("version", "revision"), [
     ("2.34.0", "ebbff0d464dd67c0269428a6d4a339778e21ec57"),
     ("2.36.0", "a866eda580c6e363a20636785bc4b4003db0652f"),
+    ("2.38.0", "dd52ec9554ee3c36395f8f2a7c1d2ab5ff00353f"),
 ])
 def test_interface_minimum_uses_its_genuine_immutable_source_recipe_without_version_rewriting(checker, tmp_path, version, revision):
     calls = []
@@ -144,6 +145,16 @@ def test_interface_minimum_uses_its_genuine_immutable_source_recipe_without_vers
     with pytest.raises(ValueError, match="advertised host"):
         checker.minimum_source(helper, tmp_path / "wrong", {}, version)
 
+
+def test_bank_fixture_approval_is_static_explicit_and_bound_to_its_actual_host_floor(checker, tmp_path):
+    metadata = tmp_path / "pyproject.toml"
+    metadata.write_text('[project]\ndependencies=["whab>=2.38,<3"]\n')
+    assert checker.bank_fixture_arguments(tmp_path) == []
+    metadata.write_text(metadata.read_text() + '[tool.whab.plugin-devkit]\nminimum-host="2.38.0"\noffline-bank-fixture="fictional-v1"\n')
+    assert checker.bank_fixture_arguments(tmp_path) == ["--bank-fixture", "fictional-v1"]
+    metadata.write_text(metadata.read_text().replace('"fictional-v1"', '"real-provider"'))
+    with pytest.raises(ValueError, match="reviewed"):
+        checker.bank_fixture_arguments(tmp_path)
 
 
 def historical_wheel_builder(tmp_path, *, second="same"):
