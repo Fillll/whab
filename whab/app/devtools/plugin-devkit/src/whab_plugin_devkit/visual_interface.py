@@ -45,8 +45,11 @@ def visual_change(runtime, plugin_id, *, wheels=None, dirty=False):
         if view is not None:
             def preparing():
                 value = runtime.expect("GET", "/api/ui/status")
+                operation = next((row for row in value.get("operations", []) if row["id"] == ticket), None)
+                if operation is not None and operation["state"] == "failed":
+                    raise AssertionError("Visual candidate preparation failed; inspect its recorded public operation status.")
                 return value if value["browser_preparation"] else None
-            status = runtime.wait(preparing)
+            status = runtime.wait(preparing, timeout=runtime.transition_timeout)
             if status["active"] != active or status["runtime"]["admission"] != "open":
                 raise AssertionError("A dirty view did not defer visual handover before the financial gate.")
             runtime.expect("PUT", "/api/ui/views/" + view, {"generation": generation, "dirty": False,

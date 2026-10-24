@@ -43,6 +43,7 @@ class FakeVisual:
         self.registered = False
         self.deleted = False
         self.commits = 0
+        self.transition_timeout = 180
 
     def expect(self, method, path, body=None, **options):
         if options.get("status", 200) == 403:
@@ -64,9 +65,10 @@ class FakeVisual:
         admission = "gated" if self.fault == "gate" else "open"
         active = {**self.active, "plugin_id": "alien"} if self.fault == "defer" and self.registered else self.active
         return {"active": active, "browser_preparation": {"id": "proposal"} if self.commits else None,
-                "runtime": {"admission": admission}}
+                "runtime": {"admission": admission}, "operations": [{"id": "operation", "state": "failed" if self.fault == "failed" else "running"}]}
 
-    def wait(self, observe):
+    def wait(self, observe, *, timeout):
+        assert timeout == self.transition_timeout
         return observe()
 
     def operation(self, path, identifier):
@@ -88,7 +90,7 @@ def test_visual_handover_correlates_exact_preview_and_cleans_opaque_view(dirty):
     assert runtime.commits == 2 and runtime.deleted == dirty
 
 
-@pytest.mark.parametrize("fault", ["duplicate", "gate", "defer", "preview", "selection"])
+@pytest.mark.parametrize("fault", ["duplicate", "gate", "defer", "preview", "selection", "failed"])
 def test_broken_handover_is_never_reported_as_success_and_view_is_released(fault):
     runtime = FakeVisual(fault)
     with pytest.raises(AssertionError):
@@ -165,5 +167,17 @@ def test_native_no_content_acknowledgement_does_not_require_a_json_payload(monke
     monkeypatch.setattr(harness.http.client, "HTTPSConnection", Connection)
     try:
         assert runtime.expect("DELETE", "/api/ui/views/fictional", status=204) is None
+    finally:
+        runtime.__exit__(None, None, None)
+
+
+@pytest.mark.parametrize("deadline", [True, 0, -1, 301, "180"])
+def test_native_handover_deadlines_are_explicit_and_bounded(deadline):
+    with pytest.raises(ValueError, match="management deadline"):
+        harness.NativeRuntime("sqlite", (), transition_timeout=deadline)
+    runtime = harness.NativeRuntime("sqlite", ())
+    try:
+        with pytest.raises(ValueError, match="observable-state"):
+            runtime.wait(lambda: True, timeout=deadline)
     finally:
         runtime.__exit__(None, None, None)

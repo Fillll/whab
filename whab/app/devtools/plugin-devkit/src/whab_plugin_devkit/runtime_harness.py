@@ -19,10 +19,13 @@ from tempfile import TemporaryDirectory
 class NativeRuntime:
     """Launch one installed host in an entirely new disposable Sandbox home."""
 
-    def __init__(self, storage, selection, *, timeout=30, api_token_setting=None, ui=None):
+    def __init__(self, storage, selection, *, timeout=30, api_token_setting=None, ui=None, transition_timeout=180):
         if storage not in {"sqlite", "json"} or type(timeout) not in {int, float} or not 0 < timeout <= 60:
             raise ValueError("Choose a reviewed local backend and a bounded startup deadline.")
         self.storage, self.selection, self.timeout = storage, tuple(selection), timeout
+        if type(transition_timeout) not in {int, float} or not 0 < transition_timeout <= 300:
+            raise ValueError("Choose a bounded management deadline covering preparation and handover.")
+        self.transition_timeout = transition_timeout
         if ui is not None and (type(ui) is not str or re.fullmatch(r"[a-z][a-z0-9-]{0,63}", ui) is None or ui in self.selection):
             raise ValueError("Choose one explicit visual interface outside the optional selection.")
         self.ui = ui
@@ -132,8 +135,11 @@ class NativeRuntime:
         finally:
             connection.close()
 
-    def wait(self, observe):
-        deadline = time.monotonic() + self.timeout
+    def wait(self, observe, *, timeout=None):
+        limit = self.timeout if timeout is None else timeout
+        if type(limit) not in {int, float} or not 0 < limit <= 300:
+            raise ValueError("Choose a bounded observable-state deadline.")
+        deadline = time.monotonic() + limit
         while True:
             value = observe()
             if value:
@@ -149,7 +155,7 @@ class NativeRuntime:
             if result and result["state"] == "failed":
                 raise AssertionError("A required runtime transition failed; inspect the recorded replay profile.")
             return result if result and result["state"] == "complete" else None
-        return self.wait(observe)
+        return self.wait(observe, timeout=self.transition_timeout)
 
     def stop(self, *, kill=False):
         process, self.process = self.process, None
