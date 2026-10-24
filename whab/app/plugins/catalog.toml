@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "6285f907174f85596537e7f31010422e7d0dfb77"
+documentation_ref = "188c008f6927682548d20dbe53bc93419d51e00b"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -200,3 +200,17 @@ scope = "The exact integrated source passed 4576 Python tests, all thirteen runt
 [verification.artifacts]
 whab = "2.34.0"
 whab_plugin_web = "1.26.0"
+
+[[verification]]
+id = "pr95-categorization-workers"
+date = "2026-10-23"
+host_version = "2.35.0"
+source_commit = "188c008f6927682548d20dbe53bc93419d51e00b"
+selection = ["random-forest-categorization"]
+method = "source-tests"
+tests = ["tests/plugins/test_categorization_worker.py", "tests/plugins/test_environments.py", "tests/test_namespace_effects_runtime.py", "tests/test_categorization_runtime.py", "tests/test_budget_cli.py", "plugins/automation/random-forest-categorization/tests", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/95"]
+scope = "The exact integrated source passed 4618 Python tests, all thirteen runtime plugins at 100% statement/branch coverage, 304 browser tests, 130 toolkit tests against each genuine minimum/current artifact, independent generated native-runtime configurations/replays and installed distributions. Actual separately approved immutable categorizer versions exercised replacement, failed model readiness, unfinished training/cancel, saved-version reopen, missing model-index materialization recovery and child termination/explicit restart. Host regressions covered complete authoritative state/model snapshots, original result recovery without hook reexecution, private effect publication boundaries, failed cached-heap retirement across both workspaces, foreign saved-model refusal before dispatch, portable checkpoints/copies and disabled namespace edits. Random Forest retained reviewed-only eligibility and its existing cutoff with complete owning coverage. CLI creation/reopen released unstarted worker/journal owners. These HTTP source tests use an HTTPS ASGI scheme; this record does not establish native listener TLS or household/provider deployment."
+[verification.artifacts]
+whab = "2.35.0"
+whab_plugin_random_forest_categorization = "1.3.0"

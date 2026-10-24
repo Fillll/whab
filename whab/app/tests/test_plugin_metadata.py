@@ -131,7 +131,7 @@ def test_static_boolean_cannot_impersonate_numeric_sdk_version(metadata_tool, st
     ("bank_logos=branding,settings=settings,branding_factory=fresh", "stateless-optional-worker"),
     ("file_import=parser", "stateless-optional-worker"),
     ("insights=insights,export=export", "stateless-report-worker"),
-    ("categorization=engine", "categorization-host"),
+    ("categorization=engine", "categorization-worker"),
 ])
 def test_supported_live_families_are_inspected_without_executing_factories(metadata_tool, static_repository, hooks, support):
     root, _, module = static_repository
@@ -142,6 +142,7 @@ def test_supported_live_families_are_inspected_without_executing_factories(metad
 
 
 @pytest.mark.parametrize("hooks, contract", [
+    ("categorization=engine", ",state_version=2"),
     ("file_import=parser,settings=settings", ""),
     ("file_import=parser,branding_factory=fresh", ""),
     ("bank_logos=branding,bind=binder", ""),
@@ -153,7 +154,7 @@ def test_unsupported_live_shapes_cannot_claim_worker_compatibility(metadata_tool
     path = module / "__init__.py"
     path.write_text("plugin=Plugin('fictional','Fictional'," + hooks +
                     ",contract=PluginContract(lifecycle='live'" + contract + "))\n")
-    with pytest.raises(ValueError, match="supported stateless worker"):
+    with pytest.raises(ValueError, match="supported capability adapter"):
         metadata_tool.descriptor_metadata(path, "plugin", root)
 
 
@@ -208,5 +209,5 @@ def test_api_factories_dynamic_or_invalid_adapter_shapes_cannot_claim_live_suppo
     root, _, module = static_repository
     path = module / "__init__.py"
     path.write_text("raise RuntimeError('source must never execute')\nplugin=Plugin('fictional','Fictional',interface=" + interface + ",contract=PluginContract(lifecycle='live'))\n")
-    with pytest.raises(ValueError, match="supported stateless worker"):
+    with pytest.raises(ValueError, match="supported capability adapter"):
         metadata_tool.descriptor_metadata(path, "plugin", root)

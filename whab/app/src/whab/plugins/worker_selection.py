@@ -22,6 +22,7 @@ from .report_worker import ReportWorker
 from .runtime import PluginError, PluginRegistry
 from .sdk import (
     BankLogos,
+    Categorization,
     FileImport,
     Interface,
     MerchantLogos,
@@ -313,6 +314,8 @@ class WorkerBinding:
 
 
 def _start(template, prepared, home=None):
+    from .categorization_worker import WorkerCategorizationFactory
+
     if not supports_live_plugin(template):
         raise PluginError("This optional plugin does not declare a supported live adapter.",
                           code="restart_required", plugin_id=template.id)
@@ -340,6 +343,7 @@ def _start(template, prepared, home=None):
                         ),
                         merchant_logos=MerchantLogos(partial(worker.fetch, merchant=True)) if adapters["merchant_logos"] else None,
                         file_import=FileImport(worker.parse, resources=resources) if adapters["file_import"] is not None else None,
+                        categorization=Categorization(WorkerCategorizationFactory(worker)) if adapters["categorization"] else None,
                         settings=None if adapters["settings"] is None else PluginSettings(
                             lambda: worker.settings()["insights"],
                             tuple(PluginAction(**row) for row in adapters["settings"]["actions"]), worker.settings_action,
@@ -400,6 +404,8 @@ async def upgrade_report(live, home, plugin_id, approvals):
         if template is None or not supports_live_plugin(template):
             raise PluginError("Enable an explicitly live supported optional adapter before upgrading it.",
                               code="restart_required", plugin_id=plugin_id)
+        if template.categorization is not None:
+            preparation.active.services["categorization"].ensure_idle()
         prepared = await run_in_threadpool(prepare_environment, Path(home) / "plugin-workers" / "environments",
                                           plugin_id, approvals)
         proxy, binding = await run_in_threadpool(_start, template, prepared, home)
@@ -426,5 +432,12 @@ async def upgrade_report(live, home, plugin_id, approvals):
     async def commit(candidate, _number):
         binding = candidate.services["plugins"].workers[plugin_id]
         await run_in_threadpool(save_reference, home, binding.environment)
+        if live.categorization is not None:
+            live.categorization.committed(candidate)
 
-    return await live.runtime.transition(prepare, commit=commit, plugin_id=plugin_id)
+    async def finalize(preparation, candidate):
+        if live.categorization is None:
+            return candidate
+        return await run_in_threadpool(live.categorization.finalize, preparation, candidate)
+
+    return await live.runtime.transition(prepare, finalize=finalize, commit=commit, plugin_id=plugin_id)

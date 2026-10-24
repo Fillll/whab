@@ -17,14 +17,24 @@ from .sdk import (
 from .wire import MAX_PAYLOAD_BYTES, WireError, _unique, _value
 from .worker_resources import capture_resources, resource_bundle
 
-LIVE_CAPABILITIES = frozenset({"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file", "interface.api"})
-OPERATIONS = frozenset({"bank.resolve", "bank.domain", "bank.fetch", "merchant.fetch", "cache.configure", "settings.read", "settings.act", "file.parse", "file.resources", "interface.describe"})
-BINARY_OPERATIONS = frozenset({"bank.fetch", "merchant.fetch", "file.parse", "file.resources"})
+LIVE_CAPABILITIES = frozenset({"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file", "categorization", "interface.api"})
+OPERATIONS = frozenset({"bank.resolve", "bank.domain", "bank.fetch", "merchant.fetch", "cache.configure", "settings.read", "settings.act", "file.parse", "file.resources", "category.call", "interface.describe"})
+BINARY_OPERATIONS = frozenset({"bank.fetch", "merchant.fetch", "file.parse", "file.resources", "category.call"})
 
 
 def supports_live_plugin(plugin):
     contract = contract_for(plugin)
     capabilities = {row.name for row in contract.provides}
+    if plugin.categorization is not None:
+        return (
+            plugin.contract is not None and contract.lifecycle == "live"
+            and capabilities == {"categorization"} and all(row.version == 1 for row in contract.provides)
+            and contract.state_version == 1 and not contract.state_upgrades
+            and all(getattr(plugin, name) is None for name in (
+                "bind", "migrate_state", "budget_connection", "settings", "insights", "export",
+                "bank", "bank_ui", "storage", "ui", "bank_logos", "merchant_logos", "file_import", "interface", "branding_factory",
+            ))
+        )
     return (
         plugin.contract is not None and contract.lifecycle == "live"
         and bool(capabilities) and capabilities <= LIVE_CAPABILITIES
@@ -52,7 +62,8 @@ def adapter_info(plugin):
             },
             "settings": None if settings is None else {"actions": [asdict(row) for row in settings.actions]},
             "interface": None if plugin.interface is None or plugin.interface.adapter is None else interface_record(plugin.interface.adapter),
-            "ui": None}
+            "ui": None,
+            "categorization": plugin.categorization is not None}
 
 
 def contract_info(plugin):
@@ -79,13 +90,13 @@ def read_contract(value, capabilities):
 
 
 def validate_adapter_info(value):
-    if type(value) is not dict or set(value) != {"bank_logos", "merchant_logos", "file_import", "settings", "interface", "ui"}:
+    if type(value) is not dict or set(value) != {"bank_logos", "merchant_logos", "file_import", "settings", "interface", "ui", "categorization"}:
         raise WireError()
     if value["ui"] is not None:
         raise WireError()
     if value["interface"] is not None:
         read_interface_record(value["interface"])
-    if type(value["merchant_logos"]) is not bool:
+    if type(value["merchant_logos"]) is not bool or type(value["categorization"]) is not bool:
         raise WireError()
     bank = value["bank_logos"]
     if bank is not None:

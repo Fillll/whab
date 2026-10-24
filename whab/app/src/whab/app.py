@@ -2,7 +2,7 @@
 
 import inspect
 from collections.abc import Mapping
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from dataclasses import replace
 from urllib.parse import urlsplit
 
@@ -11,11 +11,12 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader, PrefixLoader
+from starlette.concurrency import run_in_threadpool
 
 from whab import __version__
 from whab.budgets.host import BudgetDispatch, BudgetHost, BudgetRuntimeRequests
 from whab.budgets.plugin_state import check_saved_states
-from whab.budgets.runtime import BudgetRuntime
+from whab.budgets.runtime import BudgetRuntime, RuntimeResource
 from whab.budgets.session import BudgetSession, TrackedStorage
 from whab.budgets.storage_replicas import StorageReplicas
 from whab.budgets.storage_runtime import StorageRuntime, open_saved_storage, saved_storage_selection
@@ -45,6 +46,7 @@ from whab.services.categorization_runtime import (
     LeasedCategorization,
     live_categorizer,
 )
+from whab.services.namespace_effects import NamespaceNotifications
 from whab.services.receipts import ReceiptService
 from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
@@ -206,47 +208,50 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 budget=budget_session.context(settings.storage) if budget_session else None,
             ),
         )
-    try:
-        if budget_session:
-            budget_session.storage_payload_paths = selected_storage.storage_payload_paths if selected_storage else ()
-            budget_session.bind(store)
-            for path in settings.copy_paths:
-                target = path.resolve()
-                if not any(item["path"] == str(target) for item in budget_session.destinations):
-                    budget_session.add_copy(path.stem, str(target))
-        store = TrackedStorage(store, budget_session)
-        store.storage_plugin_id = settings.storage if owned_store else None
-        service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
-        store.on_mutation = service.invalidate_revision
-        categorization_lifecycle, categorization, categorization_resource = None, None, None
-        if not remote_authority:
-            state_home = settings.home / "data" / "plugin-state" / settings.plaid_env
-            context_factory = budget_session.context if budget_session else lambda identifier: local_context(
-                state_home, service.budget_id, identifier, lock=store.lock,
-                on_change=lambda: store.after_commit and store.after_commit())
-            saved_ids = [record["id"] for record in budget_session.manifest["plugins"]
-                         if any(f"plugins/{record['id']}/suggestions-{workspace}.json" in budget_session.files
-                                for workspace in ("personal", "demo"))] if budget_session else [
-                    path.name for path in (settings.home / "data" / "plugin-state" / settings.plaid_env / "plugin-data").glob("*")
-                    if any((path / f"suggestions-{workspace}.json").is_file() for workspace in ("personal", "demo"))]
-            snapshot = budget_session.files_for if budget_session else lambda identifier: local_files(state_home, service.budget_id, identifier)
-            categorization_lifecycle = CategorizationLifecycle(service, context_factory, snapshot)
-            categorization, categorization_resource = categorization_lifecycle.initial(plugins.descriptors(), saved_ids)
-        bank_stores = {plugin.id: BankStore(store, plugin.id, suggestions_only=lambda: bool(service.categorization and service.categorization.enabled())) for plugin in descriptors}
-    except Exception:
-        if owned_store:
-            close_storage(store)
-        raise
-    banks = {}
     worker_home = budget_session.storage_home if budget_session else settings.home
+    categorization_lifecycle, categorization, categorization_resource = None, None, None
+    worker_bindings, banks = {}, {}
     try:
-        plugins, worker_bindings = restore_workers(worker_home, plugins)
+        startup_batch = budget_session.namespace_materialization() if budget_session else nullcontext()
+        with startup_batch:
+            if budget_session:
+                budget_session.storage_payload_paths = selected_storage.storage_payload_paths if selected_storage else ()
+                budget_session.bind(store)
+                for path in settings.copy_paths:
+                    target = path.resolve()
+                    if not any(item["path"] == str(target) for item in budget_session.destinations):
+                        budget_session.add_copy(path.stem, str(target))
+            store = TrackedStorage(store, budget_session)
+            store.storage_plugin_id = settings.storage if owned_store else None
+            service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
+            store.on_mutation = service.invalidate_revision
+            plugins, worker_bindings = restore_workers(worker_home, plugins)
+            notifications = NamespaceNotifications(store.lock, lambda: store.after_commit and store.after_commit())
+            if not remote_authority:
+                state_home = settings.home / "data" / "plugin-state" / settings.plaid_env
+                context_factory = budget_session.context if budget_session else lambda identifier: local_context(
+                    state_home, service.budget_id, identifier, lock=store.lock, on_change=notifications.changed)
+                saved_ids = [record["id"] for record in budget_session.manifest["plugins"]
+                             if any(f"plugins/{record['id']}/suggestions-{workspace}.json" in budget_session.files
+                                    for workspace in ("personal", "demo"))] if budget_session else [
+                        path.name for path in (settings.home / "data" / "plugin-state" / settings.plaid_env / "plugin-data").glob("*")
+                        if any((path / f"suggestions-{workspace}.json").is_file() for workspace in ("personal", "demo"))]
+                snapshot = budget_session.files_for if budget_session else lambda identifier: local_files(state_home, service.budget_id, identifier)
+                categorization_lifecycle = CategorizationLifecycle(service, context_factory, snapshot,
+                    worker_home=worker_home, environment=settings.plaid_env,
+                    materialization=budget_session.namespace_materialization if budget_session else notifications.materialization)
+                categorization, categorization_resource = categorization_lifecycle.initial(plugins.descriptors(), saved_ids)
+            bank_stores = {plugin.id: BankStore(store, plugin.id, suggestions_only=lambda: bool(service.categorization and service.categorization.enabled())) for plugin in descriptors}
     except BaseException:
         if categorization is not None:
             try:
                 categorization.close()
             except Exception:
                 pass
+        for binding in reversed(tuple(worker_bindings.values())):
+            binding.worker.close()
+        if categorization_lifecycle is not None:
+            categorization_lifecycle.close()
         if owned_store:
             close_storage(store)
         raise
@@ -267,13 +272,21 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 categorization.close()
             except Exception:
                 pass
+        if categorization_lifecycle is not None:
+            categorization_lifecycle.close()
         if owned_store:
             close_storage(store)
         raise
+    async def close_namespaces():
+        if categorization_lifecycle is not None:
+            await run_in_threadpool(categorization_lifecycle.close)
+
+    namespace_resources = ((RuntimeResource("categorization-namespaces", close_namespaces),)
+                           if categorization_lifecycle is not None else ())
     runtime = BudgetRuntime(service.budget_id, {
         "plugins": RegistryGeneration(plugins, workers=worker_bindings, resources_enabled=bool(ui)), "ledger": service,
         "storage": store.store, "banks": banks, "categorization": categorization, "interfaces": interfaces,
-    }, (*tuple(binding.resource for binding in worker_bindings.values()),
+    }, (*namespace_resources, *tuple(binding.resource for binding in worker_bindings.values()),
         *((categorization_resource,) if categorization_resource else ()),
         *((interfaces.resource,) if interfaces.resource is not None else ())))
     if categorization is not None:
@@ -347,7 +360,11 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 finally:
                     await replicas.close()
                     await storage_runtime.close()
-                    await live.close()
+                    try:
+                        await live.close()
+                    finally:
+                        if categorization_lifecycle is not None:
+                            categorization_lifecycle.close()
             finally:
                 try:
                     for bank in reversed(tuple(banks.values())):
@@ -451,7 +468,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     storage_file_exports = bool(storage_contract and storage_contract.authority == "local"
                                 and any(capability.name == "transfer.prepare" for capability in storage_contract.provides))
     app.include_router(budget_host.router(store, settings, budget_session, storage_config=resolved_config,
-                                         storage_file_exports=storage_file_exports))
+                                         storage_file_exports=storage_file_exports,
+                                         namespace_effects=categorization_lifecycle))
     app.include_router(create_remote_router(
         lambda: runtime.handle("interfaces").call("current"),
         lambda: runtime.handle("interfaces").call("legacy_routes"),
@@ -466,8 +484,15 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 budget=budget_session.context(plugin.id) if budget_session else None,
             )))
         except Exception:
+            if categorization is not None:
+                try:
+                    categorization.close()
+                except Exception:
+                    pass
             for binding in reversed(tuple(worker_bindings.values())):
                 binding.worker.close()
+            if categorization_lifecycle is not None:
+                categorization_lifecycle.close()
             if owned_store:
                 close_storage(store)
             raise PluginError("Interface plugin could not start. Check its configuration.", code="interface_startup_failed", plugin_id=plugin.id) from None
