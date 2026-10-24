@@ -9,20 +9,20 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
-| [bank-logos](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
-| [client](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
-| [example](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
-| [example-api](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.0` | `whab>=2.34,<3` | declarative-api-worker | teaching |
-| [example-branding](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-categorization](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-file-import](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [json](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.3.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
-| [plaid](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
-| [random-forest-categorization](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.3.0` | `whab>=2.35,<3` | categorization-worker | maintained |
-| [server](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
-| [sqlite](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.12.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
-| [web](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
-| [ynab](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
+| [bank-logos](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
+| [client](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
+| [example](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
+| [example-api](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.0` | `whab>=2.34,<3` | declarative-api-worker | teaching |
+| [example-branding](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-categorization](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-file-import](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [json](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.3.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
+| [plaid](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
+| [random-forest-categorization](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.3.0` | `whab>=2.35,<3` | categorization-worker | maintained |
+| [server](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
+| [sqlite](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.12.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
+| [web](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
+| [ynab](https://github.com/Fillll/whab/blob/d1c5db51b46de91fad129ab9971cc75baecea89a/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
 Explicit stateless report, branding, file-parser, declarative API interface, pure categorization and participating visual descriptors advertise their supported live-worker adapters. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
 
@@ -179,3 +179,33 @@ Built the exact committed runtime into wheels and installed outside the checkout
 Tests: `tests/plugins/test_ui_worker.py`, `tests/web/test_visual_interface.py`, `tests/plugins/test_ui_runtime.py`.
 
 Review: [PR #97](https://github.com/Fillll/whab/pull/97).
+
+### pr102-local-storage-source
+
+Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
+
+Separate fictional SQLite and JSON primary budgets exercised typed storage workers, drained compatible upgrades, rejected candidates, pending native operation evidence, nondecreasing recovery floors, stopped repair, native lease/cleanup ownership and concurrent status reads during both authority directions. Exact frozen source passed 4924 Python cases, all fourteen plugins at 100% statement/branch coverage, 333 browser tests and 164 installed toolkit cases on each genuine minimum/current host. The canonical generated stage stopped at a sanitized API exact-replay failure after its ten native API check configurations had passed; an independent replay of all ten identical retained artifact configurations passed. The original intermittent failure remains unattributed: this record does not claim a complete canonical pass or a timeout/status-race cause. A later narrow source regression covers phase-specific execute rejection versus unknown post-dispatch evidence/receipt publication. Final integrated validation remains required.
+
+Tests: `tests/plugins/test_storage_worker.py`, `tests/plugins/test_storage_worker_faults.py`, `tests/plugins/test_storage_worker_selection.py`, `tests/web/test_storage_migration.py`, `tests/web/test_storage_replicas.py`, `scripts/check.py`.
+
+Review: [PR #102](https://github.com/Fillll/whab/pull/102).
+
+### pr102-local-storage-native-https
+
+Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
+
+Actual installed wheels outside the checkout used native HTTPS and explicit temporary CA trust; an untrusted CA was refused. Separate fictional budgets ran both SQLite-primary/JSON-copy and JSON-primary/SQLite-copy directions, never two authoritative writers in one registry. Distinct approved synthetic versions proved valid upgrade, failed candidate preservation and later upgrade. Four acknowledged accounts per direction, namespace-only revisions, bank-continuation authority deferral, copy catch-up/promotion, reverse migration, two ordinary CLI reopens, saved worker selection, opaque models/files and original containers survived. The bank guard used real encrypted continuation records with fictional capture, not a bundled provider worker or external bank connection. Exact 33-wheel hashes and scripts were retained; homes/processes were removed. This is feature evidence at the stated source, not an installed claim for subsequent source-only outcome fixes.
+
+Tests: `tests/plugins/test_storage_worker.py`, `tests/web/test_storage_migration.py`, `tests/web/test_storage_replicas.py`.
+
+Review: [PR #102](https://github.com/Fillll/whab/pull/102).
+
+### pr102-cross-host-storage-repair
+
+Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
+
+Genuine installed host 2.37 at this source and genuine host 2.38 at a28ab71cf013039e36fbf4842cb96ce7a1644de6 verified both independent backend repair directions. New-host startup refused the old approved code binding before repair without changing native/code/container bytes. Explicit stopped read-only repair retained exact native UUID/epoch/generation/digest, namespace revision, original container, prior reference bytes/history and exact lost-publication retry. Two new-host ordinary CLI reopens per backend retained three acknowledged accounts, models/settings and the saved current approved worker. Each separate named-budget startup legitimately admitted prepare_budget_files(existing=True): its exact native command fingerprint/receipt proved generation G+1 with unchanged financial digest/UUID/epoch/namespace. A new acknowledged write advanced another generation. The original overstrict assertion expecting identical generation across those distinct startup operations is preserved in the evidence; no preparation optimization was made. Both complete artifact closures, hashes, scripts and the original assertion were retained. All homes/providers were fictional; no provider connection or household deployment.
+
+Tests: `tests/plugins/test_storage_worker_selection.py`, `tests/test_budget_cli.py`.
+
+Review: [PR #102](https://github.com/Fillll/whab/pull/102).
