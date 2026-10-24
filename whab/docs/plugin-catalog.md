@@ -160,6 +160,56 @@ Tests: `devtools/plugin-devkit/tests`, `plugins/example/example-api/tests`, `scr
 
 Review: [PR #96](https://github.com/Fillll/whab/pull/96).
 
+### pr97-visual-interface-source
+
+Verified 2026-10-23; host `2.36.0`. Selected: `web`.
+
+The exact source passed 4769 Python tests, all thirteen runtime plugins at 100% statement/branch coverage, 333 browser checks, 130 installed toolkit tests per genuine minimum/current artifact, generated configurations and exact replays, and installed distributions. Covered browser preparation barriers, stable ledger services, exact selection decisions, immutable resources, guarded headless mode, stopped repair, lost replies and retained cleanup ownership through partial constructors and retirement failures. Separate headless Chrome QA checked desktop/light and compact/dark Plugins settings without overflow and completed a browser-acknowledged handover of the same Web artifact. This source evidence does not claim distinct installed versions or household deployment.
+
+Tests: `tests/plugins/test_ui_worker.py`, `tests/web/test_visual_interface.py`, `tests/plugins/test_ui_runtime.py`, `plugins/interface/web/tests`, `scripts/check.py`.
+
+Review: [PR #97](https://github.com/Fillll/whab/pull/97).
+
+### pr97-visual-interface-native-https
+
+Verified 2026-10-23; host `2.36.0`. Selected: `web`, `sqlite`.
+
+Built the exact committed runtime into wheels and installed outside the checkout. Native CA-verified HTTPS rejected cleartext, untrusted CA, foreign Host/origin and demo mutation. A dirty browser deferred handover while a separate acknowledged financial write remained admitted; duplicate commits retained the exact preview operation. Separately approved synthetic Web versions 1.27.1.dev1, broken dev2 and valid dev3 proved distinct immutable worker replacement, failed preparation preserving the prior worker, coherent four-page generation assets, headless acknowledged saves, old asset retention and exact saved dev3 restoration after an ordinary installed CLI reopen. All three acknowledged fictional accounts survived. Exact wheel/closure/script hashes and eight checks were retained; homes, host leaders and workers were removed. These synthetic provider versions differ from the bundled Web version listed here. This does not establish cross-host SDK upgrades, real provider connectivity or household installation.
+
+Tests: `tests/plugins/test_ui_worker.py`, `tests/web/test_visual_interface.py`, `tests/plugins/test_ui_runtime.py`.
+
+Review: [PR #97](https://github.com/Fillll/whab/pull/97).
+
+### pr102-local-storage-source
+
+Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
+
+Separate fictional SQLite and JSON primary budgets exercised typed storage workers, drained compatible upgrades, rejected candidates, pending native operation evidence, nondecreasing recovery floors, stopped repair, native lease/cleanup ownership and concurrent status reads during both authority directions. Exact frozen source passed 4924 Python cases, all fourteen plugins at 100% statement/branch coverage, 333 browser tests and 164 installed toolkit cases on each genuine minimum/current host. The canonical generated stage stopped at a sanitized API exact-replay failure after its ten native API check configurations had passed; an independent replay of all ten identical retained artifact configurations passed. The original intermittent failure remains unattributed: this record does not claim a complete canonical pass or a timeout/status-race cause. A later narrow source regression covers phase-specific execute rejection versus unknown post-dispatch evidence/receipt publication. Final integrated validation remains required.
+
+Tests: `tests/plugins/test_storage_worker.py`, `tests/plugins/test_storage_worker_faults.py`, `tests/plugins/test_storage_worker_selection.py`, `tests/web/test_storage_migration.py`, `tests/web/test_storage_replicas.py`, `scripts/check.py`.
+
+Review: [PR #102](https://github.com/Fillll/whab/pull/102).
+
+### pr102-local-storage-native-https
+
+Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
+
+Actual installed wheels outside the checkout used native HTTPS and explicit temporary CA trust; an untrusted CA was refused. Separate fictional budgets ran both SQLite-primary/JSON-copy and JSON-primary/SQLite-copy directions, never two authoritative writers in one registry. Distinct approved synthetic versions proved valid upgrade, failed candidate preservation and later upgrade. Four acknowledged accounts per direction, namespace-only revisions, bank-continuation authority deferral, copy catch-up/promotion, reverse migration, two ordinary CLI reopens, saved worker selection, opaque models/files and original containers survived. The bank guard used real encrypted continuation records with fictional capture, not a bundled provider worker or external bank connection. Exact 33-wheel hashes and scripts were retained; homes/processes were removed. This is feature evidence at the stated source, not an installed claim for subsequent source-only outcome fixes.
+
+Tests: `tests/plugins/test_storage_worker.py`, `tests/web/test_storage_migration.py`, `tests/web/test_storage_replicas.py`.
+
+Review: [PR #102](https://github.com/Fillll/whab/pull/102).
+
+### pr102-cross-host-storage-repair
+
+Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
+
+Genuine installed host 2.37 at this source and genuine host 2.38 at a28ab71cf013039e36fbf4842cb96ce7a1644de6 verified both independent backend repair directions. New-host startup refused the old approved code binding before repair without changing native/code/container bytes. Explicit stopped read-only repair retained exact native UUID/epoch/generation/digest, namespace revision, original container, prior reference bytes/history and exact lost-publication retry. Two new-host ordinary CLI reopens per backend retained three acknowledged accounts, models/settings and the saved current approved worker. Each separate named-budget startup legitimately admitted prepare_budget_files(existing=True): its exact native command fingerprint/receipt proved generation G+1 with unchanged financial digest/UUID/epoch/namespace. A new acknowledged write advanced another generation. The original overstrict assertion expecting identical generation across those distinct startup operations is preserved in the evidence; no preparation optimization was made. Both complete artifact closures, hashes, scripts and the original assertion were retained. All homes/providers were fictional; no provider connection or household deployment.
+
+Tests: `tests/plugins/test_storage_worker_selection.py`, `tests/test_budget_cli.py`.
+
+Review: [PR #102](https://github.com/Fillll/whab/pull/102).
+
 ### pr101-live-bank-source
 
 Verified 2026-10-23; host `2.38.0`. Selected: `plaid`.

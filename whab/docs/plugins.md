@@ -732,7 +732,7 @@ Every route requires HTTPS, including localhost and webhooks. The launcher uses 
 
 ## Extension scope
 
-The current host and supported plugins provide selected server-rendered interfaces, required storage backends, bank-service factories with scoped normalized imports and optional merchant artwork, bounded local file imports, reports, and optional bank-logo branding. UI/storage selection does not create native runtimes or general cross-backend migration. The trusted `Interface` hook supplies scoped transport routes; family login authentication is not implemented. Plaid is the bundled bank provider, not proof of institution access. Every backend/provider must preserve monetary rules, isolation, encrypted credentials, annotations and atomic checkpoints.
+The current host and supported plugins provide selected server-rendered interfaces, required storage backends, bank-service factories with scoped normalized imports and optional merchant artwork, bounded local file imports, reports, and optional bank-logo branding. Participating visual descriptors support coherent live workers and browser handovers; local SQLite/JSON migration and copies use explicit previewed authority transitions. Installing or selecting a package alone never migrates a budget. The trusted `Interface` hook supplies scoped transport routes; family login authentication is not implemented. Plaid is the bundled bank provider, not proof of institution access. Every backend/provider must preserve monetary rules, isolation, encrypted credentials, annotations and atomic checkpoints.
 
 ## Core category and currency projections
 
