@@ -53,7 +53,7 @@ identifier = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(','
 code = home / 'plugin-workers/environments' / identifier
 code.mkdir(parents=True)
 manager.write_json(code / 'ready.json', {**manifest, 'identifier': identifier, 'installation_sha256': 'a' * 64})
-subprocess.run([sys.executable, '-I', '-m', 'venv', '--without-pip', str(code / 'environment')], check=True,
+subprocess.run([sys.executable, '-I', '-B', '-m', 'venv', '--without-pip', str(code / 'environment')], check=True,
                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 result = manager.Manager(root).backup(home, manager.read_json(root / 'active.json'))
 archive = pathlib.Path(result['directory'])
@@ -143,6 +143,10 @@ class BundleCheck:
         result = subprocess.run([str(self.python), "-I", "-B", "-c", _BACKUP_PROBE,
                                  str(self.resources / "manager/launcher.py"), str(self.root), str(self.runtime)],
                                 capture_output=True, text=True, timeout=120, env=environment(), check=False)
+        if result.returncode:
+            diagnostics = self.root.parent / "backup-probe.stderr"
+            diagnostics.write_text(result.stderr)
+            diagnostics.chmod(0o600)
         require(result.returncode == 0, "The stopped runtime backup contract failed its isolated native bundle check.")
         value = json.loads(result.stdout)
         require(value.get("format") == 2 and value.get("owned_roots") == 5 and value.get("code_aliases", 0) > 0,
