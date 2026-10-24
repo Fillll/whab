@@ -72,6 +72,7 @@ A plugin's primary category describes its role; its capabilities can include con
 - [Architecture](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md)
 - [Plugin API](whab/docs/plugins.md) and [plugin folders](whab/app/plugins/README.md)
 - [Contributing and checks](whab/app/CONTRIBUTING.md) · [Previews, verification and troubleshooting](whab/docs/development.md) · [Changelog](whab/app/CHANGELOG.md)
+- [Private vulnerability reporting and supported versions](SECURITY.md)
 
 ## Privacy and control
 
