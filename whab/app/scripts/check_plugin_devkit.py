@@ -65,14 +65,13 @@ Path(destination).write_text(json.dumps(result))
 
 
 def isolated_environment(home):
-    """Standalone checks also exclude configured budgets and source import paths."""
-    password_variable = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
-    environment = {
-        key: value for key, value in os.environ.items()
-        if not key.startswith(("WHAB_", "PLAID_", "SERVER_", "CLIENT_", "PYTHON"))
-        and key not in {"TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID", "PORT", "VIRTUAL_ENV"}
-        and key != password_variable
-    }
+    """External checks inherit process settings, never arbitrary caller config."""
+    allowed = {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG", "LANGUAGE",
+               "LC_ALL", "LC_CTYPE", "LC_NUMERIC", "LC_TIME", "LC_COLLATE", "LC_MONETARY",
+               "LC_MESSAGES", "LC_PAPER", "LC_NAME", "LC_ADDRESS", "LC_TELEPHONE",
+               "LC_MEASUREMENT", "LC_IDENTIFICATION"}
+    password = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
+    environment = {key: value for key, value in os.environ.items() if key in allowed and key != password}
     environment.update(WHAB_HOME=str(home), WHAB_ENV="sandbox", PLAID_ENV="sandbox", ALLOW_LIVE_PLAID="false")
     return environment
 
