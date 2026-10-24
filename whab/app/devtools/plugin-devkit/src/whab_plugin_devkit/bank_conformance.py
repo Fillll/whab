@@ -127,14 +127,9 @@ def exercise_bank_runtime(runtime, scenario, *, variant="standard", disconnect=T
     if variant == "ready-defer":
         selected = [row["id"] for row in runtime.expect("GET", "/api/plugins")["plugins"]
                     if row["id"] not in {scenario.plugin_id, "sqlite", "json"}]
-        ticket = runtime.expect("POST", "/api/plugins/management/transition", {"plugins": selected}, status=202)
-        def refused():
-            rows = runtime.expect("GET", "/api/plugins/runtime")["operations"]
-            row = next((row for row in rows if row["id"] == ticket["id"]), None)
-            if row is not None and row["state"] == "complete":
-                raise AssertionError("An unfinished fictional connection did not defer provider retirement.")
-            return row if row is not None and row["state"] == "failed" else None
-        _check(runtime.wait(refused, timeout=runtime.transition_timeout)["error"]["code"] == "continuation_busy")
+        refused = runtime.expect("POST", "/api/plugins/management/transition", {"plugins": selected}, status=409)
+        if refused.get("code") != "continuation_busy":
+            raise AssertionError("An unfinished fictional connection did not defer provider retirement.")
         _check(runtime.expect("GET", flow)["stage"] == "ready")
     _check(runtime.expect("DELETE", flow)["stage"] == "cancelled")
     ready = runtime.expect("POST", prefix + "/link-token", {})

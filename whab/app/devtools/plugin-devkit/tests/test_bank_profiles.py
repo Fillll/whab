@@ -43,10 +43,7 @@ class ScriptedBankHTTP:
         if path == "/api/plugins":
             return {"plugins": [{"id": "sqlite"}, {"id": "fictional-bank"}]}
         if path == "/api/plugins/management/transition":
-            return {"id": "retire"}
-        if path == "/api/plugins/runtime":
-            return {"operations": [{"id": "retire", "state": "complete" if self.permits_retirement else "failed",
-                                    "error": {"code": "continuation_busy"}}]}
+            return {"code": "would_admit" if self.permits_retirement else "continuation_busy"}
         if "/continuations/" in path:
             flow = self.flows[path.rsplit("/", 1)[-1]]
             if method == "DELETE":
