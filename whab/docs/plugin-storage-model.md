@@ -67,3 +67,9 @@ These helpers do not activate a plugin or certify its persistence. An independen
 adapter must implement and test every advertised [storage contract](plugins.md#storage-backends),
 including primary-role fencing, durable retry receipts and read-only readiness
 when it advertises the [native storage worker](storage-workers.md) capability.
+
+Native worker code replacement is independently usable without advertising
+`transfer.local` or `storage.replica`. It still requires native authority and
+command evidence, read-only readiness, and drainable bank background work.
+Migration, copies and promotion separately require their transfer contracts;
+passing code readiness does not enable those operations.

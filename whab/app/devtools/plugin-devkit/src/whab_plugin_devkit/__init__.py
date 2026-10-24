@@ -3,13 +3,31 @@
 from .adapters import BackendAdapter, BackendHarness, public_snapshot
 from .api_interface import api_declaration, assert_api_interface
 from .conformance import Capability, ConformanceFailure, Report, Result, run_conformance
+from .local_storage import assert_storage_readiness, storage_conformance, storage_declaration
+from .remote_client import (
+    RemoteClientRuntime,
+    assert_lost_remote_result,
+    assert_remote_client,
+    remote_declaration,
+)
+from .remote_profiles import (
+    replay_remote_configuration,
+    sample_remote_configurations,
+    validate_remote_manifest,
+)
 from .runtime_harness import NativeRuntime
 from .runtime_profiles import (
     replay_runtime_configuration,
     sample_runtime_configurations,
     validate_runtime_manifest,
 )
+from .storage_profiles import (
+    replay_storage_configuration,
+    sample_storage_configurations,
+    validate_storage_manifest,
+)
 from .synthetic import SyntheticClock, imported_account, imported_transaction, receipt_png
+from .visual_interface import assert_visual_interface, visual_change, visual_declaration
 
 __all__ = [
     "BackendAdapter", "BackendHarness", "Capability", "ConformanceFailure", "Report",
@@ -17,4 +35,9 @@ __all__ = [
     "NativeRuntime", "Result", "SyntheticClock", "imported_account", "imported_transaction",
     "public_snapshot", "receipt_png", "replay_runtime_configuration", "run_conformance",
     "sample_runtime_configurations", "validate_runtime_manifest",
+    "assert_visual_interface", "visual_change", "visual_declaration",
+    "RemoteClientRuntime", "assert_lost_remote_result", "assert_remote_client", "remote_declaration",
+    "replay_remote_configuration", "sample_remote_configurations", "validate_remote_manifest",
+    "assert_storage_readiness", "storage_conformance", "storage_declaration",
+    "replay_storage_configuration", "sample_storage_configurations", "validate_storage_manifest",
 ]

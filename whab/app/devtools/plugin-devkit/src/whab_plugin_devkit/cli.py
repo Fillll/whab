@@ -18,7 +18,7 @@ def _selected(plugin_id, wheelhouse, *, runtime=False):
     selected = []
     required = ["whab", "whab_plugin_devkit"]
     if runtime and Version(metadata.version("whab")) >= Version("2.32.0"):
-        required.extend(["whab_plugin_json", "whab_devkit_runtime_peers"])
+        required.append("whab_devkit_runtime_peers")
     for name in (plugin_id, "sqlite"):
         matches = [entry for entry in entries if entry.name == name]
         if len(matches) != 1:
@@ -27,7 +27,12 @@ def _selected(plugin_id, wheelhouse, *, runtime=False):
         required.append(matches[0].dist.metadata["Name"])
     artifacts = installed_artifacts(wheelhouse, required)
     # Only these two explicit registrations execute, after installed bytes match.
-    return selected[0].load(), selected[1].load(), artifacts
+    candidate = selected[0].load()
+    if runtime and Version(metadata.version("whab")) >= Version("2.32.0"):
+        storage = getattr(candidate, "storage", None)
+        required.append("whab_plugin_server" if storage is not None and not callable(storage) else "whab_plugin_json")
+        artifacts = installed_artifacts(wheelhouse, required)
+    return candidate, selected[1].load(), artifacts
 
 
 def main(argv=None):
@@ -45,6 +50,7 @@ def main(argv=None):
     check.add_argument("--wheelhouse", type=Path, required=True)
     check.add_argument("--output", type=Path, default=Path("whab-plugin-check"))
     check.add_argument("--runtime", action="store_true", help="Also run the versioned native HTTPS lifecycle/migration/copy profile where supported.")
+    check.add_argument("--bank-fixture", choices=("fictional-v1",), help="Explicitly authorize this reviewed offline bank fixture; never supply a real provider.")
     replay = commands.add_parser("replay", help="Replay one manifest against exact installed approved artifacts.")
     replay.add_argument("manifest", type=Path)
     replay.add_argument("--wheelhouse", type=Path, required=True)
@@ -55,6 +61,8 @@ def main(argv=None):
             print(f"Created {project}")
             return 0
         if arguments.command == "check":
+            if arguments.bank_fixture is not None and not arguments.runtime:
+                raise ValueError("A bank fixture requires the explicit native runtime profile.")
             if arguments.runtime:
                 from .runtime_profiles import (
                     replay_runtime_configuration,
@@ -67,7 +75,8 @@ def main(argv=None):
                 candidate, reference, artifacts = _selected(arguments.plugin, arguments.wheelhouse)
                 sample, execute = sample_configurations, replay_configuration
             manifests = sample(candidate, reference, artifacts,
-                                               combinations_count=arguments.combinations, seed=arguments.seed)
+                               combinations_count=arguments.combinations, seed=arguments.seed,
+                               **({"bank_fixture": arguments.bank_fixture} if arguments.runtime else {}))
             arguments.output.mkdir(parents=True, exist_ok=False)
             results = []
             for manifest in manifests:
@@ -83,7 +92,17 @@ def main(argv=None):
         if len(raw) > 1024 * 1024:
             raise ValueError("The configuration manifest exceeds its bound.")
         value = _parse(raw)
-        if type(value) is dict and value.get("formatVersion") == 2:
+        if type(value) is dict and value.get("formatVersion") == 4:
+            from .storage_profiles import replay_storage_configuration, validate_storage_manifest
+
+            manifest, execute = validate_storage_manifest(value), replay_storage_configuration
+            candidate, reference, artifacts = _selected(manifest["candidate"], arguments.wheelhouse, runtime=manifest["runtime"]["requested"])
+        elif type(value) is dict and value.get("formatVersion") == 3:
+            from .remote_profiles import replay_remote_configuration, validate_remote_manifest
+
+            manifest, execute = validate_remote_manifest(value), replay_remote_configuration
+            candidate, reference, artifacts = _selected(manifest["candidate"], arguments.wheelhouse, runtime=manifest["runtime"]["requested"])
+        elif type(value) is dict and value.get("formatVersion") == 2:
             from .runtime_profiles import replay_runtime_configuration, validate_runtime_manifest
 
             manifest, execute = validate_runtime_manifest(value), replay_runtime_configuration
@@ -93,7 +112,7 @@ def main(argv=None):
             candidate, reference, artifacts = _selected(manifest["candidate"], arguments.wheelhouse)
         if artifacts != manifest["artifacts"]:
             raise ValueError("Replay requires the exact recorded installed wheels and hashes.")
-        print(json.dumps(execute(manifest, candidate, reference, **({"wheelhouse": arguments.wheelhouse} if manifest["formatVersion"] == 2 else {})), indent=2))
+        print(json.dumps(execute(manifest, candidate, reference, **({"wheelhouse": arguments.wheelhouse} if manifest["formatVersion"] in {2, 3, 4} else {})), indent=2))
         return 0
     except Exception:
         print("Plugin check failed. Preserve its manifest, verify the approved installed artifacts and run the project's fictional regression tests. No private exception payload is displayed.", file=sys.stderr)

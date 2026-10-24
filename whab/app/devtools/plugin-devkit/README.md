@@ -5,7 +5,7 @@ outside runtime plugin discovery directories and contributes no runtime entry po
 Install it beside the host SDK and the plugin being tested; it does not require
 the bundled plugin set, a SQLite implementation, a provider account, or pytest at runtime.
 
-The toolkit provides synchronous storage conformance, five complete teaching
+The toolkit provides synchronous storage conformance, nine complete teaching
 project generators and constrained configuration replay through public
 `whab.plugins` contracts. It requires Python 3.14+ and WHAB 2.22+ within major 2.
 Compatibility ranges require testing the minimum supported host artifact and the
@@ -35,7 +35,10 @@ whab-plugin new household-report --capability reporting --ci-ref "$WHAB_CI_COMMI
 Choose `reporting` for a one-currency report and CSV export, `branding` for an
 embedded fictional bank logo, `file-import` for a bounded USD account JSON parser,
 `categorization` for a complete saved exact-merchant model lifecycle, or `api` for
-a declarative API interface requiring WHAB 2.34+. Generated
+a declarative API interface requiring WHAB 2.34+. The `ui`, `bank` and
+`remote-client` templates require their genuine 2.36, 2.38 and 2.40 floors.
+The `storage` template requires the genuine 2.41 public pure-model SDK.
+Generated
 projects include packaging, public-SDK source, regression tests, a README and an
 MIT license. The four original templates declare restart-only lifecycle support;
 the API template declares the host-supported live lifecycle. The categorizer learns
@@ -289,7 +292,7 @@ and coverage result. It contains no financial records, snapshots, credentials or
 temporary runtime paths. Dependencies/build tools may need network access while
 preparing wheels; no provider account or bank connection is used. This initial
 gate validates maintained artifacts. The separate generated-project gate builds
-all five projects using an installed toolkit and validates every project wheel
+all nine projects using an installed toolkit and validates every project wheel
 outside the checkout:
 
 ```sh
@@ -331,9 +334,17 @@ The selected WHAB commit supplies the current candidate host, toolkit and SQLite
 reference. The project’s `[tool.whab.plugin-devkit] minimum-host` selects a known immutable
 recipe matching its declared WHAB floor: `bac249ca0e62638a40a6effc44af741c283e83d7`
 for 2.22.0, or `ebbff0d464dd67c0269428a6d4a339778e21ec57` for the API family’s
-2.34.0. A compatible actual SQLite reference accompanies each host. Different
+2.34.0. Additional genuine recipes cover 2.36/visual, 2.38/bank, and
+`e8fa8585c16d2f8a93b1966315c0fee34eb11d35` for 2.40/remote client.
+A compatible actual SQLite reference accompanies each host. Different
 minimum/current versions produce distinct real artifacts; equal versions share
 one artifact with both roles. Version metadata is never rewritten for compatibility. The installed toolkit retains its declared minimum host floor.
+
+Historical hosts may share an unchanged reference package version. The checker
+builds each source separately and reuses the first approved wheel only when every
+member's contents, modes and flags match; ZIP timestamps may differ. A conflicting
+same-identity artifact or a failed build stops validation without replacing the
+approved wheel. Exact saved artifact hashes remain the replay authority.
 
 The shared runner builds the caller project once, then creates independent
 environments outside both source checkouts. Only candidate/reference plugin
@@ -344,7 +355,7 @@ file at 100% statement/branch coverage, ten distinct configurations, all adverti
 SQLite reference suites, and all ten exact-artifact replays. Missing/empty/skipped
 project tests and missing/broken advertised suites fail. Unsupported optional
 reference capabilities remain explicit `not-applicable` results; they are never
-used to hide failures. The installed profile covers the five generated teaching families and their
+used to hide failures. The installed profile covers the nine generated teaching families and their
 explicit public probes. The API native recipe also tests its scoped HTTP/worker
 behavior; this is not arbitrary provider or all-family lifecycle certification. Add project-specific public-contract tests when extending them.
 
@@ -382,3 +393,148 @@ success and failure. Archived evidence contains approved wheels, versions/hashes
 source commit identities, test counts and fictional replay files, without runtime
 homes or ledger payloads. Preserve the wheelhouse for offline replay. The repository
 CI calls this same reusable workflow for its maintained fictional branding example.
+
+## Visual interface projects
+
+`whab-plugin new fictional-ui --capability ui` generates a complete read-only visual project for WHAB 2.36+ and toolkit 0.7+. Select its singleton with `WHAB_UI=fictional-ui`, outside the optional peer list. The `native-ui-v1` format-2 recipe keeps earlier local/API profile meanings and tests this exact approved candidate in an immutable worker, four coherent HTTPS pages, public assets supplied in its resource record, dirty-view deferral, exact preview/commit correlation, disable/re-enable and exact saved-worker/generation reopen. It also retains the constrained peer/order/sequence, primary/copy directions and public faults of the local profile. It does not claim distinct-version upgrades or private durable-boundary faults. Authors can call `assert_visual_interface(runtime, plugin, asset_name="app.js")` to name an asset in their own behavioral tests.
+
+The genuine visual minimum recipe is source `a866eda580c6e363a20636785bc4b4003db0652f`, WHAB 2.36.0. Toolkit imports and the original generated families retain their actual 2.22 floor; unsupported older-host visual runtime profiles are N/A, never passes. The generated JavaScript has no editable fields; an editable UI must preserve its own drafts and withhold its browser acknowledgement until saving/cancelling is complete.
+
+`NativeRuntime` keeps its startup/HTTP deadline separate from the bounded management deadline: `transition_timeout=180` allows the host's 120-second environment preparation and subsequent handover to finish. It accepts at most 300 seconds. A terminal failed operation fails the suite immediately; the longer preparation allowance does not convert failures to passes. Each genuine host also receives a compatible JSON reference wheel from its source recipe when the current backend requires a newer host.
+
+The full CI job has a 180-minute ceiling per Python version; the reusable job for
+one external project has a 60-minute ceiling. The observed source coverage phase
+alone took about 34 minutes, before the expanded genuine-host artifact builds,
+native configuration matrix and exact replays. These overall CI ceilings provide
+bounded room for that work and dependency installation; they are not runtime
+performance guarantees. Production readiness, RPC, startup, HTTP and transition
+deadlines are unchanged.
+
+
+
+Historical hosts may share an unchanged reference package version. The checker
+builds each source separately and reuses the first approved wheel only when every
+member's contents, modes and flags match; ZIP timestamps may differ. A conflicting
+same-identity artifact or a failed build stops validation without replacing the
+approved wheel. Exact saved artifact hashes remain the replay authority.
+
+## Offline bank projects
+
+`whab-plugin new fictional-bank --capability bank` creates an independent typed
+`BankAdapter` fixture requiring genuine WHAB 2.38+ and toolkit 0.8+. Its default
+transport has no URLs or HTTP client. Owning tests cover mocked provider failures
+and actual CA-verified native HTTPS begin/complete/sync/update/disconnect on both
+SQLite and JSON. The toolkit remains importable on its genuine 2.22 SDK floor;
+the newer bank profile is explicitly inapplicable there.
+
+After reviewing and installing the exact fictional provider and its wheel closure:
+
+```sh
+whab-plugin check --plugin fictional-bank --runtime --bank-fixture fictional-v1 --combinations 10 --wheelhouse /approved/local/wheels --output /tmp/fictional-bank-check
+whab-plugin replay /tmp/fictional-bank-check/configuration-00.json --wheelhouse /approved/local/wheels
+```
+
+`--bank-fixture fictional-v1` is explicit authorization for the versioned offline
+fixture, not permission to use a real provider. Without it a bank candidate's
+runtime suite is N/A and starts no provider. An approved fixture's broken behavior
+fails. The generated metadata carries the same explicit opt-in for reusable CI.
+Ten `native-bank-v1` manifests vary five connection sequences across both local
+backends and ten distinct peer sets: ordinary completion, ready-flow restart,
+ready-flow retirement deferral/cancel, update restart and exact completion retry.
+Each then executes its recorded peer/candidate selections, native copy catch-up,
+promotion, reverse migration, reopen and cursor checks before disconnecting.
+Pending-to-posted annotations and demo isolation are checked using public HTTPS
+responses. Worker readiness uses the approved exact candidate artifact; this is
+not a distinct-version upgrade claim. The profile makes no external provider
+HTTP calls or private commit-boundary injection claim.
+
+The public `bank_conformance` module also exposes `BankRuntime`, `BankScenario`,
+`fictional_scenario`, `exercise_bank_runtime` and the pure `bank_declaration`
+predicate. These helpers never import a concrete provider or storage module.
+The native harness gives the fixture a fresh host-owned key, keeps it across its
+own process restarts, excludes caller credentials and removes its private home.
+Trusted Python remains executable code; the harness is not a network sandbox.
+
+## Remote client projects
+
+`whab-plugin new fictional-client --capability remote-client` creates a pure
+`RemoteLedgerClient` declaration, independent packaging and native behavioral
+tests. Its genuine host floor is 2.40: the ABI begins in 2.39, while 2.40 excludes
+custom caller settings from offline provisioning. The toolkit itself keeps its
+lazy 2.22 floor; older hosts cannot count this profile as a runtime pass.
+
+The explicit `[tool.whab.plugin-devkit] offline-remote-fixture = "fictional-v1"`
+recipe permits only two disposable fictional hosts. Install the reviewed SQLite,
+API server and runtime-peer fixtures beside the candidate. JSON is not needed
+for this profile. The server uses the ordinary official CLI. The reviewed static
+`remote_launcher` supplies a CA-verified public `RemoteStore` transport, with
+environment trust disabled, then runs the official CLI. This verifies that
+transport and official services; it makes no product private-CA setting claim.
+No OS trust, household runtime or external provider is involved.
+
+Format-3 `native-remote-client-v1` manifests explicitly separate the server's local
+reference backend from the client writer. Ten distinct peer sets exercise the
+candidate's exact approved immutable worker, same-binding pause/enable, public
+financial services, peer transitions and saved-worker reopen. Controlled faults
+are rejected selection, rejected wheel hash, client SIGKILL after an acknowledged
+write, and loss of a real acknowledged public command result. Lost results remain
+unknown through client restart and block another write. Only an explicit Finish
+of the exact original authorized body, retained ID and CAS may complete it against
+the same live server. This is not receipt lookup, automatic reconciliation, or
+durable retry proof across a server restart. A single candidate wheel makes no
+distinct-version upgrade claim. Local migration and copies are explicitly N/A;
+all existing version-1/version-2 local profiles remain readable.
+
+The worker closure includes only the approved host, candidate and their runtime
+dependencies. Server, reference backend, toolkit and peer registrations remain
+outside the descriptor child. Endpoint, credential, budget and runtime key values
+stay in the fictional parent host and are absent from replay evidence. Both hosts,
+their child processes and temporary homes are cleaned even after failure. The
+maintained [remote example](../../plugins/example/example-remote-client/README.md)
+uses these same public probes.
+
+
+## Independent local storage primary
+
+`whab-plugin new fictional-storage --capability storage` creates a complete
+independent POSIX snapshot adapter, multi-file owning regression suite and package
+metadata. It imports the genuine WHAB 2.41 public `storage_model` API instead of
+wrapping a bundled backend or copying monetary policy. The toolkit retains its
+2.22 floor and loads newer storage SDK records only when advertised native
+readiness is exercised; unsupported old SDK advertisement fails explicitly.
+The actual public-model minimum source is
+`f46f70a0a19e1e282d2646ad48829bb85b760591`, with no rewritten host version.
+It includes native-only code readiness independent of optional transfer support.
+When current and minimum share version 2.41, the checker records one artifact row
+with both roles. A separately executed archived minimum uses its own wheelhouse
+and source/hash evidence; differing same-version host artifacts are never mixed
+or overwritten to manufacture two rows.
+
+`storage_conformance(plugin)` runs mandatory ledger/provider/import/funding/rollover
+behavior plus every advertised optional suite. `assert_storage_readiness(plugin)`
+proves complete read-only observations and exact durable receipt retry after
+reopen. Native opens use the public plugin factory and records only. An explicit
+POSIX-only installed package classifier makes unsupported-platform profiles not
+applicable; such a result never contributes a native pass.
+
+Format-4 `native-local-storage-v1` manifests make the reviewed storage candidate
+the sole required primary. The separately executed SQLite reference is never
+co-selected as another writer. Ten distinct seeded peer sets activate the exact
+approved candidate worker over native CA-verified HTTPS, exercise validation and
+peer transitions, retain the required storage/code binding, reject bad approved
+hashes, and verify acknowledged data after graceful restart or SIGKILL.
+Writes are acknowledged before activation, through the active worker and after
+reopening, then all three are verified after a second restart. The profile does
+not infer HTTP mutation retry support from native command receipt support. Optional
+local transfer/copy controls run only when advertised; the generated adapter
+omits these and records explicit not-applicable outcomes. Distinct-version upgrades
+and private disk faults are outside this profile; its owning tests cover native
+commit/interruption boundaries separately. Existing manifest versions 1, 2 and 3
+retain their original readers and meanings.
+
+The maintained [independent local storage example](../../plugins/example/example-storage/README.md)
+uses the same native source/test contract as generated projects. New native and
+own-file formats require explicit versioned readers; opaque provider records stay
+host-encrypted and outside portable payloads. An incomplete initial native file or
+unknown native schema is preserved and refused rather than reset. No test uses an
+external provider connection, real budget, household key or OS trust change.

@@ -16,22 +16,57 @@ def test_complete_generated_project_uses_public_sdk_and_has_working_fictional_ho
     project = generate_project(identifier, family, tmp_path / identifier)
     module_name = "whab_plugin_" + identifier.replace("-", "_")
     source = project / "src" / module_name / "__init__.py"
-    minimum = "2.34" if family == "api" else "2.22"
+    minimum = {"api": "2.34", "ui": "2.36", "bank": "2.38", "remote-client": "2.40", "storage": "2.41"}.get(family, "2.22")
     assert f"whab>={minimum},<3" in (project / "pyproject.toml").read_text()
     if family == "api" and not hasattr(sdk, "RemoteLedgerInterface"):
         assert "minimum-host = \"2.34.0\"" in (project / "pyproject.toml").read_text()
+        return
+    if family == "ui" and "view_protocol" not in sdk.UserInterface.__dataclass_fields__:
+        assert 'minimum-host = "2.36.0"' in (project / "pyproject.toml").read_text()
+        return
+    if family == "bank" and not hasattr(sdk, "BankAdapter"):
+        assert 'minimum-host = "2.38.0"' in (project / "pyproject.toml").read_text()
+        return
+    if family == "remote-client" and not hasattr(sdk, "RemoteLedgerClient"):
+        assert 'minimum-host = "2.40.0"' in (project / "pyproject.toml").read_text()
+        return
+    if family == "storage" and importlib.util.find_spec("whab.plugins.storage_model") is None:
+        assert 'minimum-host = "2.41.0"' in (project / "pyproject.toml").read_text()
+        assert (project / "src" / module_name / "backend.py").is_file()
         return
     spec = importlib.util.spec_from_file_location(module_name, source)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.plugin.id == identifier
-    assert exercise_candidate(module.plugin)
+    if family == "storage":
+        sys.modules[module_name] = module
+        try:
+            assert exercise_candidate(module.plugin) == ["storage"]
+        finally:
+            for name in tuple(sys.modules):
+                if name == module_name or name.startswith(module_name + "."):
+                    sys.modules.pop(name)
+    else:
+        assert exercise_candidate(module.plugin)
     assert (project / "LICENSE").is_file() and (project / "README.md").is_file()
     assert "whab.app" not in source.read_text() and "whab_plugin_sqlite" not in source.read_text()
-    if family == "api":
+    if family in {"api", "ui"}:
         test = (project / "tests/test_plugin.py").read_text()
-        assert "NativeRuntime" in test and "assert_api_interface" in test
+        assert "NativeRuntime" in test and ("assert_api_interface" if family == "api" else "assert_visual_interface") in test
         return  # Its installed-only native behavioral test runs in the wheel gate.
+    if family == "bank":
+        assert 'offline-bank-fixture = "fictional-v1"' in (project / "pyproject.toml").read_text()
+        assert "exercise_bank_runtime" in (project / "tests/test_plugin.py").read_text()
+        return  # The complete ordinary/native test suite runs against its installed wheel.
+    if family == "remote-client":
+        assert 'offline-remote-fixture = "fictional-v1"' in (project / "pyproject.toml").read_text()
+        assert "assert_lost_remote_result" in (project / "tests/test_plugin.py").read_text()
+        return  # Its actual two-host native test runs against installed artifacts.
+    if family == "storage":
+        assert 'Operating System :: POSIX' in (project / "pyproject.toml").read_text()
+        assert (project / "tests/test_native_failures.py").is_file()
+        assert 'storage_conformance' in (project / "tests/test_plugin.py").read_text()
+        return  # Its full durable native tests execute from installed wheels.
     # Run the generated ordinary tests too, with only its module registration.
     sys.modules[module_name] = module
     try:
@@ -48,7 +83,7 @@ def test_complete_generated_project_uses_public_sdk_and_has_working_fictional_ho
         sys.modules.pop(module_name)
 
 
-@pytest.mark.parametrize(("identifier", "family"), [("../escape", "reporting"), ("Upper", "reporting"), ("has_under", "reporting"), ("valid", "storage")])
+@pytest.mark.parametrize(("identifier", "family"), [("../escape", "reporting"), ("Upper", "reporting"), ("has_under", "reporting"), ("valid", "unknown")])
 def test_generator_rejects_unsafe_identity_or_unimplemented_family(tmp_path, identifier, family):
     with pytest.raises(ValueError):
         generate_project(identifier, family, tmp_path / "project")

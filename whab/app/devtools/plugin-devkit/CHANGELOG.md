@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+## 0.10.0 — 2026-10-23
+
+PR: [#107](https://github.com/Fillll/whab/pull/107)
+
+- Add an independent local storage generator, public conformance/read-only readiness helpers and the versioned native-local-storage-v1 replay profile. The candidate is the sole required primary; its SQLite reference is tested independently, and unsupported transfer/copy controls remain explicitly inapplicable.
+- Exercise ten distinct peer sets with exact approved-worker activation, financial writes before and after activation, saved-worker reopen and controlled public failures. Use the genuine WHAB 2.41 public storage-model floor for the complete POSIX teaching adapter while preserving the toolkit's 2.22 import floor.
+- Stage historical reference builds before comparing complete wheel member payloads, retaining the original approved bytes only when same-filename contents agree and refusing conflicting artifacts without overwriting them. This shared checker correction originated in [#102](https://github.com/Fillll/whab/pull/102).
+
+## 0.9.0 — 2026-10-23
+
+PR: [#106](https://github.com/Fillll/whab/pull/106)
+
+- Add a declarative remote-client generator, public conformance and the versioned native-remote-client-v1 profile. Record ten distinct approved-artifact configurations and exact replay through live selection, pause/resume, saved-version reopen and retained unknown-write completion.
+- Use genuine WHAB 2.40 for this family while retaining the toolkit's lazy 2.22 import floor. Verify maintained and generated projects on separate minimum/current host artifacts with native CA-verified fictional authorities and an explicit public-transport test overlay.
+- Restrict source/build/test subprocess environments to explicit standard variables and exclude caller configuration. Set overall CI ceilings to 180 minutes for the expanded matrix and 60 minutes for one reusable project after observing a 34-minute source phase; production readiness, RPC and transition deadlines remain unchanged.
+
+## 0.8.0 — 2026-10-23
+
+PR: [#105](https://github.com/Fillll/whab/pull/105)
+
+- Add public bank conformance, a complete bank project generator and the native-bank-v1 profile. Require explicit fictional-provider approval and exercise five continuation/reopen/retry variants across SQLite and JSON with distinct peer selections and exact-artifact replay.
+- Use the genuine WHAB 2.38 BankAdapter floor while retaining the toolkit's lazy 2.22 compatibility. Include an independently packaged offline teaching provider whose owning tests call the public native HTTPS helper.
+- Build historical reference wheels in staging. Reuse an approved wheel only after complete member payload, mode and flag equivalence, and preserve its bytes when a conflicting or failed build refuses validation. This shared checker correction originated in [#102](https://github.com/Fillll/whab/pull/102).
+
+## 0.7.0 — 2026-10-23
+
+PR: [#99](https://github.com/Fillll/whab/pull/99)
+
+- Add public participating visual-interface conformance, an independent UI project generator and the versioned native-ui-v1 profile with exact approved-worker activation, coherent pages/assets, browser preparation acknowledgements and saved-selection reopen in ten distinct replayable configurations.
+- Use the genuine WHAB 2.36 visual SDK floor while retaining the independently packaged toolkit's 2.22 import floor and explicit older-host applicability. Select compatible native reference wheels separately for each actual tested host.
+- Give native management transitions a bounded deadline separate from HTTP/startup readiness, and include the sixth teaching family in installed external-project and distribution checks.
+
 ## 0.6.0 — 2026-10-23
 
 PR: [#96](https://github.com/Fillll/whab/pull/96)

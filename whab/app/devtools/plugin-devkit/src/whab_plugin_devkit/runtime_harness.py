@@ -19,10 +19,25 @@ from tempfile import TemporaryDirectory
 class NativeRuntime:
     """Launch one installed host in an entirely new disposable Sandbox home."""
 
-    def __init__(self, storage, selection, *, timeout=30, api_token_setting=None):
-        if storage not in {"sqlite", "json"} or type(timeout) not in {int, float} or not 0 < timeout <= 60:
+    def __init__(self, storage, selection, *, timeout=30, api_token_setting=None, ui=None, transition_timeout=180,
+                 storage_candidate=None):
+        if storage_candidate is not None:
+            from .local_storage import storage_declaration, storage_platform
+
+            declaration = storage_declaration(storage_candidate)
+            if (storage != storage_candidate.id or declaration["native"] != "supported"
+                    or storage_platform(storage_candidate) != "supported" or storage in selection):
+                raise ValueError("Use one reviewed, applicable local storage candidate as the sole required writer.")
+        if ((storage_candidate is None and storage not in {"sqlite", "json"})
+                or type(timeout) not in {int, float} or not 0 < timeout <= 60):
             raise ValueError("Choose a reviewed local backend and a bounded startup deadline.")
         self.storage, self.selection, self.timeout = storage, tuple(selection), timeout
+        if type(transition_timeout) not in {int, float} or not 0 < transition_timeout <= 300:
+            raise ValueError("Choose a bounded management deadline covering preparation and handover.")
+        self.transition_timeout = transition_timeout
+        if ui is not None and (type(ui) is not str or re.fullmatch(r"[a-z][a-z0-9-]{0,63}", ui) is None or ui in self.selection):
+            raise ValueError("Choose one explicit visual interface outside the optional selection.")
+        self.ui = ui
         reserved = {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG", "PORT", "VIRTUAL_ENV", "ALLOW_LIVE_PLAID"}
         if api_token_setting is not None and (
             type(api_token_setting) is not str or len(api_token_setting) > 100
@@ -51,10 +66,14 @@ class NativeRuntime:
     def environment(self):
         # An allowlist prevents a caller's credentials or runtime selectors from
         # reaching the fictional host, independently of their variable names.
-        allowed = {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG"}
-        result = {key: value for key, value in os.environ.items() if key in allowed or key.startswith("LC_")}
+        allowed = {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG", "LANGUAGE",
+                   "LC_ALL", "LC_CTYPE", "LC_NUMERIC", "LC_TIME", "LC_COLLATE", "LC_MONETARY",
+                   "LC_MESSAGES", "LC_PAPER", "LC_NAME", "LC_ADDRESS", "LC_TELEPHONE",
+                   "LC_MEASUREMENT", "LC_IDENTIFICATION"}
+        password = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
+        result = {key: value for key, value in os.environ.items() if key in allowed and key != password}
         result.update(WHAB_HOME=str(self.home), WHAB_ENV="sandbox", PLAID_ENV="sandbox",
-                      WHAB_UI="", WHAB_STORAGE=self.storage, WHAB_PLUGINS=",".join(self.selection),
+                      WHAB_UI=self.ui or "", WHAB_STORAGE=self.storage, WHAB_PLUGINS=",".join(self.selection),
                       ALLOW_LIVE_PLAID="false")
         if self.api_token_setting is not None:
             result[self.api_token_setting] = self._api_token
@@ -71,7 +90,7 @@ class NativeRuntime:
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             self.port = listener.getsockname()[1]
-        self.process = subprocess.Popen([sys.executable, "-I", "-B", "-m", "whab", "--port", str(self.port)],
+        self.process = subprocess.Popen(self.launch_command(),
                                         cwd=self.home, env=self.environment(), stdin=subprocess.DEVNULL,
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         expected = metadata.version("whab")
@@ -85,6 +104,10 @@ class NativeRuntime:
                 return None
             return body if status == 200 and body.get("ready") is True and body.get("version") == expected else None
         self.wait(ready)
+
+    def launch_command(self):
+        """Use the official CLI unless a reviewed profile supplies an overlay."""
+        return [sys.executable, "-I", "-B", "-m", "whab", "--port", str(self.port)]
 
     def request(self, method, path, body=None, *, headers=None, authenticated=False):
         if authenticated and (self._api_token is None or not path.startswith("/remote/v1/")):
@@ -101,6 +124,8 @@ class NativeRuntime:
             value = response.read(2 * 1024 * 1024 + 1)
             if len(value) > 2 * 1024 * 1024:
                 raise ValueError("A fictional runtime response exceeded its bound.")
+            if response.status == 204 and not value:
+                return response.status, None
             return response.status, json.loads(value)
         finally:
             connection.close()
@@ -112,8 +137,26 @@ class NativeRuntime:
             raise AssertionError("A public runtime operation returned an unexpected status.")
         return value
 
-    def wait(self, observe):
-        deadline = time.monotonic() + self.timeout
+    def get_resource(self, path):
+        """Read bounded page/asset bytes from this owned CA-verified listener."""
+        if type(path) is not str or not path.startswith("/") or path.startswith("//"):
+            raise ValueError("Use a public path on the owned fictional listener.")
+        connection = http.client.HTTPSConnection("127.0.0.1", self.port, context=self.context, timeout=self.timeout)
+        try:
+            connection.request("GET", path)
+            response = connection.getresponse()
+            value = response.read(16 * 1024 * 1024 + 1)
+            if len(value) > 16 * 1024 * 1024:
+                raise ValueError("A fictional visual response exceeded its bound.")
+            return response.status, {name.lower(): value for name, value in response.getheaders()}, value
+        finally:
+            connection.close()
+
+    def wait(self, observe, *, timeout=None):
+        limit = self.timeout if timeout is None else timeout
+        if type(limit) not in {int, float} or not 0 < limit <= 300:
+            raise ValueError("Choose a bounded observable-state deadline.")
+        deadline = time.monotonic() + limit
         while True:
             value = observe()
             if value:
@@ -129,7 +172,7 @@ class NativeRuntime:
             if result and result["state"] == "failed":
                 raise AssertionError("A required runtime transition failed; inspect the recorded replay profile.")
             return result if result and result["state"] == "complete" else None
-        return self.wait(observe)
+        return self.wait(observe, timeout=self.transition_timeout)
 
     def stop(self, *, kill=False):
         process, self.process = self.process, None

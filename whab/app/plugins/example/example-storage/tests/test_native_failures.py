@@ -1,0 +1,551 @@
+"""Corrupt snapshots and native ownership failures never become empty budgets."""
+
+import base64
+import json
+import sqlite3
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
+from dataclasses import replace
+from threading import Event
+
+import pytest
+from whab_plugin_devkit import public_snapshot
+from whab_plugin_example_storage import create_storage
+
+from whab.plugins import StorageContext, StorageOperation, StoreError, WorkspaceImport
+from whab.plugins.storage_transfer import canonical_storage_json, read_storage_json
+
+
+def files(home):
+    return {path.relative_to(home): path.read_bytes() for path in home.rglob("*") if path.is_file()}
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "nonobject",
+        "unknown-field",
+        "wrong-version",
+        "nontext-financial",
+        "invalid-base64",
+        "noncanonical-base64",
+        "zero-generation-operation",
+        "bad-transition",
+        "bad-writer-identity",
+        "bad-operations",
+        "missing-row",
+        "nonbinary-row",
+        "missing-table",
+    ],
+)
+def test_corrupted_complete_native_snapshots_refuse_read_only_and_write_open(tmp_path, corruption):
+    context = StorageContext(tmp_path, "sandbox", {})
+    store = create_storage(context)
+    path = store.path
+    store.close()
+    connection = sqlite3.connect(path)
+    try:
+        (raw,) = connection.execute("SELECT document FROM ledger").fetchone()
+        value = json.loads(raw)
+        if corruption == "nonobject":
+            value = []
+        elif corruption == "unknown-field":
+            value["unknown"] = True
+        elif corruption == "wrong-version":
+            value["formatVersion"] = 2
+        elif corruption == "nontext-financial":
+            value["financial"] = None
+        elif corruption == "invalid-base64":
+            value["financial"] = "%"
+        elif corruption == "noncanonical-base64":
+            value["financial"] = "QR=="
+        elif corruption == "zero-generation-operation":
+            value["evidence"]["operation_id"] = "impossible-zero-generation-write"
+        elif corruption == "bad-transition":
+            value["transition"] = ""
+        elif corruption == "bad-writer-identity":
+            value["writerIdentity"] = []
+        elif corruption == "bad-operations":
+            value["operations"] = {}
+        if corruption == "missing-row":
+            connection.execute("DELETE FROM ledger")
+        elif corruption == "nonbinary-row":
+            connection.execute("UPDATE ledger SET document='not-binary'")
+        elif corruption == "missing-table":
+            connection.execute("DROP TABLE ledger")
+        else:
+            connection.execute("UPDATE ledger SET document=?", (json.dumps(value).encode(),))
+        connection.commit()
+    finally:
+        connection.close()
+    original = files(tmp_path)
+    for read_only in (True, False):
+        with pytest.raises(StoreError):
+            create_storage(replace(context, read_only=read_only))
+        assert files(tmp_path) == original
+
+
+@pytest.mark.parametrize("target", ["ledger", "lease"])
+def test_observed_symlink_replacement_fences_even_after_original_inode_restored(tmp_path, target):
+    context = StorageContext(tmp_path, "sandbox", {})
+    store = create_storage(context)
+    before = store.commit_evidence()
+    path = store.path if target == "ledger" else store.path.with_suffix(".writer")
+    original = path.with_suffix(".retained-original")
+    path.rename(original)
+    path.symlink_to(original)
+    with pytest.raises(StoreError):
+        store.commit_evidence()
+    path.unlink()
+    original.rename(path)
+    try:
+        with pytest.raises(StoreError):
+            store.commit_evidence()
+        with pytest.raises(StoreError):
+            store.add_account(
+                "personal", {"name": "Never acknowledged", "type": "depository", "balance": 125}
+            )
+    finally:
+        store.close()
+    reopened = create_storage(context)
+    try:
+        assert reopened.commit_evidence() == before
+        assert reopened.accounts("personal") == []
+    finally:
+        reopened.close()
+
+
+def test_competing_native_transaction_requires_explicit_reopen_before_financial_retry(tmp_path):
+    context = StorageContext(tmp_path, "sandbox", {})
+    store = create_storage(context)
+    before = store.commit_evidence()
+    competitor = sqlite3.connect(store.path, isolation_level=None)
+    competitor.execute("BEGIN IMMEDIATE")
+    try:
+        with pytest.raises(StoreError, match="mutation boundary"):
+            store.add_account(
+                "personal", {"name": "Blocked writer", "type": "depository", "balance": 125}
+            )
+        competitor.execute("ROLLBACK")
+        with pytest.raises(StoreError):
+            store.add_account(
+                "personal", {"name": "Still blocked", "type": "depository", "balance": 125}
+            )
+    finally:
+        competitor.close()
+        store.close()
+    reopened = create_storage(context)
+    try:
+        assert reopened.commit_evidence() == before
+        assert reopened.accounts("personal") == []
+        reopened.add_account(
+            "personal", {"name": "Explicit resumed wallet", "type": "depository", "balance": 125}
+        )
+        assert len(reopened.accounts("personal")) == 1
+    finally:
+        reopened.close()
+
+
+def test_external_native_change_after_commit_never_acknowledges_the_lost_candidate(tmp_path):
+    context = StorageContext(tmp_path, "sandbox", {})
+    store = create_storage(context)
+    store.add_account(
+        "personal", {"name": "Prior acknowledged wallet", "type": "depository", "balance": 125}
+    )
+    before = store.commit_evidence()
+    with closing(sqlite3.connect(store.path)) as connection:
+        (prior,) = connection.execute("SELECT document FROM ledger").fetchone()
+
+    def restore_old_native(stage):
+        if stage == "after-commit":
+            with closing(sqlite3.connect(store.path)) as connection:
+                connection.execute("UPDATE ledger SET document=?", (prior,))
+                connection.commit()
+
+    store._boundary = restore_old_native
+    try:
+        with pytest.raises(StoreError):
+            store.add_account(
+                "personal",
+                {"name": "Never acknowledged candidate", "type": "depository", "balance": 250},
+            )
+        with pytest.raises(StoreError):
+            store.commit_evidence()
+    finally:
+        store.close()
+    reopened = create_storage(context)
+    try:
+        assert reopened.commit_evidence() == before
+        assert [row["name"] for row in reopened.accounts("personal")] == [
+            "Prior acknowledged wallet"
+        ]
+    finally:
+        reopened.close()
+
+
+def test_concurrent_distinct_imports_recheck_identity_inside_native_transaction(
+    tmp_path, monkeypatch
+):
+    store = create_storage(StorageContext(tmp_path, "sandbox", {}))
+    imported = WorkspaceImport((), (), (), (), "2026-10")
+    validated, resume = Event(), Event()
+    preview = store.preview_workspace_import
+
+    def held_preview(workspace, plugin_id, fingerprint):
+        result = preview(workspace, plugin_id, fingerprint)
+        if fingerprint == "first-file":
+            validated.set()
+            assert resume.wait(30)
+        return result
+
+    monkeypatch.setattr(store, "preview_workspace_import", held_preview)
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            first = pool.submit(
+                store.import_workspace, "personal", "fictional-import", "first-file", imported
+            )
+            try:
+                assert validated.wait(30)
+                accepted = store.import_workspace(
+                    "personal", "fictional-import", "second-file", imported
+                )
+                before, snapshot = store.commit_evidence(), public_snapshot(store)
+            finally:
+                resume.set()
+            with pytest.raises(StoreError):
+                first.result(timeout=30)
+        assert store.commit_evidence() == before
+        assert public_snapshot(store) == snapshot
+        assert accepted["alreadyImported"] is False
+        assert preview("personal", "fictional-import", "second-file")["alreadyImported"] is True
+    finally:
+        resume.set()
+        store.close()
+
+
+def test_stopped_readiness_refuses_a_changed_native_file_without_accepting_new_state(tmp_path):
+    context = StorageContext(tmp_path, "sandbox", {})
+    creator = create_storage(context)
+    creator.close()
+    reader = create_storage(replace(context, read_only=True))
+    writer = create_storage(context)
+    try:
+        writer.add_account(
+            "personal",
+            {"name": "New acknowledged writer state", "type": "depository", "balance": 125},
+        )
+        with pytest.raises(StoreError, match="readiness snapshot changed"):
+            reader.commit_evidence()
+        with pytest.raises(StoreError):
+            reader.accounts("personal")
+        assert len(writer.accounts("personal")) == 1
+    finally:
+        reader.close()
+        writer.close()
+
+
+@pytest.mark.parametrize("problem", ["home-file", "missing-lease", "missing-shared-memory"])
+def test_unowned_or_incomplete_native_paths_are_preserved_before_any_write_open(tmp_path, problem):
+    home = tmp_path / "native"
+    context = StorageContext(home, "sandbox", {})
+    if problem == "home-file":
+        home.write_bytes(b"fictional non-directory")
+    else:
+        store = create_storage(context)
+        path = store.path
+        store.close()
+        if problem == "missing-lease":
+            path.with_suffix(".writer").unlink()
+        else:
+            path.with_name(path.name + "-wal").write_bytes(b"fictional unpaired WAL")
+    original = files(tmp_path)
+    with pytest.raises(StoreError):
+        create_storage(replace(context, read_only=problem == "missing-shared-memory"))
+    assert files(tmp_path) == original
+
+
+def test_read_only_open_rechecks_schema_after_file_header_probe(tmp_path, monkeypatch):
+    from whab_plugin_example_storage import backend
+
+    context = StorageContext(tmp_path, "sandbox", {})
+    writer = create_storage(context)
+    path = writer.path
+    writer.close()
+    probe = backend.SnapshotStorage._check_native_format
+    changed = []
+
+    def change_after_probe(self):
+        probe(self)
+        if not changed:
+            connection = sqlite3.connect(path)
+            try:
+                connection.execute("PRAGMA user_version=2")
+            finally:
+                connection.close()
+            changed.append(files(tmp_path))
+
+    monkeypatch.setattr(backend.SnapshotStorage, "_check_native_format", change_after_probe)
+    with pytest.raises(StoreError):
+        create_storage(replace(context, read_only=True))
+    assert files(tmp_path) == changed[0]
+
+
+@pytest.mark.parametrize("engine_rolled_back", [False, True])
+def test_failed_native_publication_keeps_prior_acknowledged_state(tmp_path, engine_rolled_back):
+    context = StorageContext(tmp_path, "sandbox", {})
+    store = create_storage(context)
+    before = store.commit_evidence()
+
+    def failed_publication(stage):
+        if stage == "before-commit":
+            if engine_rolled_back:
+                store._connection.execute("ROLLBACK")
+                raise sqlite3.OperationalError("fictional engine transaction rollback")
+            raise OSError("fictional device publication failure")
+
+    store._boundary = failed_publication
+    try:
+        with pytest.raises(StoreError):
+            store.add_account(
+                "personal", {"name": "Never acknowledged", "type": "depository", "balance": 125}
+            )
+        assert store.commit_evidence() == before
+        assert store.accounts("personal") == []
+    finally:
+        store.close()
+
+
+def test_initial_creation_device_failure_has_no_acknowledgment_and_preserves_incomplete_file(
+    tmp_path,
+):
+    from whab_plugin_example_storage import backend
+
+    def unavailable(stage):
+        if stage == "created-native":
+            raise OSError("fictional initial device publication failure")
+
+    context = StorageContext(tmp_path, "sandbox", {})
+    with pytest.raises(StoreError):
+        backend.SnapshotStorage(context, boundary=unavailable)
+    original = files(tmp_path)
+    assert any(name.suffix == ".sqlite3" and data == b"" for name, data in original.items())
+    with pytest.raises(StoreError):
+        create_storage(context)
+    assert files(tmp_path) == original
+
+
+def test_invalid_provider_and_file_requests_do_not_publish_partial_state(tmp_path):
+    from whab_plugin_devkit import receipt_png
+
+    from whab.plugins import SyncChanges
+
+    store = create_storage(StorageContext(tmp_path, "sandbox", {}))
+    try:
+        payload = store.export_budget_files()
+        value = read_storage_json(payload["snapshot-budget.json"])
+        value["receipts"] = {"missing-transaction": "aW52YWxpZA=="}
+        valid_image_without_transaction = {
+            **value,
+            "receipts": {"missing-transaction": base64.b64encode(receipt_png()).decode()},
+        }
+        initial = store.commit_evidence()
+        rejected = [
+            lambda: store.save_item(
+                "fictional-item", "encrypted", "Fictional", provider_id="manual"
+            ),
+            lambda: store.save_item("fictional-item", "", "Fictional"),
+            lambda: store.apply_sync(
+                "fictional-item",
+                SyncChanges(added=[], modified=[], removed=[]),
+                "next",
+                historical_complete=1,
+            ),
+            lambda: store.restore_budget("demo", store.export_budget()),
+            lambda: store.restore_budget_files("demo", payload),
+            lambda: store.restore_budget_files("personal", {}),
+            lambda: store.restore_budget_files(
+                "personal", {"snapshot-budget.json": canonical_storage_json(value)}
+            ),
+            lambda: store.restore_budget_files(
+                "personal",
+                {"snapshot-budget.json": canonical_storage_json(valid_image_without_transaction)},
+            ),
+            lambda: store.execute_operation({}),
+        ]
+        for action in rejected:
+            with pytest.raises(StoreError):
+                action()
+            assert store.commit_evidence() == initial
+            assert store.accounts("personal") == []
+        store.add_account(
+            "personal", {"name": "Unrelated manual wallet", "type": "depository", "balance": 125}
+        )
+        store.save_item("fictional-item", "host-encrypted-record", "Fictional")
+        store.disconnect_item("fictional-item")
+        assert store.accounts("personal")[0]["stale"] is False
+        before = store.commit_evidence()
+        with pytest.raises(StoreError):
+            store.set_role("fictional-stale-role", initial, "fenced")
+        assert store.commit_evidence() == before
+    finally:
+        store.close()
+
+
+def test_lease_deleted_after_read_only_preflight_is_never_recreated(tmp_path, monkeypatch):
+    from whab_plugin_example_storage import backend
+
+    context = StorageContext(tmp_path, "sandbox", {})
+    store = create_storage(context)
+    path = store.path
+    store.close()
+    original = path.read_bytes()
+    lease = path.with_suffix(".writer")
+    close = backend.SnapshotStorage.close
+    removed = []
+
+    def delete_after_preflight(self):
+        close(self)
+        if self._read_only and not removed:
+            lease.unlink()
+            removed.append(True)
+
+    monkeypatch.setattr(backend.SnapshotStorage, "close", delete_after_preflight)
+    with pytest.raises(StoreError):
+        create_storage(context)
+    assert removed and not lease.exists()
+    assert path.read_bytes() == original
+
+
+def test_native_lease_fork_during_initial_load_refuses_before_returning_a_writer(
+    tmp_path, monkeypatch
+):
+    from whab_plugin_example_storage import backend
+
+    context = StorageContext(tmp_path, "sandbox", {})
+    store = create_storage(context)
+    path = store.path
+    store.close()
+    lease = path.with_suffix(".writer")
+    original = lease.with_suffix(".retained-original")
+    with closing(sqlite3.connect(path)) as connection:
+        (raw,) = connection.execute("SELECT document FROM ledger").fetchone()
+    initial = json.loads(raw)
+    check = backend.SnapshotStorage._check_ownership
+    forked = []
+
+    def external_fork_after_check(self):
+        check(self)
+        if self._lease is not None and self._known is None and not forked:
+            lease.rename(original)
+            lease.write_bytes(original.read_bytes())
+            identity = lease.stat()
+            altered = {**initial, "writerIdentity": [identity.st_dev, identity.st_ino]}
+            with closing(sqlite3.connect(path)) as connection:
+                connection.execute("UPDATE ledger SET document=?", (json.dumps(altered).encode(),))
+                connection.commit()
+            forked.append(True)
+
+    monkeypatch.setattr(backend.SnapshotStorage, "_check_ownership", external_fork_after_check)
+    with pytest.raises(StoreError):
+        create_storage(context)
+    assert forked
+    with closing(sqlite3.connect(path)) as connection:
+        (raw,) = connection.execute("SELECT document FROM ledger").fetchone()
+    current = json.loads(raw)
+    assert {key: value for key, value in current.items() if key != "writerIdentity"} == {
+        key: value for key, value in initial.items() if key != "writerIdentity"
+    }
+
+
+@pytest.mark.parametrize("change", ["logical-wal-version", "main-header-version"])
+def test_observed_unsupported_schema_remains_fenced_after_external_restore(tmp_path, change):
+    context = StorageContext(tmp_path, "sandbox", {})
+    store = create_storage(context)
+    store.add_account(
+        "personal", {"name": "Prior acknowledged wallet", "type": "depository", "balance": 125}
+    )
+    before = store.commit_evidence()
+    if change == "logical-wal-version":
+        with closing(sqlite3.connect(store.path)) as connection:
+            connection.execute("PRAGMA user_version=2")
+            connection.commit()
+        assert int.from_bytes(store.path.read_bytes()[60:64], "big") == 1
+    else:
+        with store.path.open("r+b") as stream:
+            stream.seek(60)
+            stream.write((999).to_bytes(4, "big"))
+    with pytest.raises(StoreError):
+        store.commit_evidence()
+    if change == "logical-wal-version":
+        with closing(sqlite3.connect(store.path)) as connection:
+            connection.execute("PRAGMA user_version=1")
+            connection.commit()
+    else:
+        with store.path.open("r+b") as stream:
+            stream.seek(60)
+            stream.write((1).to_bytes(4, "big"))
+    try:
+        with pytest.raises(StoreError):
+            store.add_account(
+                "personal",
+                {
+                    "name": "Never acknowledged after schema fault",
+                    "type": "depository",
+                    "balance": 250,
+                },
+            )
+    finally:
+        store.close()
+    reopened = create_storage(context)
+    try:
+        assert reopened.commit_evidence() == before
+        assert len(reopened.accounts("personal")) == 1
+    finally:
+        reopened.close()
+
+
+def test_postcommit_logical_schema_change_reports_unknown_with_durable_receipt(tmp_path):
+    context = StorageContext(tmp_path, "sandbox", {})
+    store = create_storage(context)
+    before = store.commit_evidence()
+    operation = StorageOperation(
+        "fictional-uncertain-schema-request",
+        before.authority_epoch,
+        before.generation,
+        "personal",
+        "add_account",
+        canonical_storage_json(
+            {
+                "name": "Fictional uncertain wallet",
+                "type": "depository",
+                "balance": 125,
+            }
+        ),
+    )
+
+    def change_schema(stage):
+        if stage == "after-commit":
+            with closing(sqlite3.connect(store.path)) as connection:
+                connection.execute("PRAGMA user_version=2")
+                connection.commit()
+
+    store._boundary = change_schema
+    try:
+        with pytest.raises(StoreError):
+            store.execute_operation(operation)
+        with pytest.raises(StoreError):
+            store.operation_receipt(operation.operation_id)
+        with closing(sqlite3.connect(store.path)) as connection:
+            connection.execute("PRAGMA user_version=1")
+            connection.commit()
+    finally:
+        store.close()
+    reopened = create_storage(context)
+    try:
+        receipt = reopened.operation_receipt(operation.operation_id)
+        assert receipt.evidence.generation == before.generation + 1
+        result = reopened.execute_operation(operation)
+        assert result.replayed is True and result.receipt == receipt
+        assert len(reopened.accounts("personal")) == 1
+    finally:
+        reopened.close()

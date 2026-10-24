@@ -32,9 +32,12 @@ from whab.plugins.contracts import CapabilityError
 
 from .adapters import BackendAdapter, BackendHarness, public_snapshot
 from .api_interface import api_declaration
+from .bank_conformance import bank_declaration
 from .conformance import Capability as Suite
 from .conformance import run_conformance
+from .remote_client import remote_declaration
 from .synthetic import SyntheticClock
+from .visual_interface import visual_declaration
 
 _PEERS = ("synthetic-report-a", "synthetic-report-b", "synthetic-brand-a", "synthetic-brand-b", "synthetic-import-a", "synthetic-import-b")
 _FAULTS = ("none", "report-hook", "import-atomicity")
@@ -137,8 +140,22 @@ def exercise_candidate(plugin, registry=None):
                 or not callable(getattr(interface, "factory", None)) or not exercised):
             api_declaration(plugin)
             exercised.append("interface.api")
+    if plugin.ui:
+        visual_declaration(plugin)
+        exercised.append("interface.ui")
+    if plugin.storage is not None and not callable(plugin.storage):
+        remote_declaration(plugin)
+        exercised.append("storage.remote-declaration")
+    elif callable(plugin.storage):
+        from .local_storage import storage_conformance
+
+        storage_conformance(plugin)
+        exercised.append("storage")
+    if getattr(plugin, "bank", None) is not None and not exercised:
+        bank_declaration(plugin)
+        exercised.append("ingestion.bank")
     if not exercised:
-        raise ValueError("This increment checks reporting, branding, file import, categorization and declarative API candidates.")
+        raise ValueError("Choose a supported reporting, branding, file import, categorization, API, visual or offline bank candidate.")
     return exercised
 
 
@@ -168,6 +185,14 @@ def deterministic_negatives():
 
 def sample_configurations(candidate, reference, artifacts, *, combinations_count=10, seed=42):
     """Sample distinct selected peer sets; order-only differences never count twice."""
+    if callable(candidate.storage):
+        from .storage_profiles import sample_storage_configurations
+
+        return sample_storage_configurations(candidate, reference, artifacts, combinations_count=combinations_count, seed=seed, runtime=False)
+    if candidate.storage is not None and not callable(candidate.storage):
+        from .remote_profiles import sample_remote_configurations
+
+        return sample_remote_configurations(candidate, reference, artifacts, combinations_count=combinations_count, seed=seed, runtime=False)
     if type(combinations_count) is not int or not 1 <= combinations_count <= 32 or type(seed) is not int:
         raise ValueError("Choose an integer seed and one to 32 distinct constrained configurations.")
     randomizer = random.Random(seed)
@@ -232,8 +257,29 @@ def validate_manifest(value):
     return value
 
 
-def replay_configuration(manifest, candidate, reference):
+def reference_conformance(reference):
+    """Run the independent reviewed backend suites without selecting it as a peer."""
+    suites = set(Suite) - {Suite.NATIVE_REPLICA, Suite.DURABLE_COMMANDS}
+    provided = getattr(getattr(reference, "contract", None), "provides", ())
+    if any(capability.name == "storage.replica" and capability.version == 1 for capability in provided):
+        suites.add(Suite.NATIVE_REPLICA)
+    if any(capability.name == "storage.commands" and capability.version == 1 for capability in provided):
+        suites.add(Suite.DURABLE_COMMANDS)
+    report = run_conformance(BackendAdapter(reference.storage, frozenset(suites)), clock=SyntheticClock())
+    report.assert_success()
+    return [asdict(result) for result in report.results]
+
+
+def replay_configuration(manifest, candidate, reference, *, wheelhouse=None):
     """Run resolver stages and public contracts; actual authority never changes."""
+    if type(manifest) is dict and manifest.get("formatVersion") == 4:
+        from .storage_profiles import replay_storage_configuration
+
+        return replay_storage_configuration(manifest, candidate, reference, wheelhouse=wheelhouse)
+    if type(manifest) is dict and manifest.get("formatVersion") == 3:
+        from .remote_profiles import replay_remote_configuration
+
+        return replay_remote_configuration(manifest, candidate, reference, wheelhouse=wheelhouse)
     manifest = validate_manifest(manifest)
     if (candidate.id, reference.id) != (manifest["candidate"], manifest["reference"]):
         raise ValueError("Selected installed descriptors do not match the replay manifest.")
@@ -245,14 +291,7 @@ def replay_configuration(manifest, candidate, reference):
         raise ValueError("Resolved behavior changed with configuration order.")
     candidate_result = exercise_candidate(candidate, PluginRegistry(baseline))
     peer_result = {plugin.id: exercise_candidate(plugin, PluginRegistry(baseline)) for plugin in baseline if plugin.id in _PEERS}
-    suites = set(Suite) - {Suite.NATIVE_REPLICA, Suite.DURABLE_COMMANDS}
-    provided = getattr(getattr(reference, "contract", None), "provides", ())
-    if any(capability.name == "storage.replica" and capability.version == 1 for capability in provided):
-        suites.add(Suite.NATIVE_REPLICA)
-    if any(capability.name == "storage.commands" and capability.version == 1 for capability in provided):
-        suites.add(Suite.DURABLE_COMMANDS)
-    report = run_conformance(BackendAdapter(reference.storage, frozenset(suites)), clock=SyntheticClock())
-    report.assert_success()
+    conformance = reference_conformance(reference)
     transitions = [tuple(plugin.id for plugin in baseline)]
     peers = list(manifest["peers"])
     if manifest["sequence"] == "reorder-peers":
@@ -291,7 +330,7 @@ def replay_configuration(manifest, candidate, reference):
                 raise ValueError("The injected invalid import was accepted.")
     return {"configuration": hashlib.sha256(_dump(manifest).encode()).hexdigest(), "candidate_hooks": candidate_result, "peer_hooks": peer_result,
             "resolved": list(transitions[0]), "preflight_transitions": transitions,
-            "fault": manifest["fault"], "conformance": [asdict(result) for result in report.results],
+            "fault": manifest["fault"], "conformance": conformance,
             "deterministic_negatives": deterministic_negatives()}
 
 

@@ -88,6 +88,10 @@ def test_disabled_bundled_plugins_keep_canonical_names_without_importing(tmp_pat
         ("example-file-import", "whab_plugin_example_file_import:plugin", "Fictional account import", "example"),
         ("example-categorization", "whab_plugin_example_categorization:plugin", "Exact merchant teaching model", "example"),
         ("example-api", "whab_plugin_example_api:plugin", "Fictional API interface", "example"),
+        ("example-ui", "whab_plugin_example_ui:plugin", "Fictional visual interface", "example"),
+        ("example-bank", "whab_plugin_example_bank:plugin", "Offline fictional bank", "example"),
+        ("example-remote-client", "whab_plugin_example_remote_client:plugin", "Fictional remote ledger client", "example"),
+        ("example-storage", "whab_plugin_example_storage:plugin", "Example independent snapshot storage", "example"),
     )
     entries = tuple(
         Entry(name, RuntimeError("Disabled plugins must not be imported"), value=value)
