@@ -670,7 +670,8 @@ class IsolatedManagerTest(unittest.TestCase):
         check = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(check)
         result = subprocess.run([sys.executable, "-I", "-B", "-c", check._BACKUP_PROBE,
-                                 str(MANAGER_FILE), str(self.root), str(self.home)],
+                                 str(MANAGER_FILE), str(Path(self.temporary.name) / "launcher"),
+                                 str(Path(self.temporary.name) / "runtime")],
                                 capture_output=True, text=True, check=False, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
         value = json.loads(result.stdout)

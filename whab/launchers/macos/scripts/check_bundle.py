@@ -31,7 +31,7 @@ def environment():
 
 _BACKUP_PROBE = r"""
 import hashlib, importlib.util, json, pathlib, subprocess, sys
-manager_file, root, home = map(pathlib.Path, sys.argv[1:])
+manager_file, root, home = (pathlib.Path(value).resolve() for value in sys.argv[1:])
 spec = importlib.util.spec_from_file_location('bundle_manager_backup', manager_file)
 manager = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(manager)
@@ -68,6 +68,7 @@ print(json.dumps({'format': 2, 'owned_roots': len(markers), 'code_aliases': len(
 
 class BundleCheck:
     def __init__(self, bundle, directory, *, storage="sqlite"):
+        directory = directory.resolve()
         self.bundle = bundle
         self.resources = bundle / "Contents/Resources"
         self.python = self.resources / "python/bin/python3.14"
