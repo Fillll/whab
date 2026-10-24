@@ -1,0 +1,41 @@
+[project]
+name = "whab_plugin_example_api"
+version = "1.0.0"
+description = "Fictional WHAB teaching plugin example-api"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2.34,<3"]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10", "whab_plugin_devkit>=0.6,<1", "whab_plugin_sqlite>=1.11,<2"]
+
+[project.entry-points."whab.plugins"]
+example-api = "whab_plugin_example_api:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.whab.plugin-devkit]
+minimum-host = "2.34.0"
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{ name = "interface.api", version = 1, composition = "additive" }]
+requires = []
+conflicts = []
+lifecycle = "live"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "teaching"

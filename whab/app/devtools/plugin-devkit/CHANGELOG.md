@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.6.0 — 2026-10-23
+
+PR: [#96](https://github.com/Fillll/whab/pull/96)
+
+- Add public API interface conformance, a declarative generator and the versioned native HTTPS API profile with exact approved-worker activation and saved-version reopen in ten distinct replayable configurations.
+- Test API projects against genuine WHAB 2.34 artifacts while preserving the toolkit and other families' genuine 2.22 support; include the fifth teaching package in independent distribution checks.
+- Allow the expanded five-family minimum/current external wheel and replay gate to finish within a bounded 45-minute CI job.
+
 ## 0.5.0 — 2026-10-23
 
 PR: [#93](https://github.com/Fillll/whab/pull/93)

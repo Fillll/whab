@@ -73,7 +73,7 @@ def main(argv=None):
             for manifest in manifests:
                 path = arguments.output / f"configuration-{manifest['index']:02d}.json"
                 path.write_text(json.dumps(manifest, indent=2) + "\n")
-                results.append(execute(manifest, candidate, reference))
+                results.append(execute(manifest, candidate, reference, **({"wheelhouse": arguments.wheelhouse} if arguments.runtime else {})))
             (arguments.output / "results.json").write_text(json.dumps(results, indent=2) + "\n")
             runtime_passes = sum(result.get("runtime", {}).get("status") == "passed" for result in results)
             print(f"Passed {len(results)} distinct resolver/public-hook configurations; {runtime_passes} native runtime profiles passed.")
@@ -93,7 +93,7 @@ def main(argv=None):
             candidate, reference, artifacts = _selected(manifest["candidate"], arguments.wheelhouse)
         if artifacts != manifest["artifacts"]:
             raise ValueError("Replay requires the exact recorded installed wheels and hashes.")
-        print(json.dumps(execute(manifest, candidate, reference), indent=2))
+        print(json.dumps(execute(manifest, candidate, reference, **({"wheelhouse": arguments.wheelhouse} if manifest["formatVersion"] == 2 else {})), indent=2))
         return 0
     except Exception:
         print("Plugin check failed. Preserve its manifest, verify the approved installed artifacts and run the project's fictional regression tests. No private exception payload is displayed.", file=sys.stderr)

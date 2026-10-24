@@ -18,7 +18,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MINIMUM_HOST_VERSION = "2.22.0"
 MINIMUM_HOST_COMMIT = "bac249ca0e62638a40a6effc44af741c283e83d7"
-FAMILIES = ("reporting", "branding", "file-import", "categorization")
+API_MINIMUM_HOST_VERSION = "2.34.0"
+API_MINIMUM_HOST_COMMIT = "ebbff0d464dd67c0269428a6d4a339778e21ec57"
+MINIMUM_RECIPES = {MINIMUM_HOST_VERSION: MINIMUM_HOST_COMMIT, API_MINIMUM_HOST_VERSION: API_MINIMUM_HOST_COMMIT}
+FAMILIES = ("reporting", "branding", "file-import", "categorization", "api")
 BUILD_REQUIREMENTS = ("setuptools==84.2.1",)
 
 
@@ -93,6 +96,37 @@ def candidate_registration(wheel, identifier):
         raise ValueError("The project needs a plain module:descriptor entry point.")
     return target.split(":")[0].split(".")[0]
 
+
+
+def project_minimum(project):
+    """Choose an explicit genuine minimum artifact recipe, without importing code."""
+    from packaging.requirements import Requirement
+    from packaging.utils import canonicalize_name
+    from packaging.version import Version
+
+    value = tomllib.loads((project / "pyproject.toml").read_text())
+    minimum = value.get("tool", {}).get("whab", {}).get("plugin-devkit", {}).get("minimum-host", MINIMUM_HOST_VERSION)
+    if type(minimum) is not str or minimum not in MINIMUM_RECIPES:
+        raise ValueError("Choose a supported genuine minimum-host recipe: 2.22.0 or 2.34.0.")
+    hosts = [requirement for text in value["project"].get("dependencies", ())
+             if canonicalize_name((requirement := Requirement(text)).name) == "whab"]
+    if (len(hosts) != 1 or hosts[0].url or hosts[0].marker or hosts[0].extras
+            or Version(minimum) not in hosts[0].specifier
+            or not any(spec.operator in {">=", "==", "~="} and Version(spec.version) == Version(minimum)
+                       for spec in hosts[0].specifier)):
+        raise ValueError("Declare the project's actual WHAB floor and matching minimum-host source recipe.")
+    return minimum
+
+
+def minimum_source(helper, base, environment, version):
+    """Keep the established 2.22 reader and use a separate immutable API recipe."""
+    base.mkdir()
+    if version == MINIMUM_HOST_VERSION:
+        return helper.minimum_host_source(base, environment)
+    project = helper.source_at_revision(base, environment, MINIMUM_RECIPES[version])
+    if helper.host_version(project) != version:
+        raise ValueError("The pinned API source does not match its advertised host version.")
+    return project
 
 def approved_extra_wheels(source, destination):
     if source is None:
@@ -172,7 +206,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, help="Write exact artifacts and complete replay manifests to this JSON file.")
     parser.add_argument("--artifacts-directory", type=Path, help="Preserve approved wheels and replay files in a new directory, including on failure.")
-    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the four projects.")
+    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the five projects.")
     parser.add_argument("--plugin", help="The external project's single public plugin entry-point ID.")
     parser.add_argument("--candidate-ref", help="Full source commit for the external CI candidate host; never downloads a host wheel from an index.")
     parser.add_argument("--extra-wheelhouse", type=Path, help="Additional caller-approved dependency wheels; no candidate dependencies are downloaded.")
@@ -199,16 +233,27 @@ def main(argv=None):
                 runtime_projects = [helper.copy_project(candidate_source / "plugins/storage/json", base / "json"),
                                     helper.copy_project(ROOT / "devtools/plugin-devkit/fixtures/runtime-peers", base / "runtime-peers")]
                 projects.extend(runtime_projects)
+            requested_floors = ({project_minimum(args.project.resolve())} if args.project is not None
+                                else {MINIMUM_HOST_VERSION, API_MINIMUM_HOST_VERSION})
+            if any(Version(candidate_version) < Version(floor) for floor in requested_floors):
+                raise ValueError("The candidate host predates an advertised project minimum.")
             if args.project is not None and candidate_version == MINIMUM_HOST_VERSION:
-                raise ValueError("External CI requires distinct genuine minimum and candidate host artifacts.")
-            host_versions = [candidate_version]
-            minimum = projects[0]
-            if candidate_version != MINIMUM_HOST_VERSION:
-                minimum = helper.minimum_host_source(base, env)
-                projects.append(minimum)
-                host_versions.append(MINIMUM_HOST_VERSION)
-            references = helper.reference_projects(projects[2], minimum, candidate_host=projects[0])
-            projects.extend(project for project in dict.fromkeys(references.values()) if project not in projects)
+                raise ValueError("External CI requires a newer genuine candidate host artifact for the legacy 2.22 floor.")
+            host_sources = {candidate_version: projects[0]}
+            for floor in sorted(requested_floors):
+                if floor != candidate_version:
+                    source = minimum_source(helper, base / ("minimum-" + floor), env, floor)
+                    host_sources[floor] = source
+                    projects.append(source)
+            host_versions = list(host_sources)
+            reference_sources = {}
+            for version, source in host_sources.items():
+                recipe = helpers()
+                recipe.MINIMUM_HOST_VERSION = version
+                selected = recipe.reference_projects(projects[2], source, candidate_host=projects[0])["minimum"]
+                reference_sources[version] = selected
+                if selected not in projects:
+                    projects.append(selected)
             wheels = base / "wheels"
             wheels.mkdir()
             approved_extra_wheels(args.extra_wheelhouse, wheels)
@@ -218,10 +263,9 @@ def main(argv=None):
             all_wheels = [helper.wheel_record(path) for path in wheels.glob("*.whl")]
             toolkit_version = next(record["version"] for record in all_wheels if record["distribution"] == "whab_plugin_devkit")
             toolkit = helper.wheel_for(wheels, "whab_plugin_devkit", toolkit_version)
-            reference_versions = {label: helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"]
-                                  for label, project in references.items()}
-            sqlite_wheels = {version: helper.wheel_for(wheels, "whab_plugin_sqlite",
-                              reference_versions["minimum" if version == MINIMUM_HOST_VERSION else "candidate"])
+            reference_versions = {version: helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"]
+                                  for version, project in reference_sources.items()}
+            sqlite_wheels = {version: helper.wheel_for(wheels, "whab_plugin_sqlite", reference_versions[version])
                              for version in host_versions}
             host_wheels = {version: helper.wheel_for(wheels, "whab", version) for version in host_versions}
             runtime_wheels = [helper.wheel_for(wheels, helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["name"],
@@ -255,7 +299,7 @@ def main(argv=None):
             dirty = bool(helper.run(["git", "status", "--porcelain", "--untracked-files=all", "--",
                                      "devtools/plugin-devkit", "scripts/check_plugin_generation.py", "scripts/check_plugin_devkit.py"],
                                     cwd=ROOT, env=env, capture_output=True, text=True).stdout.strip())
-            evidence = {"minimum_host_commit": MINIMUM_HOST_COMMIT, "host_versions": host_versions,
+            evidence = {"minimum_host_commit": MINIMUM_HOST_COMMIT, "minimum_host_recipes": MINIMUM_RECIPES, "host_versions": host_versions,
                         "candidate_host_commit": args.candidate_ref or revision, "tooling_source_commit": revision,
                         "tooling_source_dirty": dirty,
                         "wheels": [helper.wheel_record(path) for path in sorted(wheels.glob("*.whl"))], "projects": []}
@@ -263,6 +307,9 @@ def main(argv=None):
                 sqlite = sqlite_wheels[version]
                 sqlite_version = helper.wheel_record(sqlite)["version"]
                 for family, identifier, project, candidate in generated:
+                    floor = project_minimum(project)
+                    if version not in {floor, candidate_version}:
+                        continue
                     work = base / f"external-{version}-{family}"
                     work.mkdir()
                     shutil.copytree(project / "tests", work / "tests")
@@ -302,7 +349,7 @@ def main(argv=None):
                     for path in sorted(output.glob("configuration-*.json")):
                         subprocess.run([str(python), "-I", "-m", "whab_plugin_devkit.cli", "replay", str(path), "--wheelhouse", str(wheels)],
                                        cwd=work, env=env, check=True, stdout=subprocess.DEVNULL)
-                    evidence["projects"].append({"family": family, "host": version, "candidate": helper.wheel_record(candidate),
+                    evidence["projects"].append({"family": family, "host": version, "minimum_host": floor, "host_roles": (["minimum"] if version == floor else []) + (["candidate"] if version == candidate_version else []), "candidate": helper.wheel_record(candidate),
                                                  "tests": counts, "coverage": "100% statements and branches",
                                                  "manifests": manifests, "results": json.loads((output / "results.json").read_text())})
             if args.report:
@@ -310,7 +357,7 @@ def main(argv=None):
                 args.report.write_text(json.dumps(evidence, indent=2) + "\n")
             if args.artifacts_directory:
                 (args.artifacts_directory / "report.json").write_text(json.dumps(evidence, indent=2) + "\n")
-            print(f"Validated {len(generated)} independent plugin project(s); each passed installed behavioral tests, 100% plugin coverage, ten distinct configurations and exact-artifact replay on {len(host_versions)} host artifact(s).")
+            print(f"Validated {len(generated)} independent plugin project(s); each passed installed behavioral tests, 100% plugin coverage, ten distinct configurations and exact-artifact replay on its genuine supported minimum/current host matrix.")
     except Exception as error:
         print(f"Plugin validation failed ({type(error).__name__}); ensure every required runtime/test/build wheel is present in the approved wheelhouse, review the fictional test failure and preserve its replay manifests.", file=sys.stderr)
         return 1

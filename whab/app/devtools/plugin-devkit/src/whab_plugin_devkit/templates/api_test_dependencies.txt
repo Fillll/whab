@@ -1,0 +1,1 @@
+, "whab_plugin_sqlite>=1.11,<2"

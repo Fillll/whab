@@ -31,6 +31,7 @@ from whab.plugins import (
 from whab.plugins.contracts import CapabilityError
 
 from .adapters import BackendAdapter, BackendHarness, public_snapshot
+from .api_interface import api_declaration
 from .conformance import Capability as Suite
 from .conformance import run_conformance
 from .synthetic import SyntheticClock
@@ -128,8 +129,16 @@ def exercise_candidate(plugin, registry=None):
         engine.rename(saved["id"], "Renamed fictional model")
         engine.delete(saved["id"])
         exercised.append("categorization")
+    if plugin.interface:
+        interface = plugin.interface
+        # Preserve the original hook-only path for mixed legacy factory plugins.
+        # A present declarative adapter must pass; unrelated hooks cannot hide it.
+        if (getattr(interface, "adapter", None) is not None
+                or not callable(getattr(interface, "factory", None)) or not exercised):
+            api_declaration(plugin)
+            exercised.append("interface.api")
     if not exercised:
-        raise ValueError("This increment checks reporting, branding, file import and categorization candidates.")
+        raise ValueError("This increment checks reporting, branding, file import, categorization and declarative API candidates.")
     return exercised
 
 
