@@ -1,0 +1,158 @@
+"""Public provider contracts with fictional transports; no external I/O."""
+
+import asyncio
+
+import pytest
+from __MODULE__ import (
+    ACCOUNT,
+    ITEM,
+    LINK_TOKEN,
+    PENDING,
+    POSTED,
+    PUBLIC_TOKEN,
+    FictionalProvider,
+    OfflineTransport,
+    plugin,
+)
+
+from whab.plugins import BankAdapter, BankProviderContext, ProviderFailure, resolve_plugins
+
+
+def run(awaitable):
+    return asyncio.run(awaitable)
+
+
+def provider(environment="sandbox", transport=None):
+    return FictionalProvider(BankProviderContext("fictional-budget", environment, {}), transport)
+
+
+def test_public_descriptor_is_explicit_typed_live_local_provider():
+    assert type(plugin.bank) is BankAdapter
+    assert plugin.contract.lifecycle == "live" and plugin.contract.authority == "local"
+    assert {row.name for row in plugin.contract.provides} == {"ingestion.bank", "lifecycle.background"}
+    assert resolve_plugins((plugin,)) == (plugin,)
+    assert plugin.bank_ui is None
+
+
+def test_pending_posted_and_cursor_replay_are_deterministic_detached_records():
+    engine = provider()
+    assert engine.config == {"environment": "sandbox", "configured": True, "liveEnabled": False, "missingConfig": []}
+    assert run(engine.connection_token(None, None)) == LINK_TOKEN
+    exchange = run(engine.exchange_token(PUBLIC_TOKEN))
+    assert exchange["item_id"] == ITEM
+    access = exchange["access_token"]
+    assert run(engine.connection_token(ITEM, access)) == LINK_TOKEN
+    first = run(engine.read_sync(ITEM, access, None, "Fictional Bank"))
+    account, = first["accounts"]
+    pending, = first["changes"]["added"]
+    assert account["id"] == ACCOUNT and account["balance"] == 10000 and account["currency"] == "USD"
+    assert pending["id"] == PENDING and pending["pending"] and pending["amount"] == 725
+    assert pending["pendingTransactionId"] is None and first["cursor"] == "pending-v1"
+    first["accounts"][0]["balance"] = 99
+    assert run(engine.read_sync(ITEM, access, None, "Fictional Bank"))["accounts"][0]["balance"] == 10000
+    second = run(engine.read_sync(ITEM, access, "pending-v1", "Fictional Bank"))
+    posted, = second["changes"]["added"]
+    assert posted["id"] == POSTED and not posted["pending"] and posted["pendingTransactionId"] == PENDING
+    assert second["cursor"] == "posted-v1" and second["historical_complete"]
+    assert second["changes"]["removed"] == [PENDING]
+    assert run(engine.read_sync(ITEM, access, "posted-v1", "Fictional Bank"))["changes"] == {"added": [], "modified": [], "removed": []}
+    assert run(engine.remove_token(access)) is None
+    assert run(engine.webhook_event(b"untrusted-fictional-body", {"signature": "invalid"})).status_code == 401
+    run(engine.close())
+    run(engine.close())
+    with pytest.raises(ProviderFailure) as error:
+        run(engine.exchange_token(PUBLIC_TOKEN))
+    assert error.value.code == "not_configured"
+
+
+@pytest.mark.parametrize("item,access", [("wrong", "fictional-access-token"), (ITEM, "wrong"), (None, "wrong"), (ITEM, None)])
+def test_update_connections_are_exact_and_invalid_values_never_reconnect(item, access):
+    with pytest.raises(ProviderFailure) as error:
+        run(provider().connection_token(item, access))
+    assert error.value.code == "reconnect"
+
+
+def test_invalid_tokens_cursors_and_transport_operations_have_fixed_failures():
+    engine = provider()
+    for call, code in (
+        (engine.exchange_token("wrong"), "transport"),
+        (engine.read_sync(ITEM, "wrong", None, "Fictional Bank"), "reconnect"),
+        (engine.read_sync(ITEM, "fictional-access-token", "unknown", "Fictional Bank"), "reconnect"),
+        (engine.remove_token("wrong"), "reconnect"),
+        (OfflineTransport().request("unknown", {}), "transport"),
+    ):
+        with pytest.raises(ProviderFailure) as error:
+            run(call)
+        assert error.value.code == code
+
+
+def test_production_is_unconfigured_and_transport_never_receives_requests():
+    class Forbidden:
+        async def request(self, *_):
+            pytest.fail("Production must never invoke a fictional transport")
+
+        async def close(self):
+            return None
+
+    engine = provider("production", Forbidden())
+    assert engine.config["missingConfig"] == ["SANDBOX_ONLY"] and not engine.config["configured"]
+    for call in (engine.connection_token(None, None), engine.exchange_token(PUBLIC_TOKEN),
+                 engine.read_sync(ITEM, "fictional-access-token", None, "Fictional Bank"),
+                 engine.remove_token("fictional-access-token")):
+        with pytest.raises(ProviderFailure) as error:
+            run(call)
+        assert error.value.code == "not_configured"
+    run(engine.close())
+
+
+def test_mock_transport_is_injectable_and_returns_detached_data():
+    class Transport:
+        def __init__(self):
+            self.calls = []
+            self.result = {"item_id": ITEM, "access_token": "fictional-access-token"}
+
+        async def request(self, command, body):
+            self.calls.append((command, body))
+            return self.result
+
+        async def close(self):
+            self.calls.append(("close", {}))
+
+    transport = Transport()
+    engine = provider(transport=transport)
+    result = run(engine.exchange_token(PUBLIC_TOKEN))
+    result["item_id"] = "mutated"
+    assert transport.result["item_id"] == ITEM
+    assert transport.calls == [("exchange", {"public_token": PUBLIC_TOKEN})]
+    run(engine.close())
+    run(engine.close())
+    assert transport.calls[-1] == ("close", {}) and len(transport.calls) == 2
+
+
+def test_failed_transport_cleanup_retains_owner_for_explicit_retry():
+    class Transport:
+        attempts = 0
+
+        async def close(self):
+            self.attempts += 1
+            if self.attempts == 1:
+                raise OSError("fictional close failure")
+
+    transport = Transport()
+    engine = provider(transport=transport)
+    with pytest.raises(OSError):
+        run(engine.close())
+    assert not engine.closed
+    run(engine.close())
+    assert engine.closed and transport.attempts == 2
+
+
+@pytest.mark.parametrize("storage", ["sqlite", "json"])
+def test_installed_provider_through_public_native_https(storage):
+    from whab_plugin_devkit.bank_conformance import BankRuntime, BankScenario, exercise_bank_runtime
+
+    scenario = BankScenario(plugin.id, ITEM, "Fictional checking", "Fictional grocer", 725,
+                            PUBLIC_TOKEN, LINK_TOKEN)
+    with BankRuntime(storage, (plugin.id,)) as runtime:
+        assert exercise_bank_runtime(runtime, scenario)["status"] == "passed"
+    assert not runtime.home.exists() and runtime.process is None and runtime.cleanups == 2
