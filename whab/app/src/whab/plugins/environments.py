@@ -36,6 +36,7 @@ from packaging.version import Version
 
 from whab import __version__
 
+from .process_environment import process_environment
 from .report_worker import ReportWorker, _stop_process_group
 from .sdk import API_VERSION, BudgetSnapshot, valid_plugin_name
 
@@ -330,15 +331,7 @@ def _candidate_cleanup(created, plugin_id, probes=()):
 
 
 def _environment():
-    # Installation and artifact verification need process settings, never the
-    # caller's plugin configuration. A prefix denylist cannot know an author's
-    # custom URL/token names, and pip is already offline and isolated.
-    allowed = {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG", "LANGUAGE",
-               "LC_ALL", "LC_CTYPE", "LC_NUMERIC", "LC_TIME", "LC_COLLATE", "LC_MONETARY",
-               "LC_MESSAGES", "LC_PAPER", "LC_NAME", "LC_ADDRESS", "LC_TELEPHONE",
-               "LC_MEASUREMENT", "LC_IDENTIFICATION"}
-    return {key: value for key, value in os.environ.items()
-            if key in allowed}
+    return process_environment()
 
 
 def _run(command, deadline):
