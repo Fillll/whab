@@ -497,7 +497,12 @@ wrapping a bundled backend or copying monetary policy. The toolkit retains its
 2.22 floor and loads newer storage SDK records only when advertised native
 readiness is exercised; unsupported old SDK advertisement fails explicitly.
 The actual public-model minimum source is
-`c10bf14a96cfd3707124fc2916d794da1b69f41f`, with no rewritten host version.
+`f46f70a0a19e1e282d2646ad48829bb85b760591`, with no rewritten host version.
+It includes native-only code readiness independent of optional transfer support.
+When current and minimum share version 2.41, the checker records one artifact row
+with both roles. A separately executed archived minimum uses its own wheelhouse
+and source/hash evidence; differing same-version host artifacts are never mixed
+or overwritten to manufacture two rows.
 
 `storage_conformance(plugin)` runs mandatory ledger/provider/import/funding/rollover
 behavior plus every advertised optional suite. `assert_storage_readiness(plugin)`

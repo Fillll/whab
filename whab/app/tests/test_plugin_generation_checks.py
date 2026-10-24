@@ -133,7 +133,7 @@ def test_project_minimum_recipe_is_explicit_and_must_match_actual_declared_host_
     ("2.36.0", "a866eda580c6e363a20636785bc4b4003db0652f"),
     ("2.38.0", "dd52ec9554ee3c36395f8f2a7c1d2ab5ff00353f"),
     ("2.40.0", "e8fa8585c16d2f8a93b1966315c0fee34eb11d35"),
-    ("2.41.0", "c10bf14a96cfd3707124fc2916d794da1b69f41f"),
+    ("2.41.0", "f46f70a0a19e1e282d2646ad48829bb85b760591"),
 ])
 def test_interface_minimum_uses_its_genuine_immutable_source_recipe_without_version_rewriting(checker, tmp_path, version, revision):
     calls = []
