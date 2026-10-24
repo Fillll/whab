@@ -18,14 +18,14 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [example-file-import](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
 | [example-ui](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/example/example-ui/README.md) | `whab_plugin_example_ui 1.0.0` | `whab>=2.36,<3` | visual-ui-worker | teaching |
 | [json](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.3.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
-| [plaid](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
+| [plaid](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.3.0` | `whab>=2.38,<3` | bank-provider-worker | maintained |
 | [random-forest-categorization](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.3.0` | `whab>=2.35,<3` | categorization-worker | maintained |
 | [server](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
 | [sqlite](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.12.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
 | [web](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
 | [ynab](https://github.com/Fillll/whab/blob/6e2dde22e74af3d1ad7005dc6a6c66227504516a/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
-Explicit stateless report, branding, file-parser, declarative API interface, pure categorization and participating visual descriptors advertise their supported live-worker adapters. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
+Explicit stateless report, branding, file-parser, declarative API interface, pure categorization, typed bank-provider and participating visual descriptors advertise their supported live-worker adapters. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
 
 ## Recorded verification
 
@@ -230,3 +230,33 @@ Genuine installed host 2.37 at this source and genuine host 2.38 at a28ab71cf013
 Tests: `tests/plugins/test_storage_worker_selection.py`, `tests/test_budget_cli.py`.
 
 Review: [PR #102](https://github.com/Fillll/whab/pull/102).
+
+### pr101-live-bank-source
+
+Verified 2026-10-23; host `2.38.0`. Selected: `plaid`.
+
+The exact source completed the complete contribution command in GitHub CI on Python 3.14 and 3.15, including genuine minimum/current installed toolkit and generated-project tests, exact-artifact replays and installed distributions. An independent macOS run passed 5143 Python tests, all fourteen runtime plugins at 100% statement/branch coverage and 354 browser checks, then stopped during an old toolkit 0.6 API replay after its ten native checks passed; that separate failure is preserved and was not attributed to a cause. An independent installed rerun passed all ten original API replays with the exact artifact hashes and unchanged 30-second operation deadlines. Bank tests used fictional homes and mocked provider transports for typed worker operations, Item/cursor and annotation preservation, startup/cleanup ownership, active work draining, scoped OAuth flows, encrypted capture and native receipt recovery. Bundled Plaid has complete owning coverage; distinct-version native worker behavior is recorded separately with a reviewed fictional provider. No real provider connection or household deployment was used.
+
+Tests: `tests/test_bank_runtime.py`, `tests/test_bank_native.py`, `tests/test_bank_lifecycle.py`, `tests/plugins/test_provider_worker.py`, `tests/plugins/test_provider_upgrade.py`, `tests/web/test_bank_continuations.py`, `tests/budgets/test_bank_storage_barriers.py`, `plugins/ingestion/plaid/tests`, `scripts/check.py`, `GitHub Actions run 40055955522`.
+
+Review: [PR #101](https://github.com/Fillll/whab/pull/101).
+
+### pr101-native-outcome-phases
+
+Verified 2026-10-23; host `2.38.0`. Selected: `sqlite`, `json`.
+
+A separate follow-up changes only the storage proxy outcome phases and adds fourteen controlled regressions. All sixty focused SQLite/JSON proxy and native worker tests passed. A direct execution rejection permits definite noncommit only after exact unchanged native proof; intent-publication failure, failed proof, malformed evidence/receipt and post-result completion failure retain pending intent and the unknown-write fence. Controlled reproductions preserved original false-rejection evidence and verified the corrected unknown outcome. This is focused follow-up validation, distinct from the earlier source's complete CI and native bank evidence.
+
+Tests: `tests/plugins/test_storage_proxy_outcomes.py`, `tests/plugins/test_storage_worker.py`.
+
+Review: [PR #101](https://github.com/Fillll/whab/pull/101).
+
+### pr101-installed-native-bank
+
+Verified 2026-10-23; host `2.38.0`. Selected: `sqlite`, `json`, `web`.
+
+Built genuine host 2.38, SQLite 1.12, JSON 1.3 and Web 1.27 wheels from the exact source and installed them outside the checkout. Three fictional native HTTPS cases explicitly trusted only their temporary runtime CA: a reviewed offline bank provider 1.0 to failed 1.5 to 2.0 upgrade with ready-flow deferral, disable/re-enable, pending-to-posted annotations and acknowledged-write SIGKILL/stock-CLI reopen; an exchange response lost before encrypted capture with no automatic repeat after reopen; and encrypted captured native application refused by a controlled directory-permission fault, then explicitly finished using the original native command and receipt. A separately reviewed fictional JSON 1.3.1 code-only fixture preserved the native UUID/epoch/generation and captured Item/cursor while recovering the original request. Synthetic provider and JSON patch versions are test fixtures, not bundled Plaid or published backend releases. The helper was extracted candidate source alongside toolkit 0.6, not a released toolkit 0.8 claim. Exact wheel/closure hashes were retained; all owned homes/listeners were removed, and no external provider HTTP or household data was used.
+
+Tests: `installed native HTTPS v1/failed-candidate/v2 bank worker verification`, `installed native HTTPS exchange-uncertain and captured-native-apply recovery`, `ordinary stock CLI reopen after acknowledged-write process termination`.
+
+Review: [PR #101](https://github.com/Fillll/whab/pull/101).

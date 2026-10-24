@@ -152,3 +152,32 @@ def test_webhook_result_is_a_strict_bounded_response_contract():
 def test_invalid_webhook_outputs_are_rejected(ok, status_code, error):
     with pytest.raises(ValueError):
         WebhookResult(ok, status_code, error)
+
+
+def test_data_only_bank_factory_and_context_have_no_key_backend_or_callbacks():
+    from whab.plugins import BankAdapter, BankProviderContext, PluginResources, ProviderWebhook
+
+    config = {'PROVIDER_SECRET': 'fictional private provider credential'}
+    context = BankProviderContext('synthetic-budget', 'sandbox', config)
+    config.clear()
+    assert context.config['PROVIDER_SECRET'] == 'fictional private provider credential'
+    assert 'fictional private' not in repr(context)
+    for name in ('store', 'budget', 'encryption_key', 'read_file', 'save_state', 'background_scope'):
+        assert not hasattr(context, name)
+    adapter = BankAdapter(lambda _: None)
+    assert Plugin('fictional-bank', 'Fictional bank', bank=adapter).bank is adapter
+    with pytest.raises(ValueError, match='host continuation'):
+        adapter(context)
+    for config in ({'TOKEN_ENCRYPTION_KEY': 'forbidden'}, {'SECRET': '\ud800'}, {'X': 'x' * 8193}):
+        with pytest.raises(ValueError):
+            BankProviderContext('synthetic-budget', 'sandbox', config)
+    assert ProviderWebhook(True, item_id='fictional-item', sync=True).sync
+    for fields in ({'ok': False, 'item_id': 'fictional-item'}, {'ok': True, 'sync': True},
+                   {'ok': True, 'status_code': 401}, {'ok': 1}):
+        with pytest.raises(ValueError):
+            ProviderWebhook(**fields)
+    ui = BankUI(resources=PluginResources({'templates/accounts.html': b'<section>Fictional</section>',
+                                         'static/connect.js': b'/* fictional */'}))
+    assert ui.templates is None and ui.resources.files['static/connect.js']
+    with pytest.raises(ValueError):
+        BankUI(resources=PluginResources({'static/connect.js': b'/* incomplete */'}))

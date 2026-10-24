@@ -483,6 +483,69 @@ async def close() -> None: ...
 
 The host creates enabled services during its asynchronous application lifespan and closes created services on shutdown or startup failure. The service owns provider-specific authentication, remote requests, token encryption, mapping, synchronization, webhook verification, event interpretation, and any cancellation/cleanup of its tasks. The host owns generic route dispatch, local access controls, safe status fields, and response shape. Canonical routes use `/api/banks/{id}/items`, `/link-token`, `/exchange`, `/sync`, and `/webhook`, with disconnect at `DELETE /api/banks/{id}/items/{item_id}`. Existing `/api/plaid/*` aliases remain available only while the `plaid` plugin is enabled. `BankError(ValueError)` represents an authored, safe user-facing error; never wrap remote exception text in it. Unexpected provider exceptions are sanitized by the host.
 
+A continuation-aware host service adds all four asynchronous facade methods:
+
+```python
+async def begin_link(item_id: str | None = None) -> dict: ...
+async def continuation_status(flow_id: str) -> dict: ...
+async def cancel_link(flow_id: str) -> dict: ...
+async def complete_link(
+    flow_id: str, public_token: str | None = None,
+    institution_name: str | None = None,
+) -> dict: ...
+```
+
+Status dictionaries contain exactly `flow_id` (32 lowercase hexadecimal
+characters), `generation` (positive safe JSON integer), `kind` (`link` or
+`update`), `stage`, and `deadline_ms` (positive safe JSON integer). Stages are
+`ready`, `exchanging`, `exchange_uncertain`, `captured`, `applying`,
+`apply_uncertain`, `complete`, `cancelled`, and `expired`. A begin result additionally
+contains only `link_token`, a plain string of 1–4096 characters, and must be ready
+with the requested connection kind. Status never returns credentials, Item IDs,
+accounts, provider payloads or native receipt contents.
+
+The host calls `begin_link` at the existing `POST /link-token` endpoint.
+`POST /exchange` requires `flowId` for this facade; `publicToken` is optional so
+an update can complete without exchanging or creating an Item.
+`GET /continuations/{flow_id}` checks status and `DELETE` at that same path
+requests cancellation. Missing IDs cannot fall back to uncorrelated exchange.
+Malformed bodies fail before provider work. Fixed `EffectError` continuation
+failures return HTTP 409 with `error` and `code`; an uncertain exchange or save
+does not authorize retry. Ordinary HTTPS, local Host/origin, budget/demo guards
+and no-store behavior apply to these endpoints. Only registered signed webhook
+paths retain the webhook exception to local access checks.
+
+The coordinator owns scope and operation identity. It binds a flow to the budget,
+Sandbox/production environment, provider and captured generation; browser fields
+are routing hints. It must publish durable intent before external exchange,
+capture the encrypted response before native application, and reconcile a lost
+native result with exact durable operation evidence. A completion retry retains
+the original flow and request, and never repeats an uncertain external exchange.
+An explicit begin retry for the same scoped Item returns its original ready
+token; incompatible nonterminal flows block a new begin. Update completion keeps
+the original provider Item identity. Retirement must finish or defer unfinished
+flows and active synchronization/webhook work. Exposing the HTTP facade alone
+does not establish live selection or worker upgrade support.
+
+Status may reconcile an exact committed native receipt into `complete`, without
+provider HTTP or a new native write. After status confirms `captured` or
+`apply_uncertain`, an explicit Finish saving action can call `complete_link`
+without a public token. The coordinator then resumes its original encrypted
+native request only after exact receipt/CAS evidence permits it. A ready link
+without its original public token must refuse completion. Unknown outcomes and a
+separate storage uncertainty gate remain blocked pending their own recovery.
+
+`BankContinuationService`, `BankContinuationStatus` and `BankLinkReady` name this
+optional facade in the public SDK. An explicit `BankAdapter(factory)` selects the
+host-owned [typed provider worker](plugin-workers.md#bank-provider-workers), which
+requires public native authority/command receipts for protected application. Its
+factory receives bounded `BankProviderContext` data without the host encryption
+key or persistence callbacks. The worker never writes financial state directly.
+
+Services with none of these four methods retain the original restart-only ABI.
+A partial facade is an error, and a legacy service cannot accept a flow ID.
+Legacy compatibility supplies no durable exchange-replay guarantee.
+
 `WebhookResult(ok: bool, status_code: int = 200, error: str | None = None)` supplies a bounded primitive response rather than a provider response dictionary. A successful result uses a 2xx status and no error. A failure must explicitly use a 4xx/5xx status and an optional plain-text, authored error of at most 200 characters. The provider verifies authenticity against the original raw request bytes before parsing or applying any event. The host validates this result before responding.
 
 `BankStore` exposes only provider-scoped persistence:
@@ -513,7 +576,23 @@ The concrete backend checks provider ownership and accepts normalized `ImportedA
 
 ### Bank UI resources
 
-Optional `BankUI(templates: pathlib.Path, static: pathlib.Path)` resources belong to an enabled bank plugin. The host validates directories at startup, loads templates under `plugins/{id}/`, and mounts static files at `/plugins/{id}/static`. The accounts fragment is `accounts.html`; the provider's browser connection script is `connect.js`. A UI descriptor requires a bank factory. A disabled provider gets no mounted assets or templates. These are explicitly trusted provider templates and scripts, unlike report hooks' escaped text; they must never embed server secrets or access tokens. The host supplies `status` (`configured`, `environment`, `liveEnabled`, `missingConfig`, `enabled`) and `items` (sanitized connection records) to the accounts fragment. Services use a public `config` mapping with `configured: bool`, `liveEnabled: bool`, and optional environment-variable names in `missingConfig`; never include secret values. The host supplies the environment from its own settings. The bundled Plaid adapter retains its legacy `plaidConfigured` service key, translated by the host. No plugin can register arbitrary HTTP routes through this descriptor.
+Optional `BankUI(templates: pathlib.Path, static: pathlib.Path)` resources belong
+to an enabled bank plugin. `BankUI(resources=PluginResources(...))` supplies the
+same captured data without mutable host paths; the two forms are mutually
+exclusive. Every bundle must contain `templates/accounts.html` and
+`static/connect.js`. The host captures validated bounded files and loads templates
+under `banks/{id}/{generation-token}/`; page scripts use the matching
+`/banks/{id}/{generation-token}/static/...` address. Old versions retain their
+exact bytes through bounded retention, then return 404. The original
+`/plugins/{id}/static/...` alias retains the first captured version for existing
+addresses. A provider never falls through to a newer incompatible script. A UI
+descriptor requires a bank capability. These are trusted templates/scripts and
+must not embed server secrets or access tokens. The host supplies public `status`
+and sanitized `items` to the accounts fragment. No plugin registers arbitrary
+HTTP routes through this descriptor. Generic bank routes and authenticated webhook
+allowlists resolve the pinned active generation, including a provider enabled
+after startup. The legacy `/api/plaid` alias returns 404 while Plaid is disabled.
+
 
 The current connection lifecycle uses Link-style short-lived tokens and public-token exchange. An external bank plugin must implement that contract and its own connection UI. A provider requiring a different consent workflow may need a later compatible API addition; claiming a `bank` descriptor does not by itself make every institution or aggregation service supported.
 

@@ -20,8 +20,11 @@ from uuid import uuid4
 
 from whab import __version__
 
+from .bank_adapter import BankAdapter, ProviderFailure
 from .categorization_worker import CategorizationDispatcher
 from .contracts import contract_for
+from .effect_store import decode, encode
+from .provider_worker import MAX_PROVIDER_BYTES, ProviderDispatcher, read_provider_result
 from .runtime import PluginError, load_plugins
 from .sdk import (
     API_VERSION,
@@ -50,7 +53,7 @@ from .worker_adapters import (
     validate_adapter_info,
 )
 from .worker_namespace import MAX_WORKER_NAMESPACE, namespace_bundle, read_namespace
-from .worker_resources import read_resource_bundle
+from .worker_resources import capture_bank_resources, read_resource_bundle, resource_bundle
 
 _ERRORS = {
     "worker_startup_failed": "The plugin worker could not start or negotiate a compatible protocol.",
@@ -102,7 +105,7 @@ def _read_request(source):
     metadata_size, payload_size = frame_lengths(header)
     magic, version, _, _ = HEADER.unpack(header)
     metadata = Frame.decode(HEADER.pack(magic, version, metadata_size, 0) + _blocking_read(source, metadata_size)).metadata
-    maximum = {"file.parse": 10 * 1024 * 1024, "category.call": MAX_WORKER_NAMESPACE}.get(metadata.get("operation"), 0)
+    maximum = {"file.parse": 10 * 1024 * 1024, "category.call": MAX_WORKER_NAMESPACE, "provider.call": MAX_PROVIDER_BYTES}.get(metadata.get("operation"), 0)
     if payload_size > maximum:
         raise WireError()
     return Frame(metadata, _blocking_read(source, payload_size))
@@ -129,7 +132,7 @@ def serve(plugin_id, source, target):
     """Worker loop; diagnostics and plugin exception details never enter frames."""
     registry = load_plugins((plugin_id,)).bind_branding()
     descriptor = registry.descriptors()[0]
-    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.categorization, descriptor.interface and descriptor.interface.adapter, descriptor.ui)):
+    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.categorization, type(descriptor.bank) is BankAdapter, descriptor.interface and descriptor.interface.adapter, descriptor.ui)):
         raise WireError()
     if descriptor.ui is not None:
         if not supports_live_plugin(descriptor) or descriptor.ui.render is not None:
@@ -149,18 +152,24 @@ def serve(plugin_id, source, target):
           "host": __version__, "live": supports_live_plugin(descriptor),
           "capabilities": [{"name": capability.name, "version": capability.version}
                            for capability in contract_for(descriptor).provides
-                           if capability.name in LIVE_CAPABILITIES],
+                           if capability.name in LIVE_CAPABILITIES
+                           and (capability.name not in {'ingestion.bank', 'lifecycle.background'} or type(descriptor.bank) is BankAdapter)],
           "insights": descriptor.insights is not None, "export": descriptor.export is not None,
           "adapters": adapter_info(descriptor), "contract": contract_info(descriptor)})
     categorization = CategorizationDispatcher(descriptor) if descriptor.categorization is not None else None
+    provider = ProviderDispatcher(descriptor) if type(descriptor.bank) is BankAdapter else None
     try:
-        _serve_requests(registry, descriptor, source, send, categorization)
+        _serve_requests(registry, descriptor, source, send, categorization, provider)
     finally:
-        if categorization is not None:
-            categorization.close()
+        try:
+            if categorization is not None:
+                categorization.close()
+        finally:
+            if provider is not None:
+                provider.close()
 
 
-def _serve_requests(registry, descriptor, source, send, categorization):
+def _serve_requests(registry, descriptor, source, send, categorization, provider):
     while True:
         try:
             frame = _read_request(source)
@@ -188,6 +197,19 @@ def _serve_requests(registry, descriptor, source, send, categorization):
                 output, payload = categorization.call(request["arguments"], frame.payload)
                 send({"id": identifier, "kind": "result", "data": output}, payload)
                 continue
+            if operation == 'provider.call':
+                if provider is None:
+                    raise WireError()
+                output, payload = provider.call(request['arguments'], frame.payload)
+                send({'id': identifier, 'kind': 'result', 'data': output}, payload)
+                continue
+            if operation == 'provider.resources':
+                if provider is None or request['arguments']:
+                    raise WireError()
+                resources = capture_bank_resources(descriptor.bank_ui)
+                output, payload = resource_bundle(resources)
+                send({'id': identifier, 'kind': 'result', 'data': output}, payload)
+                continue
             if operation in OPERATIONS:
                 output, payload = dispatch(registry, descriptor, operation, request["arguments"], frame.payload)
                 send({"id": identifier, "kind": "result", "data": output}, payload)
@@ -202,6 +224,10 @@ def _serve_requests(registry, descriptor, source, send, categorization):
                 table = registry.export(descriptor.id, snapshot)
                 output = {"columns": list(table.columns), "rows": [list(row) for row in table.rows]}
             send({"id": identifier, "kind": "result", "data": output})
+        except ProviderFailure as error:
+            if operation != 'provider.call':
+                raise WireError() from None
+            send({'id': identifier, 'kind': 'provider_error', 'code': error.code})
         except Exception:
             send({"id": identifier, "kind": "error", "code": "hook_failed"})
 
@@ -286,6 +312,10 @@ class ReportWorker:
                     ("interface.api", adapters["interface"] is not None),
                     ("categorization", adapters["categorization"]),
                     ("interface.ui", adapters["ui"] is not None),
+
+
+                    ('ingestion.bank', adapters['bank'] is not None),
+                    ('lifecycle.background', adapters['bank'] is not None),
                 ) if enabled],
                 key=lambda item: item["name"],
             )
@@ -390,7 +420,8 @@ class ReportWorker:
                 raw = Frame(request, payload).encode()
                 payload_limit = {"bank.fetch": 128 * 1024, "merchant.fetch": 128 * 1024,
                                  "file.resources": 4 * 1024 * 1024, "file.parse": 50 * 1024 * 1024,
-                                 "category.call": MAX_WORKER_NAMESPACE,
+                                 "category.call": MAX_WORKER_NAMESPACE, "provider.call": MAX_PROVIDER_BYTES,
+                                 "provider.resources": 4 * 1024 * 1024,
                                  "ui.resources": 4 * 1024 * 1024, "ui.render": 16 * 1024 * 1024}.get(operation, 0)
                 frame = self._read(self._write(raw, self.timeout), payload_limit)
                 value = frame.metadata
@@ -400,6 +431,10 @@ class ReportWorker:
                     if frame.payload:
                         raise WireError()
                     raise _error("worker_hook_failed", self.plugin_id)
+                if operation == 'provider.call' and value.keys() == {'id', 'kind', 'code'} and value['kind'] == 'provider_error':
+                    if frame.payload:
+                        raise WireError()
+                    raise ProviderFailure(value['code'])
                 if operation == "shutdown":
                     if value != {"id": identifier, "kind": "closed"}:
                         raise WireError()
@@ -407,7 +442,7 @@ class ReportWorker:
                 if set(value) != {"id", "kind", "data"} or value["kind"] != "result":
                     raise WireError()
                 return frame if operation in BINARY_OPERATIONS else value["data"]
-            except PluginError:
+            except (PluginError, ProviderFailure):
                 raise
             except TimeoutError:
                 self._stop()
@@ -452,6 +487,26 @@ class ReportWorker:
         except BaseException:
             self._stop()
             raise
+
+    def provider(self, command, values):
+        try:
+            frame = self._request('provider.call', arguments={'command': command}, payload=encode(values, MAX_PROVIDER_BYTES))
+            if frame.metadata['data'] != {'provider': 1}:
+                raise WireError()
+            return read_provider_result(command, decode(frame.payload, MAX_PROVIDER_BYTES), provider_id=self.plugin_id,
+                                        environment=values.get('environment'), item_id=values.get('item_id'))
+        except ProviderFailure:
+            if command in {'exchange_token', 'remove_token'}:
+                self._stop()
+            raise
+        except BaseException:
+            # A provider heap may cache an unacknowledged effect or external
+            # response. Only a fresh approved child can reconstruct its state.
+            self._stop()
+            raise
+
+    def provider_resources(self):
+        return self._typed('provider.resources', {}, lambda frame: read_resource_bundle(frame.metadata['data'], frame.payload))
 
     def resolve(self, text, *, domain=False):
         def decode(value):
