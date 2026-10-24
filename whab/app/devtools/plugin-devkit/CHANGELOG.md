@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.7.0 — 2026-10-23
+
+PR: [#99](https://github.com/Fillll/whab/pull/99)
+
+- Add public participating visual-interface conformance, an independent UI project generator and the versioned native-ui-v1 profile with exact approved-worker activation, coherent pages/assets, browser preparation acknowledgements and saved-selection reopen in ten distinct replayable configurations.
+- Use the genuine WHAB 2.36 visual SDK floor while retaining the independently packaged toolkit's 2.22 import floor and explicit older-host applicability. Select compatible native reference wheels separately for each actual tested host.
+- Give native management transitions a bounded deadline separate from HTTP/startup readiness, and include the sixth teaching family in installed external-project and distribution checks.
+
 ## 0.6.0 — 2026-10-23
 
 PR: [#96](https://github.com/Fillll/whab/pull/96)

@@ -164,7 +164,8 @@
       "state_version": 1,
       "support": "teaching",
       "verifications": [
-        "pr96-api-teaching-toolkit"
+        "pr96-api-teaching-toolkit",
+        "pr99-visual-teaching-toolkit"
       ],
       "version": "1.0.0"
     },
@@ -359,7 +360,10 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "teaching",
-      "verifications": [],
+      "verifications": [
+        "pr99-visual-teaching-toolkit",
+        "pr99-visual-teaching-installed-example"
+      ],
       "version": "1.0.0"
     },
     {
@@ -1162,6 +1166,57 @@
         "tests/plugins/test_ui_worker.py",
         "tests/web/test_visual_interface.py",
         "tests/plugins/test_ui_runtime.py"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.36.0",
+        "whab_plugin_devkit": "0.7.0",
+        "whab_plugin_example_api": "1.0.0",
+        "whab_plugin_example_ui": "1.0.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.36.0",
+      "id": "pr99-visual-teaching-toolkit",
+      "method": "source-tests",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/99"
+      ],
+      "scope": "The exact source passed 4779 Python tests, all fifteen runtime plugins at 100% statement/branch coverage, 333 browser checks, installed distributions and genuine minimum/current external gates. Toolkit 0.7 passed 192 installed tests per genuine WHAB 2.22/2.36 artifact with zero skips and complete statement/branch coverage. Six generated families built outside the checkout with required packages only, passed complete owning coverage and ten distinct configurations with every exact-artifact replay on each applicable genuine host floor/current matrix. Visual projects require the actual 2.36 SDK; API projects retain their actual 2.34 floor and other families retain 2.22. Older-host runtime N/A never counts as a native execution pass. The native visual profile verifies coherent pages/resources, browser preparation acknowledgements, exact approved same-candidate activation, disable/enable and saved-selection reopen. Distinct-version visual worker upgrades and household installation are separate evidence.",
+      "selection": [
+        "example-ui",
+        "example-api"
+      ],
+      "source_commit": "ea9639201c8beb9ac7a47f0963805bd80980cf77",
+      "tests": [
+        "devtools/plugin-devkit/tests",
+        "plugins/example/example-ui/tests",
+        "scripts/check_plugin_generation.py",
+        "scripts/check_distribution.py",
+        "scripts/check.py"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.36.0",
+        "whab_plugin_devkit": "0.7.0",
+        "whab_plugin_example_ui": "1.0.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.36.0",
+      "id": "pr99-visual-teaching-installed-example",
+      "method": "installed-wheel",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/99"
+      ],
+      "scope": "The exact maintained visual example and toolkit were built into approved wheels and installed outside the checkout. Its two owning behavioral tests passed with complete statement/branch coverage; ten distinct native HTTPS configurations and all ten exact-artifact replays passed using temporary fictional homes and an explicit temporary CA. Minimum and candidate are the same genuine WHAB 2.36 artifact, recorded as one host row serving both roles. Public host security guards, coherent four-page resources, exact approved-candidate activation, browser preparation and reopen executed. This is a same-artifact external-author profile, not distinct-version code-upgrade or production deployment evidence.",
+      "selection": [
+        "example-ui"
+      ],
+      "source_commit": "629f2603b7bbd8e24c42eccbe34215c3da6accbb",
+      "tests": [
+        "plugins/example/example-ui/tests",
+        "scripts/check_plugin_generation.py"
       ]
     }
   ]
