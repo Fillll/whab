@@ -2,8 +2,8 @@
 
 from whab.plugins import Plugin, PluginContract, RemoteLedgerClient
 from whab.plugins.remote_client_adapter import create_client
-from whab.storage.remote import RemoteStore as RemoteStore
-from whab.storage.remote import connection_configuration as connection_configuration
+from whab.plugins.remote_transport import RemoteStore as RemoteStore
+from whab.plugins.remote_transport import connection_configuration as connection_configuration
 
 
 def create_storage(context):

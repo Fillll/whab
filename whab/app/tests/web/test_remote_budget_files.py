@@ -67,7 +67,7 @@ def remote(monkeypatch):
         opened.append((url, token, budget_id))
         return constructor(url, token, budget_id, transport=httpx.MockTransport(request))
 
-    monkeypatch.setattr("whab.storage.remote.RemoteStore", bound)
+    monkeypatch.setattr("whab.plugins.remote_transport.RemoteStore", bound)
     return requests, opened
 
 

@@ -17,7 +17,7 @@ from whab.config import Settings
 from whab.plugins import LedgerService, PluginError, PluginRegistry
 from whab.plugins.environments import ApprovedWheel, inspect_wheel
 from whab.plugins.remote_client_adapter import client_record
-from whab.storage.remote import RemoteStore
+from whab.plugins.remote_transport import RemoteStore
 
 from .test_environments import local_closure as local_closure
 
@@ -250,7 +250,7 @@ import httpx, whab
 from whab.budgets.remote_runtime import binding_identity
 from whab.plugins import RemoteLedgerClient
 from whab.plugins.remote_selection import RemoteSelectionStore
-from whab.storage.remote import RemoteStore
+from whab.plugins.remote_transport import RemoteStore
 assert pathlib.Path(whab.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix))
 url, token, ca, home = sys.argv[1:]
 config = {"CLIENT_URL":url, "CLIENT_TOKEN":token, "CLIENT_BUDGET_ID":"default"}
