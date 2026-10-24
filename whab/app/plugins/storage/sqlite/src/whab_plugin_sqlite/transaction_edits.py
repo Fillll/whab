@@ -8,8 +8,7 @@ def edit_transaction(
     store, workspace: str, transaction_id: str, category_id=UNSET,
     reviewed: bool | None = None, note=UNSET,
 ) -> None:
-    with store._lock:
-        store.db.execute("BEGIN IMMEDIATE")
+    with store._authority_write() as write:
         try:
             if not isinstance(workspace, str) or workspace not in {"demo", "personal"}:
                 raise StoreError("Invalid workspace.")
@@ -49,7 +48,6 @@ def edit_transaction(
                 (transaction["categoryId"], int(transaction["reviewed"]), transaction["note"],
                  int(transaction["isTransfer"]), int(transaction["categoryEdited"]), workspace, transaction_id),
             )
-            store.db.execute("COMMIT")
+            write["dirty"] = True
         except Exception:
-            store.db.execute("ROLLBACK")
             raise

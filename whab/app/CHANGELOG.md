@@ -4,6 +4,107 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.35.0 — 2026-10-23
+
+PR: [#95](https://github.com/Fillll/whab/pull/95)
+
+- Isolate supported pure categorization engines in bounded workers with opaque training/model continuations and approved immutable code upgrades. Defer replacement during training and retain unrelated services and saved models.
+- Journal complete namespace snapshots and original results before materialization, portable checkpoints or copy notifications. Recover interrupted publication without rerunning model hooks; retire cached child state after failed mutations and reject foreign model identities before dispatch.
+- Preserve disabled plugin-state edits through retained journals and release unstarted runtime resources during CLI budget creation. Verify actual distinct installed worker versions, failed preparation, recovery, isolation and the complete contribution gate.
+
+## 2.34.0 — 2026-10-23
+
+PR: [#92](https://github.com/Fillll/whab/pull/92)
+
+- Add the public declarative remote-ledger API adapter and generation-owned host bindings. Retain host-owned HTTPS, bearer authorization, strict commands, complete request leases and stable ledger revision/retry services through live selection changes.
+- Negotiate immutable API workers, prepare bindings before commit, revoke retired bindings and preserve the prior interface on failed configuration. Reject ambiguous route owners and portable credential injection; retain restart-only legacy factory aliases.
+- Verify actual distinct worker versions, failed candidates, disable/re-enable and reopen, security guards and categorization resource preservation in the complete contribution gate.
+
+## 2.33.0 — 2026-10-23
+
+PR: [#91](https://github.com/Fillll/whab/pull/91)
+
+- Add private atomic effect journals with stable-lock identity fencing, complete namespace decisions and recoverable materialization. Preserve original operation/result receipts after interrupted file publication.
+- Add scoped encrypted bank continuations that durably record external exchange intent, capture responses through host encryption and retain uncertain outcomes without automatic duplicate exchanges.
+- Verify filesystem faults, concurrency and nine process-termination boundaries. These foundations do not yet activate stateful worker families.
+
+## 2.32.0 — 2026-10-23
+
+PR: [#89](https://github.com/Fillll/whab/pull/89)
+
+- Add drained final readiness for live categorization selection with read-only staged namespaces and revocable retired callbacks. Preserve ledger/retry services, unchanged engines and active training continuations; changed engines defer until unfinished training finishes or is cancelled.
+- Resolve categorization dynamically during bank ingestion and share namespace mutation locks/copy notifications. Report host-process selection support separately from pending stateful worker upgrades in management and static catalog metadata.
+- Verify live HTTP lifecycle/model preservation, preparation refusal, callback cleanup and storage-copy/recovery integration in the complete contribution gate.
+
+## 2.31.0 — 2026-10-23
+
+PR: [#88](https://github.com/Fillll/whab/pull/88)
+
+- Add protocol-2 live branding/file-parser adapters, bounded immutable resource transfer and scoped branding factories. Keep host-owned security/import validation, stable services and failed-candidate behavior.
+- Bind preview/commit to parser identity, retain old resource generations and restore approved worker versions. Add explicit approved current-host worker-reference replacement with CAS, exact history and lost-reply retry.
+- Expand static metadata/catalog lifecycle accuracy and test actual historical protocol-1 recovery, immutable wheel upgrades, per-budget caches, resource coherence and the full contribution gate.
+
+## 2.30.0 — 2026-10-23
+
+PR: [#87](https://github.com/Fillll/whab/pull/87)
+
+- Synchronize a single authoritative SQLite or JSON primary to fenced native copies, retaining independent financial and opaque-namespace watermarks. Keep primary saves successful when copying fails and discover missed work after restart.
+- Add explicit caught-up promotion through the versioned authority journal, fresh epochs, validation and source fencing. Preserve acknowledged later writes, original containers and protected same-device state through interruption and repeated reopen.
+- Add public replica conformance without changing the toolkit minimum host; verify both concrete adapters, process termination and installed CA-verified HTTPS promotion in both directions.
+
+## 2.29.0 — 2026-10-23
+
+PR: [#86](https://github.com/Fillll/whab/pull/86)
+
+- Generate a curated packaged catalog and compatibility documentation from bounded static TOML/AST metadata, with no plugin import or installation. Check source declarations, SDK hook contracts, supported inventory and generated output drift in the existing documentation gate.
+- Expose detached validated catalog data through the public reader and guarded HTTP endpoint, including during gated handovers. Record maintainer/security links, accurate legacy/live support and exact dated artifact/selection verification without inheriting evidence across versions.
+- Include all maintained teaching examples and verify the packaged resource against installed public contracts, adversarial source/corruption fixtures and existing security guards.
+
+## 2.28.0 — 2026-10-23
+
+PR: [#85](https://github.com/Fillll/whab/pull/85)
+
+- Add explicit minimal HTTPS plugin startup recovery with metadata-only inspection, revision-checked optional disabling, exact-byte archival of invalid global selections and saved worker references, and full startup retry on the same guarded listener.
+- Version metadata-only budget selection journals so unopened nonempty financial payloads remain restorable after repair or interrupted first restore. Preserve unknown namespaces, original containers and committed migrated authority with acknowledged later writes.
+- Keep failed candidates attributable and recovery available; own cancellation/shutdown cleanup. Verify installed native HTTPS repair, same-listener activation, save and restart alongside the complete contribution gate.
+
+## 2.27.0 — 2026-10-23
+
+PR: [#84](https://github.com/Fillll/whab/pull/84)
+
+- Add explicit previewed same-device SQLite/JSON migration with per-budget draining, reopened destination validation, payload-free authority journaling, source fencing and explicit recovery. Preserve stable ledger/retry services, protected connection checkpoints, original containers and opaque plugin state.
+- Expose typed durable storage commands, commit evidence and local transfer contracts; declare exact backend payload paths so unknown files and finite plugin settings survive handover. Keep upgraded report-worker ownership across storage generations.
+- Test process termination at durable boundaries and installed CA-verified HTTPS round trips/restarts. Pair minimum-host developer checks with genuine compatible pinned reference artifacts.
+
+## 2.26.0 — 2026-10-23
+
+PR: [#83](https://github.com/Fillll/whab/pull/83)
+
+- Recognize the exact registrations of three new maintained teaching plugins as developer examples, keeping them hidden from ordinary Settings without importing disabled code. Verify their independent distributions in installed-wheel checks.
+
+## 2.25.0 — 2026-10-23
+
+PR: [#81](https://github.com/Fillll/whab/pull/81)
+
+- Upgrade explicitly live stateless reports through bounded protocol-1 workers in separately prepared, immutable approved-wheel environments. Inspect metadata and hashes before activation, install explicit closures offline, negotiate readiness and retain prior versions after failed candidates.
+- Persist and validate device-local active worker versions across disable/re-enable and restart. Expose active version/health and explicit recovery that checks durable selection and version evidence before resuming an uncertain handover.
+- Contain malformed responses and timeouts; clean up owned process groups on cancellation and shutdown, including descendants. Add exact packaging metadata tooling dependency and document that trusted Python workers provide failure containment rather than a security sandbox.
+
+## 2.24.0 — 2026-10-23
+
+PR: [#80](https://github.com/Fillll/whab/pull/80)
+
+- Add per-budget runtime generations, request/background leases, stable service handles, admission gating, serialized draining and reverse resource retirement. Preserve admitted work on cancellation; gate uncertain commits for explicit validated recovery.
+- Pin default and secondary-budget dispatch to one generation. Enable explicit live selection of stateless report/export plugins while preserving ledger revisions, command retry state, bank services and storage; expose transition progress, health and attributed diagnostics.
+- Update the independent teaching report to 1.4.0 with its explicit live contract. Other families and legacy plugins retain their documented restart requirement pending adapters.
+
+## 2.23.0 — 2026-10-23
+
+PR: [#79](https://github.com/Fillll/whab/pull/79)
+
+- Support independently packaged JSON 1.0.0 local storage alongside SQLite, using shared financial helpers and explicit selection. Preserve native encrypted provider state and backend-owned receipts; retain sanitized JSON ownership in personal and demo portable exports.
+- Verify installed JSON save/reopen and export paths. Publish bounded full-file persistence, stable writer locks, flushed atomic replacement and explicit uncertain-commit evidence with interruption tests.
+
 ## 2.22.0 — 2026-10-23
 
 PR: [#76](https://github.com/Fillll/whab/pull/76)

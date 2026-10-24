@@ -4,9 +4,10 @@ import html
 import re
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+
+from plugin_metadata import source_inventory, validate_generated
 
 ROOT = Path(__file__).resolve().parents[3]
 PRIVATE_PARTS = {".venv", "node_modules", "data", "budgets", "tls", "cache", "work", "build", "dist", "_tmp", ".build"}
@@ -29,6 +30,9 @@ def source_document(name: str) -> bool:
     if len(parts) == 2 or parts[1] == "docs":
         return True
     if parts[1] == "app":
+        if name in {"whab/app/devtools/plugin-devkit/README.md",
+                    "whab/app/devtools/plugin-devkit/fixtures/runtime-peers/README.md"}:
+            return True
         return len(parts) == 3 or (
             len(parts) >= 4 and parts[2] == "plugins"
             and (len(parts) <= 6 or parts[5] == "docs")
@@ -166,24 +170,7 @@ def normalized(name: str) -> str:
 
 def validate_inventory(root: Path) -> list[str]:
     application = root / "whab/app"
-    metadata = tomllib.loads(read_source_text(application / "pyproject.toml", root))
-    bundled = {
-        normalized(re.split(r"[\s<>=!~;\[]", requirement, maxsplit=1)[0])
-        for requirement in metadata["project"]["optional-dependencies"]["bundled"]
-    }
-    plugins = {}
-    plugin_root = source_path(application / "plugins", root)
-    for path in sorted(plugin_root.glob("*/*/pyproject.toml")):
-        project = tomllib.loads(read_source_text(path, root))["project"]
-        name = normalized(project["name"])
-        if name in bundled:
-            identifiers = tuple(project.get("entry-points", {}).get("whab.plugins", {}))
-            if len(identifiers) != 1:
-                return [f"{path.relative_to(root)}: supported plugin must declare one whab.plugins entry point"]
-            identifier = identifiers[0]
-            if identifier in plugins:
-                return [f"{path.relative_to(root)}: duplicate supported plugin ID {identifier}"]
-            plugins[identifier] = name
+    plugins = {row["id"]: normalized(row["distribution"]) for row in source_inventory(root) if row["support"] == "maintained"}
     inventory_path = application / "plugins/README.md"
     inventory = read_source_text(inventory_path, root)
     section = re.search(r"^## Supported plugins\s*\n(.*?)(?=^## |\Z)", inventory, re.MULTILINE | re.DOTALL)
@@ -199,8 +186,6 @@ def validate_inventory(root: Path) -> list[str]:
                 return [f"whab/app/plugins/README.md: duplicate inventory ID {cells[0]}"]
             rows[cells[0]] = normalized(cells[1])
     errors = []
-    if set(plugins.values()) != bundled:
-        errors.append("whab/app/pyproject.toml: bundled distributions do not match available supported plugin metadata")
     if rows != plugins:
         errors.append(
             "whab/app/plugins/README.md: Supported plugins table differs from bundled metadata "
@@ -222,6 +207,7 @@ def main() -> int:
             for error in validate_document(path, ROOT, texts)
         ]
         errors.extend(validate_inventory(ROOT))
+        errors.extend(validate_generated(ROOT))
     except (OSError, subprocess.CalledProcessError, ValueError, KeyError) as error:
         print(f"Documentation check failed: {error}", file=sys.stderr)
         return 1

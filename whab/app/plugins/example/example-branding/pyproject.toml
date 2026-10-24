@@ -1,0 +1,38 @@
+[project]
+name = "whab_plugin_example_branding"
+version = "1.0.0"
+description = "Fictional WHAB teaching plugin example-branding"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2.22,<3"]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10", "whab_plugin_devkit>=0.2,<1"]
+
+[project.entry-points."whab.plugins"]
+example-branding = "whab_plugin_example_branding:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "branding.bank", "version" = 1, "composition" = "additive" }]
+requires = []
+conflicts = []
+lifecycle = "restart"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "teaching"

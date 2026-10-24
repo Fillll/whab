@@ -40,6 +40,7 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | Folder | Plugin ID | Python package | Owns |
 | --- | --- | --- | --- |
 | `storage/sqlite/` | `sqlite` | `whab_plugin_sqlite` | Default ledger backend, schema upgrades and demo seeding |
+| `storage/json/` | `json` | `whab_plugin_json` | Independent single-file local ledger, receipts and encrypted connection checkpoints |
 | `ingestion/plaid/` | `plaid` | `whab_plugin_plaid` | Bank normalization, credentials, connection UI and synchronization |
 | `ingestion/ynab/` | `ynab` | `whab_plugin_ynab` | Local YNAB ZIP parsing, migration preview and import controls |
 | `interface/web/` | `web` | `whab_plugin_web` | View models, icons, templates and browser assets |
@@ -48,6 +49,10 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | `storage/client/` | `client` | `whab_plugin_client` | Remote storage and portable connection payload |
 | `automation/random-forest-categorization/` | `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Reviewed-history models and provisional category suggestions |
 | `example/example/` | `example` | `whab_plugin_example` | Separately installed developer teaching report/export |
+| `example/example-branding/` | `example-branding` | `whab_plugin_example_branding` | Offline fictional institution branding |
+| `example/example-file-import/` | `example-file-import` | `whab_plugin_example_file_import` | Bounded fictional account parser |
+| `example/example-categorization/` | `example-categorization` | `whab_plugin_example_categorization` | Currency-scoped saved teaching model |
+| `example/example-api/` | `example-api` | `whab_plugin_example_api` | Declarative API interface with host-owned HTTPS and financial dispatch |
 
 ## Test ownership
 
@@ -77,6 +82,7 @@ This is the canonical supported-set inventory. Keep it aligned with the host's `
 | --- | --- | --- |
 | `web` | `whab_plugin_web` | Selected visual interface |
 | `sqlite` | `whab_plugin_sqlite` | Selected storage for the original workspace |
+| `json` | `whab_plugin_json` | Not selected; choose explicitly for a separate local budget |
 | `plaid` | `whab_plugin_plaid` | Optional, enabled unless overridden |
 | `bank-logos` | `whab_plugin_bank_logos` | Disabled |
 | `ynab` | `whab_plugin_ynab` | Disabled |
@@ -84,9 +90,9 @@ This is the canonical supported-set inventory. Keep it aligned with the host's `
 | `client` | `whab_plugin_client` | Not selected; choose as storage for a remote connection |
 | `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Disabled |
 
-## Teaching example
+## Teaching examples
 
-`example` is distributed separately as `whab_plugin_example`. It is a hidden developer teaching plugin, excluded from the supported bundled set and ordinary Settings. See [the example README](example/example/README.md) and [activation instructions](../../docs/plugins.md#install-the-working-example).
+The [teaching category](example/README.md) contains five independently packaged public-SDK examples: reporting/export, branding, file import, categorization and a WHAB 2.34+ declarative API interface. They are excluded from the supported bundled set and hidden from ordinary Settings. Install them with `scripts/install.py --dev --example`, then explicitly select the desired IDs; installation does not activate them. See the category guide and [activation instructions](../../docs/plugins.md#install-the-working-example).
 
 ## Installation and compatibility
 
@@ -96,7 +102,7 @@ From the application directory (`whab/app/`), install or refresh the complete lo
 .venv/bin/python scripts/install.py --dev
 ```
 
-Add `--example` to install the teaching package too; omit `--dev` when development dependencies are unnecessary. The helper supplies all local package paths together, so unpublished local plugin packages do not need to resolve from a package index. When compatible host/plugin distributions are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the [supported plugins](#supported-plugins); the source helper works directly from this checkout without requiring those releases to be published. A single plugin can be installed from its own folder, such as `.venv/bin/python -m pip install -e plugins/interface/bank-logos`. Installing a package does not enable it; see the [developer-only example activation](../../docs/plugins.md#install-the-working-example).
+Add `--example` to install the teaching packages too; omit `--dev` when development dependencies are unnecessary. The helper supplies all local package paths together, so unpublished local plugin packages do not need to resolve from a package index. When compatible host/plugin distributions are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the [supported plugins](#supported-plugins); the source helper works directly from this checkout without requiring those releases to be published. A single plugin can be installed from its own folder, such as `.venv/bin/python -m pip install -e plugins/interface/bank-logos`. Installing a package does not enable it; see the [developer-only example activation](../../docs/plugins.md#install-the-working-example).
 
 To upgrade from the former `whab-<id>-plugin` distributions, rerun the source installer. It installs the standardized packages before removing detected legacy official distributions and preserves an installed teaching example by including its replacement. For wheel installations, use a fresh environment or remove the legacy distributions when installing the new packages; keeping both would register the same runtime IDs twice. Runtime IDs, enabled selections, saved settings and routes remain stable through the package rename.
 

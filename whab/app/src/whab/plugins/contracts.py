@@ -20,9 +20,11 @@ _NAME = re.compile(r"[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\Z")
 # between plugins. Unknown names remain available for extensions to negotiate.
 _HOST_CONTRACTS = frozenset({
     "ledger.read", "ledger.mutate", "provider.state", "provider.sync", "receipts",
-    "transfer.neutral", "transfer.prepare", "interface.ui", "interface.api",
+    "transfer.neutral", "transfer.prepare", "transfer.local", "storage.authority", "storage.commands", "storage.replica", "storage.worker",
+    "interface.ui", "interface.api",
     "reporting.insights", "reporting.export", "ingestion.file", "ingestion.bank",
     "branding.bank", "branding.merchant", "categorization",
+    "lifecycle.background",
 })
 
 

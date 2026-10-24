@@ -122,7 +122,8 @@ def test_cancel_expiry_training_failures_and_invalid_inputs(client, history, mon
     action(client, 'cancel', session=run2['session'])
     service.after_import()
     assert service.error is None
-    monkeypatch.setattr(service, 'predict', lambda *_: (_ for _ in ()).throw(RuntimeError('private data')))
+    active = client.app.state.budget_runtime._active.services['categorization']
+    monkeypatch.setattr(active, 'predict', lambda *_: (_ for _ in ()).throw(RuntimeError('private data')))
     service.after_import()
     assert 'private data' not in service.error
     for payload in ({'action': 'unknown', 'pluginId': PLUGIN}, {'action': 'train', 'pluginId': PLUGIN, 'parameters': []}, {'action': 'train', 'pluginId': PLUGIN, 'unexpected': 1}):
@@ -188,15 +189,17 @@ def test_remote_host_trains_and_accepts_suggestions_once(store, history, tmp_pat
     import httpx
     from fastapi import FastAPI
     from whab_plugin_client.plugin import RemoteStore
-    from whab_plugin_server.plugin import create_interface
+    from whab_plugin_server.plugin import plugin as server_plugin
 
     from whab.plugins import InterfaceContext
+    from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
 
     authority = LedgerService(store, budget_id='authority')
     authority.categorization = CategorizationService(authority, (plugin,), lambda key: local_context(tmp_path, 'authority', key))
     token = 'synthetic-server-token-' + 'x' * 32
     app = FastAPI()
-    app.include_router(create_interface(InterfaceContext(authority, {'SERVER_TOKEN': token}, 'sandbox', 'authority')))
+    binding = BoundRemoteInterface(server_plugin.interface.adapter, InterfaceContext(authority, {'SERVER_TOKEN': token}, 'sandbox', 'authority'))
+    app.include_router(create_remote_router(lambda: binding))
     with TestClient(app, base_url='https://budget.example') as server:
         def handle(request):
             response = server.request(request.method, str(request.url), content=request.content,
@@ -261,7 +264,8 @@ def test_failed_training_clears_session_and_acceptance_provenance_failure_keeps_
     assert action(client, 'status')['models'][0]['name'] == 'Renamed model'
     action(client, 'suggest')
     suggestion = service.suggestions('personal')[history[-1]]
-    monkeypatch.setattr(service, '_save', lambda *_: (_ for _ in ()).throw(OSError('private file path')))
+    active = client.app.state.budget_runtime._active.services['categorization']
+    monkeypatch.setattr(active, '_save', lambda *_: (_ for _ in ()).throw(OSError('private file path')))
     client.app.state.ledger_service.edit_transaction('personal', history[-1], reviewed=True, suggestion_id=suggestion['id'])
     assert service.error == 'Review saved. Its suggestion history could not be updated.'
     assert next(row for row in client.app.state.store.transactions('personal') if row['id'] == history[-1])['reviewed']
@@ -322,9 +326,13 @@ def test_save_failure_does_not_chain_private_model_and_allows_retry(client, hist
 
 
 def test_model_size_failure_is_actionable_and_does_not_publish_model(client, history, monkeypatch):
-    from whab_plugin_random_forest_categorization import model
-
-    monkeypatch.setattr(model, 'LIMIT', 1)
+    # The host exercises an actionable save rejection at its public engine
+    # boundary. Plugin serialization limits have their own direct plugin tests;
+    # changing a parent module cannot affect an installed child interpreter.
+    engine = client.app.state.ledger_service.categorization.engines[PLUGIN]
+    def too_large(*_):
+        raise StoreError('Model is too large. Reduce trees, depth, or vocabulary.')
+    monkeypatch.setattr(engine, 'save', too_large)
     run = action(client, 'train', parameters={'trees': 10})
     result = {}
     while result.get('progress', 0) < 98:
@@ -338,15 +346,15 @@ def test_model_size_failure_is_actionable_and_does_not_publish_model(client, his
 
 
 def test_explicit_low_score_preview_preserves_cutoff_and_ledger(client, store, history, monkeypatch):
-    import numpy as np
-    from whab_plugin_random_forest_categorization import plugin as module
-
     model = train(client, threshold=.8)
     service = client.app.state.ledger_service.categorization
     engine = service.engines[PLUGIN]
     original = engine.context.read_file(f"models/{model['id']}.json")
     before = deepcopy(store.workspace('personal', '2026-10'))
-    monkeypatch.setattr(module, 'score', lambda _model, rows: np.array([[.4, .6]] * len(rows)))
+    monkeypatch.setattr(engine, 'predict', lambda rows: [])
+    monkeypatch.setattr(engine, 'preview', lambda rows: [
+        {'transactionId': row['id'], 'categoryId': history[1], 'score': .6,
+         'modelId': model['id'], 'belowCutoff': True} for row in rows])
     assert action(client, 'suggest')['suggested'] == 0
     assert action(client, 'status')['previewAvailable']
     assert action(client, 'preview') == {'suggested': 1, 'lowScore': 1}

@@ -5,16 +5,30 @@ import io
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 from whab.domain.accounts import bank_website_entry
 from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.plugins import PluginError
+from whab.plugins.catalog import CatalogError, catalog_snapshot
 from whab.web.csv import safe_cell
 from whab.web.navigation import budget_key
 from whab.web.plugin_snapshot import build_snapshot
-from whab.web.schemas import BankLogoPreviewBody, PluginSelectionBody, Workspace, valid_month
+from whab.web.schemas import (
+    BankLogoPreviewBody,
+    Body,
+    PluginRecoveryBody,
+    PluginSelectionBody,
+    PluginUpgradeBody,
+    Workspace,
+    valid_month,
+)
+
+
+class RuntimeCleanupBody(Body):
+    pass
 
 
 def create_router(store, plugins, plugin_manager=None):
@@ -23,6 +37,73 @@ def create_router(store, plugins, plugin_manager=None):
     @router.get("")
     def describe():
         return {"plugins": [asdict(plugin) for plugin in plugins.describe()]}
+
+    @router.get("/catalog")
+    def curated_catalog():
+        try:
+            return JSONResponse(catalog_snapshot(), headers={"Cache-Control": "no-store"})
+        except CatalogError as error:
+            raise HTTPException(503, str(error)) from None
+
+    @router.get("/runtime")
+    def runtime_status():
+        if plugin_manager is None or plugin_manager.live is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        return plugin_manager.live.status()
+
+    @router.post("/runtime/cleanup")
+    async def cleanup(request: Request, body: RuntimeCleanupBody):
+        if request.scope.get("whab.workspace") == "demo" or "demo" in request.query_params.getlist("workspace"):
+            raise HTTPException(403, "This operation requires your own budget")
+        if plugin_manager is None or plugin_manager.live is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        try:
+            await plugin_manager.live.runtime.retry_cleanup(timeout=5)
+        except PluginError as error:
+            return JSONResponse({"error": str(error), "code": error.code,
+                                 "plugin_id": error.plugin_id}, status_code=409)
+        return {"status": plugin_manager.live.status()}
+
+    @router.post("/management/transition", status_code=202)
+    async def transition(request: Request, body: PluginSelectionBody):
+        if request.scope.get("whab.workspace") == "demo":
+            raise HTTPException(403, "This operation requires your own budget")
+        if plugin_manager is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        try:
+            selection = tuple(body.plugins)
+            await run_in_threadpool(plugin_manager.preflight_live, selection)
+            identifier = plugin_manager.schedule_live(selection, validated=True)
+        except PluginError as error:
+            return JSONResponse({"error": str(error), "code": error.code,
+                                 "plugin_id": error.plugin_id}, status_code=409)
+        return {"id": identifier, "accepted": True, "status": plugin_manager.live.status()}
+
+    @router.post("/management/upgrade", status_code=202)
+    async def upgrade(request: Request, body: PluginUpgradeBody):
+        if request.scope.get("whab.workspace") == "demo":
+            raise HTTPException(403, "This operation requires your own budget")
+        if plugin_manager is None or plugin_manager.live is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        from whab.plugins.environments import ApprovedWheel
+
+        identifier = plugin_manager.live.schedule_upgrade(body.pluginId, tuple(
+            ApprovedWheel(wheel.path, wheel.sha256) for wheel in body.wheels
+        ))
+        return {"id": identifier, "accepted": True}
+
+    @router.post("/management/recover")
+    async def recover(request: Request, body: PluginRecoveryBody):
+        if request.scope.get("whab.workspace") == "demo":
+            raise HTTPException(403, "This operation requires your own budget")
+        if plugin_manager is None or plugin_manager.live is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        try:
+            generation = await plugin_manager.live.recover(body.authority)
+        except PluginError as error:
+            return JSONResponse({"error": str(error), "code": error.code,
+                                 "plugin_id": error.plugin_id}, status_code=409)
+        return {"generation": generation, "status": plugin_manager.live.status()}
 
     @router.post("/bank-logo-preview")
     def preview_bank_logo(request: Request, body: BankLogoPreviewBody):

@@ -1,0 +1,31 @@
+[project]
+name = "__MODULE__"
+version = "0.1.0"
+description = "Fictional WHAB teaching plugin __PLUGIN_ID__"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=__HOST_MINIMUM__,<3"]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10", "whab_plugin_devkit>=__KIT_MINIMUM__,<1"__REFERENCE_TEST_REQUIREMENT__]
+
+[project.entry-points."whab.plugins"]
+__PLUGIN_ID__ = "__MODULE__:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.whab.plugin-devkit]
+minimum-host = "__HOST_MINIMUM__.0"
+
+__STATIC_METADATA__

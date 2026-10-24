@@ -17,7 +17,8 @@ CATEGORY_TEMPLATE = [
 ]
 
 
-def build_initial_state(workspace: str, month: str) -> dict:
+def build_initial_state(workspace: str, month: str, *, as_of_date=None) -> dict:
+    selected_date = as_of_date or today()
     state = {
         "_id": workspace,
         "revision": 0,
@@ -81,7 +82,7 @@ def build_initial_state(workspace: str, month: str) -> dict:
                 if offset == 0
                 else int(Decimal(amount) * (Decimal(1) + Decimal(offset) * Decimal(".025"))),
                 category,
-                min(index + 2, int(today()[8:]) if offset == 0 else 20),
+                min(index + 2, int(selected_date[8:]) if offset == 0 else 20),
             )
             for index, (category, merchant, amount) in enumerate(merchants)
         ]
@@ -91,6 +92,7 @@ def build_initial_state(workspace: str, month: str) -> dict:
                 "accountId": "checking",
                 "date": f"{seed_month}-{day:02d}",
                 "merchant": merchant,
+                "merchantLogo": None,
                 "amount": amount,
                 "categoryId": category,
                 "pending": False,
@@ -106,8 +108,9 @@ def build_initial_state(workspace: str, month: str) -> dict:
     state["transactions"]["pending-demo"] = {
         "id": "pending-demo",
         "accountId": "credit",
-        "date": today(),
+        "date": selected_date,
         "merchant": "Weekend groceries",
+        "merchantLogo": None,
         "amount": 6425,
         "categoryId": "groceries",
         "pending": True,

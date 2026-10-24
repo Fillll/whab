@@ -1,10 +1,22 @@
 """Local-only request guards applied to every feature router."""
 
+import re
 from urllib.parse import urlsplit
 
 from fastapi.responses import JSONResponse
 
 from whab.domain.receipts import MAX_RECEIPT_BYTES, RECEIPT_TYPES
+
+_IMPORT_PATH = re.compile(r"/api/plugins/[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*/import/(?:new/)?(?:preview|commit)\Z")
+
+
+def _webhook(path, explicit):
+    return explicit(path) if callable(explicit) else path in explicit
+
+
+def _file_import(path, explicit):
+    parts = path.split("/")
+    return path in explicit or bool(len(parts) >= 4 and len(parts[3]) <= 64 and _IMPORT_PATH.fullmatch(path))
 
 
 def _receipt_upload(path, method):
@@ -16,7 +28,7 @@ class RequestBodyLimit:
 
     def __init__(self, app, webhook_paths, file_import_paths=()):
         self.app = app
-        self.webhook_paths = frozenset(webhook_paths)
+        self.webhook_paths = webhook_paths if callable(webhook_paths) else frozenset(webhook_paths)
         self.file_import_paths = frozenset(file_import_paths)
 
     async def __call__(self, scope, receive, send):
@@ -28,8 +40,8 @@ class RequestBodyLimit:
             await self.app(scope, receive, send)
             return
         limit = MAX_RECEIPT_BYTES if _receipt_upload(scope["path"], scope["method"]) else (
-            (50 * 1024 * 1024 if scope["path"] == "/api/budget/open" else 10 * 1024 * 1024) if scope["path"] in self.file_import_paths
-            else 128 * 1024 if scope["path"] in self.webhook_paths else 32 * 1024
+            (50 * 1024 * 1024 if scope["path"] == "/api/budget/open" else 10 * 1024 * 1024) if _file_import(scope["path"], self.file_import_paths)
+            else 128 * 1024 if _webhook(scope["path"], self.webhook_paths) else 32 * 1024
         )
         chunks = []
         size = 0
@@ -58,8 +70,22 @@ class RequestBodyLimit:
         await self.app(scope, replay, send)
 
 
+class RequireHTTPS:
+    """Reject cleartext before a runtime admission gate can delay the guard."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("scheme") != "https":
+            await JSONResponse({"error": "HTTPS is required"}, status_code=400,
+                               headers={"Cache-Control": "no-store"})(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
 def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote=False):
-    webhook_paths = frozenset(webhook_paths)
+    webhook_paths = webhook_paths if callable(webhook_paths) else frozenset(webhook_paths)
     file_import_paths = frozenset(file_import_paths)
     new_budget_import_paths = frozenset(
         path for path in file_import_paths
@@ -71,8 +97,8 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
     async def local_access(request, call_next):
         if request.url.scheme != "https":
             return JSONResponse({"error": "HTTPS is required"}, status_code=400, headers={"Cache-Control": "no-store"})
-        webhook = request.url.path in webhook_paths
-        remote_request = remote and (request.url.path == "/remote/v1" or request.url.path.startswith("/remote/v1/"))
+        webhook = _webhook(request.url.path, webhook_paths)
+        remote_request = (request.url.path == "/remote/v1" or request.url.path.startswith("/remote/v1/")) and (remote() if callable(remote) else remote)
         if not webhook and not remote_request:
             try:
                 host = urlsplit("http://" + request.headers.get("host", "")).hostname
@@ -90,7 +116,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
             "HEAD",
             "OPTIONS",
         }:
-            file_import = request.url.path in file_import_paths
+            file_import = _file_import(request.url.path, file_import_paths)
             receipt_upload = _receipt_upload(request.url.path, request.method)
             content_type = "application/zip" if file_import else "application/json"
             actual_type = request.headers.get("content-type", "").split(";")[0]
@@ -120,7 +146,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
                 path = request.url.path
                 personal_only = (
                     path.startswith(("/api/banks/", "/api/plaid/", "/api/budget/plugins/"))
-                    or ("/import/" in path and path not in new_budget_import_paths)
+                    or ("/import/" in path and path not in new_budget_import_paths and not (_file_import(path, ()) and path.endswith(("/import/new/preview", "/import/new/commit"))))
                     or path in {"/api/budget/save", "/api/budget/copies"}
                     or (request.method not in {"GET", "HEAD", "OPTIONS"} and (
                         path == "/api/plugins/management" or "/settings/actions/" in path

@@ -83,7 +83,8 @@ def test_batch_matches_core_and_preserves_other_fields_scopes_and_images(review_
     images = [tuple(row) for row in store.db.execute("SELECT * FROM transaction_receipts ORDER BY workspace,transaction_id")]
     changes = store.db.total_changes
     assert store.review_transactions(workspace, collection(selected), reviewed) is None
-    assert store.db.total_changes == changes + len(selected)
+    # One runtime authority row advances with the selected annotation rows.
+    assert store.db.total_changes == changes + len(selected) + 1
     assert store.state(workspace) == expected
     assert store.state(other) == unrelated
     assert store.export_budget(workspace) == public
@@ -199,7 +200,7 @@ def test_batch_reads_metadata_and_targets_once_and_updates_only_reviewed(review_
             return sqlite3.SQLITE_DENY
         if action == sqlite3.SQLITE_UPDATE:
             writes.append((table, column))
-            return sqlite3.SQLITE_OK if (table, column) == ("transactions", "reviewed") else sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK if (table, column) in {("transactions", "reviewed"), ("storage_authority", "record")} else sqlite3.SQLITE_DENY
         return sqlite3.SQLITE_OK
 
     monkeypatch.setattr(bulk_review, "validate_review_batch", validate)
@@ -212,7 +213,7 @@ def test_batch_reads_metadata_and_targets_once_and_updates_only_reviewed(review_
         review_ledger.db.set_authorizer(None)
         review_ledger.db.set_trace_callback(None)
     assert calls == [(["bulk-0", "bulk-1"], True)]
-    assert writes == [("transactions", "reviewed")]
+    assert writes == [("transactions", "reviewed"), ("storage_authority", "record")]
     assert sum("FROM accounts" in sql for sql in statements) == 1
     assert sum("FROM categories" in sql for sql in statements) == 1
     assert sum("FROM transactions" in sql for sql in statements) == 1

@@ -111,7 +111,8 @@ def test_explicit_paths_isolate_reads_writes_plugins_exports_and_page_assets(tmp
         assert context["apiPrefix"] == f"/budgets/{a}/api"
         assert context["budgetUrl"] == "/budgets/household"
         assert "Household wallet" in response.text and "Travel wallet" not in response.text
-        assert f'/budgets/{a}/static/app.js' in response.text
+        assert f'/budgets/{a}/ui/{context["uiGeneration"]}/static/app.js' in response.text
+        assert client.get(f'/budgets/{a}/ui/{context["uiGeneration"]}/static/app.js').status_code == 200
         assert client.get(f"/budgets/{a}/static/app.js").status_code == 200
         activated = client.post(scoped(a, f"budgets/{b}/activate"), json={})
         assert activated.status_code == 200 and activated.json()["url"] == second["url"]
@@ -250,7 +251,7 @@ def test_oauth_callback_bridge_ignores_other_tab_cookie_and_omits_callback_state
         callback_state = "synthetic-private-callback-state"
         response = client.get("/", params={"oauth_state_id": callback_state}, follow_redirects=False)
         assert response.status_code == 200
-        assert '/budgets/home/plugins/plaid/static/oauth.js' in response.text
+        assert '/budgets/home/banks/plaid/' in response.text and '/static/oauth.js' in response.text
         assert created["id"] not in response.text
         assert callback_state not in response.text
         assert response.headers["cache-control"] == "no-store"
@@ -282,7 +283,7 @@ def test_oauth_bridge_can_use_enabled_provider_from_an_already_open_budget(tmp_p
         client.cookies.set("whab-budget", "unknown-budget")
         response = client.get("/?oauth_state_id=synthetic-private-state")
         assert response.status_code == 200
-        assert f'/budgets/{key}/plugins/plaid/static/oauth.js' in response.text
+        assert f'/budgets/{key}/banks/plaid/' in response.text and '/static/oauth.js' in response.text
         assert "Private portable fixture" not in response.text
         assert "synthetic-private-state" not in response.text
         assert set(host.applications) == {"default", key}

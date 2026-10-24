@@ -9,6 +9,7 @@ import math
 import re
 import threading
 import time
+from contextvars import ContextVar
 from pathlib import Path
 
 import httpx
@@ -19,6 +20,7 @@ from whab.plugins import (
     LogoImage,
     Plugin,
     PluginAction,
+    PluginContract,
     PluginSettings,
     StoreError,
     bank_website,
@@ -91,6 +93,8 @@ _NAMES = {
     for name in names
 }
 
+_domain_resolver = ContextVar("bank_logo_domain_resolver", default=None)
+
 
 def resolve(institution_name: str) -> str | None:
     """Resolve a known public institution name locally; no account data is accepted."""
@@ -101,6 +105,10 @@ def resolve(institution_name: str) -> str | None:
 
 def resolve_domain(public_hostname: str) -> str | None:
     """Register an explicitly supplied public hostname without any network access."""
+    return _resolve_domain(_cache, public_hostname)
+
+
+def _resolve_domain(cache, public_hostname):
     if (type(public_hostname) is not str or not public_hostname or len(public_hostname) > 253
             or any(character in public_hostname for character in "/\\:@?#")):
         return None
@@ -109,7 +117,7 @@ def resolve_domain(public_hostname: str) -> str | None:
     except StoreError:
         return None
     hostname = normalized.removeprefix("https://")
-    return _cache.register_domain(hostname)
+    return cache.register_domain(hostname)
 
 
 def _fetch(client: httpx.Client, domain: str) -> LogoImage | None:
@@ -138,7 +146,8 @@ def _fetch(client: httpx.Client, domain: str) -> LogoImage | None:
 
 def fetch_logo(key: str, *, client: httpx.Client | None = None) -> LogoImage | None:
     """Fetch a registered key; an injected client supports network-free provider tests."""
-    domain = _cache.domain(key)
+    resolver = _domain_resolver.get() or _cache.domain
+    domain = resolver(key)
     if domain is None:
         return None
     if client is not None:
@@ -265,9 +274,11 @@ class _LogoCache:
                     break
             pending.wait()
         image = None
+        domain_context = _domain_resolver.set(self.domain)
         try:
             image = fetch_logo(key)
         finally:
+            _domain_resolver.reset(domain_context)
             with self._lock:
                 if generation == self._generation and self.domain(key) is not None:
                     now = time.time()
@@ -333,10 +344,26 @@ def read_settings() -> tuple[Insight, ...]:
 
 
 def apply_setting(action_id: str) -> str:
+    return _apply_setting(_cache, action_id)
+
+
+def _apply_setting(cache, action_id):
     if action_id != "flush-cache":
         raise ValueError("Unknown bank logos action.")
-    _cache.flush()
+    cache.flush()
     return "Bank logo cache cleared. Logos will download again when requested."
+
+
+def branding_instance():
+    """One budget owns these cache and settings closures; no global reconfiguration."""
+    cache = _LogoCache()
+    return Plugin(
+        id="bank-logos", display_name="Bank logos (Icon Horse)",
+        bank_logos=BankLogos(resolve, cache.get, cache.configure, lambda hostname: _resolve_domain(cache, hostname),
+                             "Icon Horse", "https://icon.horse"),
+        settings=PluginSettings(cache.read, plugin.settings.actions, lambda action: _apply_setting(cache, action)),
+        contract=PluginContract(lifecycle="live"),
+    )
 
 
 plugin = Plugin(
@@ -356,4 +383,6 @@ plugin = Plugin(
         ),),
         act=apply_setting,
     ),
+    branding_factory=branding_instance,
+    contract=PluginContract(lifecycle="live"),
 )

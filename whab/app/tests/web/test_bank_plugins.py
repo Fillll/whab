@@ -2,7 +2,6 @@
 
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +12,7 @@ from whab.config import Settings
 from whab.plugins import Plugin, PluginError, PluginRegistry, WebhookResult
 
 
-def settings(plugins=(), *, home=Path("unused-test-home"), ui="web"):
+def settings(home, plugins=(), *, ui="web"):
     return Settings(home, 5173, "sandbox", "", "", "", False, "", "", plugins, ui=ui)
 
 
@@ -65,7 +64,7 @@ class FakeBank:
         self.events.append("closed")
 
 
-def test_another_bank_uses_same_lifecycle_routes_and_scoped_store():
+def test_another_bank_uses_same_lifecycle_routes_and_scoped_store(tmp_path):
     events, contexts = [], []
 
     def factory(context):
@@ -78,7 +77,7 @@ def test_another_bank_uses_same_lifecycle_routes_and_scoped_store():
     store.save_item("plaid-item", "fictional-ciphertext", "Other provider")
     try:
         with TestClient(
-            create_app(store=store, settings=settings(ui=""), plugins=plugins),
+            create_app(store=store, settings=settings(tmp_path, ui=""), plugins=plugins),
             base_url="https://127.0.0.1:5173",
         ) as client:
             assert events == ["started"]
@@ -110,7 +109,7 @@ def test_another_bank_uses_same_lifecycle_routes_and_scoped_store():
         store.close()
 
 
-def test_startup_failure_closes_previously_started_bank(store):
+def test_startup_failure_closes_previously_started_bank(store, tmp_path):
     events = []
 
     def fail(_context):
@@ -123,24 +122,24 @@ def test_startup_failure_closes_previously_started_bank(store):
         )
     )
     with pytest.raises(PluginError, match="could not start"):
-        with TestClient(create_app(store=store, settings=settings(ui=""), plugins=plugins)):
+        with TestClient(create_app(store=store, settings=settings(tmp_path, ui=""), plugins=plugins)):
             pass
     assert events == ["closed"]
 
 
 @pytest.mark.parametrize("invalid", [None, object(), {"config": {}}])
-def test_invalid_bank_factory_result_fails_at_startup(invalid, store):
+def test_invalid_bank_factory_result_fails_at_startup(invalid, store, tmp_path):
     plugins = PluginRegistry((Plugin("invalid", "Invalid bank", bank=lambda _context: invalid),))
     with pytest.raises(PluginError, match="could not start"):
-        with TestClient(create_app(store=store, settings=settings(ui=""), plugins=plugins)):
+        with TestClient(create_app(store=store, settings=settings(tmp_path, ui=""), plugins=plugins)):
             pass
 
 
-def test_async_factory_is_rejected_without_leaking_a_coroutine(store):
+def test_async_factory_is_rejected_without_leaking_a_coroutine(store, tmp_path):
     async def factory(_context):
         return FakeBank([])
 
     plugins = PluginRegistry((Plugin("invalid", "Invalid bank", bank=factory),))
     with pytest.raises(PluginError, match="could not start"):
-        with TestClient(create_app(store=store, settings=settings(ui=""), plugins=plugins)):
+        with TestClient(create_app(store=store, settings=settings(tmp_path, ui=""), plugins=plugins)):
             pass

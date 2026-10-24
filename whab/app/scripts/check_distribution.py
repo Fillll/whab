@@ -22,13 +22,15 @@ import importlib.metadata as metadata
 import importlib
 import json
 import sys
+from dataclasses import asdict, replace
 from unittest.mock import patch
 sys.path.insert(0, sys.argv[1])
 expected = json.loads(sys.argv[2])
 import whab
 from whab.app import create_app
 from whab.config import Settings
-from whab.plugins import LogoImage, load_plugins
+from whab.plugins import LogoImage, contract_for, load_plugins
+from whab.plugins.catalog import catalog_snapshot
 from whab_plugin_plaid.logos import logo_key
 from fastapi.testclient import TestClient
 
@@ -36,6 +38,15 @@ target = Path(sys.argv[1]).resolve()
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]
 assert not metadata.distribution("whab").entry_points
+with patch.object(metadata, "entry_points", side_effect=AssertionError("Catalog must not discover code")):
+    catalog = catalog_snapshot()
+assert catalog["host_version"] == whab.__version__
+assert {row["id"] for row in catalog["plugins"]} == set(expected) - {"whab"}
+for row in catalog["plugins"]:
+    assert row["version"] == expected[row["id"]]["version"]
+    assert row["distribution"] == expected[row["id"]]["distribution"]
+catalog["plugins"].clear()
+assert catalog_snapshot()["plugins"]
 assert {entry.name for entry in metadata.entry_points(group="whab.plugins")} == set(expected) - {"whab"}
 for identifier, record in expected.items():
     assert metadata.version(record["distribution"]) == record["version"], identifier
@@ -46,6 +57,21 @@ for identifier, record in expected.items():
     assert entries[0].dist.metadata["Name"] == record["distribution"], identifier
     module = importlib.import_module(record["module"])
     assert Path(module.__file__).resolve().is_relative_to(target), identifier
+for row in catalog_snapshot()["plugins"]:
+    descriptor = load_plugins((row["id"],)).descriptors()[0]
+    contract = contract_for(descriptor)
+    assert row["display_name"] == descriptor.display_name
+    assert row["api_version"] == descriptor.api_version
+    assert row["capabilities"] == sorted((asdict(value) for value in contract.provides), key=lambda value: value["name"])
+    assert row["requires"] == [
+        {key: value for key, value in asdict(requirement).items() if value is not None}
+        for requirement in contract.requires
+    ]
+    assert row["conflicts"] == list(contract.conflicts)
+    assert row["lifecycle"] == contract.lifecycle and row["authority"] == contract.authority
+    assert row["state_version"] == contract.state_version
+    assert row["state_upgrades"] == [list(edge) for edge in contract.state_upgrades]
+    assert row["legacy"] == (descriptor.contract is None)
 assert {"server", "client"} <= {entry.name for entry in metadata.entry_points(group="whab.plugins")}
 assert load_plugins(("server",)).interface_plugins()[0].id == "server"
 assert load_plugins(("client",)).storage_plugin("client").id == "client"
@@ -62,9 +88,16 @@ assert settings.storage == "sqlite" and settings.ui == "web"
 assert settings.plugins == ("plaid", "example", "bank-logos", "ynab")
 registry = load_plugins(settings.enabled_plugins())
 assert [p.id for p in registry.describe()] == ["bank-logos", "example", "plaid", "sqlite", "web", "ynab"]
-assert all(p.lifecycle == "restart" and p.legacy for p in registry.describe())
+assert {p.id: (p.lifecycle, p.legacy) for p in registry.describe()} == {
+    "bank-logos": ("live", False), "example": ("live", False), "plaid": ("live", False),
+    "sqlite": ("live", False), "web": ("live", False), "ynab": ("live", False),
+}
+assert registry.ui_plugin("web").ui.view_protocol == 1
+assert next(p for p in registry.describe() if p.id == "example").lifecycle == "live"
+assert not next(p for p in registry.describe() if p.id == "example").legacy
 remote = load_plugins(("client",)).describe()[0]
 assert remote.authority == "remote" and not remote.legacy
+assert remote.lifecycle == "live"
 assert {row.name for row in remote.capabilities} == {"ledger.read", "ledger.mutate"}
 assert registry.bank_logo("Chase") == ("bank-logos", "chase")
 assert registry.bank_logo("Demo Bank") is None
@@ -77,6 +110,12 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
         response = client.get(f"/budgets/demo/{page}/current-month/usd")
         assert response.status_code == 200, page
         assert f"WHAB · {whab.__version__}" in response.text
+        generation = response.headers.get("X-WHAB-UI-Generation", "")
+        assert len(generation) == 64 and all(value in "0123456789abcdef" for value in generation)
+        resource = f"/budgets/demo/ui/{generation}/static/app.js"
+        assert resource in response.text
+        asset = client.get(resource)
+        assert asset.status_code == 200 and asset.headers["cache-control"].endswith("immutable")
     for asset in ("styles.css", "theme.js", "app.js", "budget-edits.js", "client.js", "favicon.svg", "logo.svg"):
         assert client.get("/budgets/demo/static/" + asset).status_code == 200, asset
     assert client.get("/budgets/home/plugins/plaid/static/connect.js").status_code == 200
@@ -150,7 +189,29 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     assert container.files["plugins/sqlite/budget.sqlite"].startswith(b"SQLite format 3")
     assert client.post("/api/budgets/default/activate", json={}).status_code == 200
 assert (settings.home / "data" / "whab-sandbox.sqlite").is_file()
-print("Installed wheels: independent versions, MIT licenses, pages, assets and plugin discovery passed.")
+json_settings = replace(settings, home=settings.home / "json-reference", storage="json", plugins=())
+with TestClient(create_app(settings=json_settings), base_url="https://127.0.0.1:5173") as client:
+    created = client.post("/api/accounts", json={
+        "workspace": "personal", "name": "Fictional JSON checking", "type": "depository", "balance": 12345,
+    })
+    assert created.status_code == 200
+    account_id = created.json()["accountId"]
+    transaction = client.post("/api/transactions", json={
+        "workspace": "personal", "accountId": account_id, "date": "2026-10-01",
+        "merchant": "Fictional JSON purchase", "amount": 125, "categoryId": None,
+    })
+    assert transaction.status_code == 200
+    assert client.get("/api/workspace?workspace=personal").json()["accounts"][0]["balance"] == 12220
+    exported = decode_container(client.get("/api/budget/export").content)
+    assert exported.manifest["storage"] == "json" and "plugins/json/budget.json" in exported.files
+    demo = decode_container(client.get("/api/budget/export?workspace=demo").content)
+    assert demo.manifest["storage"] == "json" and "plugins/json/budget.json" in demo.files
+with TestClient(create_app(settings=json_settings), base_url="https://127.0.0.1:5173") as client:
+    account = client.get("/api/workspace?workspace=personal").json()["accounts"][0]
+    assert account["id"] == account_id and account["balance"] == 12220
+assert (json_settings.home / "data" / "whab-sandbox.json").is_file()
+assert not tuple(json_settings.home.rglob("*.sqlite"))
+print("Installed wheels: curated catalog resource/contracts, independent versions, MIT licenses, pages, assets and plugin discovery passed.")
 """
 
 INDEPENDENT_VERSION = """
@@ -242,11 +303,12 @@ def main():
                 "distribution": metadata["name"], "version": metadata["version"],
                 "module": entrypoint.split(":", 1)[0].split(".", 1)[0],
             }
-        assert set(expected) == {"whab", "web", "sqlite", "plaid", "bank-logos", "ynab", "server", "client", "example", "random-forest-categorization"}
+        teaching = {"example", "example-api", "example-branding", "example-file-import", "example-categorization"}
+        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", *teaching}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {
             f'{record["distribution"]}>={record["version"]},<2'
-            for identifier, record in expected.items() if identifier not in {"whab", "example"}
+            for identifier, record in expected.items() if identifier not in {"whab", *teaching}
         }
         run(
             "-m",

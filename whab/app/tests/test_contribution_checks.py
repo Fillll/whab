@@ -1,7 +1,9 @@
 """Contribution checks share CI behavior and never discover private runtime documents."""
 
+import shutil
 import subprocess
 import sys
+import zipfile
 from importlib import util
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,9 +12,10 @@ import pytest
 
 
 @pytest.fixture
-def checker(request):
+def checker(request, monkeypatch):
     name = request.param
     path = Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py"
+    monkeypatch.syspath_prepend(str(path.parent))
     spec = util.spec_from_file_location(f"whab_{name}", path)
     module = util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -30,8 +33,16 @@ def test_full_gate_runs_python_suite_once_and_quick_gate_skips_it(checker, monke
     assert sum("scripts/check_plugin_coverage.py" in command for _, command in full) == 1
     assert not any("pytest" in command for _, command in full)
     assert "scripts/check_distribution.py" in full[-1][1]
-    assert all("coverage" not in " ".join(command) and "distribution" not in " ".join(command) for _, command in quick)
+    assert sum("scripts/check_plugin_devkit.py" in command for _, command in full) == 1
+    assert sum("scripts/check_plugin_generation.py" in command for _, command in full) == 1
+    assert all("coverage" not in " ".join(command) and "distribution" not in " ".join(command)
+               and "check_plugin_devkit" not in " ".join(command)
+               and "check_plugin_generation" not in " ".join(command) for _, command in quick)
+    assert "devtools" in next(command for name, command in full if name == "Python lint")
     assert quick[-1][1] == ["node", "--test", str(test.relative_to(tmp_path))]
+    evidence = checker.commands(docs_only=False, quick=False, node="node", evidence_dir=tmp_path / "evidence")
+    generation = next(command for _, command in evidence if "scripts/check_plugin_generation.py" in command)
+    assert generation[-2:] == ["--artifacts-directory", str(tmp_path / "evidence/generated")]
 
 
 @pytest.mark.parametrize("checker", ["check"], indirect=True)
@@ -233,14 +244,35 @@ def inventory_fixture(root):
     plugin = application / "plugins/interface/web"
     plugin.mkdir(parents=True)
     (plugin / "pyproject.toml").write_text(
-        '[project]\nname = "whab_plugin_web"\n[project.entry-points."whab.plugins"]\nweb = "web:plugin"\n'
+        '[project]\nname = "whab_plugin_web"\nversion = "1.0.0"\nrequires-python = ">=3.14"\ndependencies = ["whab>=1,<3"]\n'
+        '[project.entry-points."whab.plugins"]\nweb = "web:plugin"\n'
+        '[tool.whab.plugin]\napi-version = 1\ncapabilities = [{name="interface.ui",version=1,composition="singleton"}]\n'
+        'requires = []\nconflicts = []\nlifecycle = "restart"\nlegacy = true\nauthority = "unknown"\nstate-version = 1\nstate-upgrades = []\nsupport = "maintained"\n'
     )
+    (plugin / "src").mkdir()
+    (plugin / "src/web.py").write_text("plugin = Plugin('web', 'Fictional UI', ui=object())\n")
+    sdk = application / "src/whab/plugins"
+    sdk.mkdir(parents=True)
+    (sdk.parent / "__init__.py").write_text("__version__ = '1.0.0'\n")
+    (sdk / "contracts.py").write_text("def contract_for(plugin):\n    for attribute,name,composition in (('ui','interface.ui','singleton'),):\n        pass\n")
     inventory = application / "plugins/README.md"
     inventory.write_text(
         "# Plugins\n\n## Supported plugins\n\n| Plugin ID | Distribution | Default enablement |\n"
         "| --- | --- | --- |\n| `web` | `whab_plugin_web` | Selected |\n\n"
         "## Teaching example\n\n| `example` | `whab_plugin_example` | Developer only |\n"
     )
+    (root / "SECURITY.md").write_text("# Fictional security policy\n")
+    (application / "plugins/catalog.toml").write_text(
+        'verification = []\n[publisher]\nmaintainer="Fillll"\nrepository="https://github.com/Fillll/whab"\n'
+        'documentation_ref="' + "0" * 40 + '"\nsecurity="https://github.com/Fillll/whab/security/advisories/new"\n'
+        'security_policy="https://github.com/Fillll/whab/security/policy"\nsecurity_verified_date="2026-10-23"\n'
+        'support_policy="Fictional support policy"\n'
+    )
+    (root / "whab/docs").mkdir()
+    from plugin_metadata import generated_outputs
+
+    for path, expected in generated_outputs(root).items():
+        path.write_text(expected)
     return inventory
 
 
@@ -257,7 +289,8 @@ def test_inventory_rejects_bundled_package_without_local_metadata(checker, tmp_p
     inventory_fixture(tmp_path)
     metadata = tmp_path / "whab/app/pyproject.toml"
     metadata.write_text('[project.optional-dependencies]\nbundled = ["whab_plugin_unknown>=1"]\n')
-    assert "do not match available supported plugin metadata" in checker.validate_inventory(tmp_path)[0]
+    with pytest.raises(ValueError, match="supported"):
+        checker.validate_inventory(tmp_path)
 
 
 @pytest.mark.parametrize("checker", ["check_docs"], indirect=True)
@@ -270,8 +303,7 @@ def test_inventory_rejects_symlinked_metadata_or_docs_before_reading(checker, mo
     secret.write_text("SENSITIVE INVALID METADATA MUST NOT BE READ")
     if kind == "plugin-directory":
         plugin = tmp_path / "whab/app/plugins/interface/web"
-        (plugin / "pyproject.toml").unlink()
-        plugin.rmdir()
+        shutil.rmtree(plugin)
         plugin.symlink_to(private, target_is_directory=True)
     else:
         path = inventory if kind == "inventory" else tmp_path / "whab/app/pyproject.toml"
@@ -314,3 +346,83 @@ def test_untracked_private_documents_are_never_opened(checker, monkeypatch, tmp_
     assert checker.main() == 0
     with pytest.raises(ValueError, match="outside private/generated paths"):
         checker.read_source_text(private_paths[0], tmp_path)
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+def test_toolkit_external_environment_cannot_select_household_data_or_source_imports(checker, monkeypatch, tmp_path):
+    hostile = {"WHAB_HOME": "/fictional/private", "WHAB_BUDGET_PASSWORD_ENV": "HOUSEHOLD_PASSWORD",
+               "HOUSEHOLD_PASSWORD": "fictional-password", "CLIENT_TOKEN": "fictional-token",
+               "TOKEN_ENCRYPTION_KEY": "fictional-key", "PYTHONPATH": "/fictional/source",
+               "PYTHONHOME": "/fictional/source", "VIRTUAL_ENV": "/fictional/source"}
+    for name, value in hostile.items():
+        monkeypatch.setenv(name, value)
+    environment = checker.isolated_environment(tmp_path)
+    assert environment["WHAB_HOME"] == str(tmp_path)
+    assert all(name not in environment for name in hostile if name != "WHAB_HOME")
+    assert environment["PLAID_ENV"] == environment["WHAB_ENV"] == "sandbox"
+    assert environment["ALLOW_LIVE_PLAID"] == "false"
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+@pytest.mark.parametrize("counts", [(91, 0, 0, 0), (92, 0, 0, 1), (92, 1, 0, 0), (92, 0, 1, 0)])
+def test_toolkit_reference_coverage_cannot_pass_with_missing_skipped_or_failed_tests(checker, tmp_path, counts):
+    report = tmp_path / "tests.xml"
+    tests, failures, errors, skipped = counts
+    report.write_text(f'<testsuites><testsuite tests="{tests}" failures="{failures}" errors="{errors}" skipped="{skipped}"/></testsuites>')
+    with pytest.raises(ValueError, match="run completely"):
+        checker.validate_test_results(report)
+    report.write_text('<testsuites><testsuite tests="92" failures="0" errors="0" skipped="0"/></testsuites>')
+    assert checker.validate_test_results(report)["tests"] == 92
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+def test_toolkit_coverage_measures_every_installed_file_and_both_kinds_of_coverage(checker, tmp_path):
+    installed = tmp_path / "environment/site-packages/whab_plugin_devkit"
+    source = installed / "adapter.py"
+    report = {"meta": {"branch_coverage": True}, "files": {str(source): {"summary": {"missing_lines": 0, "missing_branches": 0}}}}
+    checker.validate_toolkit_coverage(report, [str(source)], tmp_path)
+    with pytest.raises(ValueError, match="omitted"):
+        checker.validate_toolkit_coverage(report, [str(source), str(installed / "unimported.py")], tmp_path)
+    for name in ("missing_lines", "missing_branches"):
+        report["files"][str(source)]["summary"][name] = 1
+        with pytest.raises(ValueError, match="100% statement and branch"):
+            checker.validate_toolkit_coverage(report, [str(source)], tmp_path)
+        report["files"][str(source)]["summary"][name] = 0
+    report["meta"]["branch_coverage"] = False
+    with pytest.raises(ValueError, match="measure branches"):
+        checker.validate_toolkit_coverage(report, [str(source)], tmp_path)
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+def test_toolkit_artifact_evidence_uses_wheel_metadata_and_content_hash(checker, tmp_path):
+    wheel = tmp_path / "fictional-1-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("fictional-1.dist-info/METADATA", "Name: fictional\nVersion: 1\n")
+    before = checker.wheel_record(wheel)
+    assert before["distribution"] == "fictional" and before["version"] == "1"
+    assert len(before["sha256"]) == 64
+    assert checker.wheel_for(tmp_path, "fictional", "1") == wheel
+    with zipfile.ZipFile(wheel, "a") as archive:
+        archive.writestr("changed.txt", "changed artifact")
+    assert checker.wheel_record(wheel)["sha256"] != before["sha256"]
+    with pytest.raises(ValueError, match="exactly one built wheel"):
+        checker.wheel_for(tmp_path, "fictional", "2")
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+def test_toolkit_host_version_read_does_not_execute_controlled_source(checker, tmp_path):
+    source = tmp_path / "src/whab/__init__.py"
+    source.parent.mkdir(parents=True)
+    source.write_text('raise RuntimeError("must not execute while inspecting source")\n__version__ = "2.21.1"\n')
+    assert checker.host_version(tmp_path) == "2.21.1"
+    source.write_text('raise RuntimeError("must not execute")\n')
+    with pytest.raises(ValueError, match="literal version"):
+        checker.host_version(tmp_path)
+
+
+@pytest.mark.parametrize("checker", ["check_docs"], indirect=True)
+def test_official_toolkit_and_reviewed_fixture_recipes_are_checked_without_private_tree_expansion(checker):
+    assert checker.source_document("whab/app/devtools/plugin-devkit/README.md")
+    assert checker.source_document("whab/app/devtools/plugin-devkit/fixtures/runtime-peers/README.md")
+    assert not checker.source_document("whab/app/devtools/plugin-devkit/runtime/private.md")
+    assert not checker.source_document("whab/app/devtools/plugin-devkit/.venv/README.md")

@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Protocol, TypeAlias
 from urllib.parse import urlsplit
@@ -18,7 +18,50 @@ from whab.domain.imports import ImportedAccount, SyncChanges
 from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
 
+from .bank_adapter import BankAdapter as BankAdapter
+from .bank_adapter import BankContinuationService as BankContinuationService
+from .bank_adapter import BankContinuationStatus as BankContinuationStatus
+from .bank_adapter import BankLinkReady as BankLinkReady
+from .bank_adapter import BankProvider as BankProvider
+from .bank_adapter import BankProviderContext as BankProviderContext
+from .bank_adapter import ProviderFailure as ProviderFailure
+from .bank_adapter import ProviderWebhook as ProviderWebhook
 from .contracts import Capability, PluginContract, Requirement
+from .interface_adapter import RemoteLedgerInterface
+from .remote_client_adapter import RemoteLedgerClient, client_record
+from .storage_replica import (
+    ReplicaWatermark as ReplicaWatermark,
+)
+from .storage_replica import (
+    StorageReplica as StorageReplica,
+)
+from .storage_transfer import (
+    CommitEvidence as CommitEvidence,
+)
+from .storage_transfer import (
+    LocalTransferSnapshot as LocalTransferSnapshot,
+)
+from .storage_transfer import (
+    LocalTransferStorage as LocalTransferStorage,
+)
+from .storage_transfer import (
+    OperationReceipt as OperationReceipt,
+)
+from .storage_transfer import (
+    OperationResult as OperationResult,
+)
+from .storage_transfer import (
+    StorageAuthority as StorageAuthority,
+)
+from .storage_transfer import (
+    StorageCommands as StorageCommands,
+)
+from .storage_transfer import (
+    StorageOperation as StorageOperation,
+)
+from .storage_transfer import (
+    TransferPreview as TransferPreview,
+)
 
 API_VERSION = 1
 ENTRYPOINT_GROUP = "whab.plugins"
@@ -335,12 +378,23 @@ class StorageContext:
     environment: str
     config: Mapping[str, str] = field(repr=False)
     budget: BudgetContext | None = None
+    initial_role: str = "primary"
+    read_only: bool = False
+    expected_instance_id: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.home, Path):
             raise ValueError("Storage home must be a pathlib.Path directory.")
         if type(self.environment) is not str or self.environment not in {"sandbox", "production"}:
             raise ValueError("Storage environment must be sandbox or production.")
+        if type(self.initial_role) is not str or self.initial_role not in {"primary", "staged", "copy"}:
+            raise ValueError("New storage instances must start as primary, staged, or copy.")
+        if type(self.read_only) is not bool:
+            raise ValueError("Storage read-only mode must be a plain boolean.")
+        if self.expected_instance_id is not None:
+            from uuid import UUID
+            if type(self.expected_instance_id) is not str or str(UUID(self.expected_instance_id)) != self.expected_instance_id:
+                raise ValueError("An existing storage instance requires its canonical UUID identity.")
         if not isinstance(self.config, Mapping) or any(
             type(key) is not str or type(value) is not str for key, value in self.config.items()
         ):
@@ -369,7 +423,7 @@ class InterfaceContext:
     """A scoped command service and plugin configuration; never a banking store."""
 
     service: object
-    config: Mapping[str, str]
+    config: Mapping[str, str] = field(repr=False)
     environment: str
     budget_id: str
     budget: BudgetContext | None = None
@@ -379,11 +433,18 @@ class InterfaceContext:
 class Interface:
     """Trusted transport factory. The host owns shared access guards and lifecycle."""
 
-    factory: Callable[[InterfaceContext], object]
+    factory: Callable[[InterfaceContext], object] | None = None
+    adapter: RemoteLedgerInterface | None = None
 
     def __post_init__(self):
-        if not callable(self.factory):
+        if self.factory is None and self.adapter is None:
+            raise ValueError("Interface factory must be callable or use a supported host adapter.")
+        if self.factory is not None and self.adapter is not None:
+            raise ValueError("Choose one interface factory or host adapter.")
+        if self.factory is not None and not callable(self.factory):
             raise ValueError("Interface factory must be callable.")
+        if self.adapter is not None and type(self.adapter) is not RemoteLedgerInterface:
+            raise ValueError("Use a supported data-only interface adapter.")
 
 
 class UIContextBuilder(Protocol):
@@ -415,17 +476,28 @@ class UserInterface:
     zero keeps the complete register input for existing visual plugins.
     """
 
-    templates: Path
-    static: Path
+    templates: Path | None
+    static: Path | None
     build_context: UIContextBuilder
     budget_months: int = 1
     lightweight_transactions: bool = False
     lightweight_accounts: bool = False
     transaction_page_size: int = 0
+    resources: PluginResources | None = field(default=None, repr=False)
+    render: Callable[[dict], bytes] | None = field(default=None, repr=False)
+    view_protocol: int = 0
 
     def __post_init__(self) -> None:
-        if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
-            raise ValueError("User interface resources must be pathlib.Path directories.")
+        if self.resources is None:
+            if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
+                raise ValueError("User interface resources must be pathlib.Path directories.")
+        elif (type(self.resources) is not PluginResources or self.templates is not None or self.static is not None
+              or "templates/base.html" not in self.resources.files):
+            raise ValueError("Use one complete immutable visual resource bundle instead of resource paths.")
+        if self.render is not None and not callable(self.render):
+            raise ValueError("User interface rendering must be callable.")
+        if type(self.view_protocol) is not int or self.view_protocol not in {0, 1}:
+            raise ValueError("Choose a supported browser participation protocol, or zero for restart-only views.")
         if not callable(self.build_context):
             raise ValueError("User interface context builder must be callable.")
         if type(self.budget_months) is not int or not 1 <= self.budget_months <= 12:
@@ -478,6 +550,7 @@ class BankContext:
     environment: str
     encryption_key: str = field(repr=False)
     budget: BudgetContext | None = None
+    background_scope: Callable[[], object] | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if type(self.environment) is not str or self.environment not in {"sandbox", "production"}:
@@ -488,6 +561,8 @@ class BankContext:
             raise ValueError("Bank plugin configuration must be a mapping of plain strings.")
         if type(self.encryption_key) is not str:
             raise ValueError("Bank plugin encryption key must be a plain string.")
+        if self.background_scope is not None and not callable(self.background_scope):
+            raise ValueError("Bank background scope must be an asynchronous context factory.")
         object.__setattr__(self, "config", MappingProxyType(dict(self.config)))
 
 
@@ -529,18 +604,24 @@ class BankService(Protocol):
     async def close(self) -> None: ...
 
 
-BankFactory: TypeAlias = Callable[[BankContext], BankService]
+BankFactory: TypeAlias = Callable[[BankContext], BankService] | BankAdapter
 
 
 @dataclass(frozen=True, slots=True)
 class BankUI:
     """Trusted provider UI resources. The host owns mounting and validates directories."""
 
-    templates: Path
-    static: Path
+    templates: Path | None = None
+    static: Path | None = None
+    resources: PluginResources | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
+        if self.resources is not None:
+            if type(self.resources) is not PluginResources or self.templates is not None or self.static is not None:
+                raise ValueError("Bank UI resources require one coherent path or byte bundle.")
+            if 'templates/accounts.html' not in self.resources.files or 'static/connect.js' not in self.resources.files:
+                raise ValueError("Bank UI resources require accounts.html and connect.js.")
+        elif not isinstance(self.templates, Path) or not isinstance(self.static, Path):
             raise ValueError("Bank UI resources must be pathlib.Path directories.")
 
 
@@ -601,7 +682,7 @@ class BankLogos:
 
 @dataclass(frozen=True, slots=True)
 class MerchantLogos:
-    """Fetch a bank provider's public artwork by an imported opaque key.
+    """Fetch public artwork by an imported opaque key, without bank authority.
 
     Keys contain 1–200 ASCII letters, digits, underscores or hyphens and begin
     with a letter or digit. Hooks receive no transaction or banking context.
@@ -656,16 +737,55 @@ class PluginSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class PluginResources:
+    """Detached UI files for one plugin version, without filesystem authority.
+
+    Files use ``templates/`` or ``static/`` relative names. At most 256 files,
+    2 MiB per file and 4 MiB total are accepted; templates must be UTF-8.
+    """
+
+    files: Mapping[str, bytes] = field(repr=False)
+
+    def __post_init__(self):
+        if type(self.files) not in {dict, MappingProxyType} or not 1 <= len(self.files) <= 256:
+            raise ValueError("Plugin resources must be a bounded file mapping.")
+        copied, total = {}, 0
+        for name, raw in self.files.items():
+            if type(name) is not str or not 1 <= len(name) <= 200 or "\\" in name or ":" in name or any(ord(character) < 32 or ord(character) == 127 for character in name):
+                raise ValueError("Import resource names must be safe relative paths.")
+            parts = name.split("/")
+            if not 2 <= len(parts) <= 16 or parts[0] not in {"templates", "static"} or any(part in {"", ".", ".."} for part in parts):
+                raise ValueError("Import resource names must be safe relative paths.")
+            name.encode("utf-8")
+            if type(raw) is not bytes or len(raw) > 2 * 1024 * 1024:
+                raise ValueError("Import resource files must contain at most 2 MiB of bytes.")
+            total += len(raw)
+            if total > 4 * 1024 * 1024:
+                raise ValueError("Import resources exceed their 4 MiB total bound.")
+            if parts[0] == "templates":
+                raw.decode("utf-8")
+            copied[name] = raw
+        object.__setattr__(self, "files", MappingProxyType(copied))
+
+
+@dataclass(frozen=True, slots=True)
 class FileImport:
     """Parse a bounded local file without ledger access; the host owns persistence."""
 
     parse: Callable[[bytes], WorkspaceImport]
     templates: Path | None = None
     static: Path | None = None
+    resources: PluginResources | None = None
 
     def __post_init__(self) -> None:
         if not callable(self.parse):
             raise ValueError("File import parser must be callable.")
+        if self.resources is not None:
+            if type(self.resources) is not PluginResources or self.templates is not None or self.static is not None:
+                raise ValueError("Import resources must use a detached SDK resource record, without paths.")
+            PluginResources(self.resources.files)
+            if not {"templates/accounts.html", "static/import.js"} <= self.resources.files.keys():
+                raise ValueError("Import resources require accounts.html and import.js.")
         if (self.templates is None) != (self.static is None):
             raise ValueError("File import UI requires both template and static directories.")
         if self.templates is not None and (
@@ -798,6 +918,12 @@ class Categorization:
     Engines may additionally expose preview(rows) for explicitly requested
     below-cutoff guesses. Automatic imports continue to use predict(rows).
     Predictions can include a boolean belowCutoff marker for manual previews.
+    Factories and engine methods are synchronous. Engines expose a defaults
+    mapping and index/select/delete/rename/train/save/predict methods; optional
+    close() releases owned resources. Live candidate factories receive detached
+    read-only namespace callbacks until the host commits activation. Callbacks
+    expire on retirement. Unfinished training defers replacement until the user
+    finishes or cancels it; unchanged engines retain their continuations.
     """
 
     factory: Callable[[BudgetContext], object]
@@ -817,7 +943,7 @@ class Plugin:
     export: ExportHook | None = None
     bank: BankFactory | None = None
     bank_ui: BankUI | None = None
-    storage: StorageFactory | None = None
+    storage: StorageFactory | RemoteLedgerClient | None = None
     ui: UserInterface | None = None
     bank_logos: BankLogos | None = None
     file_import: FileImport | None = None
@@ -830,8 +956,27 @@ class Plugin:
     # The host invokes one declared edge with detached staged namespace access.
     # Callbacks must use that namespace only; active state is published by the host.
     migrate_state: Callable[[BudgetContext, int, int], None] | None = None
+    storage_payload_paths: tuple[str, ...] = ()
+    # A zero-authority factory creates independent optional artwork cache/hooks.
+    # It receives no configuration, budget namespace, backend or credentials.
+    branding_factory: Callable[[], Plugin] | None = None
 
     def __post_init__(self) -> None:
+        if (type(self.storage_payload_paths) is not tuple or len(self.storage_payload_paths) > 32
+                or (self.storage_payload_paths and self.storage is None)):
+            raise ValueError("Storage payload paths require a storage factory and a bounded tuple.")
+        for name in self.storage_payload_paths:
+            if (type(name) is not str or not 1 <= len(name) <= 200 or "\\" in name or ":" in name
+                    or any(ord(character) < 32 or ord(character) == 127 for character in name)
+                    or PurePosixPath(name).is_absolute() or ".." in PurePosixPath(name).parts
+                    or str(PurePosixPath(name)) != name or name == "."):
+                raise ValueError("Storage payload paths must be exact relative file names.")
+            try:
+                name.encode("utf-8")
+            except UnicodeError:
+                raise ValueError("Storage payload paths must be exact relative file names.") from None
+        if len(set(self.storage_payload_paths)) != len(self.storage_payload_paths):
+            raise ValueError("Storage payload paths must be unique.")
         if self.contract is not None:
             if type(self.contract) is not PluginContract:
                 raise ValueError("Plugin contract must use the public PluginContract record.")
@@ -848,6 +993,8 @@ class Plugin:
             raise ValueError("Plugin interface must be an Interface descriptor or None.")
         if self.bind is not None and not callable(self.bind):
             raise ValueError("Plugin budget binder must be callable or None.")
+        if self.branding_factory is not None and not callable(self.branding_factory):
+            raise ValueError("Plugin branding factory must be callable or None.")
         if self.budget_connection is not None and not callable(self.budget_connection):
             raise ValueError("Plugin budget connection reader must be callable or None.")
         if type(self.api_version) is not int:
@@ -862,8 +1009,18 @@ class Plugin:
             raise ValueError("Plugin bank UI must be a BankUI descriptor or None.")
         if self.bank_ui is not None and self.bank is None:
             raise ValueError("Plugin bank UI requires a bank factory.")
-        if self.storage is not None and not callable(self.storage):
-            raise ValueError("Plugin storage factory must be callable or None.")
+        if type(self.storage) is RemoteLedgerClient:
+            client_record(self.storage)
+            prefix = self.id.upper().replace("-", "_") + "_"
+            if any(not getattr(self.storage, name).startswith(prefix)
+                   for name in ("url_setting", "token_setting", "budget_setting")):
+                raise ValueError("Remote client settings must belong to the declaring plugin.")
+            if self.contract is None or self.contract.authority != "remote":
+                raise ValueError("Remote client adapters require an explicit remote authority contract.")
+            if self.budget_connection is not None or self.storage_payload_paths:
+                raise ValueError("Remote client adapters use the host's fixed connection-file contract.")
+        elif self.storage is not None and not callable(self.storage):
+            raise ValueError("Plugin storage must use a factory or a supported remote client adapter.")
         if self.ui is not None and type(self.ui) is not UserInterface:
             raise ValueError("Plugin user interface must be a UserInterface descriptor or None.")
         if self.bank_logos is not None:
@@ -876,7 +1033,7 @@ class Plugin:
         if self.file_import is not None:
             if type(self.file_import) is not FileImport:
                 raise ValueError("Plugin file import must be a FileImport descriptor or None.")
-            FileImport(self.file_import.parse, self.file_import.templates, self.file_import.static)
+            FileImport(self.file_import.parse, self.file_import.templates, self.file_import.static, self.file_import.resources)
         if self.settings is not None:
             if type(self.settings) is not PluginSettings:
                 raise ValueError("Plugin settings must be a PluginSettings descriptor or None.")
@@ -885,8 +1042,6 @@ class Plugin:
             if type(self.merchant_logos) is not MerchantLogos:
                 raise ValueError("Plugin merchant logos must be a MerchantLogos descriptor or None.")
             MerchantLogos(self.merchant_logos.fetch)
-            if self.bank is None:
-                raise ValueError("Plugin merchant logos require a bank factory.")
         if (
             self.categorization is None
             and self.insights is None
@@ -895,6 +1050,7 @@ class Plugin:
             and self.storage is None
             and self.ui is None
             and self.bank_logos is None
+            and self.merchant_logos is None
             and self.file_import is None
             and self.interface is None
             and self.bind is None

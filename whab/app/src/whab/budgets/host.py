@@ -26,9 +26,15 @@ from .aliases import RouteAliases
 from .container import decode_container, encode_container
 from .credentials import encrypt_credentials
 from .document import atomic_write, encode_bundle, new_manifest
+from .runtime import RuntimeTransitionError
 from .session import BudgetSession, container_digest
 
 COOKIE = "whab-budget"
+_CONTROL_PATHS = frozenset({"/api/plugins/runtime", "/api/plugins/runtime/cleanup", "/api/plugins/catalog", "/api/plugins/management/recover", "/api/storage/status", "/api/storage/recover", "/api/storage/copies", "/api/storage/remote/status", "/api/storage/remote/selection", "/api/storage/remote/recover", "/api/storage/remote/finish", "/api/ui/status", "/api/ui/recover", "/api/ui/views"})
+
+
+def runtime_control(path):
+    return path in _CONTROL_PATHS or path.startswith("/api/ui/views/")
 
 
 def request_password(request):
@@ -364,11 +370,12 @@ class BudgetHost:
             entry for entry in entries.values()
         ]}
 
-    def router(self, store, settings, session, storage_config=None):
+    def router(self, store, settings, session, storage_config=None, *, storage_file_exports=False, namespace_effects=None):
         router = APIRouter()
         current_id = session.id if session else "default"
 
         def bundle_bytes(workspace, include_credentials, password):
+            storage_id = session.manifest["storage"] if session else (store.storage_plugin_id or settings.storage)
             if workspace == "demo":
                 if include_credentials:
                     raise StoreError("Demo budget downloads cannot include connection credentials.")
@@ -376,15 +383,15 @@ class BudgetHost:
                 if not callable(snapshot):
                     raise StoreError("This storage plugin cannot export the demo budget.")
                 images = getattr(store, "receipt_ids", None)
-                if callable(images) and images("demo"):
+                if storage_file_exports or (callable(images) and images("demo")):
                     exporter = getattr(store, "export_budget_files", None)
                     if not callable(exporter):
                         raise StoreError("This storage plugin cannot export receipt images with the demo budget.")
                     # The storage capability exports a sanitized workspace image;
                     # a fresh identity never carries personal plugin data or credentials.
-                    manifest = new_manifest("Demo budget", storage=settings.storage)
+                    manifest = new_manifest("Demo budget", storage=storage_id)
                     return encode_container(manifest, {
-                        f"plugins/{settings.storage}/{name}": raw
+                        f"plugins/{storage_id}/{name}": raw
                         for name, raw in exporter("demo").items()
                     })
                 # Demo is a separate ledger, not the active portable budget's
@@ -392,8 +399,8 @@ class BudgetHost:
                 return encode_bundle(new_manifest("Demo budget"), snapshot("demo"))
             document = session
             if document is None:
-                if self._legacy_export is None:
-                    self._legacy_export = BudgetSession.create(settings.home, settings.plaid_env, "My budget", settings.plugins, settings.storage)
+                if self._legacy_export is None or self._legacy_export.manifest["storage"] != storage_id:
+                    self._legacy_export = BudgetSession.create(settings.home, settings.plaid_env, "My budget", settings.plugins, storage_id)
                 document = self._legacy_export
                 document.store = store
                 document.storage_config = storage_config or {}
@@ -432,11 +439,12 @@ class BudgetHost:
 
         @router.get("/api/budget")
         def current(request: Request):
+            storage_id = session.manifest["storage"] if session else (store.storage_plugin_id or settings.storage)
             if request.scope.get("whab.budget_key") == "demo":
-                return {"id": "demo", "name": "Demo budget", "portable": False, "storage": settings.storage, "copies": [], "plugins": [], "missingPlugins": []}
+                return {"id": "demo", "name": "Demo budget", "portable": False, "storage": storage_id, "copies": [], "plugins": [], "missingPlugins": []}
             if session:
                 return session.projection()
-            return {"id": "default", "name": "My budget", "portable": False, "storage": settings.storage, "copies": [], "plugins": list(settings.plugins), "missingPlugins": []}
+            return {"id": "default", "name": "My budget", "portable": False, "storage": storage_id, "copies": [], "plugins": list(settings.plugins), "missingPlugins": []}
 
         @router.post("/api/budget/new")
         async def new(body: NameBody):
@@ -466,7 +474,10 @@ class BudgetHost:
             password = request_password(request)
             if budget_id not in self.applications:
                 await self.activate(budget_id, password=password)
-            raw = await run_in_threadpool(self._exports[budget_id], workspace, include_credentials, password)
+            application, _session = self.applications[budget_id]
+            runtime = application.state.budget_runtime
+            async with runtime.request():
+                raw = await run_in_threadpool(self._exports[budget_id], workspace, include_credentials, password)
             return download(raw)
 
         @router.post("/api/budget/save")
@@ -485,25 +496,68 @@ class BudgetHost:
 
         @router.get("/api/budget/plugins/{plugin_id}")
         def plugin_data(plugin_id: str):
-            record = session.plugin_record(plugin_id) if session else None
-            if record is None:
-                raise HTTPException(404, "Plugin is not part of this portable budget.")
-            return copy.deepcopy(record)
+            with store.lock:
+                record = session.plugin_record(plugin_id) if session else None
+                if record is None:
+                    raise HTTPException(404, "Plugin is not part of this portable budget.")
+                return copy.deepcopy(record)
 
         @router.put("/api/budget/plugins/{plugin_id}")
         def save_plugin_data(plugin_id: str, body: PluginDataBody):
             if session is None:
                 raise HTTPException(400, "Open a portable budget before saving its plugin data.")
-            session.save_plugin_data(plugin_id, settings=body.settings, state=body.state)
-            return copy.deepcopy(session.plugin_record(plugin_id))
+            with store.lock:
+                handled = namespace_effects is not None and namespace_effects.save_plugin_data(
+                    session, plugin_id, settings=body.settings, state=body.state)
+                if not handled:
+                    session.save_plugin_data(plugin_id, settings=body.settings, state=body.state)
+                return copy.deepcopy(session.plugin_record(plugin_id))
 
         return router
+
+
+class BudgetRuntimeRequests:
+    """Pin one generation through the entire ASGI response, including threads."""
+
+    def __init__(self, app, runtime):
+        self.app = app
+        self.runtime = runtime
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or runtime_control(scope["path"]):
+            await self.app(scope, receive, send)
+            return
+        try:
+            async with self.runtime.request():
+                await self.app(scope, receive, send)
+        except RuntimeTransitionError as error:
+            await JSONResponse({"error": str(error), "code": error.code}, status_code=503,
+                               headers={"Cache-Control": "no-store"})(scope, receive, send)
 
 
 class BudgetDispatch:
     def __init__(self, app, host):
         self.app = app
         self.host = host
+
+    async def _dispatch(self, target, identifier, scope, receive, send):
+        if scope["type"] != "http" or runtime_control(scope["path"]):
+            await target(scope, receive, send)
+            return
+        # A catalog download deliberately reaches the default controller before
+        # password validation opens its requested budget. Pin that controller;
+        # the export handler acquires the requested runtime after activation.
+        application, _session = self.host.applications.get(identifier, self.host.applications[self.host.default_id])
+        runtime = getattr(application.state, "budget_runtime", None)
+        if runtime is None:
+            await target(scope, receive, send)
+            return
+        try:
+            async with runtime.request():
+                await target(scope, receive, send)
+        except RuntimeTransitionError as error:
+            await JSONResponse({"error": str(error), "code": error.code}, status_code=503,
+                               headers={"Cache-Control": "no-store"})(scope, receive, send)
 
     def _local(self, scope):
         headers = dict(scope.get("headers", ()))
@@ -545,7 +599,7 @@ class BudgetDispatch:
         try:
             if not valid_route_key(key):
                 raise ValueError
-            if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/")):
+            if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/", "/banks/", "/ui/")):
                 if tail.endswith("/webhook"):
                     raise ValueError
             else:
@@ -588,7 +642,7 @@ class BudgetDispatch:
         scoped["whab.workspace"] = "demo" if key == "demo" else "personal"
         scoped["whab.personal_key"] = self.host.route_key(self.host.default_id)
         scoped["whab.routing"] = self.host
-        if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/")):
+        if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/", "/banks/", "/ui/")):
             scoped["path"] = tail
             scoped["raw_path"] = tail.encode("utf-8")
             if tail.startswith("/api/"):
@@ -599,7 +653,7 @@ class BudgetDispatch:
                     query.append(("workspace", scoped["whab.workspace"]))
                 scoped["query_string"] = urlencode(query).encode()
         target = self.app if identifier == self.host.default_id else entry[0]
-        await target(scoped, receive, send)
+        await self._dispatch(target, identifier, scoped, receive, send)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
@@ -616,14 +670,13 @@ class BudgetDispatch:
                 # The per-tab continuation bridge selects the originating budget.
                 # A shared or stale cookie must never activate a different runtime.
                 target = self.app
+                selected_id = self.host.default_id
                 for identifier, (application, _) in self.host.applications.items():
-                    if application.state.ui_plugin and any(
-                        plugin.id == "plaid" and plugin.bank_ui
-                        for plugin in application.state.plugins.bank_plugins()
-                    ):
+                    if application.state.ui_plugin and application.state.bank_ui_available:
                         target = self.app if identifier == self.host.default_id else application
+                        selected_id = identifier
                         break
-                await target(scope, receive, send)
+                await self._dispatch(target, selected_id, scope, receive, send)
                 return
             if scope["path"].startswith("/budgets/"):
                 await self._scoped(scope, receive, send)
@@ -633,11 +686,11 @@ class BudgetDispatch:
                 budget_id = scope["path"][len(prefix):].partition("/")[0]
                 entry = self.host.applications.get(budget_id)
                 if entry and budget_id != self.host.default_id:
-                    await entry[0](scope, receive, send)
+                    await self._dispatch(entry[0], budget_id, scope, receive, send)
                     return
                 # A remote request selects its budget explicitly. Cookies cannot
                 # redirect it, and unauthenticated requests never start runtimes.
-                await self.app(scope, receive, send)
+                await self._dispatch(self.app, self.host.default_id, scope, receive, send)
                 return
             from http.cookies import SimpleCookie
 
@@ -666,6 +719,6 @@ class BudgetDispatch:
                     return
                 entry = self.host.applications.get(budget_id)
             if entry and budget_id != self.host.default_id:
-                await entry[0](scope, receive, send)
+                await self._dispatch(entry[0], budget_id, scope, receive, send)
                 return
-        await self.app(scope, receive, send)
+        await self._dispatch(self.app, self.host.default_id, scope, receive, send)

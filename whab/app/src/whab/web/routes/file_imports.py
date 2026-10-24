@@ -23,6 +23,18 @@ def create_router(store, plugins, budget_host=None, source_id="default"):
             raise HTTPException(404, "File import plugin not enabled")
         return plugin
 
+    def parser_identity(plugin):
+        method = getattr(plugins, "parser_identity", None)
+        return method(plugin.id) if callable(method) else None
+
+    def confirm_parser(request, plugin):
+        identity = parser_identity(plugin)
+        method = getattr(plugins, "parser_requires_identity", None)
+        required = bool(method(plugin.id)) if callable(method) else False
+        supplied = request.headers.get("x-import-parser")
+        if (required or supplied is not None) and (identity is None or supplied != identity):
+            raise HTTPException(409, "The import parser changed or its preview identity is missing. Preview this export again before importing.")
+
     async def parse(request, plugin):
         try:
             confirmed_currency = currency_code(request.headers.get("x-import-currency"))
@@ -66,7 +78,7 @@ def create_router(store, plugins, budget_host=None, source_id="default"):
         except (UnicodeError, StoreError):
             raise StoreError("Choose a budget name of 1–100 characters, without NUL characters.") from None
 
-    def preview_values(fingerprint, data):
+    def preview_values(fingerprint, data, plugin):
         return {
             "fingerprint": fingerprint,
             "accounts": len(data.accounts),
@@ -76,6 +88,7 @@ def create_router(store, plugins, budget_host=None, source_id="default"):
             "budgetStartMonth": data.budget_start_month,
             "currency": data.currency,
             "warnings": data.warnings,
+            "parserIdentity": parser_identity(plugin),
         }
 
     @router.post("/{plugin_id}/import/new/preview")
@@ -85,7 +98,7 @@ def create_router(store, plugins, budget_host=None, source_id="default"):
         import_name(request)
         fingerprint, data = await parse(request, plugin)
         return {
-            **preview_values(fingerprint, data),
+            **preview_values(fingerprint, data, plugin),
             "canImport": True,
             "reason": "Import creates a new budget. Your current budget is unchanged.",
             "alreadyImported": False,
@@ -95,6 +108,7 @@ def create_router(store, plugins, budget_host=None, source_id="default"):
     @router.post("/{plugin_id}/import/new/commit")
     async def commit_new(plugin_id: str, request: Request):
         plugin = descriptor(plugin_id)
+        confirm_parser(request, plugin)
         operation = import_operation(request)
         name = import_name(request)
         fingerprint, data = await parse(request, plugin)
@@ -126,11 +140,12 @@ def create_router(store, plugins, budget_host=None, source_id="default"):
             return store.preview_workspace_import("personal", plugin.id, fingerprint)
 
         availability = await run_in_threadpool(availability)
-        return {**preview_values(fingerprint, data), **availability}
+        return {**preview_values(fingerprint, data, plugin), **availability}
 
     @router.post("/{plugin_id}/import/commit")
     async def commit(plugin_id: str, request: Request):
         plugin = descriptor(plugin_id)
+        confirm_parser(request, plugin)
         fingerprint, data = await parse(request, plugin)
         if request.headers.get("x-import-fingerprint") != fingerprint:
             raise HTTPException(

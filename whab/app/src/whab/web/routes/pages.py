@@ -43,6 +43,8 @@ def create_router(
 
     @router.get("/")
     def landing(request: Request):
+        if not getattr(ui, "available", True):
+            raise HTTPException(404, "A visual interface is unavailable.")
         if any(key in request.query_params for key in ("page", "workspace", "month", "currency")):
             raise HTTPException(400, "Open a canonical /budgets/ address.")
         routing = request.scope.get("whab.routing")
@@ -58,7 +60,7 @@ def create_router(
                 '<!doctype html><html lang="en"><meta charset="utf-8">'
                 '<title>Continue bank connection</title>'
                 '<p id="oauth-status">Returning to the budget that started this connection…</p>'
-                f'<script src="{prefix}/plugins/plaid/static/oauth.js"></script></html>'
+                f'<script src="{prefix}/banks/plaid/{plugins.bank_identity("plaid")}/static/oauth.js"></script></html>'
             )
         return RedirectResponse(target, status_code=303)
 
@@ -78,6 +80,8 @@ def create_router(
         end_date: str | None = None,
         review: Literal["all", "needs-review", "reviewed"] = "all",
     ):
+        if not getattr(ui, "available", True):
+            raise HTTPException(404, "A visual interface is unavailable.")
         if any(name in request.query_params for name in ("page", "workspace", "month", "currency")):
             raise HTTPException(400, "Routing values belong in the address path.")
         workspace = request.scope.get("whab.workspace", "demo" if key == "demo" else "personal")
@@ -196,6 +200,8 @@ def create_router(
         context["category_suggestions"] = category_suggestions
         context["url"] = url
         context["asset_prefix"] = asset_prefix
+        ui_generation = getattr(ui, "generation", None)
+        context["ui_asset_prefix"] = asset_prefix + "/ui/" + ui_generation if ui_generation else asset_prefix
         context["api_prefix"] = api_prefix
         canonical_filters = dict(request.query_params)
         canonical_filters.pop("account", None)
@@ -221,7 +227,11 @@ def create_router(
             receiptIndexScoped=True,
             canonicalUrl=canonical_url,
             personalBudgetKey=personal_key, monthToken=month_token, page=page,
+            uiGeneration=ui_generation,
         )
+        context["_ui_routing"] = {"key": key, "personal_key": personal_key, "workspace": workspace,
+                                  "page": page, "month_token": month_token, "currency": currency,
+                                  "account_slugs": account_slugs}
         context.update(
             data=data, status=status, workspace=workspace, page=page, month=month,
             version=__version__,
@@ -240,7 +250,7 @@ def create_router(
 
         context["bank_panels"] = [
             {
-                "template": f"plugins/{p.id}/accounts.html",
+                "template": f"banks/{p.id}/{plugins.bank_identity(p.id)}/accounts.html",
                 "status": public_bank_status(banks[p.id], environment),
                 "items": bank_stores[p.id].items() if workspace == "personal" else [],
             }
@@ -249,21 +259,22 @@ def create_router(
         ]
         context["bank_source_ids"] = tuple(p.id for p in plugins.bank_plugins())
         context["plugin_scripts"] = [
-            f"{asset_prefix}/plugins/{p.id}/static/connect.js?v={context['version']}"
+            f"{asset_prefix}/banks/{p.id}/{plugins.bank_identity(p.id)}/static/connect.js"
             for p in plugins.bank_plugins()
             if p.bank_ui and p.id in banks and workspace == "personal"
         ]
         context["import_panels"] = [
             {
-                "template": f"imports/{p.id}/accounts.html",
+                "template": f"imports/{p.id}/{plugins.parser_identity(p.id)}/accounts.html",
                 "id": p.id,
+                "parser_identity": plugins.parser_identity(p.id),
                 "display_name": p.display_name,
             }
             for p in plugins.file_import_plugins()
-            if p.file_import.templates is not None
+            if p.file_import.templates is not None or p.file_import.resources is not None
         ]
         context["plugin_scripts"].extend(
-            f"{asset_prefix}/imports/{panel['id']}/static/import.js?v={context['version']}"
+            f"{asset_prefix}/imports/{panel['id']}/{panel['parser_identity']}/static/import.js"
             for panel in context["import_panels"]
         )
         context["plugins"] = plugins.describe()
@@ -282,7 +293,7 @@ def create_router(
         }
         context["account_logo_provider"] = plugins.bank_logo_provider()
         merchant_providers = {
-            plugin.id for plugin in plugins.bank_plugins() if plugin.merchant_logos is not None
+            plugin.id for plugin in plugins.descriptors() if plugin.merchant_logos is not None
         }
         context["merchant_logos"] = {
             transaction["id"]: (
@@ -302,6 +313,8 @@ def create_router(
         )
         try:
             response = templates.TemplateResponse(request=request, name="base.html", context=context)
+            if ui_generation:
+                response.headers["X-WHAB-UI-Generation"] = ui_generation
             vary = ["X-WHAB-Page-Fragment"]
             if page == "budget":
                 vary.append("X-WHAB-Budget-Fragment")

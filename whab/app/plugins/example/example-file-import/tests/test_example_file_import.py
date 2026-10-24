@@ -1,0 +1,16 @@
+import pytest
+from whab_plugin_example_file_import import plugin
+
+from whab.plugins import StoreError
+
+
+def test_valid_fictional_file_returns_detached_neutral_records():
+    result = plugin.file_import.parse(b'{"name":"Fictional wallet","balance":125}')
+    assert result.currency == "USD" and result.accounts[0]["balance"] == 125
+    assert result.transactions == ()
+
+
+@pytest.mark.parametrize("raw", [b"", "text", b"x" * 16385, b"{", b"[]", b'{"name":"A","balance":true}', b'{"name":"A","balance":1.2}', b'{"name":"A","balance":1,"balance":2}', b'{"name":[],"balance":1}', b'{"name":"A","balance":1,"extra":2}'])
+def test_invalid_files_fail_without_a_ledger(raw):
+    with pytest.raises(StoreError):
+        plugin.file_import.parse(raw)

@@ -8,6 +8,7 @@ than risking duplicate writes after losing its in-memory idempotency receipts.
 from calendar import monthrange
 from collections import OrderedDict
 from collections.abc import Callable
+from contextlib import nullcontext
 from copy import deepcopy
 from hashlib import sha256
 from json import dumps
@@ -211,6 +212,11 @@ class LedgerService:
             _month(payload["month"])
         return payload
 
+    def validate_command(self, operation, workspace, payload):
+        """Validate and detach a public command without backend access or writes."""
+        self._workspace(workspace)
+        return deepcopy(self._validate(operation, payload))
+
     def command(
         self, operation: str, workspace: str, payload: dict, *,
         request_id: str, expected_revision: str,
@@ -228,72 +234,82 @@ class LedgerService:
                 if previous != fingerprint:
                     raise RequestConflict("Request ID already belongs to another command.")
                 return deepcopy(response)
+            durable_replay = getattr(self._store, "durable_command_replay", None)
+            if operation != "categorization" and callable(durable_replay):
+                replayed = durable_replay(request_id, fingerprint)
+                if replayed is not None:
+                    return deepcopy(replayed)
             if expected_revision != self._revision:
                 raise RevisionConflict("Budget changed. Refresh before making this change.")
-            if operation == "categorization":
-                if self.categorization is not None:
-                    data = self.categorization.action(workspace, payload)
+            response_revision = str(uuid4())
+            durable_scope = getattr(self._store, "durable_command_scope", None)
+            scope = (durable_scope(request_id, fingerprint, response_revision)
+                     if operation != "categorization" and callable(durable_scope) else nullcontext())
+            with scope:
+                if operation == "categorization":
+                    if self.categorization is not None:
+                        data = self.categorization.action(workspace, payload)
+                    else:
+                        remote = getattr(self._store, "categorize", None)
+                        if not callable(remote):
+                            raise StoreError("Enable a categorization plugin on the budget host first.")
+                        data = remote(workspace, payload)
+                elif operation in {"add_account", "add_category", "add_transaction"}:
+                    data = getattr(self._store, operation)(workspace, payload)
+                elif operation == "update_account":
+                    update = getattr(self._store, "update_account", None)
+                    if not callable(update):
+                        raise StoreError("This storage plugin does not support account classification changes.")
+                    data = update(
+                        workspace, payload["accountId"],
+                        {key: value for key, value in payload.items() if key != "accountId"},
+                    )
+                elif operation == "edit_transaction":
+                    suggestion_id = payload.get("suggestionId")
+                    suggestion = None
+                    if suggestion_id and self.categorization is not None:
+                        suggestion = self.categorization.verify(workspace, payload["transactionId"], suggestion_id)
+                        if payload.get("reviewed") is not True:
+                            raise StoreError("Review the transaction to accept a category suggestion.")
+                        payload.setdefault("categoryId", suggestion["categoryId"])
+                    data = self._store.edit_transaction(
+                        workspace, payload["transactionId"],
+                        category_id=payload.get("categoryId", UNSET), reviewed=payload.get("reviewed"),
+                        **({"note": payload["note"]} if "note" in payload else {}),
+                        **({"suggestion_id": suggestion_id} if suggestion_id and self.categorization is None else {}),
+                    )
+                    if suggestion is not None:
+                        self.categorization.accepted(workspace, payload["transactionId"], suggestion, payload["categoryId"])
+                elif operation == "review_transactions":
+                    review = getattr(self._store, "review_transactions", None)
+                    if not callable(review):
+                        raise StoreError("This storage plugin does not support bulk review.")
+                    review(workspace, tuple(payload["transactionIds"]), payload["reviewed"])
+                    data = None
+                elif operation == "assign_next_month":
+                    assign_next = getattr(self._store, "assign_next_month", None)
+                    if not callable(assign_next):
+                        raise StoreError("This storage plugin does not support next-month funding.")
+                    data = assign_next(
+                        workspace, payload["month"], payload["currency"], payload["assigned"],
+                    )
+                elif operation == "set_rollover_mode":
+                    set_mode = getattr(self._store, "set_rollover_mode", None)
+                    if not callable(set_mode):
+                        raise StoreError("This storage plugin does not support monthly rollover settings.")
+                    data = set_mode(workspace, payload["month"], payload["currency"], payload["mode"])
                 else:
-                    remote = getattr(self._store, "categorize", None)
-                    if not callable(remote):
-                        raise StoreError("Enable a categorization plugin on the budget host first.")
-                    data = remote(workspace, payload)
-            elif operation in {"add_account", "add_category", "add_transaction"}:
-                data = getattr(self._store, operation)(workspace, payload)
-            elif operation == "update_account":
-                update = getattr(self._store, "update_account", None)
-                if not callable(update):
-                    raise StoreError("This storage plugin does not support account classification changes.")
-                data = update(
-                    workspace, payload["accountId"],
-                    {key: value for key, value in payload.items() if key != "accountId"},
-                )
-            elif operation == "edit_transaction":
-                suggestion_id = payload.get("suggestionId")
-                suggestion = None
-                if suggestion_id and self.categorization is not None:
-                    suggestion = self.categorization.verify(workspace, payload["transactionId"], suggestion_id)
-                    if payload.get("reviewed") is not True:
-                        raise StoreError("Review the transaction to accept a category suggestion.")
-                    payload.setdefault("categoryId", suggestion["categoryId"])
-                data = self._store.edit_transaction(
-                    workspace, payload["transactionId"],
-                    category_id=payload.get("categoryId", UNSET), reviewed=payload.get("reviewed"),
-                    **({"note": payload["note"]} if "note" in payload else {}),
-                    **({"suggestion_id": suggestion_id} if suggestion_id and self.categorization is None else {}),
-                )
-                if suggestion is not None:
-                    self.categorization.accepted(workspace, payload["transactionId"], suggestion, payload["categoryId"])
-            elif operation == "review_transactions":
-                review = getattr(self._store, "review_transactions", None)
-                if not callable(review):
-                    raise StoreError("This storage plugin does not support bulk review.")
-                review(workspace, tuple(payload["transactionIds"]), payload["reviewed"])
-                data = None
-            elif operation == "assign_next_month":
-                assign_next = getattr(self._store, "assign_next_month", None)
-                if not callable(assign_next):
-                    raise StoreError("This storage plugin does not support next-month funding.")
-                data = assign_next(
-                    workspace, payload["month"], payload["currency"], payload["assigned"],
-                )
-            elif operation == "set_rollover_mode":
-                set_mode = getattr(self._store, "set_rollover_mode", None)
-                if not callable(set_mode):
-                    raise StoreError("This storage plugin does not support monthly rollover settings.")
-                data = set_mode(workspace, payload["month"], payload["currency"], payload["mode"])
-            else:
-                data = self._store.assign(
-                    workspace, payload["categoryId"], payload["month"], payload["assigned"],
-                )
-            self._revision = str(uuid4())
-            response = {"revision": self._revision, "data": data}
-            self._receipts[request_id] = (fingerprint, deepcopy(response), expected_revision)
-            if len(self._receipts) > 1024:
-                self._receipts.popitem(last=False)
-            if self._on_commit is not None:
-                self._on_commit()
-            return response
+                    data = self._store.assign(
+                        workspace, payload["categoryId"], payload["month"], payload["assigned"],
+                    )
+                self._revision = response_revision
+                response = {"revision": self._revision, "data": data}
+                self._receipts[request_id] = (fingerprint, deepcopy(response), expected_revision)
+                if len(self._receipts) > 1024:
+                    self._receipts.popitem(last=False)
+                if self._on_commit is not None:
+                    self._on_commit()
+                return response
 
     def accounts(self, workspace):
         return self.query("accounts", workspace)["data"]

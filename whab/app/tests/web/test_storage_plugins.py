@@ -1,5 +1,6 @@
 """Storage selection and lifecycle through the application composition root."""
 
+import asyncio
 import gc
 import inspect
 import json
@@ -228,7 +229,19 @@ print(json.dumps({
     assert json.loads(result.stdout) == {
         "backend": False, "schema": False, "seeding": False, "driver_imports": [],
     }
-    assert list(tmp_path.iterdir()) == []
+    assert {path.name for path in tmp_path.iterdir()} == {"visual-ui", "plugin-workers"}
+    assert {path.name for path in (tmp_path / "visual-ui").iterdir()} == {
+        "visual-selection.json", "visual-selection.json.lock",
+    }
+    # An inactive host journal makes no native authority or live-worker claim.
+    control = tmp_path / "plugin-workers" / "storage" / "memory"
+    assert {path.relative_to(tmp_path / "plugin-workers").as_posix()
+            for path in (tmp_path / "plugin-workers").rglob("*") if path.is_file()} == {
+        "storage/memory/storage-upgrade.json", "storage/memory/storage-upgrade.json.lock",
+    }
+    assert json.loads((control / "storage-upgrade.json").read_bytes())["body"] == {
+        "format": 2, "kind": "storage-code", "active": None, "native": None, "pending": None, "repair": None,
+    }
 
 
 @pytest.mark.parametrize("fail_bank_close", [False, True])
@@ -292,7 +305,20 @@ def test_alternate_backend_owns_lifecycle_routes_and_scoped_banks(
         assert backend.get_item("other-item")["cursor"] is None
         assert backend.get_item("provider:fictional:item:shared")["cursor"] == "fixture-cursor"
         assert client.get("/api/export?workspace=personal").status_code == 200
-    assert events == ["storage-started", "bank-started", "bank-closed", "storage-closed"]
+    assert events[:2] == ["storage-started", "bank-started"]
+    assert events[-1] == "storage-closed"
+    assert events[2:-1] and set(events[2:-1]) == {"bank-closed"}
+    if fail_bank_close:
+        # Failed retirement retains the original service for explicit cleanup;
+        # repeated shutdown paths must not mistake its first failure for closure.
+        assert app.state.budget_runtime.status()["cleanup_failed"] > 0
+        pending, = app.state.bank_lifecycle.services
+        pending.fail_close = False
+        asyncio.run(app.state.budget_runtime.retry_cleanup())
+        assert app.state.budget_runtime.status()["cleanup_failed"] == 0
+        assert app.state.bank_lifecycle.services == []
+    else:
+        assert events == ["storage-started", "bank-started", "bank-closed", "storage-closed"]
     assert backend.closed is True
     assert not (tmp_path / "data").exists()
 

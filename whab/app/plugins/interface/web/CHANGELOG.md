@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.26.0 — 2026-10-23
+
+PR: [#94](https://github.com/Fillll/whab/pull/94)
+
+- Add Storage copies settings with primary health, financial and plugin-state watermarks, pending/failure status, retry and disable controls. Review an empty destination before attachment and review promotion separately; retain edit barriers and show completion only after the host confirms authority.
+
 ## 1.25.1 — 2026-10-22
 
 PR: [#74](https://github.com/Fillll/whab/pull/74)

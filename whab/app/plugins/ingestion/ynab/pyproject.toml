@@ -1,12 +1,12 @@
 [project]
 name = "whab_plugin_ynab"
-version = "1.3.1"
+version = "1.4.0"
 description = "Local YNAB ZIP import plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.21,<3"]
+dependencies = ["whab>=2.31,<3"]
 
 [project.entry-points."whab.plugins"]
 ynab = "whab_plugin_ynab.plugin:plugin"
@@ -21,3 +21,15 @@ include = ["whab_plugin_ynab", "whab_plugin_ynab.*"]
 
 [tool.setuptools.package-data]
 whab_plugin_ynab = ["templates/*.html", "static/*.js"]
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "ingestion.file", "version" = 1, "composition" = "additive" }]
+requires = []
+conflicts = []
+lifecycle = "live"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "maintained"

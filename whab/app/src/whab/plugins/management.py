@@ -1,4 +1,4 @@
-"""Installed-plugin metadata and restart-bound configuration, without factory execution."""
+"""Installed metadata, restart configuration and opt-in live report management."""
 
 from copy import deepcopy
 from importlib import metadata
@@ -17,9 +17,14 @@ _BUNDLED_METADATA = {
     ("plaid", "whab_plugin_plaid.plugin:plugin"): ("ingestion", "Plaid"),
     ("ynab", "whab_plugin_ynab.plugin:plugin"): ("ingestion", "Import from YNAB ZIP file"),
     ("sqlite", "whab_plugin_sqlite.plugin:plugin"): ("storage", "SQLite"),
+    ("json", "whab_plugin_json.plugin:plugin"): ("storage", "JSON"),
     ("client", "whab_plugin_client.plugin:plugin"): ("storage", "Remote budget client"),
     ("server", "whab_plugin_server.plugin:plugin"): ("interface", "Budget API server"),
     ("example", "whab_plugin_example:plugin"): ("example", "Month totals example"),
+    ("example-branding", "whab_plugin_example_branding:plugin"): ("example", "Fictional branding"),
+    ("example-file-import", "whab_plugin_example_file_import:plugin"): ("example", "Fictional account import"),
+    ("example-categorization", "whab_plugin_example_categorization:plugin"): ("example", "Exact merchant teaching model"),
+    ("example-api", "whab_plugin_example_api:plugin"): ("example", "Fictional API interface"),
 }
 
 
@@ -73,17 +78,20 @@ def package_details(entry):
 
 
 class PluginManager:
-    """The running registry stays fixed; explicit saves configure the next startup."""
+    """Ordinary saves configure startup; explicit transitions apply live reports."""
 
-    def __init__(self, settings, plugins, budget_session=None):
+    def __init__(self, settings, plugins, budget_session=None, live=None):
         self.settings = settings
         self.plugins = plugins
         self.budget_session = budget_session
+        self.live = live
         self.required = tuple(dict.fromkeys(name for name in (settings.storage, settings.ui) if name))
+        self.visual_known = frozenset()
         self._lock = Lock()
 
     def _read_selection(self):
-        return self.budget_session.selection if self.budget_session else read_selection(self.settings.home)
+        selected = self.budget_session.selection if self.budget_session else read_selection(self.settings.home)
+        return tuple(name for name in selected if name not in self.visual_known) if selected is not None else None
 
     def projection(self):
         """Safe template/API data; a bad file can be repaired through an explicit save."""
@@ -154,7 +162,28 @@ class PluginManager:
             "configured": list(configured),
             "restart_required": active != configured,
             "error": " ".join(errors) or None,
+            **({"live": self.live.status()} if self.live else {}),
         }
+
+    def persist_live(self, selection, descriptors):
+        """Called only after generation admission is gated and drained."""
+        with self._lock:
+            if self.budget_session:
+                self.budget_session.save_selection(selection, state_versions={
+                    plugin.id: contract_for(plugin).state_version for plugin in descriptors
+                })
+            else:
+                write_selection(self.settings.home, selection)
+
+    def preflight_live(self, selection):
+        if self.live is None:
+            raise PluginError("This host has no live runtime coordinator. Save the selection and restart.", code="restart_required")
+        self.live.preflight(selection)
+
+    def schedule_live(self, selection, *, validated=False):
+        if self.live is None:
+            raise PluginError("This host has no live runtime coordinator. Save the selection and restart.", code="restart_required")
+        return self.live.schedule(selection, validated=validated)
 
     def save(self, selection):
         """Validate descriptors and required capabilities; do not open/close any service."""

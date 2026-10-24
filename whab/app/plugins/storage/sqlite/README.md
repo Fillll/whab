@@ -1,5 +1,9 @@
 # SQLite storage plugin
 
+This version requires WHAB 2.37 or newer for the public local-authority and
+single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
+for host-coordinated synchronization and explicit handover.
+
 Distributed independently as `whab_plugin_sqlite`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
 `src/whab_plugin_sqlite/` owns the bundled SQLite descriptor, ledger transactions, additive schema upgrades and fictional seeding. Keep its implementation and tests in this folder. The host uses the public storage protocol rather than importing this package.
@@ -46,4 +50,71 @@ WHAB 2.12 can request an atomic transaction-register projection without rebuildi
 
 ## Development checks
 
+The optional version-1 `storage.authority`, `storage.commands` and `transfer.local`
+contracts persist budget/environment and instance identities, authority epoch,
+logical generation, roles, transition identities and operation receipts in additive
+runtime tables. SQLite uses `synchronous=FULL`; each ordinary mutation updates its
+generation in the same native transaction. The authority schema and its initial
+identity also publish in one transaction: interruption before that commit retains
+the original usable legacy database. Pre-existing incomplete authority metadata is
+preserved and refused. Optimized annotation/review writes retain
+their scoped financial queries and add one authority-row update. Every ordinary
+mutation rejects staged, copy, fenced or retired storage, including through an older
+open handle. Reopening retains the persisted role.
+
+Durable commands apply core validation and atomically commit financial/provider
+changes with their result receipt. Exact retries return the original result before
+checking stale generation evidence. At most 4,096 receipts are retained; an unknown
+or expired command with stale evidence fails without executing. A lost response
+after native commit fences that handle as uncertain until reopening and comparing
+its durable evidence. A failed transaction retains its previous generation.
+
+Complete local transfer requires an empty staged destination and preserves both
+workspaces, deleted history and images, import identity, exact encrypted tokens,
+associations, masks and cursors. It leaves runtime keys with the host. The host must
+validate the complete digest, fence the source and durably choose authority before
+activation with a fresh epoch. Matching transfer retries are harmless; populated or
+different destinations are refused. States exceeding the public local-transfer
+bounds are refused without restricting existing SQLite ledger writes. Runtime
+authority tables and protected records never enter the sanitized portable database.
+
+Authority metadata format 2 adds the version-1 `storage.replica` contract and a
+prepared promotion identity. Opening format 1 upgrades that metadata in one native
+transaction without changing the instance, epoch, generation or financial records.
+The replica watermark, both workspaces, protected records and durable command
+receipts commit together. A copy keeps its own instance identity while recording
+its source instance/epoch/generation/operation and the host-owned namespace
+generation/digest. Opaque plugin files remain the host's responsibility.
+
+`apply_replica()` accepts only a copy. Exact replay is harmless after a lost
+response; older financial or namespace generations, a different source/epoch and
+conflicting same-generation data cannot overwrite a newer copy. Native copy data
+must match its saved watermark on reopen. Copy failure cannot undo the primary's
+committed save.
+
+`prepare_promotion()` compares complete copy evidence and the exact watermark,
+persists the transition and blocks further replica updates. Its matching
+`abort_promotion()` clears that preparation. The host must first catch up, validate
+namespaces, fence the primary and durably choose authority. Only then may
+`set_role()` activate the prepared copy with a fresh epoch. Promotion and abort
+leave financial generation and data unchanged; new primary commands advance it.
+
 From `whab/app/`, use `.venv/bin/python -m pytest plugins/storage/sqlite/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. Documentation-only edits can use `--docs`. See [plugin contribution rules](../../README.md#test-ownership) for coverage/packaging requirements and [CHANGELOG.md](CHANGELOG.md) for the release history of these capabilities.
+
+
+## Read-only readiness and live code
+
+The explicit version-1 `storage.worker` contract supports compatible live code
+replacement through the host's approved environment coordinator. The host drains
+financial/background work before releasing the old writer, durably chooses the
+new code before its first writable constructor, and retains native instance,
+authority epoch and financial generation. It uses native operation receipts to
+reconcile lost mutation replies; uncertainty gates this budget until explicit
+recovery. This does not change storage authority or select another backend.
+
+`StorageContext(read_only=True)` validates an existing current native schema
+without creating a ledger or upgrading older metadata, and rejects all mutations.
+Only compatible readers may pass candidate readiness; schema changes need an
+explicit reader/upgrader strategy. See [storage workers and stopped-host repair](../../../../docs/storage-workers.md)
+for the exact-host fence, protocol limits, durable request replay and recovery.
+The client backend requires a separate host-managed remote adapter.

@@ -1,0 +1,50 @@
+import json
+
+import pytest
+from whab_plugin_example_categorization import plugin
+
+from whab.plugins import BudgetContext, StoreError
+
+
+def test_teaching_model_training_selection_persistence_and_currency_isolation():
+    files = {}
+    context = BudgetContext("fictional", {}, {}, lambda value: None, files.get,
+                            lambda name, raw: files.__setitem__(name, raw), lambda name: files.pop(name, None))
+    engine = plugin.categorization.factory(context)
+    assert engine.defaults == {} and engine.index() == {"active": None, "models": []}
+    assert engine.predict([]) == []
+    row = {"id":"old", "merchant":"Fictional shop", "currency":"USD", "categoryId":"food", "reviewed":True}
+    training = engine.train([row, {**row, "reviewed":False, "categoryId":"wrong"}], {})
+    assert next(training)["progress"] == 50
+    with pytest.raises(StopIteration) as completed:
+        next(training)
+    record = engine.save(completed.value.value, "One model")
+    identifier = record["id"]
+    assert engine.predict([]) == []
+    with pytest.raises(StoreError):
+        engine.select("wrong")
+    engine.select(identifier)
+    inference = {**row, "id":"new", "reviewed":False, "categoryId":None}
+    assert engine.predict([inference])[0]["categoryId"] == "food"
+    assert engine.predict([{**inference,"currency":"EUR"}, row, {**inference,"merchant":"unknown"}]) == []
+    with pytest.raises(StoreError):
+        engine.rename(identifier, "")
+    engine.rename(identifier, "Renamed")
+    assert plugin.categorization.factory(context).index()["models"][0]["name"] == "Renamed"
+    with pytest.raises(StoreError):
+        engine.save(completed.value.value, "Second")
+    with pytest.raises(StoreError):
+        next(engine.train([], {"unexpected":True}))
+    with pytest.raises(StoreError):
+        next(engine.train([row] * 1001, {}))
+    engine.delete(identifier)
+    assert engine.index()["models"] == []
+    with pytest.raises(StoreError):
+        engine.select(identifier)
+    for raw in (b"invalid-json", json.dumps({"format":1}).encode(), b"x" * (2*1024*1024+1),
+                json.dumps({"format":1,"id":"invalid","active":False,"name":"A","lookup":{}}).encode(),
+                json.dumps({"format":1,"id":identifier,"active":False,"name":"","lookup":{}}).encode(),
+                json.dumps({"format":1,"id":identifier,"active":False,"name":"A","lookup":[]}).encode()):
+        files["model.json"] = raw
+        with pytest.raises(StoreError):
+            engine.index()

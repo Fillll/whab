@@ -1,0 +1,33 @@
+[project]
+name = "whab_plugin_devkit"
+version = "0.6.0"
+description = "Public-contract conformance tools for WHAB plugin authors"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2.22,<3", "packaging>=26,<27"]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10"]
+
+[project.urls]
+Repository = "https://github.com/Fillll/whab"
+
+[project.scripts]
+whab-plugin = "whab_plugin_devkit.cli:main"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["whab_plugin_devkit", "whab_plugin_devkit.*"]
+
+[tool.setuptools.package-data]
+whab_plugin_devkit = ["templates/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

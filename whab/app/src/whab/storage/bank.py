@@ -115,6 +115,22 @@ class BankStore:
         *,
         expected_cursor: Any = UNSET,
     ) -> dict:
+        payload = self.prepare_sync(item_id, changes, cursor, accounts, historical_complete,
+                                    expected_cursor=expected_cursor)
+        return self._store.apply_sync(payload["itemId"], payload["changes"], payload["cursor"], payload["accounts"],
+                                     payload["historicalComplete"], expected_cursor=payload.get("expectedCursor", UNSET))
+
+    def prepare_sync(
+        self,
+        item_id: str,
+        changes: SyncChanges,
+        cursor: str | None,
+        accounts: list[ImportedAccount] | None = None,
+        historical_complete: bool = True,
+        *,
+        expected_cursor: Any = UNSET,
+    ) -> dict:
+        """Host-owned provider scoping for either legacy or durable command writes."""
         if not self._owned_item(item_id):
             raise StoreError("Connection not found.")
         stored_item_id = self.item_identity(item_id)
@@ -128,7 +144,8 @@ class BankStore:
             for account in accounts or []
         ]
 
-        existing = {row["id"]: row for row in self._store.transactions("personal")} if self._suggestions_only else {}
+        suggestions_only = self._suggestions_only() if callable(self._suggestions_only) else self._suggestions_only
+        existing = {row["id"]: row for row in self._store.transactions("personal")} if suggestions_only else {}
 
         def scoped_transaction(transaction: ImportedTransaction) -> ImportedTransaction:
             pending = transaction.get("pendingTransactionId")
@@ -143,7 +160,7 @@ class BankStore:
                 if pending
                 else None,
                 "source": self._provider,
-                **({"suggestedCategoryId": previous.get("categoryId") if previous else None} if self._suggestions_only else {}),
+                **({"suggestedCategoryId": previous.get("categoryId") if previous else None} if suggestions_only else {}),
             }
 
         scoped_changes = {
@@ -156,11 +173,6 @@ class BankStore:
                 for transaction_id in changes.get("removed", [])
             ],
         }
-        return self._store.apply_sync(
-            stored_item_id,
-            scoped_changes,
-            cursor,
-            scoped_accounts,
-            historical_complete,
-            expected_cursor=expected_cursor,
-        )
+        return {"itemId": stored_item_id, "changes": scoped_changes, "cursor": cursor,
+                "accounts": scoped_accounts, "historicalComplete": historical_complete,
+                **({"expectedCursor": expected_cursor} if expected_cursor is not UNSET else {})}

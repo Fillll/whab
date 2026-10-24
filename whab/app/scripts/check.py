@@ -56,7 +56,7 @@ def preflight(*, docs_only: bool, quick: bool, env: dict[str, str] | None = None
     return node
 
 
-def commands(*, docs_only: bool, quick: bool, node: str | None) -> list[tuple[str, list[str]]]:
+def commands(*, docs_only: bool, quick: bool, node: str | None, evidence_dir: Path | None = None) -> list[tuple[str, list[str]]]:
     """Keep the quick path free of pytest, wheel builds and dependency downloads."""
     checks = [("Documentation", [sys.executable, "scripts/check_docs.py"])]
     if docs_only:
@@ -65,7 +65,7 @@ def commands(*, docs_only: bool, quick: bool, node: str | None) -> list[tuple[st
     if not tests:
         raise ValueError("No plugin browser tests were found; check the source checkout.")
     checks = [
-        ("Python lint", [sys.executable, "-m", "ruff", "check", "src", "scripts", "tests", "plugins", "conftest.py"]),
+        ("Python lint", [sys.executable, "-m", "ruff", "check", "src", "scripts", "tests", "plugins", "devtools", "conftest.py"]),
         ("Changelog provenance", [sys.executable, "scripts/check_changelog_prs.py"]),
         *checks,
         ("Browser JavaScript", [node, "--test", *tests]),
@@ -73,6 +73,9 @@ def commands(*, docs_only: bool, quick: bool, node: str | None) -> list[tuple[st
     if not quick:
         checks.extend([
             ("Python tests and plugin coverage", [sys.executable, "scripts/check_plugin_coverage.py"]),
+            ("Plugin toolkit wheels and coverage", [sys.executable, "scripts/check_plugin_devkit.py"]),
+            ("Generated plugin wheels and replay", [sys.executable, "scripts/check_plugin_generation.py",
+                *(["--artifacts-directory", str(evidence_dir / "generated")] if evidence_dir is not None else [])]),
             ("Installed wheels", [sys.executable, "scripts/check_distribution.py"]),
         ])
     return checks
@@ -83,12 +86,13 @@ def main(argv: list[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--quick", action="store_true", help="Lint, changelogs, documentation and Node browser tests only.")
     mode.add_argument("--docs", action="store_true", help="Check documentation only; no Node or development packages required.")
+    parser.add_argument("--evidence-dir", type=Path, help="Preserve generated-plugin wheels and replay evidence outside the checkout.")
     args = parser.parse_args(argv)
     try:
         with TemporaryDirectory(prefix="whab-contribution-checks-") as temporary:
             env = check_environment(Path(temporary).resolve())
             node = preflight(docs_only=args.docs, quick=args.quick, env=env)
-            checks = commands(docs_only=args.docs, quick=args.quick, node=node)
+            checks = commands(docs_only=args.docs, quick=args.quick, node=node, evidence_dir=args.evidence_dir)
             for name, command in checks:
                 print(f"\n{name}", flush=True)
                 result = subprocess.run(command, cwd=ROOT, env=env, check=False)

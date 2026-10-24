@@ -1,5 +1,13 @@
 # Plaid bank ingestion plugin changelog
 
+## Unreleased
+
+## 1.2.0 — 2026-10-23
+
+PR: [#84](https://github.com/Fillll/whab/pull/84)
+
+- Hold an independent host runtime lease through each coalesced background synchronization, including writes and cleanup, so storage handovers drain active ingestion safely. Observe background failures with sanitized diagnostics and require WHAB 2.27+.
+
 ## 1.1.4 — 2026-10-18
 
 PR: [#66](https://github.com/Fillll/whab/pull/66)

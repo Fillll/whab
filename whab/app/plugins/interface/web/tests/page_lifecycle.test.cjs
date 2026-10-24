@@ -82,6 +82,7 @@ function harness(initial = 'budget') {
     pendingDestination: () => null,
   };
   const runtime = {document, window, CustomEvent: Event, URL, BigInt,
+    getContext: () => ({}),
     location: {href: `https://localhost:5173/budgets/household/${initial}/2026-10/usd`,
       assign: value => locations.push(String(value)), reload: () => locations.push('reload')},
     api(url, body) {const pending = deferred(); requests.push({url, body, ...pending}); return pending.promise;},

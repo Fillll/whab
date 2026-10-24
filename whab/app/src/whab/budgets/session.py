@@ -5,6 +5,7 @@ import io
 import json
 import os
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
 from types import MappingProxyType
@@ -18,6 +19,7 @@ from .credentials import encrypt_credentials
 from .document import (
     MAX_BUNDLE_BYTES,
     MAX_MANIFEST_BYTES,
+    _json,
     atomic_write,
     digest,
     encode_bundle,
@@ -26,6 +28,8 @@ from .document import (
     upgrade_manifest,
     validate_manifest,
 )
+
+MAX_SOURCE_BYTES = MAX_MANIFEST_BYTES + 1024
 
 
 def content_digest(manifest, ledger, credential_blob=None):
@@ -57,14 +61,27 @@ def _read_source(path):
     if not path.exists():
         return None
     try:
-        value = json.loads(_read_bytes(path, MAX_MANIFEST_BYTES))
+        value = _json(_read_bytes(path, MAX_SOURCE_BYTES))
+        if type(value) is dict and value.get("formatVersion") == 2:
+            required = {"formatVersion", "selectionOnly", "restoreRequired", "content", "manifest"}
+            if (not required <= value.keys() or value.keys() - (required | {"pending", "restorePending"})
+                    or type(value["formatVersion"]) is not int or value["selectionOnly"] is not True
+                    or type(value["restoreRequired"]) is not bool
+                    or ("pending" in value and "restorePending" in value)
+                    or ("pending" in value and value["restoreRequired"])
+                    or ("restorePending" in value and not value["restoreRequired"])):
+                raise ValueError()
+            value["manifest"] = validate_manifest(value["manifest"])
+            fingerprints = {key: value[key] for key in ("content", "pending", "restorePending") if key in value}
+        else:
+            fingerprints = value
         if (
-            type(value) is not dict or "content" not in value
-            or value.keys() - {"content", "pending", "restorePending"}
-            or ("pending" in value and "restorePending" in value)
+            type(fingerprints) is not dict or "content" not in fingerprints
+            or fingerprints.keys() - {"content", "pending", "restorePending"}
+            or ("pending" in fingerprints and "restorePending" in fingerprints)
         ):
             raise ValueError()
-        for key, fingerprint in value.items():
+        for key, fingerprint in fingerprints.items():
             if key == "content" and fingerprint is None:
                 continue
             if (
@@ -73,8 +90,41 @@ def _read_source(path):
             ):
                 raise ValueError()
         return value
-    except (ValueError, OSError):
+    except (ValueError, OSError, TypeError):
         raise StoreError("The budget's local recovery record is unreadable.") from None
+
+
+def recovery_source(previous, manifest, incoming):
+    """Upgrade only the selection journal; never assert that a ledger was restored.
+
+    The complete manifest and its original source fingerprint share one atomic
+    decision. A crash cannot expose a selection marker without its metadata.
+    Unversioned native recovery records keep their exact legacy representation
+    until this explicit metadata-only save upgrades them.
+    """
+    manifest = validate_manifest(manifest)
+    value = {key: previous[key] for key in ("content", "pending", "restorePending") if previous and key in previous}
+    if previous is None:
+        value["content"] = incoming
+    value.update(formatVersion=2, selectionOnly=True, manifest=manifest,
+                 restoreRequired=previous.get("restoreRequired", "restorePending" in previous) if previous else True)
+    raw = json.dumps(value, ensure_ascii=False).encode()
+    if len(raw) > MAX_SOURCE_BYTES:
+        raise StoreError("The budget's saved plugin setup exceeds the supported size.")
+    return value, raw
+
+
+def _flush_source_home(home, directory):
+    home, directory = Path(home).resolve(), Path(directory).resolve()
+    while directory.is_relative_to(home):
+        descriptor = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        if directory == home:
+            break
+        directory = directory.parent
 
 
 class BudgetSession:
@@ -90,34 +140,71 @@ class BudgetSession:
         self.credential_blob = credential_blob
         self.password = password
         self.storage_config = {}
+        self.storage_payload_paths = ()
         self._has_payload = files is not None
         self.storage_home = self.home / "budgets" / self.id / environment
         self.lock = RLock()
         self.store = None
+        self.after_checkpoint = None
+        self._namespace_depth = 0
+        self._namespace_pending = False
+        self._namespace_failed = False
+        self._namespace_batch_failed = False
         self.missing_plugins = []
         self.destinations = []
         self.status = "saved"
         self._file_digest = digest(_read_bytes(self.path)) if self.path and self.path.exists() else None
+        self._incoming_content = content_digest(self.manifest, self.ledger if self.ledger is not None else self.files, self.credential_blob)
+        from .storage_runtime import prepare_session_authority, storage_manifest
+        preserved_original = prepare_session_authority(self)
+        from .remote_runtime import prepare_remote_session
+        preserved_original = prepare_remote_session(self) or preserved_original
         self._source = _read_source(self.storage_home / "source.json")
+        if self.storage_authority and (
+            self._source is None
+            or not (self.storage_home / "manifest.json").is_file()
+            or not (self.storage_home / "plugin-data.whab").is_file()
+        ):
+            raise StoreError("The migrated budget's local plugin recovery state is unavailable; restore it before opening this budget.")
         if (self.ledger is not None or self._has_payload) and self._source is not None:
-            incoming = content_digest(self.manifest, self.ledger if self.ledger is not None else self.files, self.credential_blob)
-            if incoming not in (self._source["content"], self._source.get("pending")):
+            incoming = self._incoming_content
+            if not preserved_original and incoming not in (self._source["content"], self._source.get("pending")):
                 raise StoreError("This budget differs from the copy already opened on this device. Export the recovered budget before opening a different revision.")
             saved_manifest = self.storage_home / "manifest.json"
-            if "restorePending" not in self._source and saved_manifest.exists():
+            if self._source.get("formatVersion") == 2:
+                recovered = self._source["manifest"]
+                if self.storage_authority or self.remote_authority:
+                    recovered = storage_manifest(recovered, self.manifest["storage"])
+                if recovered["id"] != self.id or recovered["storage"] != self.manifest["storage"]:
+                    raise StoreError("The budget's saved plugin setup belongs to another budget or storage plugin.")
+                self.manifest = recovered
+            elif "restorePending" not in self._source and saved_manifest.exists():
                 try:
                     recovered = validate_manifest(json.loads(_read_bytes(saved_manifest, MAX_MANIFEST_BYTES)))
+                    if self.storage_authority or self.remote_authority:
+                        recovered = storage_manifest(recovered, self.manifest["storage"])
                     if recovered["id"] != self.id or recovered["storage"] != self.manifest["storage"]:
                         raise ValueError()
                     self.manifest = recovered
                 except (ValueError, OSError):
                     raise StoreError("The budget's saved plugin setup is unreadable.") from None
             saved_files = self.storage_home / "plugin-data.whab"
-            if "restorePending" not in self._source and saved_files.exists():
+            if ("restorePending" not in self._source or self._source.get("formatVersion") == 2) and saved_files.exists():
                 recovered = decode_container(_read_bytes(saved_files))
-                if recovered.manifest["id"] != self.id or recovered.manifest["storage"] != self.manifest["storage"]:
+                if recovered.manifest["id"] != self.id or (not (self.storage_authority or self.remote_authority) and recovered.manifest["storage"] != self.manifest["storage"]):
                     raise StoreError("The budget's saved plugin files are unreadable.")
                 self.files = recovered.files
+        if self.remote_authority:
+            origin = self.remote_authority["origin_plugin"]
+            target = self.remote_authority["choice"]["plugin"]
+            old, new = f"plugins/{origin}/connection.json", f"plugins/{target}/connection.json"
+            if new not in self.files and old in self.files:
+                self.files[new] = self.files[old]
+        if self.storage_authority:
+            # Native authority was explicitly journalled. Its data is validated
+            # before bind; portable source snapshots cannot overwrite it.
+            self.ledger = None
+            self._has_payload = False
         self._load_copies()
 
     @classmethod
@@ -192,21 +279,33 @@ class BudgetSession:
     def bind(self, store):
         """Restore only into a new isolated backend; never replace an existing ledger."""
         self.store = store
+        worker_recovery = getattr(store, "worker_recovery_required", None)
+        if callable(worker_recovery) and worker_recovery():
+            # Keep the original restore/checkpoint evidence untouched until
+            # native request recovery has proved this instance's exact state.
+            return
+        if self.storage_authority:
+            self.checkpoint()
+            return
         if self.ledger is None and self._has_payload:
             prepare = getattr(store, "prepare_budget_files", None)
             if not callable(prepare):
                 raise StoreError("This storage plugin cannot open its saved budget files.")
-            existing = self._source is not None and "restorePending" not in self._source
+            existing = self._source is not None and "restorePending" not in self._source and not self._source.get("restoreRequired", False)
             if not existing:
                 incoming = content_digest(self.manifest, self.files, self.credential_blob)
-                initial = {"content": incoming, "restorePending": incoming}
+                initial = ({**self._source, "restorePending": incoming, "restoreRequired": True}
+                           if self._source and self._source.get("formatVersion") == 2 else {"content": incoming, "restorePending": incoming})
                 try:
                     atomic_write(self.storage_home / "source.json", json.dumps(initial).encode())
                 except OSError:
                     raise StoreError("The budget's recovery record could not be saved; its files were not restored.") from None
                 self._source = initial
-            prepare("personal", self.files_for(self.manifest["storage"]), existing=existing)
-        if self.ledger is not None and (self._source is None or "restorePending" in self._source):
+            payload = self.files_for(self.manifest["storage"])
+            if self.storage_payload_paths:
+                payload = {name: raw for name, raw in payload.items() if name in self.storage_payload_paths}
+            prepare("personal", payload, existing=existing)
+        if self.ledger is not None and (self._source is None or "restorePending" in self._source or self._source.get("restoreRequired", False)):
             incoming = content_digest(self.manifest, self.ledger)
             restore = getattr(store, "restore_budget", None)
             # The restore contract detaches external provider balance snapshots.
@@ -216,8 +315,9 @@ class BudgetSession:
                     if account["source"] not in {"manual", "demo"}:
                         account["stale"] = True
             expected_digest = content_digest(None, expected)
-            if self._source is None:
-                initial = {"content": incoming, "restorePending": expected_digest}
+            if self._source is None or self._source.get("formatVersion") == 2:
+                initial = ({**self._source, "restorePending": expected_digest, "restoreRequired": True}
+                           if self._source else {"content": incoming, "restorePending": expected_digest})
                 try:
                     atomic_write(self.storage_home / "source.json", json.dumps(initial).encode())
                 except OSError:
@@ -287,9 +387,18 @@ class BudgetSession:
 
     def _save_manifest(self, value):
         validated = validate_manifest(value)
+        metadata_only = self.store is None and (self.ledger is not None or self._has_payload)
         try:
-            atomic_write(self.storage_home / "manifest.json", json.dumps(validated).encode())
+            if metadata_only:
+                source, raw = recovery_source(self._source, validated, self._incoming_content)
+                atomic_write(self.storage_home / "source.json", raw)
+                _flush_source_home(self.home, self.storage_home)
+                self._source = source
+            else:
+                atomic_write(self.storage_home / "manifest.json", json.dumps(validated).encode())
         except OSError:
+            if metadata_only:
+                raise StoreError("The budget's plugin setup could not be confirmed. Refresh its saved recovery record before retrying.") from None
             raise StoreError("The budget's plugin setup could not be saved; its previous settings are unchanged.") from None
         self.manifest = validated
         self.checkpoint()
@@ -347,15 +456,26 @@ class BudgetSession:
             self._save_files({name: raw for name, raw in self.files.items() if name != key})
 
     def bundle(self, *, include_credentials=False, password=None, preserve_credentials=False):
+        with self.lock:
+            if self._namespace_depth or self._namespace_failed:
+                raise StoreError("Recover the complete plugin namespace before exporting this budget.")
+            return self._bundle(include_credentials=include_credentials, password=password,
+                                preserve_credentials=preserve_credentials)
+
+    def _bundle(self, *, include_credentials=False, password=None, preserve_credentials=False):
         export_files = getattr(self.store, "export_budget_files", None)
         if callable(export_files):
             with self.lock:
                 plugin_id = self.manifest["storage"]
                 prefix = f"plugins/{plugin_id}/"
-                files = {key: value for key, value in self.files.items() if not key.startswith(prefix)}
+                generated = {prefix + name for name in self.storage_payload_paths}
+                files = {key: value for key, value in self.files.items()
+                         if key not in generated and (self.storage_payload_paths or not key.startswith(prefix))}
                 payload = export_files("personal")
                 if type(payload) is not dict:
                     raise StoreError("This storage plugin returned invalid budget files.")
+                if self.storage_payload_paths and payload.keys() != set(self.storage_payload_paths):
+                    raise StoreError("The storage export does not match its declared payload paths.")
                 files.update({prefix + name: raw for name, raw in payload.items()})
                 blob = self.credential_blob if preserve_credentials else None
                 if include_credentials:
@@ -374,10 +494,45 @@ class BudgetSession:
             raise StoreError("This storage plugin does not support plugin-owned budget files.")
         return encode_bundle(self.manifest, export("personal"))
 
+    @contextmanager
+    def namespace_materialization(self):
+        """Defer exports/copy notifications until complete effect recovery succeeds.
+
+        The caller owns the authoritative namespace journal. Nested callbacks
+        may save individual native files; none can publish a partial container.
+        A failed batch keeps exports fenced until a later complete recovery batch.
+        """
+        with self.lock:
+            outer = self._namespace_depth == 0
+            if outer:
+                self._namespace_batch_failed = False
+            self._namespace_depth += 1
+            failed = False
+            try:
+                yield
+            except BaseException:
+                failed = self._namespace_batch_failed = self._namespace_failed = True
+                raise
+            finally:
+                self._namespace_depth -= 1
+                if outer:
+                    self._namespace_failed = self._namespace_batch_failed
+                    if not self._namespace_failed and self._namespace_pending:
+                        self._namespace_pending = False
+                        self.checkpoint()
+                    elif self._namespace_failed and not failed:
+                        raise StoreError("The plugin namespace still requires complete recovery before exporting.")
+
     def checkpoint(self):
         if self.store is None:
             return
         with self.lock:
+            if self._namespace_depth or self._namespace_failed:
+                self._namespace_pending = True
+                self.status = "pending"
+                for destination in self.destinations:
+                    destination["status"] = "pending"
+                return
             try:
                 raw = self.bundle(preserve_credentials=True)
                 container = decode_container(raw, password=self.password)
@@ -432,6 +587,11 @@ class BudgetSession:
                     destination["status"] = "saved"
                 except (OSError, StoreError):
                     destination["status"] = "pending"
+            if self.after_checkpoint:
+                try:
+                    self.after_checkpoint()
+                except Exception:
+                    pass
 
     def _check_copy_content(self, destination, candidate):
         path = Path(destination["path"])
@@ -508,7 +668,7 @@ class BudgetSession:
 class TrackedStorage:
     """Checkpoint portable files after committed writes, including bank synchronization."""
 
-    MUTATIONS = frozenset({"add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "review_transactions", "assign", "apply_sync", "import_workspace", "save_item", "set_item_status", "disconnect_item", "save_receipt", "delete_receipt"})
+    MUTATIONS = frozenset({"add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "apply_sync", "import_workspace", "save_item", "set_item_status", "disconnect_item", "save_receipt", "delete_receipt", "restore_budget", "restore_budget_files", "execute_operation"})
 
     def __init__(self, store, session=None):
         self.store = store
@@ -516,21 +676,43 @@ class TrackedStorage:
         self.lock = session.lock if session else RLock()
         self.on_mutation = None
         self.after_ingestion = None
+        self.after_commit = None
+        self.storage_plugin_id = None
+
+    def retarget(self, backend, runtime, plugin_id):
+        """Control-plane replacement after the entire budget has gated/drained."""
+        status = runtime.status()
+        if status["admission"] != "gated" or status["active_leases"]:
+            raise StoreError("Storage replacement requires a drained budget runtime.")
+        with self.lock:
+            self.store = backend
+            self.storage_plugin_id = plugin_id
+            if self.session:
+                self.session.store = backend
 
     def __getattr__(self, name):
         member = getattr(self.store, name)
-        if name not in self.MUTATIONS or not callable(member):
+        if not callable(member):
             return member
 
-        def mutate(*args, **kwargs):
+        def invoke(*args, **kwargs):
             with self.lock:
-                result = member(*args, **kwargs)
+                result = getattr(self.store, name)(*args, **kwargs)
+                if name not in self.MUTATIONS or (name == "execute_operation" and result.replayed):
+                    return result
                 if self.on_mutation:
                     self.on_mutation()
                 if self.session:
                     self.session.checkpoint()
-                if name in {"apply_sync", "import_workspace"} and self.after_ingestion:
+                effective_name = args[0].name if name == "execute_operation" else name
+                if effective_name in {"apply_sync", "import_workspace"} and self.after_ingestion:
                     self.after_ingestion()
+                if self.after_commit:
+                    try:
+                        self.after_commit()
+                    except Exception:
+                        # Native financial success is independent of copy work.
+                        pass
                 return result
 
-        return mutate
+        return invoke

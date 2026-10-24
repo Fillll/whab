@@ -17,18 +17,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#191715">
     <title>WHAB · We Have A Budget</title>
-    <link rel="icon" href="{{ asset_prefix }}/static/favicon.svg?v={{ web_asset_version }}" type="image/svg+xml">
-    <script src="{{ asset_prefix }}/static/theme.js?v={{ web_asset_version }}"></script>
-    <link rel="stylesheet" href="{{ asset_prefix }}/static/styles.css?v={{ web_asset_version }}">
+    <link rel="icon" href="{{ ui_asset_prefix|default(asset_prefix) }}/static/favicon.svg?v={{ web_asset_version }}" type="image/svg+xml">
+    <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/theme.js?v={{ web_asset_version }}"></script>
+    <link rel="stylesheet" href="{{ ui_asset_prefix|default(asset_prefix) }}/static/styles.css?v={{ web_asset_version }}">
     <script id="whab-context" type="application/json">{{ client_context|tojson }}</script>
-    <script type="importmap">{{ module_imports(asset_prefix)|tojson }}</script>
-    <script src="{{ asset_prefix }}/static/app.js?v={{ web_asset_version }}" type="module"></script>
+    <script type="importmap">{{ module_imports(ui_asset_prefix|default(asset_prefix))|tojson }}</script>
+    <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/app.js?v={{ web_asset_version }}" type="module"></script>
     {% for script in plugin_scripts %}<script src="{{ script }}" type="module"></script>{% endfor %}
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <a class="brand" href="{{ url('budget') }}" aria-label="WHAB home"><img class="brand-symbol" src="{{ asset_prefix }}/static/logo.svg?v={{ web_asset_version }}" alt="" width="40" height="40"><span><strong>WHAB</strong><small>We Have A Budget</small></span></a>
+        <a class="brand" href="{{ url('budget') }}" aria-label="WHAB home"><img class="brand-symbol" src="{{ ui_asset_prefix|default(asset_prefix) }}/static/logo.svg?v={{ web_asset_version }}" alt="" width="40" height="40"><span><strong>WHAB</strong><small>We Have A Budget</small></span></a>
         <div class="nav-label">WORKSPACE</div>
         <nav aria-label="Main navigation">
           {% for key,label in nav %}<a class="nav-item {% if page==key %}active {% endif %}"
@@ -49,7 +49,7 @@
   </div>
 </div>
 </aside>
-<main data-page-assets="{{ dict(web=web_asset_version, plugins=plugin_scripts)|tojson|forceescape }}">
+<main data-page-assets="{{ dict(web=web_asset_version, plugins=plugin_scripts, ui=client_context.get('uiGeneration'))|tojson|forceescape }}">
   <header class="topbar">
     <div class="breadcrumb">
       {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }} {{ icon('chevron-right', 14) }}<span>{{ page|capitalize }}</span>

@@ -4,6 +4,45 @@ WHAB provides **user-interface**, **storage**, **data-ingestion**, **reporting**
 
 The [budget and plugin model](target-architecture.md) groups capabilities by responsibility. This guide defines the executable API v1 contracts; category names do not add or rename SDK hooks.
 
+The [per-budget runtime](plugin-runtime.md) documents generation leases, controlled
+handover and the first explicit live reporting/export selection API. Other
+families retain their documented restart requirement until their adapters exist.
+
+The [approved report-worker adapter](plugin-workers.md) adds bounded framing,
+immutable local wheel environments, compatible report upgrades and validated
+recovery. Installed Python remains trusted executable code.
+
+The [curated catalog](plugin-catalog.md) records package identity, compatibility,
+static capabilities and exact verification evidence. Regenerate it with
+`.venv/bin/python scripts/plugin_metadata.py --write` from `whab/app/`; the normal
+documentation check rejects drift. Generation reads source declarations without
+importing plugin modules. `whab.plugins.catalog.catalog_snapshot()` reads a
+detached, validated copy of the packaged catalog without entry-point discovery,
+network access or installation. It describes reviewed source artifacts rather
+than the active or installed selection. Report vulnerabilities through the
+[security policy](../../SECURITY.md).
+
+Live optional adapters also cover explicit branding and pure file parsers. A
+descriptor may set `branding_factory: Callable[[], Plugin]` to create independent
+bank/merchant artwork and settings hooks for each budget. It receives no context
+or credentials, must preserve identity and the effective contract, and must return
+a descriptor without another factory, binder or non-branding capability. General
+budget binders retain their separate restart/state contract.
+
+`PluginResources(files: Mapping[str, bytes])` copies a bounded immutable UI bundle
+under safe `templates/` and `static/` relative names. `FileImport` may use
+`resources=PluginResources(...)` instead of filesystem paths; the forms are mutually
+exclusive. Parser bundles require `templates/accounts.html` and `static/import.js`.
+The host captures one resource version with each parser, renders its matching
+templates and serves generation-specific asset URLs. See [worker bounds and
+handover behavior](plugin-workers.md#recovery-and-limits).
+
+File-import preview responses include `parserIdentity`. Commit clients must send
+that value as `X-Import-Parser` for explicitly live parsers. Missing/retired tokens
+return 409 before the replacement parser runs. A fresh preview preserves the
+original file fingerprint; import operation IDs and completed retry receipts
+remain unchanged.
+
 ## Trust and enablement
 
 Application source paths in this guide are relative to `whab/app/`. Each concrete implementation lives in `plugins/<category>/<id>/` and owns its source package, assets, README, tests, `pyproject.toml` and dated `CHANGELOG.md`. The canonical [plugin inventory](../app/plugins/README.md#supported-plugins) identifies the supported set and the separately installed teaching example. The `bundled` extra selects that supported set when compatible distributions are available in the chosen package index or local wheelhouse; source checkouts use `.venv/bin/python scripts/install.py --dev` from `whab/app/`. The host wheel contains no concrete plugin package or entry point. A material plugin-only change bumps that plugin's `project.version` and local changelog; only host/core/SDK changes bump the app, with spanning changes updating each affected owner. Keep implementation tests beside their plugin and shared SDK/host contracts in `tests/`. See [folder ownership and test commands](../app/plugins/README.md). The public `whab.plugins` SDK stays in core under `src/whab/plugins/`.
@@ -72,6 +111,14 @@ The session cookie identifies the active budget for existing unscoped clients wi
 The bundled Web UI's **Settings → Plugins → Installed** lists installed registrations alongside the running and configured selections. It defaults to **All categories**; a category filter narrows the installed list. Every visible row has a **Settings** page; teaching examples are hidden from ordinary Settings and have no visible Settings page. Each visible page contains package details and any controls supplied by the active plugin. Inactive registrations show enable/restart guidance without executing settings hooks. Discovery reads package metadata without importing disabled plugin code. Known inactive supported registrations use friendly names and categories from bundled registration metadata without importing code; unknown registrations fall back to their entry-point IDs. Inactive capability kinds remain unknown until their descriptors are explicitly loaded. Selected storage and UI plugins remain required. An unavailable or duplicate optional registration cannot be enabled, but a selected one can be unchecked to repair the selection for the next startup.
 
 **Save plugin selection** loads and validates the proposed descriptors without calling storage/bank factories or reporting hooks. It rejects missing or ambiguous registrations, incompatible descriptors, and attempts to change the selected storage or interface. Saving leaves the running registry, provider services, connections and ledger unchanged; changes apply after restart. An imported bank's history and saved connections remain when its plugin is disabled.
+
+For failures that prevent the full application from starting, the explicit
+[`--recover-plugins` listener](plugin-recovery.md) reads package metadata without
+loading plugin targets. It offers revision-checked optional-plugin removal,
+archival of invalid global selections or saved report-worker references, and a
+full startup retry on the same guarded HTTPS listener. It preserves opaque budget
+namespaces and unopened financial payloads; it cannot disable required storage or
+the selected interface or repair an invalid budget manifest by guessing.
 
 For portable budgets, the host stores the optional selection in that budget’s manifest, preserving disabled entries and their settings/state. The original local workspace stores at most 100 unique optional IDs in an atomic `plugins.json` replacement in the runtime home (`WHAB_HOME`, or the launch directory). The file uses `{"version": 1, "plugins": ["plaid", "example"]}` and contains no credentials or ledger records. Its optional selection takes precedence over `WHAB_PLUGINS`, including an explicitly empty saved list. Removing this file restores environment defaults on the next start. Invalid or unreadable saved settings cause an actionable startup error; repair the file, or explicitly save a replacement while WHAB is still running.
 
@@ -201,6 +248,12 @@ After installing the package, select **plaid** and **my-summary** in Settings, s
 
 ### Versioned capabilities and saved state
 
+The independently packaged [plugin developer toolkit](../app/devtools/plugin-devkit/README.md)
+provides initial public storage conformance suites. External projects install
+only their host, toolkit and candidate/reference packages; optional advertised
+features fail explicitly when broken and unadvertised features report their
+applicability. The kit is development infrastructure outside runtime discovery.
+
 SDK API v1 remains supported. WHAB 2.22 adds immutable runtime metadata separately
 from Python distribution dependency resolution:
 
@@ -266,6 +319,20 @@ the [platform execution checklist](plugin-platform.md).
 
 ## Storage backends
 
+From WHAB 2.41, independent adapters can use the public
+[`whab.plugins.storage_model` pure helpers](plugin-storage-model.md) for shared
+financial commands, state construction, normalized provider merges and projections.
+The adapter retains its own locks, detached candidates, native schema, atomic
+commits and durable operation evidence; the helpers do not open a backend.
+
+WHAB 2.23 adds the independently packaged [JSON backend](../app/plugins/storage/json/README.md)
+alongside SQLite. It passes the public storage conformance suites and stores its
+native ledger, receipts and encrypted provider records in one versioned file.
+Keys remain outside that file. Use its sanitized portable export for transfer;
+the native JSON file contains private device state. Native full-file limits,
+uncertain commits, writer locking and measured performance are documented in its
+owning guide. Selecting JSON does not migrate SQLite data or promote a copy.
+
 The bundled SQLite descriptor is registered as `sqlite = "whab_plugin_sqlite.plugin:plugin"`. Host code imports `StorageBackend` rather than a concrete store or database driver. The SQLite descriptor opens its backend only when the selected factory runs.
 
 ```python
@@ -278,6 +345,10 @@ plugin = Plugin(id="my-storage", display_name="My storage", storage=create_stora
 ```
 
 Register the descriptor in its own distribution's `whab.plugins` entry points and set `WHAB_STORAGE=my-storage` for the original workspace or initial CLI budget creation. Existing portable budgets instead use the required storage ID in their manifest; Settings creates new SQLite budgets. Its synchronous factory receives `StorageContext(home: Path, environment: str, config: Mapping[str, str])`: resolved runtime home, `sandbox`/`production`, and only backend-prefixed environment keys. The context is frozen; configuration is copied read-only and excluded from its representation. It supplies no bank credentials or token-decryption key.
+
+WHAB 2.37 adds `StorageContext(read_only=True, expected_instance_id=...)` for participating local storage workers. A read-only factory must validate an existing current native schema without creating files, adopting metadata or running an upgrader; an expected instance UUID must be proved through read-only validation before any writable constructor. SQLite 1.12 and JSON 1.3 declare `storage.worker` version 1 and compatible live code replacement. The host keeps durable caller bindings, validates native receipts and gates unknown mutation outcomes until explicit evidence recovery. See [local storage workers](storage-workers.md); this adapter does not cover remote client authority or implicitly change the selected backend.
+
+WHAB 2.39 adds the data-only `RemoteLedgerClient` alternative to a callable storage factory. Declare an explicit remote/live contract and bounded protocol-1 configuration-key names owned by the plugin; values stay on the host. A descriptor worker advertises only that metadata. The host retains the exact normalized HTTPS origin, remote budget, bearer binding, transport, local revision and unresolved request identity across compatible code replacements. Pausing drains work and retires the descriptor child; re-enabling retains the same authority. Legacy callable remote factories remain restart-required. Their compatibility reexports use the public host helper `whab.plugins.remote_transport`; this transport stays in the host and is never a worker capability. See [the client lifecycle and explicit original-request completion controls](../app/plugins/storage/client/README.md).
 
 `StorageBackend` is a synchronous structural protocol. The signatures below omit `self`:
 
@@ -380,7 +451,7 @@ To show bank controls, include each `bank_panels` template with its scoped `stat
 
 Bank scripts announce feedback through a cancelable document event, `whab:notice`, with `detail.message`. An interface can display this plain text and call `event.preventDefault()` to mark it handled. The bundled Web interface uses its toast; the provider falls back to a browser alert if unhandled.
 
-`WHAB_UI=` selects headless mode: `/` and core visual assets are absent, while guarded APIs and required storage remain. Disabling visuals does not delete data or disable bank services. Storage and UI selection are independent.
+`WHAB_UI=` initially selects headless mode: `/` and current visual assets are absent, while guarded APIs and required storage remain. Disabling visuals does not delete data or disable bank services. Storage and UI selection are independent. From WHAB 2.36, a private device-local visual decision overrides that initial value after an explicit live selection. `UserInterface` may supply one complete immutable `PluginResources` bundle instead of template/static paths; a template-only interface may have no static assets. `view_protocol=1` opts into the host's browser participation contract and requires a pure explicit live visual descriptor. Existing descriptors default to protocol zero and retain restart-required compatibility. Presentation helpers execute inside approved visual workers from bounded public projections; the host retains financial rules and transport guards. See [visual interface workers](plugin-workers.md#visual-interface-workers) for preparation, generation URLs, unsaved edits, commit/recovery and exact saved-worker behavior.
 
 ## Privileged bank capability
 
@@ -420,6 +491,69 @@ async def close() -> None: ...
 
 The host creates enabled services during its asynchronous application lifespan and closes created services on shutdown or startup failure. The service owns provider-specific authentication, remote requests, token encryption, mapping, synchronization, webhook verification, event interpretation, and any cancellation/cleanup of its tasks. The host owns generic route dispatch, local access controls, safe status fields, and response shape. Canonical routes use `/api/banks/{id}/items`, `/link-token`, `/exchange`, `/sync`, and `/webhook`, with disconnect at `DELETE /api/banks/{id}/items/{item_id}`. Existing `/api/plaid/*` aliases remain available only while the `plaid` plugin is enabled. `BankError(ValueError)` represents an authored, safe user-facing error; never wrap remote exception text in it. Unexpected provider exceptions are sanitized by the host.
 
+A continuation-aware host service adds all four asynchronous facade methods:
+
+```python
+async def begin_link(item_id: str | None = None) -> dict: ...
+async def continuation_status(flow_id: str) -> dict: ...
+async def cancel_link(flow_id: str) -> dict: ...
+async def complete_link(
+    flow_id: str, public_token: str | None = None,
+    institution_name: str | None = None,
+) -> dict: ...
+```
+
+Status dictionaries contain exactly `flow_id` (32 lowercase hexadecimal
+characters), `generation` (positive safe JSON integer), `kind` (`link` or
+`update`), `stage`, and `deadline_ms` (positive safe JSON integer). Stages are
+`ready`, `exchanging`, `exchange_uncertain`, `captured`, `applying`,
+`apply_uncertain`, `complete`, `cancelled`, and `expired`. A begin result additionally
+contains only `link_token`, a plain string of 1–4096 characters, and must be ready
+with the requested connection kind. Status never returns credentials, Item IDs,
+accounts, provider payloads or native receipt contents.
+
+The host calls `begin_link` at the existing `POST /link-token` endpoint.
+`POST /exchange` requires `flowId` for this facade; `publicToken` is optional so
+an update can complete without exchanging or creating an Item.
+`GET /continuations/{flow_id}` checks status and `DELETE` at that same path
+requests cancellation. Missing IDs cannot fall back to uncorrelated exchange.
+Malformed bodies fail before provider work. Fixed `EffectError` continuation
+failures return HTTP 409 with `error` and `code`; an uncertain exchange or save
+does not authorize retry. Ordinary HTTPS, local Host/origin, budget/demo guards
+and no-store behavior apply to these endpoints. Only registered signed webhook
+paths retain the webhook exception to local access checks.
+
+The coordinator owns scope and operation identity. It binds a flow to the budget,
+Sandbox/production environment, provider and captured generation; browser fields
+are routing hints. It must publish durable intent before external exchange,
+capture the encrypted response before native application, and reconcile a lost
+native result with exact durable operation evidence. A completion retry retains
+the original flow and request, and never repeats an uncertain external exchange.
+An explicit begin retry for the same scoped Item returns its original ready
+token; incompatible nonterminal flows block a new begin. Update completion keeps
+the original provider Item identity. Retirement must finish or defer unfinished
+flows and active synchronization/webhook work. Exposing the HTTP facade alone
+does not establish live selection or worker upgrade support.
+
+Status may reconcile an exact committed native receipt into `complete`, without
+provider HTTP or a new native write. After status confirms `captured` or
+`apply_uncertain`, an explicit Finish saving action can call `complete_link`
+without a public token. The coordinator then resumes its original encrypted
+native request only after exact receipt/CAS evidence permits it. A ready link
+without its original public token must refuse completion. Unknown outcomes and a
+separate storage uncertainty gate remain blocked pending their own recovery.
+
+`BankContinuationService`, `BankContinuationStatus` and `BankLinkReady` name this
+optional facade in the public SDK. An explicit `BankAdapter(factory)` selects the
+host-owned [typed provider worker](plugin-workers.md#bank-provider-workers), which
+requires public native authority/command receipts for protected application. Its
+factory receives bounded `BankProviderContext` data without the host encryption
+key or persistence callbacks. The worker never writes financial state directly.
+
+Services with none of these four methods retain the original restart-only ABI.
+A partial facade is an error, and a legacy service cannot accept a flow ID.
+Legacy compatibility supplies no durable exchange-replay guarantee.
+
 `WebhookResult(ok: bool, status_code: int = 200, error: str | None = None)` supplies a bounded primitive response rather than a provider response dictionary. A successful result uses a 2xx status and no error. A failure must explicitly use a 4xx/5xx status and an optional plain-text, authored error of at most 200 characters. The provider verifies authenticity against the original raw request bytes before parsing or applying any event. The host validates this result before responding.
 
 `BankStore` exposes only provider-scoped persistence:
@@ -450,7 +584,23 @@ The concrete backend checks provider ownership and accepts normalized `ImportedA
 
 ### Bank UI resources
 
-Optional `BankUI(templates: pathlib.Path, static: pathlib.Path)` resources belong to an enabled bank plugin. The host validates directories at startup, loads templates under `plugins/{id}/`, and mounts static files at `/plugins/{id}/static`. The accounts fragment is `accounts.html`; the provider's browser connection script is `connect.js`. A UI descriptor requires a bank factory. A disabled provider gets no mounted assets or templates. These are explicitly trusted provider templates and scripts, unlike report hooks' escaped text; they must never embed server secrets or access tokens. The host supplies `status` (`configured`, `environment`, `liveEnabled`, `missingConfig`, `enabled`) and `items` (sanitized connection records) to the accounts fragment. Services use a public `config` mapping with `configured: bool`, `liveEnabled: bool`, and optional environment-variable names in `missingConfig`; never include secret values. The host supplies the environment from its own settings. The bundled Plaid adapter retains its legacy `plaidConfigured` service key, translated by the host. No plugin can register arbitrary HTTP routes through this descriptor.
+Optional `BankUI(templates: pathlib.Path, static: pathlib.Path)` resources belong
+to an enabled bank plugin. `BankUI(resources=PluginResources(...))` supplies the
+same captured data without mutable host paths; the two forms are mutually
+exclusive. Every bundle must contain `templates/accounts.html` and
+`static/connect.js`. The host captures validated bounded files and loads templates
+under `banks/{id}/{generation-token}/`; page scripts use the matching
+`/banks/{id}/{generation-token}/static/...` address. Old versions retain their
+exact bytes through bounded retention, then return 404. The original
+`/plugins/{id}/static/...` alias retains the first captured version for existing
+addresses. A provider never falls through to a newer incompatible script. A UI
+descriptor requires a bank capability. These are trusted templates/scripts and
+must not embed server secrets or access tokens. The host supplies public `status`
+and sanitized `items` to the accounts fragment. No plugin registers arbitrary
+HTTP routes through this descriptor. Generic bank routes and authenticated webhook
+allowlists resolve the pinned active generation, including a provider enabled
+after startup. The legacy `/api/plaid` alias returns 404 while Plaid is disabled.
+
 
 The current connection lifecycle uses Link-style short-lived tokens and public-token exchange. An external bank plugin must implement that contract and its own connection UI. A provider requiring a different consent workflow may need a later compatible API addition; claiming a `bank` descriptor does not by itself make every institution or aggregation service supported.
 
@@ -576,11 +726,17 @@ Preview reports availability without mutation. Commit returns `{"counts": {"acco
 
 `Interface(factory)` is a trusted transport capability separate from the server-rendered `UserInterface`. The host calls its factory with `InterfaceContext(service, config, environment, budget_id, budget=None)`. The `service` provides scoped public ledger queries and validated commands; it is not a bank store. `config` contains the plugin's machine-specific configuration. A `BudgetContext` provides portable settings/state and namespace-scoped file access where the host supplies it. Save state as bounded JSON. Machine credentials stay local by default; explicitly exported remote credentials use the container’s password-protected credential payload.
 
+The supported live API form is `Interface(adapter=RemoteLedgerInterface(protocol_version=1, token_setting="SERVER_TOKEN", queries=True, commands=True))` with an explicit `PluginContract(lifecycle="live")`. Supply either a factory or an adapter. The data-only adapter declares the existing `/remote/v1` protocol; at least one operation class must be enabled. `token_setting` names a bounded uppercase configuration key in that plugin's own machine-local configuration. The host validates a 32 through 4,096 character token and keeps the token, request authorization, strict command validation and ledger dispatch outside workers. `InterfaceContext.config` is omitted from its representation.
+
+There is exactly one declarative v1 route owner per budget. Duplicate declarative owners and mixtures with legacy factories fail before configuration or factories run. Supported selection changes prepare a generation-owned binding, drain complete admitted requests, persist the decision and retire the old binding. Failed preparation leaves the active binding unchanged. Ledger revisions and retry receipts survive successful optional-interface changes. Disabled remote routes retain HTTPS and local Host/origin guards and return 404 locally. Legacy factory routes preserve their URL compatibility and restart-required lifecycle. [Approved worker upgrades](plugin-workers.md) exchange only a strict interface declaration, require the current host artifact, and restore the saved exact environment on reopen; they never exchange routers, service handles, credentials or executable objects.
+
 The bundled `server` descriptor belongs to Interface and contributes `/remote/v1`. It requires `SERVER_TOKEN` with at least 32 characters and accepts HTTPS only. Its machine/server credential authorizes budgets explicitly configured with the server plugin; this is not a per-household account system. The bundled `client` descriptor belongs to Storage, with `CLIENT_URL` (an HTTPS origin), `CLIENT_TOKEN` and `CLIENT_BUDGET_ID`. Select `WHAB_STORAGE=client` for a client instance and disable local bank plugins there; bank connections run on the server. The connection payload records its public HTTPS origin and remote budget identity. A machine token is used only when the device-configured `CLIENT_URL` and `CLIENT_BUDGET_ID` match that target. Alternatively, the host can supply an explicitly unlocked password-encrypted remote credential bound to that exact origin and budget. Saving or opening the connection container does not fetch the financial ledger.
 
 The remote public protocol exposes accounts, categories, transactions, workspace projections and portable ledger snapshots. Commands support manual accounts/categories/transactions, account classification changes, transaction edits and allocations. A command includes `operation`, `workspace`, `payload`, `request_id` and `expected_revision`. Unknown operations/fields fail validation. Responses include `budgetId`, `revision` and `data`; the client verifies budget identity. Bank tokens, Item operations and synchronization cursors are outside this protocol.
 
-The server serializes public operations per budget. A stale revision returns a conflict requiring refresh and review. It retains at most 1,024 in-memory request receipts so a retry with the same ID and body can return the committed result; reusing the ID for different content fails. Revisions change on server restart, preventing a stale retry from silently replaying when receipts are lost. If a response is lost, the client preserves the pending command and requires retrying that same change before a different mutation. It reports explicit failures and never falls back to another ledger.
+The server serializes public operations per budget. A stale revision returns a conflict; reusing a request ID for different content fails. Ordinary host backends retain at most 1,024 in-memory request receipts. Participating native storage workers additionally bind the caller identity and canonical command to an atomic native receipt, which can prove an exact replay before checking the original revision. Server revisions change on restart; without a matching retained receipt, the original stale revision refuses the command. The HTTP protocol does not expose a public receipt-lookup endpoint.
+
+Declarative remote clients durably record payload-free original intent metadata before sending a mutation. A lost result blocks new writes across client restart and code replacement; reads remain available while enabled. Reads, a `409` and restart never clear an unknown result. Explicit Finish validates the original public command and submits only its exact ID, body fingerprint, authority binding and original revision; it is not automatic retry or a receipt lookup. A correlated success records completion, while a conflict retains the unknown outcome. Legacy callable clients retain their older in-memory retry path. Neither path silently falls back to another ledger.
 
 Every route requires HTTPS, including localhost and webhooks. The launcher uses native TLS and rejects plaintext rather than redirecting or trusting forwarded proxy headers. The visual application and private banking routes remain loopback-only with Host/origin checks. Only explicitly enabled `/remote/v1` protocol routes and registered signed bank-webhook paths bypass those local checks: the remote plugin requires bearer authorization and webhook providers must verify signatures before processing. TLS encryption is separate from those authentication checks. Certificate paths and explicit local CA trust are described in [usage](usage.md#local-https); exposing selected remote/webhook routes must preserve the other local restrictions. Enabling a server capability does not provide a household login system.
 
@@ -598,6 +754,8 @@ Workspace accounts and transactions identify their currency; transactions inheri
 ## Categorization capability
 
 WHAB 2.19 adds `Categorization(factory)` to the public SDK. The factory receives a `BudgetContext` providing only the plugin's namespaced files. Its engine supplies `defaults`, `index()`, `train(rows, parameters)` as a cooperative iterator returning a candidate model, `save(model, name)`, `select(id)`, `rename(id, name)`, `delete(id)`, and `predict(rows)`. Training rows are detached snapshots of categorized, reviewed, posted transactions; inference rows are uncategorized and unreviewed. Both exclude transfers and unsupported splits. Fields include payee (`merchant`), account ID/type/subtype, amount in minor units, date, currency, category ID, and review status. Engines must never infer training eligibility from a category alone.
+
+Factories and engine methods are synchronous; optional `close()` releases owned resources. The [live categorization selection adapter](plugin-runtime.md#live-categorization-selection) prepares explicit live categorizers with detached read-only namespaces after draining, then activates their callbacks only after selection commits. Unfinished training defers a changed categorizer until finish/cancel; unchanged engines retain their continuations. Retired callbacks reject reads and writes. The [categorization worker adapter](plugin-workers.md#categorization-workers) runs installed pure engines in a child, keeps training/model objects there, and supports approved immutable code upgrades. Complete namespace effects and original result receipts commit in the host before materialization; interrupted saves recover without rerunning plugin code.
 
 The host owns suggestion identities, input fingerprints, currency checks, dismissal, acceptance, ingestion triggers, and settings-session expiry. Engines return `transactionId`, `categoryId`, `modelId`, and a finite `score` between zero and one. A prediction never writes the ledger category or marks a transaction reviewed. The host saves suggestions in `suggestions-personal.json` or `suggestions-demo.json` within the owning plugin namespace. Demo model files use a separate `demo/` namespace. Models and accepted/dismissed suggestion provenance remain data-only portable files.
 
