@@ -9,19 +9,19 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
-| [bank-logos](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
-| [client](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
-| [example](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
-| [example-branding](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-categorization](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-file-import](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [json](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.2.0` | `whab>=2.30,<3` | restart-required | maintained |
-| [plaid](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
-| [random-forest-categorization](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.2.0` | `whab>=2.32,<3` | categorization-host | maintained |
-| [server](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
-| [sqlite](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.11.0` | `whab>=2.30,<3` | restart-required | maintained |
-| [web](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.25.1` | `whab>=2.19,<3` | Legacy; restart required | maintained |
-| [ynab](https://github.com/Fillll/whab/blob/eb7bcc573e28c9e1d452e48cc277e0be55a382a9/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
+| [bank-logos](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
+| [client](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
+| [example](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
+| [example-branding](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-categorization](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-file-import](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [json](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.2.0` | `whab>=2.30,<3` | restart-required | maintained |
+| [plaid](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
+| [random-forest-categorization](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.2.0` | `whab>=2.32,<3` | categorization-host | maintained |
+| [server](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
+| [sqlite](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.11.0` | `whab>=2.30,<3` | restart-required | maintained |
+| [web](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.26.0` | `whab>=2.19,<3` | Legacy; restart required | maintained |
+| [ynab](https://github.com/Fillll/whab/blob/6285f907174f85596537e7f31010422e7d0dfb77/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
 Explicit stateless report, branding, file-parser and declarative API interface descriptors advertise their supported live-worker adapters. Categorization supports host-process selection changes; its code upgrades still require an application restart. Other entries require restart; backend migration and copies are not inferred from package installation.
 
@@ -118,3 +118,23 @@ The exact source passed 4561 Python tests, all thirteen runtime plugins at 100% 
 Tests: `tests/web/test_live_api_interfaces.py`, `tests/plugins/test_environments.py::test_real_api_worker_upgrade_failed_preparation_disable_reenable_and_reopen`, `tests/test_remote_protocol.py`, `plugins/interface/server/tests`, `scripts/check.py`.
 
 Review: [PR #92](https://github.com/Fillll/whab/pull/92).
+
+### pr92-installed-native-api
+
+Verified 2026-10-23; host `2.34.0`. Selected: `server`, `sqlite`.
+
+Archived the exact committed source and installed genuine host2.34/server1.1/SQLite1.11 wheels outside the checkout. Native TLS1.3 explicitly trusted only the temporary runtime CA and rejected an untrusted CA. Verified bearer/Host/origin/budget guards and the bundled server worker, then four separately approved reviewed synthetic server versions: failed missing-token binding preserved the active environment/reference and exact same-host retry; query-only and command-only declarations rejected the other operation; all-command declarations enabled replacement and disable/re-enable. A test-only launcher paused an admitted public ledger command at an event-file barrier before financial dispatch; disabling drained until it acknowledged, preserving both accounts. Ordinary installed stock CLI restart restored the exact saved synthetic worker environment and both acknowledged accounts. Exact artifact/closure hashes and 17 HTTP outcomes were recorded. All listeners, workers and fictional homes were removed. This does not establish retry durability across host restart or provider/household connectivity.
+
+Tests: `installed native HTTPS API interface upgrade/drain/reopen verification`.
+
+Review: [PR #92](https://github.com/Fillll/whab/pull/92).
+
+### pr94-storage-copy-controls
+
+Verified 2026-10-23; host `2.34.0`. Selected: `web`.
+
+The exact integrated source passed 4576 Python tests, all thirteen runtime plugins at 100% statement/branch coverage, 304 browser tests, 130 toolkit tests on each genuine minimum/current host, external generated native-runtime configurations and exact replays, and installed distribution checks. Storage-copy controls exercised current-primary status, financial and namespace watermarks, explicit empty-destination attachment and reviewed promotion, pending operation tracking, unknown-response reconciliation without mutation replay, stale-response guards, focus/edit barriers, unsupported hosts and demo read-only behavior. Browser visual inspection was unavailable; source/template and browser interaction checks do not establish visual acceptance or household installation.
+
+Tests: `plugins/interface/web/tests/storage_copies.test.cjs`, `plugins/interface/web/tests/test_storage_copies.py`, `plugins/interface/web/tests/test_plugin_settings.py`, `scripts/check.py`.
+
+Review: [PR #94](https://github.com/Fillll/whab/pull/94).
