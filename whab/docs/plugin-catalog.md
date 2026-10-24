@@ -9,23 +9,23 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
-| [bank-logos](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
-| [client](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.6.0` | `whab>=2.39,<3` | declarative-remote-client-worker | maintained |
-| [example](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
-| [example-api](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.0` | `whab>=2.34,<3` | declarative-api-worker | teaching |
-| [example-bank](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-bank/README.md) | `whab_plugin_example_bank 1.0.0` | `whab>=2.38,<3` | bank-provider-worker | teaching |
-| [example-branding](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-categorization](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-file-import](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-remote-client](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-remote-client/README.md) | `whab_plugin_example_remote_client 1.0.0` | `whab>=2.40,<3` | declarative-remote-client-worker | teaching |
-| [example-ui](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-ui/README.md) | `whab_plugin_example_ui 1.0.0` | `whab>=2.36,<3` | visual-ui-worker | teaching |
-| [json](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.3.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
-| [plaid](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.3.0` | `whab>=2.38,<3` | bank-provider-worker | maintained |
-| [random-forest-categorization](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.3.0` | `whab>=2.35,<3` | categorization-worker | maintained |
-| [server](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
-| [sqlite](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.12.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
-| [web](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
-| [ynab](https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
+| [bank-logos](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
+| [client](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.6.0` | `whab>=2.39,<3` | declarative-remote-client-worker | maintained |
+| [example](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
+| [example-api](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.0` | `whab>=2.34,<3` | declarative-api-worker | teaching |
+| [example-bank](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-bank/README.md) | `whab_plugin_example_bank 1.0.0` | `whab>=2.38,<3` | bank-provider-worker | teaching |
+| [example-branding](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-categorization](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-file-import](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-remote-client](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-remote-client/README.md) | `whab_plugin_example_remote_client 1.0.0` | `whab>=2.40,<3` | declarative-remote-client-worker | teaching |
+| [example-ui](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-ui/README.md) | `whab_plugin_example_ui 1.0.0` | `whab>=2.36,<3` | visual-ui-worker | teaching |
+| [json](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.3.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
+| [plaid](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.3.0` | `whab>=2.38,<3` | bank-provider-worker | maintained |
+| [random-forest-categorization](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.3.0` | `whab>=2.35,<3` | categorization-worker | maintained |
+| [server](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
+| [sqlite](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.12.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
+| [web](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
+| [ynab](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
 Explicit stateless report, branding, file-parser, declarative API interface, pure categorization, typed bank-provider and participating visual descriptors advertise their supported live-worker adapters. Declarative remote-client workers return metadata only; the host retains their exact HTTPS authority, credentials, transport and financial intent. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
 
@@ -192,6 +192,16 @@ The exact source passed 4779 Python tests, all fifteen runtime plugins at 100% s
 Tests: `devtools/plugin-devkit/tests`, `plugins/example/example-ui/tests`, `scripts/check_plugin_generation.py`, `scripts/check_distribution.py`, `scripts/check.py`.
 
 Review: [PR #99](https://github.com/Fillll/whab/pull/99).
+
+### pr106-remote-client-teaching
+
+Verified 2026-10-23; host `2.41.0`. Selected: `example-remote-client`.
+
+The exact clean committed source passed 290 installed toolkit tests on genuine WHAB 2.22 and current 2.41 with zero skips; candidate toolkit statement/branch coverage was complete. The maintained remote-client example and a separately generated project each passed installed owning behavior and complete plugin coverage on separate genuine WHAB 2.40 minimum and 2.41 current artifacts. Each of those four rows passed ten distinct native configurations and ten exact approved-artifact replays, with all fictional homes/listeners/workers cleaned up. The genuine 2.40 source was e8fa8585c16d2f8a93b1966315c0fee34eb11d35. Native profiles used host-owned authorization/financial services, two fictional HTTPS hosts and a reviewed public-transport overlay that explicitly trusted the temporary authority CA. They exercised candidate workers, varied peers/order/transitions, pause/resume, exact-version reopen and client restart after a dropped acknowledged result; explicit Finish retained the original request/CAS identity. This does not establish stock client CLI private-CA configuration, remote-server restart retry durability, public receipt lookup, automatic unknown reconciliation, distinct-version upgrades from a single candidate artifact, local migration/copy support or household deployment. The toolkit's genuine 2.22 import compatibility is separate from this optional family's 2.40 floor. The interrupted source canonical run is not certified as a complete pass.
+
+Tests: `devtools/plugin-devkit/tests`, `plugins/example/example-remote-client/tests`, `scripts/check_plugin_devkit.py`, `scripts/check_plugin_generation.py`.
+
+Review: [PR #106](https://github.com/Fillll/whab/pull/106).
 
 ### pr99-visual-teaching-installed-example
 
