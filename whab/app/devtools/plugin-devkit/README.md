@@ -334,7 +334,7 @@ reference. The project’s `[tool.whab.plugin-devkit] minimum-host` selects a kn
 recipe matching its declared WHAB floor: `bac249ca0e62638a40a6effc44af741c283e83d7`
 for 2.22.0, or `ebbff0d464dd67c0269428a6d4a339778e21ec57` for the API family’s
 2.34.0. Additional genuine recipes cover 2.36/visual, 2.38/bank, and
-`d13bccb2d2e3122bdb00a1f4d2e0e9aa4b1393f1` for 2.40/remote client.
+`e8fa8585c16d2f8a93b1966315c0fee34eb11d35` for 2.40/remote client.
 A compatible actual SQLite reference accompanies each host. Different
 minimum/current versions produce distinct real artifacts; equal versions share
 one artifact with both roles. Version metadata is never rewritten for compatibility. The installed toolkit retains its declared minimum host floor.
