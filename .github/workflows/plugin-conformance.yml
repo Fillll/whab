@@ -1,0 +1,111 @@
+name: Reusable external plugin conformance
+
+on:
+  workflow_call:
+    inputs:
+      plugin-id:
+        description: The single public plugin ID registered by the caller's reviewed project
+        required: true
+        type: string
+      whab-ref:
+        description: Full reviewed WHAB source commit containing this workflow/tooling and the candidate host
+        required: true
+        type: string
+      project-directory:
+        description: Project directory relative to the caller repository
+        default: .
+        type: string
+      extra-wheelhouse-directory:
+        description: Optional reviewed dependency wheels directory relative to the caller repository
+        default: ""
+        type: string
+      extra-wheelhouse-artifact:
+        description: Optional artifact from an earlier caller job containing reviewed dependency wheel files
+        default: ""
+        type: string
+      python-version:
+        default: "3.14"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Validate immutable source selection
+        env:
+          WHAB_CI_REF: ${{ inputs.whab-ref }}
+          WHAB_CI_EXTRA_DIRECTORY: ${{ inputs.extra-wheelhouse-directory }}
+          WHAB_CI_EXTRA_ARTIFACT: ${{ inputs.extra-wheelhouse-artifact }}
+        run: |
+          if [[ ! "$WHAB_CI_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "whab-ref must be a full reviewed lowercase commit SHA" >&2
+            exit 1
+          fi
+          if [[ -n "$WHAB_CI_EXTRA_DIRECTORY" && -n "$WHAB_CI_EXTRA_ARTIFACT" ]]; then
+            echo "Choose one approved dependency directory or artifact" >&2
+            exit 1
+          fi
+      - name: Check out caller-authorized plugin source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: plugin
+          persist-credentials: false
+      - name: Check out pinned WHAB tooling and host source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Fillll/whab
+          ref: ${{ inputs.whab-ref }}
+          path: platform
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up supported Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Download caller-approved dependency wheels
+        if: inputs.extra-wheelhouse-artifact != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.extra-wheelhouse-artifact }}
+          path: plugin/.whab-ci-extra-wheels
+      - name: Install pinned checker bootstrap dependency
+        run: python -I -m pip --isolated install --disable-pip-version-check --index-url https://pypi.org/simple packaging==26.3
+      - name: Build and validate installed minimum/candidate artifacts
+        env:
+          WHAB_CI_REF: ${{ inputs.whab-ref }}
+          WHAB_CI_PLUGIN: ${{ inputs.plugin-id }}
+          WHAB_CI_PROJECT: ${{ inputs.project-directory }}
+          WHAB_CI_EXTRA_WHEELS: ${{ inputs.extra-wheelhouse-directory }}
+          WHAB_CI_EXTRA_ARTIFACT: ${{ inputs.extra-wheelhouse-artifact }}
+        run: |
+          python - <<'PY'
+          import os, pathlib, subprocess, sys
+          caller = pathlib.Path("plugin").resolve()
+          def approved_path(value):
+              path = (caller / value).resolve()
+              if not path.is_relative_to(caller):
+                  raise SystemExit("CI inputs must stay within the caller checkout")
+              return str(path)
+          command = [sys.executable, "-I", "platform/whab/app/scripts/check_plugin_generation.py",
+                     "--project", approved_path(os.environ["WHAB_CI_PROJECT"]),
+                     "--plugin", os.environ["WHAB_CI_PLUGIN"],
+                     "--candidate-ref", os.environ["WHAB_CI_REF"],
+                     "--artifacts-directory", str(pathlib.Path(os.environ["RUNNER_TEMP"]) / "whab-external-plugin-evidence")]
+          if os.environ["WHAB_CI_EXTRA_ARTIFACT"]:
+              command += ["--extra-wheelhouse", approved_path(".whab-ci-extra-wheels")]
+          elif os.environ["WHAB_CI_EXTRA_WHEELS"]:
+              command += ["--extra-wheelhouse", approved_path(os.environ["WHAB_CI_EXTRA_WHEELS"])]
+          subprocess.run(command, check=True)
+          PY
+      - name: Preserve approved wheels and synthetic replay evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: whab-plugin-evidence-${{ inputs.plugin-id }}-${{ inputs.python-version }}
+          path: ${{ runner.temp }}/whab-external-plugin-evidence
+          if-no-files-found: ignore
+          retention-days: 14

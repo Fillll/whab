@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from whab_plugin_devkit import artifacts
 
 
 @pytest.fixture
@@ -70,12 +71,14 @@ def test_artifact_workspace_preserves_only_wheels_and_replay_files_even_after_fa
             pytest.fail("Existing evidence must never be overwritten")
 
 
-@pytest.mark.parametrize("failure", [None, "source-import", "wrong-version", "extra-plugin", "missing-plugin", "runtime-toolkit-entry"])
+@pytest.mark.parametrize("failure", [None, "source-import", "wrong-version", "extra-plugin", "missing-plugin", "runtime-toolkit-entry", "entrypoint-owner", "descriptor-id", "missing-source"])
 def test_installed_gate_verifies_module_locations_versions_and_entrypoint_ownership(checker, monkeypatch, tmp_path, failure):
     root = tmp_path / "environment"
     root.mkdir()
     monkeypatch.setattr(sys, "prefix", str(root))
-    monkeypatch.setattr(sys, "argv", ["verify", json.dumps({"whab": "2.22.0", "whab_plugin_devkit": "0.2.0"}), "generated-report"])
+    monkeypatch.setattr(sys, "argv", ["verify", json.dumps({"whab": "2.22.0", "whab_plugin_devkit": "0.2.0"}),
+                                    "generated-report", "fictional", "fictional", str(tmp_path), str(tmp_path / "installation.json")])
+    monkeypatch.setattr(artifacts, "installed_artifacts", lambda *_: [])
     monkeypatch.setattr(importlib, "import_module", lambda name: SimpleNamespace(__file__=str(
         (tmp_path / "checkout" if failure == "source-import" else root / "site-packages") / name / "__init__.py")))
     monkeypatch.setattr(metadata, "version", lambda name: "9" if failure == "wrong-version" else {"whab": "2.22.0", "whab_plugin_devkit": "0.2.0"}[name])
@@ -84,15 +87,19 @@ def test_installed_gate_verifies_module_locations_versions_and_entrypoint_owners
         names.add("unexpected-plugin")
     if failure == "missing-plugin":
         names.remove("sqlite")
-    monkeypatch.setattr(metadata, "entry_points", lambda **_: [SimpleNamespace(name=name) for name in names])
+    monkeypatch.setattr(metadata, "entry_points", lambda **_: [SimpleNamespace(
+        name=name, dist=SimpleNamespace(metadata={"Name": "wrong" if failure == "entrypoint-owner" else "fictional"}),
+        load=lambda: SimpleNamespace(id="wrong" if failure == "descriptor-id" else "generated-report"),
+    ) for name in names])
     entry = SimpleNamespace(group="whab.plugins" if failure == "runtime-toolkit-entry" else "console_scripts",
                             name="whab-plugin", value="whab_plugin_devkit.cli:main")
-    monkeypatch.setattr(metadata, "distribution", lambda _: SimpleNamespace(entry_points=[entry]))
+    monkeypatch.setattr(metadata, "distribution", lambda _: SimpleNamespace(entry_points=[entry], locate_file=lambda name: root / name))
+    monkeypatch.setattr(metadata, "files", lambda _: [] if failure == "missing-source" else [Path("fictional.py")])
     if failure is None:
-        exec(checker.VERIFY, {})
+        exec(checker.VERIFY_PROJECT, {})
     else:
         with pytest.raises(AssertionError):
-            exec(checker.VERIFY, {})
+            exec(checker.VERIFY_PROJECT, {})
 
 
 def test_generation_gate_sanitizes_unexpected_build_failures(checker, monkeypatch, capsys):
