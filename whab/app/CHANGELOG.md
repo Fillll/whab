@@ -4,6 +4,22 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.38.0 — 2026-10-23
+
+PR: [#101](https://github.com/Fillll/whab/pull/101)
+
+- Add bounded bank-provider workers and approved immutable code upgrades. Keep encryption keys, native command brokerage, authorization and financial validation under host control; preserve existing connections, synchronization checkpoints and stable ledger services.
+- Bind browser Link and OAuth continuations to opaque budget/provider identities. Persist exchange intent before external work and encrypted responses plus exact native commands before application; retain uncertain outcomes without duplicate exchanges or automatic reconnects.
+- Drain generation-owned synchronization, webhooks and requests, defer retirement and authority changes during unfinished flows, and retain failed cleanup owners. Preserve unknown native outcomes after failed evidence or receipt publication instead of reporting a definite rejection.
+
+## 2.37.0 — 2026-10-23
+
+PR: [#102](https://github.com/Fillll/whab/pull/102)
+
+- Run supported local SQLite/JSON backends in bounded typed workers and replace compatible approved code after request/background draining. Preserve stable ledger/retry services, native identity/epoch/generation, namespaces, copies and exact saved worker ownership.
+- Persist caller operation identities and reconcile native receipts after lost replies. Keep unknown outcomes gated, reject history older than acknowledged evidence, and distinguish proven execute rejection from failures after dispatch or during evidence publication.
+- Add explicit stopped-host read-only repair that preserves prior code history, native roles/data and pending intents. Retain constructor/cleanup owners and defer authority changes while bank continuations remain unfinished.
+
 ## 2.36.0 — 2026-10-23
 
 PR: [#97](https://github.com/Fillll/whab/pull/97)
