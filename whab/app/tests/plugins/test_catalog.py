@@ -161,3 +161,20 @@ def test_catalog_rejects_false_bank_worker_support_without_loading_code(change):
     change(row)
     with pytest.raises(catalog.CatalogError):
         catalog.validate_catalog(value)
+
+
+@pytest.mark.parametrize("identifier", ["sqlite", "json"])
+def test_local_storage_worker_label_requires_local_native_receipt_capabilities(identifier):
+    value = catalog.catalog_snapshot()
+    row = next(row for row in value["plugins"] if row["id"] == identifier)
+    assert row["live_support"] == "local-storage-worker" and row["authority"] == "local"
+    for change in (
+        {"authority": "remote"},
+        {"capabilities": [record for record in row["capabilities"] if record["name"] != "storage.worker"]},
+        {"capabilities": [{"name": "reporting.insights", "version": 1, "composition": "additive"}]},
+        {"state_version": 2},
+    ):
+        malformed = copy.deepcopy(value)
+        next(record for record in malformed["plugins"] if record["id"] == identifier).update(change)
+        with pytest.raises(catalog.CatalogError):
+            catalog.validate_catalog(malformed)

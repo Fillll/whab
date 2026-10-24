@@ -95,6 +95,9 @@ def test_authority_control_uncertainty_retains_its_separate_recovery_owner(proxy
         proxy.recover()
     assert proxy.recover_control(before) == replace(before, role="fenced")
     assert proxy.commit_evidence().role == "fenced"
+    proxy.set_role("owned-migration", proxy.commit_evidence(), "primary")
+    assert proxy.recover() == {"outcome": "unchanged"}
+    assert proxy.commit_evidence() == before
 
 
 @pytest.mark.parametrize("conflict", ["financial_pending", "changed_generation", "financial_fault"])
@@ -315,3 +318,50 @@ def test_financial_recovery_never_resumes_an_authority_fenced_native_instance(pr
     with pytest.raises(PluginError):
         proxy.recover()
     assert proxy.worker_recovery_required()
+
+
+@pytest.mark.parametrize("kind", ["sqlite", "json"])
+@pytest.mark.parametrize("conflict", ["older_generation", "same_generation_other_content"])
+def test_preworker_acknowledged_baseline_cannot_regress_during_read_fault_recovery(kind, conflict, tmp_path):
+    from whab.plugins import load_plugins
+    from whab.plugins.storage import open_storage
+
+    context = StorageContext(tmp_path, "sandbox", {})
+    descriptor = load_plugins((kind,)).storage_plugin(kind)
+    native = open_storage(descriptor, context)
+    native.close()
+    path = tmp_path / "data" / ("whab-sandbox." + ("sqlite" if kind == "sqlite" else "json"))
+    pristine = path.read_bytes()
+    native = open_storage(descriptor, context)
+    native.add_account("personal", {"name": "Fictional acknowledged before worker", "type": "depository", "balance": 77})
+    expected = native.commit_evidence()
+    native.close()
+    acknowledged = path.read_bytes()
+    replacement = pristine
+    if conflict == "same_generation_other_content":
+        path.write_bytes(pristine)
+        other = open_storage(descriptor, context)
+        other.add_account("personal", {"name": "Different fictional branch", "type": "depository", "balance": 88})
+        assert other.commit_evidence().generation == expected.generation
+        other.close()
+        replacement = path.read_bytes()
+        path.write_bytes(acknowledged)
+    backend = StorageWorkerProxy(StorageWorker(kind), context, tmp_path / "intents")
+    try:
+        assert backend.commit_evidence() == expected
+        assert backend.intents.snapshot()["completed"] == []
+        backend.worker._process.kill()
+        backend.worker._process.wait(timeout=5)
+        with pytest.raises(PluginError):
+            backend.accounts("personal")
+        path.write_bytes(replacement)
+        with pytest.raises(PluginError):
+            backend.recover()
+        assert backend.worker_recovery_required()
+        assert path.read_bytes() == replacement
+        path.write_bytes(acknowledged)
+        assert backend.recover() == {"outcome": "unchanged"}
+        assert backend.commit_evidence() == expected
+        assert [row["balance"] for row in backend.accounts("personal")] == [77]
+    finally:
+        backend.close()
