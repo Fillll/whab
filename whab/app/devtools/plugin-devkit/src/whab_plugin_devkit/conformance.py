@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
 from json import dumps
+from uuid import uuid4
 
 from whab.plugins import StoreError, WorkspaceImport
 
@@ -19,6 +20,7 @@ class Capability(StrEnum):
     NEXT_MONTH_FUNDING = "next-month-funding"
     MONTHLY_ROLLOVER = "monthly-rollover"
     NEUTRAL_TRANSFER = "neutral-transfer"
+    NATIVE_REPLICA = "native-replica"
 
 
 @dataclass(frozen=True)
@@ -283,6 +285,56 @@ def _neutral_transfer(harness, clock):
     _reject(lambda: destination.restore_budget("personal", exported))
 
 
+def _native_replica(harness, clock):
+    # Deliberately duck type only public methods/returned records. Older SDKs
+    # keep running their supported suites; false replica advertisements fail.
+    source = harness.open("replica-primary")
+    _, _, transaction = _seed(source, clock)
+    if Capability.RECEIPTS in harness.adapter.capabilities:
+        source.save_receipt("personal", transaction, receipt_png())
+    destination = harness.open("replica-copy", initial_role="copy")
+    initial = destination.commit_evidence()
+    replica_id = str(uuid4())
+    first = source.export_local()
+    watermark = destination.apply_replica(replica_id, first, "1" * 64, initial, namespace_generation=1)
+    copied = destination.export_local()
+    _check((copied.financial, copied.protected, copied.receipt_bytes) == (first.financial, first.protected, first.receipt_bytes),
+           "Replica lost complete local data.")
+    _check(copied.source.role == "copy" and copied.source.instance_id != first.source.instance_id,
+           "Replica did not retain its fenced native identity.")
+    _reject(lambda: destination.add_account("personal", {"name": "Invalid copy write", "type": "depository", "balance": 1}))
+    namespace = destination.apply_replica(replica_id, first, "2" * 64, destination.commit_evidence(), namespace_generation=2)
+    _check(namespace.source_generation == watermark.source_generation and namespace.namespace_generation == 2,
+           "Namespace-only copy save lost its independent generation.")
+    _reject(lambda: destination.apply_replica(replica_id, first, "1" * 64, destination.commit_evidence(), namespace_generation=1))
+    source.add_account("personal", {"name": "Acknowledged later", "type": "depository", "balance": 2})
+    latest = source.export_local()
+    watermark = destination.apply_replica(replica_id, latest, "2" * 64, destination.commit_evidence(), namespace_generation=2)
+    _check(destination.apply_replica(replica_id, latest, "2" * 64, initial, namespace_generation=2) == watermark,
+           "Exact lost-response retry did not replay its durable watermark.")
+    _reject(lambda: destination.apply_replica(replica_id, first, "3" * 64, destination.commit_evidence(), namespace_generation=3))
+    harness.close(destination)
+    destination = harness.open("replica-copy", reopen=True)
+    _check(destination.replica_watermark() == watermark and destination.commit_evidence().role == "copy",
+           "Replica watermark or fence disappeared after reopen.")
+    transition_id = str(uuid4())
+    prepared = destination.prepare_promotion(transition_id, destination.commit_evidence(), watermark)
+    _reject(lambda: destination.apply_replica(replica_id, latest, "3" * 64, prepared, namespace_generation=3))
+    destination.abort_promotion(transition_id, prepared)
+    prepared = destination.prepare_promotion(transition_id, destination.commit_evidence(), watermark)
+    fenced = source.set_role(transition_id, source.commit_evidence(), "fenced")
+    promoted = destination.set_role(transition_id, prepared, "primary", authority_epoch=str(uuid4()))
+    _check(promoted.authority_epoch != watermark.source_authority_epoch, "Promotion reused its source authority epoch.")
+    source.set_role(transition_id, fenced, "retired")
+    _reject(lambda: source.add_account("personal", {"name": "Invalid retired write", "type": "depository", "balance": 1}))
+    destination.add_account("personal", {"name": "Promoted primary write", "type": "depository", "balance": 3})
+    acknowledged = public_snapshot(destination)
+    harness.close(destination)
+    destination = harness.open("replica-copy", reopen=True)
+    _check(destination.commit_evidence().role == "primary" and public_snapshot(destination) == acknowledged,
+           "Promoted primary lost an acknowledged write after reopen.")
+
+
 _SUITES = {
     Capability.LEDGER: (
         ("minor-units-and-currencies", _ledger_currency),
@@ -297,6 +349,7 @@ _SUITES = {
     Capability.NEXT_MONTH_FUNDING: (("funding-validation-and-reopen", _funding),),
     Capability.MONTHLY_ROLLOVER: (("rollover-validation-and-reopen", _rollover),),
     Capability.NEUTRAL_TRANSFER: (("sanitized-financial-roundtrip", _neutral_transfer),),
+    Capability.NATIVE_REPLICA: (("fenced-monotonic-copy-and-promotion", _native_replica),),
 }
 
 

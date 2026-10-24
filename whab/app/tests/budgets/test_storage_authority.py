@@ -1,6 +1,7 @@
 """Authority survives lost responses and process death at durable boundaries."""
 
 import asyncio
+import json
 import os
 import subprocess
 import sys
@@ -49,6 +50,20 @@ def setup(tmp_path, *, journal_class=AuthorityJournal):
     def builder(active, target):
         return {**active.services, "storage": target}
     return source, journal, runtime, coordinator, namespace, factory, builder
+
+
+@run_async
+async def test_version_one_journal_upgrades_explicitly_without_payload_or_authority_change(tmp_path):
+    source, journal, runtime, coordinator, namespace, factory, builder = setup(tmp_path)
+    await coordinator.migrate("first", "second", factory, factory, builder)
+    current = journal.read()
+    legacy = {key: value for key, value in current.items() if key not in {"kind", "replica"}}
+    legacy["formatVersion"] = 1
+    journal.path.write_text(json.dumps(legacy))
+    upgraded = journal.read()
+    assert upgraded == current
+    assert upgraded["formatVersion"] == 2 and upgraded["kind"] == "migration" and upgraded["replica"] is None
+    assert journal.path.read_text() == json.dumps(legacy)
 
 
 @run_async

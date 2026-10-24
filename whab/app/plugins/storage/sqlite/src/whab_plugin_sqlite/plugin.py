@@ -83,7 +83,7 @@ plugin = Plugin(
     storage_payload_paths=("budget.sqlite",),
     contract=PluginContract(
         provides=tuple(Capability(name) for name in (
-            "receipts", "transfer.neutral", "transfer.prepare", "storage.authority", "storage.commands", "transfer.local",
+            "receipts", "transfer.neutral", "transfer.prepare", "storage.authority", "storage.commands", "transfer.local", "storage.replica",
         )), authority="local", lifecycle="restart",
     ),
 )

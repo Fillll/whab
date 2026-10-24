@@ -241,10 +241,9 @@ def test_transfer_of_unwritten_source_supports_null_operation_and_read_only_copy
         copied = target.set_role("transfer", staged, "copy")
         with pytest.raises(StoreError, match="fenced"):
             target.add_account("demo", {"name": "Fictional", "type": "depository", "balance": 0})
-        target.set_role("transfer", copied, "primary", authority_epoch=str(uuid4()))
-        target.add_account("personal", {"name": "Fictional", "type": "depository", "balance": 0})
-        with pytest.raises(StoreError, match="changed"):
-            target.import_local("transfer", snapshot)
+        with pytest.raises(StoreError, match="prepared"):
+            target.set_role("transfer", copied, "primary", authority_epoch=str(uuid4()))
+        assert target.import_local("transfer", snapshot) == copied
     finally:
         target.close()
 
@@ -274,7 +273,7 @@ def test_native_v1_adoption_persists_identity_without_changing_generation_or_epo
         evidence = adopted.commit_evidence()
         assert evidence.role == "primary"
         assert evidence.generation == before.generation and evidence.authority_epoch == before.authority_epoch
-        assert json.loads(path.read_bytes())["formatVersion"] == 2
+        assert json.loads(path.read_bytes())["formatVersion"] == 3
         recovery = path.with_name(path.name + ".schema1-recovery")
         assert recovery.read_bytes() == original
         assert stat.S_IMODE(recovery.stat().st_mode) == 0o600
@@ -353,7 +352,7 @@ def test_existing_matching_schema_one_recovery_is_reused_after_interrupted_upgra
     recovery.chmod(0o644)
     recovered = Store(path)
     try:
-        assert json.loads(path.read_bytes())["formatVersion"] == 2
+        assert json.loads(path.read_bytes())["formatVersion"] == 3
         assert path.with_name(path.name + ".schema1-recovery").read_bytes() == raw
         assert stat.S_IMODE(recovery.stat().st_mode) == 0o600
     finally:

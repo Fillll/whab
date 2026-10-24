@@ -128,6 +128,7 @@ Advertise optional suite names through `Capability`:
 | `next-month-funding` | Saved projection, invalid amount rejection and reopen |
 | `monthly-rollover` | Saved policy, invalid policy rejection and reopen |
 | `neutral-transfer` | Financial round trip, empty-destination guard, private-record exclusion; deleted history when sync is also advertised |
+| `native-replica` | Complete local copy, native write fence, independent financial/namespace watermarks, stale-job rejection, durable replay/reopen and explicit prepared promotion |
 
 An unadvertised optional suite returns `not-applicable` with an explicit reason.
 An advertised capability with missing or broken methods returns `failed`; it is
@@ -136,6 +137,13 @@ in CI; merely creating a report is observational and does not raise for failed c
 Reports retain case names and exception types, excluding exception text, paths,
 record values and snapshots. Public snapshots remain detached in memory for
 comparisons. Use synthetic data exclusively.
+
+`native-replica` exercises the public `storage.replica` v1 methods. It forwards
+`StorageContext.initial_role="copy"` only for this advertised suite. Ordinary
+primary factories keep the older SDK constructor path. Reference configuration
+runs select the replica suite only when the installed descriptor advertises it;
+an older reference reports it as not applicable. Advertising replica support on
+an SDK or backend without its required controls fails the suite.
 
 These tests check observable financial records and projections, not implementation
 classes, database handles or private state methods. Neutral restores may mark

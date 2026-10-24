@@ -7,6 +7,12 @@ from uuid import uuid4
 from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
 from whab.domain.ledger_state import require_pristine
+from whab.plugins.storage_replica import (
+    ReplicaWatermark,
+    read_replica_watermark,
+    replica_record,
+    validate_replica_apply,
+)
 from whab.plugins.storage_transfer import (
     MAX_OPERATION_RECEIPTS,
     CommitEvidence,
@@ -57,16 +63,20 @@ class Authority:
             if row is None:
                 if tables:
                     raise StoreError("SQLite storage authority metadata is missing; preserve this database for recovery.")
-                metadata = {"formatVersion": 1, "budgetId": budget_id, "environment": environment,
+                metadata = {"formatVersion": 2, "budgetId": budget_id, "environment": environment,
                             "instanceId": str(uuid4()), "authorityEpoch": str(uuid4()), "generation": 0,
                             "operationId": None, "role": "primary" if existing else initial_role,
-                            "transitionId": None, "transfer": None, "empty": self._pristine()}
+                            "transitionId": None, "transfer": None, "empty": self._pristine(),
+                            "replica": None, "promotionId": None}
                 self._metadata_evidence(metadata, "0" * 64)
                 self._save_authority(metadata, create=True)
             else:
                 metadata = self._authority_metadata()
                 if metadata["budgetId"] != budget_id or metadata["environment"] != environment:
                     raise StoreError("SQLite storage identity belongs to another budget or environment.")
+                if metadata["formatVersion"] == 1:
+                    metadata.update(formatVersion=2, replica=None, promotionId=None)
+                    self._save_authority(metadata)
             if self.db.execute("SELECT COUNT(*) FROM storage_operations").fetchone()[0] > MAX_OPERATION_RECEIPTS:
                 raise StoreError("SQLite operation receipts exceed their supported bound.")
             for receipt in self.db.execute("SELECT operation_id,generation,record FROM storage_operations"):
@@ -88,14 +98,42 @@ class Authority:
         if type(row[0]) is not bytes:
             raise StoreError("Invalid SQLite storage authority metadata.")
         metadata = read_storage_json(row[0])
-        if type(metadata) is not dict or metadata.keys() != {
+        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2}:
+            raise StoreError("Invalid SQLite storage authority metadata.")
+        if metadata.keys() != {
             "formatVersion", "budgetId", "environment", "instanceId", "authorityEpoch", "generation",
             "operationId", "role", "transitionId", "transfer", "empty",
-        } or type(metadata["formatVersion"]) is not int or metadata["formatVersion"] != 1 or type(metadata["empty"]) is not bool:
+        } | ({"replica", "promotionId"} if metadata["formatVersion"] == 2 else set()) or type(metadata["empty"]) is not bool:
             raise StoreError("Invalid SQLite storage authority metadata.")
         self._metadata_evidence(metadata, "0" * 64)
         if metadata["transitionId"] is not None:
             storage_identifier(metadata["transitionId"])
+        if metadata["formatVersion"] == 2:
+            record = metadata["replica"]
+            if record is not None:
+                watermark = read_replica_watermark(record)
+                if (watermark.source_instance_id == metadata["instanceId"]
+                        or (metadata["role"] == "copy" and (
+                            metadata["authorityEpoch"] != watermark.source_authority_epoch
+                            or metadata["generation"] != watermark.source_generation
+                            or metadata["operationId"] != watermark.source_operation_id
+                            or self._current_evidence(metadata).state_digest != watermark.state_digest))):
+                    raise StoreError("Invalid SQLite replica data evidence.")
+                if metadata["role"] == "copy":
+                    financial, protected = encode_local_state(self._local_states())
+                    source = replace(self._current_evidence(metadata), instance_id=watermark.source_instance_id, role="primary")
+                    snapshot = LocalTransferSnapshot(source, financial, protected, tuple(
+                        self._read_stored_receipt(row, metadata) for row in self.db.execute(
+                            "SELECT operation_id,generation,record FROM storage_operations ORDER BY operation_id",
+                        )
+                    ))
+                    if snapshot.digest != watermark.transfer_digest:
+                        raise StoreError("Invalid SQLite replica transfer evidence.")
+            if metadata["promotionId"] is not None:
+                storage_identifier(metadata["promotionId"])
+                if (metadata["role"] != "copy" or record is None
+                        or metadata["transitionId"] != metadata["promotionId"]):
+                    raise StoreError("Invalid SQLite replica promotion identity.")
         transfer = metadata["transfer"]
         if transfer is not None:
             if type(transfer) is not dict or transfer.keys() != {"id", "digest", "source"}:
@@ -267,7 +305,11 @@ class Authority:
                 if target == current and metadata["transitionId"] == transition_id:
                     return current
                 raise StoreError("Storage changed before its role transition.")
+            if current.role == "copy" and role == "primary" and metadata["promotionId"] != transition_id:
+                raise StoreError("Copy promotion requires its matching prepared transition.")
             metadata.update(role=role, authorityEpoch=epoch, transitionId=transition_id)
+            if role == "primary":
+                metadata["promotionId"] = None
         return target
 
     def export_local(self):
@@ -288,19 +330,19 @@ class Authority:
             if not empty:
                 return TransferPreview(False, False, "destination_not_empty")
             try:
-                self._check_local_target(metadata, snapshot)
+                self._check_local_target(metadata, snapshot, preview=True)
             except StoreError:
                 return TransferPreview(True, False, "unsupported_records")
             return TransferPreview(True, True)
 
-    def _check_local_target(self, metadata, snapshot):
+    def _check_local_target(self, metadata, snapshot, *, preview=False):
         if type(snapshot) is not LocalTransferSnapshot:
             raise StoreError("Local transfer requires a validated snapshot.")
         source = snapshot.source
         if (metadata["budgetId"] != source.budget_id or metadata["environment"] != source.environment
                 or metadata["instanceId"] == source.instance_id):
             raise StoreError("Local transfer storage identity does not match.")
-        if metadata["role"] != "staged" or not metadata["empty"] or not self._pristine():
+        if metadata["role"] not in ({"staged", "copy"} if preview else {"staged"}) or not metadata["empty"] or not self._pristine():
             raise StoreError("Local transfer requires an empty staged destination.")
         return decode_local_state(snapshot.financial, snapshot.protected)
 
@@ -319,23 +361,77 @@ class Authority:
                     return current
                 raise StoreError("This destination already received another local transfer or changed afterward.")
             states = self._check_local_target(metadata, snapshot)
-            for table in ("transaction_receipts", "transactions", "accounts", "categories", "budget", "future_funding", "rollover_modes", "items", "workspace_imports"):
-                self.db.execute(f"DELETE FROM {table}")
-            for workspace, state in states.items():
-                self._write_state(state)
-                for identifier, image in state["receipts"].items():
-                    self.db.execute("INSERT INTO transaction_receipts(workspace,transaction_id,image) VALUES(?,?,?)", (workspace, identifier, image))
-                imported = state["importReceipt"]
-                if imported is not None:
-                    self.db.execute("INSERT INTO workspace_imports(workspace,plugin_id,fingerprint,account_count,category_count,transaction_count,assignment_count) VALUES(?,?,?,?,?,?,?)",
-                                    (workspace, imported["pluginId"], imported["fingerprint"], *(imported["counts"][name] for name in ("accounts", "categories", "transactions", "assignments"))))
-            self.db.execute("DELETE FROM storage_operations")
-            for receipt in snapshot.receipts:
-                self.db.execute("INSERT INTO storage_operations(operation_id,generation,record) VALUES(?,?,?)",
-                                (receipt.operation_id, receipt.evidence.generation, canonical_storage_json(receipt_record(receipt))))
+            self._replace_local_states(states, snapshot.receipts)
             source = snapshot.source
             metadata.update(generation=source.generation, operationId=source.operation_id,
                             authorityEpoch=source.authority_epoch, empty=False, transitionId=transfer_id,
                             transfer={"id": transfer_id, "digest": snapshot.digest, "source": evidence_record(source)})
             result = self._current_evidence(metadata)
         return result
+
+    def _replace_local_states(self, states, receipts):
+        for table in ("transaction_receipts", "transactions", "accounts", "categories", "budget", "future_funding", "rollover_modes", "items", "workspace_imports"):
+            self.db.execute(f"DELETE FROM {table}")
+        for workspace, state in states.items():
+            self._write_state(state)
+            for identifier, image in state["receipts"].items():
+                self.db.execute("INSERT INTO transaction_receipts(workspace,transaction_id,image) VALUES(?,?,?)", (workspace, identifier, image))
+            imported = state["importReceipt"]
+            if imported is not None:
+                self.db.execute("INSERT INTO workspace_imports(workspace,plugin_id,fingerprint,account_count,category_count,transaction_count,assignment_count) VALUES(?,?,?,?,?,?,?)",
+                                (workspace, imported["pluginId"], imported["fingerprint"], *(imported["counts"][name] for name in ("accounts", "categories", "transactions", "assignments"))))
+        self.db.execute("DELETE FROM storage_operations")
+        for receipt in receipts:
+            self.db.execute("INSERT INTO storage_operations(operation_id,generation,record) VALUES(?,?,?)",
+                            (receipt.operation_id, receipt.evidence.generation, canonical_storage_json(receipt_record(receipt))))
+
+    def replica_watermark(self):
+        with self._snapshot():
+            self._check_authority()
+            record = self._authority_metadata()["replica"]
+            return None if record is None else read_replica_watermark(record)
+
+    def apply_replica(self, replica_id, snapshot, namespace_digest, expected, *, namespace_generation):
+        with self._authority_write(financial=False) as transaction:
+            metadata = transaction["metadata"]
+            current = self._current_evidence(metadata)
+            record = metadata["replica"]
+            watermark, replayed = validate_replica_apply(
+                current, None if record is None else read_replica_watermark(record), replica_id,
+                snapshot, namespace_digest, expected, namespace_generation=namespace_generation,
+                empty=metadata["empty"] and self._pristine(), promotion_id=metadata["promotionId"],
+            )
+            if replayed:
+                return watermark
+            self._replace_local_states(decode_local_state(snapshot.financial, snapshot.protected), snapshot.receipts)
+            metadata.update(generation=snapshot.source.generation, operationId=snapshot.source.operation_id,
+                            authorityEpoch=snapshot.source.authority_epoch, empty=False,
+                            replica=replica_record(watermark))
+        return watermark
+
+    def prepare_promotion(self, transition_id, expected, watermark):
+        storage_identifier(transition_id)
+        with self._authority_write(financial=False) as transaction:
+            metadata = transaction["metadata"]
+            current = self._current_evidence(metadata)
+            record = metadata["replica"]
+            if (type(expected) is not CommitEvidence or current != expected or current.role != "copy"
+                    or type(watermark) is not ReplicaWatermark or record is None
+                    or read_replica_watermark(record) != watermark
+                    or metadata["promotionId"] not in {None, transition_id}):
+                raise StoreError("Copy changed before its promotion preparation.")
+            metadata.update(transitionId=transition_id, promotionId=transition_id)
+        return current
+
+    def abort_promotion(self, transition_id, expected):
+        storage_identifier(transition_id)
+        with self._authority_write(financial=False) as transaction:
+            metadata = transaction["metadata"]
+            current = self._current_evidence(metadata)
+            if (type(expected) is not CommitEvidence or current != expected or current.role != "copy"
+                    or metadata["promotionId"] not in {None, transition_id}):
+                raise StoreError("Copy promotion does not match this abort request.")
+            if metadata["promotionId"] is None:
+                return current
+            metadata.update(transitionId=None, promotionId=None)
+        return current

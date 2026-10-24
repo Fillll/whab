@@ -522,6 +522,9 @@ class StorageRuntime:
         if self.app:
             self.app.state.storage_plugin = plugin_id
             self.app.state.store = prepared
+        replicas = getattr(self, "replicas", None)
+        if replicas:
+            replicas.supported_primary_ids.add(plugin_id)
 
     async def recover(self):
         self.locations.check_key(self.settings.encryption_key)
@@ -531,6 +534,9 @@ class StorageRuntime:
                 operation["state"] = "recovered"
         if self.session:
             await asyncio.to_thread(self.session.checkpoint)
+        replicas = getattr(self, "replicas", None)
+        if replicas:
+            await asyncio.to_thread(replicas.authority_recovered)
         return generation
 
     def status(self):

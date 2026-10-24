@@ -19,6 +19,12 @@ from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
 
 from .contracts import Capability, PluginContract, Requirement
+from .storage_replica import (
+    ReplicaWatermark as ReplicaWatermark,
+)
+from .storage_replica import (
+    StorageReplica as StorageReplica,
+)
 from .storage_transfer import (
     CommitEvidence as CommitEvidence,
 )
