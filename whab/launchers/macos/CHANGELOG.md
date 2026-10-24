@@ -1,5 +1,7 @@
 # macOS launcher changelog
 
+## Unreleased
+
 ## 1.1.2 — 2026-10-18
 
 PR: [#68](https://github.com/Fillll/whab/pull/68)

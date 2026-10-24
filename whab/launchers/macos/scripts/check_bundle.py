@@ -29,6 +29,43 @@ def environment():
     return {key: os.environ[key] for key in ("HOME", "PATH", "TMPDIR", "LANG") if key in os.environ}
 
 
+_BACKUP_PROBE = r"""
+import hashlib, importlib.util, json, pathlib, subprocess, sys
+manager_file, root, home = map(pathlib.Path, sys.argv[1:])
+spec = importlib.util.spec_from_file_location('bundle_manager_backup', manager_file)
+manager = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(manager)
+markers = ['plugin-workers/probe.private', 'visual-ui/probe.private', 'remote-client/probe.private',
+           'storage-authority/probe.private', 'storage-instances/probe.private']
+for name in markers:
+    path = home / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b'fictional backup marker')
+baseline = manager.runtime_fingerprint(home)
+for name in markers:
+    path = home / name
+    path.write_bytes(b'changed fictional marker')
+    assert manager.runtime_fingerprint(home) != baseline
+    path.write_bytes(b'fictional backup marker')
+manifest = {'format': 1, 'plugin': 'launcher-probe', 'host_sdk': 1,
+            'python': {'version': sys.version.split()[0]}, 'wheels': []}
+identifier = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+code = home / 'plugin-workers/environments' / identifier
+code.mkdir(parents=True)
+manager.write_json(code / 'ready.json', {**manifest, 'identifier': identifier, 'installation_sha256': 'a' * 64})
+subprocess.run([sys.executable, '-I', '-m', 'venv', '--without-pip', str(code / 'environment')], check=True,
+               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+result = manager.Manager(root).backup(home, manager.read_json(root / 'active.json'))
+archive = pathlib.Path(result['directory'])
+record = manager.read_json(archive / 'backup.json')
+assert result['format'] == 2 and record['requires_environment_rebuild'] and record['code_links']
+assert all((archive / 'runtime' / name).read_bytes() == b'fictional backup marker' for name in markers)
+assert not any(path.is_symlink() for path in archive.rglob('*'))
+assert manager.runtime_fingerprint(archive / 'runtime', archived_links=record['code_links']) == record['fingerprint']
+print(json.dumps({'format': 2, 'owned_roots': len(markers), 'code_aliases': len(record['code_links'])}))
+"""
+
+
 class BundleCheck:
     def __init__(self, bundle, directory):
         self.bundle = bundle
@@ -101,6 +138,15 @@ class BundleCheck:
             require(not path.is_symlink() and stat.S_IMODE(path.stat().st_mode) == expected,
                     "A transition backup file or directory is not private.")
 
+    def verify_runtime_backup(self):
+        result = subprocess.run([str(self.python), "-I", "-B", "-c", _BACKUP_PROBE,
+                                 str(self.resources / "manager/launcher.py"), str(self.root), str(self.runtime)],
+                                capture_output=True, text=True, timeout=120, env=environment(), check=False)
+        require(result.returncode == 0, "The stopped runtime backup contract failed its isolated native bundle check.")
+        value = json.loads(result.stdout)
+        require(value.get("format") == 2 and value.get("owned_roots") == 5 and value.get("code_aliases", 0) > 0,
+                "The bundle did not archive complete runtime state and inert code aliases.")
+
     def run(self):
         for path in (self.python, self.resources / "manager/launcher.py",
                      self.resources / "manager/server.py", self.resources / "seed/build.json"):
@@ -163,6 +209,8 @@ class BundleCheck:
         require((self.runtime / ".env").read_bytes() == configuration, "Offline relaunch changed runtime configuration.")
         require(self.command("stop").get("running") is False, "Final Stop did not stop WHAB.")
         self.checks.append("offline relaunch preserves ledger and configuration")
+        self.verify_runtime_backup()
+        self.checks.append("complete runtime backup and inert worker code aliases")
         self.permissions()
         self.checks.append("private state and backup permissions")
         self.verify_signature()
