@@ -291,6 +291,42 @@
       "capabilities": [
         {
           "composition": "singleton",
+          "name": "interface.ui",
+          "version": 1
+        }
+      ],
+      "conflicts": [],
+      "display_name": "Fictional visual interface",
+      "distribution": "whab_plugin_example_ui",
+      "documentation": "https://github.com/Fillll/whab/blob/e5ccbfda2dc5b32f239846a12d70a40a36dbddc1/whab/app/plugins/example/example-ui/README.md",
+      "entry_point": {
+        "group": "whab.plugins",
+        "name": "example-ui",
+        "value": "whab_plugin_example_ui:plugin"
+      },
+      "id": "example-ui",
+      "legacy": false,
+      "lifecycle": "live",
+      "live_support": "visual-ui-worker",
+      "maintainer": "Fillll",
+      "repository": "https://github.com/Fillll/whab",
+      "requires": [],
+      "requires_host": "whab>=2.36,<3",
+      "requires_python": ">=3.14",
+      "security": "https://github.com/Fillll/whab/security/advisories/new",
+      "source": "whab/app/plugins/example/example-ui",
+      "state_upgrades": [],
+      "state_version": 1,
+      "support": "teaching",
+      "verifications": [],
+      "version": "1.0.0"
+    },
+    {
+      "api_version": 1,
+      "authority": "local",
+      "capabilities": [
+        {
+          "composition": "singleton",
           "name": "ledger.mutate",
           "version": 1
         },

@@ -10,6 +10,7 @@ from .runtime_profiles import (
     validate_runtime_manifest,
 )
 from .synthetic import SyntheticClock, imported_account, imported_transaction, receipt_png
+from .visual_interface import assert_visual_interface, visual_change, visual_declaration
 
 __all__ = [
     "BackendAdapter", "BackendHarness", "Capability", "ConformanceFailure", "Report",
@@ -17,4 +18,5 @@ __all__ = [
     "NativeRuntime", "Result", "SyntheticClock", "imported_account", "imported_transaction",
     "public_snapshot", "receipt_png", "replay_runtime_configuration", "run_conformance",
     "sample_runtime_configurations", "validate_runtime_manifest",
+    "assert_visual_interface", "visual_change", "visual_declaration",
 ]

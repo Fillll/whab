@@ -20,8 +20,11 @@ MINIMUM_HOST_VERSION = "2.22.0"
 MINIMUM_HOST_COMMIT = "bac249ca0e62638a40a6effc44af741c283e83d7"
 API_MINIMUM_HOST_VERSION = "2.34.0"
 API_MINIMUM_HOST_COMMIT = "ebbff0d464dd67c0269428a6d4a339778e21ec57"
-MINIMUM_RECIPES = {MINIMUM_HOST_VERSION: MINIMUM_HOST_COMMIT, API_MINIMUM_HOST_VERSION: API_MINIMUM_HOST_COMMIT}
-FAMILIES = ("reporting", "branding", "file-import", "categorization", "api")
+UI_MINIMUM_HOST_VERSION = "2.36.0"
+UI_MINIMUM_HOST_COMMIT = "a866eda580c6e363a20636785bc4b4003db0652f"
+MINIMUM_RECIPES = {MINIMUM_HOST_VERSION: MINIMUM_HOST_COMMIT, API_MINIMUM_HOST_VERSION: API_MINIMUM_HOST_COMMIT,
+                   UI_MINIMUM_HOST_VERSION: UI_MINIMUM_HOST_COMMIT}
+FAMILIES = ("reporting", "branding", "file-import", "categorization", "api", "ui")
 BUILD_REQUIREMENTS = ("setuptools==84.2.1",)
 
 
@@ -107,7 +110,7 @@ def project_minimum(project):
     value = tomllib.loads((project / "pyproject.toml").read_text())
     minimum = value.get("tool", {}).get("whab", {}).get("plugin-devkit", {}).get("minimum-host", MINIMUM_HOST_VERSION)
     if type(minimum) is not str or minimum not in MINIMUM_RECIPES:
-        raise ValueError("Choose a supported genuine minimum-host recipe: 2.22.0 or 2.34.0.")
+        raise ValueError("Choose a supported genuine minimum-host recipe: 2.22.0, 2.34.0 or 2.36.0.")
     hosts = [requirement for text in value["project"].get("dependencies", ())
              if canonicalize_name((requirement := Requirement(text)).name) == "whab"]
     if (len(hosts) != 1 or hosts[0].url or hosts[0].marker or hosts[0].extras
@@ -119,13 +122,13 @@ def project_minimum(project):
 
 
 def minimum_source(helper, base, environment, version):
-    """Keep the established 2.22 reader and use a separate immutable API recipe."""
+    """Keep the established 2.22 reader and immutable family-specific recipes."""
     base.mkdir()
     if version == MINIMUM_HOST_VERSION:
         return helper.minimum_host_source(base, environment)
     project = helper.source_at_revision(base, environment, MINIMUM_RECIPES[version])
     if helper.host_version(project) != version:
-        raise ValueError("The pinned API source does not match its advertised host version.")
+        raise ValueError("The pinned source does not match its advertised host version.")
     return project
 
 def approved_extra_wheels(source, destination):
@@ -206,7 +209,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, help="Write exact artifacts and complete replay manifests to this JSON file.")
     parser.add_argument("--artifacts-directory", type=Path, help="Preserve approved wheels and replay files in a new directory, including on failure.")
-    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the five projects.")
+    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the six projects.")
     parser.add_argument("--plugin", help="The external project's single public plugin entry-point ID.")
     parser.add_argument("--candidate-ref", help="Full source commit for the external CI candidate host; never downloads a host wheel from an index.")
     parser.add_argument("--extra-wheelhouse", type=Path, help="Additional caller-approved dependency wheels; no candidate dependencies are downloaded.")
@@ -234,7 +237,7 @@ def main(argv=None):
                                     helper.copy_project(ROOT / "devtools/plugin-devkit/fixtures/runtime-peers", base / "runtime-peers")]
                 projects.extend(runtime_projects)
             requested_floors = ({project_minimum(args.project.resolve())} if args.project is not None
-                                else {MINIMUM_HOST_VERSION, API_MINIMUM_HOST_VERSION})
+                                else {MINIMUM_HOST_VERSION, API_MINIMUM_HOST_VERSION, UI_MINIMUM_HOST_VERSION})
             if any(Version(candidate_version) < Version(floor) for floor in requested_floors):
                 raise ValueError("The candidate host predates an advertised project minimum.")
             if args.project is not None and candidate_version == MINIMUM_HOST_VERSION:
