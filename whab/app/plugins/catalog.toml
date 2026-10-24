@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "7701959dcdfc70a611ddfe8620c0a039155c76c7"
+documentation_ref = "c95f1045909cc5918eade69b180086823d3cd0bf"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -278,6 +278,23 @@ whab_plugin_example_ui = "1.0.0"
 whab_plugin_example_api = "1.0.0"
 
 [[verification]]
+id = "pr106-remote-client-teaching"
+date = "2026-10-23"
+host_version = "2.41.0"
+source_commit = "1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2"
+selection = ["example-remote-client"]
+method = "installed-wheel"
+tests = ["devtools/plugin-devkit/tests", "plugins/example/example-remote-client/tests", "scripts/check_plugin_devkit.py", "scripts/check_plugin_generation.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/106"]
+scope = "The exact clean committed source passed 290 installed toolkit tests on genuine WHAB 2.22 and current 2.41 with zero skips; candidate toolkit statement/branch coverage was complete. The maintained remote-client example and a separately generated project each passed installed owning behavior and complete plugin coverage on separate genuine WHAB 2.40 minimum and 2.41 current artifacts. Each of those four rows passed ten distinct native configurations and ten exact approved-artifact replays, with all fictional homes/listeners/workers cleaned up. The genuine 2.40 source was e8fa8585c16d2f8a93b1966315c0fee34eb11d35. Native profiles used host-owned authorization/financial services, two fictional HTTPS hosts and a reviewed public-transport overlay that explicitly trusted the temporary authority CA. They exercised candidate workers, varied peers/order/transitions, pause/resume, exact-version reopen and client restart after a dropped acknowledged result; explicit Finish retained the original request/CAS identity. This does not establish stock client CLI private-CA configuration, remote-server restart retry durability, public receipt lookup, automatic unknown reconciliation, distinct-version upgrades from a single candidate artifact, local migration/copy support or household deployment. The toolkit's genuine 2.22 import compatibility is separate from this optional family's 2.40 floor. The interrupted source canonical run is not certified as a complete pass."
+[verification.artifacts]
+whab = "2.41.0"
+whab_plugin_devkit = "0.9.0"
+whab_plugin_example_remote_client = "1.0.0"
+whab_plugin_server = "1.1.0"
+whab_plugin_sqlite = "1.12.0"
+
+[[verification]]
 id = "pr99-visual-teaching-installed-example"
 date = "2026-10-23"
 host_version = "2.36.0"
@@ -291,6 +308,53 @@ scope = "The exact maintained visual example and toolkit were built into approve
 whab = "2.36.0"
 whab_plugin_devkit = "0.7.0"
 whab_plugin_example_ui = "1.0.0"
+
+[[verification]]
+id = "pr100-remote-client-lifecycle"
+date = "2026-10-23"
+host_version = "2.39.0"
+source_commit = "df865488e5b7f9645c96e060c1d8fce4dd261086"
+selection = ["client"]
+method = "source-tests"
+tests = ["tests/plugins/test_remote_client_workers.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/100"]
+scope = "Focused tests prepared separately approved synthetic descriptor wheels 1.0, 1.1 and 2.0 against the real current host closure. A missing-setting candidate preserved the active worker; compatible replacement retained the host transport, pending original command and revision, preserved the previous immutable environment and restored the exact saved version after pause/reopen. Explicit original-request completion preserved one acknowledged fictional account. Paused startup executed no descriptor, an incompatible host expectation refused before interpreter execution, and a stopped same-binding repair preserved prior ready metadata. An embedded separate installed native listener test built the real host, SQLite and server wheels outside the checkout, explicitly verified its runtime CA, observed unauthenticated 401/authenticated 200, and exercised the public host-owned remote transport with one acknowledged account. That native transport uses an explicitly supplied test CA; this does not prove stock client CLI private-CA configuration, distinct descriptor upgrades over a native listener, public receipt lookup, remote-server restart retry durability or household deployment. The canonical source suite passed before the narrow follow-ups, but its external API exact replay failed and is not certified by this record."
+[verification.artifacts]
+whab = "2.39.0"
+whab_plugin_client = "1.6.0"
+whab_plugin_server = "1.1.0"
+whab_plugin_sqlite = "1.12.0"
+
+[[verification]]
+id = "pr103-explicit-child-environments"
+date = "2026-10-23"
+host_version = "2.40.0"
+source_commit = "e6720053dee7cd0c3f9fcca7212955f0d804a92c"
+selection = ["example", "sqlite", "json"]
+method = "source-tests"
+tests = ["tests/plugins/test_process_environment.py", "tests/plugins/test_storage_worker_faults.py::test_native_child_receives_scoped_config_without_custom_provider_or_api_environment_credentials", "tests/plugins/test_remote_client_workers.py::test_installed_host_client_uses_native_https_verified_runtime_ca_and_public_server"]
+pull_requests = ["https://github.com/Fillll/whab/pull/103"]
+scope = "The exact source passed six focused cases: the explicit process allowlist and password-alias exclusion, actual report/SQLite/JSON worker startup and cleanup with fictional custom-setting canaries, scoped configuration dispatch, and the installed native HTTPS fixture. Arbitrary apparently safe names were excluded while the reviewed standard locale survived. The native fixture built its declared isolated build backend and retained failure diagnostics privately; it verified the temporary runtime CA, public authorization and an acknowledged fictional account. Earlier complete CI on the equivalent public-SDK foundation had two fixture failures that are corrected here; an interrupted local run is not a complete-pass claim. This record covers the child-environment policy and focused fixture corrections, not the final combined submission gate or household deployment. Trusted executable plugins retain operating-system access."
+[verification.artifacts]
+whab = "2.40.0"
+whab_plugin_example = "1.4.0"
+whab_plugin_sqlite = "1.12.0"
+whab_plugin_json = "1.3.0"
+
+[[verification]]
+id = "pr107-installed-storage-primary-smoke"
+date = "2026-10-23"
+host_version = "2.41.0"
+source_commit = "ac518313952022003face183c59f7b38a8742f34"
+selection = ["example-storage"]
+method = "installed-wheel"
+tests = ["plugins/example/example-storage/tests", "native-local-storage-v1 configuration and exact-artifact replay"]
+pull_requests = ["https://github.com/Fillll/whab/pull/104", "https://github.com/Fillll/whab/pull/107"]
+scope = "Built the exact clean source into genuine host 2.41, toolkit 0.10 and independent storage example 1.0 wheels, then installed outside the checkout. All 71 owning tests passed with zero skips and 100% statement/branch coverage. One native-local-storage-v1 configuration and its exact-artifact replay each verified the candidate as sole required primary, read-only readiness, approved-worker activation, three acknowledged financial writes, two saved-worker reopens, an invalid-selection public fault and complete owned-process cleanup over temporary-CA HTTPS. The independently tested SQLite reference was not co-selected with the primary. This completed smoke exposed and verified the host correction that separates native code readiness from migration/copy eligibility while retaining background-work draining. The earlier installed failure is retained separately. The example does not advertise transfer.local or storage.replica; those controls are explicitly inapplicable. This record claims neither distinct-version upgrades, the complete ten-configuration matrix, a complete contribution gate nor household deployment. The full report and exact artifact closure were retained; no real bank or household data was used."
+[verification.artifacts]
+whab = "2.41.0"
+whab_plugin_devkit = "0.10.0"
+whab_plugin_example_storage = "1.0.0"
 
 [[verification]]
 id = "pr102-local-storage-source"
@@ -383,38 +447,6 @@ whab_plugin_json = "1.3.0"
 whab_plugin_web = "1.27.0"
 
 [[verification]]
-id = "pr100-remote-client-lifecycle"
-date = "2026-10-23"
-host_version = "2.39.0"
-source_commit = "df865488e5b7f9645c96e060c1d8fce4dd261086"
-selection = ["client"]
-method = "source-tests"
-tests = ["tests/plugins/test_remote_client_workers.py"]
-pull_requests = ["https://github.com/Fillll/whab/pull/100"]
-scope = "Focused tests prepared separately approved synthetic descriptor wheels 1.0, 1.1 and 2.0 against the real current host closure. A missing-setting candidate preserved the active worker; compatible replacement retained the host transport, pending original command and revision, preserved the previous immutable environment and restored the exact saved version after pause/reopen. Explicit original-request completion preserved one acknowledged fictional account. Paused startup executed no descriptor, an incompatible host expectation refused before interpreter execution, and a stopped same-binding repair preserved prior ready metadata. An embedded separate installed native listener test built the real host, SQLite and server wheels outside the checkout, explicitly verified its runtime CA, observed unauthenticated 401/authenticated 200, and exercised the public host-owned remote transport with one acknowledged account. That native transport uses an explicitly supplied test CA; this does not prove stock client CLI private-CA configuration, distinct descriptor upgrades over a native listener, public receipt lookup, remote-server restart retry durability or household deployment. The canonical source suite passed before the narrow follow-ups, but its external API exact replay failed and is not certified by this record."
-[verification.artifacts]
-whab = "2.39.0"
-whab_plugin_client = "1.6.0"
-whab_plugin_server = "1.1.0"
-whab_plugin_sqlite = "1.12.0"
-
-[[verification]]
-id = "pr103-explicit-child-environments"
-date = "2026-10-23"
-host_version = "2.40.0"
-source_commit = "e6720053dee7cd0c3f9fcca7212955f0d804a92c"
-selection = ["example", "sqlite", "json"]
-method = "source-tests"
-tests = ["tests/plugins/test_process_environment.py", "tests/plugins/test_storage_worker_faults.py::test_native_child_receives_scoped_config_without_custom_provider_or_api_environment_credentials", "tests/plugins/test_remote_client_workers.py::test_installed_host_client_uses_native_https_verified_runtime_ca_and_public_server"]
-pull_requests = ["https://github.com/Fillll/whab/pull/103"]
-scope = "The exact source passed six focused cases: the explicit process allowlist and password-alias exclusion, actual report/SQLite/JSON worker startup and cleanup with fictional custom-setting canaries, scoped configuration dispatch, and the installed native HTTPS fixture. Arbitrary apparently safe names were excluded while the reviewed standard locale survived. The native fixture built its declared isolated build backend and retained failure diagnostics privately; it verified the temporary runtime CA, public authorization and an acknowledged fictional account. Earlier complete CI on the equivalent public-SDK foundation had two fixture failures that are corrected here; an interrupted local run is not a complete-pass claim. This record covers the child-environment policy and focused fixture corrections, not the final combined submission gate or household deployment. Trusted executable plugins retain operating-system access."
-[verification.artifacts]
-whab = "2.40.0"
-whab_plugin_example = "1.4.0"
-whab_plugin_sqlite = "1.12.0"
-whab_plugin_json = "1.3.0"
-
-[[verification]]
 id = "pr105-bank-toolkit-source"
 date = "2026-10-23"
 host_version = "2.38.0"
@@ -462,20 +494,3 @@ whab_plugin_devkit = "0.8.0"
 whab_plugin_generated_bank = "0.1.0"
 whab_plugin_sqlite = "1.12.0"
 whab_plugin_json = "1.3.0"
-
-[[verification]]
-id = "pr106-remote-client-teaching"
-date = "2026-10-23"
-host_version = "2.41.0"
-source_commit = "1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2"
-selection = ["example-remote-client"]
-method = "installed-wheel"
-tests = ["devtools/plugin-devkit/tests", "plugins/example/example-remote-client/tests", "scripts/check_plugin_devkit.py", "scripts/check_plugin_generation.py"]
-pull_requests = ["https://github.com/Fillll/whab/pull/106"]
-scope = "The exact clean committed source passed 290 installed toolkit tests on genuine WHAB 2.22 and current 2.41 with zero skips; candidate toolkit statement/branch coverage was complete. The maintained remote-client example and a separately generated project each passed installed owning behavior and complete plugin coverage on separate genuine WHAB 2.40 minimum and 2.41 current artifacts. Each of those four rows passed ten distinct native configurations and ten exact approved-artifact replays, with all fictional homes/listeners/workers cleaned up. The genuine 2.40 source was e8fa8585c16d2f8a93b1966315c0fee34eb11d35. Native profiles used host-owned authorization/financial services, two fictional HTTPS hosts and a reviewed public-transport overlay that explicitly trusted the temporary authority CA. They exercised candidate workers, varied peers/order/transitions, pause/resume, exact-version reopen and client restart after a dropped acknowledged result; explicit Finish retained the original request/CAS identity. This does not establish stock client CLI private-CA configuration, remote-server restart retry durability, public receipt lookup, automatic unknown reconciliation, distinct-version upgrades from a single candidate artifact, local migration/copy support or household deployment. The toolkit's genuine 2.22 import compatibility is separate from this optional family's 2.40 floor. The interrupted source canonical run is not certified as a complete pass."
-[verification.artifacts]
-whab = "2.41.0"
-whab_plugin_devkit = "0.9.0"
-whab_plugin_example_remote_client = "1.0.0"
-whab_plugin_server = "1.1.0"
-whab_plugin_sqlite = "1.12.0"

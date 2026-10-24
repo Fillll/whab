@@ -145,11 +145,26 @@ def test_negative_runner_detects_missing_or_wrong_rejections(monkeypatch):
     Plugin("brand", "Broken", bank_logos=BankLogos(lambda _: 1, lambda _: None)),
     Plugin("brand", "Broken", bank_logos=BankLogos(lambda _: None, lambda _: object())),
     Plugin("file", "Broken", file_import=FileImport(lambda _: None)),
-    Plugin("unsupported", "Unsupported", storage=lambda _: None),
 ])
 def test_broken_advertised_candidate_hooks_fail_instead_of_being_skipped(plugin):
     with pytest.raises(ValueError):
         configurations.exercise_candidate(plugin)
+
+
+def test_broken_storage_factory_fails_public_conformance_instead_of_becoming_inapplicable():
+    from whab_plugin_devkit import ConformanceFailure
+
+    with pytest.raises(ConformanceFailure):
+        configurations.exercise_candidate(Plugin("broken-storage", "Broken storage", storage=lambda _: None))
+
+
+def test_unsupported_hook_record_is_rejected_without_claiming_a_hook_pass():
+    from types import SimpleNamespace
+
+    plugin = SimpleNamespace(**{name:None for name in ("insights", "export", "bank_logos", "merchant_logos",
+        "file_import", "categorization", "interface", "ui", "storage", "bank")})
+    with pytest.raises(ValueError):
+        configurations.exercise_candidate(plugin, registry=object())
 
 
 @pytest.mark.parametrize("failure", ["nonempty", "endless", "empty-prediction", "wrong-prediction"])
