@@ -19,10 +19,13 @@ def main():
     parser.add_argument("--budget-password-env", metavar="VARIABLE", help="Read the budget password from this environment variable")
     parser.add_argument("--create", metavar="NAME", help="Create the --budget file with this budget name")
     parser.add_argument("--copy", action="append", default=[], metavar="FILE", help="Also save the opened budget to this unused file location")
+    parser.add_argument("--recover-plugins", action="store_true", help="Start minimal local plugin recovery without opening plugin factories")
     parser.add_argument(
         "--reload", action="store_true", help="Reload Python files during development"
     )
     args = parser.parse_args()
+    if args.recover_plugins and (args.create is not None or args.copy or args.reload):
+        parser.error("Use --recover-plugins separately from --create, --copy and --reload.")
     if (args.create is not None or args.copy) and not args.budget:
         parser.error("Use --budget FILE with --create or --copy.")
     if args.budget_password_env is not None:
@@ -58,13 +61,13 @@ def main():
         os.environ["WHAB_BUDGET"] = str(path)
     if args.copy:
         os.environ["WHAB_BUDGET_COPIES"] = os.pathsep.join(str(Path(path).expanduser().resolve()) for path in args.copy)
-    settings = Settings.load()
+    settings = Settings.load(read_plugin_selection=False) if args.recover_plugins else Settings.load()
     try:
         validate_tls(settings.tls_cert_file, settings.tls_key_file)
     except ValueError as error:
         parser.error(str(error))
     uvicorn.run(
-        "whab.app:create_app",
+        "whab.plugins.recovery:create_app" if args.recover_plugins else "whab.app:create_app",
         factory=True,
         host="127.0.0.1",
         port=args.port or settings.port,
