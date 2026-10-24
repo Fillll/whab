@@ -246,7 +246,7 @@ def main(argv=None):
                     host_sources[floor] = source
                     projects.append(source)
             host_versions = list(host_sources)
-            reference_sources = {}
+            reference_sources, runtime_sources = {}, {}
             for version, source in host_sources.items():
                 recipe = helpers()
                 recipe.MINIMUM_HOST_VERSION = version
@@ -254,6 +254,11 @@ def main(argv=None):
                 reference_sources[version] = selected
                 if selected not in projects:
                     projects.append(selected)
+                if Version(version) >= Version("2.32.0"):
+                    native = recipe.reference_projects(runtime_projects[0], source, candidate_host=projects[0], plugin="json")["minimum"]
+                    runtime_sources[version] = (native, runtime_projects[1])
+                    if native not in projects:
+                        projects.append(native)
             wheels = base / "wheels"
             wheels.mkdir()
             approved_extra_wheels(args.extra_wheelhouse, wheels)
@@ -268,12 +273,13 @@ def main(argv=None):
             sqlite_wheels = {version: helper.wheel_for(wheels, "whab_plugin_sqlite", reference_versions[version])
                              for version in host_versions}
             host_wheels = {version: helper.wheel_for(wheels, "whab", version) for version in host_versions}
-            runtime_wheels = [helper.wheel_for(wheels, helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["name"],
+            runtime_wheels = {version: [helper.wheel_for(wheels, helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["name"],
                                                helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"])
-                              for project in runtime_projects]
+                              for project in sources] for version, sources in runtime_sources.items()}
             for version, host in host_wheels.items():
                 helper.run([sys.executable, "-I", "-m", "pip", "--isolated", "download", "--index-url", "https://pypi.org/simple", "--disable-pip-version-check", "--only-binary=:all:", "--dest", str(wheels),
-                            str(host), str(toolkit), str(sqlite_wheels[version]), *helper.TEST_REQUIREMENTS], cwd=base, env=env)
+                            str(host), str(toolkit), str(sqlite_wheels[version]), *helper.TEST_REQUIREMENTS,
+                            *(str(wheel) for wheel in runtime_wheels.get(version, ()))], cwd=base, env=env)
             bootstrap = base / "generator-environment"
             helper.run([sys.executable, "-I", "-m", "venv", str(bootstrap)], cwd=base, env=env)
             generator_python = bootstrap / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
@@ -320,13 +326,13 @@ def main(argv=None):
                     candidate_record = helper.wheel_record(candidate)
                     command = [str(python), "-I", "-m", "pip", "install", "--no-index", "--find-links", str(wheels),
                                str(host), str(toolkit), str(sqlite), str(candidate) + "[test]", *helper.TEST_REQUIREMENTS,
-                               *(str(wheel) for wheel in runtime_wheels if Version(version) >= Version("2.32.0"))]
+                               *(str(wheel) for wheel in runtime_wheels.get(version, ()))]
                     subprocess.run(command, cwd=work, env=env, check=True)
                     subprocess.run([str(python), "-I", "-m", "pip", "check"], cwd=work, env=env, check=True)
                     expected = {"whab": version, "whab_plugin_devkit": toolkit_version,
                                 "whab_plugin_sqlite": sqlite_version, candidate_record["distribution"]: candidate_record["version"]}
                     if Version(version) >= Version("2.32.0"):
-                        expected.update({record["distribution"]: record["version"] for record in map(helper.wheel_record, runtime_wheels)})
+                        expected.update({record["distribution"]: record["version"] for record in map(helper.wheel_record, runtime_wheels[version])})
                     installation = work / "installation.json"
                     subprocess.run([str(python), "-I", "-c", VERIFY_PROJECT, json.dumps(expected), identifier,
                                     candidate_record["distribution"], module, str(wheels), str(installation)], cwd=work, env=env, check=True)
