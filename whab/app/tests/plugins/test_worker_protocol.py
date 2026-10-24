@@ -222,18 +222,32 @@ while True:
 
 
 @pytest.fixture
-def fixture_process(monkeypatch):
+def fixture_process(monkeypatch, tmp_path):
     original = subprocess.Popen
     processes = []
     observed = []
 
-    def select(mode):
+    def select(mode, *, ready=False):
         program = _FIXTURE_WORKER.replace("mode = MODE", "mode = " + repr(mode))
+        marker = tmp_path / f"ready-{len(processes)}"
+        if ready:
+            # Malformed-response tests measure the operation/validation boundary.
+            # Wait for this fixture's real hello, keeping interpreter/coverage
+            # startup outside that measurement. Startup-deadline tests below
+            # deliberately do not use this setup barrier.
+            program = program.replace("send(hello)",
+                                      "send(hello)\nfrom pathlib import Path\nPath(" + repr(str(marker)) + ").write_text('ready')")
 
         def spawn(command, **kwargs):
             observed.append((command, kwargs))
             process = original([sys.executable, "-I", "-c", program], **kwargs)
             processes.append(process)
+            if ready:
+                deadline = time.monotonic() + 30
+                while not marker.exists():
+                    if process.poll() is not None or time.monotonic() >= deadline:
+                        raise AssertionError("The malformed-response fixture did not send its ready handshake.")
+                    time.sleep(0.01)
             return process
 
         monkeypatch.setattr(report_worker.subprocess, "Popen", spawn)
@@ -333,7 +347,7 @@ def test_live_report_support_requires_explicit_stateless_report_contract_without
 
 @pytest.mark.parametrize("mode", ["crash", "bad-frame", "wrong-id", "unknown-field", "payload", "insights-type", "insights-fields"])
 def test_failed_or_malformed_worker_reports_are_attributed_and_retired(mode, fixture_process, worker_snapshot):
-    processes, _ = fixture_process(mode)
+    processes, _ = fixture_process(mode, ready=True)
     worker = ReportWorker("fixture", timeout=5)
     with pytest.raises(PluginError) as raised:
         worker.insights(worker_snapshot)
