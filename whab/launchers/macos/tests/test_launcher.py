@@ -1,6 +1,7 @@
 """Isolated launcher safety tests. These never open a user's WHAB runtime."""
 
 import contextlib
+import hashlib
 import importlib.util
 import io
 import json
@@ -486,6 +487,242 @@ class IsolatedManagerTest(unittest.TestCase):
             self.assertEqual(path.stat().st_mode & 0o777, 0o700 if path.is_dir() else 0o600)
         self.assertEqual(backup["fingerprint"], launcher.runtime_fingerprint(destination))
 
+    def code_environment(self, prefix="", *, family=None):
+        manifest = {"format": 1, "plugin": "fictional", "host_sdk": 1,
+                    "python": {"version": "3.14", "sha256": "a" * 64}, "wheels": []}
+        if family is not None:
+            manifest.update(format=2, family=family)
+        identifier = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        root = self.home / prefix / "plugin-workers/environments" / identifier
+        environment = root / "environment"
+        environment.mkdir(parents=True)
+        launcher.write_json(root / "ready.json", {**manifest, "identifier": identifier, "installation_sha256": "b" * 64})
+        (root / "wheels").mkdir()
+        (root / "wheels/reviewed.whl").write_bytes(b"fictional approved input marker")
+        return root, environment
+
+    def test_all_new_runtime_roots_are_copied_and_fingerprinted(self):
+        self.config("PORT=6412\n")
+        names = ("plugin-workers/storage/sqlite/storage-upgrade.json", "plugin-workers/storage-intents/requests.json",
+                 "plugin-workers/bank-continuations/fixture.json", "plugin-workers/namespace-effects/model.json",
+                 "visual-ui/visual-selection.json", "remote-client/remote-client.json",
+                 "storage-authority/authority.json", "storage-authority/replicas.json",
+                 "storage-instances/fictional/data/whab-sandbox.sqlite")
+        for name in names:
+            path = self.home / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"fictional native or private state")
+        before = launcher.runtime_fingerprint(self.home)
+        backup = self.manager.backup(self.home, self.installation())
+        destination = Path(backup["directory"]) / "runtime"
+        self.assertEqual(backup["format"], 2)
+        for name in names:
+            with self.subTest(name=name):
+                self.assertEqual((destination / name).read_bytes(), (self.home / name).read_bytes())
+                (self.home / name).write_bytes(b"changed state")
+                self.assertNotEqual(launcher.runtime_fingerprint(self.home), before)
+                (self.home / name).write_bytes(b"fictional native or private state")
+        self.assertEqual(launcher.runtime_fingerprint(destination), before)
+
+    def test_local_json_and_named_json_budget_are_complete_backup_inputs(self):
+        self.config("PORT=6412\nWHAB_STORAGE=json\n")
+        manifest = self.home / "budgets/fictional/sandbox/manifest.json"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(json.dumps({"storage": "json"}))
+        names = ("data/whab-sandbox.json", "budgets/fictional/sandbox/data/whab-sandbox.json",
+                 "storage-instances/copy/data/whab-sandbox.json", "storage-authority/authority.json")
+        for name in names:
+            path = self.home / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'{}')
+        before = launcher.runtime_fingerprint(self.home)
+        backup = self.manager.backup(self.home, self.installation())
+        destination = Path(backup["directory"]) / "runtime"
+        self.assertEqual(launcher.runtime_fingerprint(destination), before)
+        self.assertEqual((destination / manifest.relative_to(self.home)).read_bytes(), manifest.read_bytes())
+        for name in names:
+            self.assertEqual((destination / name).read_bytes(), b'{}')
+        (self.home / names[0]).write_bytes(b'{"fictional":true}')
+        self.assertNotEqual(launcher.runtime_fingerprint(self.home), before)
+
+    def test_only_scoped_host_records_describe_budget_references(self):
+        self.config()
+        _root, environment = self.code_environment("budgets/fictional/sandbox")
+        package = environment / "lib/fictional-package"
+        package.mkdir(parents=True)
+        (package / "manifest.json").write_text('["fictional package resource"]')
+        (package / "copies.json").write_text(json.dumps([{"path": str(self.base / "outside.whab")}]))
+        before = launcher.runtime_fingerprint(self.home)
+        backup = self.manager.backup(self.home, self.installation())
+        destination = Path(backup["directory"]) / "runtime"
+        for name in ("manifest.json", "copies.json"):
+            self.assertEqual((destination / package.relative_to(self.home) / name).read_bytes(), (package / name).read_bytes())
+        self.assertEqual(launcher.runtime_fingerprint(destination), before)
+
+    def test_unknown_remote_and_invalid_budget_storage_refuse_before_stop(self):
+        self.config()
+        manifest = self.home / "budgets/fictional/production/manifest.json"
+        manifest.parent.mkdir(parents=True)
+        for storage in ("client", "unknown", [], {}, True):
+            manifest.write_text(json.dumps({"storage": storage}))
+            with self.subTest(storage=storage), patch.object(self.manager, "stop") as stop:
+                with self.assertRaisesRegex(launcher.LauncherError, "external storage"):
+                    self.manager.switch(self.installation())
+                stop.assert_not_called()
+        manifest.unlink()
+        (self.home / ".env").write_text("PORT=6412\nWHAB_STORAGE=client\n")
+        with patch.object(self.manager, "stop") as stop:
+            with self.assertRaisesRegex(launcher.LauncherError, "external storage"):
+                self.manager.switch(self.installation())
+            stop.assert_not_called()
+
+    def test_budget_scope_links_are_refused_before_metadata_is_read(self):
+        self.config()
+        outside = self.base / "outside"
+        outside.mkdir()
+        budgets = self.home / "budgets"
+        budgets.mkdir()
+        link = budgets / "fictional"
+        link.symlink_to(outside, target_is_directory=True)
+        with patch.object(launcher, "read_json", side_effect=AssertionError("Do not read linked budget metadata")):
+            with self.assertRaisesRegex(launcher.LauncherError, "symbolic links"):
+                launcher.runtime_references(self.home)
+
+    def test_default_and_named_budget_code_aliases_are_archived_without_following(self):
+        self.config("PORT=6412\n")
+        external = self.base / "outside/python3.14"
+        external.parent.mkdir()
+        external.write_bytes(b"outside interpreter bytes must never be read or copied")
+        expected = []
+        for prefix in ("", "budgets/fictional/sandbox"):
+            _root, environment = self.code_environment(prefix, family="storage" if prefix else None)
+            (environment / "bin").mkdir()
+            (environment / "lib").mkdir()
+            (environment / "bin/python").symlink_to(external)
+            (environment / "bin/python3").symlink_to("python")
+            (environment / "lib64").symlink_to("lib", target_is_directory=True)
+            (environment / "pyvenv.cfg").write_text("fictional code archive")
+            expected.extend((environment / name).relative_to(self.home).as_posix()
+                            for name in ("bin/python", "bin/python3", "lib64"))
+        before = launcher.runtime_fingerprint(self.home)
+        backup = self.manager.backup(self.home, self.installation())
+        archive = Path(backup["directory"])
+        data = launcher.read_json(archive / "backup.json")
+        self.assertEqual({record["path"] for record in data["code_links"]}, set(expected))
+        self.assertTrue(data["requires_environment_rebuild"] and backup["requires_environment_rebuild"])
+        self.assertEqual(len(data["environment_archives"]), 2)
+        for name in expected:
+            self.assertFalse((archive / "runtime" / name).exists())
+        self.assertEqual(launcher.runtime_fingerprint(archive / "runtime", archived_links=data["code_links"]), before)
+        for path in archive.rglob("*"):
+            self.assertFalse(path.is_symlink())
+            if path.is_file():
+                self.assertNotIn(external.read_bytes(), path.read_bytes())
+        launcher.write_json(self.root / "transition.json", {"previous": self.installation(), "backup": backup, "state": "complete"})
+        with self.assertRaisesRegex(launcher.LauncherError, "explicit reviewed rebuilding"):
+            self.manager.rollback()
+
+    def test_arbitrary_new_runtime_links_and_unready_code_links_still_refuse(self):
+        self.config("PORT=6412\n")
+        outside = self.base / "outside"
+        outside.write_text("private marker")
+        for name in ("plugin-workers/native-storage/link", "visual-ui/link", "remote-client/link",
+                     "storage-authority/link", "storage-instances/link"):
+            path = self.home / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.symlink_to(outside)
+            with self.subTest(name=name), self.assertRaises(launcher.LauncherError):
+                self.manager.backup(self.home, self.installation())
+            path.unlink()
+        root, environment = self.code_environment()
+        (environment / "bin").mkdir()
+        (environment / "bin/python").symlink_to("python3.14")
+        (root / "ready.json").unlink()
+        with self.assertRaisesRegex(launcher.LauncherError, "ready manifest"):
+            self.manager.backup(self.home, self.installation())
+
+    def test_code_link_targets_and_manifest_identity_changes_cannot_be_hidden(self):
+        self.config("PORT=6412\n")
+        root, environment = self.code_environment()
+        (environment / "bin").mkdir()
+        link = environment / "bin/python"
+        link.symlink_to("python3.14")
+        before = launcher.runtime_fingerprint(self.home)
+        link.unlink()
+        link.symlink_to("python3.15")
+        self.assertNotEqual(launcher.runtime_fingerprint(self.home), before)
+        link.unlink()
+        link.symlink_to("../private/python3.14")
+        with self.assertRaises(launcher.LauncherError):
+            launcher.runtime_fingerprint(self.home)
+        link.unlink()
+        link.symlink_to("python3.14")
+        ready = launcher.read_json(root / "ready.json")
+        ready["plugin"] = "changed"
+        launcher.write_json(root / "ready.json", ready)
+        with self.assertRaisesRegex(launcher.LauncherError, "content address"):
+            launcher.runtime_fingerprint(self.home)
+
+    def test_native_bundle_probe_archives_a_real_stdlib_venv_in_a_disposable_home(self):
+        self.config("PORT=6412\n")
+        source = MANAGER_FILE.parent.parent / "scripts/check_bundle.py"
+        spec = importlib.util.spec_from_file_location("bundle_backup_check", source)
+        check = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(check)
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", check._BACKUP_PROBE,
+                                 str(MANAGER_FILE), str(Path(self.temporary.name) / "launcher"),
+                                 str(Path(self.temporary.name) / "runtime")],
+                                capture_output=True, text=True, check=False, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertEqual(value["format"], 2)
+        self.assertEqual(value["owned_roots"], 5)
+        self.assertGreater(value["code_aliases"], 0)
+
+    def test_changed_native_file_during_copy_keeps_source_and_discards_incomplete_backup(self):
+        self.config("PORT=6412\n")
+        native = self.home / "storage-instances/fictional/data/ledger.sqlite"
+        native.parent.mkdir(parents=True)
+        native.write_bytes(b"before")
+        copy = launcher.shutil.copyfile
+        def changed(source, target, **kwargs):
+            result = copy(source, target, **kwargs)
+            if source == native:
+                native.write_bytes(b"changed during backup")
+            return result
+        with patch.object(launcher.shutil, "copyfile", side_effect=changed), self.assertRaisesRegex(launcher.LauncherError, "changed while"):
+            self.manager.backup(self.home, self.installation())
+        self.assertEqual(native.read_bytes(), b"changed during backup")
+        self.assertEqual(list((self.root / "backups").iterdir()), [])
+
+    def test_surviving_native_owner_refuses_backup_until_its_real_lock_releases(self):
+        self.config("PORT=6412\n")
+        lock = self.home / "plugin-workers/native-storage/sqlite/sandbox/storage-writer.json.lock"
+        lock.parent.mkdir(parents=True)
+        lock.touch()
+        program = "import fcntl,sys; f=open(sys.argv[1],'rb'); fcntl.flock(f,fcntl.LOCK_EX); print('ready',flush=True); sys.stdin.readline()"
+        child = subprocess.Popen([sys.executable, "-I", "-B", "-c", program, str(lock)],
+                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            self.assertEqual(child.stdout.readline(), b"ready\n")
+            launcher.ensure_backup_scope(self.home)  # The pre-stop check permits a normal active owner.
+            with self.assertRaisesRegex(launcher.LauncherError, "private state lease"):
+                self.manager.backup(self.home, self.installation())
+            self.assertFalse((self.root / "backups").exists())
+        finally:
+            child.communicate(input=b"finish\n", timeout=5)
+        self.assertEqual(child.returncode, 0)
+        backup = self.manager.backup(self.home, self.installation())
+        self.assertTrue((Path(backup["directory"]) / "runtime" / lock.relative_to(self.home)).is_file())
+
+    def test_legacy_fingerprints_cannot_authorize_new_contract_rollback(self):
+        self.config("PORT=6412\n")
+        backup = self.manager.backup(self.home, self.installation())
+        backup.pop("format")
+        launcher.write_json(self.root / "transition.json", {"previous": self.installation(), "backup": backup, "state": "complete"})
+        with self.assertRaisesRegex(launcher.LauncherError, "complete runtime contract"):
+            self.manager.rollback()
+
     def test_external_budget_copy_refuses_update_before_stop(self):
         self.config()
         copies = self.home / "budgets/id/sandbox/copies.json"
@@ -614,14 +851,18 @@ class SourceVerificationTest(unittest.TestCase):
             (app / "src/whab/__init__.py").write_text('__version__ = "2.3.0"\n')
             (app / "src/whab/budgets/session.py").write_text("PACKAGE = True\n")
             (app / "pyproject.toml").write_text('[project]\nname="whab"\n')
-            for private in ("budgets", "data", "tls", ".venv"):
+            private_directories = ("budgets", "data", "tls", ".venv", "cache", "plugin-workers", "visual-ui",
+                                   "remote-client", "storage-authority", "storage-instances")
+            for private in private_directories:
                 (app / private).mkdir()
                 (app / private / "private").write_text("private runtime")
-            (app / ".env").write_text("private configuration")
+            private_files = (".env", "plugins.json", ".whab-recovery", ".plugins-recovery")
+            for private in private_files:
+                (app / private).write_text("private configuration")
             launcher.copy_seed_source(root / "seed", root / "output")
             copied = root / "output/whab/app"
             self.assertEqual((copied / "src/whab/budgets/session.py").read_text(), "PACKAGE = True\n")
-            for private in ("budgets", "data", "tls", ".venv", ".env"):
+            for private in (*private_directories, *private_files):
                 self.assertFalse((copied / private).exists())
 
     def archive(self, directory, members):
