@@ -42,6 +42,9 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 include = ["whab", "whab.*"]
 
+[tool.setuptools.package-data]
+"whab.plugins" = ["catalog.json"]
+
 [tool.setuptools.dynamic]
 version = {attr = "whab.__version__"}
 

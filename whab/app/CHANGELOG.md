@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.29.0 — 2026-10-23
+
+PR: [#86](https://github.com/Fillll/whab/pull/86)
+
+- Generate a curated packaged catalog and compatibility documentation from bounded static TOML/AST metadata, with no plugin import or installation. Check source declarations, SDK hook contracts, supported inventory and generated output drift in the existing documentation gate.
+- Expose detached validated catalog data through the public reader and guarded HTTP endpoint, including during gated handovers. Record maintainer/security links, accurate legacy/live support and exact dated artifact/selection verification without inheriting evidence across versions.
+- Include all maintained teaching examples and verify the packaged resource against installed public contracts, adversarial source/corruption fixtures and existing security guards.
+
 ## 2.28.0 — 2026-10-23
 
 PR: [#85](https://github.com/Fillll/whab/pull/85)

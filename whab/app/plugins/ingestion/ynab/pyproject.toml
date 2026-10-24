@@ -21,3 +21,15 @@ include = ["whab_plugin_ynab", "whab_plugin_ynab.*"]
 
 [tool.setuptools.package-data]
 whab_plugin_ynab = ["templates/*.html", "static/*.js"]
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "ingestion.file", "version" = 1, "composition" = "additive" }]
+requires = []
+conflicts = []
+lifecycle = "restart"
+legacy = true
+authority = "unknown"
+state-version = 1
+state-upgrades = []
+support = "maintained"
