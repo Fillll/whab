@@ -138,7 +138,7 @@ _FIXTURE_WORKER = """
 import json
 import os
 import sys
-from whab.plugins.wire import Frame, HEADER, frame_lengths
+from whab.plugins.wire import Frame, HEADER, PROTOCOL_VERSION, frame_lengths
 from whab import __version__
 
 mode = MODE
@@ -155,7 +155,9 @@ if mode == 'startup-crash':
 if mode == 'startup-timeout':
     sys.stdin.buffer.read()
     raise SystemExit(0)
-hello = {'kind':'ready','worker':1,'sdk':1,'plugin':'fixture','distribution':'fixture-package','version':'1.0.0','host':__version__,'live':True,'capabilities':[{'name':'reporting.insights','version':1},{'name':'reporting.export','version':1}],'insights':True,'export':True}
+hello = {'kind':'ready','worker':PROTOCOL_VERSION,'sdk':1,'plugin':'fixture','distribution':'fixture-package','version':'1.0.0','host':__version__,'live':True,'capabilities':[{'name':'reporting.insights','version':1},{'name':'reporting.export','version':1}],'insights':True,'export':True,
+         'adapters':{'bank_logos':None,'merchant_logos':False,'file_import':None,'settings':None},
+         'contract':{'requires':[],'conflicts':[],'authority':'local','state_version':1,'state_upgrades':[],'lifecycle':'live','legacy':False}}
 if mode.startswith('hello:'):
     hello.update(json.loads(mode.removeprefix('hello:')))
 send(hello)
@@ -169,6 +171,12 @@ while True:
     metadata_size, payload_size = frame_lengths(header)
     request = Frame.decode(header + sys.stdin.buffer.read(metadata_size + payload_size)).metadata
     identifier = request['id']
+    if mode == 'oversized-logo':
+        from whab.plugins.wire import PROTOCOL_VERSION
+        sys.stdout.buffer.write(HEADER.pack(b'WHAB',PROTOCOL_VERSION,2,128*1024+1)+b'{}')
+        sys.stdout.buffer.flush()
+        sys.stdin.buffer.read()
+        break
     if request['operation'] == 'shutdown':
         if mode == 'shutdown-timeout':
             sys.stdin.buffer.read()
@@ -267,7 +275,7 @@ def test_real_example_worker_roundtrip_matches_public_results_and_closes(worker_
     assert "Fictional merchant" not in output.out + output.err
 
 
-@pytest.mark.parametrize("mode", ["startup-crash", "startup-timeout", 'hello:{"worker":2}', 'hello:{"worker":true}',
+@pytest.mark.parametrize("mode", ["startup-crash", "startup-timeout", 'hello:{"worker":999}', 'hello:{"worker":true}',
                                   'hello:{"sdk":2}', 'hello:{"sdk":true}', 'hello:{"plugin":"different"}',
                                   'hello:{"distribution":""}', 'hello:{"version":""}',
                                   'hello:{"insights":false,"export":false}', 'hello:{"insights":"true"}',
@@ -352,6 +360,16 @@ def test_request_timeout_retires_worker_without_retry(fixture_process, worker_sn
         worker.insights(worker_snapshot)
     assert raised.value.code == "worker_timeout"
     assert len(observed) == 1
+    assert_retired(worker, processes[0])
+
+
+def test_logo_response_size_is_rejected_from_header_before_waiting_for_binary_body(fixture_process):
+    processes, _ = fixture_process("oversized-logo")
+    worker = ReportWorker("fixture", timeout=5)
+    started = time.monotonic()
+    with pytest.raises(PluginError) as raised:
+        worker.fetch("fixture")
+    assert raised.value.code == "worker_protocol" and time.monotonic() - started < 2
     assert_retired(worker, processes[0])
 
 

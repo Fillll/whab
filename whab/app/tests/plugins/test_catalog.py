@@ -10,6 +10,12 @@ import pytest
 from whab.plugins import catalog
 
 
+def corrupt_linked_artifact(value):
+    row = next(row for row in value["plugins"] if row["verifications"])
+    evidence = next(record for record in value["verifications"] if record["id"] == row["verifications"][0])
+    evidence["artifacts"][row["distribution"]] = "9.9.9"
+
+
 def test_catalog_reads_packaged_data_without_discovery_and_returns_independent_payloads(monkeypatch):
     def forbidden(*_, **__):
         pytest.fail("Catalog reads must not discover or import plugin entry points")
@@ -20,6 +26,8 @@ def test_catalog_reads_packaged_data_without_discovery_and_returns_independent_p
     assert first["publisher"]["security"] == "https://github.com/Fillll/whab/security/advisories/new"
     entries = {row["id"]: row for row in first["plugins"]}
     assert entries["example"]["live_support"] == "stateless-report-worker"
+    assert entries["bank-logos"]["live_support"] == "stateless-optional-worker"
+    assert entries["ynab"]["live_support"] == "stateless-optional-worker"
     assert entries["sqlite"]["legacy"] is False
     assert entries["client"]["authority"] == "remote"
     assert entries["json"]["legacy"] is False
@@ -50,7 +58,7 @@ def test_catalog_reads_packaged_data_without_discovery_and_returns_independent_p
     lambda value: value["verifications"][0].update(selection=["unreviewed-provider"]),
     lambda value: value["verifications"][0].update(date="2026-02-30"),
     lambda value: value["verifications"][0].update(pull_requests=["https://github.com/Fillll/whab/issues/79"]),
-    lambda value: value["verifications"][0]["artifacts"].update(whab_plugin_bank_logos="9.9.9"),
+    corrupt_linked_artifact,
 ])
 def test_invalid_catalog_data_is_rejected_with_authored_private_data_free_diagnostic(change):
     value = catalog.catalog_snapshot()

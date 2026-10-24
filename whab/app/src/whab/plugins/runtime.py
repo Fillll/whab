@@ -100,6 +100,32 @@ class PluginRegistry:
             bound.append(resolved)
         return PluginRegistry(tuple(bound))
 
+    def bind_branding(self, selected=None):
+        """Create independent artwork hooks without granting budget authority."""
+        selected = set(selected) if selected is not None else {plugin.id for plugin in self._plugins}
+        bound = []
+        for plugin in self._plugins:
+            if plugin.id not in selected or plugin.branding_factory is None:
+                bound.append(plugin)
+                continue
+            try:
+                if any(getattr(plugin, name) is not None for name in (
+                    "bind", "migrate_state", "budget_connection", "categorization", "bank", "bank_ui", "storage", "ui", "interface", "file_import", "insights", "export",
+                )):
+                    raise ValueError()
+                resolved = plugin.branding_factory()
+                if type(resolved) is not Plugin or (resolved.id, resolved.api_version, resolved.display_name) != (plugin.id, plugin.api_version, plugin.display_name) or resolved.branding_factory is not None:
+                    raise ValueError()
+                if any(getattr(resolved, name) is not None for name in (
+                    "bind", "migrate_state", "budget_connection", "categorization", "bank", "bank_ui", "storage", "ui", "interface", "file_import", "insights", "export",
+                )) or resolved.contract != plugin.contract or contract_for(resolved) != contract_for(plugin):
+                    raise ValueError()
+            except Exception:
+                raise PluginError("Plugin artwork could not open its independent cache hooks. Reinstall or disable the plugin.",
+                                  code="branding_startup_failed", plugin_id=plugin.id) from None
+            bound.append(resolved)
+        return PluginRegistry(tuple(bound))
+
     def describe(self) -> tuple[PluginDescription, ...]:
         return tuple(
             PluginDescription(

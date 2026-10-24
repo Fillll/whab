@@ -68,6 +68,7 @@ from .sdk import (
     PluginAction,
     PluginDescription,
     PluginInsightResult,
+    PluginResources,
     PluginSettings,
     ReceiptSelectionIndex,
     ReceiptStorage,
@@ -95,6 +96,7 @@ from .sdk import (
 __all__ = [
     "ReplicaWatermark",
     "StorageReplica",
+    "PluginResources",
     "Capability",
     "CapabilityError",
     "PluginContract",

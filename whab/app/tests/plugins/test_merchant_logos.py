@@ -27,8 +27,8 @@ def test_merchant_artwork_is_an_optional_capability_of_the_existing_bank():
         MerchantLogos(None)
     with pytest.raises(ValueError, match="MerchantLogos"):
         Plugin("bank", "Bank", bank=lambda _: None, merchant_logos={})
-    with pytest.raises(ValueError, match="bank factory"):
-        Plugin("bank", "Bank", merchant_logos=MerchantLogos(lambda _: None))
+    standalone = Plugin("artwork", "Artwork", merchant_logos=MerchantLogos(lambda _: None))
+    assert PluginRegistry((standalone,)).describe()[0].kinds == ("branding",)
 
 
 def test_disabled_bank_artwork_never_loads_or_fetches():

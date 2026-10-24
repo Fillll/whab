@@ -114,8 +114,13 @@ def validate_catalog(value):
                 _positive(edge[1])
                 _require(edge[0] < edge[1] <= row["state_version"])
             if row["lifecycle"] == "live":
-                _require(not row["legacy"] and row["live_support"] == "stateless-report-worker" and row["state_version"] == 1
-                         and not row["state_upgrades"] and bool(capability_names) and capability_names <= {"reporting.insights", "reporting.export"})
+                support = row["live_support"]
+                allowed = {"reporting.insights", "reporting.export"}
+                if support == "stateless-optional-worker":
+                    allowed |= {"branding.bank", "branding.merchant", "ingestion.file"}
+                _require(not row["legacy"] and support in {"stateless-report-worker", "stateless-optional-worker"}
+                         and row["state_version"] == 1 and not row["state_upgrades"] and bool(capability_names)
+                         and capability_names <= allowed and all(capability["version"] == 1 for capability in row["capabilities"]))
             else:
                 _require(row["live_support"] == "restart-required")
             _require(row["support"] in {"maintained", "teaching"})

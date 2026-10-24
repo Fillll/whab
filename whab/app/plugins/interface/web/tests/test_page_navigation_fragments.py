@@ -168,7 +168,9 @@ def test_fragment_assets_match_loaded_plugin_scripts_without_executing_or_replac
         _, parsed = fragment(client, "/budgets/home/accounts/2026-10/usd")
         assets = parsed.fragments[0]["assets"]
         assert assets == PageMarkup(full.text).main_assets
-        assert len(assets["plugins"]) == 1 and assets["plugins"][0].startswith("/budgets/home/imports/fictional-import/static/import.js?v=")
+        assert len(assets["plugins"]) == 1
+        assert re.fullmatch(r"/budgets/home/imports/fictional-import/[0-9a-f]{32}/static/import\.js", assets["plugins"][0])
+        assert client.get(assets["plugins"][0]).text == "/* Fictional plugin module. */"
         assert any(tag == "script" and attrs.get("src") == assets["plugins"][0] for tag, attrs in PageMarkup(full.text).tags)
         assert "data-fictional-import" in full.text
         assert not [tag for tag, _ in parsed.tags if tag == "script"]

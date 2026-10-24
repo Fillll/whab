@@ -61,6 +61,127 @@ def export_url(identifier, prefix=""):
     return f"{prefix}/api/plugins/{identifier}/export?workspace=personal&month=2026-10"
 
 
+def test_held_parser_finishes_before_swap_and_stale_commit_never_calls_replacement(tmp_path, store, monkeypatch):
+    from whab.budgets.runtime import RuntimeCandidate
+    from whab.plugins import FileImport, WorkspaceImport
+    from whab.plugins.live import RegistryGeneration
+
+    async def scenario():
+        entered, finish = Event(), Event()
+        calls = []
+
+        def old_parser(raw):
+            entered.set()
+            assert finish.wait(5)
+            return WorkspaceImport((), (), (), (), "2026-10", warnings=("Original parser",))
+
+        def replacement(raw):
+            calls.append(raw)
+            return WorkspaceImport((), (), (), (), "2026-10", warnings=("Replacement parser",))
+
+        first = Plugin("parser", "Original", file_import=FileImport(old_parser), contract=PluginContract(lifecycle="live"))
+        second = replace(first, file_import=FileImport(replacement))
+        install(monkeypatch, first)
+        app = create_app(store=store, settings=settings(tmp_path, ("parser",)), plugins=PluginRegistry((sqlite_plugin, first)))
+        headers = {"Content-Type": "application/zip", "X-Import-Currency": "USD"}
+        path = "/api/plugins/parser/import/"
+        async with running(app) as client:
+            pending = asyncio.create_task(client.post(path + "preview", content=b"fictional archive", headers=headers))
+            assert await asyncio.to_thread(entered.wait, 5)
+
+            async def prepare(preparation):
+                active = preparation.active.services["plugins"]
+                registry = PluginRegistry((sqlite_plugin, second))
+                return RuntimeCandidate({**preparation.active.services, "plugins": RegistryGeneration(registry, active.stable, previous=active)}, preparation.active.resources)
+
+            change = asyncio.create_task(app.state.budget_runtime.transition(prepare))
+            await app.state.budget_runtime.wait_for_phase("draining")
+            finish.set()
+            preview = (await pending).json()
+            assert preview["warnings"] == ["Original parser"]
+            assert await change == 2
+            for token in (preview["parserIdentity"], None):
+                commit_headers = {**headers, "X-Import-Fingerprint": preview["fingerprint"]}
+                if token:
+                    commit_headers["X-Import-Parser"] = token
+                response = await client.post(path + "commit", content=b"fictional archive", headers=commit_headers)
+                assert response.status_code == 409
+            assert calls == [] and store.accounts("personal") == []
+            fresh = (await client.post(path + "preview", content=b"fictional archive", headers=headers)).json()
+            assert fresh["warnings"] == ["Replacement parser"]
+            assert fresh["fingerprint"] == preview["fingerprint"] and fresh["parserIdentity"] != preview["parserIdentity"]
+
+    asyncio.run(scenario())
+
+
+def test_unrelated_live_change_keeps_parser_preview_identity(tmp_path, store, monkeypatch):
+    from whab.plugins import FileImport, WorkspaceImport
+
+    async def scenario():
+        parser = Plugin("parser", "Parser", file_import=FileImport(lambda _: WorkspaceImport((), (), (), (), "2026-10")), contract=PluginContract(lifecycle="live"))
+        extra = report("second", "New report")
+        install(monkeypatch, parser, extra)
+        app = create_app(store=store, settings=settings(tmp_path, ("parser",)), plugins=PluginRegistry((sqlite_plugin, parser)))
+        headers = {"Content-Type": "application/zip", "X-Import-Currency": "USD"}
+        path = "/api/plugins/parser/import/"
+        async with running(app) as client:
+            before = (await client.post(path + "preview", content=b"fictional archive", headers=headers)).json()
+            assert await app.state.live_plugins.activate(("parser", "second")) == 2
+            after = (await client.post(path + "preview", content=b"fictional archive", headers=headers)).json()
+            assert before["parserIdentity"] == after["parserIdentity"]
+            response = await client.post(path + "commit", content=b"fictional archive", headers={**headers,
+                "X-Import-Fingerprint": before["fingerprint"], "X-Import-Parser": before["parserIdentity"]})
+            assert response.status_code == 200
+
+    asyncio.run(scenario())
+
+
+def test_bundled_branding_and_import_enable_disable_with_captured_assets_and_upload_guards(tmp_path, store, monkeypatch):
+    import importlib
+    import re
+
+    from whab_plugin_bank_logos.plugin import plugin as logos_plugin
+    from whab_plugin_web.plugin import plugin as web_plugin
+    from whab_plugin_ynab.plugin import plugin as ynab_plugin
+
+    from whab.plugins import LogoImage
+
+    async def scenario():
+        install(monkeypatch, logos_plugin, ynab_plugin, web_plugin)
+        calls = []
+        image = LogoImage(bytes.fromhex("89504e470d0a1a0a") + b"fictional", "image/png")
+        monkeypatch.setattr(importlib.import_module("whab_plugin_bank_logos.plugin"), "fetch_logo",
+                            lambda key: calls.append(key) or image)
+        app = create_app(store=store, settings=replace(settings(tmp_path, ()), ui="web"), plugins=PluginRegistry((sqlite_plugin, web_plugin)))
+        async with running(app) as client:
+            assert await app.state.live_plugins.activate(("bank-logos", "ynab")) == 2
+            page = await client.get("/budgets/home/accounts/current-month/usd")
+            asset = re.search(r"/budgets/home/imports/ynab/[0-9a-f]{32}/static/import.js", page.text)[0]
+            assert (await client.get(asset)).status_code == 200
+            assert "X-Import-Parser" in (await client.get(asset)).text
+            # This parser was absent at app construction. ZIP recognition and
+            # its 10 MiB body policy still apply without rebuilding middleware.
+            upload = await client.post("/api/plugins/ynab/import/preview", content=b"x" * 40000,
+                                       headers={"Content-Type": "application/zip", "X-Import-Currency": "USD"})
+            assert upload.status_code == 400
+            logo = (await client.post("/api/plugins/bank-logo-preview", json={"website": "bank.example.org"})).json()
+            assert logo["available"] and (await client.get(logo["logoUrl"])).content == image.data
+            assert len(calls) == 1
+            assert await app.state.live_plugins.activate(()) == 3
+            page = await client.get("/budgets/home/accounts/current-month/usd")
+            assert 'data-file-import="ynab"' not in page.text
+            assert (await client.get(logo["logoUrl"])).status_code == 404
+            assert (await client.get(asset)).status_code == 200  # Retired HTML keeps matching immutable bytes.
+            assert await app.state.live_plugins.activate(("bank-logos", "ynab")) == 4
+            page = await client.get("/budgets/home/accounts/current-month/usd")
+            new_asset = re.search(r"/budgets/home/imports/ynab/[0-9a-f]{32}/static/import.js", page.text)[0]
+            assert new_asset != asset
+            again = (await client.post("/api/plugins/bank-logo-preview", json={"website": "bank.example.org"})).json()
+            assert again["available"] and len(calls) == 1  # Only this budget's saved artwork was reopened.
+
+    asyncio.run(scenario())
+
+
 def test_held_export_keeps_old_generation_and_new_requests_use_new_report(tmp_path, store, monkeypatch):
     async def scenario():
         entered, finish = Event(), Event()
@@ -98,7 +219,7 @@ def test_held_export_keeps_old_generation_and_new_requests_use_new_report(tmp_pa
             projection = (await client.get("/api/plugins/management")).json()
             assert projection["active"] == projection["configured"] == ["second"]
             assert not projection["restart_required"]
-            assert projection["live"]["families"] == ["reporting.insights", "reporting.export"]
+            assert projection["live"]["families"] == ["branding.bank", "branding.merchant", "ingestion.file", "reporting.export", "reporting.insights"]
             assert projection["live"]["code_upgrades"] is True
 
     asyncio.run(scenario())

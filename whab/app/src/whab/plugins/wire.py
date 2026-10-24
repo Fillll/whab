@@ -5,7 +5,7 @@ import math
 import struct
 from dataclasses import dataclass, field
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 MAX_METADATA_BYTES = 8 * 1024 * 1024
 MAX_PAYLOAD_BYTES = 50 * 1024 * 1024
 HEADER = struct.Struct("!4sHII")
@@ -17,22 +17,22 @@ class WireError(ValueError):
         super().__init__("The plugin worker sent an invalid or incompatible frame.")
 
 
-def _value(value, depth=0):
+def _value(value, depth=0, *, max_items=100000):
     if depth > 16:
         raise WireError()
     if type(value) is dict:
-        if len(value) > 100000:
+        if len(value) > max_items:
             raise WireError()
         for key, item in value.items():
             if type(key) is not str or not key or len(key) > 200:
                 raise WireError()
-            _value(key, depth + 1)
-            _value(item, depth + 1)
+            _value(key, depth + 1, max_items=max_items)
+            _value(item, depth + 1, max_items=max_items)
     elif type(value) is list:
-        if len(value) > 100000:
+        if len(value) > max_items:
             raise WireError()
         for item in value:
-            _value(item, depth + 1)
+            _value(item, depth + 1, max_items=max_items)
     elif type(value) is str:
         if len(value) > 100000 or "\x00" in value:
             raise WireError()

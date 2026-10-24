@@ -255,15 +255,16 @@ def create_router(
         ]
         context["import_panels"] = [
             {
-                "template": f"imports/{p.id}/accounts.html",
+                "template": f"imports/{p.id}/{plugins.parser_identity(p.id)}/accounts.html",
                 "id": p.id,
+                "parser_identity": plugins.parser_identity(p.id),
                 "display_name": p.display_name,
             }
             for p in plugins.file_import_plugins()
-            if p.file_import.templates is not None
+            if p.file_import.templates is not None or p.file_import.resources is not None
         ]
         context["plugin_scripts"].extend(
-            f"{asset_prefix}/imports/{panel['id']}/static/import.js?v={context['version']}"
+            f"{asset_prefix}/imports/{panel['id']}/{panel['parser_identity']}/static/import.js"
             for panel in context["import_panels"]
         )
         context["plugins"] = plugins.describe()
@@ -282,7 +283,7 @@ def create_router(
         }
         context["account_logo_provider"] = plugins.bank_logo_provider()
         merchant_providers = {
-            plugin.id for plugin in plugins.bank_plugins() if plugin.merchant_logos is not None
+            plugin.id for plugin in plugins.descriptors() if plugin.merchant_logos is not None
         }
         context["merchant_logos"] = {
             transaction["id"]: (

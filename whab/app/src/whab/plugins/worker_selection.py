@@ -1,22 +1,34 @@
-"""Host-owned activation and durable device-local references for report workers."""
+"""Host-owned activation and durable references for approved optional workers."""
 
 import hashlib
 import json
 import os
 import re
+import stat
 import tempfile
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from functools import partial
 from pathlib import Path
 
 from starlette.concurrency import run_in_threadpool
 
 from whab.budgets.runtime import RuntimeCandidate, RuntimeResource
 
-from .environments import ApprovedWheel, prepare_environment
-from .live import RegistryGeneration, live_report
+from .environments import ApprovedWheel, _lock, prepare_environment
+from .live import RegistryGeneration
 from .report_worker import ReportWorker
 from .runtime import PluginError, PluginRegistry
-from .sdk import PluginContract, valid_plugin_name
+from .sdk import (
+    BankLogos,
+    FileImport,
+    MerchantLogos,
+    PluginAction,
+    PluginSettings,
+    valid_plugin_name,
+)
+from .worker_adapters import supports_live_plugin
 
 _HASH = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -80,9 +92,47 @@ def reopen_environment(root, plugin_id, identifier):
         raise _error(plugin_id) from None
 
 
+@contextmanager
+def _reference_lock(home):
+    home = Path(home)
+    directory = home
+    for name in ("plugin-workers", "locks"):
+        directory /= name
+        if directory.is_symlink():
+            raise ValueError()
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for path in (home, directory.parent, directory):
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    with _lock(directory / "references.lock", time.monotonic() + 30):
+        yield
+
+
+def _reference_record(prepared):
+    return {"format": 1, "plugin": prepared.plugin_id, "environment": prepared.identifier,
+            "distribution": prepared.distribution, "version": prepared.version}
+
+
 def save_reference(home, prepared):
-    """One flushed atomic reference is the report-code activation decision."""
-    directory = Path(home) / "plugin-workers" / "active"
+    """Publish one flushed activation decision under the reference writer lock."""
+    with _reference_lock(home):
+        _save_reference(home, prepared)
+
+
+def _reference_directory(home):
+    directory = Path(home)
+    for name in ("plugin-workers", "active"):
+        directory /= name
+        if directory.is_symlink():
+            raise ValueError()
+    return directory
+
+
+def _save_reference(home, prepared):
+    directory = _reference_directory(home)
     # Environment preparation already owns and flushes plugin-workers. Flush
     # each reference directory before a successful decision can be reported.
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -92,8 +142,7 @@ def save_reference(home, prepared):
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
-    raw = _json({"format": 1, "plugin": prepared.plugin_id, "environment": prepared.identifier,
-                 "distribution": prepared.distribution, "version": prepared.version})
+    raw = _json(_reference_record(prepared))
     descriptor, temporary = tempfile.mkstemp(prefix=".worker-", dir=directory)
     try:
         try:
@@ -111,6 +160,100 @@ def save_reference(home, prepared):
             os.close(descriptor)
     finally:
         Path(temporary).unlink(missing_ok=True)
+
+
+def _reference_bytes(path):
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError()
+        raw = os.read(descriptor, 16385)
+        if not raw or len(raw) > 16384:
+            raise ValueError()
+        return raw
+    finally:
+        os.close(descriptor)
+
+
+def worker_reference_revision(home, plugin_id):
+    """Read a bounded opaque CAS revision, without executing the saved worker."""
+    try:
+        if not valid_plugin_name(plugin_id):
+            raise ValueError()
+        directory = _reference_directory(home)
+        return hashlib.sha256(_reference_bytes(directory / (plugin_id + ".json"))).hexdigest()
+    except Exception:
+        raise _error(plugin_id) from None
+
+
+def _preserve_reference(home, plugin_id, revision, raw):
+    directory = Path(home) / "plugin-workers"
+    for name in ("history", plugin_id):
+        directory /= name
+        if directory.is_symlink():
+            raise ValueError()
+        directory.mkdir(mode=0o700, exist_ok=True)
+        descriptor = os.open(directory.parent, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    target = directory / (revision + ".json")
+    descriptor, temporary = tempfile.mkstemp(prefix=".reference-", dir=directory)
+    try:
+        try:
+            with os.fdopen(descriptor, "wb", closefd=False) as saved:
+                saved.write(raw)
+                saved.flush()
+                os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        try:
+            os.link(temporary, target)
+        except FileExistsError:
+            if _reference_bytes(target) != raw:
+                raise ValueError()
+        descriptor = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def replace_saved_worker(home, plugin_id, approvals, *, expected_reference_sha256):
+    """Explicitly repair a CLOSED or recovery-gated budget's worker selection.
+
+    The caller owns the admission barrier: never invoke this on a running,
+    admitted budget. Only a fresh approved current-host environment is published;
+    prior immutable environments and the exact old reference are preserved.
+    """
+    try:
+        if not valid_plugin_name(plugin_id) or type(expected_reference_sha256) is not str or _HASH.fullmatch(expected_reference_sha256) is None:
+            raise ValueError()
+        home = Path(home)
+        prepared = prepare_environment(home / "plugin-workers" / "environments", plugin_id, approvals)
+        with _reference_lock(home):
+            reference = _reference_directory(home) / (plugin_id + ".json")
+            current = _reference_bytes(reference)
+            if hashlib.sha256(current).hexdigest() != expected_reference_sha256:
+                history = home / "plugin-workers" / "history"
+                if history.is_symlink() or (history / plugin_id).is_symlink():
+                    raise ValueError()
+                history = history / plugin_id / (expected_reference_sha256 + ".json")
+                if current != _json(_reference_record(prepared)) or hashlib.sha256(_reference_bytes(history)).hexdigest() != expected_reference_sha256:
+                    raise PluginError("The saved worker reference changed. Inspect it again before replacing it.",
+                                      code="worker_reference_conflict", plugin_id=plugin_id)
+            else:
+                _preserve_reference(home, plugin_id, expected_reference_sha256, current)
+            _save_reference(home, prepared)
+        return prepared
+    except PluginError:
+        raise
+    except Exception:
+        raise PluginError("The approved worker replacement could not be published. Preserve its files and inspect the saved reference before retrying.",
+                          code="worker_replacement_failed", plugin_id=plugin_id) from None
 
 
 def validate_saved_generation(live, generation):
@@ -168,16 +311,43 @@ class WorkerBinding:
     resource: RuntimeResource
 
 
-def _start(template, prepared):
-    if not live_report(template):
-        raise PluginError("Only explicitly live stateless reports support this worker adapter.",
+def _start(template, prepared, home=None):
+    if not supports_live_plugin(template):
+        raise PluginError("This optional plugin does not declare a supported live adapter.",
                           code="restart_required", plugin_id=template.id)
     worker = ReportWorker(template.id, python=prepared.python, expected_distribution=prepared.distribution,
                           expected_version=prepared.version)
-    if not worker.info["live"]:
+    try:
+        if not worker.info["live"]:
+            raise PluginError("The candidate does not declare a compatible live lifecycle.",
+                              code="restart_required", plugin_id=template.id)
+        adapters = worker.info["adapters"]
+        bank = adapters["bank_logos"]
+        if bank is not None and bank["cache"]:
+            if home is None:
+                raise _error(template.id)
+            worker.configure_cache(Path(home) / "cache" / "plugins" / template.id / "environments" / prepared.identifier)
+        resources = worker.resources() if adapters["file_import"] is not None else None
+        if adapters["file_import"] is not None and (resources is not None) != adapters["file_import"]["ui"]:
+            raise _error(template.id)
+        proxy = replace(template, insights=worker.insights if worker.info["insights"] else None,
+                        export=worker.export if worker.info["export"] else None,
+                        bank_logos=None if bank is None else BankLogos(
+                            worker.resolve, worker.fetch, configure_cache=worker.configure_cache if bank["cache"] else None,
+                            resolve_domain=partial(worker.resolve, domain=True) if bank["domain"] else None,
+                            provider_name=bank["provider_name"], provider_url=bank["provider_url"],
+                        ),
+                        merchant_logos=MerchantLogos(partial(worker.fetch, merchant=True)) if adapters["merchant_logos"] else None,
+                        file_import=FileImport(worker.parse, resources=resources) if adapters["file_import"] is not None else None,
+                        settings=None if adapters["settings"] is None else PluginSettings(
+                            lambda: worker.settings()["insights"],
+                            tuple(PluginAction(**row) for row in adapters["settings"]["actions"]), worker.settings_action,
+                        ), contract=worker.contract)
+        if not supports_live_plugin(proxy):
+            raise _error(template.id)
+    except BaseException:
         worker.close()
-        raise PluginError("The candidate report does not declare a compatible live lifecycle.",
-                          code="restart_required", plugin_id=template.id)
+        raise
 
     async def close():
         await run_in_threadpool(worker.close)
@@ -185,9 +355,6 @@ def _start(template, prepared):
             raise PluginError("The report worker still has pending cleanup.", code="worker_cleanup_pending", plugin_id=template.id)
 
     binding = WorkerBinding(prepared, worker, RuntimeResource(template.id, close))
-    proxy = replace(template, insights=worker.insights if worker.info["insights"] else None,
-                    export=worker.export if worker.info["export"] else None,
-                    contract=PluginContract(lifecycle="live"))
     return proxy, binding
 
 
@@ -210,7 +377,7 @@ def restore_workers(home, registry, existing=None):
                     prepared = reopen_environment(Path(home) / "plugin-workers" / "environments", plugin.id, value["environment"])
                     if (prepared.distribution, prepared.version) != (value["distribution"], value["version"]):
                         raise ValueError()
-                    plugin, binding = _start(plugin, prepared)
+                    plugin, binding = _start(plugin, prepared, home)
                     bindings[plugin.id] = binding
                 except Exception:
                     raise _error(plugin.id) from None
@@ -228,16 +395,16 @@ async def upgrade_report(live, home, plugin_id, approvals):
     async def prepare(preparation):
         active = preparation.active.services["plugins"]
         template = next((plugin for plugin in active.descriptors() if plugin.id == plugin_id), None)
-        if template is None or not live_report(template):
-            raise PluginError("Enable an explicitly live stateless report before upgrading it.",
+        if template is None or not supports_live_plugin(template):
+            raise PluginError("Enable an explicitly live supported optional adapter before upgrading it.",
                               code="restart_required", plugin_id=plugin_id)
         prepared = await run_in_threadpool(prepare_environment, Path(home) / "plugin-workers" / "environments",
                                           plugin_id, approvals)
-        proxy, binding = await run_in_threadpool(_start, template, prepared)
+        proxy, binding = await run_in_threadpool(_start, template, prepared, home)
         preparation.own(binding.resource)
         registry = PluginRegistry(tuple(proxy if plugin.id == plugin_id else plugin for plugin in active.descriptors()))
         bindings = {**active.workers, plugin_id: binding}
-        candidate = RegistryGeneration(registry, active.stable, bindings)
+        candidate = RegistryGeneration(registry, active.stable, bindings, previous=active)
         previous = active.workers.get(plugin_id)
         resources = tuple(resource for resource in preparation.active.resources
                           if previous is None or resource is not previous.resource)
