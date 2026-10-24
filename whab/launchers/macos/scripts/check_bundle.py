@@ -67,12 +67,13 @@ print(json.dumps({'format': 2, 'owned_roots': len(markers), 'code_aliases': len(
 
 
 class BundleCheck:
-    def __init__(self, bundle, directory):
+    def __init__(self, bundle, directory, *, storage="sqlite"):
         self.bundle = bundle
         self.resources = bundle / "Contents/Resources"
         self.python = self.resources / "python/bin/python3.14"
         self.root = directory / "launcher"
         self.runtime = directory / "runtime"
+        self.storage = storage
         self.origin = None
         self.context = None
         self.http = None
@@ -157,6 +158,11 @@ class BundleCheck:
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
+        if self.storage == "json":
+            self.runtime.mkdir(mode=0o700)
+            configuration = self.runtime / ".env"
+            configuration.write_text(f"PORT={port}\nWHAB_STORAGE=json\nWHAB_UI=web\nWHAB_PLUGINS=\n")
+            configuration.chmod(0o600)
         self.command("configure", "--runtime-home", str(self.runtime), "--port", str(port))
         first = self.command("start", "--offline")
         require(first.get("running") is True and bool(first.get("version")), "Offline first installation did not start.")
@@ -181,6 +187,11 @@ class BundleCheck:
         with self.http.open(request, timeout=15) as response:
             require(response.status == 200, "Creating the fictional manual account failed.")
         self.fictional_account()
+        if self.storage == "json":
+            require((self.runtime / "data/whab-sandbox.json").is_file()
+                    and not any((self.runtime / "data").glob("*.sqlite")),
+                    "The JSON runtime did not persist through its genuine local backend.")
+            self.checks.append("genuine local JSON persistence")
         repeated = self.command("start", "--offline")
         require(self.health(repeated)["instance"] == initial_health["instance"], "Repeated Start created another server instance.")
         self.checks.append("idempotent start")
@@ -215,12 +226,13 @@ class BundleCheck:
         self.checks.append("private state and backup permissions")
         self.verify_signature()
         self.checks.append("bundle signature preserved after lifecycle")
-        return {"ok": True, "version": first["version"], "build": first["build"], "checks": self.checks}
+        return {"ok": True, "version": first["version"], "build": first["build"], "storage": self.storage, "checks": self.checks}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", required=True, type=Path, help="Complete locally signed WHAB.app bundle.")
+    parser.add_argument("--storage", choices=("sqlite", "json"), default="sqlite", help="Reviewed local backend for the disposable runtime.")
     parser.add_argument("--keep-test-dir", action="store_true", help="Keep disposable data and private logs for diagnosis.")
     args = parser.parse_args()
     bundle = args.bundle.expanduser().resolve()
@@ -229,7 +241,7 @@ def main():
     # permits retaining diagnostics if an owned process cannot stop gracefully.
     temporary = tempfile.TemporaryDirectory(prefix="whab-bundle-check-", delete=False)
     directory = Path(temporary.name)
-    check = BundleCheck(bundle, directory)
+    check = BundleCheck(bundle, directory, storage=args.storage)
     stopped = False
     failure = None
     summary = None

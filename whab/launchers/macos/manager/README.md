@@ -128,6 +128,12 @@ holds existing private lock files for its duration; a surviving native or contro
 owner refuses the switch until cleanup finishes. The backup includes encryption and
 TLS keys; a portable `.whab` export is never used as its substitute.
 
+The reviewed local SQLite and JSON backends are supported for the original home
+and named budgets. Only scoped host manifests, indexes and copy records describe
+external references; similarly named files inside worker packages remain ordinary
+backed-up code resources. Other storage adapters, including remote authorities,
+require their own complete backup plan before a host update.
+
 An explicitly adopted `.env` symlink is supported only when it targets a private
 regular file owned by the same user. The backup contains a regular copy and keeps
 the original target path in private metadata. Special files, external mutable paths, remote storage and ordinary runtime

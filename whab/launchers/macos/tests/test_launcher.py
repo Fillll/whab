@@ -524,6 +524,70 @@ class IsolatedManagerTest(unittest.TestCase):
                 (self.home / name).write_bytes(b"fictional native or private state")
         self.assertEqual(launcher.runtime_fingerprint(destination), before)
 
+    def test_local_json_and_named_json_budget_are_complete_backup_inputs(self):
+        self.config("PORT=6412\nWHAB_STORAGE=json\n")
+        manifest = self.home / "budgets/fictional/sandbox/manifest.json"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(json.dumps({"storage": "json"}))
+        names = ("data/whab-sandbox.json", "budgets/fictional/sandbox/data/whab-sandbox.json",
+                 "storage-instances/copy/data/whab-sandbox.json", "storage-authority/authority.json")
+        for name in names:
+            path = self.home / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'{}')
+        before = launcher.runtime_fingerprint(self.home)
+        backup = self.manager.backup(self.home, self.installation())
+        destination = Path(backup["directory"]) / "runtime"
+        self.assertEqual(launcher.runtime_fingerprint(destination), before)
+        self.assertEqual((destination / manifest.relative_to(self.home)).read_bytes(), manifest.read_bytes())
+        for name in names:
+            self.assertEqual((destination / name).read_bytes(), b'{}')
+        (self.home / names[0]).write_bytes(b'{"fictional":true}')
+        self.assertNotEqual(launcher.runtime_fingerprint(self.home), before)
+
+    def test_only_scoped_host_records_describe_budget_references(self):
+        self.config()
+        _root, environment = self.code_environment("budgets/fictional/sandbox")
+        package = environment / "lib/fictional-package"
+        package.mkdir(parents=True)
+        (package / "manifest.json").write_text('["fictional package resource"]')
+        (package / "copies.json").write_text(json.dumps([{"path": str(self.base / "outside.whab")}]))
+        before = launcher.runtime_fingerprint(self.home)
+        backup = self.manager.backup(self.home, self.installation())
+        destination = Path(backup["directory"]) / "runtime"
+        for name in ("manifest.json", "copies.json"):
+            self.assertEqual((destination / package.relative_to(self.home) / name).read_bytes(), (package / name).read_bytes())
+        self.assertEqual(launcher.runtime_fingerprint(destination), before)
+
+    def test_unknown_remote_and_invalid_budget_storage_refuse_before_stop(self):
+        self.config()
+        manifest = self.home / "budgets/fictional/production/manifest.json"
+        manifest.parent.mkdir(parents=True)
+        for storage in ("client", "unknown", [], {}, True):
+            manifest.write_text(json.dumps({"storage": storage}))
+            with self.subTest(storage=storage), patch.object(self.manager, "stop") as stop:
+                with self.assertRaisesRegex(launcher.LauncherError, "external storage"):
+                    self.manager.switch(self.installation())
+                stop.assert_not_called()
+        manifest.unlink()
+        (self.home / ".env").write_text("PORT=6412\nWHAB_STORAGE=client\n")
+        with patch.object(self.manager, "stop") as stop:
+            with self.assertRaisesRegex(launcher.LauncherError, "external storage"):
+                self.manager.switch(self.installation())
+            stop.assert_not_called()
+
+    def test_budget_scope_links_are_refused_before_metadata_is_read(self):
+        self.config()
+        outside = self.base / "outside"
+        outside.mkdir()
+        budgets = self.home / "budgets"
+        budgets.mkdir()
+        link = budgets / "fictional"
+        link.symlink_to(outside, target_is_directory=True)
+        with patch.object(launcher, "read_json", side_effect=AssertionError("Do not read linked budget metadata")):
+            with self.assertRaisesRegex(launcher.LauncherError, "symbolic links"):
+                launcher.runtime_references(self.home)
+
     def test_default_and_named_budget_code_aliases_are_archived_without_following(self):
         self.config("PORT=6412\n")
         external = self.base / "outside/python3.14"

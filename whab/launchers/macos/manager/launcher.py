@@ -38,6 +38,7 @@ MAX_DOWNLOAD = 128 * 1024 * 1024
 MAX_EXTRACTED = 512 * 1024 * 1024
 DEFAULT_ROOT = Path.home() / "Library/Application Support/WHAB/launcher"
 BACKUP_FORMAT = 2
+LOCAL_STORAGE = {"sqlite", "json"}
 RUNTIME_NAMES = {".env", "plugins.json", "data", "budgets", "tls", "cache",
                  "plugin-workers", "visual-ui", "remote-client", "storage-authority", "storage-instances"}
 SOURCE_PRIVATE = RUNTIME_NAMES | {".venv", ".git", "work", "build", "dist"}
@@ -347,17 +348,39 @@ def runtime_references(home):
             path = Path(values[key]).expanduser()
             references.append(path if path.is_absolute() else home / path)
     references.extend(Path(value).expanduser() for value in values.get("WHAB_BUDGET_COPIES", "").split(os.pathsep) if value)
-    if values.get("WHAB_STORAGE", "sqlite") != "sqlite":
+    if values.get("WHAB_STORAGE", "sqlite") not in LOCAL_STORAGE:
         raise LauncherError("external_runtime", "This runtime uses external storage. Back up that storage and update it manually.")
-    for pattern in ("index-*.json", "**/copies.json"):
-        for path in (home / "budgets").glob(pattern):
+    budgets = home / "budgets"
+    if budgets.is_symlink():
+        raise LauncherError("external_runtime", "Runtime budget directories must not be symbolic links.")
+    scopes = []
+    for budget in sorted(budgets.iterdir()) if budgets.is_dir() else ():
+        if budget.is_symlink():
+            raise LauncherError("external_runtime", "Runtime budget directories must not be symbolic links.")
+        if budget.is_dir():
+            for environment in ("sandbox", "production"):
+                scope = budget / environment
+                if scope.is_symlink():
+                    raise LauncherError("external_runtime", "Runtime budget directories must not be symbolic links.")
+                if scope.is_dir():
+                    scopes.append(scope)
+    # Only host-owned records describe budget references. Package resources
+    # inside a worker environment can also be named manifest.json/copies.json.
+    for paths in (budgets.glob("index-*.json"), (scope / "copies.json" for scope in scopes)):
+        for path in paths:
+            if not path.exists() and not path.is_symlink():
+                continue
             entries = read_json(path, [])
             if not isinstance(entries, list) or any(not isinstance(entry, dict) or not isinstance(entry.get("path"), str) for entry in entries):
                 raise LauncherError("invalid_runtime", "A saved budget location record could not be validated for backup.")
             references.extend(Path(entry["path"]).expanduser() for entry in entries)
-    for path in (home / "budgets").glob("**/manifest.json"):
+    for scope in scopes:
+        path = scope / "manifest.json"
+        if not path.exists() and not path.is_symlink():
+            continue
         manifest = read_json(path, {})
-        if not isinstance(manifest, dict) or manifest.get("storage", "sqlite") != "sqlite":
+        if (not isinstance(manifest, dict) or type(manifest.get("storage", "sqlite")) is not str
+                or manifest.get("storage", "sqlite") not in LOCAL_STORAGE):
             raise LauncherError("external_runtime", "A budget uses external storage. Back up that storage and update it manually.")
     if any(not path.is_absolute() or not path.resolve().is_relative_to(home.resolve()) for path in references):
         raise LauncherError("external_runtime", "This runtime references budgets, copies, or TLS files outside its home. Move those files and settings into the runtime home, or make a complete backup and update manually.")
