@@ -90,7 +90,7 @@ def _require_storage(manifest):
 
 
 def decode_container(raw, password=None):
-    """Read v1 ledgers or v2 plugin payloads, returning normalized manifest v1."""
+    """Read legacy ledgers, v2 namespaces, and explicitly versioned v3 state."""
     if type(raw) is not bytes or not raw or len(raw) > MAX_BUNDLE_BYTES:
         raise StoreError("Choose a WHAB budget no larger than 50 MiB.")
     try:
@@ -99,17 +99,20 @@ def decode_container(raw, password=None):
             manifest = _json(_read(archive, archive.getinfo("manifest.json")))
             if type(manifest) is not dict or type(manifest.get("formatVersion")) is not int:
                 raise ValueError()
-            if manifest["formatVersion"] == 1:
+            if manifest["formatVersion"] == 1 or (manifest["formatVersion"] == 3 and "ledger.json" in archive.namelist()):
                 legacy_manifest, ledger = decode_bundle(raw)
                 return BudgetContainer(legacy_manifest, {}, legacy_ledger=ledger)
-            if manifest["formatVersion"] != 2:
+            if manifest["formatVersion"] not in {2, 3}:
                 raise ValueError()
             if type(manifest.get("plugins")) is not list:
                 raise ValueError()
             normalized = copy.deepcopy(manifest)
-            normalized["formatVersion"] = 1
+            normalized["formatVersion"] = 1 if manifest["formatVersion"] == 2 else 3
             for plugin in normalized["plugins"]:
-                if type(plugin) is not dict or plugin.keys() != {"id", "enabled", "apiVersion"}:
+                keys = {"id", "enabled", "apiVersion"}
+                if normalized["formatVersion"] == 3:
+                    keys.add("stateVersion")
+                if type(plugin) is not dict or plugin.keys() != keys:
                     raise ValueError()
                 plugin.update(settings={}, state={})
             normalized = validate_manifest(normalized)
@@ -149,7 +152,7 @@ def decode_container(raw, password=None):
 
 
 def encode_container(manifest, files, credential_blob=None):
-    """Write v2 metadata and opaque files without serializing executable code."""
+    """Write v2 or v3 metadata and opaque files without executable serialization."""
     manifest = validate_manifest(manifest)
     _require_storage(manifest)
     if not isinstance(files, Mapping):
@@ -163,7 +166,7 @@ def encode_container(manifest, files, credential_blob=None):
             raise StoreError("Plugin container files must belong to their declared namespace.")
         payloads[name] = value
     wire = copy.deepcopy(manifest)
-    wire["formatVersion"] = 2
+    wire["formatVersion"] = 2 if manifest["formatVersion"] == 1 else 3
     for plugin in wire["plugins"]:
         for filename, key in _METADATA.items():
             value = plugin.pop(key)

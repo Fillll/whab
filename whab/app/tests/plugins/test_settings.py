@@ -188,7 +188,7 @@ def test_settings_action_invalidates_an_in_flight_legacy_logo_fetch():
 def test_cache_owners_receive_only_their_path_and_control_fetch_expiry(tmp_path):
     calls, configured = [], []
     logos = BankLogos(lambda _: "bank", lambda _: calls.append("fetch") or LogoImage(PNG, "image/png"), configured.append)
-    registry = PluginRegistry((registration(logos=logos), registration()))
+    registry = PluginRegistry((registration(logos=logos), Plugin("other", "Other", insights=lambda _: ())))
     registry.configure_logo_caches(tmp_path)
     assert configured == [tmp_path / "cache" / "plugins" / "example"]
     for _ in range(2):
@@ -232,4 +232,6 @@ def test_active_external_plugin_category_follows_capabilities(tmp_path, monkeypa
         Plugin("importer", "Importer", file_import=FileImport(lambda _: None)),
         registration(),
     ))
-    assert [plugin_category(description.id, (), description) for description in registry.describe()] == ["interface", "storage", "ingestion", "ingestion", "insight"]
+    assert {description.id: plugin_category(description.id, (), description) for description in registry.describe()} == {
+        "ui": "interface", "storage": "storage", "bank": "ingestion", "importer": "ingestion", "example": "insight",
+    }

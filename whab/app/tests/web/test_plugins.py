@@ -100,7 +100,8 @@ def test_plugin_csv_is_scoped_escaped_and_guarded_like_core_routes(tmp_path):
             )
             assert client.get(path.replace("2026-10", "2026-13")).status_code == 400
             assert client.get(path.replace("/test/", "/disabled/")).status_code == 404
-            assert client.get("/api/plugins").json()["plugins"][0]["has_export"] is True
+            descriptions = {row["id"]: row for row in client.get("/api/plugins").json()["plugins"]}
+            assert descriptions["test"]["has_export"] is True
     finally:
         store.close()
 

@@ -50,15 +50,14 @@ def test_storage_factory_descriptor_can_be_loaded_and_selected_without_running_f
 
 def test_storage_selector_rejects_an_extra_enabled_backend_without_constructing_any():
     calls = []
-    registry = PluginRegistry(
-        (
-            Plugin("one", "First backend", storage=lambda context: calls.append("one")),
-            Plugin("two", "Second backend", storage=lambda context: calls.append("two")),
+    with pytest.raises(PluginError, match="singleton capability") as error:
+        PluginRegistry(
+            (
+                Plugin("one", "First backend", storage=lambda context: calls.append("one")),
+                Plugin("two", "Second backend", storage=lambda context: calls.append("two")),
+            )
         )
-    )
-    with pytest.raises(PluginError, match="Multiple storage plugins") as error:
-        registry.storage_plugin("one")
-    assert error.value.code == "multiple_storage_plugins"
+    assert error.value.code == "conflicting_providers"
     assert calls == []
 
 
@@ -171,12 +170,11 @@ def test_user_interface_descriptor_is_frozen_and_matches_view_builder_signature(
 
 def test_interface_selector_rejects_an_extra_enabled_interface(tmp_path):
     interface = UserInterface(tmp_path, tmp_path, build_context)
-    registry = PluginRegistry(
-        (Plugin("one", "One UI", ui=interface), Plugin("two", "Two UI", ui=interface))
-    )
-    with pytest.raises(PluginError, match="Multiple user interface plugins") as error:
-        registry.ui_plugin("one")
-    assert error.value.code == "multiple_ui_plugins"
+    with pytest.raises(PluginError, match="singleton capability") as error:
+        PluginRegistry(
+            (Plugin("one", "One UI", ui=interface), Plugin("two", "Two UI", ui=interface))
+        )
+    assert error.value.code == "conflicting_providers"
 
 
 def test_interface_selection_errors_are_distinct_and_sanitized():

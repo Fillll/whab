@@ -10,7 +10,7 @@ from uuid import uuid4
 import httpx
 
 from whab.domain.portable import validate_portable_budget
-from whab.plugins import UNSET, Plugin, StorageContext, StoreError
+from whab.plugins import UNSET, Plugin, PluginContract, StorageContext, StoreError
 
 
 def _connection(url, budget_id):
@@ -255,4 +255,5 @@ def create_storage(context: StorageContext) -> RemoteStore:
 plugin = Plugin(
     id="client", display_name="Remote budget client", storage=create_storage,
     budget_connection=connection_configuration,
+    contract=PluginContract(authority="remote"),
 )

@@ -197,7 +197,72 @@ name = "whab_plugin_my_summary"
 my-summary = "whab_plugin_my_summary:plugin"
 ```
 
-After installing the package, select **plaid** and **my-summary** in Settings, save, and restart. With no saved selection, use `WHAB_PLUGINS=plaid,my-summary` instead. Multiple environment names use commas; configured order controls insight panel order, and Settings saves its displayed order. Your package should declare a compatible WHAB dependency, for example `whab>=1.1.0,<3` for this API; using the new host management endpoints requires WHAB 1.2 or newer.
+After installing the package, select **plaid** and **my-summary** in Settings, save, and restart. With no saved selection, use `WHAB_PLUGINS=plaid,my-summary` instead. Multiple environment names use commas. From WHAB 2.22, capability dependencies run before consumers, with plugin ID breaking ties between independent plugins; discovery and selection order no longer change insight or branding precedence. Declare a compatible WHAB dependency, for example `whab>=1.1.0,<3` for the original API. The capability metadata below requires `whab>=2.22,<3`.
+
+### Versioned capabilities and saved state
+
+SDK API v1 remains supported. WHAB 2.22 adds immutable runtime metadata separately
+from Python distribution dependency resolution:
+
+```python
+from whab.plugins import Capability, Plugin, PluginContract, Requirement
+
+plugin = Plugin(
+    id="my-summary", display_name="My month summary", insights=insights,
+    contract=PluginContract(
+        provides=(Capability("my-summary.dataset", version=1),),
+        requires=(Requirement("ledger.read", min_version=1, max_version=1),),
+        lifecycle="restart", state_version=1,
+    ),
+)
+```
+
+Versions are positive integers through 65,535, and requirement bounds are
+inclusive. Each capability composes as `additive` or `singleton`. Core hook
+capabilities are inferred even with explicit metadata: a storage hook cannot hide
+its singleton `ledger.mutate` writer, and a visual hook cannot hide its singleton
+`interface.ui`. Other names include `ledger.read`, `provider.state`,
+`provider.sync`, `interface.api`, `reporting.insights`, `reporting.export`,
+`ingestion.bank`, `ingestion.file`, `branding.bank`, `branding.merchant`, and
+`categorization`. Storage may additionally advertise optional contracts such as
+`receipts`, `transfer.neutral`, and `transfer.prepare`; declarations alone are not
+conformance evidence. Existing public protocols define their method shapes.
+
+`requires` orders consumers after every selected provider of that capability;
+every provider must satisfy the accepted version range. `conflicts` names
+capabilities that cannot coexist with this plugin. The host rejects missing or
+incompatible requirements, composition disagreements, singleton conflicts and
+dependency cycles before invoking binders or factories. `load_descriptors` loads
+validated descriptors for assembling a complete candidate; `PluginRegistry` and
+`load_plugins` resolve that complete candidate.
+
+`authority` is `local`, `remote`, or `unknown`. Remote storage receives
+host-enforced bank-ingestion and local-training restrictions independently of its
+ID. Old descriptors without `contract` receive an explicit legacy adapter with
+restart-only lifecycle; a legacy `budget_connection` hook identifies remote
+authority. Other legacy storage authority is unknown, and inferred provider
+capabilities preserve API v1 compatibility without certifying optional behavior.
+Active management projections expose effective capabilities, requirements,
+authority, lifecycle declaration, saved-state version and legacy status. Disabled
+packages stay unimported and have no inferred compatibility claim.
+
+`state_version` names the current saved-state schema. `state_upgrades` contains
+directed `(source, target)` edges increasing toward it. A declared path is
+compatibility evidence, not permission to overwrite a budget. An optional
+`migrate_state(context, source, target)` synchronous callback prepares one edge
+using a detached `BudgetContext`: its own state and data files only, with settings
+read-only. Callbacks expire after that edge. The host validates every path before
+running any migrator, bounds the resulting container, and returns a candidate
+without changing the active namespace. Startup refuses an upgrade until a
+transition explicitly commits it; newer state or a missing path reports an
+actionable error. Disabled and unavailable state remains opaque.
+
+Existing manifest v1 and container v2 retain their exact schemas and readers.
+The explicit v3 upgrader adds `stateVersion` to each plugin record; old state
+starts at version 1. V3 supports both legacy neutral ledger bundles and opaque
+plugin-file containers. Reading old budgets never silently rewrites them. Live
+activation and recovery controls for committing prepared upgrades are tracked in
+the [platform execution checklist](plugin-platform.md).
 
 ## Storage backends
 

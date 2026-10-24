@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.22.0 — 2026-10-23
+
+PR: [#76](https://github.com/Fillll/whab/pull/76)
+
+- Resolve versioned plugin capabilities and dependencies deterministically before binders or factories. Reject incompatible host contracts, singleton conflicts, cycles and missing requirements; expose accurate legacy, lifecycle and authority metadata.
+- Add explicit v3 saved-state metadata while retaining manifest v1 and container v2 readers. Prepare declared state upgrades in detached namespaces with revocable callbacks; preserve disabled and unavailable payloads and reject incompatible active state.
+- Apply remote-storage credential, banking and categorization policies by authority capability. Bundle client 1.5.0 with its explicit remote declaration.
+
 ## 2.21.1 — 2026-10-18
 
 PR: [#72](https://github.com/Fillll/whab/pull/72)
