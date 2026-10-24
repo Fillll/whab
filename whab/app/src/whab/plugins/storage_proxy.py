@@ -122,7 +122,7 @@ class StorageWorkerProxy:
         try:
             evidence = worker.open(context)
         except BaseException:
-            worker.close()
+            self.close()
             raise
         if not context.read_only:
             try:
@@ -130,9 +130,7 @@ class StorageWorkerProxy:
                 self.intents.validate_current(evidence)
                 self._fenced = self.intents.snapshot()["pending"] is not None
             except BaseException:
-                worker.close()
-                if self.intents is not None:
-                    self.intents.close()
+                self.close()
                 raise
         self._before = evidence
 
@@ -308,6 +306,8 @@ class StorageWorkerProxy:
             try:
                 current = replacement.open(replace(self.context, expected_instance_id=self._before.instance_id))
                 self.intents.validate_current(current)
+                if current.role != "primary":
+                    raise StoreError("Native financial recovery requires the retained primary authority.")
                 pending = self.intents.snapshot()["pending"]
                 outcome = "unchanged"
                 if pending is not None:

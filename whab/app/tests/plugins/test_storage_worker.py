@@ -288,3 +288,30 @@ def test_storage_codec_retains_binary_and_rejects_untyped_objects():
 def test_legacy_or_remote_storage_cannot_silently_use_local_worker():
     with pytest.raises(ValueError):
         StorageWorker("client", python=sys.executable)
+
+
+@pytest.mark.parametrize("changed", ["before", "receipt", "current"])
+def test_durable_financial_receipt_cannot_validate_a_nonprimary_authority(proxy, changed):
+    from whab.plugins.storage_intents import validate_receipt
+    from whab.plugins.storage_transfer import evidence_record, read_evidence
+
+    proxy.add_account("personal", {"name": "Acknowledged primary", "type": "depository", "balance": 9})
+    row = proxy.intents.snapshot()["completed"][-1]
+    receipt = proxy.operation_receipt(row["operation_id"])
+    current = proxy.commit_evidence()
+    if changed == "before":
+        row["before"] = evidence_record(replace(read_evidence(row["before"]), role="fenced"))
+    elif changed == "receipt":
+        receipt = replace(receipt, evidence=replace(receipt.evidence, role="fenced"))
+    else:
+        current = replace(current, role="fenced")
+    with pytest.raises(StoreError, match="does not match"):
+        validate_receipt(row, receipt, current)
+
+
+def test_financial_recovery_never_resumes_an_authority_fenced_native_instance(proxy):
+    before = proxy.commit_evidence()
+    proxy.set_role("explicit-authority-owner", before, "fenced")
+    with pytest.raises(PluginError):
+        proxy.recover()
+    assert proxy.worker_recovery_required()

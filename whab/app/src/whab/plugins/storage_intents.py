@@ -57,6 +57,7 @@ def validate_receipt(row, receipt, current):
     """Require native evidence for this exact caller/operation binding."""
     before = read_evidence(row["before"])
     if (type(receipt) is not OperationReceipt or type(current) is not CommitEvidence
+            or before.role != "primary" or receipt.evidence.role != "primary" or current.role != "primary"
             or receipt.operation_id != row["operation_id"] or receipt.fingerprint != row["fingerprint"]
             or receipt.evidence.budget_id != before.budget_id or receipt.evidence.environment != before.environment
             or receipt.evidence.instance_id != before.instance_id or receipt.evidence.authority_epoch != before.authority_epoch
