@@ -888,6 +888,13 @@ def test_installer_completion_timeout_and_cancellation_stop_only_the_owned_proce
         assert kwargs["start_new_session"] is True
         process = original(arguments, **kwargs)
         processes.append(process)
+        if outcome == "timeout":
+            # Exercise timeout cleanup after the descendant actually exists;
+            # interpreter startup under load is outside this short wait.
+            deadline = time.monotonic() + 5
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert marker.exists()
         if cancel:
             original_wait = process.wait
             pending = [True]
@@ -1069,6 +1076,10 @@ def test_real_api_worker_upgrade_failed_preparation_disable_reenable_and_reopen(
         assert first.worker.healthy and not original_binding._closed
         assert app.state.budget_runtime.status()["generation"] == 2
         assert client.get(path + "/queries/accounts?workspace=personal", headers=headers).status_code == 200
+        approvals = (*local_closure, approve(wheel("2.0.0", commands=False)))
+        # Prepare the immutable artifacts before holding financial work. The
+        # barrier below measures admitted request drain, not pip/venv latency.
+        prepare_environment(configuration.home / "plugin-workers" / "environments", identifier, approvals)
         entered, finish = Event(), Event()
         original_query = original_binding.query
 
@@ -1081,7 +1092,6 @@ def test_real_api_worker_upgrade_failed_preparation_disable_reenable_and_reopen(
         with ThreadPoolExecutor(max_workers=1) as pool:
             request = pool.submit(client.get, path + "/queries/accounts?workspace=personal", headers=headers)
             assert entered.wait(5)
-            approvals = (*local_closure, approve(wheel("2.0.0", commands=False)))
             change = client.portal.start_task_soon(app.state.live_plugins.upgrade, identifier, approvals)
             client.portal.call(app.state.budget_runtime.wait_for_phase, "draining")
             assert first.worker.healthy and not original_binding._closed and not change.done()

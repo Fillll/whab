@@ -232,6 +232,7 @@ print(json.dumps({
     assert {path.name for path in (tmp_path / "visual-ui").iterdir()} == {
         "visual-selection.json", "visual-selection.json.lock",
     }
+    # An inactive host journal makes no native authority or live-worker claim.
     control = tmp_path / "plugin-workers" / "storage" / "memory"
     assert {path.relative_to(tmp_path / "plugin-workers").as_posix()
             for path in (tmp_path / "plugin-workers").rglob("*") if path.is_file()} == {
