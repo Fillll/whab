@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.3.0 — 2026-10-23
+
+PR: [#101](https://github.com/Fillll/whab/pull/101)
+
+- Support the typed live bank-provider adapter on WHAB 2.38+, retaining host-owned encryption, durable native application, signed-webhook checks and independently leased background synchronization.
+- Preserve budget and OAuth identity through explicit connection continuations, status checks, cancellation and update completion. Keep unknown exchanges blocked for reconciliation and retain existing Item identities, annotations and checkpoints across supported replacement and reopen.
+
 ## 1.2.0 — 2026-10-23
 
 PR: [#84](https://github.com/Fillll/whab/pull/84)
