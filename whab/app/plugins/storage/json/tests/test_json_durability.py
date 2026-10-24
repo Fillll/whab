@@ -31,7 +31,7 @@ def test_stable_lock_rejects_competing_writers_and_survives_replacement(json_sto
     assert child.returncode == 0
     json_store.close()
     with pytest.raises(StoreError, match="closed"):
-        json_store.commit_evidence()
+        json_store.commit_status()
     reopened = Store(json_store.path)
     reopened.close()
     reopened.close()
@@ -74,7 +74,7 @@ def test_external_change_at_handover_barrier_is_not_overwritten(json_store):
 
 
 def test_disk_full_before_replace_keeps_previous_generation_and_allows_retry(json_store, monkeypatch):
-    previous = json_store.commit_evidence()
+    previous = json_store.commit_status()
     raw = json_store.path.read_bytes()
     real_fsync = os.fsync
 
@@ -86,14 +86,14 @@ def test_disk_full_before_replace_keeps_previous_generation_and_allows_retry(jso
         _account(json_store)
     monkeypatch.setattr(os, "fsync", real_fsync)
     assert json_store.path.read_bytes() == raw
-    assert json_store.commit_evidence() == previous
+    assert json_store.commit_status() == previous
     assert not list(json_store.path.parent.glob(".whab-json-*"))
     _account(json_store)
-    assert json_store.commit_evidence()["generation"] == previous["generation"] + 1
+    assert json_store.commit_status()["generation"] == previous["generation"] + 1
 
 
 def test_disk_full_when_creating_temporary_file_preserves_committed_state(json_store, monkeypatch):
-    previous = json_store.commit_evidence()
+    previous = json_store.commit_status()
 
     def no_space(*args, **kwargs):
         raise OSError(errno.ENOSPC, "fictional disk full")
@@ -101,12 +101,12 @@ def test_disk_full_when_creating_temporary_file_preserves_committed_state(json_s
     monkeypatch.setattr("whab_plugin_json.store.tempfile.mkstemp", no_space)
     with pytest.raises(StoreError, match="previous generation"):
         _account(json_store)
-    assert json_store.commit_evidence() == previous
+    assert json_store.commit_status() == previous
 
 
 def test_failed_file_object_conversion_closes_raw_temporary_descriptor(json_store, monkeypatch):
     descriptors = set(os.listdir("/dev/fd"))
-    previous = json_store.commit_evidence()
+    previous = json_store.commit_status()
     original = os.fdopen
 
     def no_file_object(descriptor, mode, *args, **kwargs):
@@ -118,7 +118,7 @@ def test_failed_file_object_conversion_closes_raw_temporary_descriptor(json_stor
     with pytest.raises(StoreError, match="previous generation"):
         _account(json_store)
     assert set(os.listdir("/dev/fd")) == descriptors
-    assert json_store.commit_evidence() == previous
+    assert json_store.commit_status() == previous
     assert not list(json_store.path.parent.glob(".whab-json-*"))
 
 
@@ -140,7 +140,7 @@ def test_cancellation_during_lock_startup_releases_descriptor(tmp_path, monkeypa
 
 @pytest.mark.parametrize("stage", ["replaced", "directory_flushed", "published"])
 def test_post_replace_failure_is_uncertain_and_recovered_by_identity(json_store, stage):
-    previous = json_store.commit_evidence()
+    previous = json_store.commit_status()
 
     def failure(boundary):
         if boundary == stage:
@@ -149,7 +149,7 @@ def test_post_replace_failure_is_uncertain_and_recovered_by_identity(json_store,
     json_store._hook = failure
     with pytest.raises(CommitUncertain) as error:
         _account(json_store)
-    attempted = json_store.commit_evidence()
+    attempted = json_store.commit_status()
     assert attempted["status"] == "uncertain"
     assert attempted["operationId"] == error.value.operation_id
     assert attempted["generation"] == previous["generation"] + 1
@@ -160,7 +160,7 @@ def test_post_replace_failure_is_uncertain_and_recovered_by_identity(json_store,
     json_store.close()
     reopened = Store(json_store.path)
     try:
-        recovered = reopened.commit_evidence()
+        recovered = reopened.commit_status()
         assert recovered["operationId"] == attempted["operationId"]
         assert recovered["generation"] == attempted["generation"]
         assert recovered["status"] == "committed"
@@ -197,7 +197,7 @@ def test_directory_flush_failure_fences_uncertain_write(json_store, monkeypatch)
     ("replaced", True), ("directory_flushed", True), ("published", True),
 ])
 def test_process_termination_at_every_durable_commit_boundary(json_store, stage, committed):
-    previous = json_store.commit_evidence()
+    previous = json_store.commit_status()
     path = json_store.path
     json_store.close()
     script = (
@@ -214,9 +214,9 @@ def test_process_termination_at_every_durable_commit_boundary(json_store, stage,
     reopened = Store(path)
     try:
         assert len(reopened.accounts("personal")) == int(committed)
-        assert reopened.commit_evidence()["generation"] == previous["generation"] + int(committed)
+        assert reopened.commit_status()["generation"] == previous["generation"] + int(committed)
         if committed:
-            assert reopened.commit_evidence()["operationId"] != previous["operationId"]
+            assert reopened.commit_status()["operationId"] != previous["operationId"]
         _account(reopened)
     finally:
         reopened.close()
@@ -317,9 +317,9 @@ def test_control_interrupt_does_not_claim_a_rollback(json_store, boundary):
     with pytest.raises(KeyboardInterrupt):
         _account(json_store)
     if boundary == "replaced":
-        assert json_store.commit_evidence()["status"] == "uncertain"
+        assert json_store.commit_status()["status"] == "uncertain"
     else:
-        assert json_store.commit_evidence()["status"] == "committed"
+        assert json_store.commit_status()["status"] == "committed"
 
 
 def test_temporary_cleanup_failure_does_not_turn_committed_save_into_failure(json_store, monkeypatch):
@@ -332,7 +332,7 @@ def test_temporary_cleanup_failure_does_not_turn_committed_save_into_failure(jso
 
     monkeypatch.setattr(Path, "unlink", cleanup)
     _account(json_store)
-    assert json_store.commit_evidence()["status"] == "committed"
+    assert json_store.commit_status()["status"] == "committed"
 
 
 def test_new_directory_entries_are_flushed_before_file_publication(tmp_path, monkeypatch):
@@ -392,7 +392,7 @@ def test_directory_flush_failure_then_retry_does_not_adopt_undurable_anchor(tmp_
     try:
         assert seen[:2] == [tmp_path, parent]
         _account(backend)
-        assert backend.commit_evidence()["generation"] == 1
+        assert backend.commit_status()["generation"] == 1
     finally:
         backend.close()
 

@@ -5,8 +5,7 @@ from whab.plugins import validate_review_batch
 
 
 def review_transactions(store, workspace, transaction_ids, reviewed):
-    with store._lock:
-        store.db.execute("BEGIN IMMEDIATE")
+    with store._authority_write() as transaction:
         try:
             store._require_workspace(workspace)
             selected = validate_review_batch(transaction_ids, reviewed)
@@ -41,7 +40,6 @@ def review_transactions(store, workspace, transaction_ids, reviewed):
                 "UPDATE transactions SET reviewed=? WHERE workspace=? AND id IN (" + placeholders + ")",
                 [int(reviewed), workspace, *selected],
             )
-            store.db.execute("COMMIT")
+            transaction["dirty"] = True
         except BaseException:
-            store.db.execute("ROLLBACK")
             raise

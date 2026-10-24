@@ -1,12 +1,12 @@
 [project]
 name = "whab_plugin_plaid"
-version = "1.1.4"
+version = "1.2.0"
 description = "Plaid bank ingestion plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.5,<3", "httpx==0.28.1", "cryptography==50.0.2"]
+dependencies = ["whab>=2.27,<3", "httpx==0.28.1", "cryptography==50.0.2"]
 
 [project.entry-points."whab.plugins"]
 plaid = "whab_plugin_plaid.plugin:plugin"

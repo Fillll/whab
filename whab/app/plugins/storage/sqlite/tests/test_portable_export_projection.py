@@ -43,7 +43,7 @@ def previous_export(store, workspace):
     """Reference the original public restore route and exact database encoding."""
     snapshot = previous_snapshot(store, workspace)
     images = [(key, store.get_receipt(workspace, key)) for key in store.receipt_ids(workspace)]
-    clean = Store(":memory:", month=snapshot["budgetStartMonth"])
+    clean = Store(":memory:", month=snapshot["budgetStartMonth"], _authority=False)
     try:
         clean.restore_budget("personal", snapshot)
         for key, image in images:

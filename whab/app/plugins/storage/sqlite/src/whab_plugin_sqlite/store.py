@@ -31,18 +31,28 @@ from whab.domain.portable import validate_portable_budget
 from whab.domain.transactions import UNSET, transaction_rows
 from whab.domain.validation import validate_label
 
+from .authority import Authority
 from .schema import initialize_schema
 from .seeding import build_initial_state
 
 __all__ = ["Store"]
 
 
-class Store:
+class Store(Authority):
     def __init__(
-        self, database_path: str | Path = "data/whab-sandbox.sqlite", *, month: str | None = None
+        self, database_path: str | Path = "data/whab-sandbox.sqlite", *, month: str | None = None,
+        budget_id="default", environment=None, initial_role="primary", _authority=True,
     ):
+        if type(initial_role) is not str or initial_role not in {"primary", "staged", "copy"}:
+            raise StoreError("New storage requires a primary, staged or copy role.")
         self._lock = RLock()
+        self._authority_enabled = _authority
+        self._writing = None
+        self._uncertain = None
         self.database_path = str(database_path)
+        if environment is None:
+            environment = "production" if self.database_path.endswith("-production.sqlite") else "sandbox"
+        existing = self.database_path != ":memory:" and Path(database_path).is_file() and Path(database_path).stat().st_size > 0
         os.umask(0o077)
         if self.database_path != ":memory:":
             Path(database_path).parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -66,6 +76,12 @@ class Store:
                 except Exception:
                     self.db.execute("ROLLBACK")
                     raise
+        if _authority:
+            try:
+                self._authority_initialize(budget_id, environment, initial_role, existing=existing)
+            except BaseException:
+                self.db.close()
+                raise
 
     def close(self) -> None:
         with self._lock:
@@ -276,18 +292,13 @@ class Store:
         *,
         write_if: Callable[[Any], bool] | None = None,
     ) -> Any:
-        with self._lock:
-            self.db.execute("BEGIN IMMEDIATE")
-            try:
-                state = self.state(workspace)
-                result = operation(state)
-                if write_if is None or write_if(result):
-                    self._write_state(state)
-                self.db.execute("COMMIT")
-                return result
-            except Exception:
-                self.db.execute("ROLLBACK")
-                raise
+        with self._authority_write() as transaction:
+            state = self.state(workspace)
+            result = operation(state)
+            if write_if is None or write_if(result):
+                self._write_state(state)
+                transaction["dirty"] = True
+            return result
 
     def import_workspace(
         self, workspace: str, plugin_id: str, fingerprint: str, data: WorkspaceImport
@@ -606,12 +617,16 @@ class Store:
     def save_receipt(self, workspace: str, transaction_id: str, raw: bytes) -> None:
         from .receipts import save
 
-        save(self, workspace, transaction_id, raw)
+        with self._authority_write() as transaction:
+            save(self, workspace, transaction_id, raw)
+            transaction["dirty"] = True
 
     def delete_receipt(self, workspace: str, transaction_id: str) -> None:
         from .receipts import delete
 
-        delete(self, workspace, transaction_id)
+        with self._authority_write() as transaction:
+            delete(self, workspace, transaction_id)
+            transaction["dirty"] = True
 
     def transactions(self, workspace: str, month: str | None = None) -> list[dict]:
         return transaction_rows(self.state(workspace), month)

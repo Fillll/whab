@@ -16,6 +16,9 @@ import zipfile
 from email.parser import BytesParser
 from pathlib import Path
 
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
+
 ROOT = Path(__file__).resolve().parents[1]
 MINIMUM_HOST_VERSION = "2.22.0"
 MINIMUM_HOST_COMMIT = "bac249ca0e62638a40a6effc44af741c283e83d7"
@@ -100,7 +103,9 @@ def minimum_host_source(base, environment):
     archive = base / "minimum-host.tar"
     with archive.open("wb") as output:
         run(["git", "archive", "--format=tar", MINIMUM_HOST_COMMIT, "--",
-             "whab/app/src", "whab/app/pyproject.toml", "whab/app/README.md", "whab/app/LICENSE"],
+             "whab/app/src", "whab/app/pyproject.toml", "whab/app/README.md", "whab/app/LICENSE",
+             "whab/app/plugins/storage/sqlite/src", "whab/app/plugins/storage/sqlite/pyproject.toml",
+             "whab/app/plugins/storage/sqlite/README.md", "whab/app/plugins/storage/sqlite/LICENSE"],
             cwd=repository, env=environment, stdout=output)
     destination = base / "minimum-source"
     with tarfile.open(archive) as source:
@@ -109,6 +114,28 @@ def minimum_host_source(base, environment):
     if host_version(project) != MINIMUM_HOST_VERSION:
         raise ValueError("The pinned source does not match the advertised minimum host version.")
     return project
+
+
+def reference_projects(candidate, minimum):
+    """Pair each host with a genuine compatible reference from its source artifact."""
+    def supports(project, version):
+        metadata = tomllib.loads((project / "pyproject.toml").read_text())["project"]
+        requirements = [Requirement(value) for value in metadata.get("dependencies", ())]
+        hosts = [value for value in requirements if canonicalize_name(value.name) == "whab"]
+        if len(hosts) != 1 or hosts[0].marker or hosts[0].extras or hosts[0].url:
+            raise ValueError("The reference backend must declare one unconditional host compatibility range.")
+        return version in hosts[0].specifier
+
+    if not supports(candidate, host_version(ROOT)):
+        raise ValueError("The candidate reference backend does not support the candidate host.")
+    selected = candidate if supports(candidate, MINIMUM_HOST_VERSION) else minimum / "plugins/storage/sqlite"
+    if not supports(selected, MINIMUM_HOST_VERSION):
+        raise ValueError("The pinned reference backend does not support the minimum host.")
+    candidate_version = tomllib.loads((candidate / "pyproject.toml").read_text())["project"]["version"]
+    selected_version = tomllib.loads((selected / "pyproject.toml").read_text())["project"]["version"]
+    if selected != candidate and selected_version == candidate_version:
+        raise ValueError("Distinct reference backend source artifacts must have distinct versions.")
+    return {"candidate": candidate, "minimum": selected}
 
 
 def wheel_record(path):
@@ -194,25 +221,27 @@ def main(argv=None):
             toolkit = ROOT / "devtools/plugin-devkit"
             toolkit_version = tomllib.loads((toolkit / "pyproject.toml").read_text())["project"]["version"]
             sqlite = ROOT / "plugins/storage/sqlite"
-            sqlite_version = tomllib.loads((sqlite / "pyproject.toml").read_text())["project"]["version"]
             minimum = minimum_host_source(base, environment)
             candidate = copy_project(ROOT, base / "candidate-source")
             candidate_version = host_version(candidate)
             if candidate_version == MINIMUM_HOST_VERSION:
                 raise ValueError("Minimum and candidate host artifacts must represent distinct supported versions.")
+            references = reference_projects(copy_project(sqlite, base / "sqlite-source"), minimum)
             projects = (minimum, candidate, copy_project(toolkit, base / "toolkit-source"),
-                        copy_project(sqlite, base / "sqlite-source"))
+                        *dict.fromkeys(references.values()))
             wheels = base / "wheelhouse"
             for project in projects:
                 run([sys.executable, "-I", "-m", "pip", "wheel", "--disable-pip-version-check", "--no-deps",
                      "--wheel-dir", str(wheels), str(project)], cwd=base, env=environment)
             toolkit_wheel = wheel_for(wheels, "whab_plugin_devkit", toolkit_version)
-            sqlite_wheel = wheel_for(wheels, "whab_plugin_sqlite", sqlite_version)
+            sqlite_wheels = {label: wheel_for(wheels, "whab_plugin_sqlite",
+                            tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"])
+                            for label, project in references.items()}
             hosts = {"minimum": wheel_for(wheels, "whab", MINIMUM_HOST_VERSION),
                      "candidate": wheel_for(wheels, "whab", candidate_version)}
-            for host_wheel in hosts.values():
+            for label, host_wheel in hosts.items():
                 run([sys.executable, "-I", "-m", "pip", "download", "--disable-pip-version-check", "--only-binary=:all:",
-                     "--dest", str(wheels), str(host_wheel), str(toolkit_wheel), str(sqlite_wheel), *TEST_REQUIREMENTS],
+                     "--dest", str(wheels), str(host_wheel), str(toolkit_wheel), str(sqlite_wheels[label]), *TEST_REQUIREMENTS],
                     cwd=base, env=environment)
             revision = run(["git", "rev-parse", "HEAD"], cwd=ROOT, env=environment, capture_output=True, text=True).stdout.strip()
             source_dirty = bool(run(["git", "diff", "--name-only", "HEAD", "--", "src", "pyproject.toml", "README.md", "LICENSE"],
@@ -221,7 +250,7 @@ def main(argv=None):
                       "candidate_host_source_commit": revision, "candidate_host_source_dirty": source_dirty,
                       "wheels": [wheel_record(path) for path in sorted(wheels.glob("*.whl"))], "hosts": {}}
             for label in ("candidate", "minimum"):
-                report["hosts"][label] = check_host(label, hosts[label], toolkit_wheel, sqlite_wheel,
+                report["hosts"][label] = check_host(label, hosts[label], toolkit_wheel, sqlite_wheels[label],
                                                     wheels, toolkit / "tests", base, environment)
             if args.report:
                 args.report.parent.mkdir(parents=True, exist_ok=True)

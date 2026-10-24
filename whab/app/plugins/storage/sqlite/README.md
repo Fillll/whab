@@ -46,4 +46,32 @@ WHAB 2.12 can request an atomic transaction-register projection without rebuildi
 
 ## Development checks
 
+The optional version-1 `storage.authority`, `storage.commands` and `transfer.local`
+contracts persist budget/environment and instance identities, authority epoch,
+logical generation, roles, transition identities and operation receipts in additive
+runtime tables. SQLite uses `synchronous=FULL`; each ordinary mutation updates its
+generation in the same native transaction. The authority schema and its initial
+identity also publish in one transaction: interruption before that commit retains
+the original usable legacy database. Pre-existing incomplete authority metadata is
+preserved and refused. Optimized annotation/review writes retain
+their scoped financial queries and add one authority-row update. Every ordinary
+mutation rejects staged, copy, fenced or retired storage, including through an older
+open handle. Reopening retains the persisted role.
+
+Durable commands apply core validation and atomically commit financial/provider
+changes with their result receipt. Exact retries return the original result before
+checking stale generation evidence. At most 4,096 receipts are retained; an unknown
+or expired command with stale evidence fails without executing. A lost response
+after native commit fences that handle as uncertain until reopening and comparing
+its durable evidence. A failed transaction retains its previous generation.
+
+Complete local transfer requires an empty staged destination and preserves both
+workspaces, deleted history and images, import identity, exact encrypted tokens,
+associations, masks and cursors. It leaves runtime keys with the host. The host must
+validate the complete digest, fence the source and durably choose authority before
+activation with a fresh epoch. Matching transfer retries are harmless; populated or
+different destinations are refused. States exceeding the public local-transfer
+bounds are refused without restricting existing SQLite ledger writes. Runtime
+authority tables and protected records never enter the sanitized portable database.
+
 From `whab/app/`, use `.venv/bin/python -m pytest plugins/storage/sqlite/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. Documentation-only edits can use `--docs`. See [plugin contribution rules](../../README.md#test-ownership) for coverage/packaging requirements and [CHANGELOG.md](CHANGELOG.md) for the release history of these capabilities.
