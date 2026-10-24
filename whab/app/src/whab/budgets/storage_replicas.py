@@ -26,7 +26,7 @@ from whab.plugins.storage_transfer import CommitEvidence, read_storage_json
 
 from .container import MAX_CONTAINER_FILES
 from .document import MAX_BUNDLE_BYTES, MAX_MANIFEST_BYTES, digest, validate_manifest
-from .runtime import RuntimeCandidate
+from .runtime import RuntimeCandidate, RuntimeTransitionError
 from .session import _read_bytes
 from .storage_authority import AuthorityJournal, _durable_directory, _fsync_directory
 from .storage_runtime import (
@@ -618,9 +618,11 @@ class StorageReplicas:
                 if self.storage.session:
                     await asyncio.to_thread(self.storage.session.checkpoint)
                 operation["state"] = "complete"
-            except Exception:
+            except Exception as error:
                 recovery = self.storage.runtime.status()["health"] == "recovery_required"
-                operation.update(state="recovery_required" if recovery else "failed", error={"code": "promotion_failed"})
+                diagnostic = ({"code": error.code, "plugin_id": error.plugin_id, "message": str(error)}
+                              if isinstance(error, RuntimeTransitionError) else {"code": "promotion_failed"})
+                operation.update(state="recovery_required" if recovery else "failed", error=diagnostic)
                 if not recovery:
                     entry["state"] = "active"
                     await asyncio.to_thread(self._save)

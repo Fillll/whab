@@ -1,7 +1,14 @@
-<section class="bank-provider" data-bank-provider="plaid">
+<section class="bank-provider" data-bank-provider="plaid" data-bank-environment="{{ status.environment }}">
   <div class="section-title">
     <h2>Plaid connections</h2>
     <button class="button primary" data-plaid-connect {% if not status.configured %}disabled{% endif %}>{{ icon('link', 16) if icon is defined else '' }}Connect account</button>
+  </div>
+  <div class="connection-notice" data-plaid-continuation hidden>
+    <div><strong>Unfinished bank connection</strong><p>Check the original session before connecting again. An uncertain exchange must be reconciled first.</p>
+      <button class="text-link" data-plaid-check-link>Check status</button>
+      <button class="text-link" data-plaid-cancel-link>Cancel session</button>
+      <button class="text-link" data-plaid-finish-link hidden>Finish saving</button>
+    </div>
   </div>
 <div class="connection-notice">
   {{ icon('shield', 20) if icon is defined else '' }}

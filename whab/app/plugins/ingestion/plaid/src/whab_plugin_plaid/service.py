@@ -38,7 +38,7 @@ class PlaidRemoteError(Exception):
         self.code = code
 
 
-def plaid_configuration(env: dict | None = None) -> dict:
+def plaid_configuration(env: dict | None = None, *, require_key=True) -> dict:
     env = os.environ if env is None else env
     environment = env.get("PLAID_ENV", "sandbox")
     missing = []
@@ -48,7 +48,7 @@ def plaid_configuration(env: dict | None = None) -> dict:
         missing.append("PLAID_CLIENT_ID")
     if not env.get("PLAID_SECRET"):
         missing.append("PLAID_SECRET")
-    if not re.fullmatch(r"[a-fA-F0-9]{64}", env.get("TOKEN_ENCRYPTION_KEY", "")):
+    if require_key and not re.fullmatch(r"[a-fA-F0-9]{64}", env.get("TOKEN_ENCRYPTION_KEY", "")):
         missing.append("TOKEN_ENCRYPTION_KEY")
     if environment == "production" and env.get("ALLOW_LIVE_PLAID") != "true":
         missing.append("ALLOW_LIVE_PLAID")
@@ -94,6 +94,8 @@ def _base64url(value: str) -> bytes:
 
 
 class PlaidService:
+    _requires_encryption = True
+
     def __init__(
         self, store: BankStore, env: dict | None = None, client: httpx.AsyncClient | None = None,
         *, background_scope=None,
@@ -101,7 +103,7 @@ class PlaidService:
         self.store = store
         self._background_scope = background_scope
         self.env = dict(os.environ if env is None else env)
-        self.config = plaid_configuration(self.env)
+        self.config = plaid_configuration(self.env, require_key=self._requires_encryption)
         self._owns_client = client is None
         self.client = (
             client
@@ -291,7 +293,7 @@ class PlaidService:
                 raise PlaidError("Bank disconnection could not complete. Try again.") from None
 
     async def verify_webhook(self, raw_body: bytes, signed_jwt: str | None) -> bool:
-        if not self.config["plaidConfigured"]:
+        if not self.config.get("plaidConfigured", self.config.get("configured")):
             return False
         try:
             if not isinstance(signed_jwt, str) or len(signed_jwt) > 8192:
