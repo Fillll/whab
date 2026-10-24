@@ -174,12 +174,15 @@ class StorageWorkerProxy:
             replay = check_storage_operation(current, operation, previous)
             if replay is not None:
                 return replay
+            phase = "intent"
             try:
                 self._attempted = {"operation_id": operation.operation_id, "fingerprint": operation.fingerprint,
                                    "before": evidence_record(current),
                                    "request": self._scope}
                 self.intents.begin(operation, current, self._scope)
+                phase = "execute"
                 result = self._call("execute_operation", operation)
+                phase = "evidence"
                 if type(result) is not OperationResult:
                     raise StoreError("Invalid native storage operation result.")
                 current = self._call("commit_evidence")
@@ -188,15 +191,19 @@ class StorageWorkerProxy:
                 self._attempted = None
                 return result
             except PluginError as error:
-                if error.code == "storage_worker_rejected":
+                if phase == "execute" and error.code == "storage_worker_rejected":
                     try:
                         self.intents.not_committed(self._call("commit_evidence"))
-                        self._attempted = None
                     except Exception:
-                        self._unknown()
-                    raise
+                        pass
+                    else:
+                        self._attempted = None
+                        raise
+                # A failed read or receipt publication after execute returned
+                # cannot turn the original financial outcome into a rejection.
+                # Failed noncommit proof likewise retains its pending identity.
                 self._unknown()
-                raise
+                raise storage_error(self.worker.plugin_id, "storage_write_unknown") from None
             except BaseException:
                 self._unknown()
                 raise storage_error(self.worker.plugin_id, "storage_write_unknown") from None
