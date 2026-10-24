@@ -391,6 +391,12 @@ The genuine visual minimum recipe is source `a866eda580c6e363a20636785bc4b4003db
 
 `NativeRuntime` keeps its startup/HTTP deadline separate from the bounded management deadline: `transition_timeout=180` allows the host's 120-second environment preparation and subsequent handover to finish. It accepts at most 300 seconds. A terminal failed operation fails the suite immediately; the longer preparation allowance does not convert failures to passes. Each genuine host also receives a compatible JSON reference wheel from its source recipe when the current backend requires a newer host.
 
+Historical hosts may share an unchanged reference package version. The checker
+builds each source separately and reuses the first approved wheel only when every
+member's contents, modes and flags match; ZIP timestamps may differ. A conflicting
+same-identity artifact or a failed build stops validation without replacing the
+approved wheel. Exact saved artifact hashes remain the replay authority.
+
 ## Offline bank projects
 
 `whab-plugin new fictional-bank --capability bank` creates an independent typed
