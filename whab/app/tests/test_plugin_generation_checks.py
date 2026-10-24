@@ -128,7 +128,7 @@ def test_project_minimum_recipe_is_explicit_and_must_match_actual_declared_host_
 @pytest.mark.parametrize(("version", "revision"), [
     ("2.34.0", "ebbff0d464dd67c0269428a6d4a339778e21ec57"),
     ("2.36.0", "a866eda580c6e363a20636785bc4b4003db0652f"),
-    ("2.38.0", "75ede3d6639b716b7110a69b5e8ec99334842799"),
+    ("2.38.0", "dd52ec9554ee3c36395f8f2a7c1d2ab5ff00353f"),
 ])
 def test_interface_minimum_uses_its_genuine_immutable_source_recipe_without_version_rewriting(checker, tmp_path, version, revision):
     calls = []
