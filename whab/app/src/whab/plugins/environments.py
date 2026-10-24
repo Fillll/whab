@@ -36,6 +36,7 @@ from packaging.version import Version
 
 from whab import __version__
 
+from .process_environment import process_environment
 from .report_worker import ReportWorker, _stop_process_group
 from .sdk import API_VERSION, BudgetSnapshot, valid_plugin_name
 
@@ -330,10 +331,7 @@ def _candidate_cleanup(created, plugin_id, probes=()):
 
 
 def _environment():
-    password = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
-    return {key: value for key, value in os.environ.items()
-            if not key.startswith(("WHAB_", "PLAID_", "SERVER_", "CLIENT_", "PYTHON", "PIP_"))
-            and key not in {password, "TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID", "VIRTUAL_ENV"}}
+    return process_environment()
 
 
 def _run(command, deadline):
@@ -534,6 +532,8 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                             adapters = probe.info["adapters"]
                             if adapters["interface"] is not None:
                                 probe.interface()
+                            if adapters["remote_client"] is not None:
+                                probe.remote_client()
                             if adapters["ui"] is not None:
                                 from .ui_worker import readiness_arguments
 

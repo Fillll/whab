@@ -116,23 +116,54 @@ real runtime; the launcher never kills a process it did not start.
 
 After the previous owned process stops, an update copies the complete recognized
 runtime state into a new private backup: `.env`, `plugins.json`, `data/`, `budgets/`,
-`tls/`, `cache/`, root `.whab-*`/`.plugins-*` recovery files, and configured budget,
-copy and certificate paths inside the runtime home. Source files, development
+`tls/`, `cache/`, `plugin-workers/`, `visual-ui/`, `remote-client/`,
+`storage-authority/`, `storage-instances/`, root `.whab-*`/`.plugins-*` recovery
+files, and configured budget, copy and certificate paths inside the runtime home.
+This includes every native instance and copy, role/authority evidence, financial
+intent, encrypted bank continuation, model effect journal, worker selection,
+approved wheel and visual resource generation. Source files, development
 environments and build output in a mixed source/runtime home are excluded. Backup
-files are mode 600 and directories mode 700. The backup includes encryption and
+files are mode 600 and directories mode 700. After stopping the host, backup
+holds existing private lock files for its duration; a surviving native or control
+owner refuses the switch until cleanup finishes. The backup includes encryption and
 TLS keys; a portable `.whab` export is never used as its substitute.
+
+The reviewed local SQLite and JSON backends are supported for the original home
+and named budgets. Only scoped host manifests, indexes and copy records describe
+external references; similarly named files inside worker packages remain ordinary
+backed-up code resources. Other storage adapters, including remote authorities,
+require their own complete backup plan before a host update.
 
 An explicitly adopted `.env` symlink is supported only when it targets a private
 regular file owned by the same user. The backup contains a regular copy and keeps
-the original target path in private metadata. Other runtime symlinks, special
-files, external mutable paths, and remote storage require a separate complete
-backup plan; the automatic update refuses before stopping a working app.
+the original target path in private metadata. Special files, external mutable paths, remote storage and ordinary runtime
+symlinks require a separate complete backup plan; the automatic update refuses
+before stopping a working app.
+
+Backup format 2 adds a narrow exception for standard Python interpreter aliases
+and the internal `lib64 -> lib` alias inside a content-addressed worker environment
+with a matching ready manifest. The backup never follows these aliases. It stores
+their literal paths and targets as private `code_links` records, alongside every
+regular code/artifact file. No symbolic links are created in the backup. Aliases
+inside native/state directories, package links, escaping relative targets and
+unready or mismatched environment metadata remain refused.
+
+Worker environments contain absolute installation paths and are archived as
+code evidence. A backup containing one is marked `requires_environment_rebuild`;
+it cannot authorize automatic code-only rollback. Restore all native data, keys,
+selection and effect journals intact into a separate home, retain the archived
+code trees separately, and use the supported stopped repair/rebuild controls with
+reviewed matching artifacts before opening that scope. Never execute an archived
+venv or silently discard its selected version. There is no automatic environment
+rebuild or restore-over-existing operation.
 
 The transition journal and previous installation remain available if startup
 fails. **Start, Restart, and Update remain blocked after an incomplete transition**
 so they cannot execute old code against possibly migrated data. Doctor and Stop
 remain available. Code-only rollback is permitted only when a full runtime
-fingerprint proves no files changed since backup. For any data or schema change:
+format-2 fingerprint proves no files changed since backup and no immutable worker
+environment requires rebuilding. Older fingerprints cannot prove coverage of the
+new private roots. For any data or schema change:
 
 1. Stop the candidate and preserve the current runtime and transition journal.
 2. Copy the matching backup's `runtime/` into a **new, separate runtime directory**;

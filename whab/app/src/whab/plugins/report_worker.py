@@ -24,7 +24,9 @@ from .bank_adapter import BankAdapter, ProviderFailure
 from .categorization_worker import CategorizationDispatcher
 from .contracts import contract_for
 from .effect_store import decode, encode
+from .process_environment import process_environment
 from .provider_worker import MAX_PROVIDER_BYTES, ProviderDispatcher, read_provider_result
+from .remote_client_adapter import supports_remote_client
 from .runtime import PluginError, load_plugins
 from .sdk import (
     API_VERSION,
@@ -132,7 +134,7 @@ def serve(plugin_id, source, target):
     """Worker loop; diagnostics and plugin exception details never enter frames."""
     registry = load_plugins((plugin_id,)).bind_branding()
     descriptor = registry.descriptors()[0]
-    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.categorization, type(descriptor.bank) is BankAdapter, descriptor.interface and descriptor.interface.adapter, descriptor.ui)):
+    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.categorization, type(descriptor.bank) is BankAdapter, descriptor.interface and descriptor.interface.adapter, descriptor.ui, supports_remote_client(descriptor))):
         raise WireError()
     if descriptor.ui is not None:
         if not supports_live_plugin(descriptor) or descriptor.ui.render is not None:
@@ -287,12 +289,10 @@ class ReportWorker:
         if on_create is not None:
             on_create(self)
         try:
-            password_variable = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
-            env = {key: value for key, value in os.environ.items() if not key.startswith(("WHAB_", "PLAID_", "CLIENT_", "SERVER_", plugin_id.upper().replace("-", "_") + "_")) and key not in {"PYTHONPATH", "TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID"} and key != password_variable and not key.upper().endswith(("_TOKEN", "_SECRET", "_PASSWORD", "_KEY", "_AUTHORIZATION"))}
             self._process = subprocess.Popen(
                 [str(python), "-I", "-B", "-m", "whab.plugins.report_worker", plugin_id],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                env=env, bufsize=0, start_new_session=True,
+                env=process_environment(), bufsize=0, start_new_session=True,
             )
             hello = self._read(timeout)
             if hello.payload or set(hello.metadata) != {"kind", "worker", "sdk", "plugin", "distribution", "version", "host", "live", "capabilities", "insights", "export", "adapters", "contract"}:
@@ -312,8 +312,8 @@ class ReportWorker:
                     ("interface.api", adapters["interface"] is not None),
                     ("categorization", adapters["categorization"]),
                     ("interface.ui", adapters["ui"] is not None),
-
-
+                    ("ledger.read", adapters["remote_client"] is not None),
+                    ("ledger.mutate", adapters["remote_client"] is not None),
                     ('ingestion.bank', adapters['bank'] is not None),
                     ('lifecycle.background', adapters['bank'] is not None),
                 ) if enabled],
@@ -323,11 +323,19 @@ class ReportWorker:
                 raise WireError()
             if not expected_capabilities or sorted(value["capabilities"], key=lambda item: item["name"]) != expected_capabilities:
                 raise WireError()
-            if (adapters["interface"] is not None or adapters["ui"] is not None or adapters["categorization"]) and value["host"] != __version__:
+            if (adapters["interface"] is not None or adapters["ui"] is not None or adapters["categorization"] or adapters["remote_client"] is not None) and value["host"] != __version__:
                 raise WireError()
             if adapters["ui"] is not None and (value["insights"] or value["export"]):
                 raise WireError()
             self.contract = read_contract(value["contract"], value["capabilities"])
+            if adapters["remote_client"] is not None:
+                from .remote_client_adapter import read_client_record
+                from .sdk import Plugin
+
+                declaration = Plugin(plugin_id, "Remote client declaration",
+                                     storage=read_client_record(adapters["remote_client"]), contract=self.contract)
+                if not value["live"] or value["insights"] or value["export"] or not supports_remote_client(declaration):
+                    raise WireError()
             if value["live"] and (value["contract"]["legacy"] or self.contract.lifecycle != "live" or self.contract.state_version != 1 or self.contract.state_upgrades):
                 raise WireError()
             if expected_distribution is not None and value["distribution"] != expected_distribution or expected_version is not None and value["version"] != expected_version:
@@ -594,6 +602,16 @@ class ReportWorker:
             return token, value["result"], read_namespace(value["namespace"], frame.payload)
 
         return self._typed("category.call", {**arguments, "namespace": namespace}, decode, payload)
+
+    def remote_client(self):
+        from .remote_client_adapter import client_record, read_client_record
+
+        def decode(value):
+            result = read_client_record(value)
+            if client_record(result) != self.info["adapters"]["remote_client"]:
+                raise WireError()
+            return result
+        return self._typed("client.describe", {}, decode)
 
     def close(self):
         try:

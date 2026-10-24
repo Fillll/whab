@@ -21,6 +21,7 @@ from whab import __version__
 from whab.domain.errors import StoreError
 
 from .contracts import Capability, contract_for
+from .process_environment import process_environment
 from .report_worker import ReportWorker, _blocking_read
 from .runtime import PluginError, load_plugins
 from .sdk import API_VERSION, BudgetContext, StorageContext, valid_plugin_name
@@ -229,15 +230,10 @@ class StorageWorker:
         if on_create is not None:
             on_create(self)
         try:
-            password = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
-            environment = {key: value for key, value in os.environ.items()
-                           if not key.startswith(("WHAB_", "PLAID_", "CLIENT_", "SERVER_", plugin_id.upper().replace("-", "_") + "_"))
-                           and key not in {"PYTHONPATH", "TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID", password}
-                           and not key.upper().endswith(("_TOKEN", "_SECRET", "_PASSWORD", "_KEY", "_AUTHORIZATION"))}
             self._process = subprocess.Popen(
                 [str(python), "-I", "-B", "-m", "whab.plugins.storage_worker", plugin_id],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                env=environment, bufsize=0, start_new_session=True,
+                env=process_environment(), bufsize=0, start_new_session=True,
             )
             hello = self._read(timeout)
             if type(hello) is not dict or hello.keys() != {

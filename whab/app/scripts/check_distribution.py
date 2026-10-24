@@ -97,6 +97,7 @@ assert next(p for p in registry.describe() if p.id == "example").lifecycle == "l
 assert not next(p for p in registry.describe() if p.id == "example").legacy
 remote = load_plugins(("client",)).describe()[0]
 assert remote.authority == "remote" and not remote.legacy
+assert remote.lifecycle == "live"
 assert {row.name for row in remote.capabilities} == {"ledger.read", "ledger.mutate"}
 assert registry.bank_logo("Chase") == ("bank-logos", "chase")
 assert registry.bank_logo("Demo Bank") is None

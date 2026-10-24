@@ -4,13 +4,36 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.41.0 — 2026-10-23
+
+PR: [#104](https://github.com/Fillll/whab/pull/104)
+
+- Expose pure financial state, command, validation, synchronization and projection helpers through `whab.plugins.storage_model` so independent storage adapters share core rules without importing bundled persistence implementations.
+- Document detached candidate transactions, explicit time, native identities and durable publication. Preserve the separation between sanitized neutral records, protected same-device records and host-owned plugin namespaces.
+- Allow native worker code replacement independently of migration/copy capabilities while retaining bank background-work draining and native authority/evidence checks.
+
+## 2.40.0 — 2026-10-23
+
+PR: [#103](https://github.com/Fillll/whab/pull/103)
+
+- Give plugin installation, installed-artifact verification and every owned worker process one explicit environment policy. Retain only reviewed standard process variables; exclude arbitrary caller configuration and the selected budget-password alias even when it names a standard variable.
+- Preserve explicit scoped configuration through the existing worker contracts. Verify real report, SQLite and JSON child startup and cleanup with fictional configuration canaries; document that trusted Python workers retain their operating-system access.
+
+## 2.39.0 — 2026-10-23
+
+PR: [#100](https://github.com/Fillll/whab/pull/100)
+
+- Add declarative remote-client workers with host-owned HTTPS, credentials and financial validation. Drain live pause/resume and same-authority immutable code replacement while retaining the original transport and request/revision identity.
+- Durably retain bounded unknown-write intent across client restart. Explicit Finish accepts only the original validated request and CAS revision; reads, conflicts and restart never clear uncertainty or silently resubmit a new command.
+- Preserve failed candidates, exact saved worker versions and stopped same-binding repairs. Keep legacy client factories restart-required and remote authorities isolated from local ingestion and training.
+
 ## 2.38.0 — 2026-10-23
 
 PR: [#101](https://github.com/Fillll/whab/pull/101)
 
 - Add bounded bank-provider workers and approved immutable code upgrades. Keep encryption keys, native command brokerage, authorization and financial validation under host control; preserve existing connections, synchronization checkpoints and stable ledger services.
 - Bind browser Link and OAuth continuations to opaque budget/provider identities. Persist exchange intent before external work and encrypted responses plus exact native commands before application; retain uncertain outcomes without duplicate exchanges or automatic reconnects.
-- Drain generation-owned synchronization, webhooks and requests, defer retirement and authority changes during unfinished flows, and retain failed cleanup owners. Preserve unknown native outcomes after failed evidence or receipt publication instead of reporting a definite rejection.
+- Drain generation-owned synchronization, webhooks and requests, defer retirement and authority changes during unfinished flows, and retain failed cleanup owners.
 
 ## 2.37.0 — 2026-10-23
 
@@ -19,6 +42,7 @@ PR: [#102](https://github.com/Fillll/whab/pull/102)
 - Run supported local SQLite/JSON backends in bounded typed workers and replace compatible approved code after request/background draining. Preserve stable ledger/retry services, native identity/epoch/generation, namespaces, copies and exact saved worker ownership.
 - Persist caller operation identities and reconcile native receipts after lost replies. Keep unknown outcomes gated, reject history older than acknowledged evidence, and distinguish proven execute rejection from failures after dispatch or during evidence publication.
 - Add explicit stopped-host read-only repair that preserves prior code history, native roles/data and pending intents. Retain constructor/cleanup owners and defer authority changes while bank continuations remain unfinished.
+- Stage independent historical reference builds and reuse an existing approved wheel only when its complete bounded member contents and attributes match. Reject conflicting or failed builds without overwriting replay artifacts.
 
 ## 2.36.0 — 2026-10-23
 

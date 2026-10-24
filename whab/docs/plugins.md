@@ -319,6 +319,12 @@ the [platform execution checklist](plugin-platform.md).
 
 ## Storage backends
 
+From WHAB 2.41, independent adapters can use the public
+[`whab.plugins.storage_model` pure helpers](plugin-storage-model.md) for shared
+financial commands, state construction, normalized provider merges and projections.
+The adapter retains its own locks, detached candidates, native schema, atomic
+commits and durable operation evidence; the helpers do not open a backend.
+
 WHAB 2.23 adds the independently packaged [JSON backend](../app/plugins/storage/json/README.md)
 alongside SQLite. It passes the public storage conformance suites and stores its
 native ledger, receipts and encrypted provider records in one versioned file.
@@ -341,6 +347,8 @@ plugin = Plugin(id="my-storage", display_name="My storage", storage=create_stora
 Register the descriptor in its own distribution's `whab.plugins` entry points and set `WHAB_STORAGE=my-storage` for the original workspace or initial CLI budget creation. Existing portable budgets instead use the required storage ID in their manifest; Settings creates new SQLite budgets. Its synchronous factory receives `StorageContext(home: Path, environment: str, config: Mapping[str, str])`: resolved runtime home, `sandbox`/`production`, and only backend-prefixed environment keys. The context is frozen; configuration is copied read-only and excluded from its representation. It supplies no bank credentials or token-decryption key.
 
 WHAB 2.37 adds `StorageContext(read_only=True, expected_instance_id=...)` for participating local storage workers. A read-only factory must validate an existing current native schema without creating files, adopting metadata or running an upgrader; an expected instance UUID must be proved through read-only validation before any writable constructor. SQLite 1.12 and JSON 1.3 declare `storage.worker` version 1 and compatible live code replacement. The host keeps durable caller bindings, validates native receipts and gates unknown mutation outcomes until explicit evidence recovery. See [local storage workers](storage-workers.md); this adapter does not cover remote client authority or implicitly change the selected backend.
+
+WHAB 2.39 adds the data-only `RemoteLedgerClient` alternative to a callable storage factory. Declare an explicit remote/live contract and bounded protocol-1 configuration-key names owned by the plugin; values stay on the host. A descriptor worker advertises only that metadata. The host retains the exact normalized HTTPS origin, remote budget, bearer binding, transport, local revision and unresolved request identity across compatible code replacements. Pausing drains work and retires the descriptor child; re-enabling retains the same authority. Legacy callable remote factories remain restart-required. Their compatibility reexports use the public host helper `whab.plugins.remote_transport`; this transport stays in the host and is never a worker capability. See [the client lifecycle and explicit original-request completion controls](../app/plugins/storage/client/README.md).
 
 `StorageBackend` is a synchronous structural protocol. The signatures below omit `self`:
 
@@ -726,7 +734,9 @@ The bundled `server` descriptor belongs to Interface and contributes `/remote/v1
 
 The remote public protocol exposes accounts, categories, transactions, workspace projections and portable ledger snapshots. Commands support manual accounts/categories/transactions, account classification changes, transaction edits and allocations. A command includes `operation`, `workspace`, `payload`, `request_id` and `expected_revision`. Unknown operations/fields fail validation. Responses include `budgetId`, `revision` and `data`; the client verifies budget identity. Bank tokens, Item operations and synchronization cursors are outside this protocol.
 
-The server serializes public operations per budget. A stale revision returns a conflict requiring refresh and review. It retains at most 1,024 in-memory request receipts so a retry with the same ID and body can return the committed result; reusing the ID for different content fails. Revisions change on server restart, preventing a stale retry from silently replaying when receipts are lost. If a response is lost, the client preserves the pending command and requires retrying that same change before a different mutation. It reports explicit failures and never falls back to another ledger.
+The server serializes public operations per budget. A stale revision returns a conflict; reusing a request ID for different content fails. Ordinary host backends retain at most 1,024 in-memory request receipts. Participating native storage workers additionally bind the caller identity and canonical command to an atomic native receipt, which can prove an exact replay before checking the original revision. Server revisions change on restart; without a matching retained receipt, the original stale revision refuses the command. The HTTP protocol does not expose a public receipt-lookup endpoint.
+
+Declarative remote clients durably record payload-free original intent metadata before sending a mutation. A lost result blocks new writes across client restart and code replacement; reads remain available while enabled. Reads, a `409` and restart never clear an unknown result. Explicit Finish validates the original public command and submits only its exact ID, body fingerprint, authority binding and original revision; it is not automatic retry or a receipt lookup. A correlated success records completion, while a conflict retains the unknown outcome. Legacy callable clients retain their older in-memory retry path. Neither path silently falls back to another ledger.
 
 Every route requires HTTPS, including localhost and webhooks. The launcher uses native TLS and rejects plaintext rather than redirecting or trusting forwarded proxy headers. The visual application and private banking routes remain loopback-only with Host/origin checks. Only explicitly enabled `/remote/v1` protocol routes and registered signed bank-webhook paths bypass those local checks: the remote plugin requires bearer authorization and webhook providers must verify signatures before processing. TLS encryption is separate from those authentication checks. Certificate paths and explicit local CA trust are described in [usage](usage.md#local-https); exposing selected remote/webhook routes must preserve the other local restrictions. Enabling a server capability does not provide a household login system.
 
