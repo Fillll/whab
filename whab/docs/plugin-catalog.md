@@ -212,3 +212,83 @@ The exact maintained visual example and toolkit were built into approved wheels 
 Tests: `plugins/example/example-ui/tests`, `scripts/check_plugin_generation.py`.
 
 Review: [PR #99](https://github.com/Fillll/whab/pull/99).
+
+### pr100-remote-client-lifecycle
+
+Verified 2026-10-23; host `2.39.0`. Selected: `client`.
+
+Focused tests prepared separately approved synthetic descriptor wheels 1.0, 1.1 and 2.0 against the real current host closure. A missing-setting candidate preserved the active worker; compatible replacement retained the host transport, pending original command and revision, preserved the previous immutable environment and restored the exact saved version after pause/reopen. Explicit original-request completion preserved one acknowledged fictional account. Paused startup executed no descriptor, an incompatible host expectation refused before interpreter execution, and a stopped same-binding repair preserved prior ready metadata. An embedded separate installed native listener test built the real host, SQLite and server wheels outside the checkout, explicitly verified its runtime CA, observed unauthenticated 401/authenticated 200, and exercised the public host-owned remote transport with one acknowledged account. That native transport uses an explicitly supplied test CA; this does not prove stock client CLI private-CA configuration, distinct descriptor upgrades over a native listener, public receipt lookup, remote-server restart retry durability or household deployment. The canonical source suite passed before the narrow follow-ups, but its external API exact replay failed and is not certified by this record.
+
+Tests: `tests/plugins/test_remote_client_workers.py`.
+
+Review: [PR #100](https://github.com/Fillll/whab/pull/100).
+
+### pr103-explicit-child-environments
+
+Verified 2026-10-23; host `2.40.0`. Selected: `example`, `sqlite`, `json`.
+
+The exact source passed six focused cases: the explicit process allowlist and password-alias exclusion, actual report/SQLite/JSON worker startup and cleanup with fictional custom-setting canaries, scoped configuration dispatch, and the installed native HTTPS fixture. Arbitrary apparently safe names were excluded while the reviewed standard locale survived. The native fixture built its declared isolated build backend and retained failure diagnostics privately; it verified the temporary runtime CA, public authorization and an acknowledged fictional account. Earlier complete CI on the equivalent public-SDK foundation had two fixture failures that are corrected here; an interrupted local run is not a complete-pass claim. This record covers the child-environment policy and focused fixture corrections, not the final combined submission gate or household deployment. Trusted executable plugins retain operating-system access.
+
+Tests: `tests/plugins/test_process_environment.py`, `tests/plugins/test_storage_worker_faults.py::test_native_child_receives_scoped_config_without_custom_provider_or_api_environment_credentials`, `tests/plugins/test_remote_client_workers.py::test_installed_host_client_uses_native_https_verified_runtime_ca_and_public_server`.
+
+Review: [PR #103](https://github.com/Fillll/whab/pull/103).
+
+### pr102-local-storage-source
+
+Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
+
+Separate fictional SQLite and JSON primary budgets exercised typed storage workers, drained compatible upgrades, rejected candidates, pending native operation evidence, nondecreasing recovery floors, stopped repair, native lease/cleanup ownership and concurrent status reads during both authority directions. Exact frozen source passed 4924 Python cases, all fourteen plugins at 100% statement/branch coverage, 333 browser tests and 164 installed toolkit cases on each genuine minimum/current host. The canonical generated stage stopped at a sanitized API exact-replay failure after its ten native API check configurations had passed; an independent replay of all ten identical retained artifact configurations passed. The original intermittent failure remains unattributed: this record does not claim a complete canonical pass or a timeout/status-race cause. A later narrow source regression covers phase-specific execute rejection versus unknown post-dispatch evidence/receipt publication. Final integrated validation remains required.
+
+Tests: `tests/plugins/test_storage_worker.py`, `tests/plugins/test_storage_worker_faults.py`, `tests/plugins/test_storage_worker_selection.py`, `tests/web/test_storage_migration.py`, `tests/web/test_storage_replicas.py`, `scripts/check.py`.
+
+Review: [PR #102](https://github.com/Fillll/whab/pull/102).
+
+### pr102-local-storage-native-https
+
+Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
+
+Actual installed wheels outside the checkout used native HTTPS and explicit temporary CA trust; an untrusted CA was refused. Separate fictional budgets ran both SQLite-primary/JSON-copy and JSON-primary/SQLite-copy directions, never two authoritative writers in one registry. Distinct approved synthetic versions proved valid upgrade, failed candidate preservation and later upgrade. Four acknowledged accounts per direction, namespace-only revisions, bank-continuation authority deferral, copy catch-up/promotion, reverse migration, two ordinary CLI reopens, saved worker selection, opaque models/files and original containers survived. The bank guard used real encrypted continuation records with fictional capture, not a bundled provider worker or external bank connection. Exact 33-wheel hashes and scripts were retained; homes/processes were removed. This is feature evidence at the stated source, not an installed claim for subsequent source-only outcome fixes.
+
+Tests: `tests/plugins/test_storage_worker.py`, `tests/web/test_storage_migration.py`, `tests/web/test_storage_replicas.py`.
+
+Review: [PR #102](https://github.com/Fillll/whab/pull/102).
+
+### pr102-cross-host-storage-repair
+
+Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
+
+Genuine installed host 2.37 at this source and genuine host 2.38 at a28ab71cf013039e36fbf4842cb96ce7a1644de6 verified both independent backend repair directions. New-host startup refused the old approved code binding before repair without changing native/code/container bytes. Explicit stopped read-only repair retained exact native UUID/epoch/generation/digest, namespace revision, original container, prior reference bytes/history and exact lost-publication retry. Two new-host ordinary CLI reopens per backend retained three acknowledged accounts, models/settings and the saved current approved worker. Each separate named-budget startup legitimately admitted prepare_budget_files(existing=True): its exact native command fingerprint/receipt proved generation G+1 with unchanged financial digest/UUID/epoch/namespace. A new acknowledged write advanced another generation. The original overstrict assertion expecting identical generation across those distinct startup operations is preserved in the evidence; no preparation optimization was made. Both complete artifact closures, hashes, scripts and the original assertion were retained. All homes/providers were fictional; no provider connection or household deployment.
+
+Tests: `tests/plugins/test_storage_worker_selection.py`, `tests/test_budget_cli.py`.
+
+Review: [PR #102](https://github.com/Fillll/whab/pull/102).
+
+### pr101-live-bank-source
+
+Verified 2026-10-23; host `2.38.0`. Selected: `plaid`.
+
+The exact source completed the complete contribution command in GitHub CI on Python 3.14 and 3.15, including genuine minimum/current installed toolkit and generated-project tests, exact-artifact replays and installed distributions. An independent macOS run passed 5143 Python tests, all fourteen runtime plugins at 100% statement/branch coverage and 354 browser checks, then stopped during an old toolkit 0.6 API replay after its ten native checks passed; that separate failure is preserved and was not attributed to a cause. An independent installed rerun passed all ten original API replays with the exact artifact hashes and unchanged 30-second operation deadlines. Bank tests used fictional homes and mocked provider transports for typed worker operations, Item/cursor and annotation preservation, startup/cleanup ownership, active work draining, scoped OAuth flows, encrypted capture and native receipt recovery. Bundled Plaid has complete owning coverage; distinct-version native worker behavior is recorded separately with a reviewed fictional provider. No real provider connection or household deployment was used.
+
+Tests: `tests/test_bank_runtime.py`, `tests/test_bank_native.py`, `tests/test_bank_lifecycle.py`, `tests/plugins/test_provider_worker.py`, `tests/plugins/test_provider_upgrade.py`, `tests/web/test_bank_continuations.py`, `tests/budgets/test_bank_storage_barriers.py`, `plugins/ingestion/plaid/tests`, `scripts/check.py`, `GitHub Actions run 40055955522`.
+
+Review: [PR #101](https://github.com/Fillll/whab/pull/101).
+
+### pr101-native-outcome-phases
+
+Verified 2026-10-23; host `2.38.0`. Selected: `sqlite`, `json`.
+
+A separate follow-up changes only the storage proxy outcome phases and adds fourteen controlled regressions. All sixty focused SQLite/JSON proxy and native worker tests passed. A direct execution rejection permits definite noncommit only after exact unchanged native proof; intent-publication failure, failed proof, malformed evidence/receipt and post-result completion failure retain pending intent and the unknown-write fence. Controlled reproductions preserved original false-rejection evidence and verified the corrected unknown outcome. This is focused follow-up validation, distinct from the earlier source's complete CI and native bank evidence.
+
+Tests: `tests/plugins/test_storage_proxy_outcomes.py`, `tests/plugins/test_storage_worker.py`.
+
+Review: [PR #101](https://github.com/Fillll/whab/pull/101).
+
+### pr101-installed-native-bank
+
+Verified 2026-10-23; host `2.38.0`. Selected: `sqlite`, `json`, `web`.
+
+Built genuine host 2.38, SQLite 1.12, JSON 1.3 and Web 1.27 wheels from the exact source and installed them outside the checkout. Three fictional native HTTPS cases explicitly trusted only their temporary runtime CA: a reviewed offline bank provider 1.0 to failed 1.5 to 2.0 upgrade with ready-flow deferral, disable/re-enable, pending-to-posted annotations and acknowledged-write SIGKILL/stock-CLI reopen; an exchange response lost before encrypted capture with no automatic repeat after reopen; and encrypted captured native application refused by a controlled directory-permission fault, then explicitly finished using the original native command and receipt. A separately reviewed fictional JSON 1.3.1 code-only fixture preserved the native UUID/epoch/generation and captured Item/cursor while recovering the original request. Synthetic provider and JSON patch versions are test fixtures, not bundled Plaid or published backend releases. The helper was extracted candidate source alongside toolkit 0.6, not a released toolkit 0.8 claim. Exact wheel/closure hashes were retained; all owned homes/listeners were removed, and no external provider HTTP or household data was used.
+
+Tests: `installed native HTTPS v1/failed-candidate/v2 bank worker verification`, `installed native HTTPS exchange-uncertain and captured-native-apply recovery`, `ordinary stock CLI reopen after acknowledged-write process termination`.
+
+Review: [PR #101](https://github.com/Fillll/whab/pull/101).
