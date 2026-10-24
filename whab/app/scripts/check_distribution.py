@@ -303,7 +303,7 @@ def main():
                 "distribution": metadata["name"], "version": metadata["version"],
                 "module": entrypoint.split(":", 1)[0].split(".", 1)[0],
             }
-        teaching = {"example", "example-api", "example-branding", "example-file-import", "example-categorization"}
+        teaching = {"example", "example-api", "example-ui", "example-branding", "example-file-import", "example-categorization"}
         assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", *teaching}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {

@@ -24,7 +24,8 @@ jobs:
   checks:
     name: CI (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Source coverage plus every genuine-host native configuration and exact replay.
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
