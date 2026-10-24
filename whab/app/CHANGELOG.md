@@ -10,6 +10,7 @@ PR: [#104](https://github.com/Fillll/whab/pull/104)
 
 - Expose pure financial state, command, validation, synchronization and projection helpers through `whab.plugins.storage_model` so independent storage adapters share core rules without importing bundled persistence implementations.
 - Document detached candidate transactions, explicit time, native identities and durable publication. Preserve the separation between sanitized neutral records, protected same-device records and host-owned plugin namespaces.
+- Allow native worker code replacement independently of migration/copy capabilities while retaining bank background-work draining and native authority/evidence checks.
 
 ## 2.40.0 — 2026-10-23
 
