@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.8.0 — 2026-10-23
+
+PR: [#105](https://github.com/Fillll/whab/pull/105)
+
+- Add public bank conformance, a complete bank project generator and the native-bank-v1 profile. Require explicit fictional-provider approval and exercise five continuation/reopen/retry variants across SQLite and JSON with distinct peer selections and exact-artifact replay.
+- Use the genuine WHAB 2.38 BankAdapter floor while retaining the toolkit's lazy 2.22 compatibility. Include an independently packaged offline teaching provider whose owning tests call the public native HTTPS helper.
+- Build historical reference wheels in staging. Reuse an approved wheel only after complete member payload, mode and flag equivalence, and preserve its bytes when a conflicting or failed build refuses validation.
+
 ## 0.7.0 — 2026-10-23
 
 PR: [#99](https://github.com/Fillll/whab/pull/99)
