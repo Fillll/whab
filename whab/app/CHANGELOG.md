@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.40.0 — 2026-10-23
+
+PR: [#103](https://github.com/Fillll/whab/pull/103)
+
+- Give plugin installation, installed-artifact verification and every owned worker process one explicit environment policy. Retain only reviewed standard process variables; exclude arbitrary caller configuration and the selected budget-password alias even when it names a standard variable.
+- Preserve explicit scoped configuration through the existing worker contracts. Verify real report, SQLite and JSON child startup and cleanup with fictional configuration canaries; document that trusted Python workers retain their operating-system access.
+
 ## 2.39.0 — 2026-10-23
 
 PR: [#100](https://github.com/Fillll/whab/pull/100)
