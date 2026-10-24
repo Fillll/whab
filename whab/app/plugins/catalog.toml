@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "1d4aead82850cc6030f335acb39dd2202b28306b"
+documentation_ref = "8d802177a75dac33c1bc2ed5f5e394ddd30c55ec"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -215,6 +215,21 @@ scope = "The exact integrated source passed 4618 Python tests, all thirteen runt
 whab = "2.35.0"
 whab_plugin_random_forest_categorization = "1.3.0"
 
+[[verification]]
+id = "pr96-api-teaching-toolkit"
+date = "2026-10-23"
+host_version = "2.34.0"
+source_commit = "3fb26924548651901e265d88a56cce48210fa883"
+selection = ["example-api"]
+method = "source-tests"
+tests = ["devtools/plugin-devkit/tests", "plugins/example/example-api/tests", "scripts/check_plugin_generation.py", "scripts/check_distribution.py", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/96"]
+scope = "The exact source passed 4569 Python tests, all fourteen runtime plugins at 100% statement/branch coverage, 280 browser checks, installed distributions and genuine minimum/current external gates. Toolkit 0.6 passed 164 installed tests per genuine WHAB 2.22/2.34 artifact with zero skips and complete statement/branch coverage. Five generated families built outside the checkout with required packages only, passed complete owning coverage and ten distinct constrained configurations with exact-artifact replay. Native API profiles used actual CA-verified HTTPS, host authorization and financial validation, enable/disable, same-candidate immutable worker activation and saved-version reopen. API projects use their genuine 2.34 minimum; older-host runtime N/A is never an API pass. The independently packaged example-api passed its own native public conformance and ten configurations/replays. These profiles do not claim distinct-version worker upgrades, restart-durable financial retries or household deployment; all budgets and providers were fictional."
+[verification.artifacts]
+whab = "2.34.0"
+whab_plugin_devkit = "0.6.0"
+whab_plugin_example_api = "1.0.0"
+
 
 [[verification]]
 id = "pr97-visual-interface-source"
@@ -245,17 +260,34 @@ whab = "2.36.0"
 whab_plugin_web = "1.27.0"
 whab_plugin_sqlite = "1.11.0"
 
+
 [[verification]]
-id = "pr96-api-teaching-toolkit"
+id = "pr99-visual-teaching-toolkit"
 date = "2026-10-23"
-host_version = "2.34.0"
-source_commit = "3fb26924548651901e265d88a56cce48210fa883"
-selection = ["example-api"]
+host_version = "2.36.0"
+source_commit = "ea9639201c8beb9ac7a47f0963805bd80980cf77"
+selection = ["example-ui", "example-api"]
 method = "source-tests"
-tests = ["devtools/plugin-devkit/tests", "plugins/example/example-api/tests", "scripts/check_plugin_generation.py", "scripts/check_distribution.py", "scripts/check.py"]
-pull_requests = ["https://github.com/Fillll/whab/pull/96"]
-scope = "The exact source passed 4569 Python tests, all fourteen runtime plugins at 100% statement/branch coverage, 280 browser checks, installed distributions and genuine minimum/current external gates. Toolkit 0.6 passed 164 installed tests per genuine WHAB 2.22/2.34 artifact with zero skips and complete statement/branch coverage. Five generated families built outside the checkout with required packages only, passed complete owning coverage and ten distinct constrained configurations with exact-artifact replay. Native API profiles used actual CA-verified HTTPS, host authorization and financial validation, enable/disable, same-candidate immutable worker activation and saved-version reopen. API projects use their genuine 2.34 minimum; older-host runtime N/A is never an API pass. The independently packaged example-api passed its own native public conformance and ten configurations/replays. These profiles do not claim distinct-version worker upgrades, restart-durable financial retries or household deployment; all budgets and providers were fictional."
+tests = ["devtools/plugin-devkit/tests", "plugins/example/example-ui/tests", "scripts/check_plugin_generation.py", "scripts/check_distribution.py", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/99"]
+scope = "The exact source passed 4779 Python tests, all fifteen runtime plugins at 100% statement/branch coverage, 333 browser checks, installed distributions and genuine minimum/current external gates. Toolkit 0.7 passed 192 installed tests per genuine WHAB 2.22/2.36 artifact with zero skips and complete statement/branch coverage. Six generated families built outside the checkout with required packages only, passed complete owning coverage and ten distinct configurations with every exact-artifact replay on each applicable genuine host floor/current matrix. Visual projects require the actual 2.36 SDK; API projects retain their actual 2.34 floor and other families retain 2.22. Older-host runtime N/A never counts as a native execution pass. The native visual profile verifies coherent pages/resources, browser preparation acknowledgements, exact approved same-candidate activation, disable/enable and saved-selection reopen. Distinct-version visual worker upgrades and household installation are separate evidence."
 [verification.artifacts]
-whab = "2.34.0"
-whab_plugin_devkit = "0.6.0"
+whab = "2.36.0"
+whab_plugin_devkit = "0.7.0"
+whab_plugin_example_ui = "1.0.0"
 whab_plugin_example_api = "1.0.0"
+
+[[verification]]
+id = "pr99-visual-teaching-installed-example"
+date = "2026-10-23"
+host_version = "2.36.0"
+source_commit = "629f2603b7bbd8e24c42eccbe34215c3da6accbb"
+selection = ["example-ui"]
+method = "installed-wheel"
+tests = ["plugins/example/example-ui/tests", "scripts/check_plugin_generation.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/99"]
+scope = "The exact maintained visual example and toolkit were built into approved wheels and installed outside the checkout. Its two owning behavioral tests passed with complete statement/branch coverage; ten distinct native HTTPS configurations and all ten exact-artifact replays passed using temporary fictional homes and an explicit temporary CA. Minimum and candidate are the same genuine WHAB 2.36 artifact, recorded as one host row serving both roles. Public host security guards, coherent four-page resources, exact approved-candidate activation, browser preparation and reopen executed. This is a same-artifact external-author profile, not distinct-version code-upgrade or production deployment evidence."
+[verification.artifacts]
+whab = "2.36.0"
+whab_plugin_devkit = "0.7.0"
+whab_plugin_example_ui = "1.0.0"

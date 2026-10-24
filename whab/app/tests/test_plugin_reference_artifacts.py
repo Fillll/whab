@@ -54,3 +54,20 @@ def test_incompatible_pinned_reference_or_same_version_source_collision_is_rejec
     (reference / "pyproject.toml").write_text('[project]\nversion = "1.10.0"\ndependencies = ["whab>=2.21,<3"]\n')
     with pytest.raises(ValueError, match="distinct versions"):
         checker.reference_projects(current, pinned)
+
+
+@pytest.mark.parametrize("floor", ["2.34.0", "2.36.0"])
+def test_native_json_runtime_reference_uses_its_genuine_compatible_host_source(checker, tmp_path, monkeypatch, floor):
+    monkeypatch.setattr(checker, "host_version", lambda _: "2.39.0")
+    monkeypatch.setattr(checker, "MINIMUM_HOST_VERSION", floor)
+    current = project(tmp_path / "current-json", "1.3.0", "whab>=2.37,<3")
+    pinned = tmp_path / "pinned"
+    older = project(pinned / "plugins/storage/json", "1.2.0", "whab>=2.30,<3")
+    for path in (current, older):
+        metadata = path / "pyproject.toml"
+        metadata.write_text(metadata.read_text().replace("whab_plugin_sqlite", "whab_plugin_json"))
+    original = (older / "pyproject.toml").read_bytes()
+    assert checker.reference_projects(current, pinned, plugin="json") == {"candidate": current, "minimum": older}
+    assert (older / "pyproject.toml").read_bytes() == original
+    with pytest.raises(ValueError, match="reviewed native"):
+        checker.reference_projects(current, pinned, plugin="../private")
