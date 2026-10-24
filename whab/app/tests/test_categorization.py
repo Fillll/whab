@@ -189,15 +189,17 @@ def test_remote_host_trains_and_accepts_suggestions_once(store, history, tmp_pat
     import httpx
     from fastapi import FastAPI
     from whab_plugin_client.plugin import RemoteStore
-    from whab_plugin_server.plugin import create_interface
+    from whab_plugin_server.plugin import plugin as server_plugin
 
     from whab.plugins import InterfaceContext
+    from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
 
     authority = LedgerService(store, budget_id='authority')
     authority.categorization = CategorizationService(authority, (plugin,), lambda key: local_context(tmp_path, 'authority', key))
     token = 'synthetic-server-token-' + 'x' * 32
     app = FastAPI()
-    app.include_router(create_interface(InterfaceContext(authority, {'SERVER_TOKEN': token}, 'sandbox', 'authority')))
+    binding = BoundRemoteInterface(server_plugin.interface.adapter, InterfaceContext(authority, {'SERVER_TOKEN': token}, 'sandbox', 'authority'))
+    app.include_router(create_remote_router(lambda: binding))
     with TestClient(app, base_url='https://budget.example') as server:
         def handle(request):
             response = server.request(request.method, str(request.url), content=request.content,

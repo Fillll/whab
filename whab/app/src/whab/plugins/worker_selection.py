@@ -23,6 +23,7 @@ from .runtime import PluginError, PluginRegistry
 from .sdk import (
     BankLogos,
     FileImport,
+    Interface,
     MerchantLogos,
     PluginAction,
     PluginSettings,
@@ -342,7 +343,8 @@ def _start(template, prepared, home=None):
                         settings=None if adapters["settings"] is None else PluginSettings(
                             lambda: worker.settings()["insights"],
                             tuple(PluginAction(**row) for row in adapters["settings"]["actions"]), worker.settings_action,
-                        ), contract=worker.contract)
+                        ), interface=Interface(adapter=worker.interface()) if adapters["interface"] is not None else None,
+                        contract=worker.contract)
         if not supports_live_plugin(proxy):
             raise _error(template.id)
     except BaseException:
@@ -408,7 +410,18 @@ async def upgrade_report(live, home, plugin_id, approvals):
         previous = active.workers.get(plugin_id)
         resources = tuple(resource for resource in preparation.active.resources
                           if previous is None or resource is not previous.resource)
-        return RuntimeCandidate({**preparation.active.services, "plugins": candidate}, (*resources, binding.resource))
+        resources = (*resources, binding.resource)
+        services = {**preparation.active.services, "plugins": candidate}
+        if live.prepare_interfaces is not None:
+            previous_interface = preparation.active.services.get("interfaces")
+            interfaces = await run_in_threadpool(live.prepare_interfaces, candidate, previous_interface)
+            if interfaces is not previous_interface:
+                resources = tuple(resource for resource in resources if previous_interface is None or resource is not previous_interface.resource)
+                if interfaces.resource is not None:
+                    preparation.own(interfaces.resource)
+                    resources += (interfaces.resource,)
+            services["interfaces"] = interfaces
+        return RuntimeCandidate(services, resources)
 
     async def commit(candidate, _number):
         binding = candidate.services["plugins"].workers[plugin_id]

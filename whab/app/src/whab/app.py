@@ -29,6 +29,7 @@ from whab.plugins import (
     load_plugins,
 )
 from whab.plugins.contracts import contract_for
+from whab.plugins.interface_adapter import validate_interface_owners
 from whab.plugins.live import (
     LeasedPluginRegistry,
     LivePluginSelection,
@@ -49,7 +50,8 @@ from whab.storage.bank import BankStore
 from whab.web.errors import install_error_handlers
 from whab.web.import_resources import ImportResourceLoader
 from whab.web.import_resources import create_router as import_resources_router
-from whab.web.middleware import install_middleware
+from whab.web.interface_adapter import create_remote_router, prepare_interfaces
+from whab.web.middleware import RequireHTTPS, install_middleware
 from whab.web.routes.banks import create_router as banks_router
 from whab.web.routes.file_imports import create_router as file_imports_router
 from whab.web.routes.health import create_router as health_router
@@ -140,6 +142,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         settings = replace(settings, storage=budget_session.manifest["storage"], plugins=tuple(name for name in budget_session.selection if name in installed))
     budget_host = budget_host or BudgetHost(settings)
     plugins = plugins if plugins is not None else load_plugins(settings.enabled_plugins())
+    validate_interface_owners(plugins.descriptors())
     nonlive = {plugin.id for plugin in plugins.descriptors() if not (supports_live_plugin(plugin) or live_categorizer(plugin))}
     if budget_session:
         check_saved_states(budget_session.manifest, plugins.descriptors())
@@ -247,11 +250,32 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         if owned_store:
             close_storage(store)
         raise
+    def interface_context(identifier):
+        # A portable budget may never choose this machine's bearer credential,
+        # even when an adapter uses an unconventional configuration-key name.
+        return InterfaceContext(service=service, config=settings.plugin_configuration(identifier),
+            environment=settings.plaid_env, budget_id=service.budget_id,
+            budget=budget_session.context(identifier) if budget_session else None)
+
+    try:
+        interfaces = prepare_interfaces(plugins, interface_context)
+    except BaseException:
+        for binding in reversed(tuple(worker_bindings.values())):
+            binding.worker.close()
+        if categorization is not None:
+            try:
+                categorization.close()
+            except Exception:
+                pass
+        if owned_store:
+            close_storage(store)
+        raise
     runtime = BudgetRuntime(service.budget_id, {
         "plugins": RegistryGeneration(plugins, workers=worker_bindings, resources_enabled=bool(ui)), "ledger": service,
-        "storage": store.store, "banks": banks, "categorization": categorization,
-    }, tuple(binding.resource for binding in worker_bindings.values()) +
-       ((categorization_resource,) if categorization_resource else ()))
+        "storage": store.store, "banks": banks, "categorization": categorization, "interfaces": interfaces,
+    }, (*tuple(binding.resource for binding in worker_bindings.values()),
+        *((categorization_resource,) if categorization_resource else ()),
+        *((interfaces.resource,) if interfaces.resource is not None else ())))
     if categorization is not None:
         service.categorization = LeasedCategorization(runtime)
         store.after_ingestion = service.categorization.after_import
@@ -260,6 +284,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     live = LivePluginSelection(runtime, plugin_manager.required, installed_entrypoints,
                                plugin_manager.persist_live, budget_session, nonlive, worker_home)
     live.categorization = categorization_lifecycle
+    live.prepare_interfaces = lambda registry, previous: prepare_interfaces(registry, interface_context, previous)
     plugin_manager.live = live
     storage_runtime = StorageRuntime(settings, budget_session, store, runtime, registry,
         lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin))
@@ -343,9 +368,6 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         openapi_url=None,
         lifespan=lifespan,
     )
-    # The inner lease also covers directly used child apps. BudgetDispatch pins
-    # the same generation around every default/selected dispatch path.
-    app.add_middleware(BudgetRuntimeRequests, runtime=runtime)
     templates = Jinja2Templates(directory=ui.templates) if ui else None
     loaders = {}
     for plugin in descriptors:
@@ -377,8 +399,11 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             for plugin in import_descriptors
             for action in ("preview", "commit", "new/preview", "new/commit")
         } | {"/api/budget/open"},
-        remote=bool(plugins.interface_plugins()),
+        remote=lambda: runtime.handle("interfaces").call("enabled"),
     )
+    # Guards and routing share the same generation, including direct child apps.
+    # This pure ASGI lease lasts through the complete response body.
+    app.add_middleware(BudgetRuntimeRequests, runtime=runtime)
     install_error_handlers(app)
     app.include_router(health_router())
     if ui:
@@ -427,7 +452,13 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                                 and any(capability.name == "transfer.prepare" for capability in storage_contract.provides))
     app.include_router(budget_host.router(store, settings, budget_session, storage_config=resolved_config,
                                          storage_file_exports=storage_file_exports))
+    app.include_router(create_remote_router(
+        lambda: runtime.handle("interfaces").call("current"),
+        lambda: runtime.handle("interfaces").call("legacy_routes"),
+    ))
     for plugin in plugins.interface_plugins():
+        if plugin.interface.factory is None:
+            continue
         try:
             app.include_router(plugin.interface.factory(InterfaceContext(
                 service=service, config=plugin_config(settings, budget_session, plugin.id),
@@ -443,4 +474,5 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     if not _child:
         budget_host.register(app, budget_session)
         app.add_middleware(BudgetDispatch, host=budget_host)
+    app.add_middleware(RequireHTTPS)
     return app

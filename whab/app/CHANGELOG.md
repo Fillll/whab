@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.34.0 — 2026-10-23
+
+PR: [#92](https://github.com/Fillll/whab/pull/92)
+
+- Add the public declarative remote-ledger API adapter and generation-owned host bindings. Retain host-owned HTTPS, bearer authorization, strict commands, complete request leases and stable ledger revision/retry services through live selection changes.
+- Negotiate immutable API workers, prepare bindings before commit, revoke retired bindings and preserve the prior interface on failed configuration. Reject ambiguous route owners and portable credential injection; retain restart-only legacy factory aliases.
+- Verify actual distinct worker versions, failed candidates, disable/re-enable and reopen, security guards and categorization resource preservation in the complete contribution gate.
+
 ## 2.33.0 — 2026-10-23
 
 PR: [#91](https://github.com/Fillll/whab/pull/91)

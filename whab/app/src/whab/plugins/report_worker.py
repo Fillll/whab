@@ -125,7 +125,7 @@ def serve(plugin_id, source, target):
     """Worker loop; diagnostics and plugin exception details never enter frames."""
     registry = load_plugins((plugin_id,)).bind_branding()
     descriptor = registry.descriptors()[0]
-    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import)):
+    if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.interface and descriptor.interface.adapter)):
         raise WireError()
     entries = tuple(entry for entry in metadata.entry_points(group="whab.plugins") if entry.name == plugin_id)
     distribution = entries[0].dist
@@ -224,7 +224,7 @@ class ReportWorker:
         self._retiring = None
         try:
             password_variable = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
-            env = {key: value for key, value in os.environ.items() if not key.startswith(("WHAB_", "PLAID_", "CLIENT_", "SERVER_")) and key not in {"PYTHONPATH", "TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID"} and key != password_variable}
+            env = {key: value for key, value in os.environ.items() if not key.startswith(("WHAB_", "PLAID_", "CLIENT_", "SERVER_", plugin_id.upper().replace("-", "_") + "_")) and key not in {"PYTHONPATH", "TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID"} and key != password_variable and not key.upper().endswith(("_TOKEN", "_SECRET", "_PASSWORD", "_KEY", "_AUTHORIZATION"))}
             self._process = subprocess.Popen(
                 [str(python), "-I", "-B", "-m", "whab.plugins.report_worker", plugin_id],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -245,12 +245,15 @@ class ReportWorker:
                     ("branding.bank", adapters["bank_logos"] is not None),
                     ("branding.merchant", adapters["merchant_logos"]),
                     ("ingestion.file", adapters["file_import"] is not None),
+                    ("interface.api", adapters["interface"] is not None),
                 ) if enabled],
                 key=lambda item: item["name"],
             )
             if type(value["host"]) is not str or not value["host"] or type(value["live"]) is not bool or type(value["capabilities"]) is not list or any(type(item) is not dict or set(item) != {"name", "version"} or type(item["version"]) is not int for item in value["capabilities"]):
                 raise WireError()
             if not expected_capabilities or sorted(value["capabilities"], key=lambda item: item["name"]) != expected_capabilities:
+                raise WireError()
+            if adapters["interface"] is not None and value["host"] != __version__:
                 raise WireError()
             self.contract = read_contract(value["contract"], value["capabilities"])
             if value["live"] and (value["contract"]["legacy"] or self.contract.lifecycle != "live" or self.contract.state_version != 1 or self.contract.state_upgrades):
@@ -458,6 +461,16 @@ class ReportWorker:
 
     def resources(self):
         return self._typed("file.resources", {}, lambda frame: read_resource_bundle(frame.metadata["data"], frame.payload))
+
+    def interface(self):
+        from .interface_adapter import interface_record, read_interface_record
+
+        def decode(value):
+            result = read_interface_record(value)
+            if interface_record(result) != self.info["adapters"]["interface"]:
+                raise WireError()
+            return result
+        return self._typed("interface.describe", {}, decode)
 
     def close(self):
         try:

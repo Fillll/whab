@@ -66,6 +66,20 @@ class RequestBodyLimit:
         await self.app(scope, replay, send)
 
 
+class RequireHTTPS:
+    """Reject cleartext before a runtime admission gate can delay the guard."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("scheme") != "https":
+            await JSONResponse({"error": "HTTPS is required"}, status_code=400,
+                               headers={"Cache-Control": "no-store"})(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
 def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote=False):
     webhook_paths = frozenset(webhook_paths)
     file_import_paths = frozenset(file_import_paths)
@@ -80,7 +94,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
         if request.url.scheme != "https":
             return JSONResponse({"error": "HTTPS is required"}, status_code=400, headers={"Cache-Control": "no-store"})
         webhook = request.url.path in webhook_paths
-        remote_request = remote and (request.url.path == "/remote/v1" or request.url.path.startswith("/remote/v1/"))
+        remote_request = (request.url.path == "/remote/v1" or request.url.path.startswith("/remote/v1/")) and (remote() if callable(remote) else remote)
         if not webhook and not remote_request:
             try:
                 host = urlsplit("http://" + request.headers.get("host", "")).hostname

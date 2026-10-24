@@ -17,6 +17,7 @@ from whab.services.categorization_runtime import live_categorizer
 
 from .configuration import validate_selection
 from .contracts import contract_for
+from .interface_adapter import validate_interface_owners
 from .runtime import PluginError, PluginRegistry, load_descriptors
 from .worker_adapters import LIVE_CAPABILITIES, supports_live_plugin
 from .worker_resources import capture_resources
@@ -52,6 +53,7 @@ class RegistryGeneration:
 
     def __init__(self, registry, stable=None, workers=None, previous=None, resources_enabled=None):
         self.registry = registry
+        validate_interface_owners(registry.descriptors())
         self.stable = stable or registry
         self.workers = dict(workers or {})
         self.resources_enabled = previous.resources_enabled if resources_enabled is None and previous else (True if resources_enabled is None else resources_enabled)
@@ -99,6 +101,9 @@ class RegistryGeneration:
 
     def file_import_plugins(self):
         return self.registry.file_import_plugins()
+
+    def interface_plugins(self):
+        return self.registry.interface_plugins()
 
     def parser_identity(self, plugin_id):
         parser = self._parsers.get(plugin_id)
@@ -172,6 +177,7 @@ class LivePluginSelection:
         self.nonlive = frozenset(nonlive)
         self.home = home
         self.categorization = None
+        self.prepare_interfaces = None
         self.initial_selection = frozenset(plugin.id for plugin in runtime._active.services["plugins"].descriptors()) - self.required
         self._lock = Lock()
         self._tickets = {}
@@ -220,6 +226,7 @@ class LivePluginSelection:
                          for name in sorted((self.required & set(current)) | set(selection))
                          if name not in unavailable)
         registry = PluginRegistry(selected)
+        validate_interface_owners(registry.descriptors())
         if bind:
             registry = registry.bind_branding(added)
         if self.session:
@@ -324,6 +331,12 @@ class LivePluginSelection:
         return identifier
 
     async def _activate(self, selection, ticket=None):
+        def changed_owner():
+            with self.runtime.lease() as lease:
+                current_ids = {plugin.id for plugin in lease.service("plugins").descriptors()} - self.required
+            changed = set(selection) - current_ids or current_ids - set(selection)
+            return next(iter(changed)) if len(changed) == 1 else None
+
         async def prepare(preparation):
             if ticket:
                 with self._lock:
@@ -344,7 +357,18 @@ class LivePluginSelection:
             removed = {id(binding.resource) for name, binding in active.workers.items() if name not in candidate.workers}
             resources = tuple(resource for resource in preparation.active.resources if id(resource) not in removed)
             resources += tuple(binding.resource for name, binding in candidate.workers.items() if name not in active.workers)
-            return RuntimeCandidate({**preparation.active.services, "plugins": candidate}, resources)
+            services = {**preparation.active.services, "plugins": candidate}
+            if self.prepare_interfaces is not None:
+                interfaces = await run_in_threadpool(self.prepare_interfaces, candidate, preparation.active.services.get("interfaces"))
+                previous = preparation.active.services.get("interfaces")
+                if previous is not interfaces:
+                    if interfaces.resource is not None:
+                        preparation.own(interfaces.resource)
+                    resources = tuple(resource for resource in resources if previous is None or resource is not previous.resource)
+                    if interfaces.resource is not None:
+                        resources += (interfaces.resource,)
+                services["interfaces"] = interfaces
+            return RuntimeCandidate(services, resources)
 
         async def commit(candidate, _number):
             registry = candidate.services["plugins"]
@@ -358,7 +382,10 @@ class LivePluginSelection:
             return await run_in_threadpool(self.categorization.finalize, preparation, candidate)
 
         try:
-            generation = await self.runtime.transition(prepare, finalize=finalize, commit=commit)
+            # A preceding transition may have gated admission after preflight.
+            # Never block the event loop while obtaining diagnostic ownership.
+            owner = await run_in_threadpool(changed_owner)
+            generation = await self.runtime.transition(prepare, finalize=finalize, commit=commit, plugin_id=owner)
         except (PluginError, asyncio.CancelledError) as error:
             if ticket:
                 diagnostic = ({"code": error.code, "plugin_id": error.plugin_id, "message": str(error)}

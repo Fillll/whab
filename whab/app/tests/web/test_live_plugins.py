@@ -219,7 +219,7 @@ def test_held_export_keeps_old_generation_and_new_requests_use_new_report(tmp_pa
             projection = (await client.get("/api/plugins/management")).json()
             assert projection["active"] == projection["configured"] == ["second"]
             assert not projection["restart_required"]
-            assert projection["live"]["families"] == ["branding.bank", "branding.merchant", "categorization", "ingestion.file", "reporting.export", "reporting.insights"]
+            assert projection["live"]["families"] == ["branding.bank", "branding.merchant", "categorization", "ingestion.file", "interface.api", "reporting.export", "reporting.insights"]
             assert projection["live"]["code_upgrades"] is True
 
     asyncio.run(scenario())
@@ -482,6 +482,15 @@ def test_remote_queries_are_leased_for_default_and_secondary_budgets(tmp_path, m
                 response = await client.get(path, headers=headers)
                 assert response.status_code == 200 and response.json()["budgetId"] == target
             assert observed == [("default", 1), (identifier, 1)]
+            secondary = host.applications[identifier][0]
+            await secondary.state.live_plugins.activate(("first",))
+            secondary_path = f"/remote/v1/budgets/{identifier}/queries/accounts?workspace=personal"
+            default_path = "/remote/v1/budgets/default/queries/accounts?workspace=personal"
+            assert (await client.get(secondary_path, headers=headers)).status_code == 404
+            assert (await client.get(secondary_path, headers={**headers, "Host": "foreign.invalid"})).status_code == 403
+            assert (await client.get(default_path, headers=headers)).status_code == 200
+            await secondary.state.live_plugins.activate(("first", "server"))
+            assert (await client.get(secondary_path, headers=headers)).json()["budgetId"] == identifier
 
     asyncio.run(scenario())
 

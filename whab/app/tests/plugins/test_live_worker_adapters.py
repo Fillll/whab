@@ -193,3 +193,25 @@ def test_branding_factory_is_zero_authority_and_cannot_change_identity_contract_
         with pytest.raises(ValueError) as raised:
             registry.bind_branding()
         assert raised.value.code == "branding_startup_failed" and raised.value.plugin_id == "artwork"
+
+
+def test_interface_worker_metadata_and_dispatch_are_strict_data_only():
+    from whab.plugins import Interface, RemoteLedgerInterface
+    from whab.plugins.interface_adapter import interface_record
+    from whab.plugins.worker_adapters import adapter_info, validate_adapter_info
+
+    plugin = Plugin("api", "Fictional API", interface=Interface(adapter=RemoteLedgerInterface(token_setting="API_TOKEN")), contract=PluginContract(lifecycle="live"))
+    registry = PluginRegistry((plugin,))
+    assert supports_live_plugin(plugin)
+    metadata = adapter_info(plugin)
+    assert metadata["ui"] is None
+    assert validate_adapter_info(metadata) == metadata
+    assert dispatch(registry, plugin, "interface.describe", {}, b"") == (interface_record(plugin.interface.adapter), b"")
+    legacy = replace(plugin, interface=Interface(lambda _: pytest.fail("Legacy factories must not execute in workers")))
+    assert not supports_live_plugin(legacy)
+    for selected, arguments, payload in ((plugin, {"token": "never"}, b""), (plugin, {}, b"private"), (legacy, {}, b"")):
+        with pytest.raises(WireError):
+            dispatch(registry, selected, "interface.describe", arguments, payload)
+    for change in ({"interface": {}}, {"interface": {**metadata["interface"], "commands": 1}}, {"ui": {"render": True}}):
+        with pytest.raises(ValueError):
+            validate_adapter_info({**metadata, **change})

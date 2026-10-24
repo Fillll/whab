@@ -6,18 +6,20 @@ import httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from whab_plugin_client.plugin import RemoteStore
-from whab_plugin_server.plugin import create_interface
+from whab_plugin_server.plugin import plugin as server_plugin
 
 from whab.services.ledger import LedgerService
+from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
 
 
 def test_remote_scope_changes_preserve_budget_and_portable_semantics(store):
     token = "synthetic-account-scope-token-" + "a" * 32
     app = FastAPI()
-    app.include_router(create_interface(SimpleNamespace(
+    binding = BoundRemoteInterface(server_plugin.interface.adapter, SimpleNamespace(
         service=LedgerService(store, budget_id="scope"),
         config={"SERVER_TOKEN": token}, budget_id="scope",
-    )))
+    ))
+    app.include_router(create_remote_router(lambda: binding))
     with TestClient(app, base_url="https://budget.example") as server:
         def dispatch(request):
             response = server.request(
