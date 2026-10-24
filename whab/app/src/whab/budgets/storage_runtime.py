@@ -449,12 +449,16 @@ class StorageRuntime:
             raise PluginError("Injected storage has no declared migration contract.", code="restart_required")
         plugin = self.registry.storage_plugin(identifier)
         self._supported(plugin)
+        self.check_background()
+        return plugin
+
+    def check_background(self):
+        """Require drainable bank work for either code or authority replacement."""
         for provider in self.registry.bank_plugins():
             capabilities = contract_for(provider).provides
             if not any(cap.name == "lifecycle.background" and cap.version == 1 for cap in capabilities):
-                raise PluginError("Disable or update this bank plugin before live storage migration; its background work cannot be drained.",
+                raise PluginError("Disable or update this bank plugin before replacing storage; its background work cannot be drained.",
                                   code="restart_required", plugin_id=provider.id)
-        return plugin
 
     def preview(self, destination):
         source = self._source()
