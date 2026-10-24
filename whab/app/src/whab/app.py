@@ -497,7 +497,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         @asynccontextmanager
         async def lifespan(_app):
             try:
-                for plugin in registry.bank_plugins():
+                # Startup owns these immutable descriptors while unresolved
+                # native evidence can keep ordinary runtime admission gated.
+                for plugin in plugins.bank_plugins():
                     bank = await run_in_threadpool(bank_lifecycle.create, plugin, runtime.status()["generation"],
                                                    (bank_services or {}).get(plugin.id))
                     banks[plugin.id] = bank

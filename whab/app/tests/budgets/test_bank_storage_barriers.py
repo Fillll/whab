@@ -4,11 +4,13 @@ import asyncio
 
 import pytest
 
+from tests.plugins.test_storage_upgrade_barriers import prepared_fixture
 from tests.test_bank_runtime import Provider
 from tests.web.test_live_plugins import running
 from tests.web.test_storage_migration import migrate
 from tests.web.test_storage_replicas import attach, promoted
 from whab.app import create_app
+from whab.budgets import storage_upgrade
 from whab.config import Settings
 from whab.plugins import (
     BankAdapter,
@@ -91,4 +93,52 @@ def test_idle_real_bank_flow_blocks_authority_and_terminal_cancellation_releases
                 assert result["operations"][-1]["state"] == "complete"
                 assert app.state.storage_plugin == destination
                 assert app.state.budget_runtime._active.services["banks"][descriptor.id] is bank
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("primary", ["sqlite", "json"])
+def test_real_captured_bank_command_finishes_after_same_authority_storage_worker_upgrade(tmp_path, monkeypatch, primary):
+    async def scenario():
+        descriptor = Plugin("fictional-bank", "Fictional bank", bank=BankAdapter(lambda _: pytest.fail("Use reviewed injected provider")),
+            contract=PluginContract(lifecycle="live", provides=(Capability("lifecycle.background"),)))
+        native = load_plugins((primary,)).storage_plugin(primary)
+        settings = Settings(tmp_path, 5173, "sandbox", "", "", "11" * 32, False, "", "", (descriptor.id,), ui="", storage=primary)
+        injected = {}
+        app = create_app(settings=settings, plugins=PluginRegistry((native, descriptor)), bank_services=injected)
+        tracked = app.state.tracked_store
+        provider = Provider()
+        bank = BankCoordinator(provider, tracked, BankStore(tracked, descriptor.id), budget_id="default",
+            environment="sandbox", provider_id=descriptor.id, generation=1, home=tmp_path / "fictional-flows",
+            encryption_key="11" * 32, code_identity="fictional-code-v1")
+        injected[descriptor.id] = bank
+        prepared = prepared_fixture(tmp_path, primary)
+        monkeypatch.setattr(storage_upgrade, "prepare_environment", lambda *_args, **_kwargs: prepared)
+        async with running(app) as client:
+            prefix = "/api/banks/" + descriptor.id
+            flow = (await client.post(prefix + "/link-token", json={})).json()["flow_id"]
+            execute = bank.broker.execute
+
+            def before_dispatch(_operation):
+                raise OSError("fictional dispatch never reached native backend")
+
+            monkeypatch.setattr(bank.broker, "execute", before_dispatch)
+            response = await client.post(prefix + "/exchange", json={"flowId": flow, "publicToken": "fictional-public-token"})
+            assert response.status_code == 409 and response.json()["code"] == "apply_uncertain"
+            scope = bank.journal.scope_for(flow)
+            original_request = bank.journal.native_request(scope, flow)
+            evidence, calls = tracked.commit_evidence(), list(provider.calls)
+            monkeypatch.setattr(bank, "prepare_close", lambda: pytest.fail("Code-only change must retain the captured provider"))
+            await app.state.storage_upgrade.upgrade(primary, ())
+            assert app.state.budget_runtime._active.services["banks"][descriptor.id] is bank
+            assert tracked.commit_evidence() == evidence and bank.journal.native_request(scope, flow) == original_request
+            assert provider.calls == calls
+            monkeypatch.setattr(bank.broker, "execute", execute)
+            response = await client.post(prefix + "/exchange", json={"flowId": flow})
+            assert response.status_code == 200 and response.json()["stage"] == "complete"
+            assert provider.calls == calls  # Captured exchange is never sent twice.
+            committed = tracked.commit_evidence()
+            assert committed.instance_id == evidence.instance_id and committed.authority_epoch == evidence.authority_epoch
+            assert committed.generation == evidence.generation + 1 and committed.operation_id == flow
+            assert tracked.operation_receipt(flow) is not None
+            assert bank.journal.native_request(scope, flow) == original_request
     asyncio.run(scenario())
