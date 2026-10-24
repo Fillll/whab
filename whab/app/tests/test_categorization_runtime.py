@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from dataclasses import replace
 from threading import Event
 from types import SimpleNamespace
@@ -552,3 +552,146 @@ def test_uncertain_selection_recovery_activates_only_validated_namespace(tmp_pat
             assert old.closed == int(written)
 
     asyncio.run(scenario())
+
+
+def test_unstarted_application_shutdown_releases_owned_worker_and_namespace_journal(tmp_path, store):
+    from whab_plugin_random_forest_categorization.plugin import plugin
+
+    from whab.app import create_app
+    from whab.config import Settings
+    from whab.plugins import PluginRegistry
+    from whab.plugins.categorization_worker import WorkerCategorizer
+
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (plugin.id,), ui="")
+    first = create_app(store=store, settings=settings, plugins=PluginRegistry((plugin,)))
+    engine = first.state.ledger_service.categorization.engines[plugin.id]
+    assert isinstance(engine, WorkerCategorizer)
+    worker = engine.factory.worker
+    assert worker.healthy
+    asyncio.run(first.state.budget_runtime.shutdown())
+    assert not worker.healthy and not worker.cleanup_pending
+    assert engine.closed
+    # No ASGI lifespan entered: the same process can open the same private
+    # journal again without a leaked lifetime lock or module-global engine.
+    second = create_app(store=store, settings=settings, plugins=PluginRegistry((plugin,)))
+    try:
+        assert second.state.ledger_service.categorization.engines[plugin.id].index()['models'] == []
+    finally:
+        asyncio.run(second.state.budget_runtime.shutdown())
+
+
+def test_portable_host_state_edits_join_authoritative_journal_when_disabled_and_reopen(tmp_path):
+    from fastapi.testclient import TestClient
+    from whab_plugin_random_forest_categorization.plugin import plugin
+
+    from whab.app import create_app
+    from whab.budgets.session import BudgetSession
+    from whab.config import Settings
+
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
+    session = BudgetSession.create(tmp_path, "sandbox", "Fictional worker budget", (plugin.id,))
+    app = create_app(settings=settings, budget_session=session)
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        manager = app.state.ledger_service.categorization.engines[plugin.id].factory.effects
+        manager.context(writable=True).write("unknown.bin", b"preserve exact own bytes")
+        checkpoint = []
+        session.after_checkpoint = lambda: checkpoint.append(session.path.read_bytes())
+        response = client.put(f"/api/budget/plugins/{plugin.id}", json={
+            "state": {"operatorEdit": 1}, "settings": {"label": "Fictional settings"}})
+        assert response.status_code == 200, response.text
+        assert response.json()["state"] == manager.snapshot.state == {"operatorEdit": 1}
+        assert response.json()["settings"] == {"label": "Fictional settings"}
+        assert len(checkpoint) == 1
+        response = client.post("/api/plugins/management/transition", json={"plugins": []})
+        assert response.status_code == 202
+        async def settle():
+            if app.state.live_plugins._tasks:
+                await asyncio.gather(*tuple(app.state.live_plugins._tasks), return_exceptions=True)
+        client.portal.call(settle)
+        assert not app.state.ledger_service.categorization.enabled()
+        response = client.put(f"/api/budget/plugins/{plugin.id}", json={"state": {"operatorEdit": 2}})
+        assert response.status_code == 200, response.text
+        assert response.json()["state"] == manager.snapshot.state == {"operatorEdit": 2}
+        assert response.json()["settings"] == {"label": "Fictional settings"}
+        assert manager.snapshot.files["unknown.bin"] == b"preserve exact own bytes"
+        raw = manager.journal.store.path.read_bytes()
+        invalid = client.put(f"/api/budget/plugins/{plugin.id}", json={"state": {"operatorEdit": 3},
+            "settings": {"accessToken": "forbidden-fictional-secret"}})
+        assert invalid.status_code == 400
+        assert manager.journal.store.path.read_bytes() == raw
+    reopened = create_app(settings=settings, budget_session=session)
+    with TestClient(reopened, base_url="https://127.0.0.1:5173") as client:
+        record = client.get(f"/api/budget/plugins/{plugin.id}").json()
+        assert not record["enabled"] and record["state"] == {"operatorEdit": 2}
+        assert record["settings"] == {"label": "Fictional settings"}
+        assert session.read_file(plugin.id, "unknown.bin") == b"preserve exact own bytes"
+
+
+def test_journal_open_failure_closes_child_acquired_before_namespace_binding(tmp_path, store, monkeypatch):
+    from whab.plugins.effect_store import EffectError
+
+    child = SimpleNamespace(closed=0, cleanup_pending=False)
+    def close():
+        child.closed += 1
+    child.close = close
+    entry = SimpleNamespace(name='first', dist=SimpleNamespace(metadata={'Name': 'fictional-package'}, version='1.0.0'))
+    monkeypatch.setattr('whab.services.categorization_runtime.metadata.entry_points', lambda **_: (entry,))
+    monkeypatch.setattr('whab.plugins.report_worker.ReportWorker', lambda *_args, **_kwargs: child)
+    lifecycle = CategorizationLifecycle(LedgerService(store, budget_id='fictional'),
+        lambda name: local_context(tmp_path, 'fictional', name), lambda _: {},
+        worker_home=tmp_path, materialization=nullcontext)
+    monkeypatch.setattr(lifecycle, '_namespace', lambda _: (_ for _ in ()).throw(EffectError('effect_unavailable')))
+    with pytest.raises(EffectError):
+        lifecycle.initial((descriptor(),))
+    assert child.closed == 1
+
+
+def test_partial_worker_hello_failure_retains_owner_and_refuses_another_child_until_reaped(tmp_path, store, monkeypatch):
+    import base64
+    import os
+    import signal
+    import subprocess
+    import sys
+
+    from whab.plugins import report_worker
+    from whab.plugins.wire import Frame
+
+    packet = base64.b64encode(Frame({'bad': 'hello'}).encode()).decode()
+    source = (f'import base64,signal,sys;sys.stdout.buffer.write(base64.b64decode({packet!r}));'
+              'sys.stdout.buffer.flush();signal.pause()')
+    popen, children = subprocess.Popen, []
+    def start(_args, **kwargs):
+        child = popen([sys.executable, '-I', '-u', '-c', source], **kwargs)
+        children.append(child)
+        return child
+    entry = SimpleNamespace(name='first', dist=SimpleNamespace(metadata={'Name': 'fictional-package'}, version='1.0.0'))
+    lifecycle = CategorizationLifecycle(LedgerService(store, budget_id='fictional'),
+        lambda name: local_context(tmp_path, 'fictional', name), lambda _: {},
+        worker_home=tmp_path, materialization=nullcontext)
+    try:
+        with monkeypatch.context() as failure:
+            failure.setattr(report_worker.subprocess, 'Popen', start)
+            failure.setattr(report_worker, '_stop_process_group', lambda _: (_ for _ in ()).throw(OSError('fictional reap failure')))
+            failure.setattr('whab.services.categorization_runtime.metadata.entry_points', lambda **_: (entry,))
+            with pytest.raises(PluginError) as error:
+                lifecycle.initial((descriptor(),))
+            assert error.value.code == 'worker_startup_failed'
+            worker, = lifecycle._pending_workers
+            assert worker.cleanup_pending and children[0].poll() is None
+            with pytest.raises(PluginError) as error:
+                lifecycle.close()
+            assert error.value.code == 'worker_cleanup_pending'
+            with pytest.raises(PluginError) as error:
+                lifecycle._service((descriptor(),))
+            assert error.value.code == 'worker_cleanup_pending'
+            assert len(children) == 1 and lifecycle._pending_workers == [worker]
+        lifecycle.close()
+        assert children[0].poll() is not None and not lifecycle._pending_workers
+        service = lifecycle._service(())
+        assert not service.enabled()
+        service.close()
+    finally:
+        for child in children:
+            if child.poll() is None:
+                os.killpg(child.pid, signal.SIGKILL)
+            child.wait(timeout=5)

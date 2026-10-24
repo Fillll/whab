@@ -111,7 +111,8 @@ def test_explicit_paths_isolate_reads_writes_plugins_exports_and_page_assets(tmp
         assert context["apiPrefix"] == f"/budgets/{a}/api"
         assert context["budgetUrl"] == "/budgets/household"
         assert "Household wallet" in response.text and "Travel wallet" not in response.text
-        assert f'/budgets/{a}/static/app.js' in response.text
+        assert f'/budgets/{a}/ui/{context["uiGeneration"]}/static/app.js' in response.text
+        assert client.get(f'/budgets/{a}/ui/{context["uiGeneration"]}/static/app.js').status_code == 200
         assert client.get(f"/budgets/{a}/static/app.js").status_code == 200
         activated = client.post(scoped(a, f"budgets/{b}/activate"), json={})
         assert activated.status_code == 200 and activated.json()["url"] == second["url"]

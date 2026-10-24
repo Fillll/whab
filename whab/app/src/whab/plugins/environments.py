@@ -64,7 +64,7 @@ class EnvironmentPreparationError(ValueError):
             "environment_changed": "A prepared environment no longer matches its approved artifacts. Preserve it and prepare a new version.",
             "environment_cleanup_failed": "An incomplete candidate environment could not be cleaned up. Existing prepared environments are unchanged.",
             "unsupported_platform": "Versioned worker environments currently require macOS or Linux file locking.",
-            "unsupported_lifecycle": "Only explicitly live stateless reporting, branding and file-parser adapters can be prepared for live upgrades.",
+            "unsupported_lifecycle": "Only explicitly live plugins with supported versioned capability adapters can be prepared for live upgrades.",
         }
         super().__init__(messages[code])
         self.code, self.plugin_id = code, plugin_id
@@ -308,12 +308,19 @@ def _lock(path, deadline):
 
 
 @contextmanager
-def _candidate_cleanup(created, plugin_id):
+def _candidate_cleanup(created, plugin_id, probes=()):
     # This context exits before the preparation lock, so another preparer can
     # never observe or replace a directory while failure cleanup removes it.
     try:
         yield
-    except BaseException:
+    except BaseException as error:
+        if any(probe.cleanup_pending for probe in probes):
+            # A retained child may still execute these files. Its owner must
+            # finish cleanup before another preparation can replace them.
+            created.clear()
+            if not isinstance(error, Exception):
+                raise
+            raise EnvironmentPreparationError("environment_cleanup_failed", plugin_id) from None
         if created:
             try:
                 shutil.rmtree(created.pop())
@@ -388,7 +395,8 @@ def _verify(path, python, manifest, deadline):
     _run([str(python), "-I", "-B", "-c", _VERIFY, str(path), str(expected), str(Path(__file__).resolve().parents[2])], deadline)
 
 
-def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, timeout=120) -> PreparedEnvironment:
+def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, timeout=120,
+                        worker_owner=None, worker_retired=None) -> PreparedEnvironment:
     """Prepare one approved optional-plugin closure; publication grants no activation.
 
     A venv is created at its final content address because Python environments
@@ -404,6 +412,12 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
         raise ValueError("Environment preparation requires a timeout within 600 seconds.")
     deadline = time.monotonic() + timeout
     created = []
+    probes = []
+
+    def own_probe(worker):
+        probes.append(worker)
+        if worker_owner is not None:
+            worker_owner(worker)
     try:
         root = Path(root).resolve()
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -457,7 +471,7 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
             destination = root / identifier
             python = destination / "environment/bin/python"
             receipt = {"format": 1, "identifier": identifier}
-            with _lock(locks / (identifier + ".lock"), deadline), _candidate_cleanup(created, plugin_id):
+            with _lock(locks / (identifier + ".lock"), deadline), _candidate_cleanup(created, plugin_id, probes):
                 if destination.is_symlink():
                     raise EnvironmentPreparationError("environment_changed", plugin_id)
                 ready = destination / "ready.json"
@@ -491,7 +505,8 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                           "--no-index", "--no-deps", *(str(destination / "wheels" / item.filename) for item in records)], deadline)
                     _verify(destination, python, manifest, deadline)
                     probe = ReportWorker(plugin_id, python=python, timeout=min(60, _remaining(deadline)),
-                                         expected_distribution=plugin.distribution, expected_version=plugin.version)
+                                         expected_distribution=plugin.distribution, expected_version=plugin.version,
+                                         on_create=own_probe)
                     try:
                         if probe.info["host"] != __version__:
                             raise EnvironmentPreparationError("incompatible_host", plugin_id)
@@ -500,6 +515,13 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                         adapters = probe.info["adapters"]
                         if adapters["interface"] is not None:
                             probe.interface()
+                        if adapters["ui"] is not None:
+                            from .ui_worker import readiness_arguments
+
+                            probe.visual_resources()
+                            for page in ("budget", "transactions", "accounts", "insights"):
+                                probe.timeout = min(60, _remaining(deadline))
+                                probe.render_ui(readiness_arguments(page))
                         if adapters["bank_logos"] is not None:
                             if adapters["bank_logos"]["cache"]:
                                 probe.configure_cache(destination / "probe-cache")
@@ -510,6 +532,17 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                             resources = probe.resources()
                             if (resources is not None) != adapters["file_import"]["ui"]:
                                 raise EnvironmentPreparationError("environment_failed", plugin_id)
+                        if adapters["categorization"]:
+                            from .namespace_effects import NamespaceSnapshot
+
+                            namespace = NamespaceSnapshot({}, {})
+                            for workspace in ("personal", "demo"):
+                                engine, _, _ = probe.category({"engine": None, "command": "open", "values": {},
+                                    "context": {"budget": "readiness", "workspace": workspace, "settings": {}}}, namespace)
+                                _, index, observed = probe.category({"engine": engine, "command": "index", "values": {}, "context": None}, namespace)
+                                if type(index) is not dict or type(index.get("models")) is not list or observed.digest != namespace.digest:
+                                    raise EnvironmentPreparationError("environment_failed", plugin_id)
+                                probe.category({"engine": engine, "command": "close", "values": {}, "context": None}, namespace)
                         snapshot = BudgetSnapshot("personal", "2000-01", (), (), ())
                         if probe.info["insights"]:
                             probe.timeout = min(60, _remaining(deadline))
@@ -520,6 +553,10 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                     finally:
                         probe.timeout = max(0.001, min(60, deadline - time.monotonic()))
                         probe.close()
+                        if probe.cleanup_pending:
+                            raise EnvironmentPreparationError("environment_cleanup_failed", plugin_id)
+                        if worker_retired is not None:
+                            worker_retired(probe)
                     if (destination / "probe-cache").exists():
                         shutil.rmtree(destination / "probe-cache")
                     _remaining(deadline)

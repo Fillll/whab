@@ -459,17 +459,28 @@ class UserInterface:
     zero keeps the complete register input for existing visual plugins.
     """
 
-    templates: Path
-    static: Path
+    templates: Path | None
+    static: Path | None
     build_context: UIContextBuilder
     budget_months: int = 1
     lightweight_transactions: bool = False
     lightweight_accounts: bool = False
     transaction_page_size: int = 0
+    resources: PluginResources | None = field(default=None, repr=False)
+    render: Callable[[dict], bytes] | None = field(default=None, repr=False)
+    view_protocol: int = 0
 
     def __post_init__(self) -> None:
-        if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
-            raise ValueError("User interface resources must be pathlib.Path directories.")
+        if self.resources is None:
+            if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
+                raise ValueError("User interface resources must be pathlib.Path directories.")
+        elif (type(self.resources) is not PluginResources or self.templates is not None or self.static is not None
+              or "templates/base.html" not in self.resources.files):
+            raise ValueError("Use one complete immutable visual resource bundle instead of resource paths.")
+        if self.render is not None and not callable(self.render):
+            raise ValueError("User interface rendering must be callable.")
+        if type(self.view_protocol) is not int or self.view_protocol not in {0, 1}:
+            raise ValueError("Choose a supported browser participation protocol, or zero for restart-only views.")
         if not callable(self.build_context):
             raise ValueError("User interface context builder must be callable.")
         if type(self.budget_months) is not int or not 1 <= self.budget_months <= 12:

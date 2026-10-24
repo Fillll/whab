@@ -49,7 +49,7 @@ Explicit stateless branding and file-parser descriptors also support live
 selection. Bank-logo settings actions have only their public cache authority;
 file parsers receive upload bytes and return a validated `WorkspaceImport`.
 General budget binders, saved-state upgrades, financial storage/provider factories
-and categorization remain outside these adapters. A zero-argument
+remain outside these stateless adapters. A zero-argument
 `branding_factory` can return independent artwork/settings hooks with the same
 identity and effective contract; it receives no budget context or credentials.
 The host resolves the selection before invoking factories during preparation.
@@ -61,6 +61,18 @@ health and cleanup errors. Status remains available while admission is gated;
 HTTPS, local Host/origin and authorization controls still apply. Demo-scoped
 transition requests are rejected. The ordinary `PUT /api/plugins/management`
 continues to configure the next startup.
+
+Failed resource closes retain their private owner. Runtime status counts both
+ongoing cleanup and retained failures in `cleanup_pending`, and reports completed
+failed attempts in `cleanup_failed`; diagnostic messages contain no plugin data.
+An explicit local `POST /api/plugins/runtime/cleanup` with the strict empty JSON
+body `{}` makes one bounded retry of each retained failed owner. Re-read status:
+HTTP 200 confirms the retry finished, while remaining failures stay observable.
+Slow closes continue without cancellation. Demo requests are refused and the
+normal HTTPS, Host, origin and authorization guards apply even while admission is
+gated. Cleanup never repeats a financial mutation, decides transition authority,
+or clears a native financial recovery gate. Host shutdown retries retained owners;
+historical diagnostics may remain after cleanup succeeds.
 
 Live changes preserve the existing ledger revision, retry receipts, bank objects,
 storage and provider caches. Unknown/disabled optional namespaces remain in the
@@ -91,8 +103,12 @@ completed model is visible to a replacement after draining, and saved models,
 demo/personal separation, and disabled suggestion history survive re-enabling
 and reopening. Failed candidate readiness preserves the active service and data.
 
-Categorization selection currently executes in the host process. Runtime status
-lists it in `host_only_families`; `code_upgrade_families` lists the families with
-an available immutable worker upgrade adapter. Selecting a categorizer does not
-upgrade or replace imported Python package files. Ordinary saved selections still
-apply on the next startup.
+Installed pure categorizers run through a bounded child engine adapter and the
+host-owned complete namespace effect journal. `code_upgrade_families` includes
+`categorization`; approved immutable code upgrades use the [worker upgrade
+control](plugin-workers.md#categorization-workers). Model objects and training
+iterators remain child-local, while the host owns suggestion/financial rules and
+atomic model namespace decisions. Startup materializes and verifies retained
+namespace decisions before exposing workers or copy observers. Ordinary saved
+selections still apply on the next startup. Legacy descriptors without an explicit
+compatible live contract retain restart behavior.

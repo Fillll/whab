@@ -141,7 +141,7 @@ def test_context_advertises_route_support_with_legacy_or_unsupported_receipt_sto
     monkeypatch.setattr(store, "receipt_ids_for", None)
     assert context(client.get("/budgets/home/transactions/2026-10/usd"))["receiptIndexScoped"] is True
     monkeypatch.setattr(store, "save_receipt", None)
-    with TestClient(create_app(store=store, settings=settings(tmp_path)), base_url=BASE) as unsupported:
+    with TestClient(create_app(store=store, settings=settings(tmp_path / "unsupported")), base_url=BASE) as unsupported:
         assert context(unsupported.get("/budgets/home/transactions/2026-10/usd"))["receiptIndexScoped"] is True
         assert unsupported.post("/api/receipts/index", json=body(["active"])).json() == {
             "supported": False, "transactionIds": [],

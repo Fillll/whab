@@ -99,7 +99,7 @@ def test_every_view_fragment_matches_full_page_context_and_runtime_assets(client
     assert data["context"]["currency"] == "USD"
     assert data["context"]["apiPrefix"] == f"/budgets/{key}/api"
     assert data["context"]["budgetId"] == ("demo" if key == "demo" else "default")
-    assert data["assets"] == parsed_full.main_assets == {"web": WEB_ASSET_VERSION, "plugins": []}
+    assert data["assets"] == parsed_full.main_assets == {"web": WEB_ASSET_VERSION, "plugins": [], "ui": expected["uiGeneration"]}
     assert "<!DOCTYPE html>" in full.text and 'class="sidebar"' in full.text
     assert '<script ' in full.text and 'id="settings-dialog"' in full.text
     assert response.text.count("data-transaction-navigation-count") == 1

@@ -1,5 +1,5 @@
 /* WHAB controls. Business rules live in Python; bank UI is loaded by enabled plugins. */
-import {api, apiUrl, notify, pageUrl} from './client.js';
+import {api, apiUrl, getContext, notify, pageUrl} from './client.js';
 import {initBudgetEdits, syncBudgetGroups} from './budget-edits.js';
 import {initBudgetSourceLinks} from './budget-source-links.js';
 import {initAccountNavigation} from './account-navigation.js';
@@ -7,6 +7,9 @@ import {initTransactionRegister} from './transaction-register.js';
 import {hydrateCurrencyChoices, initAccountSettings} from './account-settings.js';
 import {bindLogos} from './logo-images.js';
 import {initCategorizationSettings} from './categorization-settings.js';
+import {initStorageCopies} from './storage-copies.js';
+import {createUIViews} from './ui-lifecycle.js';
+import {initVisualSettings} from './visual-settings.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -179,16 +182,18 @@ document.querySelector('[data-dismiss-toast]').addEventListener('click', () => {
   toast.hidden = true;
 });
 
+let optionalSelectionDirty = () => false;
 const pluginSelection = document.querySelector('[data-plugin-selection]');
 if (pluginSelection) {
   const selectedPlugins = () => new FormData(pluginSelection).getAll('plugin');
   const initialSelection = new Set(selectedPlugins());
+  optionalSelectionDirty = () => {const current = new Set(selectedPlugins()); return current.size !== initialSelection.size || [...current].some(id => !initialSelection.has(id));};
   const pending = pluginSelection.querySelector('.plugin-restart-notice');
   pluginSelection.addEventListener('change', () => {
     const selection = new Set(selectedPlugins());
     const changed = selection.size !== initialSelection.size || [...selection].some(id => !initialSelection.has(id));
     if (changed) {
-      pending.textContent = 'You have unsaved plugin changes. Save your selection, then restart WHAB to apply it.';
+      pending.textContent = 'You have unsaved plugin changes. Review a live selection, or save it for restart.';
       pending.hidden = false;
     } else if (pending.dataset.restartRequired === 'true') {
       pending.textContent = 'Restart WHAB to apply your saved plugin selection. Running plugins stay active until then.';
@@ -601,3 +606,50 @@ document.addEventListener('click', async event => {
   if (await currentRegister.flush()) location.assign(target.href);
   else notify('Save the transaction edit before continuing.');
 });
+initVisualSettings({
+  async beforeChange() {
+    if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'plugin-settings'}}))) return false;
+    await requireSavedEdits();
+    return true;
+  },
+  async beforeCommit(kind) {
+    if (kind === 'visual' && optionalSelectionDirty()) return false;
+    if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'plugin-settings'}}))) return false;
+    if ([...document.querySelectorAll('dialog[open]')].some(dialog => !['settings-dialog', 'plugins-dialog'].includes(dialog.id))) return false;
+    await requireSavedEdits();
+    return true;
+  },
+  onOptionalComplete() {location.hash = 'plugins'; location.reload();},
+});
+
+initStorageCopies({beforeChange: async () => {
+  if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'storage-copies'}}))) return false;
+  await requireSavedEdits();
+}});
+
+
+const uiViews = createUIViews({
+  generation: getContext().uiGeneration,
+  async request(suffix, body, method) {
+    const response = await fetch(apiUrl('/ui/views' + suffix), {
+      method, cache: 'no-store', headers: {'Content-Type': 'application/json'},
+      ...(body === null ? {} : {body: JSON.stringify(body)}),
+    });
+    const result = await response.json();
+    if (!response.ok) throw Object.assign(new Error(result.error || 'Interface status is unavailable.'), {code: result.code});
+    return result;
+  },
+  isDirty: () => Boolean(currentRegister?.dirty || budgetEdits.dirty ||
+    document.querySelector('dialog[open], form[data-busy], [data-save-state="saving"], [data-save-state="error"]') || !navigationReady()),
+  async ready() {
+    accountNavigation.cancelPending();
+    return navigationReady() && await flushEdits();
+  },
+  freeze(value) {
+    const shell = document.querySelector('.app-shell');
+    if (shell) { shell.inert = value; shell.setAttribute('aria-busy', String(value)); }
+  },
+  reload: () => location.reload(),
+});
+void uiViews?.start();
+window.addEventListener('pagehide', () => uiViews?.stop());

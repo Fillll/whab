@@ -43,6 +43,8 @@ def create_router(
 
     @router.get("/")
     def landing(request: Request):
+        if not getattr(ui, "available", True):
+            raise HTTPException(404, "A visual interface is unavailable.")
         if any(key in request.query_params for key in ("page", "workspace", "month", "currency")):
             raise HTTPException(400, "Open a canonical /budgets/ address.")
         routing = request.scope.get("whab.routing")
@@ -78,6 +80,8 @@ def create_router(
         end_date: str | None = None,
         review: Literal["all", "needs-review", "reviewed"] = "all",
     ):
+        if not getattr(ui, "available", True):
+            raise HTTPException(404, "A visual interface is unavailable.")
         if any(name in request.query_params for name in ("page", "workspace", "month", "currency")):
             raise HTTPException(400, "Routing values belong in the address path.")
         workspace = request.scope.get("whab.workspace", "demo" if key == "demo" else "personal")
@@ -196,6 +200,8 @@ def create_router(
         context["category_suggestions"] = category_suggestions
         context["url"] = url
         context["asset_prefix"] = asset_prefix
+        ui_generation = getattr(ui, "generation", None)
+        context["ui_asset_prefix"] = asset_prefix + "/ui/" + ui_generation if ui_generation else asset_prefix
         context["api_prefix"] = api_prefix
         canonical_filters = dict(request.query_params)
         canonical_filters.pop("account", None)
@@ -221,7 +227,11 @@ def create_router(
             receiptIndexScoped=True,
             canonicalUrl=canonical_url,
             personalBudgetKey=personal_key, monthToken=month_token, page=page,
+            uiGeneration=ui_generation,
         )
+        context["_ui_routing"] = {"key": key, "personal_key": personal_key, "workspace": workspace,
+                                  "page": page, "month_token": month_token, "currency": currency,
+                                  "account_slugs": account_slugs}
         context.update(
             data=data, status=status, workspace=workspace, page=page, month=month,
             version=__version__,
@@ -303,6 +313,8 @@ def create_router(
         )
         try:
             response = templates.TemplateResponse(request=request, name="base.html", context=context)
+            if ui_generation:
+                response.headers["X-WHAB-UI-Generation"] = ui_generation
             vary = ["X-WHAB-Page-Fragment"]
             if page == "budget":
                 vary.append("X-WHAB-Budget-Fragment")

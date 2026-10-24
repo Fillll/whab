@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from whab.plugins import Plugin, UserInterface
+from whab.plugins import Plugin, PluginContract, UserInterface
 
 from .views import build_context
 
@@ -18,5 +18,7 @@ plugin = Plugin(
         lightweight_transactions=True,
         lightweight_accounts=True,
         transaction_page_size=100,
+        view_protocol=1,
     ),
+    contract=PluginContract(lifecycle="live"),
 )

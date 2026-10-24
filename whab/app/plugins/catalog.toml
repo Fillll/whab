@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "3fb26924548651901e265d88a56cce48210fa883"
+documentation_ref = "1d4aead82850cc6030f335acb39dd2202b28306b"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -171,6 +171,79 @@ scope = "The exact source passed 4561 Python tests, all thirteen runtime plugins
 [verification.artifacts]
 whab = "2.34.0"
 whab_plugin_server = "1.1.0"
+
+[[verification]]
+id = "pr92-installed-native-api"
+date = "2026-10-23"
+host_version = "2.34.0"
+source_commit = "ebbff0d464dd67c0269428a6d4a339778e21ec57"
+selection = ["server", "sqlite"]
+method = "installed-wheel"
+tests = ["installed native HTTPS API interface upgrade/drain/reopen verification"]
+pull_requests = ["https://github.com/Fillll/whab/pull/92"]
+scope = "Archived the exact committed source and installed genuine host2.34/server1.1/SQLite1.11 wheels outside the checkout. Native TLS1.3 explicitly trusted only the temporary runtime CA and rejected an untrusted CA. Verified bearer/Host/origin/budget guards and the bundled server worker, then four separately approved reviewed synthetic server versions: failed missing-token binding preserved the active environment/reference and exact same-host retry; query-only and command-only declarations rejected the other operation; all-command declarations enabled replacement and disable/re-enable. A test-only launcher paused an admitted public ledger command at an event-file barrier before financial dispatch; disabling drained until it acknowledged, preserving both accounts. Ordinary installed stock CLI restart restored the exact saved synthetic worker environment and both acknowledged accounts. Exact artifact/closure hashes and 17 HTTP outcomes were recorded. All listeners, workers and fictional homes were removed. This does not establish retry durability across host restart or provider/household connectivity."
+[verification.artifacts]
+whab = "2.34.0"
+whab_plugin_server = "1.1.0"
+whab_plugin_sqlite = "1.11.0"
+
+[[verification]]
+id = "pr94-storage-copy-controls"
+date = "2026-10-23"
+host_version = "2.34.0"
+source_commit = "6285f907174f85596537e7f31010422e7d0dfb77"
+selection = ["web"]
+method = "source-tests"
+tests = ["plugins/interface/web/tests/storage_copies.test.cjs", "plugins/interface/web/tests/test_storage_copies.py", "plugins/interface/web/tests/test_plugin_settings.py", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/94"]
+scope = "The exact integrated source passed 4576 Python tests, all thirteen runtime plugins at 100% statement/branch coverage, 304 browser tests, 130 toolkit tests on each genuine minimum/current host, external generated native-runtime configurations and exact replays, and installed distribution checks. Storage-copy controls exercised current-primary status, financial and namespace watermarks, explicit empty-destination attachment and reviewed promotion, pending operation tracking, unknown-response reconciliation without mutation replay, stale-response guards, focus/edit barriers, unsupported hosts and demo read-only behavior. Browser visual inspection was unavailable; source/template and browser interaction checks do not establish visual acceptance or household installation."
+[verification.artifacts]
+whab = "2.34.0"
+whab_plugin_web = "1.26.0"
+
+[[verification]]
+id = "pr95-categorization-workers"
+date = "2026-10-23"
+host_version = "2.35.0"
+source_commit = "188c008f6927682548d20dbe53bc93419d51e00b"
+selection = ["random-forest-categorization"]
+method = "source-tests"
+tests = ["tests/plugins/test_categorization_worker.py", "tests/plugins/test_environments.py", "tests/test_namespace_effects_runtime.py", "tests/test_categorization_runtime.py", "tests/test_budget_cli.py", "plugins/automation/random-forest-categorization/tests", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/95"]
+scope = "The exact integrated source passed 4618 Python tests, all thirteen runtime plugins at 100% statement/branch coverage, 304 browser tests, 130 toolkit tests against each genuine minimum/current artifact, independent generated native-runtime configurations/replays and installed distributions. Actual separately approved immutable categorizer versions exercised replacement, failed model readiness, unfinished training/cancel, saved-version reopen, missing model-index materialization recovery and child termination/explicit restart. Host regressions covered complete authoritative state/model snapshots, original result recovery without hook reexecution, private effect publication boundaries, failed cached-heap retirement across both workspaces, foreign saved-model refusal before dispatch, portable checkpoints/copies and disabled namespace edits. Random Forest retained reviewed-only eligibility and its existing cutoff with complete owning coverage. CLI creation/reopen released unstarted worker/journal owners. These HTTP source tests use an HTTPS ASGI scheme; this record does not establish native listener TLS or household/provider deployment."
+[verification.artifacts]
+whab = "2.35.0"
+whab_plugin_random_forest_categorization = "1.3.0"
+
+
+[[verification]]
+id = "pr97-visual-interface-source"
+date = "2026-10-23"
+host_version = "2.36.0"
+source_commit = "1d4aead82850cc6030f335acb39dd2202b28306b"
+selection = ["web"]
+method = "source-tests"
+tests = ["tests/plugins/test_ui_worker.py", "tests/web/test_visual_interface.py", "tests/plugins/test_ui_runtime.py", "plugins/interface/web/tests", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/97"]
+scope = "The exact source passed 4769 Python tests, all thirteen runtime plugins at 100% statement/branch coverage, 333 browser checks, 130 installed toolkit tests per genuine minimum/current artifact, generated configurations and exact replays, and installed distributions. Covered browser preparation barriers, stable ledger services, exact selection decisions, immutable resources, guarded headless mode, stopped repair, lost replies and retained cleanup ownership through partial constructors and retirement failures. Separate headless Chrome QA checked desktop/light and compact/dark Plugins settings without overflow and completed a browser-acknowledged handover of the same Web artifact. This source evidence does not claim distinct installed versions or household deployment."
+[verification.artifacts]
+whab = "2.36.0"
+whab_plugin_web = "1.27.0"
+
+[[verification]]
+id = "pr97-visual-interface-native-https"
+date = "2026-10-23"
+host_version = "2.36.0"
+source_commit = "911bfe0f0be6b8ba1b82d34e886e99411d6a5784"
+selection = ["web", "sqlite"]
+method = "installed-wheel"
+tests = ["tests/plugins/test_ui_worker.py", "tests/web/test_visual_interface.py", "tests/plugins/test_ui_runtime.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/97"]
+scope = "Built the exact committed runtime into wheels and installed outside the checkout. Native CA-verified HTTPS rejected cleartext, untrusted CA, foreign Host/origin and demo mutation. A dirty browser deferred handover while a separate acknowledged financial write remained admitted; duplicate commits retained the exact preview operation. Separately approved synthetic Web versions 1.27.1.dev1, broken dev2 and valid dev3 proved distinct immutable worker replacement, failed preparation preserving the prior worker, coherent four-page generation assets, headless acknowledged saves, old asset retention and exact saved dev3 restoration after an ordinary installed CLI reopen. All three acknowledged fictional accounts survived. Exact wheel/closure/script hashes and eight checks were retained; homes, host leaders and workers were removed. These synthetic provider versions differ from the bundled Web version listed here. This does not establish cross-host SDK upgrades, real provider connectivity or household installation."
+[verification.artifacts]
+whab = "2.36.0"
+whab_plugin_web = "1.27.0"
+whab_plugin_sqlite = "1.11.0"
 
 [[verification]]
 id = "pr96-api-teaching-toolkit"

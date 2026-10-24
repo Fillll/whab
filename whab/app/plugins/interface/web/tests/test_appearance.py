@@ -85,10 +85,11 @@ def test_theme_bootstrap_precedes_styles_and_uses_web_plugin_asset_version(clien
     response = client.get(f"/budgets/demo/{page}/current-month/usd")
     assert response.status_code == 200
     head = response.text.split("</head>", 1)[0]
+    generation = json.loads(re.search(r'<script id="whab-context"[^>]*>(.*?)</script>', head, re.S)[1])["uiGeneration"]
     tags = Tags(head).tags
     script_index, script = next(
         (index, attrs) for index, (tag, attrs) in enumerate(tags)
-        if tag == "script" and urlparse(attrs.get("src", "")).path == "/budgets/demo/static/theme.js"
+        if tag == "script" and urlparse(attrs.get("src", "")).path == f"/budgets/demo/ui/{generation}/static/theme.js"
     )
     style_index, stylesheet = next(
         (index, attrs) for index, (tag, attrs) in enumerate(tags)
@@ -114,10 +115,12 @@ def test_every_transitive_web_module_has_a_versioned_import_before_the_entry_poi
     text = response.text
     imports = re.search(r'<script type="importmap">(.*?)</script>', text)[1]
     mapping = json.loads(imports)["imports"]
+    generation = json.loads(re.search(r'<script id="whab-context"[^>]*>(.*?)</script>', text, re.S)[1])["uiGeneration"]
+    prefix = f"/budgets/demo/ui/{generation}/static"
     assets = files("whab_plugin_web").joinpath("static")
     for asset in assets.iterdir():
         if asset.name.endswith(".js"):
-            assert mapping[f"/budgets/demo/static/{asset.name}"] == (
-                f"/budgets/demo/static/{asset.name}?v={version('whab_plugin_web')}"
+            assert mapping[f"{prefix}/{asset.name}"] == (
+                f"{prefix}/{asset.name}?v={version('whab_plugin_web')}"
             )
     assert text.index('type="importmap"') < text.index('type="module"')

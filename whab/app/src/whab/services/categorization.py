@@ -15,7 +15,7 @@ from types import MappingProxyType
 from uuid import UUID, uuid4
 
 from whab.budgets.container import MAX_CONTAINER_FILES, validate_file_name
-from whab.budgets.document import MAX_BUNDLE_BYTES, atomic_write
+from whab.budgets.document import MAX_BUNDLE_BYTES, _json, atomic_write, portable_values
 from whab.domain.categorization import candidates, fingerprint
 from whab.domain.errors import StoreError
 from whab.plugins import BudgetContext
@@ -59,6 +59,8 @@ def local_files(home, budget_id, plugin_id):
                     raise StoreError("Plugin data contains an unsupported file type.")
                 name = os.path.relpath(child.path, root).replace(os.sep, "/")
                 validate_file_name(f"plugins/{plugin_id}/{name}")
+                if name == "state.json":
+                    continue
                 remaining = MAX_BUNDLE_BYTES - size
                 if len(result) >= MAX_CONTAINER_FILES or child.stat(follow_symlinks=False).st_size > remaining:
                     raise StoreError("The categorization namespace exceeds its supported size.")
@@ -91,6 +93,8 @@ def local_context(home, budget_id, plugin_id, *, lock=None, on_change=None):
 
     def read(name):
         with lock:
+            if name in {"state.json", "settings.json"}:
+                raise StoreError("Use the plugin's scoped state callbacks.")
             target = path(name)
             return target.read_bytes() if target.exists() else None
 
@@ -105,6 +109,8 @@ def local_context(home, budget_id, plugin_id, *, lock=None, on_change=None):
 
     def write(name, raw):
         with lock:
+            if name in {"state.json", "settings.json"}:
+                raise StoreError("Use the plugin's scoped state callbacks.")
             if type(raw) is not bytes:
                 raise StoreError("Plugin files must contain bytes.")
             atomic_write(path(name), raw)
@@ -112,10 +118,38 @@ def local_context(home, budget_id, plugin_id, *, lock=None, on_change=None):
 
     def delete(name):
         with lock:
+            if name in {"state.json", "settings.json"}:
+                raise StoreError("Use the plugin's scoped state callbacks.")
             path(name).unlink(missing_ok=True)
             changed()
 
-    return BudgetContext(budget_id, MappingProxyType({}), MappingProxyType({}), lambda _: None,
+    def state():
+        target = path("state.json")
+        if not target.exists():
+            return {}
+        try:
+            with target.open("rb") as source:
+                raw = source.read(1024 * 1024 + 1)
+            if len(raw) > 1024 * 1024:
+                raise ValueError()
+            value = portable_values(_json(raw))
+            if type(value) is not dict:
+                raise ValueError()
+            return value
+        except Exception:
+            raise StoreError("Saved plugin state is invalid. Preserve its private namespace.") from None
+
+    def save_state(value):
+        with lock:
+            if type(value) is not dict:
+                raise StoreError("Plugin state must contain a JSON object.")
+            raw = json.dumps(portable_values(value), ensure_ascii=False, allow_nan=False).encode("utf-8")
+            if len(raw) > 1024 * 1024:
+                raise StoreError("Plugin state exceeds its supported size.")
+            atomic_write(path("state.json"), raw)
+            changed()
+
+    return BudgetContext(budget_id, MappingProxyType({}), MappingProxyType(state()), save_state,
                          read, write, delete)
 
 
@@ -142,14 +176,14 @@ class CategorizationService:
                 context = self.contexts[plugin.id]
                 personal = _EngineContext(context)
                 self._engine_contexts.append(personal)
-                self.engines[plugin.id] = self._engine(plugin, personal.context())
+                self.engines[plugin.id] = self._engine(plugin, personal.context(), "personal")
                 scoped = replace(context,
                                  read_file=lambda name, ctx=context: ctx.read_file("demo/" + name),
                                  write_file=lambda name, raw, ctx=context: ctx.write_file("demo/" + name, raw),
                                  delete_file=lambda name, ctx=context: ctx.delete_file("demo/" + name))
                 demo = _EngineContext(scoped)
                 self._engine_contexts.append(demo)
-                self.demo_engines[plugin.id] = self._engine(plugin, demo.context())
+                self.demo_engines[plugin.id] = self._engine(plugin, demo.context(), "demo")
         except Exception:
             try:
                 self.close()
@@ -159,8 +193,11 @@ class CategorizationService:
                               code="categorization_startup_failed", plugin_id=plugin.id) from None
 
     @staticmethod
-    def _engine(plugin, context):
-        engine = plugin.categorization.factory(context)
+    def _engine(plugin, context, workspace="personal"):
+        from whab.plugins.categorization_worker import WorkerCategorizationFactory
+
+        factory = plugin.categorization.factory
+        engine = factory.create(context, workspace) if isinstance(factory, WorkerCategorizationFactory) else factory(context)
         if inspect.isawaitable(engine):
             if inspect.iscoroutine(engine):
                 engine.close()
@@ -217,6 +254,8 @@ class CategorizationService:
                 if id(engine) not in seen and callable(getattr(engine, "close", None)):
                     callbacks.append(engine.close)
                     seen.add(id(engine))
+            callbacks.extend(factory.close for factory in getattr(self, "_worker_factories", ()))
+            callbacks.extend(access.close for access in getattr(self, "_namespace_access", ()))
             failed = False
             for close in callbacks:
                 try:
@@ -339,6 +378,9 @@ class CategorizationService:
                 model_id = values.get("modelId", "")
                 if len(model_id) != 36 or str(UUID(model_id)) != model_id:
                     raise StoreError("Choose a saved model.")
+                index = engine.index()
+                if not any(type(row) is dict and row.get("id") == model_id for row in index.get("models", ())):
+                    raise StoreError("Choose a saved model from this budget and workspace.")
                 if action == "rename":
                     engine.rename(model_id, values.get("name", "Random forest"))
                 else:

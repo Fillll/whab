@@ -4,6 +4,22 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.36.0 — 2026-10-23
+
+PR: [#97](https://github.com/Fillll/whab/pull/97)
+
+- Prepare participating visual interfaces in approved immutable workers and coherently version their templates/assets. Preserve browser drafts by deferring handover until views acknowledge preparation; retain old resources and stable financial services through selection changes.
+- Persist exact visual selections and worker references before publication. Support headless operation, explicit stopped repair, recovery disabling and retained cleanup ownership after partial construction or failed retirement.
+- Verify native HTTPS distinct-version upgrades, failed preparation, browser handovers, saved-worker reopen and the complete contribution gate.
+
+## 2.35.0 — 2026-10-23
+
+PR: [#95](https://github.com/Fillll/whab/pull/95)
+
+- Isolate supported pure categorization engines in bounded workers with opaque training/model continuations and approved immutable code upgrades. Defer replacement during training and retain unrelated services and saved models.
+- Journal complete namespace snapshots and original results before materialization, portable checkpoints or copy notifications. Recover interrupted publication without rerunning model hooks; retire cached child state after failed mutations and reject foreign model identities before dispatch.
+- Preserve disabled plugin-state edits through retained journals and release unstarted runtime resources during CLI budget creation. Verify actual distinct installed worker versions, failed preparation, recovery, isolation and the complete contribution gate.
+
 ## 2.34.0 — 2026-10-23
 
 PR: [#92](https://github.com/Fillll/whab/pull/92)

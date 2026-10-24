@@ -34,6 +34,21 @@ from whab.plugins.environments import (
 from whab.plugins.report_worker import ReportWorker
 
 
+def test_pending_preparation_child_preserves_its_environment_until_owner_retires_it(tmp_path):
+    from types import SimpleNamespace
+
+    environment = tmp_path / "unpublished-environment"
+    environment.mkdir()
+    sentinel = environment / "preserved.py"
+    sentinel.write_bytes(b"fictional approved code")
+    created = [environment]
+    with pytest.raises(EnvironmentPreparationError) as caught:
+        with environments._candidate_cleanup(created, "fictional", [SimpleNamespace(cleanup_pending=True)]):
+            raise RuntimeError("fictional preparation failure")
+    assert caught.value.code == "environment_cleanup_failed"
+    assert sentinel.read_bytes() == b"fictional approved code" and not created
+
+
 def test_application_upgrades_real_reports_without_losing_ledger_or_reopen_version(tmp_path, local_closure, store, monkeypatch):
     import asyncio
     from types import SimpleNamespace
@@ -147,6 +162,95 @@ def test_application_upgrades_real_reports_without_losing_ledger_or_reopen_versi
 
 def approve(path):
     return ApprovedWheel(path, hashlib.sha256(path.read_bytes()).hexdigest())
+
+
+def test_real_visual_worker_versions_keep_code_resource_identity_and_failed_readiness_preserves_old(tmp_path, local_closure):
+    from whab.plugins import Plugin, PluginContract, PluginRegistry, PluginResources, UserInterface
+    from whab.plugins.ui_resources import UIResourceArchive, capture_visual
+    from whab.plugins.ui_worker import readiness_arguments
+    from whab.plugins.worker_selection import _start
+
+    def wheel(version, *, broken=False):
+        source = (
+            "from pathlib import Path\n"
+            "from whab.plugins import Plugin, PluginContract, UserInterface\n"
+            "root = Path(__file__).parent\n"
+            "def context(data, status, items, **values):\n"
+            f"    return {{'data': data, 'amount': lambda amount: '{version}:' + str(amount)}}\n"
+            "plugin=Plugin('fictional-reports','Fictional visual',ui=UserInterface(root/'templates',root/'static',context,view_protocol=1),contract=PluginContract(lifecycle='live'))\n"
+        )
+        files = {"fictional_reports/templates/base.html": b"<p>{{ amount(data.summary.readyToAssign) }}</p>"}
+        if not broken:
+            files["fictional_reports/static/app.js"] = f"export const version = '{version}';".encode()
+        return approve(make_wheel(tmp_path, version, source=source, extra_files=files))
+
+    template = Plugin("fictional-reports", "Fictional visual", ui=UserInterface(
+        None, None, lambda *args, **values: {}, resources=PluginResources({
+            "templates/base.html": b"host", "static/app.js": b"host",
+        }), view_protocol=1), contract=PluginContract(lifecycle="live"))
+    root = tmp_path / "approved"
+    archive = UIResourceArchive(tmp_path / "runtime")
+    first = prepare_environment(root, template.id, (*local_closure, wheel("1.0.0")))
+    old_proxy, old = _start(template, first)
+    try:
+        old_bundle = archive.store(capture_visual(template.id, old_proxy.ui, first.identifier))
+        assert old_proxy.ui.render(readiness_arguments("budget")) == b"<p>1.0.0:0</p>"
+        assert old_proxy.ui.build_context({}, {}, [], workspace="personal", page="budget", month="2000-01", selected=None)["_ui_inputs"]["page"] == "budget"
+        with pytest.raises(EnvironmentPreparationError):
+            prepare_environment(root, template.id, (*local_closure, wheel("1.1.0", broken=True)))
+        assert old.worker.healthy
+        assert old_proxy.ui.render(readiness_arguments("accounts")) == b"<p>1.0.0:0</p>"
+        approved_second = wheel("2.0.0")
+        second = prepare_environment(root, template.id, (*local_closure, approved_second))
+        new_proxy, new = _start(template, second)
+        try:
+            new_bundle = archive.store(capture_visual(template.id, new_proxy.ui, second.identifier))
+            assert new_bundle.generation != old_bundle.generation
+            assert new_proxy.ui.render(readiness_arguments("transactions")) == b"<p>2.0.0:0</p>"
+            assert archive.load(old_bundle.generation).resources.files["static/app.js"] == b"export const version = '1.0.0';"
+            old.worker.close()
+            assert not old.worker.healthy and new.worker.healthy
+            assert first.path != second.path and first.path.is_dir()
+        finally:
+            new.worker.close()
+        reopened = ReportWorker(template.id, python=second.python)
+        try:
+            assert reopened.render_ui(readiness_arguments("insights")) == b"<p>2.0.0:0</p>"
+        finally:
+            reopened.close()
+    finally:
+        old.worker.close()
+
+    # A stopped recovery publishes only fresh approved code. The old saved
+    # interpreter is deliberately unavailable at the runtime's expected path.
+    from uuid import uuid4
+
+    from whab.plugins.ui_repair import replace_saved_visual_worker, visual_worker_revision
+    from whab.plugins.ui_runtime import read_visual_choice, restore_visual_worker
+    from whab.plugins.ui_selection import UISelectionStore
+
+    home = tmp_path / "runtime"
+    reference = {"environment": first.identifier, "distribution": first.distribution, "version": first.version}
+    with UISelectionStore(home, "fictional", "sandbox", template.id) as selected:
+        selected.publish({"id": str(uuid4()), "selection": template.id, "generation": old_bundle.generation,
+                          "worker": reference}, selected.revision(selected.snapshot()))
+    path = home / "visual-ui/visual-selection.json"
+    original = path.read_bytes()
+    before = environments._installation_hash(first.path)
+    assert not (home / "plugin-workers/environments" / first.identifier).exists()
+    revision = visual_worker_revision(home, "fictional", "sandbox")
+    decision = replace_saved_visual_worker(home, "fictional", "sandbox", template.id,
+        (*local_closure, approved_second), expected_revision=revision)
+    assert decision["worker"]["version"] == "2.0.0"
+    assert environments._installation_hash(first.path) == before
+    assert (home / "visual-ui/history" / (revision + ".json")).read_bytes() == original
+    choice = read_visual_choice(home, "fictional", "sandbox", template.id)
+    restored, bindings = restore_visual_worker(home, PluginRegistry((template,)), choice)
+    try:
+        assert restored.ui_plugin(template.id).ui.render(readiness_arguments("budget")) == b"<p>2.0.0:0</p>"
+        assert archive.load(old_bundle.generation).resources.files["static/app.js"] == b"export const version = '1.0.0';"
+    finally:
+        bindings[template.id].worker.close()
 
 
 def parser_wheel(directory, version, *, broken_resources=False):
@@ -434,8 +538,11 @@ def test_synthetic_saved_protocol1_environment_is_fenced_then_explicitly_reprepa
 
     class LegacyProbe(ReportWorker):
         """A report-only protocol-1 client used solely to publish the old fixture."""
-        def __init__(self, plugin_id, *, python, timeout, expected_distribution, expected_version):
+        def __init__(self, plugin_id, *, python, timeout, expected_distribution, expected_version, on_create=None):
             self.plugin_id, self.timeout, self._lock, self._retiring = plugin_id, timeout, Lock(), None
+            self._process = None
+            if on_create is not None:
+                on_create(self)
             self._process = subprocess.Popen([str(python), "-I", "-B", "-m", "whab.plugins.report_worker", plugin_id],
                                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                              env=environments._environment(), start_new_session=True, bufsize=0)
@@ -444,7 +551,7 @@ def test_synthetic_saved_protocol1_environment_is_fenced_then_explicitly_reprepa
                 assert self.info["worker"] == 1 and self.info["distribution"] == expected_distribution and self.info["version"] == expected_version
                 # New preparation uses this explicit shim only for constructing
                 # a genuine old-format fixture. Restoring later never uses it.
-                self.info["adapters"] = {"bank_logos": None, "merchant_logos": False, "file_import": None, "settings": None, "interface": None, "ui": None}
+                self.info["adapters"] = {"bank_logos": None, "merchant_logos": False, "file_import": None, "settings": None, "interface": None, "ui": None, "categorization": False}
             except BaseException:
                 self._stop()
                 raise
@@ -1000,3 +1107,172 @@ def test_real_api_worker_upgrade_failed_preparation_disable_reenable_and_reopen(
         assert app.state.budget_runtime._active.services["plugins"].workers[identifier].worker.info["version"] == "2.0.0"
         assert len(store.accounts("personal")) == 1
     assert first and second and not first.worker.healthy and not second.worker.healthy
+
+
+_CATEGORY_SOURCE = '''
+import json
+from uuid import uuid4
+from whab.plugins import Plugin, PluginContract, Categorization
+VERSION = VERSION_LITERAL
+class Engine:
+    defaults = {'trees': 1}
+    def __init__(self, context):
+        self.context = context
+    def index(self):
+        raw = self.context.read_file('models.json')
+        if raw and VERSION == '3.0.0':
+            raise RuntimeError('synthetic-private-model-readiness-detail')
+        result = json.loads(raw) if raw else {'active': None, 'models': []}
+        return {**result, 'workerVersion': VERSION}
+    def put(self, index):
+        self.context.write_file('models.json', json.dumps(index).encode())
+    def train(self, rows, parameters):
+        yield {'stage': 'Training fictional model ' + VERSION, 'progress': 50}
+        return {'id': str(uuid4()), 'version': VERSION}
+    def save(self, model, name):
+        index = self.index()
+        self.context.write_file('models/' + model['id'] + '.bin', ('model ' + VERSION).encode())
+        record = {**model, 'name': name}
+        self.put({**index, 'models': [*index['models'], record]})
+        self.context.save_state({'trainedBy': VERSION})
+        return record
+    def select(self, identifier):
+        self.put({**self.index(), 'active': identifier})
+    def delete(self, identifier):
+        index = self.index()
+        self.put({**index, 'active': None, 'models': [row for row in index['models'] if row['id'] != identifier]})
+        self.context.delete_file('models/' + identifier + '.bin')
+    def rename(self, identifier, name):
+        index = self.index()
+        self.put({**index, 'models': [{**row, 'name': name} if row['id'] == identifier else row for row in index['models']]})
+    def predict(self, rows):
+        return []
+    def close(self):
+        pass
+plugin = Plugin('fictional-reports', 'Fictional categorizer', categorization=Categorization(Engine),
+                contract=PluginContract(lifecycle='live'))
+'''
+
+
+def test_real_category_versions_recover_complete_effects_preserve_training_and_reopen(tmp_path, local_closure, store, monkeypatch):
+    """Actual distinct approved code artifacts; no parent monkeypatch crosses IPC."""
+    import asyncio
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    from whab.app import create_app
+    from whab.config import Settings
+    from whab.plugins import PluginRegistry
+    from whab.plugins.categorization_worker import WorkerCategorizer
+    from whab.services.categorization import local_context, local_files
+
+    namespace = {}
+    exec(_CATEGORY_SOURCE.replace('VERSION_LITERAL', repr('host')), namespace)
+    template = namespace['plugin']
+    entry = SimpleNamespace(name=template.id, group='whab.plugins', load=lambda: template)
+    monkeypatch.setattr('whab.plugins.management.installed_entrypoints', lambda: (entry,))
+    monkeypatch.setattr('whab.app.installed_entrypoints', lambda: (entry,))
+    settings = Settings(tmp_path / 'runtime', 5173, 'sandbox', '', '', '', False, '', '', (template.id,), ui='')
+    home = settings.home / 'data/plugin-state/sandbox'
+    local_context(home, 'default', template.id).write_file('unknown.bin', b'preserve unknown synthetic bytes')
+    app = create_app(store=store, settings=settings, plugins=PluginRegistry((template,)))
+    ledger = app.state.ledger_service
+
+    def settle(client):
+        async def wait():
+            if app.state.live_plugins._tasks:
+                await asyncio.gather(*tuple(app.state.live_plugins._tasks), return_exceptions=True)
+        client.portal.call(wait)
+
+    def upgrade(client, version):
+        wheel = make_wheel(tmp_path, version, source=_CATEGORY_SOURCE.replace('VERSION_LITERAL', repr(version)))
+        response = client.post('/api/plugins/management/upgrade', json={
+            'pluginId': template.id,
+            'wheels': [{'path': str(item.path), 'sha256': item.sha256} for item in (*local_closure, approve(wheel))]})
+        assert response.status_code == 202, response.text
+        settle(client)
+        return next(row for row in client.get('/api/plugins/runtime').json()['operations'] if row['id'] == response.json()['id'])
+
+    def action(client, operation, workspace='personal', **values):
+        response = client.post('/api/categorization', json={'workspace': workspace,
+            'payload': {'pluginId': template.id, 'action': operation, **values}})
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    with TestClient(app, base_url='https://127.0.0.1:5173') as client:
+        account = ledger.add_account('personal', {'name': 'Fictional stable ledger', 'type': 'depository', 'balance': 321})
+        revision = ledger.revision
+        assert upgrade(client, '1.0.0')['state'] == 'complete'
+        assert ledger.revision == revision
+        first = app.state.budget_runtime._active.services['plugins'].workers[template.id]
+        engine = ledger.categorization.engines[template.id]
+        assert isinstance(engine, WorkerCategorizer) and first.worker.healthy
+        assert action(client, 'status')['workerVersion'] == '1.0.0'
+        run = action(client, 'train')
+        assert action(client, 'step', session=run['session'])['progress'] == 50
+        deferred = upgrade(client, '2.0.0')
+        assert deferred['state'] == 'failed' and deferred['error']['code'] == 'continuation_busy'
+        assert first.worker.healthy
+        trained = action(client, 'step', session=run['session'])['model']
+        action(client, 'select', modelId=trained['id'])
+        # Demo has a separate child engine and own model files.
+        demo = action(client, 'train', workspace='demo')
+        action(client, 'step', workspace='demo', session=demo['session'])
+        demo_model = action(client, 'step', workspace='demo', session=demo['session'])['model']
+        action(client, 'select', workspace='demo', modelId=demo_model['id'])
+        native = local_files(home, 'default', template.id)
+        assert native['unknown.bin'] == b'preserve unknown synthetic bytes'
+        assert native['models/' + trained['id'] + '.bin'] == b'model 1.0.0'
+        assert native['demo/models/' + demo_model['id'] + '.bin'] == b'model 1.0.0'
+        # Cancel an actually advanced child iterator before changing code.
+        cancelled = action(client, 'train')
+        action(client, 'step', session=cancelled['session'])
+        assert action(client, 'cancel', session=cancelled['session']) == {'canceled': True}
+        original_first = environments._installation_hash(first.environment.path)
+        assert upgrade(client, '3.0.0')['state'] == 'failed'
+        assert first.worker.healthy and action(client, 'status')['active'] == trained['id']
+        revision = ledger.revision
+        assert upgrade(client, '2.0.0')['state'] == 'complete'
+        assert app.state.ledger_service is ledger and ledger.revision == revision
+        second = app.state.budget_runtime._active.services['plugins'].workers[template.id]
+        assert second.worker.healthy and not first.worker.healthy and engine.closed
+        assert environments._installation_hash(first.environment.path) == original_first
+        assert action(client, 'status')['workerVersion'] == '2.0.0'
+        assert action(client, 'status')['active'] == trained['id']
+        assert action(client, 'status', workspace='demo')['active'] == demo_model['id']
+        action(client, 'rename', modelId=trained['id'], name='Renamed after upgrade')
+        assert ledger.accounts('personal')[0]['id'] == account
+        assert 'fictional_reports' not in sys.modules
+    # A new host restores the durable v2 environment and recovers the full native
+    # model/index/state from its journal before starting either child engine.
+    native_root = home / 'plugin-data' / template.id
+    (native_root / 'models.json').unlink()
+    app = create_app(store=store, settings=settings, plugins=PluginRegistry((template,)))
+    ledger = app.state.ledger_service
+    with TestClient(app, base_url='https://127.0.0.1:5173') as client:
+        status = action(client, 'status')
+        assert status['workerVersion'] == '2.0.0' and status['active'] == trained['id']
+        assert status['models'][0]['name'] == 'Renamed after upgrade'
+        assert local_context(home, 'default', template.id).state == {'trainedBy': '1.0.0'}
+        assert ledger.accounts('personal')[0]['id'] == account
+        assert action(client, 'status', workspace='demo')['active'] == demo_model['id']
+
+        # A real process death publishes no additional namespace decision. There
+        # is no automatic child restart; reopening validates the same v2 artifact.
+        active = ledger.categorization.engines[template.id]
+        manager = active.factory.effects
+        before_crash = manager.journal.store.path.read_bytes()
+        child = active.factory.worker._process
+        child.kill()
+        assert child.wait(timeout=5) == -signal.SIGKILL
+        failed = client.post('/api/categorization', json={'workspace': 'personal',
+            'payload': {'pluginId': template.id, 'action': 'status'}})
+        assert failed.status_code == 400 and 'synthetic-private' not in failed.text
+        assert manager.journal.store.path.read_bytes() == before_crash
+        assert not active.factory.worker.healthy
+    app = create_app(store=store, settings=settings, plugins=PluginRegistry((template,)))
+    ledger = app.state.ledger_service
+    with TestClient(app, base_url='https://127.0.0.1:5173') as client:
+        assert action(client, 'status')['active'] == trained['id']
+        assert action(client, 'status')['workerVersion'] == '2.0.0'

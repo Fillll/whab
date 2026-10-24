@@ -84,7 +84,7 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     text = response.text
     settings = dialog(text, "settings-dialog")
     assert re.findall(r'data-dialog="([^"]+)"', settings) == [
-        "budgets-dialog", "plugins-dialog", "about-dialog",
+        "budgets-dialog", "storage-copies-dialog", "plugins-dialog", "about-dialog",
     ]
     assert f"Current budget · {label}" in settings
     budgets = dialog(text, "budgets-dialog")
@@ -196,8 +196,8 @@ def test_plugin_categories_and_names_are_sorted_and_examples_are_hidden(client, 
 @pytest.mark.parametrize(("changes", "selection", "runtime", "guidance"), [
     ({"active": True, "enabled": True}, "Enabled", "Running", None),
     ({"active": True}, "Will disable after restart", "Running", None),
-    ({"enabled": True}, "Will enable after restart", "Not running", "Restart WHAB to view"),
-    ({}, "Disabled", "Not running", "Enable this plugin, save your selection, and restart"),
+    ({"enabled": True}, "Will enable after restart", "Not running", "Apply a supported live selection or restart WHAB to view"),
+    ({}, "Disabled", "Not running", "Enable this plugin, then review a supported live selection or save it for restart"),
     ({"active": True, "enabled": True, "required": True}, "Required", "Running", None),
 ])
 def test_each_plugin_has_settings_with_saved_and_running_state(client, monkeypatch, changes, selection, runtime, guidance):
