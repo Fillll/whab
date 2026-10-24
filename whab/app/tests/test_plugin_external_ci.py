@@ -136,9 +136,14 @@ def test_external_project_build_never_resolves_dependencies_online(checker, tmp_
     def run(command, **kwargs):
         calls.append(command)
         if "wheel" in command:
-            (wheels / "fixture.whl").write_bytes(b"fictional wheel")
+            destination = Path(command[command.index("--wheel-dir") + 1])
+            assert destination != wheels
+            with zipfile.ZipFile(destination / "fixture.whl", "w") as archive:
+                archive.writestr("fixture/__init__.py", "VALUE = 1\n")
 
     assert checker.build_project(SimpleNamespace(run=run), Path("python"), tmp_path, wheels, tmp_path, {}) == wheels / "fixture.whl"
+    with zipfile.ZipFile(wheels / "fixture.whl") as archive:
+        assert archive.read("fixture/__init__.py") == b"VALUE = 1\n"
     assert all("--no-index" in command for command in calls)
     assert "--no-build-isolation" in calls[-1] and "--no-deps" in calls[-1]
 
