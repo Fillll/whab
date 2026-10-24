@@ -12,6 +12,30 @@ PR: [#100](https://github.com/Fillll/whab/pull/100)
 - Durably retain bounded unknown-write intent across client restart. Explicit Finish accepts only the original validated request and CAS revision; reads, conflicts and restart never clear uncertainty or silently resubmit a new command.
 - Preserve failed candidates, exact saved worker versions and stopped same-binding repairs. Keep legacy client factories restart-required and remote authorities isolated from local ingestion and training.
 
+## 2.38.0 — 2026-10-23
+
+PR: [#101](https://github.com/Fillll/whab/pull/101)
+
+- Add bounded bank-provider workers and approved immutable code upgrades. Keep encryption keys, native command brokerage, authorization and financial validation under host control; preserve existing connections, synchronization checkpoints and stable ledger services.
+- Bind browser Link and OAuth continuations to opaque budget/provider identities. Persist exchange intent before external work and encrypted responses plus exact native commands before application; retain uncertain outcomes without duplicate exchanges or automatic reconnects.
+- Drain generation-owned synchronization, webhooks and requests, defer retirement and authority changes during unfinished flows, and retain failed cleanup owners. Preserve unknown native outcomes after failed evidence or receipt publication instead of reporting a definite rejection.
+
+## 2.37.0 — 2026-10-23
+
+PR: [#102](https://github.com/Fillll/whab/pull/102)
+
+- Run supported local SQLite/JSON backends in bounded typed workers and replace compatible approved code after request/background draining. Preserve stable ledger/retry services, native identity/epoch/generation, namespaces, copies and exact saved worker ownership.
+- Persist caller operation identities and reconcile native receipts after lost replies. Keep unknown outcomes gated, reject history older than acknowledged evidence, and distinguish proven execute rejection from failures after dispatch or during evidence publication.
+- Add explicit stopped-host read-only repair that preserves prior code history, native roles/data and pending intents. Retain constructor/cleanup owners and defer authority changes while bank continuations remain unfinished.
+
+## 2.36.0 — 2026-10-23
+
+PR: [#97](https://github.com/Fillll/whab/pull/97)
+
+- Prepare participating visual interfaces in approved immutable workers and coherently version their templates/assets. Preserve browser drafts by deferring handover until views acknowledge preparation; retain old resources and stable financial services through selection changes.
+- Persist exact visual selections and worker references before publication. Support headless operation, explicit stopped repair, recovery disabling and retained cleanup ownership after partial construction or failed retirement.
+- Verify native HTTPS distinct-version upgrades, failed preparation, browser handovers, saved-worker reopen and the complete contribution gate.
+
 ## 2.35.0 — 2026-10-23
 
 PR: [#95](https://github.com/Fillll/whab/pull/95)
