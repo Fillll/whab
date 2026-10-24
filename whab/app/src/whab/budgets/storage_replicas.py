@@ -26,7 +26,7 @@ from whab.plugins.storage_transfer import CommitEvidence, read_storage_json
 
 from .container import MAX_CONTAINER_FILES
 from .document import MAX_BUNDLE_BYTES, MAX_MANIFEST_BYTES, digest, validate_manifest
-from .runtime import RuntimeCandidate
+from .runtime import RuntimeCandidate, RuntimeTransitionError
 from .session import _read_bytes
 from .storage_authority import AuthorityJournal, _durable_directory, _fsync_directory
 from .storage_runtime import (
@@ -275,7 +275,7 @@ class StorageReplicas:
                 raise _failure("Another copy coordinator owns this budget, or its ownership lock changed.") from None
 
     def _plugin(self, identifier):
-        plugin = load_descriptors((identifier,), installed_entrypoints())[0]
+        plugin = self.storage.descriptor_for(load_descriptors((identifier,), installed_entrypoints())[0])
         self.storage._supported(plugin)
         if not any(cap.name == "storage.replica" and cap.version == 1 for cap in contract_for(plugin).provides):
             raise _failure("This storage plugin does not support native synchronized copies.")
@@ -286,7 +286,7 @@ class StorageReplicas:
         location = self.storage.locations.data["instances"][entry["instance_id"]]
         return open_storage(plugin, StorageContext(self.storage.locations.home(location), self.storage.settings.plaid_env,
             self.storage.config_for(plugin), self.storage.session.context(plugin.id) if self.storage.session else None,
-            initial_role="copy"))
+            initial_role="copy", expected_instance_id=entry["instance_id"]))
 
     def _entry(self, identifier):
         _uuid(identifier)
@@ -594,6 +594,9 @@ class StorageReplicas:
             return
         async with self._serial:
             def build(active, prepared):
+                upgrades = getattr(self.storage.app.state, "storage_upgrade", None) if self.storage.app else None
+                if upgrades is not None:
+                    return upgrades.build_generation(active, prepared, target, source_id)
                 descriptors = tuple(target if plugin.id == source_id else plugin for plugin in active.services["plugins"].descriptors())
                 registry = RegistryGeneration(PluginRegistry(descriptors), stable=active.services["plugins"],
                                               workers=active.services["plugins"].workers)
@@ -615,9 +618,11 @@ class StorageReplicas:
                 if self.storage.session:
                     await asyncio.to_thread(self.storage.session.checkpoint)
                 operation["state"] = "complete"
-            except Exception:
+            except Exception as error:
                 recovery = self.storage.runtime.status()["health"] == "recovery_required"
-                operation.update(state="recovery_required" if recovery else "failed", error={"code": "promotion_failed"})
+                diagnostic = ({"code": error.code, "plugin_id": error.plugin_id, "message": str(error)}
+                              if isinstance(error, RuntimeTransitionError) else {"code": "promotion_failed"})
+                operation.update(state="recovery_required" if recovery else "failed", error=diagnostic)
                 if not recovery:
                     entry["state"] = "active"
                     await asyncio.to_thread(self._save)

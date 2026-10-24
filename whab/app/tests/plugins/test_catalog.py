@@ -32,7 +32,8 @@ def test_catalog_reads_packaged_data_without_discovery_and_returns_independent_p
     assert entries["sqlite"]["legacy"] is False
     assert entries["client"]["authority"] == "remote"
     assert entries["json"]["legacy"] is False
-    assert entries["plaid"]["lifecycle"] == "restart"
+    assert entries["plaid"]["lifecycle"] == "live"
+    assert entries["plaid"]["live_support"] == "bank-provider-worker"
     first["plugins"].clear()
     assert catalog.catalog_snapshot()["plugins"]
 
@@ -142,5 +143,38 @@ def test_visual_worker_label_requires_the_singleton_visual_capability():
     ):
         malformed = copy.deepcopy(value)
         next(row for row in malformed["plugins"] if row["id"] == "web").update(change)
+        with pytest.raises(catalog.CatalogError):
+            catalog.validate_catalog(malformed)
+
+
+@pytest.mark.parametrize('change', [
+    lambda row: row.update(authority='remote'),
+    lambda row: row.update(state_version=2),
+    lambda row: row.update(state_upgrades=[[1, 2]]),
+    lambda row: row.update(legacy=True),
+    lambda row: row.update(capabilities=[cap for cap in row['capabilities'] if cap['name'] != 'lifecycle.background']),
+    lambda row: row['capabilities'].append({'name': 'interface.api', 'version': 1, 'composition': 'additive'}),
+])
+def test_catalog_rejects_false_bank_worker_support_without_loading_code(change):
+    value = catalog.catalog_snapshot()
+    row = next(item for item in value['plugins'] if item['id'] == 'plaid')
+    change(row)
+    with pytest.raises(catalog.CatalogError):
+        catalog.validate_catalog(value)
+
+
+@pytest.mark.parametrize("identifier", ["sqlite", "json"])
+def test_local_storage_worker_label_requires_local_native_receipt_capabilities(identifier):
+    value = catalog.catalog_snapshot()
+    row = next(row for row in value["plugins"] if row["id"] == identifier)
+    assert row["live_support"] == "local-storage-worker" and row["authority"] == "local"
+    for change in (
+        {"authority": "remote"},
+        {"capabilities": [record for record in row["capabilities"] if record["name"] != "storage.worker"]},
+        {"capabilities": [{"name": "reporting.insights", "version": 1, "composition": "additive"}]},
+        {"state_version": 2},
+    ):
+        malformed = copy.deepcopy(value)
+        next(record for record in malformed["plugins"] if record["id"] == identifier).update(change)
         with pytest.raises(catalog.CatalogError):
             catalog.validate_catalog(malformed)

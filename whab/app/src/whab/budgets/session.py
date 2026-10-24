@@ -271,6 +271,11 @@ class BudgetSession:
     def bind(self, store):
         """Restore only into a new isolated backend; never replace an existing ledger."""
         self.store = store
+        worker_recovery = getattr(store, "worker_recovery_required", None)
+        if callable(worker_recovery) and worker_recovery():
+            # Keep the original restore/checkpoint evidence untouched until
+            # native request recovery has proved this instance's exact state.
+            return
         if self.storage_authority:
             self.checkpoint()
             return
@@ -691,7 +696,8 @@ class TrackedStorage:
                     self.on_mutation()
                 if self.session:
                     self.session.checkpoint()
-                if name in {"apply_sync", "import_workspace"} and self.after_ingestion:
+                effective_name = args[0].name if name == "execute_operation" else name
+                if effective_name in {"apply_sync", "import_workspace"} and self.after_ingestion:
                     self.after_ingestion()
                 if self.after_commit:
                     try:

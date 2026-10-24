@@ -20,14 +20,14 @@ from .contracts import contract_for
 from .interface_adapter import validate_interface_owners
 from .runtime import PluginError, PluginRegistry, load_descriptors
 from .worker_adapters import LIVE_CAPABILITIES, supports_live_plugin
-from .worker_resources import capture_resources
+from .worker_resources import capture_bank_resources, capture_resources
 
 _REPORTS = frozenset({"reporting.insights", "reporting.export"})
 _METHODS = frozenset({
     "describe", "descriptors", "bank_plugins", "interface_plugins", "file_import_plugins",
     "storage_plugin", "ui_plugin", "settings", "settings_action", "bank_logo",
     "bank_logo_provider", "logo_image", "merchant_logo_image", "insights", "export",
-    "parser_identity", "parser_requires_identity", "import_resource",
+    "parser_identity", "parser_requires_identity", "import_resource", "bank_identity", "bank_resource",
     "ui_templates",
 })
 
@@ -59,6 +59,8 @@ class RegistryGeneration:
         self.workers = dict(workers or {})
         self.resources_enabled = previous.resources_enabled if resources_enabled is None and previous else (True if resources_enabled is None else resources_enabled)
         self._parsers = {}
+        self._banks = {}
+        self._legacy_bank_tokens = dict(previous._legacy_bank_tokens) if previous else {}
         self._resources = dict(previous._resources) if previous else {}
         self._legacy_tokens = dict(previous._legacy_tokens) if previous else {}
         for plugin in registry.file_import_plugins():
@@ -74,12 +76,25 @@ class RegistryGeneration:
                 if resources is not None:
                     self._resources[plugin.id, token] = resources
                     self._legacy_tokens.setdefault(plugin.id, token)
+        for plugin in registry.bank_plugins():
+            before = previous._banks.get(plugin.id) if previous else None
+            token = before[1] if before and before[0] is plugin.bank_ui else uuid4().hex
+            self._banks[plugin.id] = plugin.bank_ui, token
+            if plugin.bank_ui is not None and (not before or before[0] is not plugin.bank_ui):
+                try:
+                    resources = capture_bank_resources(plugin.bank_ui) if self.resources_enabled else None
+                except Exception:
+                    raise PluginError("Bank plugin UI resources are missing or invalid. Reinstall or disable the plugin.",
+                                      code="missing_resources", plugin_id=plugin.id) from None
+                if resources is not None:
+                    self._resources[plugin.id, token] = resources
+                    self._legacy_bank_tokens.setdefault(plugin.id, token)
         # Old HTML keeps its exact public files or receives 404 after bounded
         # retention. It can never fall through to a newer parser's JavaScript.
         for identifier in {key[0] for key in self._resources}:
             keys = [key for key in self._resources if key[0] == identifier]
             while len(keys) > 8 or sum(sum(map(len, self._resources[key].files.values())) for key in keys) > 8 * 1024 * 1024:
-                removable = next((key for key in keys if key != (identifier, self._parsers.get(identifier, (None, None))[1])), None)
+                removable = next((key for key in keys if key not in {(identifier, self._parsers.get(identifier, (None, None))[1]), (identifier, self._banks.get(identifier, (None, None))[1])}), None)
                 if removable is None:
                     break
                 del self._resources[removable]
@@ -99,13 +114,11 @@ class RegistryGeneration:
 
     def ui_templates(self):
         """Bound public extension templates for the operation's visual worker."""
-        from .worker_resources import capture_resource_paths
-
         templates = {}
-        for plugin in self.bank_plugins():
-            if plugin.bank_ui is not None:
-                resources = capture_resource_paths(plugin.bank_ui.templates, plugin.bank_ui.static)
-                templates.update({f"plugins/{plugin.id}/{name.removeprefix('templates/')}": raw.decode("utf-8")
+        for identifier, (_, token) in self._banks.items():
+            resources = self._resources.get((identifier, token))
+            if resources is not None:
+                templates.update({f"banks/{identifier}/{token}/{name.removeprefix('templates/')}": raw.decode("utf-8")
                                   for name, raw in resources.files.items() if name.startswith("templates/")})
         for identifier, (_, token, _) in self._parsers.items():
             resources = self._resources.get((identifier, token))
@@ -138,6 +151,18 @@ class RegistryGeneration:
 
     def import_resource(self, plugin_id, token, name):
         token = token or self._legacy_tokens.get(plugin_id)
+        resources = self._resources.get((plugin_id, token))
+        return resources.files.get(name) if resources else None
+
+    def bank_plugins(self):
+        return self.registry.bank_plugins()
+
+    def bank_identity(self, plugin_id):
+        selected = self._banks.get(plugin_id)
+        return selected[1] if selected else None
+
+    def bank_resource(self, plugin_id, token, name):
+        token = token or self._legacy_bank_tokens.get(plugin_id)
         resources = self._resources.get((plugin_id, token))
         return resources.files.get(name) if resources else None
 
@@ -203,6 +228,8 @@ class LivePluginSelection:
         self.prepare_interfaces = None
         self.visual_ids = frozenset()
         self.visual = None
+        self.storage = None
+        self.banks = None
         self.initial_selection = frozenset(plugin.id for plugin in runtime._active.services["plugins"].descriptors()) - self.required
         self._lock = Lock()
         self._tickets = {}
@@ -222,11 +249,18 @@ class LivePluginSelection:
         upgrades = set(LIVE_CAPABILITIES) - {"interface.ui"}
         if self.visual is not None:
             upgrades.add("interface.ui")
+        if self.banks is None:
+            upgrades -= {"ingestion.bank", "lifecycle.background"}
         families = set(upgrades)
         if self.categorization is not None:
             families.add("categorization")
+        storage_supported = self.storage is not None and self.storage.supported()
+        code_families = set(upgrades)
+        if storage_supported:
+            families.add("storage")
+            code_families.add("storage")
         return {"families": sorted(families),
-                "code_upgrade_families": sorted(upgrades) if self.home is not None else [],
+                "code_upgrade_families": sorted(code_families) if self.home is not None else [],
                 "host_only_families": [],
                 "code_upgrades": self.home is not None, "runtime": self.runtime.status(),
                 "workers": sorted(workers, key=lambda item: item["plugin"]), "operations": operations}
@@ -246,7 +280,9 @@ class LivePluginSelection:
             if plugin is not None and plugin.ui is not None:
                 raise PluginError("Use the dedicated visual interface controls to prepare browser views and resources.",
                                   code="required_plugin", plugin_id=identifier)
-            if plugin is None or identifier in self.nonlive or not (supports_live_plugin(plugin) or (self.categorization is not None and live_categorizer(plugin))):
+            if (plugin is None or identifier in self.nonlive
+                    or (plugin.bank is not None and self.banks is None)
+                    or not (supports_live_plugin(plugin) or (self.categorization is not None and live_categorizer(plugin)))):
                 raise PluginError(
                     "This plugin needs an available live capability adapter. Finish its active work or restart WHAB with a compatible plugin selection.",
                     code="restart_required", plugin_id=identifier,
@@ -277,6 +313,8 @@ class LivePluginSelection:
             candidate = self._candidate(selection, lease.service("plugins"))
             if self.categorization is not None:
                 self.categorization.preflight(lease.service("categorization"), candidate.descriptors())
+            if self.banks is not None:
+                self.banks.preflight(lease.service("banks"), candidate.descriptors())
 
     def preflight(self, selection):
         self._preflight(validate_selection(selection))
@@ -311,13 +349,20 @@ class LivePluginSelection:
 
         if self.home is None:
             raise PluginError("This runtime cannot persist worker environments.", code="restart_required", plugin_id=plugin_id)
+        if self.storage is not None and plugin_id == self.storage.plugin_id:
+            return await self.storage.upgrade(plugin_id, approvals)
         return await upgrade_report(self, self.home, plugin_id, approvals)
 
     async def recover(self, authority):
         from .worker_selection import validate_saved_generation
 
+        if self.storage is not None and (self.storage.pending is not None or self.storage.status()["uncertain"]):
+            task = self.runtime.schedule(self.storage.recover(authority))
+            return await asyncio.shield(task)
+
         async def validate(chosen, active, candidate):
-            if active.services.get("visual") is not candidate.services.get("visual"):
+            if (active.services.get("visual") is not candidate.services.get("visual")
+                    or active.services.get("storage") is not candidate.services.get("storage")):
                 return False
             generation = active if chosen == "active" else candidate
             valid = await run_in_threadpool(validate_saved_generation, self, generation)
@@ -414,9 +459,11 @@ class LivePluginSelection:
                 self.categorization.committed(candidate)
 
         async def finalize(preparation, candidate):
-            if self.categorization is None:
-                return candidate
-            return await run_in_threadpool(self.categorization.finalize, preparation, candidate)
+            if self.categorization is not None:
+                candidate = await run_in_threadpool(self.categorization.finalize, preparation, candidate)
+            if self.banks is not None:
+                candidate = await run_in_threadpool(self.banks.finalize, preparation, candidate)
+            return candidate
 
         try:
             owner = changed_owner()

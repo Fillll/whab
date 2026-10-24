@@ -17,15 +17,15 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [example-categorization](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
 | [example-file-import](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
 | [example-ui](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/example/example-ui/README.md) | `whab_plugin_example_ui 1.0.0` | `whab>=2.36,<3` | visual-ui-worker | teaching |
-| [json](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.2.0` | `whab>=2.30,<3` | restart-required | maintained |
-| [plaid](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.2.0` | `whab>=2.27,<3` | restart-required | maintained |
+| [json](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.3.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
+| [plaid](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.3.0` | `whab>=2.38,<3` | bank-provider-worker | maintained |
 | [random-forest-categorization](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.3.0` | `whab>=2.35,<3` | categorization-worker | maintained |
 | [server](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
-| [sqlite](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.11.0` | `whab>=2.30,<3` | restart-required | maintained |
+| [sqlite](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.12.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
 | [web](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
 | [ynab](https://github.com/Fillll/whab/blob/8d802177a75dac33c1bc2ed5f5e394ddd30c55ec/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
-Explicit stateless report, branding, file-parser, declarative API interface, pure categorization and participating visual descriptors advertise their supported live-worker adapters. Other entries require restart; backend migration and copies are not inferred from package installation.
+Explicit stateless report, branding, file-parser, declarative API interface, pure categorization, typed bank-provider and participating visual descriptors advertise their supported live-worker adapters. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
 
 ## Recorded verification
 

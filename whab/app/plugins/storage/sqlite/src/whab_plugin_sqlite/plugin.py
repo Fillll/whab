@@ -75,7 +75,8 @@ def create_storage(context: StorageContext) -> StorageBackend:
                 "The existing SQLite file could not be opened as a WHAB ledger."
             ) from None
     return Store(path, budget_id=context.budget.budget_id if context.budget is not None else "default",
-                 environment=context.environment, initial_role=context.initial_role)
+                 environment=context.environment, initial_role=context.initial_role,
+                 read_only=context.read_only)
 
 
 plugin = Plugin(
@@ -83,7 +84,7 @@ plugin = Plugin(
     storage_payload_paths=("budget.sqlite",),
     contract=PluginContract(
         provides=tuple(Capability(name) for name in (
-            "receipts", "transfer.neutral", "transfer.prepare", "storage.authority", "storage.commands", "transfer.local", "storage.replica",
-        )), authority="local", lifecycle="restart",
+            "receipts", "transfer.neutral", "transfer.prepare", "storage.authority", "storage.commands", "transfer.local", "storage.replica", "storage.worker",
+        )), authority="local", lifecycle="live",
     ),
 )

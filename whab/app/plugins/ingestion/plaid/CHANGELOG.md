@@ -1,5 +1,7 @@
 # Plaid bank ingestion plugin changelog
 
+## Unreleased
+
 ## 1.2.0 — 2026-10-23
 
 PR: [#84](https://github.com/Fillll/whab/pull/84)

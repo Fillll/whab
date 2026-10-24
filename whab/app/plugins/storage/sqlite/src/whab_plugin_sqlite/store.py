@@ -41,17 +41,54 @@ __all__ = ["Store"]
 class Store(Authority):
     def __init__(
         self, database_path: str | Path = "data/whab-sandbox.sqlite", *, month: str | None = None,
-        budget_id="default", environment=None, initial_role="primary", _authority=True,
+        budget_id="default", environment=None, initial_role="primary", _authority=True, read_only=False,
     ):
         if type(initial_role) is not str or initial_role not in {"primary", "staged", "copy"}:
             raise StoreError("New storage requires a primary, staged or copy role.")
         self._lock = RLock()
+        if type(read_only) is not bool:
+            raise StoreError("Storage read-only mode must be a plain boolean.")
+        self._read_only = read_only
+        self._read_identity = None
         self._authority_enabled = _authority
         self._writing = None
         self._uncertain = None
         self.database_path = str(database_path)
         if environment is None:
             environment = "production" if self.database_path.endswith("-production.sqlite") else "sandbox"
+        if read_only:
+            if self.database_path == ":memory:":
+                raise StoreError("Read-only storage requires an existing native ledger.")
+            path = Path(database_path).absolute()
+            wal = Path(self.database_path + "-wal")
+            immutable = not (wal.exists() or wal.is_symlink())
+            if immutable:
+                information = path.stat()
+                self._read_identity = (information.st_dev, information.st_ino, information.st_size,
+                                       information.st_mtime_ns, information.st_ctime_ns)
+            # A stopped, clean WAL database otherwise creates empty -wal/-shm
+            # files even with mode=ro. Immutable reads avoid that; reject any
+            # observed source change because SQLite disables change detection.
+            # An active writer's existing WAL remains visible via normal RO.
+            self.db = sqlite3.connect(path.as_uri() + "?mode=ro" + ("&immutable=1" if immutable else ""), uri=True,
+                                      timeout=10, isolation_level=None, check_same_thread=False)
+            self.db.row_factory = sqlite3.Row
+            try:
+                with self._snapshot():
+                    metadata = self._authority_metadata()
+                    if metadata["formatVersion"] != 2:
+                        raise StoreError("Read-only readiness requires the current native SQLite schema; upgrade it explicitly first.")
+                    if metadata["budgetId"] != budget_id or metadata["environment"] != environment:
+                        raise StoreError("SQLite storage identity belongs to another budget or environment.")
+                    if self.db.execute("SELECT COUNT(*) FROM storage_operations").fetchone()[0] > 4096:
+                        raise StoreError("SQLite operation receipts exceed their supported bound.")
+                    for receipt in self.db.execute("SELECT operation_id,generation,record FROM storage_operations"):
+                        self._read_stored_receipt(receipt, metadata)
+                    self._current_evidence(metadata)
+            except BaseException:
+                self.db.close()
+                raise
+            return
         existing = self.database_path != ":memory:" and Path(database_path).is_file() and Path(database_path).stat().st_size > 0
         os.umask(0o077)
         if self.database_path != ":memory:":
@@ -90,6 +127,7 @@ class Store(Authority):
     @contextmanager
     def _snapshot(self):
         with self._lock:
+            self._check_read_identity()
             # A read transaction makes the account/ledger/cursor snapshot coherent
             # even if another process commits a sync between these SELECTs.
             own_transaction = not self.db.in_transaction
@@ -97,12 +135,25 @@ class Store(Authority):
                 self.db.execute("BEGIN")
             try:
                 yield
+                self._check_read_identity()
                 if own_transaction:
                     self.db.execute("COMMIT")
             except Exception:
                 if own_transaction:
                     self.db.execute("ROLLBACK")
                 raise
+
+    def _check_read_identity(self):
+        if self._read_identity is not None:
+            try:
+                information = Path(self.database_path).stat()
+                identity = (information.st_dev, information.st_ino, information.st_size,
+                            information.st_mtime_ns, information.st_ctime_ns)
+                wal = Path(self.database_path + "-wal")
+                if identity != self._read_identity or wal.exists() or wal.is_symlink():
+                    raise ValueError()
+            except (OSError, ValueError):
+                raise StoreError("The read-only native SQLite snapshot changed. Revalidate it before activation.") from None
 
     def state(self, workspace: str) -> dict:
         if not isinstance(workspace, str) or workspace not in {"demo", "personal"}:

@@ -18,6 +18,14 @@ from whab.domain.imports import ImportedAccount, SyncChanges
 from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
 
+from .bank_adapter import BankAdapter as BankAdapter
+from .bank_adapter import BankContinuationService as BankContinuationService
+from .bank_adapter import BankContinuationStatus as BankContinuationStatus
+from .bank_adapter import BankLinkReady as BankLinkReady
+from .bank_adapter import BankProvider as BankProvider
+from .bank_adapter import BankProviderContext as BankProviderContext
+from .bank_adapter import ProviderFailure as ProviderFailure
+from .bank_adapter import ProviderWebhook as ProviderWebhook
 from .contracts import Capability, PluginContract, Requirement
 from .interface_adapter import RemoteLedgerInterface
 from .storage_replica import (
@@ -370,6 +378,8 @@ class StorageContext:
     config: Mapping[str, str] = field(repr=False)
     budget: BudgetContext | None = None
     initial_role: str = "primary"
+    read_only: bool = False
+    expected_instance_id: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.home, Path):
@@ -378,6 +388,12 @@ class StorageContext:
             raise ValueError("Storage environment must be sandbox or production.")
         if type(self.initial_role) is not str or self.initial_role not in {"primary", "staged", "copy"}:
             raise ValueError("New storage instances must start as primary, staged, or copy.")
+        if type(self.read_only) is not bool:
+            raise ValueError("Storage read-only mode must be a plain boolean.")
+        if self.expected_instance_id is not None:
+            from uuid import UUID
+            if type(self.expected_instance_id) is not str or str(UUID(self.expected_instance_id)) != self.expected_instance_id:
+                raise ValueError("An existing storage instance requires its canonical UUID identity.")
         if not isinstance(self.config, Mapping) or any(
             type(key) is not str or type(value) is not str for key, value in self.config.items()
         ):
@@ -587,18 +603,24 @@ class BankService(Protocol):
     async def close(self) -> None: ...
 
 
-BankFactory: TypeAlias = Callable[[BankContext], BankService]
+BankFactory: TypeAlias = Callable[[BankContext], BankService] | BankAdapter
 
 
 @dataclass(frozen=True, slots=True)
 class BankUI:
     """Trusted provider UI resources. The host owns mounting and validates directories."""
 
-    templates: Path
-    static: Path
+    templates: Path | None = None
+    static: Path | None = None
+    resources: PluginResources | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
+        if self.resources is not None:
+            if type(self.resources) is not PluginResources or self.templates is not None or self.static is not None:
+                raise ValueError("Bank UI resources require one coherent path or byte bundle.")
+            if 'templates/accounts.html' not in self.resources.files or 'static/connect.js' not in self.resources.files:
+                raise ValueError("Bank UI resources require accounts.html and connect.js.")
+        elif not isinstance(self.templates, Path) or not isinstance(self.static, Path):
             raise ValueError("Bank UI resources must be pathlib.Path directories.")
 
 

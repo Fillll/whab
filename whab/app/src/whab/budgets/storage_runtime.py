@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from whab.domain.errors import StoreError
 from whab.plugins import PluginError, StorageContext, load_descriptors
 from whab.plugins.contracts import contract_for
+from whab.plugins.effect_store import EffectError
 from whab.plugins.live import RegistryGeneration
 from whab.plugins.management import installed_entrypoints
 from whab.plugins.runtime import PluginRegistry
@@ -32,6 +33,7 @@ from whab.plugins.storage import close_storage, open_storage
 from whab.plugins.storage_transfer import (
     canonical_storage_json,
     decode_local_state,
+    read_evidence,
     read_storage_json,
 )
 
@@ -251,6 +253,40 @@ def saved_storage_selection(base, budget_id, environment):
     return (locations, *selected) if selected else None
 
 
+def validated_native_binding(base, context, plugin_id, current, *, resolved=False):
+    """Read retained host authority proof; a requested UUID/path is insufficient.
+
+    Repair may read either prescribed side without making it authoritative.
+    Startup adoption requires an already resolved primary decision, after the
+    authority coordinator's own unfence/promotion validation. No native writes.
+    """
+    budget_id = context.budget.budget_id if context.budget else "default"
+    locations = StorageLocations(base, budget_id, context.environment)
+    record = locations.journal.read()
+    if record is None or locations.data is None:
+        return False
+    entry = locations.data["instances"].get(current.instance_id)
+    if (entry is None or entry["plugin_id"] != plugin_id or locations.home(entry) != context.home.resolve()
+            or current.budget_id != budget_id or current.environment != context.environment):
+        return False
+    side = next((side for side in ("source", "destination")
+                 if record[side]["instance_id"] == current.instance_id and record[f"{side}_plugin_id"] == plugin_id), None)
+    if side is None:
+        return False
+    committed = record["stage"] in _COMMITTED
+    if resolved and (current.role != "primary" or current.instance_id != record["authority_instance_id"]
+                     or record["stage"] not in {"aborted", "active", "retired"}):
+        return False
+    minimum = read_evidence(record[side])
+    epoch = record["target_epoch"] if side == "destination" and committed and current.role == "primary" else minimum.authority_epoch
+    minimum = replace(minimum, role=current.role, authority_epoch=epoch)
+    later = side == "source" and record["stage"] == "aborted" or side == "destination" and committed and current.role == "primary"
+    return (current.instance_id == minimum.instance_id and current.authority_epoch == epoch
+            and current.generation >= minimum.generation
+            and (current.generation == minimum.generation and current == minimum
+                 or later and current.generation > minimum.generation))
+
+
 def prepare_session_authority(session):
     selected = saved_storage_selection(session.storage_home, session.id, session.environment)
     session.storage_authority = selected
@@ -308,7 +344,7 @@ def namespace_evidence(locations, settings, session):
                              original_digest, locations.data["key_reference"])
 
 
-def open_saved_storage(settings, session, config_for):
+def open_saved_storage(settings, session, config_for, descriptor_for=None):
     """Open and resolve only the journal's explicit native instances at startup."""
     base, budget_id = (session.storage_home, session.id) if session else (settings.home, "default")
     selected = saved_storage_selection(base, budget_id, settings.plaid_env)
@@ -318,6 +354,8 @@ def open_saved_storage(settings, session, config_for):
     locations.check_key(settings.encryption_key)
     descriptors = {plugin.id: plugin for plugin in load_descriptors(tuple(dict.fromkeys(
         (record["source_plugin_id"], record["destination_plugin_id"]))))}
+    if descriptor_for is not None:
+        descriptors = {identifier: descriptor_for(plugin) for identifier, plugin in descriptors.items()}
     opened = {}
     try:
         for side in ("source", "destination"):
@@ -329,6 +367,7 @@ def open_saved_storage(settings, session, config_for):
             opened[side] = open_storage(plugin, StorageContext(
                 locations.home(location), settings.plaid_env, config_for(plugin),
                 session.context(plugin.id) if session else None,
+                expected_instance_id=instance_id,
             ))
         side = resolve_authority(locations.journal, opened["source"], opened["destination"],
                                  namespace_evidence(locations, settings, session))
@@ -373,9 +412,25 @@ class StorageRuntime:
         base = session.storage_home if session else settings.home
         self.locations = StorageLocations(base, runtime.budget_id, settings.plaid_env)
         self.coordinator = StorageAuthorityCoordinator(runtime, self.locations.journal,
-            lambda: namespace_evidence(self.locations, self.settings, self.session))
+            lambda: namespace_evidence(self.locations, self.settings, self.session),
+            before_authority=self._prepare_banks)
         self.previews, self.operations, self.tasks = {}, {}, set()
         self.app = self.manager = self.live = None
+        self.descriptor_for = lambda plugin: plugin
+
+    async def _prepare_banks(self, active):
+        # Drained requests cannot still use a provider, but an idle captured
+        # continuation may bind the old native UUID/epoch/generation. Refuse
+        # authority changes before their first durable decision in that case.
+        for provider, bank in active.services.get("banks", {}).items():
+            prepare_close = getattr(bank, "prepare_close", None)
+            if callable(prepare_close):
+                try:
+                    result = prepare_close()
+                    if asyncio.iscoroutine(result):
+                        await result
+                except EffectError:
+                    raise RuntimeTransitionError("continuation_busy", provider) from None
 
     def attach(self, app, manager, live):
         self.app, self.manager, self.live = app, manager, live
@@ -405,7 +460,7 @@ class StorageRuntime:
         source = self._source()
         if not valid_plugin_name(destination) or destination == source.id:
             raise PluginError("Choose a different installed local storage plugin.", code="invalid_configuration")
-        target = load_descriptors((destination,), installed_entrypoints())[0]
+        target = self.descriptor_for(load_descriptors((destination,), installed_entrypoints())[0])
         self._supported(target)
         snapshot = self.tracked.export_local()
         protected = decode_local_state(snapshot.financial, snapshot.protected)
@@ -425,7 +480,9 @@ class StorageRuntime:
             if not preview.empty or not preview.supported:
                 raise PluginError("The destination cannot preserve this complete budget in an empty instance.",
                                   code="storage_transfer_unsupported", plugin_id=target.id)
-            self.locations.register(backend.commit_evidence(), target.id, relative_home, target.storage_payload_paths)
+            evidence = backend.commit_evidence()
+            self.locations.register(evidence, target.id, relative_home, target.storage_payload_paths)
+            context = replace(context, expected_instance_id=evidence.instance_id)
         finally:
             close_storage(backend)
         self.previews[identifier] = {"source": source.id, "destination": target.id, "context": context,
@@ -474,6 +531,9 @@ class StorageRuntime:
         def factory():
             return open_storage(target, plan["context"])
         def build(active, prepared):
+            upgrades = getattr(self.app.state, "storage_upgrade", None) if self.app else None
+            if upgrades is not None:
+                return upgrades.build_generation(active, prepared, target, plan["source"])
             descriptors = tuple(target if plugin.id == plan["source"] else plugin for plugin in active.services["plugins"].descriptors())
             registry = RegistryGeneration(PluginRegistry(descriptors), stable=active.services["plugins"],
                                           workers=active.services["plugins"].workers)
@@ -491,7 +551,7 @@ class StorageRuntime:
         except (StoreError, PluginError) as error:
             operation.update(state="recovery_required" if self.runtime.status()["health"] == "recovery_required" else "failed",
                              error={"code": getattr(error, "code", "storage_transition_failed"),
-                                    "message": str(error), "plugin_id": target.id})
+                                    "message": str(error), "plugin_id": getattr(error, "plugin_id", None) or target.id})
             raise
 
     def _activate(self, prepared, plugin_id):
@@ -522,11 +582,27 @@ class StorageRuntime:
         if self.app:
             self.app.state.storage_plugin = plugin_id
             self.app.state.store = prepared
+            upgrades = getattr(self.app.state, "storage_upgrade", None)
+            if upgrades is not None:
+                upgrades.retarget(plugin_id, StorageContext(self.locations.home(entry), self.settings.plaid_env,
+                    self.config_for(load_descriptors((plugin_id,), installed_entrypoints())[0]),
+                    self.session.context(plugin_id) if self.session else None, expected_instance_id=evidence.instance_id))
         replicas = getattr(self, "replicas", None)
         if replicas:
             replicas.supported_primary_ids.add(plugin_id)
 
+    def _restart_required(self):
+        pending = self.coordinator._pending
+        with self.runtime._condition:
+            uncertain = self.runtime._uncertain
+            return bool(pending and uncertain and self.runtime._service_fault
+                        and uncertain[0].services.get("storage") is pending["source"]
+                        and uncertain[1].services.get("storage") is pending["destination"])
+
     async def recover(self):
+        if self._restart_required():
+            raise PluginError("Restart this budget host to validate its retained storage authority journal and native worker evidence. Preserve both native instances.",
+                              code="restart_required", plugin_id=self.tracked.storage_plugin_id)
         self.locations.check_key(self.settings.encryption_key)
         generation = await self.coordinator.recover()
         for operation in self.operations.values():
@@ -540,7 +616,12 @@ class StorageRuntime:
         return generation
 
     def status(self):
-        return {"runtime": self.runtime.status(), "storage": self.tracked.storage_plugin_id,
+        upgrades = getattr(self.app.state, "storage_upgrade", None) if self.app else None
+        runtime, restart = self.runtime.status(), self._restart_required()
+        return {"runtime": runtime, "storage": self.tracked.storage_plugin_id,
+                "recovery": {"mode": "restart_required" if restart else "in_process" if runtime["health"] == "recovery_required" else "none",
+                             "code": "combined_storage_recovery" if restart else None},
+                "code": upgrades.status() if upgrades is not None else {"supported": False},
                 "authority": self.coordinator.status(), "operations": [copy.deepcopy(value) for value in self.operations.values()]}
 
     async def close(self):

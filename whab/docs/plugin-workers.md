@@ -1,9 +1,11 @@
 # Approved optional-worker upgrades
 
 WHAB 2.25 introduced explicitly live stateless reporting/export upgrades. The
-current adapter also replaces branding, file-parser, declarative API interface
-and explicitly scoped categorization code without restarting its listener.
+current adapter also replaces branding, file-parser, declarative API interface,
+explicitly scoped categorization and typed bank-provider code without restarting its listener.
 WHAB 2.36 adds the separate visual adapter with coherent assets and browser participation.
+WHAB 2.37 adds the separate [local storage adapter](storage-workers.md) for SQLite and JSON, with native durable receipts and same-authority code handover.
+WHAB 2.38 adds the typed bank-provider adapter and host-owned durable continuation/native broker.
 Other families require their own adapters. The parent
 retains TLS, authorization, local-access guards, budget identity and financial
 validation. These data protocols accept no financial mutation, backend handle,
@@ -232,7 +234,7 @@ model formats. The installed-version upgrade test uses distinct fictional v1/v2
 wheels, both workspaces and a failed candidate, then reopens from the saved v2
 reference. Random forest host tests also run the actual installed engine child.
 
-Protected bank flows and storage require their own adapters. Tests use reviewed
+Local storage requires its own separate adapter. Tests use reviewed
 fictional wheels, temporary homes and mocked providers; worker processes are not
 a security sandbox.
 
@@ -298,3 +300,55 @@ A running owner, changed decision, invalid scope or unsupported journal version
 refuses repair; preserve those files instead of removing a journal or choosing a
 different interface automatically. A host upgrade requires approved wheels built
 for that actual host before a worker can resume.
+## Bank provider workers
+
+A live bank declares `bank=BankAdapter(factory)`, `PluginContract(lifecycle="live",
+authority="local", provides=(Capability("ingestion.bank"),
+Capability("lifecycle.background")))`. The typed provider adapter is separate from
+legacy `BankContext` factories, whose restart ABI remains supported. Only the
+explicit pure provider shape can enter an approved immutable worker environment.
+The host probes construction/public configuration and captured UI resources during
+readiness; it sends no Link, exchange, synchronization or provider HTTP request.
+
+The synchronous factory receives `BankProviderContext(budget_id, environment,
+config)`. Its config is copied, bounded and hidden from repr. Host encryption keys,
+backend handles, `BudgetContext`, file callbacks and background factories are
+excluded. The async engine exposes `connection_token`, `exchange_token`,
+`read_sync`, `remove_token`, `webhook_event` and `close`. Transport outputs are strict
+bounded JSON DTOs. A sync returns normalized `SyncChanges`/`ImportedAccount` records,
+a cursor and historical-complete flag; the host validates again and performs
+provider namespacing and native atomic apply. Webhook signature verification runs
+against the original bytes in the child; only verified typed actions reach the
+host's owned Item lookup and background sync queue.
+
+Provider RPC payloads are at most 16 MiB; synchronization accepts up to 100,000
+changes and 500 accounts per complete batch. Webhooks are bounded by the existing
+128 KiB HTTP body limit (the internal codec also caps raw bytes at 1 MiB), and
+captured bank UI bundles use the shared 4 MiB/256-file resource bounds. Unsupported
+volumes fail before native mutation. The bank's public config contains only
+`environment`, `configured`, `liveEnabled` and bounded missing-config key names.
+Expected errors use fixed `ProviderFailure` codes (`not_configured`, `reconnect`,
+`transport`); provider response/error text never enters diagnostics. Unknown hook
+failures, process death, malformed frames and irreversible transport failures
+close the child; there is no automatic restart or repeated external exchange.
+
+`BankCoordinator` owns the four-method continuation facade described in
+[the bank SDK](plugins.md#privileged-bank-capability). A begin retry returns its original
+encrypted ready Link token. Exchange intent is flushed before provider HTTP, then
+the normalized response and exact native request are encrypted and flushed before
+`StorageCommands.execute_operation`. The native receipt is the sole commit
+proof. Status can reconcile an existing receipt without HTTP or a new native
+write. Explicit Finish saving can resume the captured exact request after receipt
+or unchanged-generation evidence permits it. Receipt absence alone is unknown;
+a pending native-worker intent cannot be bypassed. Unknown external exchange
+requires independent provider verification through the private continuation
+reconciliation control, not a new Link or token exchange.
+
+Host-owned request tasks retain generation leases after browser disconnection.
+Queued webhook sync uses an independent lease and retains a coalesced follow-up
+notification. Changed provider selection/upgrade defers unfinished or uncertain
+flows and queued work; unchanged providers retain their original scope across
+unrelated runtime changes. Missing host keys leave a new provider unconfigured;
+existing private journals require their original key. Private journals never
+enter portable containers, catalogs, worker IPC or copy namespaces. This remains
+a trusted-Python containment contract, without an OS sandbox.

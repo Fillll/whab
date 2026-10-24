@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.30 or newer for the public local-authority and
+This version requires WHAB 2.37 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -100,3 +100,21 @@ namespaces, fence the primary and durably choose authority. Only then may
 leave financial generation and data unchanged; new primary commands advance it.
 
 From `whab/app/`, use `.venv/bin/python -m pytest plugins/storage/sqlite/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. Documentation-only edits can use `--docs`. See [plugin contribution rules](../../README.md#test-ownership) for coverage/packaging requirements and [CHANGELOG.md](CHANGELOG.md) for the release history of these capabilities.
+
+
+## Read-only readiness and live code
+
+The explicit version-1 `storage.worker` contract supports compatible live code
+replacement through the host's approved environment coordinator. The host drains
+financial/background work before releasing the old writer, durably chooses the
+new code before its first writable constructor, and retains native instance,
+authority epoch and financial generation. It uses native operation receipts to
+reconcile lost mutation replies; uncertainty gates this budget until explicit
+recovery. This does not change storage authority or select another backend.
+
+`StorageContext(read_only=True)` validates an existing current native schema
+without creating a ledger or upgrading older metadata, and rejects all mutations.
+Only compatible readers may pass candidate readiness; schema changes need an
+explicit reader/upgrader strategy. See [storage workers and stopped-host repair](../../../../docs/storage-workers.md)
+for the exact-host fence, protocol limits, durable request replay and recovery.
+The client backend requires a separate host-managed remote adapter.

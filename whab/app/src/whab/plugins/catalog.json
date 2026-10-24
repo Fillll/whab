@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "host_version": "2.36.0",
+  "host_version": "2.38.0",
   "plugins": [
     {
       "api_version": 1,
@@ -367,6 +367,11 @@
         },
         {
           "composition": "additive",
+          "name": "storage.worker",
+          "version": 1
+        },
+        {
+          "composition": "additive",
           "name": "transfer.local",
           "version": 1
         },
@@ -392,22 +397,20 @@
       },
       "id": "json",
       "legacy": false,
-      "lifecycle": "restart",
-      "live_support": "restart-required",
+      "lifecycle": "live",
+      "live_support": "local-storage-worker",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2.30,<3",
+      "requires_host": "whab>=2.37,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/storage/json",
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [
-        "pr87-installed-copy-promotion"
-      ],
-      "version": "1.2.0"
+      "verifications": [],
+      "version": "1.3.0"
     },
     {
       "api_version": 1,
@@ -440,23 +443,20 @@
       },
       "id": "plaid",
       "legacy": false,
-      "lifecycle": "restart",
-      "live_support": "restart-required",
+      "lifecycle": "live",
+      "live_support": "bank-provider-worker",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2.27,<3",
+      "requires_host": "whab>=2.38,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/ingestion/plaid",
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [
-        "pr86-installed-sqlite-web",
-        "pr86-installed-json-web"
-      ],
-      "version": "1.2.0"
+      "verifications": [],
+      "version": "1.3.0"
     },
     {
       "api_version": 1,
@@ -581,6 +581,11 @@
         },
         {
           "composition": "additive",
+          "name": "storage.worker",
+          "version": 1
+        },
+        {
+          "composition": "additive",
           "name": "transfer.local",
           "version": 1
         },
@@ -606,24 +611,20 @@
       },
       "id": "sqlite",
       "legacy": false,
-      "lifecycle": "restart",
-      "live_support": "restart-required",
+      "lifecycle": "live",
+      "live_support": "local-storage-worker",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2.30,<3",
+      "requires_host": "whab>=2.37,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/storage/sqlite",
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [
-        "pr87-installed-copy-promotion",
-        "pr92-installed-native-api",
-        "pr97-visual-interface-native-https"
-      ],
-      "version": "1.11.0"
+      "verifications": [],
+      "version": "1.12.0"
     },
     {
       "api_version": 1,

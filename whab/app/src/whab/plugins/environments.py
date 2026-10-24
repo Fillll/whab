@@ -395,7 +395,7 @@ def _verify(path, python, manifest, deadline):
     _run([str(python), "-I", "-B", "-c", _VERIFY, str(path), str(expected), str(Path(__file__).resolve().parents[2])], deadline)
 
 
-def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, timeout=120,
+def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, timeout=120, family="optional",
                         worker_owner=None, worker_retired=None) -> PreparedEnvironment:
     """Prepare one approved optional-plugin closure; publication grants no activation.
 
@@ -410,6 +410,8 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
         raise ValueError("Choose a plugin ID and a bounded tuple of approved local wheels.")
     if type(timeout) not in {int, float} or not 0 < timeout <= 600:
         raise ValueError("Environment preparation requires a timeout within 600 seconds.")
+    if family not in {"optional", "storage"}:
+        raise ValueError("Choose a supported worker protocol family.")
     deadline = time.monotonic() + timeout
     created = []
     probes = []
@@ -463,6 +465,10 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                         "python": {"version": platform.python_version(), "cache_tag": sys.implementation.cache_tag,
                                    "sha256": _sha256(Path(sys.executable))},
                         "wheels": [asdict(record) for record in records]}
+            # V1 remains exact for existing optional environments. Storage's
+            # distinct private protocol has an explicitly versioned receipt.
+            if family == "storage":
+                manifest.update(format=2, family="storage")
             manifest = json.loads(_json(manifest))
             if len(_json(manifest)) > MAX_METADATA_BYTES - 256:
                 raise EnvironmentPreparationError("invalid_closure", plugin_id)
@@ -504,59 +510,77 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                     _run([str(python), "-I", "-m", "pip", "--isolated", "install", "--disable-pip-version-check",
                           "--no-index", "--no-deps", *(str(destination / "wheels" / item.filename) for item in records)], deadline)
                     _verify(destination, python, manifest, deadline)
-                    probe = ReportWorker(plugin_id, python=python, timeout=min(60, _remaining(deadline)),
-                                         expected_distribution=plugin.distribution, expected_version=plugin.version,
-                                         on_create=own_probe)
-                    try:
-                        if probe.info["host"] != __version__:
-                            raise EnvironmentPreparationError("incompatible_host", plugin_id)
-                        if not probe.info["live"]:
-                            raise EnvironmentPreparationError("unsupported_lifecycle", plugin_id)
-                        adapters = probe.info["adapters"]
-                        if adapters["interface"] is not None:
-                            probe.interface()
-                        if adapters["ui"] is not None:
-                            from .ui_worker import readiness_arguments
-
-                            probe.visual_resources()
-                            for page in ("budget", "transactions", "accounts", "insights"):
-                                probe.timeout = min(60, _remaining(deadline))
-                                probe.render_ui(readiness_arguments(page))
-                        if adapters["bank_logos"] is not None:
-                            if adapters["bank_logos"]["cache"]:
-                                probe.configure_cache(destination / "probe-cache")
-                            probe.resolve("Unknown fictional institution")
-                        if adapters["settings"] is not None:
-                            probe.settings()
-                        if adapters["file_import"] is not None:
-                            resources = probe.resources()
-                            if (resources is not None) != adapters["file_import"]["ui"]:
-                                raise EnvironmentPreparationError("environment_failed", plugin_id)
-                        if adapters["categorization"]:
-                            from .namespace_effects import NamespaceSnapshot
-
-                            namespace = NamespaceSnapshot({}, {})
-                            for workspace in ("personal", "demo"):
-                                engine, _, _ = probe.category({"engine": None, "command": "open", "values": {},
-                                    "context": {"budget": "readiness", "workspace": workspace, "settings": {}}}, namespace)
-                                _, index, observed = probe.category({"engine": engine, "command": "index", "values": {}, "context": None}, namespace)
-                                if type(index) is not dict or type(index.get("models")) is not list or observed.digest != namespace.digest:
-                                    raise EnvironmentPreparationError("environment_failed", plugin_id)
-                                probe.category({"engine": engine, "command": "close", "values": {}, "context": None}, namespace)
-                        snapshot = BudgetSnapshot("personal", "2000-01", (), (), ())
-                        if probe.info["insights"]:
-                            probe.timeout = min(60, _remaining(deadline))
-                            probe.insights(snapshot)
-                        if probe.info["export"]:
-                            probe.timeout = min(60, _remaining(deadline))
-                            probe.export(snapshot)
-                    finally:
+                    if family == "storage":
+                        from .storage_worker import StorageWorker
+                        probe = StorageWorker(plugin_id, python=python, timeout=min(60, _remaining(deadline)),
+                                              expected_distribution=plugin.distribution, expected_version=plugin.version,
+                                              on_create=own_probe)
+                        # Its strict hello is the data-only engine readiness probe.
                         probe.timeout = max(0.001, min(60, deadline - time.monotonic()))
                         probe.close()
                         if probe.cleanup_pending:
                             raise EnvironmentPreparationError("environment_cleanup_failed", plugin_id)
                         if worker_retired is not None:
                             worker_retired(probe)
+                    else:
+                        probe = ReportWorker(plugin_id, python=python, timeout=min(60, _remaining(deadline)),
+                                             expected_distribution=plugin.distribution, expected_version=plugin.version,
+                                             on_create=own_probe)
+                        try:
+                            if probe.info["host"] != __version__:
+                                raise EnvironmentPreparationError("incompatible_host", plugin_id)
+                            if not probe.info["live"]:
+                                raise EnvironmentPreparationError("unsupported_lifecycle", plugin_id)
+                            adapters = probe.info["adapters"]
+                            if adapters["interface"] is not None:
+                                probe.interface()
+                            if adapters["ui"] is not None:
+                                from .ui_worker import readiness_arguments
+
+                                probe.visual_resources()
+                                for page in ("budget", "transactions", "accounts", "insights"):
+                                    probe.timeout = min(60, _remaining(deadline))
+                                    probe.render_ui(readiness_arguments(page))
+                            if adapters["bank_logos"] is not None:
+                                if adapters["bank_logos"]["cache"]:
+                                    probe.configure_cache(destination / "probe-cache")
+                                probe.resolve("Unknown fictional institution")
+                            if adapters["settings"] is not None:
+                                probe.settings()
+                            if adapters["file_import"] is not None:
+                                resources = probe.resources()
+                                if (resources is not None) != adapters["file_import"]["ui"]:
+                                    raise EnvironmentPreparationError("environment_failed", plugin_id)
+                            if adapters["categorization"]:
+                                from .namespace_effects import NamespaceSnapshot
+
+                                namespace = NamespaceSnapshot({}, {})
+                                for workspace in ("personal", "demo"):
+                                    engine, _, _ = probe.category({"engine": None, "command": "open", "values": {},
+                                        "context": {"budget": "readiness", "workspace": workspace, "settings": {}}}, namespace)
+                                    _, index, observed = probe.category({"engine": engine, "command": "index", "values": {}, "context": None}, namespace)
+                                    if type(index) is not dict or type(index.get("models")) is not list or observed.digest != namespace.digest:
+                                        raise EnvironmentPreparationError("environment_failed", plugin_id)
+                                    probe.category({"engine": engine, "command": "close", "values": {}, "context": None}, namespace)
+                            if adapters["bank"] is not None:
+                                probe.provider('open', {'budget_id': 'readiness', 'environment': 'sandbox', 'config': {}})
+                                if adapters["bank"]["ui"] and probe.provider_resources() is None:
+                                    raise EnvironmentPreparationError("environment_failed", plugin_id)
+                                probe.provider('close', {})
+                            snapshot = BudgetSnapshot("personal", "2000-01", (), (), ())
+                            if probe.info["insights"]:
+                                probe.timeout = min(60, _remaining(deadline))
+                                probe.insights(snapshot)
+                            if probe.info["export"]:
+                                probe.timeout = min(60, _remaining(deadline))
+                                probe.export(snapshot)
+                        finally:
+                            probe.timeout = max(0.001, min(60, deadline - time.monotonic()))
+                            probe.close()
+                            if probe.cleanup_pending:
+                                raise EnvironmentPreparationError("environment_cleanup_failed", plugin_id)
+                            if worker_retired is not None:
+                                worker_retired(probe)
                     if (destination / "probe-cache").exists():
                         shutil.rmtree(destination / "probe-cache")
                     _remaining(deadline)
