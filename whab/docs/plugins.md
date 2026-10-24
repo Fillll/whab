@@ -272,6 +272,14 @@ the [platform execution checklist](plugin-platform.md).
 
 ## Storage backends
 
+WHAB 2.23 adds the independently packaged [JSON backend](../app/plugins/storage/json/README.md)
+alongside SQLite. It passes the public storage conformance suites and stores its
+native ledger, receipts and encrypted provider records in one versioned file.
+Keys remain outside that file. Use its sanitized portable export for transfer;
+the native JSON file contains private device state. Native full-file limits,
+uncertain commits, writer locking and measured performance are documented in its
+owning guide. Selecting JSON does not migrate SQLite data or promote a copy.
+
 The bundled SQLite descriptor is registered as `sqlite = "whab_plugin_sqlite.plugin:plugin"`. Host code imports `StorageBackend` rather than a concrete store or database driver. The SQLite descriptor opens its backend only when the selected factory runs.
 
 ```python

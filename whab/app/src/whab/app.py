@@ -349,7 +349,11 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.state.ui_plugin = ui_plugin.id if ui_plugin else None
     app.state.ledger_service = service
     app.state.budget_session = budget_session
-    app.include_router(budget_host.router(store, settings, budget_session, storage_config=resolved_config))
+    storage_contract = contract_for(selected_storage) if selected_storage else None
+    storage_file_exports = bool(storage_contract and storage_contract.authority == "local"
+                                and any(capability.name == "transfer.prepare" for capability in storage_contract.provides))
+    app.include_router(budget_host.router(store, settings, budget_session, storage_config=resolved_config,
+                                         storage_file_exports=storage_file_exports))
     for plugin in plugins.interface_plugins():
         try:
             app.include_router(plugin.interface.factory(InterfaceContext(

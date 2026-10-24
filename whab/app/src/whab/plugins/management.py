@@ -17,6 +17,7 @@ _BUNDLED_METADATA = {
     ("plaid", "whab_plugin_plaid.plugin:plugin"): ("ingestion", "Plaid"),
     ("ynab", "whab_plugin_ynab.plugin:plugin"): ("ingestion", "Import from YNAB ZIP file"),
     ("sqlite", "whab_plugin_sqlite.plugin:plugin"): ("storage", "SQLite"),
+    ("json", "whab_plugin_json.plugin:plugin"): ("storage", "JSON"),
     ("client", "whab_plugin_client.plugin:plugin"): ("storage", "Remote budget client"),
     ("server", "whab_plugin_server.plugin:plugin"): ("interface", "Budget API server"),
     ("example", "whab_plugin_example:plugin"): ("example", "Month totals example"),
