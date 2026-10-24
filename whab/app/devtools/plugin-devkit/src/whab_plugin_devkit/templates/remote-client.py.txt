@@ -1,0 +1,10 @@
+"""Declare a remote authority; HTTPS credentials and transport stay in the host."""
+
+from whab.plugins import Plugin, PluginContract, RemoteLedgerClient
+
+plugin = Plugin(
+    "__PLUGIN_ID__", "Fictional remote ledger client",
+    storage=RemoteLedgerClient(url_setting="__URL_SETTING__", token_setting="__TOKEN_SETTING__",
+                               budget_setting="__BUDGET_SETTING__"),
+    contract=PluginContract(authority="remote", lifecycle="live"),
+)

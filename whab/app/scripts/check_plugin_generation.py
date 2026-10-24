@@ -23,10 +23,13 @@ API_MINIMUM_HOST_COMMIT = "ebbff0d464dd67c0269428a6d4a339778e21ec57"
 UI_MINIMUM_HOST_VERSION = "2.36.0"
 UI_MINIMUM_HOST_COMMIT = "a866eda580c6e363a20636785bc4b4003db0652f"
 BANK_MINIMUM_HOST_VERSION = "2.38.0"
-BANK_MINIMUM_HOST_COMMIT = "75ede3d6639b716b7110a69b5e8ec99334842799"
+BANK_MINIMUM_HOST_COMMIT = "dd52ec9554ee3c36395f8f2a7c1d2ab5ff00353f"
+REMOTE_MINIMUM_HOST_VERSION = "2.40.0"
+REMOTE_MINIMUM_HOST_COMMIT = "d13bccb2d2e3122bdb00a1f4d2e0e9aa4b1393f1"
 MINIMUM_RECIPES = {MINIMUM_HOST_VERSION: MINIMUM_HOST_COMMIT, API_MINIMUM_HOST_VERSION: API_MINIMUM_HOST_COMMIT,
-                   UI_MINIMUM_HOST_VERSION: UI_MINIMUM_HOST_COMMIT, BANK_MINIMUM_HOST_VERSION: BANK_MINIMUM_HOST_COMMIT}
-FAMILIES = ("reporting", "branding", "file-import", "categorization", "api", "ui", "bank")
+                   UI_MINIMUM_HOST_VERSION: UI_MINIMUM_HOST_COMMIT, BANK_MINIMUM_HOST_VERSION: BANK_MINIMUM_HOST_COMMIT,
+                   REMOTE_MINIMUM_HOST_VERSION: REMOTE_MINIMUM_HOST_COMMIT}
+FAMILIES = ("reporting", "branding", "file-import", "categorization", "api", "ui", "bank", "remote-client")
 BUILD_REQUIREMENTS = ("setuptools==84.2.1",)
 
 
@@ -61,10 +64,15 @@ for name in ('whab', 'whab_plugin_devkit', 'whab_plugin_sqlite', module):
     assert pathlib.Path(importlib.import_module(name).__file__).resolve().is_relative_to(root), name
 entries = tuple(metadata.entry_points(group='whab.plugins'))
 selected = {'sqlite', identifier}
+if 'whab_plugin_server' in expected:
+    selected.add('server')
+    assert pathlib.Path(importlib.import_module('whab_plugin_server').__file__).resolve().is_relative_to(root)
 if 'whab_plugin_json' in expected:
-    selected |= {'json', 'synthetic-report-a', 'synthetic-report-b', 'synthetic-brand-a', 'synthetic-brand-b', 'synthetic-import-a', 'synthetic-import-b'}
-    for name in ('whab_plugin_json', 'whab_devkit_runtime_peers'):
-        assert pathlib.Path(importlib.import_module(name).__file__).resolve().is_relative_to(root), name
+    selected.add('json')
+    assert pathlib.Path(importlib.import_module('whab_plugin_json').__file__).resolve().is_relative_to(root)
+if 'whab_devkit_runtime_peers' in expected:
+    selected |= {'synthetic-report-a', 'synthetic-report-b', 'synthetic-brand-a', 'synthetic-brand-b', 'synthetic-import-a', 'synthetic-import-b'}
+    assert pathlib.Path(importlib.import_module('whab_devkit_runtime_peers').__file__).resolve().is_relative_to(root)
 assert len(entries) == len(selected) and {entry.name for entry in entries} == selected
 candidate, = (entry for entry in entries if entry.name == identifier)
 assert normalized(candidate.dist.metadata['Name']) == normalized(distribution)
@@ -112,7 +120,7 @@ def project_minimum(project):
     value = tomllib.loads((project / "pyproject.toml").read_text())
     minimum = value.get("tool", {}).get("whab", {}).get("plugin-devkit", {}).get("minimum-host", MINIMUM_HOST_VERSION)
     if type(minimum) is not str or minimum not in MINIMUM_RECIPES:
-        raise ValueError("Choose a supported genuine minimum-host recipe: 2.22.0, 2.34.0, 2.36.0 or 2.38.0.")
+        raise ValueError("Choose a supported genuine minimum-host recipe: 2.22.0, 2.34.0, 2.36.0, 2.38.0 or 2.40.0.")
     hosts = [requirement for text in value["project"].get("dependencies", ())
              if canonicalize_name((requirement := Requirement(text)).name) == "whab"]
     if (len(hosts) != 1 or hosts[0].url or hosts[0].marker or hosts[0].extras
@@ -132,6 +140,17 @@ def bank_fixture_arguments(project):
     if fixture != "fictional-v1" or project_minimum(project) != BANK_MINIMUM_HOST_VERSION:
         raise ValueError("Use the reviewed fictional-v1 bank fixture on its genuine 2.38 host floor.")
     return ["--bank-fixture", fixture]
+
+
+def remote_fixture_enabled(project):
+    """The author's fixture approval grants only disposable fictional authority."""
+    value = tomllib.loads((project / "pyproject.toml").read_text())
+    fixture = value.get("tool", {}).get("whab", {}).get("plugin-devkit", {}).get("offline-remote-fixture")
+    if fixture is None:
+        return False
+    if fixture != "fictional-v1" or project_minimum(project) != REMOTE_MINIMUM_HOST_VERSION:
+        raise ValueError("Use the reviewed fictional-v1 remote fixture on its genuine 2.40 host floor.")
+    return True
 
 
 def minimum_source(helper, base, environment, version):
@@ -222,7 +241,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, help="Write exact artifacts and complete replay manifests to this JSON file.")
     parser.add_argument("--artifacts-directory", type=Path, help="Preserve approved wheels and replay files in a new directory, including on failure.")
-    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the seven projects.")
+    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the eight projects.")
     parser.add_argument("--plugin", help="The external project's single public plugin entry-point ID.")
     parser.add_argument("--candidate-ref", help="Full source commit for the external CI candidate host; never downloads a host wheel from an index.")
     parser.add_argument("--extra-wheelhouse", type=Path, help="Additional caller-approved dependency wheels; no candidate dependencies are downloaded.")
@@ -241,6 +260,10 @@ def main(argv=None):
             projects = [helper.copy_project(candidate_source, base / "host"),
                         helper.copy_project(ROOT / "devtools/plugin-devkit", base / "toolkit"),
                         helper.copy_project(candidate_source / "plugins/storage/sqlite", base / "sqlite")]
+            remote_requested = args.project is None or remote_fixture_enabled(args.project.resolve())
+            server_source = helper.copy_project(candidate_source / "plugins/interface/server", base / "server") if remote_requested else None
+            if server_source is not None:
+                projects.append(server_source)
             candidate_version = helper.host_version(projects[0])
             from packaging.version import Version
 
@@ -250,7 +273,7 @@ def main(argv=None):
                                     helper.copy_project(ROOT / "devtools/plugin-devkit/fixtures/runtime-peers", base / "runtime-peers")]
                 projects.extend(runtime_projects)
             requested_floors = ({project_minimum(args.project.resolve())} if args.project is not None
-                                else {MINIMUM_HOST_VERSION, API_MINIMUM_HOST_VERSION, UI_MINIMUM_HOST_VERSION, BANK_MINIMUM_HOST_VERSION})
+                                else {MINIMUM_HOST_VERSION, API_MINIMUM_HOST_VERSION, UI_MINIMUM_HOST_VERSION, BANK_MINIMUM_HOST_VERSION, REMOTE_MINIMUM_HOST_VERSION})
             if any(Version(candidate_version) < Version(floor) for floor in requested_floors):
                 raise ValueError("The candidate host predates an advertised project minimum.")
             if args.project is not None and candidate_version == MINIMUM_HOST_VERSION:
@@ -284,6 +307,8 @@ def main(argv=None):
             all_wheels = [helper.wheel_record(path) for path in wheels.glob("*.whl")]
             toolkit_version = next(record["version"] for record in all_wheels if record["distribution"] == "whab_plugin_devkit")
             toolkit = helper.wheel_for(wheels, "whab_plugin_devkit", toolkit_version)
+            server_wheel = (helper.wheel_for(wheels, "whab_plugin_server", helper.tomllib.loads((server_source / "pyproject.toml").read_text())["project"]["version"])
+                            if server_source is not None else None)
             reference_versions = {version: helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"]
                                   for version, project in reference_sources.items()}
             sqlite_wheels = {version: helper.wheel_for(wheels, "whab_plugin_sqlite", reference_versions[version])
@@ -295,7 +320,8 @@ def main(argv=None):
             for version, host in host_wheels.items():
                 helper.run([sys.executable, "-I", "-m", "pip", "--isolated", "download", "--index-url", "https://pypi.org/simple", "--disable-pip-version-check", "--only-binary=:all:", "--dest", str(wheels),
                             str(host), str(toolkit), str(sqlite_wheels[version]), *helper.TEST_REQUIREMENTS,
-                            *(str(wheel) for wheel in runtime_wheels.get(version, ()))], cwd=base, env=env)
+                            *(str(wheel) for wheel in runtime_wheels.get(version, ())),
+                            *([str(server_wheel)] if server_wheel is not None and Version(version) >= Version(REMOTE_MINIMUM_HOST_VERSION) else [])], cwd=base, env=env)
             bootstrap = base / "generator-environment"
             helper.run([sys.executable, "-I", "-m", "venv", str(bootstrap)], cwd=base, env=env)
             generator_python = bootstrap / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
@@ -332,6 +358,11 @@ def main(argv=None):
                     floor = project_minimum(project)
                     if version not in {floor, candidate_version}:
                         continue
+                    remote_project = remote_fixture_enabled(project)
+                    extra_runtime = runtime_wheels.get(version, ())
+                    if remote_project:
+                        extra_runtime = [wheel for wheel in extra_runtime if helper.wheel_record(wheel)["distribution"] != "whab_plugin_json"]
+                        extra_runtime = [*extra_runtime, server_wheel]
                     work = base / f"external-{version}-{family}"
                     work.mkdir()
                     shutil.copytree(project / "tests", work / "tests")
@@ -342,13 +373,13 @@ def main(argv=None):
                     candidate_record = helper.wheel_record(candidate)
                     command = [str(python), "-I", "-m", "pip", "install", "--no-index", "--find-links", str(wheels),
                                str(host), str(toolkit), str(sqlite), str(candidate) + "[test]", *helper.TEST_REQUIREMENTS,
-                               *(str(wheel) for wheel in runtime_wheels.get(version, ()))]
+                               *(str(wheel) for wheel in extra_runtime)]
                     subprocess.run(command, cwd=work, env=env, check=True)
                     subprocess.run([str(python), "-I", "-m", "pip", "check"], cwd=work, env=env, check=True)
                     expected = {"whab": version, "whab_plugin_devkit": toolkit_version,
                                 "whab_plugin_sqlite": sqlite_version, candidate_record["distribution"]: candidate_record["version"]}
                     if Version(version) >= Version("2.32.0"):
-                        expected.update({record["distribution"]: record["version"] for record in map(helper.wheel_record, runtime_wheels[version])})
+                        expected.update({record["distribution"]: record["version"] for record in map(helper.wheel_record, extra_runtime)})
                     installation = work / "installation.json"
                     subprocess.run([str(python), "-I", "-c", VERIFY_PROJECT, json.dumps(expected), identifier,
                                     candidate_record["distribution"], module, str(wheels), str(installation)], cwd=work, env=env, check=True)

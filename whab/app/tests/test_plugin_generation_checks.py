@@ -128,7 +128,8 @@ def test_project_minimum_recipe_is_explicit_and_must_match_actual_declared_host_
 @pytest.mark.parametrize(("version", "revision"), [
     ("2.34.0", "ebbff0d464dd67c0269428a6d4a339778e21ec57"),
     ("2.36.0", "a866eda580c6e363a20636785bc4b4003db0652f"),
-    ("2.38.0", "75ede3d6639b716b7110a69b5e8ec99334842799"),
+    ("2.38.0", "dd52ec9554ee3c36395f8f2a7c1d2ab5ff00353f"),
+    ("2.40.0", "d13bccb2d2e3122bdb00a1f4d2e0e9aa4b1393f1"),
 ])
 def test_interface_minimum_uses_its_genuine_immutable_source_recipe_without_version_rewriting(checker, tmp_path, version, revision):
     calls = []
@@ -152,3 +153,16 @@ def test_bank_fixture_approval_is_static_explicit_and_bound_to_its_actual_host_f
     metadata.write_text(metadata.read_text().replace('"fictional-v1"', '"real-provider"'))
     with pytest.raises(ValueError, match="reviewed"):
         checker.bank_fixture_arguments(tmp_path)
+
+
+def test_remote_fixture_approval_has_a_genuine_provisioning_floor(checker, tmp_path):
+    metadata = tmp_path / "pyproject.toml"
+    metadata.write_text('[project]\ndependencies=["whab>=2.40,<3"]\n')
+    assert not checker.remote_fixture_enabled(tmp_path)
+    metadata.write_text(metadata.read_text() + '[tool.whab.plugin-devkit]\nminimum-host="2.40.0"\noffline-remote-fixture="fictional-v1"\n')
+    assert checker.remote_fixture_enabled(tmp_path)
+    assert checker.MINIMUM_RECIPES["2.40.0"] == "d13bccb2d2e3122bdb00a1f4d2e0e9aa4b1393f1"
+    for version, fixture in (("2.40", "real-server"), ("2.39", "fictional-v1")):
+        metadata.write_text(f'[project]\ndependencies=["whab>={version},<3"]\n[tool.whab.plugin-devkit]\nminimum-host="{version}.0"\noffline-remote-fixture="{fixture}"\n')
+        with pytest.raises(ValueError):
+            checker.remote_fixture_enabled(tmp_path)

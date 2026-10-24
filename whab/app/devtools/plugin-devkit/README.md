@@ -5,7 +5,7 @@ outside runtime plugin discovery directories and contributes no runtime entry po
 Install it beside the host SDK and the plugin being tested; it does not require
 the bundled plugin set, a SQLite implementation, a provider account, or pytest at runtime.
 
-The toolkit provides synchronous storage conformance, seven complete teaching
+The toolkit provides synchronous storage conformance, eight complete teaching
 project generators and constrained configuration replay through public
 `whab.plugins` contracts. It requires Python 3.14+ and WHAB 2.22+ within major 2.
 Compatibility ranges require testing the minimum supported host artifact and the
@@ -35,7 +35,9 @@ whab-plugin new household-report --capability reporting --ci-ref "$WHAB_CI_COMMI
 Choose `reporting` for a one-currency report and CSV export, `branding` for an
 embedded fictional bank logo, `file-import` for a bounded USD account JSON parser,
 `categorization` for a complete saved exact-merchant model lifecycle, or `api` for
-a declarative API interface requiring WHAB 2.34+. Generated
+a declarative API interface requiring WHAB 2.34+. The `ui`, `bank` and
+`remote-client` templates require their genuine 2.36, 2.38 and 2.40 floors.
+Generated
 projects include packaging, public-SDK source, regression tests, a README and an
 MIT license. The four original templates declare restart-only lifecycle support;
 the API template declares the host-supported live lifecycle. The categorizer learns
@@ -289,7 +291,7 @@ and coverage result. It contains no financial records, snapshots, credentials or
 temporary runtime paths. Dependencies/build tools may need network access while
 preparing wheels; no provider account or bank connection is used. This initial
 gate validates maintained artifacts. The separate generated-project gate builds
-all seven projects using an installed toolkit and validates every project wheel
+all eight projects using an installed toolkit and validates every project wheel
 outside the checkout:
 
 ```sh
@@ -331,7 +333,9 @@ The selected WHAB commit supplies the current candidate host, toolkit and SQLite
 reference. The project’s `[tool.whab.plugin-devkit] minimum-host` selects a known immutable
 recipe matching its declared WHAB floor: `bac249ca0e62638a40a6effc44af741c283e83d7`
 for 2.22.0, or `ebbff0d464dd67c0269428a6d4a339778e21ec57` for the API family’s
-2.34.0. A compatible actual SQLite reference accompanies each host. Different
+2.34.0. Additional genuine recipes cover 2.36/visual, 2.38/bank, and
+`d13bccb2d2e3122bdb00a1f4d2e0e9aa4b1393f1` for 2.40/remote client.
+A compatible actual SQLite reference accompanies each host. Different
 minimum/current versions produce distinct real artifacts; equal versions share
 one artifact with both roles. Version metadata is never rewritten for compatibility. The installed toolkit retains its declared minimum host floor.
 
@@ -344,7 +348,7 @@ file at 100% statement/branch coverage, ten distinct configurations, all adverti
 SQLite reference suites, and all ten exact-artifact replays. Missing/empty/skipped
 project tests and missing/broken advertised suites fail. Unsupported optional
 reference capabilities remain explicit `not-applicable` results; they are never
-used to hide failures. The installed profile covers the seven generated teaching families and their
+used to hide failures. The installed profile covers the eight generated teaching families and their
 explicit public probes. The API native recipe also tests its scoped HTTP/worker
 behavior; this is not arbitrary provider or all-family lifecycle certification. Add project-specific public-contract tests when extending them.
 
@@ -391,6 +395,14 @@ The genuine visual minimum recipe is source `a866eda580c6e363a20636785bc4b4003db
 
 `NativeRuntime` keeps its startup/HTTP deadline separate from the bounded management deadline: `transition_timeout=180` allows the host's 120-second environment preparation and subsequent handover to finish. It accepts at most 300 seconds. A terminal failed operation fails the suite immediately; the longer preparation allowance does not convert failures to passes. Each genuine host also receives a compatible JSON reference wheel from its source recipe when the current backend requires a newer host.
 
+The full CI job has a 180-minute ceiling per Python version; the reusable job for
+one external project has a 60-minute ceiling. The observed source coverage phase
+alone took about 34 minutes, before the expanded genuine-host artifact builds,
+native configuration matrix and exact replays. These overall CI ceilings provide
+bounded room for that work and dependency installation; they are not runtime
+performance guarantees. Production readiness, RPC, startup, HTTP and transition
+deadlines are unchanged.
+
 ## Offline bank projects
 
 `whab-plugin new fictional-bank --capability bank` creates an independent typed
@@ -427,3 +439,41 @@ predicate. These helpers never import a concrete provider or storage module.
 The native harness gives the fixture a fresh host-owned key, keeps it across its
 own process restarts, excludes caller credentials and removes its private home.
 Trusted Python remains executable code; the harness is not a network sandbox.
+
+## Remote client projects
+
+`whab-plugin new fictional-client --capability remote-client` creates a pure
+`RemoteLedgerClient` declaration, independent packaging and native behavioral
+tests. Its genuine host floor is 2.40: the ABI begins in 2.39, while 2.40 excludes
+custom caller settings from offline provisioning. The toolkit itself keeps its
+lazy 2.22 floor; older hosts cannot count this profile as a runtime pass.
+
+The explicit `[tool.whab.plugin-devkit] offline-remote-fixture = "fictional-v1"`
+recipe permits only two disposable fictional hosts. Install the reviewed SQLite,
+API server and runtime-peer fixtures beside the candidate. JSON is not needed
+for this profile. The server uses the ordinary official CLI. The reviewed static
+`remote_launcher` supplies a CA-verified public `RemoteStore` transport, with
+environment trust disabled, then runs the official CLI. This verifies that
+transport and official services; it makes no product private-CA setting claim.
+No OS trust, household runtime or external provider is involved.
+
+Format-3 `native-remote-client-v1` manifests explicitly separate the server's local
+reference backend from the client writer. Ten distinct peer sets exercise the
+candidate's exact approved immutable worker, same-binding pause/enable, public
+financial services, peer transitions and saved-worker reopen. Controlled faults
+are rejected selection, rejected wheel hash, client SIGKILL after an acknowledged
+write, and loss of a real acknowledged public command result. Lost results remain
+unknown through client restart and block another write. Only an explicit Finish
+of the exact original authorized body, retained ID and CAS may complete it against
+the same live server. This is not receipt lookup, automatic reconciliation, or
+durable retry proof across a server restart. A single candidate wheel makes no
+distinct-version upgrade claim. Local migration and copies are explicitly N/A;
+all existing version-1/version-2 local profiles remain readable.
+
+The worker closure includes only the approved host, candidate and their runtime
+dependencies. Server, reference backend, toolkit and peer registrations remain
+outside the descriptor child. Endpoint, credential, budget and runtime key values
+stay in the fictional parent host and are absent from replay evidence. Both hosts,
+their child processes and temporary homes are cleaned even after failure. The
+maintained [remote example](../../plugins/example/example-remote-client/README.md)
+uses these same public probes.

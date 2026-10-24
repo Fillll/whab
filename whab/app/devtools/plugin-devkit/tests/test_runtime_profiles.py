@@ -87,11 +87,14 @@ def test_runtime_manifest_checks_version_required_fields_and_candidate_applicabi
 def test_native_harness_restricts_environment_and_cleans_failed_startup(monkeypatch):
     monkeypatch.setenv("UNCONVENTIONAL_PRIVATE_CREDENTIAL", "fictional-secret")
     monkeypatch.setenv("WHAB_BUDGET", "/private/not-read")
+    monkeypatch.setenv("WHAB_BUDGET_PASSWORD_ENV", "LANG")
+    monkeypatch.setenv("LANG", "fictional-password")
     with pytest.raises(ValueError):
         harness.NativeRuntime("community", ())
     runtime = harness.NativeRuntime("sqlite", ())
     assert "UNCONVENTIONAL_PRIVATE_CREDENTIAL" not in runtime.environment()
     assert "WHAB_BUDGET" not in runtime.environment()
+    assert "LANG" not in runtime.environment()
     assert runtime.environment()["ALLOW_LIVE_PLAID"] == "false"
     home = runtime.home
     monkeypatch.setattr(runtime, "start", lambda: (_ for _ in ()).throw(RuntimeError("fictional startup failure")))

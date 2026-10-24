@@ -100,6 +100,8 @@ def test_runner_scrubs_private_runtime_and_credentials_from_every_child(checker,
         "SERVER_TOKEN": "private-server-token", "CLIENT_TOKEN": "private-client-token",
         "TOKEN_ENCRYPTION_KEY": "private-encryption-key", "ALLOW_LIVE_PLAID": "true", "PORT": "9000",
         "PYTHONPATH": str(private),
+        "EXAMPLE_REMOTE_CLIENT_URL": "https://fictional.example", "EXAMPLE_REMOTE_CLIENT_TOKEN": "fictional-canary",
+        "EXAMPLE_REMOTE_CLIENT_BUDGET_ID": "fictional-budget",
     }
     for name, value in hostile.items():
         monkeypatch.setenv(name, value)
@@ -112,7 +114,7 @@ def test_runner_scrubs_private_runtime_and_credentials_from_every_child(checker,
         assert env["WHAB_ENV"] == env["PLAID_ENV"] == "sandbox"
         assert env["ALLOW_LIVE_PLAID"] == "false"
         assert all(name not in env for name in hostile if name not in {"WHAB_HOME", "WHAB_ENV", "PLAID_ENV", "ALLOW_LIVE_PLAID"})
-        assert env["COVERAGE_FILE"] == "preserved-generic-tool-setting"
+        assert "COVERAGE_FILE" not in env
         children.append(home)
 
     def preflight(**kwargs):
@@ -361,6 +363,47 @@ def test_toolkit_external_environment_cannot_select_household_data_or_source_imp
     assert all(name not in environment for name in hostile if name != "WHAB_HOME")
     assert environment["PLAID_ENV"] == environment["WHAB_ENV"] == "sandbox"
     assert environment["ALLOW_LIVE_PLAID"] == "false"
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+@pytest.mark.parametrize("kind", ["toolkit", "generation", "source"])
+@pytest.mark.parametrize("password_name", ["FICTIONAL_UNLOCK", "LANG"])
+def test_external_packaging_and_readiness_children_exclude_custom_caller_settings(checker, monkeypatch, tmp_path, kind, password_name):
+    names = ("EXAMPLE_REMOTE_CLIENT_URL", "EXAMPLE_REMOTE_CLIENT_TOKEN", "EXAMPLE_REMOTE_CLIENT_BUDGET_ID",
+             "FICTIONAL_UNLOCK", "WHAB_BUDGET_PASSWORD_ENV", "LC_CUSTOM_TOKEN", "HOME", "PYTHONPATH", "PIP_CONFIG_FILE",
+             "HTTP_PROXY", "HTTPS_PROXY", "SSL_CERT_FILE", "PYTEST_ADDOPTS", "COVERAGE_PROCESS_START")
+    for name in names:
+        monkeypatch.setenv(name, "fictional-canary")
+    monkeypatch.setenv("WHAB_BUDGET_PASSWORD_ENV", password_name)
+    monkeypatch.setenv("LANG", "C")
+    monkeypatch.setenv("LC_ALL", "C")
+    if password_name == "LANG":
+        monkeypatch.setenv("LANG", "fictional-password")
+        names = (*names, "LANG")
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    if kind == "generation":
+        path = Path(__file__).resolve().parents[1] / "scripts/check_plugin_generation.py"
+        spec = util.spec_from_file_location("fictional_generation_environment", path)
+        generation = util.module_from_spec(spec)
+        spec.loader.exec_module(generation)
+        environment = generation.project_environment(checker, tmp_path)
+        assert environment["PIP_INDEX_URL"] == "https://pypi.org/simple"
+    elif kind == "source":
+        path = Path(__file__).resolve().parents[1] / "scripts/check.py"
+        spec = util.spec_from_file_location("fictional_source_environment", path)
+        source = util.module_from_spec(spec)
+        spec.loader.exec_module(source)
+        environment = source.check_environment(tmp_path)
+    else:
+        environment = checker.isolated_environment(tmp_path)
+    assert not set(names) & environment.keys()
+    assert environment["WHAB_HOME"] == str(tmp_path)
+    result = checker.run([sys.executable, "-I", "-B", "-c",
+                          "import os,sys; assert not set(sys.argv[1:]) & os.environ.keys(); "
+                          "assert os.environ.get('LANG')==(None if 'LANG' in sys.argv[1:] else 'C'); "
+                          "assert os.environ['LC_ALL']=='C'; print('clean')", *names],
+                         cwd=tmp_path, env=environment, capture_output=True, text=True)
+    assert result.stdout.strip() == "clean" and not result.stderr
 
 
 @pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)

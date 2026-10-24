@@ -57,8 +57,12 @@ class NativeRuntime:
     def environment(self):
         # An allowlist prevents a caller's credentials or runtime selectors from
         # reaching the fictional host, independently of their variable names.
-        allowed = {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG"}
-        result = {key: value for key, value in os.environ.items() if key in allowed or key.startswith("LC_")}
+        allowed = {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG", "LANGUAGE",
+                   "LC_ALL", "LC_CTYPE", "LC_NUMERIC", "LC_TIME", "LC_COLLATE", "LC_MONETARY",
+                   "LC_MESSAGES", "LC_PAPER", "LC_NAME", "LC_ADDRESS", "LC_TELEPHONE",
+                   "LC_MEASUREMENT", "LC_IDENTIFICATION"}
+        password = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
+        result = {key: value for key, value in os.environ.items() if key in allowed and key != password}
         result.update(WHAB_HOME=str(self.home), WHAB_ENV="sandbox", PLAID_ENV="sandbox",
                       WHAB_UI=self.ui or "", WHAB_STORAGE=self.storage, WHAB_PLUGINS=",".join(self.selection),
                       ALLOW_LIVE_PLAID="false")
@@ -77,7 +81,7 @@ class NativeRuntime:
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             self.port = listener.getsockname()[1]
-        self.process = subprocess.Popen([sys.executable, "-I", "-B", "-m", "whab", "--port", str(self.port)],
+        self.process = subprocess.Popen(self.launch_command(),
                                         cwd=self.home, env=self.environment(), stdin=subprocess.DEVNULL,
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         expected = metadata.version("whab")
@@ -91,6 +95,10 @@ class NativeRuntime:
                 return None
             return body if status == 200 and body.get("ready") is True and body.get("version") == expected else None
         self.wait(ready)
+
+    def launch_command(self):
+        """Use the official CLI unless a reviewed profile supplies an overlay."""
+        return [sys.executable, "-I", "-B", "-m", "whab", "--port", str(self.port)]
 
     def request(self, method, path, body=None, *, headers=None, authenticated=False):
         if authenticated and (self._api_token is None or not path.startswith("/remote/v1/")):
