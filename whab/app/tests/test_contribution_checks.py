@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import zipfile
 from importlib import util
 from pathlib import Path
 from types import SimpleNamespace
@@ -30,7 +31,10 @@ def test_full_gate_runs_python_suite_once_and_quick_gate_skips_it(checker, monke
     assert sum("scripts/check_plugin_coverage.py" in command for _, command in full) == 1
     assert not any("pytest" in command for _, command in full)
     assert "scripts/check_distribution.py" in full[-1][1]
-    assert all("coverage" not in " ".join(command) and "distribution" not in " ".join(command) for _, command in quick)
+    assert sum("scripts/check_plugin_devkit.py" in command for _, command in full) == 1
+    assert all("coverage" not in " ".join(command) and "distribution" not in " ".join(command)
+               and "check_plugin_devkit" not in " ".join(command) for _, command in quick)
+    assert "devtools" in next(command for name, command in full if name == "Python lint")
     assert quick[-1][1] == ["node", "--test", str(test.relative_to(tmp_path))]
 
 
@@ -314,3 +318,75 @@ def test_untracked_private_documents_are_never_opened(checker, monkeypatch, tmp_
     assert checker.main() == 0
     with pytest.raises(ValueError, match="outside private/generated paths"):
         checker.read_source_text(private_paths[0], tmp_path)
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+def test_toolkit_external_environment_cannot_select_household_data_or_source_imports(checker, monkeypatch, tmp_path):
+    hostile = {"WHAB_HOME": "/fictional/private", "WHAB_BUDGET_PASSWORD_ENV": "HOUSEHOLD_PASSWORD",
+               "HOUSEHOLD_PASSWORD": "fictional-password", "CLIENT_TOKEN": "fictional-token",
+               "TOKEN_ENCRYPTION_KEY": "fictional-key", "PYTHONPATH": "/fictional/source",
+               "PYTHONHOME": "/fictional/source", "VIRTUAL_ENV": "/fictional/source"}
+    for name, value in hostile.items():
+        monkeypatch.setenv(name, value)
+    environment = checker.isolated_environment(tmp_path)
+    assert environment["WHAB_HOME"] == str(tmp_path)
+    assert all(name not in environment for name in hostile if name != "WHAB_HOME")
+    assert environment["PLAID_ENV"] == environment["WHAB_ENV"] == "sandbox"
+    assert environment["ALLOW_LIVE_PLAID"] == "false"
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+@pytest.mark.parametrize("counts", [(12, 0, 0, 0), (13, 0, 0, 1), (13, 1, 0, 0), (13, 0, 1, 0)])
+def test_toolkit_reference_coverage_cannot_pass_with_missing_skipped_or_failed_tests(checker, tmp_path, counts):
+    report = tmp_path / "tests.xml"
+    tests, failures, errors, skipped = counts
+    report.write_text(f'<testsuites><testsuite tests="{tests}" failures="{failures}" errors="{errors}" skipped="{skipped}"/></testsuites>')
+    with pytest.raises(ValueError, match="run completely"):
+        checker.validate_test_results(report)
+    report.write_text('<testsuites><testsuite tests="13" failures="0" errors="0" skipped="0"/></testsuites>')
+    assert checker.validate_test_results(report)["tests"] == 13
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+def test_toolkit_coverage_measures_every_installed_file_and_both_kinds_of_coverage(checker, tmp_path):
+    installed = tmp_path / "environment/site-packages/whab_plugin_devkit"
+    source = installed / "adapter.py"
+    report = {"meta": {"branch_coverage": True}, "files": {str(source): {"summary": {"missing_lines": 0, "missing_branches": 0}}}}
+    checker.validate_toolkit_coverage(report, [str(source)], tmp_path)
+    with pytest.raises(ValueError, match="omitted"):
+        checker.validate_toolkit_coverage(report, [str(source), str(installed / "unimported.py")], tmp_path)
+    for name in ("missing_lines", "missing_branches"):
+        report["files"][str(source)]["summary"][name] = 1
+        with pytest.raises(ValueError, match="100% statement and branch"):
+            checker.validate_toolkit_coverage(report, [str(source)], tmp_path)
+        report["files"][str(source)]["summary"][name] = 0
+    report["meta"]["branch_coverage"] = False
+    with pytest.raises(ValueError, match="measure branches"):
+        checker.validate_toolkit_coverage(report, [str(source)], tmp_path)
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+def test_toolkit_artifact_evidence_uses_wheel_metadata_and_content_hash(checker, tmp_path):
+    wheel = tmp_path / "fictional-1-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("fictional-1.dist-info/METADATA", "Name: fictional\nVersion: 1\n")
+    before = checker.wheel_record(wheel)
+    assert before["distribution"] == "fictional" and before["version"] == "1"
+    assert len(before["sha256"]) == 64
+    assert checker.wheel_for(tmp_path, "fictional", "1") == wheel
+    with zipfile.ZipFile(wheel, "a") as archive:
+        archive.writestr("changed.txt", "changed artifact")
+    assert checker.wheel_record(wheel)["sha256"] != before["sha256"]
+    with pytest.raises(ValueError, match="exactly one built wheel"):
+        checker.wheel_for(tmp_path, "fictional", "2")
+
+
+@pytest.mark.parametrize("checker", ["check_plugin_devkit"], indirect=True)
+def test_toolkit_host_version_read_does_not_execute_controlled_source(checker, tmp_path):
+    source = tmp_path / "src/whab/__init__.py"
+    source.parent.mkdir(parents=True)
+    source.write_text('raise RuntimeError("must not execute while inspecting source")\n__version__ = "2.21.1"\n')
+    assert checker.host_version(tmp_path) == "2.21.1"
+    source.write_text('raise RuntimeError("must not execute")\n')
+    with pytest.raises(ValueError, match="literal version"):
+        checker.host_version(tmp_path)

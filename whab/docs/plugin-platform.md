@@ -8,8 +8,8 @@ not update the household installation or publish releases.
 
 | Package | Deliverable and verification | Current state |
 | --- | --- | --- |
-| 1 | Versioned capabilities, deterministic resolution, authority policy, compatible manifests and staged saved-state upgrades | Initial implementation; validation in progress |
-| 2 | Independent public conformance kit; capability applicability; ten distinct replayable configurations | Initial kit in development; random configurations pending |
+| 1 | Versioned capabilities, deterministic resolution, authority policy, compatible manifests and staged saved-state upgrades | Initial implementation tested in draft PR #76; live commit controls pending |
+| 2 | Independent public conformance kit; capability applicability; ten distinct replayable configurations | Initial storage suites and minimum/candidate installed-wheel CI tested; random configurations pending |
 | 3 | Independent durable JSON storage, strict validation, interruption tests and fictional benchmarks | Pending |
 | 4 | Per-budget generations, request/background leases, admission gates, draining and stable services | Coordinator in development; integration pending |
 | 5 | Bounded worker protocol, immutable versioned environments, readiness and durable mutation outcomes | Pending |

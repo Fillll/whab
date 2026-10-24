@@ -65,7 +65,7 @@ def commands(*, docs_only: bool, quick: bool, node: str | None) -> list[tuple[st
     if not tests:
         raise ValueError("No plugin browser tests were found; check the source checkout.")
     checks = [
-        ("Python lint", [sys.executable, "-m", "ruff", "check", "src", "scripts", "tests", "plugins", "conftest.py"]),
+        ("Python lint", [sys.executable, "-m", "ruff", "check", "src", "scripts", "tests", "plugins", "devtools", "conftest.py"]),
         ("Changelog provenance", [sys.executable, "scripts/check_changelog_prs.py"]),
         *checks,
         ("Browser JavaScript", [node, "--test", *tests]),
@@ -73,6 +73,7 @@ def commands(*, docs_only: bool, quick: bool, node: str | None) -> list[tuple[st
     if not quick:
         checks.extend([
             ("Python tests and plugin coverage", [sys.executable, "scripts/check_plugin_coverage.py"]),
+            ("Plugin toolkit wheels and coverage", [sys.executable, "scripts/check_plugin_devkit.py"]),
             ("Installed wheels", [sys.executable, "scripts/check_distribution.py"]),
         ])
     return checks
