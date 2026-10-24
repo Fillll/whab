@@ -42,6 +42,7 @@ PR: [#102](https://github.com/Fillll/whab/pull/102)
 - Run supported local SQLite/JSON backends in bounded typed workers and replace compatible approved code after request/background draining. Preserve stable ledger/retry services, native identity/epoch/generation, namespaces, copies and exact saved worker ownership.
 - Persist caller operation identities and reconcile native receipts after lost replies. Keep unknown outcomes gated, reject history older than acknowledged evidence, and distinguish proven execute rejection from failures after dispatch or during evidence publication.
 - Add explicit stopped-host read-only repair that preserves prior code history, native roles/data and pending intents. Retain constructor/cleanup owners and defer authority changes while bank continuations remain unfinished.
+- Stage independent historical reference builds and reuse an existing approved wheel only when its complete bounded member contents and attributes match. Reject conflicting or failed builds without overwriting replay artifacts.
 
 ## 2.36.0 — 2026-10-23
 
