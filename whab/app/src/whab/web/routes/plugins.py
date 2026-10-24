@@ -5,7 +5,8 @@ import io
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 from whab.domain.accounts import bank_website_entry
 from whab.domain.budget import select_currency
@@ -23,6 +24,27 @@ def create_router(store, plugins, plugin_manager=None):
     @router.get("")
     def describe():
         return {"plugins": [asdict(plugin) for plugin in plugins.describe()]}
+
+    @router.get("/runtime")
+    def runtime_status():
+        if plugin_manager is None or plugin_manager.live is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        return plugin_manager.live.status()
+
+    @router.post("/management/transition", status_code=202)
+    async def transition(request: Request, body: PluginSelectionBody):
+        if request.scope.get("whab.workspace") == "demo":
+            raise HTTPException(403, "This operation requires your own budget")
+        if plugin_manager is None:
+            raise HTTPException(404, "Live plugin management is unavailable")
+        try:
+            selection = tuple(body.plugins)
+            await run_in_threadpool(plugin_manager.preflight_live, selection)
+            identifier = plugin_manager.schedule_live(selection, validated=True)
+        except PluginError as error:
+            return JSONResponse({"error": str(error), "code": error.code,
+                                 "plugin_id": error.plugin_id}, status_code=409)
+        return {"id": identifier, "accepted": True, "status": plugin_manager.live.status()}
 
     @router.post("/bank-logo-preview")
     def preview_bank_logo(request: Request, body: BankLogoPreviewBody):

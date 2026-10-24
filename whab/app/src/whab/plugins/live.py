@@ -1,0 +1,214 @@
+"""Host integration for live selection of explicitly stateless report plugins.
+
+The running environment is unchanged: this enables/disables selected installed
+report hooks, not plugin code upgrades or worker isolation. All other families
+retain their existing instances and restart-bound configuration behavior.
+"""
+
+import asyncio
+from copy import deepcopy
+from functools import partial
+from threading import Lock
+from uuid import uuid4
+
+from starlette.concurrency import run_in_threadpool
+
+from whab.budgets.runtime import RuntimeCandidate
+
+from .configuration import validate_selection
+from .contracts import contract_for
+from .runtime import PluginError, PluginRegistry, load_descriptors
+
+_REPORTS = frozenset({"reporting.insights", "reporting.export"})
+_METHODS = frozenset({
+    "describe", "descriptors", "bank_plugins", "interface_plugins", "file_import_plugins",
+    "storage_plugin", "ui_plugin", "settings", "settings_action", "bank_logo",
+    "bank_logo_provider", "logo_image", "merchant_logo_image", "insights", "export",
+})
+
+
+def live_report(plugin):
+    """Explicit support excludes binders, saved state, settings and other hooks."""
+    contract = contract_for(plugin)
+    return (
+        plugin.contract is not None and contract.lifecycle == "live"
+        and (plugin.insights is not None or plugin.export is not None)
+        and {capability.name for capability in contract.provides} <= _REPORTS
+        and contract.state_version == 1 and not contract.state_upgrades
+        and all(getattr(plugin, name) is None for name in (
+            "bind", "settings", "migrate_state", "budget_connection", "categorization",
+            "bank", "bank_ui", "storage", "ui", "bank_logos", "file_import",
+            "merchant_logos", "interface",
+        ))
+    )
+
+
+class RegistryGeneration:
+    """Replace report hooks while retaining unchanged providers and their caches."""
+
+    def __init__(self, registry, stable=None):
+        self.registry = registry
+        self.stable = stable or registry
+
+    def describe(self):
+        return self.registry.describe()
+
+    def descriptors(self):
+        return self.registry.descriptors()
+
+    def insights(self, snapshot):
+        return self.registry.insights(snapshot)
+
+    def export(self, plugin_id, snapshot):
+        return self.registry.export(plugin_id, snapshot)
+
+    def settings(self, plugin_id):
+        if not any(plugin.id == plugin_id for plugin in self.descriptors()) or any(plugin.id == plugin_id and live_report(plugin) for plugin in self.descriptors()):
+            return self.registry.settings(plugin_id)
+        return self.stable.settings(plugin_id)
+
+    def settings_action(self, plugin_id, action_id):
+        if not any(plugin.id == plugin_id for plugin in self.descriptors()) or any(plugin.id == plugin_id and live_report(plugin) for plugin in self.descriptors()):
+            return self.registry.settings_action(plugin_id, action_id)
+        return self.stable.settings_action(plugin_id, action_id)
+
+    def __getattr__(self, name):
+        if name not in _METHODS:
+            raise AttributeError(name)
+        return getattr(self.stable, name)
+
+
+class LeasedPluginRegistry:
+    """Never cache a bound method from a replaceable registry generation."""
+
+    def __init__(self, runtime):
+        self._handle = runtime.handle("plugins")
+
+    def __getattr__(self, name):
+        if name not in _METHODS:
+            raise AttributeError(name)
+        return partial(self._handle.call, name)
+
+
+class LivePluginSelection:
+    """Validate report-only changes and publish saved selections under the gate."""
+
+    def __init__(self, runtime, required, entrypoints, persist, session=None, nonlive=()):
+        self.runtime = runtime
+        self.required = frozenset(required)
+        self.entrypoints = entrypoints
+        self.persist = persist
+        self.session = session
+        self.nonlive = frozenset(nonlive)
+        self._lock = Lock()
+        self._tickets = {}
+        self._tasks = set()
+
+    def status(self):
+        with self._lock:
+            operations = [dict(ticket) for ticket in self._tickets.values()]
+        return {"families": ["reporting.insights", "reporting.export"],
+                "code_upgrades": False, "runtime": self.runtime.status(), "operations": operations}
+
+    def _candidate(self, selection, active):
+        selection = validate_selection(selection)
+        if self.required & set(selection):
+            raise PluginError("Storage and user interfaces remain selected by the host. Choose only optional plugins.", code="required_plugin")
+        current = {plugin.id: plugin for plugin in active.descriptors()}
+        unavailable = set(self.session.missing_plugins) if self.session else set()
+        previous = (set(current) - self.required) | unavailable
+        changed = previous ^ set(selection)
+        added = tuple(sorted(set(selection) - set(current) - unavailable))
+        loaded = {plugin.id: plugin for plugin in load_descriptors(added, self.entrypoints())}
+        for identifier in sorted(changed):
+            plugin = current.get(identifier) or loaded.get(identifier)
+            if plugin is None or identifier in self.nonlive or not live_report(plugin):
+                raise PluginError(
+                    "This change requires a restart. Live selection currently supports only explicitly live, stateless reporting/export plugins without settings or binders.",
+                    code="restart_required", plugin_id=identifier,
+                )
+        # Injectable host backends need not have a discovery descriptor. Do
+        # not invent an active storage plugin while changing their reports.
+        selected = tuple(current[name] if name in current else loaded[name]
+                         for name in sorted((self.required & set(current)) | set(selection))
+                         if name not in unavailable)
+        registry = PluginRegistry(selected)
+        if self.session:
+            from whab.budgets.plugin_state import check_saved_states
+
+            manifest = deepcopy(self.session.manifest)
+            for record in manifest["plugins"]:
+                record["enabled"] = record["id"] in self.required | set(selection)
+            check_saved_states(manifest, registry.descriptors())
+        return RegistryGeneration(registry, active.stable)
+
+    def _preflight(self, selection):
+        # The scheduling request already owns a generation. This scope also
+        # permits direct host callers to validate without retaining raw services.
+        with self.runtime.lease() as lease:
+            self._candidate(selection, lease.service("plugins"))
+
+    def preflight(self, selection):
+        self._preflight(validate_selection(selection))
+
+    def schedule(self, selection, *, validated=False):
+        selection = validate_selection(selection)
+        if not validated:
+            self._preflight(selection)
+        identifier = str(uuid4())
+        with self._lock:
+            if sum(ticket["state"] in {"queued", "running"} for ticket in self._tickets.values()) >= 32:
+                raise PluginError("Too many live transitions are pending. Wait for them to finish before retrying.", code="transition_busy")
+            self._tickets[identifier] = {"id": identifier, "state": "queued", "error": None}
+            while len(self._tickets) > 32:
+                oldest = next(iter(self._tickets))
+                if self._tickets[oldest]["state"] in {"queued", "running"}:
+                    break
+                self._tickets.pop(oldest)
+        task = self.runtime.schedule(self._activate(selection, identifier))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return identifier
+
+    async def activate(self, selection):
+        """Awaitable host API, called outside an admitted budget operation."""
+        selection = validate_selection(selection)
+        await run_in_threadpool(self._preflight, selection)
+        return await self._activate(selection)
+
+    async def _activate(self, selection, ticket=None):
+        async def prepare(preparation):
+            if ticket:
+                with self._lock:
+                    self._tickets[ticket]["state"] = "running"
+            active = preparation.active.services["plugins"]
+            candidate = await run_in_threadpool(self._candidate, selection, active)
+            return RuntimeCandidate({**preparation.active.services, "plugins": candidate}, preparation.active.resources)
+
+        async def commit(candidate, _number):
+            registry = candidate.services["plugins"]
+            await run_in_threadpool(self.persist, selection, registry.descriptors())
+
+        try:
+            generation = await self.runtime.transition(prepare, commit=commit)
+        except (PluginError, asyncio.CancelledError) as error:
+            if ticket:
+                diagnostic = ({"code": error.code, "plugin_id": error.plugin_id, "message": str(error)}
+                              if isinstance(error, PluginError) else
+                              {"code": "transition_interrupted", "plugin_id": None,
+                               "message": "The runtime transition did not finish. Inspect runtime status before retrying."})
+                with self._lock:
+                    self._tickets[ticket].update(state="failed", error=diagnostic)
+            raise
+        if ticket:
+            with self._lock:
+                self._tickets[ticket]["state"] = "complete"
+        return generation
+
+    async def close(self):
+        # Accepted transitions belong to the host, including after their HTTP
+        # caller disconnected. Settle them before retiring host services.
+        if self._tasks:
+            await asyncio.gather(*tuple(self._tasks), return_exceptions=True)
+        if self.runtime.status()["health"] != "recovery_required":
+            await self.runtime.close()

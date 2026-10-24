@@ -42,6 +42,7 @@ def test_example_totals_and_export_keep_integer_cents_and_exclude_pending_transf
     module = example_module()
     assert module.plugin.id == "example"
     assert module.plugin.api_version == 1
+    assert module.plugin.contract.lifecycle == "live"
     totals = module.insights(snapshot)
     assert [(row.title, row.value) for row in totals] == [
         ("Net spending", "$15.00"),

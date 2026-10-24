@@ -13,8 +13,9 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader, PrefixLoader
 
 from whab import __version__
-from whab.budgets.host import BudgetDispatch, BudgetHost
+from whab.budgets.host import BudgetDispatch, BudgetHost, BudgetRuntimeRequests
 from whab.budgets.plugin_state import check_saved_states
+from whab.budgets.runtime import BudgetRuntime
 from whab.budgets.session import BudgetSession, TrackedStorage
 from whab.config import Settings
 from whab.plugins import (
@@ -26,6 +27,12 @@ from whab.plugins import (
     load_plugins,
 )
 from whab.plugins.contracts import contract_for
+from whab.plugins.live import (
+    LeasedPluginRegistry,
+    LivePluginSelection,
+    RegistryGeneration,
+    live_report,
+)
 from whab.plugins.management import PluginManager, installed_entrypoints
 from whab.plugins.storage import close_storage, open_storage
 from whab.services.categorization import CategorizationService, local_context
@@ -115,6 +122,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         settings = replace(settings, storage=budget_session.manifest["storage"], plugins=tuple(name for name in budget_session.selection if name in installed))
     budget_host = budget_host or BudgetHost(settings)
     plugins = plugins if plugins is not None else load_plugins(settings.enabled_plugins())
+    nonlive = {plugin.id for plugin in plugins.descriptors() if not live_report(plugin)}
     if budget_session:
         check_saved_states(budget_session.manifest, plugins.descriptors())
         plugins = plugins.bind_budget(budget_session.context)
@@ -200,6 +208,15 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             close_storage(store)
         raise
     banks = {}
+    runtime = BudgetRuntime(service.budget_id, {
+        "plugins": RegistryGeneration(plugins), "ledger": service,
+        "storage": store, "banks": banks,
+    })
+    registry = LeasedPluginRegistry(runtime)
+    plugin_manager = PluginManager(settings, registry, budget_session=budget_session)
+    live = LivePluginSelection(runtime, plugin_manager.required, installed_entrypoints,
+                               plugin_manager.persist_live, budget_session, nonlive)
+    plugin_manager.live = live
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -250,8 +267,11 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         finally:
             # Close every service even if another plugin's cleanup raises.
             try:
-                if not _child:
-                    await budget_host.close()
+                try:
+                    if not _child:
+                        await budget_host.close()
+                finally:
+                    await live.close()
             finally:
                 try:
                     for bank in reversed(tuple(banks.values())):
@@ -272,6 +292,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         openapi_url=None,
         lifespan=lifespan,
     )
+    # The inner lease also covers directly used child apps. BudgetDispatch pins
+    # the same generation around every default/selected dispatch path.
+    app.add_middleware(BudgetRuntimeRequests, runtime=runtime)
     templates = Jinja2Templates(directory=ui.templates) if ui else None
     loaders = {}
     import_loaders = {}
@@ -322,7 +345,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.include_router(receipts_router(receipt_service))
     app.state.receipt_service = receipt_service
     app.include_router(file_imports_router(
-        store, plugins, budget_host, budget_session.id if budget_session else "default",
+        store, registry, budget_host, budget_session.id if budget_session else "default",
     ))
     for plugin in descriptors:
         app.include_router(banks_router(plugin.id, banks, bank_stores[plugin.id]))
@@ -330,11 +353,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             app.include_router(
                 banks_router(plugin.id, banks, bank_stores[plugin.id], prefix="/api/plaid")
             )
-    plugin_manager = PluginManager(settings, plugins, budget_session=budget_session)
-    app.include_router(plugins_router(store, plugins, plugin_manager))
+    app.include_router(plugins_router(store, registry, plugin_manager))
     app.include_router(
         pages_router(
-            store, banks, bank_stores, plugins, templates, settings.plaid_env, ui,
+            store, banks, bank_stores, registry, templates, settings.plaid_env, ui,
             plugin_manager=plugin_manager,
             budget_name=budget_session.name if budget_session else "My budget",
             service=service,
@@ -343,7 +365,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     app.state.store = store.store
     app.state.tracked_store = store
     app.state.banks = banks
-    app.state.plugins = plugins
+    app.state.plugins = registry
+    app.state.budget_runtime = runtime
+    app.state.live_plugins = live
+    app.state.bank_ui_available = any(plugin.id == "plaid" and plugin.bank_ui for plugin in descriptors)
     app.state.plugin_manager = plugin_manager
     app.state.storage_plugin = settings.storage if owned_store else None
     app.state.ui_plugin = ui_plugin.id if ui_plugin else None
