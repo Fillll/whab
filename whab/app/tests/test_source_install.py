@@ -133,8 +133,8 @@ def test_plugin_cleanup_preserves_linked_metadata_and_parent_paths(tmp_path, lin
 
 def test_successful_source_install_cleans_metadata_after_local_projects_install(tmp_path, monkeypatch):
     legacy = legacy_metadata(tmp_path)
-    for folder in ("interface/web", "storage/sqlite", "example/example"):
-        project = tmp_path / "plugins" / folder / "pyproject.toml"
+    for folder in ("plugins/interface/web", "plugins/storage/sqlite", "plugins/example/example", "devtools/plugin-devkit"):
+        project = tmp_path / folder / "pyproject.toml"
         project.parent.mkdir(parents=True)
         project.write_text("")
     calls = []
@@ -154,9 +154,22 @@ def test_successful_source_install_cleans_metadata_after_local_projects_install(
         "-e", str(tmp_path / "plugins/example/example"),
         "-e", str(tmp_path / "plugins/interface/web"),
         "-e", str(tmp_path / "plugins/storage/sqlite"),
+        "-e", str(tmp_path / "devtools/plugin-devkit"),
     ]
     assert options == {"cwd": tmp_path, "check": True}
     assert not legacy.exists()
+
+
+def test_normal_source_install_does_not_install_developer_toolkit(tmp_path, monkeypatch):
+    project = tmp_path / "devtools/plugin-devkit/pyproject.toml"
+    project.parent.mkdir(parents=True)
+    project.write_text("")
+    commands = []
+    monkeypatch.setattr(installer, "ROOT", tmp_path)
+    monkeypatch.setattr(installer.subprocess, "run", lambda command, **kwargs: commands.append(command))
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT)])
+    installer.main()
+    assert str(project.parent) not in commands[0]
 
 
 @pytest.mark.parametrize("example_option, legacy_example", [(False, False), (True, False), (False, True)])

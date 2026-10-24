@@ -40,6 +40,7 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | Folder | Plugin ID | Python package | Owns |
 | --- | --- | --- | --- |
 | `storage/sqlite/` | `sqlite` | `whab_plugin_sqlite` | Default ledger backend, schema upgrades and demo seeding |
+| `storage/json/` | `json` | `whab_plugin_json` | Independent single-file local ledger, receipts and encrypted connection checkpoints |
 | `ingestion/plaid/` | `plaid` | `whab_plugin_plaid` | Bank normalization, credentials, connection UI and synchronization |
 | `ingestion/ynab/` | `ynab` | `whab_plugin_ynab` | Local YNAB ZIP parsing, migration preview and import controls |
 | `interface/web/` | `web` | `whab_plugin_web` | View models, icons, templates and browser assets |
@@ -77,6 +78,7 @@ This is the canonical supported-set inventory. Keep it aligned with the host's `
 | --- | --- | --- |
 | `web` | `whab_plugin_web` | Selected visual interface |
 | `sqlite` | `whab_plugin_sqlite` | Selected storage for the original workspace |
+| `json` | `whab_plugin_json` | Not selected; choose explicitly for a separate local budget |
 | `plaid` | `whab_plugin_plaid` | Optional, enabled unless overridden |
 | `bank-logos` | `whab_plugin_bank_logos` | Disabled |
 | `ynab` | `whab_plugin_ynab` | Disabled |

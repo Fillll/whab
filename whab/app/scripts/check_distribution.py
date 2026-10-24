@@ -22,6 +22,7 @@ import importlib.metadata as metadata
 import importlib
 import json
 import sys
+from dataclasses import replace
 from unittest.mock import patch
 sys.path.insert(0, sys.argv[1])
 expected = json.loads(sys.argv[2])
@@ -150,6 +151,28 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     assert container.files["plugins/sqlite/budget.sqlite"].startswith(b"SQLite format 3")
     assert client.post("/api/budgets/default/activate", json={}).status_code == 200
 assert (settings.home / "data" / "whab-sandbox.sqlite").is_file()
+json_settings = replace(settings, home=settings.home / "json-reference", storage="json", plugins=())
+with TestClient(create_app(settings=json_settings), base_url="https://127.0.0.1:5173") as client:
+    created = client.post("/api/accounts", json={
+        "workspace": "personal", "name": "Fictional JSON checking", "type": "depository", "balance": 12345,
+    })
+    assert created.status_code == 200
+    account_id = created.json()["accountId"]
+    transaction = client.post("/api/transactions", json={
+        "workspace": "personal", "accountId": account_id, "date": "2026-10-01",
+        "merchant": "Fictional JSON purchase", "amount": 125, "categoryId": None,
+    })
+    assert transaction.status_code == 200
+    assert client.get("/api/workspace?workspace=personal").json()["accounts"][0]["balance"] == 12220
+    exported = decode_container(client.get("/api/budget/export").content)
+    assert exported.manifest["storage"] == "json" and "plugins/json/budget.json" in exported.files
+    demo = decode_container(client.get("/api/budget/export?workspace=demo").content)
+    assert demo.manifest["storage"] == "json" and "plugins/json/budget.json" in demo.files
+with TestClient(create_app(settings=json_settings), base_url="https://127.0.0.1:5173") as client:
+    account = client.get("/api/workspace?workspace=personal").json()["accounts"][0]
+    assert account["id"] == account_id and account["balance"] == 12220
+assert (json_settings.home / "data" / "whab-sandbox.json").is_file()
+assert not tuple(json_settings.home.rglob("*.sqlite"))
 print("Installed wheels: independent versions, MIT licenses, pages, assets and plugin discovery passed.")
 """
 
@@ -242,7 +265,7 @@ def main():
                 "distribution": metadata["name"], "version": metadata["version"],
                 "module": entrypoint.split(":", 1)[0].split(".", 1)[0],
             }
-        assert set(expected) == {"whab", "web", "sqlite", "plaid", "bank-logos", "ynab", "server", "client", "example", "random-forest-categorization"}
+        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "example", "random-forest-categorization"}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {
             f'{record["distribution"]}>={record["version"]},<2'
