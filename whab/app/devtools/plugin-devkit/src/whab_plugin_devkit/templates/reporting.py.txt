@@ -1,0 +1,17 @@
+"""One-currency fictional reports; the host owns CSV escaping and downloads."""
+
+from whab.plugins import BudgetSnapshot, ExportTable, Insight, Plugin, PluginContract, format_money
+
+
+def insights(snapshot: BudgetSnapshot):
+    return (Insight("Account balances", format_money(sum(row.balance_cents for row in snapshot.accounts), snapshot.currency)),)
+
+
+def export(snapshot: BudgetSnapshot):
+    return ExportTable(("account", "minor_units", "currency"), tuple(
+        (row.name, row.balance_cents, snapshot.currency) for row in snapshot.accounts
+    ))
+
+
+plugin = Plugin("__PLUGIN_ID__", "Fictional report", insights=insights, export=export,
+                contract=PluginContract(lifecycle="restart"))
