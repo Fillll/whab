@@ -2,7 +2,10 @@
 
 import importlib
 import json
+import subprocess
 import sys
+import warnings
+import zipfile
 from importlib import metadata, util
 from pathlib import Path
 from types import SimpleNamespace
@@ -125,14 +128,95 @@ def test_project_minimum_recipe_is_explicit_and_must_match_actual_declared_host_
             checker.project_minimum(project)
 
 
-def test_api_minimum_uses_its_genuine_immutable_source_recipe_without_version_rewriting(checker, tmp_path):
+@pytest.mark.parametrize(("version", "revision"), [
+    ("2.34.0", "ebbff0d464dd67c0269428a6d4a339778e21ec57"),
+    ("2.36.0", "a866eda580c6e363a20636785bc4b4003db0652f"),
+    ("2.38.0", "dd52ec9554ee3c36395f8f2a7c1d2ab5ff00353f"),
+])
+def test_interface_minimum_uses_its_genuine_immutable_source_recipe_without_version_rewriting(checker, tmp_path, version, revision):
     calls = []
     helper = SimpleNamespace(minimum_host_source=lambda base, env: calls.append(("legacy", base)) or "legacy-source",
                              source_at_revision=lambda base, env, revision: calls.append(("api", revision)) or "api-source",
-                             host_version=lambda _: "2.34.0")
+                             host_version=lambda _: version)
     assert checker.minimum_source(helper, tmp_path / "older", {}, "2.22.0") == "legacy-source"
-    assert checker.minimum_source(helper, tmp_path / "api", {}, "2.34.0") == "api-source"
-    assert calls[-1] == ("api", checker.API_MINIMUM_HOST_COMMIT)
+    assert checker.minimum_source(helper, tmp_path / "interface", {}, version) == "api-source"
+    assert calls[-1] == ("api", revision) and checker.MINIMUM_RECIPES[version] == revision
     helper.host_version = lambda _: "2.22.0"
     with pytest.raises(ValueError, match="advertised host"):
-        checker.minimum_source(helper, tmp_path / "wrong", {}, "2.34.0")
+        checker.minimum_source(helper, tmp_path / "wrong", {}, version)
+
+
+def test_bank_fixture_approval_is_static_explicit_and_bound_to_its_actual_host_floor(checker, tmp_path):
+    metadata = tmp_path / "pyproject.toml"
+    metadata.write_text('[project]\ndependencies=["whab>=2.38,<3"]\n')
+    assert checker.bank_fixture_arguments(tmp_path) == []
+    metadata.write_text(metadata.read_text() + '[tool.whab.plugin-devkit]\nminimum-host="2.38.0"\noffline-bank-fixture="fictional-v1"\n')
+    assert checker.bank_fixture_arguments(tmp_path) == ["--bank-fixture", "fictional-v1"]
+    metadata.write_text(metadata.read_text().replace('"fictional-v1"', '"real-provider"'))
+    with pytest.raises(ValueError, match="reviewed"):
+        checker.bank_fixture_arguments(tmp_path)
+
+
+def historical_wheel_builder(tmp_path, *, second="same"):
+    """Emit controlled wheel members as two independent historical builds."""
+    projects = [tmp_path / name for name in ("host-2.34", "host-2.36")]
+    for project in projects:
+        project.mkdir()
+        (project / "pyproject.toml").write_text('[build-system]\nrequires=["setuptools>=68"]\n')
+    wheels = tmp_path / "approved"
+    wheels.mkdir()
+    calls = []
+
+    def run(command, **_):
+        if "wheel" not in command:
+            return
+        calls.append(command)
+        repeated = len(calls) == 2
+        if repeated and second == "build-failure":
+            raise subprocess.CalledProcessError(7, command)
+        destination = Path(command[command.index("--wheel-dir") + 1])
+        names = ["fictional-1.0-py3-none-any.whl"]
+        if repeated and second == "empty-output":
+            names = []
+        if repeated and second == "multiple-wheels":
+            names.append("other-1.0-py3-none-any.whl")
+        for name in names:
+            members = [("fictional/__init__.py", b"value = 1\n"),
+                       ("fictional-1.0.dist-info/METADATA", b"Name: fictional\nVersion: 1.0\n")]
+            if repeated and second == "different-code":
+                members[0] = (members[0][0], b"value = 2\n")
+            if repeated and second == "extra-member":
+                members.append(("fictional/extra.py", b"extra = True\n"))
+            if repeated and second == "duplicate-name":
+                members.append(members[0])
+            with zipfile.ZipFile(destination / name, "w") as archive, warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)  # Deliberate duplicate-member fixture.
+                for member, payload in members:
+                    entry = zipfile.ZipInfo(member, date_time=(2026, 10, 23, 0, 0, 2 * len(calls)))
+                    entry.create_system = 3
+                    mode = 0o100755 if repeated and second == "different-mode" else 0o100644
+                    entry.external_attr = mode << 16
+                    archive.writestr(entry, payload)
+
+    return SimpleNamespace(run=run), projects, wheels, calls
+
+
+def test_identical_historical_reference_wheels_reuse_the_original_approved_bytes(checker, tmp_path):
+    helper, projects, wheels, calls = historical_wheel_builder(tmp_path)
+    first = checker.build_project(helper, "reviewed-python", projects[0], wheels, tmp_path, {})
+    original = first.read_bytes()
+    second = checker.build_project(helper, "reviewed-python", projects[1], wheels, tmp_path, {})
+    assert second == first and second.read_bytes() == original
+    assert list(wheels.iterdir()) == [first]
+    assert len(calls) == 2 and all(Path(call[call.index("--wheel-dir") + 1]) != wheels for call in calls)
+
+
+@pytest.mark.parametrize("second", ["different-code", "different-mode", "extra-member", "duplicate-name",
+                                   "build-failure", "multiple-wheels", "empty-output"])
+def test_conflicting_or_failed_historical_build_never_overwrites_approved_artifacts(checker, tmp_path, second):
+    helper, projects, wheels, _ = historical_wheel_builder(tmp_path, second=second)
+    first = checker.build_project(helper, "reviewed-python", projects[0], wheels, tmp_path, {})
+    original = first.read_bytes()
+    with pytest.raises((ValueError, subprocess.CalledProcessError)):
+        checker.build_project(helper, "reviewed-python", projects[1], wheels, tmp_path, {})
+    assert list(wheels.iterdir()) == [first] and first.read_bytes() == original

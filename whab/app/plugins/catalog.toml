@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "2194635cccfa7f0d05ece36b13981eca12692aa1"
+documentation_ref = "5c7c86d389843ae3f6c685fc2d8ba70532afc2ac"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -230,6 +230,7 @@ whab = "2.34.0"
 whab_plugin_devkit = "0.6.0"
 whab_plugin_example_api = "1.0.0"
 
+
 [[verification]]
 id = "pr97-visual-interface-source"
 date = "2026-10-23"
@@ -258,6 +259,38 @@ scope = "Built the exact committed runtime into wheels and installed outside the
 whab = "2.36.0"
 whab_plugin_web = "1.27.0"
 whab_plugin_sqlite = "1.11.0"
+
+
+[[verification]]
+id = "pr99-visual-teaching-toolkit"
+date = "2026-10-23"
+host_version = "2.36.0"
+source_commit = "ea9639201c8beb9ac7a47f0963805bd80980cf77"
+selection = ["example-ui", "example-api"]
+method = "source-tests"
+tests = ["devtools/plugin-devkit/tests", "plugins/example/example-ui/tests", "scripts/check_plugin_generation.py", "scripts/check_distribution.py", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/99"]
+scope = "The exact source passed 4779 Python tests, all fifteen runtime plugins at 100% statement/branch coverage, 333 browser checks, installed distributions and genuine minimum/current external gates. Toolkit 0.7 passed 192 installed tests per genuine WHAB 2.22/2.36 artifact with zero skips and complete statement/branch coverage. Six generated families built outside the checkout with required packages only, passed complete owning coverage and ten distinct configurations with every exact-artifact replay on each applicable genuine host floor/current matrix. Visual projects require the actual 2.36 SDK; API projects retain their actual 2.34 floor and other families retain 2.22. Older-host runtime N/A never counts as a native execution pass. The native visual profile verifies coherent pages/resources, browser preparation acknowledgements, exact approved same-candidate activation, disable/enable and saved-selection reopen. Distinct-version visual worker upgrades and household installation are separate evidence."
+[verification.artifacts]
+whab = "2.36.0"
+whab_plugin_devkit = "0.7.0"
+whab_plugin_example_ui = "1.0.0"
+whab_plugin_example_api = "1.0.0"
+
+[[verification]]
+id = "pr99-visual-teaching-installed-example"
+date = "2026-10-23"
+host_version = "2.36.0"
+source_commit = "629f2603b7bbd8e24c42eccbe34215c3da6accbb"
+selection = ["example-ui"]
+method = "installed-wheel"
+tests = ["plugins/example/example-ui/tests", "scripts/check_plugin_generation.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/99"]
+scope = "The exact maintained visual example and toolkit were built into approved wheels and installed outside the checkout. Its two owning behavioral tests passed with complete statement/branch coverage; ten distinct native HTTPS configurations and all ten exact-artifact replays passed using temporary fictional homes and an explicit temporary CA. Minimum and candidate are the same genuine WHAB 2.36 artifact, recorded as one host row serving both roles. Public host security guards, coherent four-page resources, exact approved-candidate activation, browser preparation and reopen executed. This is a same-artifact external-author profile, not distinct-version code-upgrade or production deployment evidence."
+[verification.artifacts]
+whab = "2.36.0"
+whab_plugin_devkit = "0.7.0"
+whab_plugin_example_ui = "1.0.0"
 
 [[verification]]
 id = "pr102-local-storage-source"
@@ -348,3 +381,52 @@ whab = "2.38.0"
 whab_plugin_sqlite = "1.12.0"
 whab_plugin_json = "1.3.0"
 whab_plugin_web = "1.27.0"
+
+[[verification]]
+id = "pr105-bank-toolkit-source"
+date = "2026-10-23"
+host_version = "2.38.0"
+source_commit = "034cdf2771ae72d0f133b0f5ceff17bfa78a1212"
+selection = ["example-bank"]
+method = "source-tests"
+tests = ["devtools/plugin-devkit/tests", "plugins/example/example-bank/tests", "tests/test_plugin_generation_checks.py", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/105"]
+scope = "The exact source passed 5176 Python cases, all sixteen runtime plugins at 100% statement/branch coverage and 354 browser checks. Genuine installed toolkit tests passed 224 cases each on WHAB 2.22 and 2.38 with zero skips; the current toolkit measured 1507 statements and 474 branches at 100%. The bank module remains lazy on the older SDK and requires actual 2.38 for its native behavior. The complete local command later stopped before generated configurations because two historical source recipes built the same reference-wheel filename. That original artifact-assembly failure is preserved; this record does not claim a complete canonical pass or final generated matrix. Separate prior installed bank records establish their exact tested snapshots."
+[verification.artifacts]
+whab = "2.38.0"
+whab_plugin_devkit = "0.8.0"
+whab_plugin_example_bank = "1.0.0"
+
+[[verification]]
+id = "pr105-installed-bank-example"
+date = "2026-10-23"
+host_version = "2.38.0"
+source_commit = "9315c12aa968bb22145f39fcda66dfd222109bf2"
+selection = ["example-bank", "sqlite", "json"]
+method = "installed-wheel"
+tests = ["plugins/example/example-bank/tests", "scripts/check_plugin_generation.py", "whab_plugin_devkit.bank_conformance"]
+pull_requests = ["https://github.com/Fillll/whab/pull/105"]
+scope = "Built and installed the maintained example, toolkit and genuine host/reference wheels outside the checkout. The example passed all twelve owning behavioral tests at 100% of 63 statements and 20 branches, then ten distinct native configurations and ten exact-artifact replays. WHAB 2.38 served both minimum and current roles using one actual compatible artifact. The five variants (standard, ready restart, ready retirement deferral, update restart and completion replay) each ran against SQLite and JSON with distinct reviewed peer sets. Public native HTTPS used only the temporary runtime CA, host financial/continuation APIs and the explicitly approved offline fictional transport. Completed flow, sync, annotation, acknowledged-write/copy/promotion/migration/reopen and disconnect checks created no external connection. Approved same-artifact activation is readiness evidence; distinct-version bank upgrades are recorded in PR101. Exact hashes were retained and owned homes/processes removed."
+[verification.artifacts]
+whab = "2.38.0"
+whab_plugin_devkit = "0.8.0"
+whab_plugin_example_bank = "1.0.0"
+whab_plugin_sqlite = "1.12.0"
+whab_plugin_json = "1.3.0"
+
+[[verification]]
+id = "pr105-installed-generated-bank"
+date = "2026-10-23"
+host_version = "2.38.0"
+source_commit = "8c0452a95198827acba22a0146cdfcd3583e0416"
+selection = ["sqlite", "json"]
+method = "installed-wheel"
+tests = ["scripts/check_plugin_generation.py", "generated bank project owning tests", "whab_plugin_devkit.bank_conformance"]
+pull_requests = ["https://github.com/Fillll/whab/pull/105"]
+scope = "The public generator created an independent generated-bank project outside the checkout. Its installed wheel passed twelve owning tests with complete statement/branch coverage, all ten distinct native-bank-v1 configurations and all ten exact replays using the same five offline flow variants in both reference-backend directions. The actual host 2.38 artifact fulfilled both minimum and current roles; the reviewed immutable recipe retains that genuine SDK floor for later host matrices. Explicit fictional-v1 approval, exact wheel hashes and saved manifests bound every replay. The selected curated packages here are the SQLite/JSON references; the generated bank distribution is a separate reviewed fixture, not the maintained example or bundled Plaid. The behavior used temporary-CA HTTPS and no external provider traffic."
+[verification.artifacts]
+whab = "2.38.0"
+whab_plugin_devkit = "0.8.0"
+whab_plugin_generated_bank = "0.1.0"
+whab_plugin_sqlite = "1.12.0"
+whab_plugin_json = "1.3.0"

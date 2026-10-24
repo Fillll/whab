@@ -16,10 +16,16 @@ def test_complete_generated_project_uses_public_sdk_and_has_working_fictional_ho
     project = generate_project(identifier, family, tmp_path / identifier)
     module_name = "whab_plugin_" + identifier.replace("-", "_")
     source = project / "src" / module_name / "__init__.py"
-    minimum = "2.34" if family == "api" else "2.22"
+    minimum = {"api": "2.34", "ui": "2.36", "bank": "2.38"}.get(family, "2.22")
     assert f"whab>={minimum},<3" in (project / "pyproject.toml").read_text()
     if family == "api" and not hasattr(sdk, "RemoteLedgerInterface"):
         assert "minimum-host = \"2.34.0\"" in (project / "pyproject.toml").read_text()
+        return
+    if family == "ui" and "view_protocol" not in sdk.UserInterface.__dataclass_fields__:
+        assert 'minimum-host = "2.36.0"' in (project / "pyproject.toml").read_text()
+        return
+    if family == "bank" and not hasattr(sdk, "BankAdapter"):
+        assert 'minimum-host = "2.38.0"' in (project / "pyproject.toml").read_text()
         return
     spec = importlib.util.spec_from_file_location(module_name, source)
     module = importlib.util.module_from_spec(spec)
@@ -28,10 +34,14 @@ def test_complete_generated_project_uses_public_sdk_and_has_working_fictional_ho
     assert exercise_candidate(module.plugin)
     assert (project / "LICENSE").is_file() and (project / "README.md").is_file()
     assert "whab.app" not in source.read_text() and "whab_plugin_sqlite" not in source.read_text()
-    if family == "api":
+    if family in {"api", "ui"}:
         test = (project / "tests/test_plugin.py").read_text()
-        assert "NativeRuntime" in test and "assert_api_interface" in test
+        assert "NativeRuntime" in test and ("assert_api_interface" if family == "api" else "assert_visual_interface") in test
         return  # Its installed-only native behavioral test runs in the wheel gate.
+    if family == "bank":
+        assert 'offline-bank-fixture = "fictional-v1"' in (project / "pyproject.toml").read_text()
+        assert "exercise_bank_runtime" in (project / "tests/test_plugin.py").read_text()
+        return  # The complete ordinary/native test suite runs against its installed wheel.
     # Run the generated ordinary tests too, with only its module registration.
     sys.modules[module_name] = module
     try:

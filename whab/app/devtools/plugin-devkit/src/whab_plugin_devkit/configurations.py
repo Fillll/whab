@@ -32,9 +32,11 @@ from whab.plugins.contracts import CapabilityError
 
 from .adapters import BackendAdapter, BackendHarness, public_snapshot
 from .api_interface import api_declaration
+from .bank_conformance import bank_declaration
 from .conformance import Capability as Suite
 from .conformance import run_conformance
 from .synthetic import SyntheticClock
+from .visual_interface import visual_declaration
 
 _PEERS = ("synthetic-report-a", "synthetic-report-b", "synthetic-brand-a", "synthetic-brand-b", "synthetic-import-a", "synthetic-import-b")
 _FAULTS = ("none", "report-hook", "import-atomicity")
@@ -137,8 +139,14 @@ def exercise_candidate(plugin, registry=None):
                 or not callable(getattr(interface, "factory", None)) or not exercised):
             api_declaration(plugin)
             exercised.append("interface.api")
+    if plugin.ui:
+        visual_declaration(plugin)
+        exercised.append("interface.ui")
+    if getattr(plugin, "bank", None) is not None and not exercised:
+        bank_declaration(plugin)
+        exercised.append("ingestion.bank")
     if not exercised:
-        raise ValueError("This increment checks reporting, branding, file import, categorization and declarative API candidates.")
+        raise ValueError("Choose a supported reporting, branding, file import, categorization, API, visual or offline bank candidate.")
     return exercised
 
 

@@ -45,6 +45,7 @@ def main(argv=None):
     check.add_argument("--wheelhouse", type=Path, required=True)
     check.add_argument("--output", type=Path, default=Path("whab-plugin-check"))
     check.add_argument("--runtime", action="store_true", help="Also run the versioned native HTTPS lifecycle/migration/copy profile where supported.")
+    check.add_argument("--bank-fixture", choices=("fictional-v1",), help="Explicitly authorize this reviewed offline bank fixture; never supply a real provider.")
     replay = commands.add_parser("replay", help="Replay one manifest against exact installed approved artifacts.")
     replay.add_argument("manifest", type=Path)
     replay.add_argument("--wheelhouse", type=Path, required=True)
@@ -55,6 +56,8 @@ def main(argv=None):
             print(f"Created {project}")
             return 0
         if arguments.command == "check":
+            if arguments.bank_fixture is not None and not arguments.runtime:
+                raise ValueError("A bank fixture requires the explicit native runtime profile.")
             if arguments.runtime:
                 from .runtime_profiles import (
                     replay_runtime_configuration,
@@ -67,7 +70,8 @@ def main(argv=None):
                 candidate, reference, artifacts = _selected(arguments.plugin, arguments.wheelhouse)
                 sample, execute = sample_configurations, replay_configuration
             manifests = sample(candidate, reference, artifacts,
-                                               combinations_count=arguments.combinations, seed=arguments.seed)
+                               combinations_count=arguments.combinations, seed=arguments.seed,
+                               **({"bank_fixture": arguments.bank_fixture} if arguments.runtime else {}))
             arguments.output.mkdir(parents=True, exist_ok=False)
             results = []
             for manifest in manifests:
