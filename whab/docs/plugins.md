@@ -319,6 +319,12 @@ the [platform execution checklist](plugin-platform.md).
 
 ## Storage backends
 
+From WHAB 2.41, independent adapters can use the public
+[`whab.plugins.storage_model` pure helpers](plugin-storage-model.md) for shared
+financial commands, state construction, normalized provider merges and projections.
+The adapter retains its own locks, detached candidates, native schema, atomic
+commits and durable operation evidence; the helpers do not open a backend.
+
 WHAB 2.23 adds the independently packaged [JSON backend](../app/plugins/storage/json/README.md)
 alongside SQLite. It passes the public storage conformance suites and stores its
 native ledger, receipts and encrypted provider records in one versioned file.

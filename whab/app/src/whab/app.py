@@ -565,7 +565,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 StorageContext(backend_home, settings.plaid_env, resolved_config,
                     budget_session.context(settings.storage) if budget_session else None,
                     expected_instance_id=selected[1]["authority_instance_id"] if selected else None),
-                registry, check=storage_runtime._source, binding=storage_binding,
+                registry, check=storage_runtime.check_background, binding=storage_binding,
                 on_create=lambda owner: startup.own(owner, owner.close_sync))
             live.storage = storage_upgrade
         replicas = StorageReplicas(storage_runtime)
