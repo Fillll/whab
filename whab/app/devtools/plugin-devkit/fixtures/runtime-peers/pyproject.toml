@@ -1,0 +1,21 @@
+[project]
+name = "whab_devkit_runtime_peers"
+version = "1.0.0"
+description = "Reviewed fictional peers for WHAB runtime conformance only"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab_plugin_devkit>=0.4,<1", "whab>=2.22,<3"]
+[project.entry-points."whab.plugins"]
+synthetic-report-a = "whab_devkit_runtime_peers:report_a"
+synthetic-report-b = "whab_devkit_runtime_peers:report_b"
+synthetic-brand-a = "whab_devkit_runtime_peers:brand_a"
+synthetic-brand-b = "whab_devkit_runtime_peers:brand_b"
+synthetic-import-a = "whab_devkit_runtime_peers:import_a"
+synthetic-import-b = "whab_devkit_runtime_peers:import_b"
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["src"]

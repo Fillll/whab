@@ -2,10 +2,17 @@
 
 from .adapters import BackendAdapter, BackendHarness, public_snapshot
 from .conformance import Capability, ConformanceFailure, Report, Result, run_conformance
+from .runtime_harness import NativeRuntime
+from .runtime_profiles import (
+    replay_runtime_configuration,
+    sample_runtime_configurations,
+    validate_runtime_manifest,
+)
 from .synthetic import SyntheticClock, imported_account, imported_transaction, receipt_png
 
 __all__ = [
     "BackendAdapter", "BackendHarness", "Capability", "ConformanceFailure", "Report",
-    "Result", "SyntheticClock", "imported_account", "imported_transaction",
-    "public_snapshot", "receipt_png", "run_conformance",
+    "NativeRuntime", "Result", "SyntheticClock", "imported_account", "imported_transaction",
+    "public_snapshot", "receipt_png", "replay_runtime_configuration", "run_conformance",
+    "sample_runtime_configurations", "validate_runtime_manifest",
 ]

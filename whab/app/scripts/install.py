@@ -68,7 +68,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dev", action="store_true", help="Include the host's development tools.")
     parser.add_argument("--example", action="store_true", help="Also install teaching example plugins.")
+    parser.add_argument("--runtime-fixtures", action="store_true", help="Include development tools and explicit reviewed peers required by native conformance tests.")
     args = parser.parse_args()
+    development = args.dev or args.runtime_fixtures
     legacy_plugins = installed_legacy_plugins()
     include_examples = args.example or "whab-example-plugin" in legacy_plugins
     projects = sorted(
@@ -76,10 +78,15 @@ def main():
         for project in (ROOT / "plugins").glob("*/*/pyproject.toml")
         if include_examples or project.parent.parent.name != "example"
     )
-    if args.dev:
+    if development:
         projects.extend(sorted(project.parent for project in (ROOT / "devtools").glob("*/pyproject.toml")))
+    if args.runtime_fixtures:
+        fixture = ROOT / "devtools/plugin-devkit/fixtures/runtime-peers"
+        if not (fixture / "pyproject.toml").is_file():
+            parser.error("The reviewed runtime peer source is missing; use a complete source checkout.")
+        projects.append(fixture)
     command = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check"]
-    command.extend(("-e", str(ROOT) + ("[dev]" if args.dev else "")))
+    command.extend(("-e", str(ROOT) + ("[dev]" if development else "")))
     for project in projects:
         command.extend(("-e", str(project)))
     subprocess.run(command, cwd=ROOT, check=True)
