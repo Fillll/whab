@@ -18,7 +18,7 @@ def _selected(plugin_id, wheelhouse, *, runtime=False):
     selected = []
     required = ["whab", "whab_plugin_devkit"]
     if runtime and Version(metadata.version("whab")) >= Version("2.32.0"):
-        required.extend(["whab_plugin_json", "whab_devkit_runtime_peers"])
+        required.append("whab_devkit_runtime_peers")
     for name in (plugin_id, "sqlite"):
         matches = [entry for entry in entries if entry.name == name]
         if len(matches) != 1:
@@ -27,7 +27,12 @@ def _selected(plugin_id, wheelhouse, *, runtime=False):
         required.append(matches[0].dist.metadata["Name"])
     artifacts = installed_artifacts(wheelhouse, required)
     # Only these two explicit registrations execute, after installed bytes match.
-    return selected[0].load(), selected[1].load(), artifacts
+    candidate = selected[0].load()
+    if runtime and Version(metadata.version("whab")) >= Version("2.32.0"):
+        storage = getattr(candidate, "storage", None)
+        required.append("whab_plugin_server" if storage is not None and not callable(storage) else "whab_plugin_json")
+        artifacts = installed_artifacts(wheelhouse, required)
+    return candidate, selected[1].load(), artifacts
 
 
 def main(argv=None):
@@ -87,7 +92,12 @@ def main(argv=None):
         if len(raw) > 1024 * 1024:
             raise ValueError("The configuration manifest exceeds its bound.")
         value = _parse(raw)
-        if type(value) is dict and value.get("formatVersion") == 2:
+        if type(value) is dict and value.get("formatVersion") == 3:
+            from .remote_profiles import replay_remote_configuration, validate_remote_manifest
+
+            manifest, execute = validate_remote_manifest(value), replay_remote_configuration
+            candidate, reference, artifacts = _selected(manifest["candidate"], arguments.wheelhouse, runtime=manifest["runtime"]["requested"])
+        elif type(value) is dict and value.get("formatVersion") == 2:
             from .runtime_profiles import replay_runtime_configuration, validate_runtime_manifest
 
             manifest, execute = validate_runtime_manifest(value), replay_runtime_configuration
@@ -97,7 +107,7 @@ def main(argv=None):
             candidate, reference, artifacts = _selected(manifest["candidate"], arguments.wheelhouse)
         if artifacts != manifest["artifacts"]:
             raise ValueError("Replay requires the exact recorded installed wheels and hashes.")
-        print(json.dumps(execute(manifest, candidate, reference, **({"wheelhouse": arguments.wheelhouse} if manifest["formatVersion"] == 2 else {})), indent=2))
+        print(json.dumps(execute(manifest, candidate, reference, **({"wheelhouse": arguments.wheelhouse} if manifest["formatVersion"] in {2, 3} else {})), indent=2))
         return 0
     except Exception:
         print("Plugin check failed. Preserve its manifest, verify the approved installed artifacts and run the project's fictional regression tests. No private exception payload is displayed.", file=sys.stderr)

@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "14ff3d586c3f0ad673a3db0865f8c7bf3a2d60e0"
+documentation_ref = "7701959dcdfc70a611ddfe8620c0a039155c76c7"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -462,3 +462,20 @@ whab_plugin_devkit = "0.8.0"
 whab_plugin_generated_bank = "0.1.0"
 whab_plugin_sqlite = "1.12.0"
 whab_plugin_json = "1.3.0"
+
+[[verification]]
+id = "pr106-remote-client-teaching"
+date = "2026-10-23"
+host_version = "2.41.0"
+source_commit = "1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2"
+selection = ["example-remote-client"]
+method = "installed-wheel"
+tests = ["devtools/plugin-devkit/tests", "plugins/example/example-remote-client/tests", "scripts/check_plugin_devkit.py", "scripts/check_plugin_generation.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/106"]
+scope = "The exact clean committed source passed 290 installed toolkit tests on genuine WHAB 2.22 and current 2.41 with zero skips; candidate toolkit statement/branch coverage was complete. The maintained remote-client example and a separately generated project each passed installed owning behavior and complete plugin coverage on separate genuine WHAB 2.40 minimum and 2.41 current artifacts. Each of those four rows passed ten distinct native configurations and ten exact approved-artifact replays, with all fictional homes/listeners/workers cleaned up. The genuine 2.40 source was e8fa8585c16d2f8a93b1966315c0fee34eb11d35. Native profiles used host-owned authorization/financial services, two fictional HTTPS hosts and a reviewed public-transport overlay that explicitly trusted the temporary authority CA. They exercised candidate workers, varied peers/order/transitions, pause/resume, exact-version reopen and client restart after a dropped acknowledged result; explicit Finish retained the original request/CAS identity. This does not establish stock client CLI private-CA configuration, remote-server restart retry durability, public receipt lookup, automatic unknown reconciliation, distinct-version upgrades from a single candidate artifact, local migration/copy support or household deployment. The toolkit's genuine 2.22 import compatibility is separate from this optional family's 2.40 floor. The interrupted source canonical run is not certified as a complete pass."
+[verification.artifacts]
+whab = "2.41.0"
+whab_plugin_devkit = "0.9.0"
+whab_plugin_example_remote_client = "1.0.0"
+whab_plugin_server = "1.1.0"
+whab_plugin_sqlite = "1.12.0"

@@ -1,12 +1,12 @@
 [project]
 name = "whab_plugin_devkit"
-version = "0.8.0"
+version = "0.9.0"
 description = "Public-contract conformance tools for WHAB plugin authors"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.22,<3", "packaging>=26,<27"]
+dependencies = ["whab>=2.22,<3", "packaging>=26,<27", "httpx>=0.28,<1"]
 
 [project.optional-dependencies]
 test = ["pytest>=9,<10"]
