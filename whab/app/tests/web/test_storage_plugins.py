@@ -228,7 +228,12 @@ print(json.dumps({
     assert json.loads(result.stdout) == {
         "backend": False, "schema": False, "seeding": False, "driver_imports": [],
     }
-    assert {path.name for path in tmp_path.iterdir()} == {"visual-ui"}
+    assert {path.name for path in tmp_path.iterdir()} == {"visual-ui", "plugin-workers"}
+    # This host metadata makes no native authority or live-worker claim for a
+    # legacy backend and must not import/create any concrete storage backend.
+    decision = json.loads((tmp_path / "plugin-workers/storage/memory/storage-upgrade.json").read_bytes())["body"]
+    assert decision == {"format": 2, "kind": "storage-code", "active": None, "native": None,
+                        "pending": None, "repair": None}
     assert {path.name for path in (tmp_path / "visual-ui").iterdir()} == {
         "visual-selection.json", "visual-selection.json.lock",
     }

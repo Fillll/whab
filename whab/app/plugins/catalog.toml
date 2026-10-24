@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "8d802177a75dac33c1bc2ed5f5e394ddd30c55ec"
+documentation_ref = "0ad5d25e680ee4499648d23149d87114ced6d0a0"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -291,3 +291,48 @@ scope = "The exact maintained visual example and toolkit were built into approve
 whab = "2.36.0"
 whab_plugin_devkit = "0.7.0"
 whab_plugin_example_ui = "1.0.0"
+
+[[verification]]
+id = "pr102-local-storage-source"
+date = "2026-10-23"
+host_version = "2.37.0"
+source_commit = "65ddbdfc7acdf3376041f460e4bb4e08f543d931"
+selection = ["sqlite", "json"]
+method = "source-tests"
+tests = ["tests/plugins/test_storage_worker.py", "tests/plugins/test_storage_worker_faults.py", "tests/plugins/test_storage_worker_selection.py", "tests/web/test_storage_migration.py", "tests/web/test_storage_replicas.py", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/102"]
+scope = "Separate fictional SQLite and JSON primary budgets exercised typed storage workers, drained compatible upgrades, rejected candidates, pending native operation evidence, nondecreasing recovery floors, stopped repair, native lease/cleanup ownership and concurrent status reads during both authority directions. Exact frozen source passed 4924 Python cases, all fourteen plugins at 100% statement/branch coverage, 333 browser tests and 164 installed toolkit cases on each genuine minimum/current host. The canonical generated stage stopped at a sanitized API exact-replay failure after its ten native API check configurations had passed; an independent replay of all ten identical retained artifact configurations passed. The original intermittent failure remains unattributed: this record does not claim a complete canonical pass or a timeout/status-race cause. A later narrow source regression covers phase-specific execute rejection versus unknown post-dispatch evidence/receipt publication. Final integrated validation remains required."
+[verification.artifacts]
+whab = "2.37.0"
+whab_plugin_sqlite = "1.12.0"
+whab_plugin_json = "1.3.0"
+
+[[verification]]
+id = "pr102-local-storage-native-https"
+date = "2026-10-23"
+host_version = "2.37.0"
+source_commit = "05e81db449e1cf4278a0dc9c4ea7fc8f1789fcf3"
+selection = ["sqlite", "json"]
+method = "installed-wheel"
+tests = ["tests/plugins/test_storage_worker.py", "tests/web/test_storage_migration.py", "tests/web/test_storage_replicas.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/102"]
+scope = "Actual installed wheels outside the checkout used native HTTPS and explicit temporary CA trust; an untrusted CA was refused. Separate fictional budgets ran both SQLite-primary/JSON-copy and JSON-primary/SQLite-copy directions, never two authoritative writers in one registry. Distinct approved synthetic versions proved valid upgrade, failed candidate preservation and later upgrade. Four acknowledged accounts per direction, namespace-only revisions, bank-continuation authority deferral, copy catch-up/promotion, reverse migration, two ordinary CLI reopens, saved worker selection, opaque models/files and original containers survived. The bank guard used real encrypted continuation records with fictional capture, not a bundled provider worker or external bank connection. Exact 33-wheel hashes and scripts were retained; homes/processes were removed. This is feature evidence at the stated source, not an installed claim for subsequent source-only outcome fixes."
+[verification.artifacts]
+whab = "2.37.0"
+whab_plugin_sqlite = "1.12.0"
+whab_plugin_json = "1.3.0"
+
+[[verification]]
+id = "pr102-cross-host-storage-repair"
+date = "2026-10-23"
+host_version = "2.37.0"
+source_commit = "2ce6d202b05e032baeb3005b15710c486d1856dd"
+selection = ["sqlite", "json"]
+method = "installed-wheel"
+tests = ["tests/plugins/test_storage_worker_selection.py", "tests/test_budget_cli.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/102"]
+scope = "Genuine installed host 2.37 at this source and genuine host 2.38 at a28ab71cf013039e36fbf4842cb96ce7a1644de6 verified both independent backend repair directions. New-host startup refused the old approved code binding before repair without changing native/code/container bytes. Explicit stopped read-only repair retained exact native UUID/epoch/generation/digest, namespace revision, original container, prior reference bytes/history and exact lost-publication retry. Two new-host ordinary CLI reopens per backend retained three acknowledged accounts, models/settings and the saved current approved worker. Each separate named-budget startup legitimately admitted prepare_budget_files(existing=True): its exact native command fingerprint/receipt proved generation G+1 with unchanged financial digest/UUID/epoch/namespace. A new acknowledged write advanced another generation. The original overstrict assertion expecting identical generation across those distinct startup operations is preserved in the evidence; no preparation optimization was made. Both complete artifact closures, hashes, scripts and the original assertion were retained. All homes/providers were fictional; no provider connection or household deployment."
+[verification.artifacts]
+whab = "2.37.0"
+whab_plugin_sqlite = "1.12.0"
+whab_plugin_json = "1.3.0"

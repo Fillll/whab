@@ -53,24 +53,30 @@ class Store(Authority):
     Synchronous methods must be called on the host's existing blocking-I/O pool.
     """
 
-    def __init__(self, path, *, month=None, commit_hook=None, budget_id="default", environment="sandbox", initial_role="primary"):
+    def __init__(self, path, *, month=None, commit_hook=None, budget_id="default", environment="sandbox", initial_role="primary", read_only=False):
         if type(initial_role) is not str or initial_role not in {"primary", "staged", "copy"}:
             raise StoreError("New storage requires a primary, staged or copy role.")
         self.path = Path(path).absolute()
-        ensure_durable_directory(self.path.parent)
+        if type(read_only) is not bool:
+            raise StoreError("Storage read-only mode must be a plain boolean.")
+        self._read_only = read_only
+        if not read_only:
+            ensure_durable_directory(self.path.parent)
         self._lock = RLock()
         self._closed = False
         self._uncertain = None
         self._changed = False
         self._hook = commit_hook
         self._pending = None
-        self._writer = WriterLock(self.path.with_name(self.path.name + ".lock"))
+        self._writer = None if read_only else WriterLock(self.path.with_name(self.path.name + ".lock"))
         try:
             raw = read_file(self.path)
             self._disk_hash = fingerprint(raw) if raw is not None else None
             self._disk_identity = self._identity() if raw is not None else None
             if raw is not None:
                 self._data = codec.decode(raw)
+                if read_only and self._data["formatVersion"] != 3:
+                    raise StoreError("Read-only readiness requires the current native JSON schema; upgrade it explicitly first.")
                 if self._data["formatVersion"] == 1:
                     preserve_schema_one(self.path, raw)
                     self._data.update(formatVersion=3, authority=fresh_metadata(
@@ -86,6 +92,8 @@ class Store(Authority):
                     self._data["formatVersion"] = 3
                     self._commit(self._data)
             else:
+                if read_only:
+                    raise StoreError("Read-only storage requires an existing native ledger.")
                 selected = month or current_month()
                 validate_month(selected)
                 self._data = {
@@ -97,14 +105,16 @@ class Store(Authority):
                 }
                 self._commit(self._data)
         except BaseException:
-            self._writer.close()
+            if self._writer is not None:
+                self._writer.close()
             self._closed = True
             raise
 
     def close(self):
         with self._lock:
             if not self._closed:
-                self._writer.close()
+                if self._writer is not None:
+                    self._writer.close()
                 self._closed = True
 
     def _boundary(self, name):
@@ -123,7 +133,8 @@ class Store(Authority):
         if self._changed:
             raise ExternalChange("JSON storage changed outside this writer; preserve both revisions before reopening.")
         try:
-            self._writer.check()
+            if self._writer is not None:
+                self._writer.check()
             raw = read_file(self.path)
             actual = fingerprint(raw) if raw is not None else None
             identity = self._identity() if raw is not None else None
@@ -146,6 +157,8 @@ class Store(Authority):
             }}
 
     def _commit(self, candidate):
+        if self._read_only:
+            raise StoreError("Read-only storage cannot accept mutations.")
         self._check_current()
         raw, candidate = codec.encode(candidate)
         try:

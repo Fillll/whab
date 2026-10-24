@@ -33,6 +33,7 @@ _MESSAGES = {
     "commit_uncertain": "The runtime handover could not be confirmed. Validate authority before resuming this budget.",
     "recovery_required": "Validate this budget's runtime authority before another transition.",
     "recovery_failed": "Runtime authority could not be validated. This budget remains paused.",
+    "storage_write_unknown": "A storage write needs explicit native-evidence recovery. This budget remains paused.",
     "transition_in_operation": "Finish the current budget operation before changing its runtime.",
     "service_unavailable": "This service is not available in the operation's runtime generation.",
     "async_service": "Use asynchronous service access for this runtime operation.",
@@ -211,6 +212,7 @@ class BudgetRuntime:
         self._phase = "active"
         self._sequence = 0
         self._uncertain = None
+        self._service_fault = None
 
     def handle(self, name):
         if type(name) is not str or not name.isidentifier() or name.startswith("_"):
@@ -230,8 +232,42 @@ class BudgetRuntime:
                 "cleanup_errors": [dict(error) for error in self._cleanup_errors],
                 "cleanup_pending": len(self._cleanup) + len(self._cleanup_failed),
                 "cleanup_failed": len(self._cleanup_failed),
-                "health": "recovery_required" if self._uncertain else "degraded" if self._cleanup_errors else "ready",
+                "health": "recovery_required" if self._uncertain or self._service_fault else "degraded" if self._cleanup_errors else "ready",
             }
+
+    def fence_storage(self, plugin_id):
+        """A synchronous financial worker may fence its affected budget only."""
+        if not valid_plugin_name(plugin_id):
+            raise RuntimeTransitionError("invalid_runtime")
+        with self._condition:
+            self._service_fault = plugin_id
+            self._gate = True
+            self._phase = "recovery_required"
+            self._error = self._diagnostic("storage_write_unknown", plugin_id)
+            self._notify()
+
+    async def recover_storage(self, validate, *, plugin_id, drain_timeout=30):
+        """Explicit sole-writer evidence recovery; never cancel admitted work."""
+        if self._inherited() is not None or not callable(validate) or not valid_plugin_name(plugin_id):
+            raise RuntimeTransitionError("transition_in_operation")
+        _timeout(drain_timeout)
+        return await self._owned(self._recover_storage(validate, plugin_id, drain_timeout))
+
+    async def _recover_storage(self, validate, plugin_id, drain_timeout):
+        async with self._serial:
+            with self._condition:
+                if self._closed or self._uncertain is not None or self._service_fault != plugin_id:
+                    raise RuntimeTransitionError("recovery_required")
+            await self._wait(lambda: not self._leases, drain_timeout, "drain_timeout")
+            if await _invoke(validate) is not True:
+                raise RuntimeTransitionError("recovery_failed")
+            with self._condition:
+                self._service_fault = None
+                self._error = None
+                self._gate = False
+                self._phase = "active"
+                self._notify()
+            return self._active.number
 
     @staticmethod
     def _diagnostic(code, plugin_id):
@@ -468,7 +504,7 @@ class BudgetRuntime:
         with self._condition:
             if self._closed:
                 raise RuntimeTransitionError("runtime_closed")
-            if self._uncertain:
+            if self._uncertain or self._service_fault:
                 raise RuntimeTransitionError("recovery_required")
 
     def _begin(self, plugin_id):
@@ -482,9 +518,9 @@ class BudgetRuntime:
 
     def _resume(self, phase="active"):
         with self._condition:
-            self._gate = False
+            self._gate = self._service_fault is not None
             self._pending = None
-            self._phase = phase
+            self._phase = "recovery_required" if self._service_fault else phase
             self._notify()
 
     async def transition(self, prepare, *, readiness=None, finalize=None, commit=None, plugin_id=None,
@@ -533,6 +569,9 @@ class BudgetRuntime:
                 self._progress("draining", 50)
                 code = "drain_timeout"
                 await self._wait(lambda: not self._leases, drain_timeout, code)
+                with self._condition:
+                    if self._service_fault is not None:
+                        raise RuntimeTransitionError("storage_write_unknown", self._service_fault)
                 if finalize is not None:
                     self._progress("finalizing", 60)
                     code = "readiness_failed"
@@ -553,6 +592,8 @@ class BudgetRuntime:
                     owner = error.plugin_id
                 if isinstance(error, RuntimeTransitionError) and error.code == "continuation_busy":
                     code, owner = error.code, error.plugin_id
+                if self._service_fault is not None:
+                    code, owner = "storage_write_unknown", self._service_fault
                 with self._condition:
                     self._error = self._diagnostic(code, owner)
                 self._resume("failed")
