@@ -270,3 +270,13 @@ Focused tests prepared separately approved synthetic descriptor wheels 1.0, 1.1 
 Tests: `tests/plugins/test_remote_client_workers.py`.
 
 Review: [PR #100](https://github.com/Fillll/whab/pull/100).
+
+### pr103-explicit-child-environments
+
+Verified 2026-10-23; host `2.40.0`. Selected: `example`, `sqlite`, `json`.
+
+The exact source passed six focused cases: the explicit process allowlist and password-alias exclusion, actual report/SQLite/JSON worker startup and cleanup with fictional custom-setting canaries, scoped configuration dispatch, and the installed native HTTPS fixture. Arbitrary apparently safe names were excluded while the reviewed standard locale survived. The native fixture built its declared isolated build backend and retained failure diagnostics privately; it verified the temporary runtime CA, public authorization and an acknowledged fictional account. Earlier complete CI on the equivalent public-SDK foundation had two fixture failures that are corrected here; an interrupted local run is not a complete-pass claim. This record covers the child-environment policy and focused fixture corrections, not the final combined submission gate or household deployment. Trusted executable plugins retain operating-system access.
+
+Tests: `tests/plugins/test_process_environment.py`, `tests/plugins/test_storage_worker_faults.py::test_native_child_receives_scoped_config_without_custom_provider_or_api_environment_credentials`, `tests/plugins/test_remote_client_workers.py::test_installed_host_client_uses_native_https_verified_runtime_ca_and_public_server`.
+
+Review: [PR #103](https://github.com/Fillll/whab/pull/103).

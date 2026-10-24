@@ -178,9 +178,9 @@ import os,sys
 from dataclasses import replace
 from whab.plugins import PluginRegistry
 from whab.plugins import storage_worker
-for key in ('FICTIONAL_PROVIDER_TOKEN','FICTIONAL_SERVICE_SECRET','FICTIONAL_API_KEY','FICTIONAL_AUTHORIZATION','fictional_password','JSON_CUSTOM_VALUE','ODD_PASSWORD_ALIAS'):
+for key in ('FICTIONAL_PROVIDER_TOKEN','FICTIONAL_SERVICE_SECRET','FICTIONAL_API_KEY','FICTIONAL_AUTHORIZATION','fictional_password','JSON_CUSTOM_VALUE','ODD_PASSWORD_ALIAS','FICTIONAL_SAFE_VALUE'):
  assert key not in os.environ
-assert os.environ['FICTIONAL_SAFE_VALUE']=='retained'
+assert os.environ['LANG']=='C'
 original=storage_worker.load_plugins(('json',)).storage_plugin('json')
 def factory(context):
  assert dict(context.config)=={'EXPLICIT_STORAGE_SETTING':'scoped'}
@@ -192,7 +192,8 @@ storage_worker.serve('json',sys.stdin.buffer,sys.stdout.buffer)
                 'fictional_password', 'JSON_CUSTOM_VALUE', 'ODD_PASSWORD_ALIAS'):
         monkeypatch.setenv(key, 'fictional-never-forward')
     monkeypatch.setenv('WHAB_BUDGET_PASSWORD_ENV', 'ODD_PASSWORD_ALIAS')
-    monkeypatch.setenv('FICTIONAL_SAFE_VALUE', 'retained')
+    monkeypatch.setenv('FICTIONAL_SAFE_VALUE', 'arbitrary-name-is-not-approved')
+    monkeypatch.setenv('LANG', 'C')
     popen = subprocess.Popen
     monkeypatch.setattr(storage_worker.subprocess, 'Popen', lambda _args, **kwargs: popen([sys.executable, '-I', '-B', '-c', script], **kwargs))
     from whab.plugins import StorageContext
