@@ -32,6 +32,7 @@ from whab.plugins.contracts import CapabilityError
 
 from .adapters import BackendAdapter, BackendHarness, public_snapshot
 from .api_interface import api_declaration
+from .bank_conformance import bank_declaration
 from .conformance import Capability as Suite
 from .conformance import run_conformance
 from .synthetic import SyntheticClock
@@ -141,8 +142,11 @@ def exercise_candidate(plugin, registry=None):
     if plugin.ui:
         visual_declaration(plugin)
         exercised.append("interface.ui")
+    if getattr(plugin, "bank", None) is not None and not exercised:
+        bank_declaration(plugin)
+        exercised.append("ingestion.bank")
     if not exercised:
-        raise ValueError("Choose a supported reporting, branding, file import, categorization, API or visual candidate.")
+        raise ValueError("Choose a supported reporting, branding, file import, categorization, API, visual or offline bank candidate.")
     return exercised
 
 

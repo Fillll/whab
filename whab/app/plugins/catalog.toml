@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "8d802177a75dac33c1bc2ed5f5e394ddd30c55ec"
+documentation_ref = "22022509ea5aa5ad399d762add50167b62bdd097"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -229,3 +229,33 @@ scope = "The exact source passed 4569 Python tests, all fourteen runtime plugins
 whab = "2.34.0"
 whab_plugin_devkit = "0.6.0"
 whab_plugin_example_api = "1.0.0"
+
+
+[[verification]]
+id = "pr97-visual-interface-source"
+date = "2026-10-23"
+host_version = "2.36.0"
+source_commit = "1d4aead82850cc6030f335acb39dd2202b28306b"
+selection = ["web"]
+method = "source-tests"
+tests = ["tests/plugins/test_ui_worker.py", "tests/web/test_visual_interface.py", "tests/plugins/test_ui_runtime.py", "plugins/interface/web/tests", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/97"]
+scope = "The exact source passed 4769 Python tests, all thirteen runtime plugins at 100% statement/branch coverage, 333 browser checks, 130 installed toolkit tests per genuine minimum/current artifact, generated configurations and exact replays, and installed distributions. Covered browser preparation barriers, stable ledger services, exact selection decisions, immutable resources, guarded headless mode, stopped repair, lost replies and retained cleanup ownership through partial constructors and retirement failures. Separate headless Chrome QA checked desktop/light and compact/dark Plugins settings without overflow and completed a browser-acknowledged handover of the same Web artifact. This source evidence does not claim distinct installed versions or household deployment."
+[verification.artifacts]
+whab = "2.36.0"
+whab_plugin_web = "1.27.0"
+
+[[verification]]
+id = "pr97-visual-interface-native-https"
+date = "2026-10-23"
+host_version = "2.36.0"
+source_commit = "911bfe0f0be6b8ba1b82d34e886e99411d6a5784"
+selection = ["web", "sqlite"]
+method = "installed-wheel"
+tests = ["tests/plugins/test_ui_worker.py", "tests/web/test_visual_interface.py", "tests/plugins/test_ui_runtime.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/97"]
+scope = "Built the exact committed runtime into wheels and installed outside the checkout. Native CA-verified HTTPS rejected cleartext, untrusted CA, foreign Host/origin and demo mutation. A dirty browser deferred handover while a separate acknowledged financial write remained admitted; duplicate commits retained the exact preview operation. Separately approved synthetic Web versions 1.27.1.dev1, broken dev2 and valid dev3 proved distinct immutable worker replacement, failed preparation preserving the prior worker, coherent four-page generation assets, headless acknowledged saves, old asset retention and exact saved dev3 restoration after an ordinary installed CLI reopen. All three acknowledged fictional accounts survived. Exact wheel/closure/script hashes and eight checks were retained; homes, host leaders and workers were removed. These synthetic provider versions differ from the bundled Web version listed here. This does not establish cross-host SDK upgrades, real provider connectivity or household installation."
+[verification.artifacts]
+whab = "2.36.0"
+whab_plugin_web = "1.27.0"
+whab_plugin_sqlite = "1.11.0"
