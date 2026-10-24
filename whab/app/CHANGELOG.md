@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.28.0 — 2026-10-23
+
+PR: [#85](https://github.com/Fillll/whab/pull/85)
+
+- Add explicit minimal HTTPS plugin startup recovery with metadata-only inspection, revision-checked optional disabling, exact-byte archival of invalid global selections and saved worker references, and full startup retry on the same guarded listener.
+- Version metadata-only budget selection journals so unopened nonempty financial payloads remain restorable after repair or interrupted first restore. Preserve unknown namespaces, original containers and committed migrated authority with acknowledged later writes.
+- Keep failed candidates attributable and recovery available; own cancellation/shutdown cleanup. Verify installed native HTTPS repair, same-listener activation, save and restart alongside the complete contribution gate.
+
 ## 2.27.0 — 2026-10-23
 
 PR: [#84](https://github.com/Fillll/whab/pull/84)

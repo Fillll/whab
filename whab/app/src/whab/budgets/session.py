@@ -18,6 +18,7 @@ from .credentials import encrypt_credentials
 from .document import (
     MAX_BUNDLE_BYTES,
     MAX_MANIFEST_BYTES,
+    _json,
     atomic_write,
     digest,
     encode_bundle,
@@ -26,6 +27,8 @@ from .document import (
     upgrade_manifest,
     validate_manifest,
 )
+
+MAX_SOURCE_BYTES = MAX_MANIFEST_BYTES + 1024
 
 
 def content_digest(manifest, ledger, credential_blob=None):
@@ -57,14 +60,27 @@ def _read_source(path):
     if not path.exists():
         return None
     try:
-        value = json.loads(_read_bytes(path, MAX_MANIFEST_BYTES))
+        value = _json(_read_bytes(path, MAX_SOURCE_BYTES))
+        if type(value) is dict and value.get("formatVersion") == 2:
+            required = {"formatVersion", "selectionOnly", "restoreRequired", "content", "manifest"}
+            if (not required <= value.keys() or value.keys() - (required | {"pending", "restorePending"})
+                    or type(value["formatVersion"]) is not int or value["selectionOnly"] is not True
+                    or type(value["restoreRequired"]) is not bool
+                    or ("pending" in value and "restorePending" in value)
+                    or ("pending" in value and value["restoreRequired"])
+                    or ("restorePending" in value and not value["restoreRequired"])):
+                raise ValueError()
+            value["manifest"] = validate_manifest(value["manifest"])
+            fingerprints = {key: value[key] for key in ("content", "pending", "restorePending") if key in value}
+        else:
+            fingerprints = value
         if (
-            type(value) is not dict or "content" not in value
-            or value.keys() - {"content", "pending", "restorePending"}
-            or ("pending" in value and "restorePending" in value)
+            type(fingerprints) is not dict or "content" not in fingerprints
+            or fingerprints.keys() - {"content", "pending", "restorePending"}
+            or ("pending" in fingerprints and "restorePending" in fingerprints)
         ):
             raise ValueError()
-        for key, fingerprint in value.items():
+        for key, fingerprint in fingerprints.items():
             if key == "content" and fingerprint is None:
                 continue
             if (
@@ -73,8 +89,41 @@ def _read_source(path):
             ):
                 raise ValueError()
         return value
-    except (ValueError, OSError):
+    except (ValueError, OSError, TypeError):
         raise StoreError("The budget's local recovery record is unreadable.") from None
+
+
+def recovery_source(previous, manifest, incoming):
+    """Upgrade only the selection journal; never assert that a ledger was restored.
+
+    The complete manifest and its original source fingerprint share one atomic
+    decision. A crash cannot expose a selection marker without its metadata.
+    Unversioned native recovery records keep their exact legacy representation
+    until this explicit metadata-only save upgrades them.
+    """
+    manifest = validate_manifest(manifest)
+    value = {key: previous[key] for key in ("content", "pending", "restorePending") if previous and key in previous}
+    if previous is None:
+        value["content"] = incoming
+    value.update(formatVersion=2, selectionOnly=True, manifest=manifest,
+                 restoreRequired=previous.get("restoreRequired", "restorePending" in previous) if previous else True)
+    raw = json.dumps(value, ensure_ascii=False).encode()
+    if len(raw) > MAX_SOURCE_BYTES:
+        raise StoreError("The budget's saved plugin setup exceeds the supported size.")
+    return value, raw
+
+
+def _flush_source_home(home, directory):
+    home, directory = Path(home).resolve(), Path(directory).resolve()
+    while directory.is_relative_to(home):
+        descriptor = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        if directory == home:
+            break
+        directory = directory.parent
 
 
 class BudgetSession:
@@ -99,8 +148,8 @@ class BudgetSession:
         self.destinations = []
         self.status = "saved"
         self._file_digest = digest(_read_bytes(self.path)) if self.path and self.path.exists() else None
+        self._incoming_content = content_digest(self.manifest, self.ledger if self.ledger is not None else self.files, self.credential_blob)
         from .storage_runtime import prepare_session_authority, storage_manifest
-        incoming_manifest = self.manifest
         preserved_original = prepare_session_authority(self)
         self._source = _read_source(self.storage_home / "source.json")
         if self.storage_authority and (
@@ -110,11 +159,18 @@ class BudgetSession:
         ):
             raise StoreError("The migrated budget's local plugin recovery state is unavailable; restore it before opening this budget.")
         if (self.ledger is not None or self._has_payload) and self._source is not None:
-            incoming = content_digest(incoming_manifest, self.ledger if self.ledger is not None else self.files, self.credential_blob)
+            incoming = self._incoming_content
             if not preserved_original and incoming not in (self._source["content"], self._source.get("pending")):
                 raise StoreError("This budget differs from the copy already opened on this device. Export the recovered budget before opening a different revision.")
             saved_manifest = self.storage_home / "manifest.json"
-            if "restorePending" not in self._source and saved_manifest.exists():
+            if self._source.get("formatVersion") == 2:
+                recovered = self._source["manifest"]
+                if self.storage_authority:
+                    recovered = storage_manifest(recovered, self.manifest["storage"])
+                if recovered["id"] != self.id or recovered["storage"] != self.manifest["storage"]:
+                    raise StoreError("The budget's saved plugin setup belongs to another budget or storage plugin.")
+                self.manifest = recovered
+            elif "restorePending" not in self._source and saved_manifest.exists():
                 try:
                     recovered = validate_manifest(json.loads(_read_bytes(saved_manifest, MAX_MANIFEST_BYTES)))
                     if self.storage_authority:
@@ -125,7 +181,7 @@ class BudgetSession:
                 except (ValueError, OSError):
                     raise StoreError("The budget's saved plugin setup is unreadable.") from None
             saved_files = self.storage_home / "plugin-data.whab"
-            if "restorePending" not in self._source and saved_files.exists():
+            if ("restorePending" not in self._source or self._source.get("formatVersion") == 2) and saved_files.exists():
                 recovered = decode_container(_read_bytes(saved_files))
                 if recovered.manifest["id"] != self.id or (not self.storage_authority and recovered.manifest["storage"] != self.manifest["storage"]):
                     raise StoreError("The budget's saved plugin files are unreadable.")
@@ -216,10 +272,11 @@ class BudgetSession:
             prepare = getattr(store, "prepare_budget_files", None)
             if not callable(prepare):
                 raise StoreError("This storage plugin cannot open its saved budget files.")
-            existing = self._source is not None and "restorePending" not in self._source
+            existing = self._source is not None and "restorePending" not in self._source and not self._source.get("restoreRequired", False)
             if not existing:
                 incoming = content_digest(self.manifest, self.files, self.credential_blob)
-                initial = {"content": incoming, "restorePending": incoming}
+                initial = ({**self._source, "restorePending": incoming, "restoreRequired": True}
+                           if self._source and self._source.get("formatVersion") == 2 else {"content": incoming, "restorePending": incoming})
                 try:
                     atomic_write(self.storage_home / "source.json", json.dumps(initial).encode())
                 except OSError:
@@ -229,7 +286,7 @@ class BudgetSession:
             if self.storage_payload_paths:
                 payload = {name: raw for name, raw in payload.items() if name in self.storage_payload_paths}
             prepare("personal", payload, existing=existing)
-        if self.ledger is not None and (self._source is None or "restorePending" in self._source):
+        if self.ledger is not None and (self._source is None or "restorePending" in self._source or self._source.get("restoreRequired", False)):
             incoming = content_digest(self.manifest, self.ledger)
             restore = getattr(store, "restore_budget", None)
             # The restore contract detaches external provider balance snapshots.
@@ -239,8 +296,9 @@ class BudgetSession:
                     if account["source"] not in {"manual", "demo"}:
                         account["stale"] = True
             expected_digest = content_digest(None, expected)
-            if self._source is None:
-                initial = {"content": incoming, "restorePending": expected_digest}
+            if self._source is None or self._source.get("formatVersion") == 2:
+                initial = ({**self._source, "restorePending": expected_digest, "restoreRequired": True}
+                           if self._source else {"content": incoming, "restorePending": expected_digest})
                 try:
                     atomic_write(self.storage_home / "source.json", json.dumps(initial).encode())
                 except OSError:
@@ -310,9 +368,18 @@ class BudgetSession:
 
     def _save_manifest(self, value):
         validated = validate_manifest(value)
+        metadata_only = self.store is None and (self.ledger is not None or self._has_payload)
         try:
-            atomic_write(self.storage_home / "manifest.json", json.dumps(validated).encode())
+            if metadata_only:
+                source, raw = recovery_source(self._source, validated, self._incoming_content)
+                atomic_write(self.storage_home / "source.json", raw)
+                _flush_source_home(self.home, self.storage_home)
+                self._source = source
+            else:
+                atomic_write(self.storage_home / "manifest.json", json.dumps(validated).encode())
         except OSError:
+            if metadata_only:
+                raise StoreError("The budget's plugin setup could not be confirmed. Refresh its saved recovery record before retrying.") from None
             raise StoreError("The budget's plugin setup could not be saved; its previous settings are unchanged.") from None
         self.manifest = validated
         self.checkpoint()

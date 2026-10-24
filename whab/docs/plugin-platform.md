@@ -17,7 +17,7 @@ not update the household installation or publish releases.
 | 7 | Previewed SQLite/JSON migration, protected same-device transfer, authority journal and restart recovery | Implemented and tested in draft PR [#84](https://github.com/Fillll/whab/pull/84), including process termination and installed native HTTPS round trips/restarts |
 | 8 | Single-primary backend copies, monotonic watermarks, retry and explicit validated promotion in both directions | Pending |
 | 9 | Independently installed generator/examples, clean external wheel CI, static metadata and compatibility docs | Four independent project generators and external wheel/replay CI tested in draft PR [#82](https://github.com/Fillll/whab/pull/82); maintained branding/parser/categorization examples tested in [#83](https://github.com/Fillll/whab/pull/83); static catalog and broader family examples pending |
-| 10 | Recovery controls, attributed diagnostics, curated static catalog and verified private security-reporting route | Private route enabled and policy prepared in draft PR [#77](https://github.com/Fillll/whab/pull/77); startup recovery and static catalog pending |
+| 10 | Recovery controls, attributed diagnostics, curated static catalog and verified private security-reporting route | Private route enabled and policy prepared in draft PR [#77](https://github.com/Fillll/whab/pull/77); minimal startup recovery tested in draft PR [#85](https://github.com/Fillll/whab/pull/85); static catalog pending |
 
 Dependencies: contracts precede the conformance kit; JSON storage and runtime
 coordination can then advance in parallel. Workers and capability-family
