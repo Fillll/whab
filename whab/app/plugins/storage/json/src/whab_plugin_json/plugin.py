@@ -8,7 +8,8 @@ def create_storage(context: StorageContext):
 
     return Store(context.home / "data" / f"whab-{context.environment}.json",
                  budget_id=context.budget.budget_id if context.budget is not None else "default",
-                 environment=context.environment, initial_role=context.initial_role)
+                 environment=context.environment, initial_role=context.initial_role,
+                 read_only=context.read_only)
 
 
 plugin = Plugin(
@@ -16,8 +17,8 @@ plugin = Plugin(
     storage_payload_paths=("budget.json",),
     contract=PluginContract(
         provides=tuple(Capability(name) for name in (
-            "receipts", "transfer.neutral", "transfer.prepare", "storage.authority", "storage.commands", "transfer.local", "storage.replica",
+            "receipts", "transfer.neutral", "transfer.prepare", "storage.authority", "storage.commands", "transfer.local", "storage.replica", "storage.worker",
         )),
-        authority="local", lifecycle="restart",
+        authority="local", lifecycle="live",
     ),
 )

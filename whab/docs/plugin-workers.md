@@ -4,6 +4,7 @@ WHAB 2.25 introduced explicitly live stateless reporting/export upgrades. The
 current adapter also replaces branding, file-parser, declarative API interface
 and explicitly scoped categorization code without restarting its listener.
 WHAB 2.36 adds the separate visual adapter with coherent assets and browser participation.
+WHAB 2.37 adds the separate [local storage adapter](storage-workers.md) for SQLite and JSON, with native durable receipts and same-authority code handover.
 Other families require their own adapters. The parent
 retains TLS, authorization, local-access guards, budget identity and financial
 validation. These data protocols accept no financial mutation, backend handle,

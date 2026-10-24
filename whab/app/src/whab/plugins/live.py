@@ -203,6 +203,7 @@ class LivePluginSelection:
         self.prepare_interfaces = None
         self.visual_ids = frozenset()
         self.visual = None
+        self.storage = None
         self.initial_selection = frozenset(plugin.id for plugin in runtime._active.services["plugins"].descriptors()) - self.required
         self._lock = Lock()
         self._tickets = {}
@@ -225,8 +226,13 @@ class LivePluginSelection:
         families = set(upgrades)
         if self.categorization is not None:
             families.add("categorization")
+        storage_supported = self.storage is not None and self.storage.supported()
+        code_families = set(upgrades)
+        if storage_supported:
+            families.add("storage")
+            code_families.add("storage")
         return {"families": sorted(families),
-                "code_upgrade_families": sorted(upgrades) if self.home is not None else [],
+                "code_upgrade_families": sorted(code_families) if self.home is not None else [],
                 "host_only_families": [],
                 "code_upgrades": self.home is not None, "runtime": self.runtime.status(),
                 "workers": sorted(workers, key=lambda item: item["plugin"]), "operations": operations}
@@ -311,13 +317,20 @@ class LivePluginSelection:
 
         if self.home is None:
             raise PluginError("This runtime cannot persist worker environments.", code="restart_required", plugin_id=plugin_id)
+        if self.storage is not None and plugin_id == self.storage.plugin_id:
+            return await self.storage.upgrade(plugin_id, approvals)
         return await upgrade_report(self, self.home, plugin_id, approvals)
 
     async def recover(self, authority):
         from .worker_selection import validate_saved_generation
 
+        if self.storage is not None and (self.storage.pending is not None or self.storage.status()["uncertain"]):
+            task = self.runtime.schedule(self.storage.recover(authority))
+            return await asyncio.shield(task)
+
         async def validate(chosen, active, candidate):
-            if active.services.get("visual") is not candidate.services.get("visual"):
+            if (active.services.get("visual") is not candidate.services.get("visual")
+                    or active.services.get("storage") is not candidate.services.get("storage")):
                 return False
             generation = active if chosen == "active" else candidate
             valid = await run_in_threadpool(validate_saved_generation, self, generation)

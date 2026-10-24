@@ -335,6 +335,12 @@ for 2.22.0, or `ebbff0d464dd67c0269428a6d4a339778e21ec57` for the API family’s
 minimum/current versions produce distinct real artifacts; equal versions share
 one artifact with both roles. Version metadata is never rewritten for compatibility. The installed toolkit retains its declared minimum host floor.
 
+Historical hosts may share an unchanged reference package version. The checker
+builds each source separately and reuses the first approved wheel only when every
+member's contents, modes and flags match; ZIP timestamps may differ. A conflicting
+same-identity artifact or a failed build stops validation without replacing the
+approved wheel. Exact saved artifact hashes remain the replay authority.
+
 The shared runner builds the caller project once, then creates independent
 environments outside both source checkouts. Only candidate/reference plugin
 registrations are permitted. Before importing either descriptor it verifies exact

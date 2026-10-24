@@ -36,7 +36,7 @@ def test_json_factory_owns_separate_environment_files_and_metadata(tmp_path):
         sandbox.add_account("personal", {"name": "Fictional", "type": "depository", "balance": 100})
         assert production.accounts("personal") == []
         assert plugin.contract.authority == "local"
-        assert plugin.contract.lifecycle == "restart"
+        assert plugin.contract.lifecycle == "live"
         assert {path.name for path in (tmp_path / "data").glob("*.json")} == {
             "whab-sandbox.json", "whab-production.json",
         }
