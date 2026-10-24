@@ -15,7 +15,7 @@
       "conflicts": [],
       "display_name": "Bank logos (Icon Horse)",
       "distribution": "whab_plugin_bank_logos",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/interface/bank-logos/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/interface/bank-logos/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "bank-logos",
@@ -58,7 +58,7 @@
       "conflicts": [],
       "display_name": "Remote budget client",
       "distribution": "whab_plugin_client",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/storage/client/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/storage/client/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "client",
@@ -78,7 +78,9 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [],
+      "verifications": [
+        "pr100-remote-client-lifecycle"
+      ],
       "version": "1.6.0"
     },
     {
@@ -99,7 +101,7 @@
       "conflicts": [],
       "display_name": "Month totals example",
       "distribution": "whab_plugin_example",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/example/example/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example",
@@ -122,7 +124,8 @@
       "verifications": [
         "pr82-installed-sqlite-web",
         "pr86-installed-sqlite-web",
-        "pr86-installed-json-web"
+        "pr86-installed-json-web",
+        "pr103-explicit-child-environments"
       ],
       "version": "1.4.0"
     },
@@ -139,7 +142,7 @@
       "conflicts": [],
       "display_name": "Fictional API interface",
       "distribution": "whab_plugin_example_api",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-api/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/example/example-api/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-api",
@@ -183,7 +186,7 @@
       "conflicts": [],
       "display_name": "Offline fictional bank",
       "distribution": "whab_plugin_example_bank",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-bank/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/example/example-bank/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-bank",
@@ -219,7 +222,7 @@
       "conflicts": [],
       "display_name": "Fictional branding",
       "distribution": "whab_plugin_example_branding",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-branding/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/example/example-branding/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-branding",
@@ -258,7 +261,7 @@
       "conflicts": [],
       "display_name": "Exact merchant teaching model",
       "distribution": "whab_plugin_example_categorization",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-categorization/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/example/example-categorization/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-categorization",
@@ -297,7 +300,7 @@
       "conflicts": [],
       "display_name": "Fictional account import",
       "distribution": "whab_plugin_example_file_import",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-file-import/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/example/example-file-import/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-file-import",
@@ -341,7 +344,7 @@
       "conflicts": [],
       "display_name": "Fictional remote ledger client",
       "distribution": "whab_plugin_example_remote_client",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-remote-client/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/example/example-remote-client/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-remote-client",
@@ -361,7 +364,9 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "teaching",
-      "verifications": [],
+      "verifications": [
+        "pr106-remote-client-teaching"
+      ],
       "version": "1.0.0"
     },
     {
@@ -422,7 +427,7 @@
       "conflicts": [],
       "display_name": "Example independent snapshot storage",
       "distribution": "whab_plugin_example_storage",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-storage/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/example/example-storage/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-storage",
@@ -458,7 +463,7 @@
       "conflicts": [],
       "display_name": "Fictional visual interface",
       "distribution": "whab_plugin_example_ui",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-ui/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/example/example-ui/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-ui",
@@ -552,7 +557,7 @@
       "conflicts": [],
       "display_name": "JSON",
       "distribution": "whab_plugin_json",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/storage/json/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/storage/json/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "json",
@@ -572,7 +577,14 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [],
+      "verifications": [
+        "pr103-explicit-child-environments",
+        "pr102-local-storage-source",
+        "pr102-local-storage-native-https",
+        "pr102-cross-host-storage-repair",
+        "pr101-native-outcome-phases",
+        "pr101-installed-native-bank"
+      ],
       "version": "1.3.0"
     },
     {
@@ -598,7 +610,7 @@
       "conflicts": [],
       "display_name": "Plaid",
       "distribution": "whab_plugin_plaid",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/ingestion/plaid/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/ingestion/plaid/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "plaid",
@@ -618,7 +630,9 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [],
+      "verifications": [
+        "pr101-live-bank-source"
+      ],
       "version": "1.3.0"
     },
     {
@@ -634,7 +648,7 @@
       "conflicts": [],
       "display_name": "Random forest categorization",
       "distribution": "whab_plugin_random_forest_categorization",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/automation/random-forest-categorization/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/automation/random-forest-categorization/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "random-forest-categorization",
@@ -672,7 +686,7 @@
       "conflicts": [],
       "display_name": "Remote budget server",
       "distribution": "whab_plugin_server",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/interface/server/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/interface/server/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "server",
@@ -694,7 +708,9 @@
       "support": "maintained",
       "verifications": [
         "pr92-live-api-interface",
-        "pr92-installed-native-api"
+        "pr92-installed-native-api",
+        "pr106-remote-client-teaching",
+        "pr100-remote-client-lifecycle"
       ],
       "version": "1.1.0"
     },
@@ -766,7 +782,7 @@
       "conflicts": [],
       "display_name": "SQLite",
       "distribution": "whab_plugin_sqlite",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/storage/sqlite/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/storage/sqlite/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "sqlite",
@@ -786,7 +802,16 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [],
+      "verifications": [
+        "pr106-remote-client-teaching",
+        "pr100-remote-client-lifecycle",
+        "pr103-explicit-child-environments",
+        "pr102-local-storage-source",
+        "pr102-local-storage-native-https",
+        "pr102-cross-host-storage-repair",
+        "pr101-native-outcome-phases",
+        "pr101-installed-native-bank"
+      ],
       "version": "1.12.0"
     },
     {
@@ -802,7 +827,7 @@
       "conflicts": [],
       "display_name": "WHAB web",
       "distribution": "whab_plugin_web",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/interface/web/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/interface/web/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "web",
@@ -824,7 +849,8 @@
       "support": "maintained",
       "verifications": [
         "pr97-visual-interface-source",
-        "pr97-visual-interface-native-https"
+        "pr97-visual-interface-native-https",
+        "pr101-installed-native-bank"
       ],
       "version": "1.27.0"
     },
@@ -841,7 +867,7 @@
       "conflicts": [],
       "display_name": "Import from YNAB ZIP file",
       "distribution": "whab_plugin_ynab",
-      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/ingestion/ynab/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/5c4458b6ff092cb56c4923112980302f54f589d6/whab/app/plugins/ingestion/ynab/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "ynab",
@@ -868,7 +894,7 @@
     }
   ],
   "publisher": {
-    "documentation_ref": "5d75262fbf9d7fb242a6873760cceb73a215d1c2",
+    "documentation_ref": "5c4458b6ff092cb56c4923112980302f54f589d6",
     "maintainer": "Fillll",
     "repository": "https://github.com/Fillll/whab",
     "security": "https://github.com/Fillll/whab/security/advisories/new",
@@ -1316,6 +1342,33 @@
     },
     {
       "artifacts": {
+        "whab": "2.41.0",
+        "whab_plugin_devkit": "0.9.0",
+        "whab_plugin_example_remote_client": "1.0.0",
+        "whab_plugin_server": "1.1.0",
+        "whab_plugin_sqlite": "1.12.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.41.0",
+      "id": "pr106-remote-client-teaching",
+      "method": "installed-wheel",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/106"
+      ],
+      "scope": "The exact clean committed source passed 290 installed toolkit tests on genuine WHAB 2.22 and current 2.41 with zero skips; candidate toolkit statement/branch coverage was complete. The maintained remote-client example and a separately generated project each passed installed owning behavior and complete plugin coverage on separate genuine WHAB 2.40 minimum and 2.41 current artifacts. Each of those four rows passed ten distinct native configurations and ten exact approved-artifact replays, with all fictional homes/listeners/workers cleaned up. The genuine 2.40 source was e8fa8585c16d2f8a93b1966315c0fee34eb11d35. Native profiles used host-owned authorization/financial services, two fictional HTTPS hosts and a reviewed public-transport overlay that explicitly trusted the temporary authority CA. They exercised candidate workers, varied peers/order/transitions, pause/resume, exact-version reopen and client restart after a dropped acknowledged result; explicit Finish retained the original request/CAS identity. This does not establish stock client CLI private-CA configuration, remote-server restart retry durability, public receipt lookup, automatic unknown reconciliation, distinct-version upgrades from a single candidate artifact, local migration/copy support or household deployment. The toolkit's genuine 2.22 import compatibility is separate from this optional family's 2.40 floor. The interrupted source canonical run is not certified as a complete pass.",
+      "selection": [
+        "example-remote-client"
+      ],
+      "source_commit": "1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2",
+      "tests": [
+        "devtools/plugin-devkit/tests",
+        "plugins/example/example-remote-client/tests",
+        "scripts/check_plugin_devkit.py",
+        "scripts/check_plugin_generation.py"
+      ]
+    },
+    {
+      "artifacts": {
         "whab": "2.36.0",
         "whab_plugin_devkit": "0.7.0",
         "whab_plugin_example_ui": "1.0.0"
@@ -1335,6 +1388,214 @@
       "tests": [
         "plugins/example/example-ui/tests",
         "scripts/check_plugin_generation.py"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.39.0",
+        "whab_plugin_client": "1.6.0",
+        "whab_plugin_server": "1.1.0",
+        "whab_plugin_sqlite": "1.12.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.39.0",
+      "id": "pr100-remote-client-lifecycle",
+      "method": "source-tests",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/100"
+      ],
+      "scope": "Focused tests prepared separately approved synthetic descriptor wheels 1.0, 1.1 and 2.0 against the real current host closure. A missing-setting candidate preserved the active worker; compatible replacement retained the host transport, pending original command and revision, preserved the previous immutable environment and restored the exact saved version after pause/reopen. Explicit original-request completion preserved one acknowledged fictional account. Paused startup executed no descriptor, an incompatible host expectation refused before interpreter execution, and a stopped same-binding repair preserved prior ready metadata. An embedded separate installed native listener test built the real host, SQLite and server wheels outside the checkout, explicitly verified its runtime CA, observed unauthenticated 401/authenticated 200, and exercised the public host-owned remote transport with one acknowledged account. That native transport uses an explicitly supplied test CA; this does not prove stock client CLI private-CA configuration, distinct descriptor upgrades over a native listener, public receipt lookup, remote-server restart retry durability or household deployment. The canonical source suite passed before the narrow follow-ups, but its external API exact replay failed and is not certified by this record.",
+      "selection": [
+        "client"
+      ],
+      "source_commit": "df865488e5b7f9645c96e060c1d8fce4dd261086",
+      "tests": [
+        "tests/plugins/test_remote_client_workers.py"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.40.0",
+        "whab_plugin_example": "1.4.0",
+        "whab_plugin_json": "1.3.0",
+        "whab_plugin_sqlite": "1.12.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.40.0",
+      "id": "pr103-explicit-child-environments",
+      "method": "source-tests",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/103"
+      ],
+      "scope": "The exact source passed six focused cases: the explicit process allowlist and password-alias exclusion, actual report/SQLite/JSON worker startup and cleanup with fictional custom-setting canaries, scoped configuration dispatch, and the installed native HTTPS fixture. Arbitrary apparently safe names were excluded while the reviewed standard locale survived. The native fixture built its declared isolated build backend and retained failure diagnostics privately; it verified the temporary runtime CA, public authorization and an acknowledged fictional account. Earlier complete CI on the equivalent public-SDK foundation had two fixture failures that are corrected here; an interrupted local run is not a complete-pass claim. This record covers the child-environment policy and focused fixture corrections, not the final combined submission gate or household deployment. Trusted executable plugins retain operating-system access.",
+      "selection": [
+        "example",
+        "sqlite",
+        "json"
+      ],
+      "source_commit": "e6720053dee7cd0c3f9fcca7212955f0d804a92c",
+      "tests": [
+        "tests/plugins/test_process_environment.py",
+        "tests/plugins/test_storage_worker_faults.py::test_native_child_receives_scoped_config_without_custom_provider_or_api_environment_credentials",
+        "tests/plugins/test_remote_client_workers.py::test_installed_host_client_uses_native_https_verified_runtime_ca_and_public_server"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.37.0",
+        "whab_plugin_json": "1.3.0",
+        "whab_plugin_sqlite": "1.12.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.37.0",
+      "id": "pr102-local-storage-source",
+      "method": "source-tests",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/102"
+      ],
+      "scope": "Separate fictional SQLite and JSON primary budgets exercised typed storage workers, drained compatible upgrades, rejected candidates, pending native operation evidence, nondecreasing recovery floors, stopped repair, native lease/cleanup ownership and concurrent status reads during both authority directions. Exact frozen source passed 4924 Python cases, all fourteen plugins at 100% statement/branch coverage, 333 browser tests and 164 installed toolkit cases on each genuine minimum/current host. The canonical generated stage stopped at a sanitized API exact-replay failure after its ten native API check configurations had passed; an independent replay of all ten identical retained artifact configurations passed. The original intermittent failure remains unattributed: this record does not claim a complete canonical pass or a timeout/status-race cause. A later narrow source regression covers phase-specific execute rejection versus unknown post-dispatch evidence/receipt publication. Final integrated validation remains required.",
+      "selection": [
+        "sqlite",
+        "json"
+      ],
+      "source_commit": "65ddbdfc7acdf3376041f460e4bb4e08f543d931",
+      "tests": [
+        "tests/plugins/test_storage_worker.py",
+        "tests/plugins/test_storage_worker_faults.py",
+        "tests/plugins/test_storage_worker_selection.py",
+        "tests/web/test_storage_migration.py",
+        "tests/web/test_storage_replicas.py",
+        "scripts/check.py"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.37.0",
+        "whab_plugin_json": "1.3.0",
+        "whab_plugin_sqlite": "1.12.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.37.0",
+      "id": "pr102-local-storage-native-https",
+      "method": "installed-wheel",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/102"
+      ],
+      "scope": "Actual installed wheels outside the checkout used native HTTPS and explicit temporary CA trust; an untrusted CA was refused. Separate fictional budgets ran both SQLite-primary/JSON-copy and JSON-primary/SQLite-copy directions, never two authoritative writers in one registry. Distinct approved synthetic versions proved valid upgrade, failed candidate preservation and later upgrade. Four acknowledged accounts per direction, namespace-only revisions, bank-continuation authority deferral, copy catch-up/promotion, reverse migration, two ordinary CLI reopens, saved worker selection, opaque models/files and original containers survived. The bank guard used real encrypted continuation records with fictional capture, not a bundled provider worker or external bank connection. Exact 33-wheel hashes and scripts were retained; homes/processes were removed. This is feature evidence at the stated source, not an installed claim for subsequent source-only outcome fixes.",
+      "selection": [
+        "sqlite",
+        "json"
+      ],
+      "source_commit": "05e81db449e1cf4278a0dc9c4ea7fc8f1789fcf3",
+      "tests": [
+        "tests/plugins/test_storage_worker.py",
+        "tests/web/test_storage_migration.py",
+        "tests/web/test_storage_replicas.py"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.37.0",
+        "whab_plugin_json": "1.3.0",
+        "whab_plugin_sqlite": "1.12.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.37.0",
+      "id": "pr102-cross-host-storage-repair",
+      "method": "installed-wheel",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/102"
+      ],
+      "scope": "Genuine installed host 2.37 at this source and genuine host 2.38 at a28ab71cf013039e36fbf4842cb96ce7a1644de6 verified both independent backend repair directions. New-host startup refused the old approved code binding before repair without changing native/code/container bytes. Explicit stopped read-only repair retained exact native UUID/epoch/generation/digest, namespace revision, original container, prior reference bytes/history and exact lost-publication retry. Two new-host ordinary CLI reopens per backend retained three acknowledged accounts, models/settings and the saved current approved worker. Each separate named-budget startup legitimately admitted prepare_budget_files(existing=True): its exact native command fingerprint/receipt proved generation G+1 with unchanged financial digest/UUID/epoch/namespace. A new acknowledged write advanced another generation. The original overstrict assertion expecting identical generation across those distinct startup operations is preserved in the evidence; no preparation optimization was made. Both complete artifact closures, hashes, scripts and the original assertion were retained. All homes/providers were fictional; no provider connection or household deployment.",
+      "selection": [
+        "sqlite",
+        "json"
+      ],
+      "source_commit": "2ce6d202b05e032baeb3005b15710c486d1856dd",
+      "tests": [
+        "tests/plugins/test_storage_worker_selection.py",
+        "tests/test_budget_cli.py"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.38.0",
+        "whab_plugin_plaid": "1.3.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.38.0",
+      "id": "pr101-live-bank-source",
+      "method": "source-tests",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/101"
+      ],
+      "scope": "The exact source completed the complete contribution command in GitHub CI on Python 3.14 and 3.15, including genuine minimum/current installed toolkit and generated-project tests, exact-artifact replays and installed distributions. An independent macOS run passed 5143 Python tests, all fourteen runtime plugins at 100% statement/branch coverage and 354 browser checks, then stopped during an old toolkit 0.6 API replay after its ten native checks passed; that separate failure is preserved and was not attributed to a cause. An independent installed rerun passed all ten original API replays with the exact artifact hashes and unchanged 30-second operation deadlines. Bank tests used fictional homes and mocked provider transports for typed worker operations, Item/cursor and annotation preservation, startup/cleanup ownership, active work draining, scoped OAuth flows, encrypted capture and native receipt recovery. Bundled Plaid has complete owning coverage; distinct-version native worker behavior is recorded separately with a reviewed fictional provider. No real provider connection or household deployment was used.",
+      "selection": [
+        "plaid"
+      ],
+      "source_commit": "dd52ec9554ee3c36395f8f2a7c1d2ab5ff00353f",
+      "tests": [
+        "tests/test_bank_runtime.py",
+        "tests/test_bank_native.py",
+        "tests/test_bank_lifecycle.py",
+        "tests/plugins/test_provider_worker.py",
+        "tests/plugins/test_provider_upgrade.py",
+        "tests/web/test_bank_continuations.py",
+        "tests/budgets/test_bank_storage_barriers.py",
+        "plugins/ingestion/plaid/tests",
+        "scripts/check.py",
+        "GitHub Actions run 40055955522"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.38.0",
+        "whab_plugin_json": "1.3.0",
+        "whab_plugin_sqlite": "1.12.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.38.0",
+      "id": "pr101-native-outcome-phases",
+      "method": "source-tests",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/101"
+      ],
+      "scope": "A separate follow-up changes only the storage proxy outcome phases and adds fourteen controlled regressions. All sixty focused SQLite/JSON proxy and native worker tests passed. A direct execution rejection permits definite noncommit only after exact unchanged native proof; intent-publication failure, failed proof, malformed evidence/receipt and post-result completion failure retain pending intent and the unknown-write fence. Controlled reproductions preserved original false-rejection evidence and verified the corrected unknown outcome. This is focused follow-up validation, distinct from the earlier source's complete CI and native bank evidence.",
+      "selection": [
+        "sqlite",
+        "json"
+      ],
+      "source_commit": "2194635cccfa7f0d05ece36b13981eca12692aa1",
+      "tests": [
+        "tests/plugins/test_storage_proxy_outcomes.py",
+        "tests/plugins/test_storage_worker.py"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.38.0",
+        "whab_plugin_json": "1.3.0",
+        "whab_plugin_sqlite": "1.12.0",
+        "whab_plugin_web": "1.27.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.38.0",
+      "id": "pr101-installed-native-bank",
+      "method": "installed-wheel",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/101"
+      ],
+      "scope": "Built genuine host 2.38, SQLite 1.12, JSON 1.3 and Web 1.27 wheels from the exact source and installed them outside the checkout. Three fictional native HTTPS cases explicitly trusted only their temporary runtime CA: a reviewed offline bank provider 1.0 to failed 1.5 to 2.0 upgrade with ready-flow deferral, disable/re-enable, pending-to-posted annotations and acknowledged-write SIGKILL/stock-CLI reopen; an exchange response lost before encrypted capture with no automatic repeat after reopen; and encrypted captured native application refused by a controlled directory-permission fault, then explicitly finished using the original native command and receipt. A separately reviewed fictional JSON 1.3.1 code-only fixture preserved the native UUID/epoch/generation and captured Item/cursor while recovering the original request. Synthetic provider and JSON patch versions are test fixtures, not bundled Plaid or published backend releases. The helper was extracted candidate source alongside toolkit 0.6, not a released toolkit 0.8 claim. Exact wheel/closure hashes were retained; all owned homes/listeners were removed, and no external provider HTTP or household data was used.",
+      "selection": [
+        "sqlite",
+        "json",
+        "web"
+      ],
+      "source_commit": "a28ab71cf013039e36fbf4842cb96ce7a1644de6",
+      "tests": [
+        "installed native HTTPS v1/failed-candidate/v2 bank worker verification",
+        "installed native HTTPS exchange-uncertain and captured-native-apply recovery",
+        "ordinary stock CLI reopen after acknowledged-write process termination"
       ]
     }
   ]

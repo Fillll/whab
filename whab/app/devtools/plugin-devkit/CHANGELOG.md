@@ -10,6 +10,14 @@ PR: [#107](https://github.com/Fillll/whab/pull/107)
 - Exercise ten distinct peer sets with exact approved-worker activation, financial writes before and after activation, saved-worker reopen and controlled public failures. Use the genuine WHAB 2.41 public storage-model floor for the complete POSIX teaching adapter while preserving the toolkit's 2.22 import floor.
 - Stage historical reference builds before comparing complete wheel member payloads, retaining the original approved bytes only when same-filename contents agree and refusing conflicting artifacts without overwriting them.
 
+## 0.9.0 — 2026-10-23
+
+PR: [#106](https://github.com/Fillll/whab/pull/106)
+
+- Add a declarative remote-client generator, public conformance and the versioned native-remote-client-v1 profile. Record ten distinct approved-artifact configurations and exact replay through live selection, pause/resume, saved-version reopen and retained unknown-write completion.
+- Use genuine WHAB 2.40 for this family while retaining the toolkit's lazy 2.22 import floor. Verify maintained and generated projects on separate minimum/current host artifacts with native CA-verified fictional authorities and an explicit public-transport test overlay.
+- Restrict source/build/test subprocess environments to explicit standard variables and exclude caller configuration. Set overall CI ceilings to 180 minutes for the expanded matrix and 60 minutes for one reusable project after observing a 34-minute source phase; production readiness, RPC and transition deadlines remain unchanged.
+
 ## 0.7.0 — 2026-10-23
 
 PR: [#99](https://github.com/Fillll/whab/pull/99)
