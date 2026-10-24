@@ -711,7 +711,11 @@ class StorageUpgrade:
         async def validate():
             def reconcile():
                 with self.tracked.lock:
-                    recover()
+                    record = self.journal.snapshot()
+                    if record["active"] is None or record["native"] is None or record["pending"] is not None:
+                        raise storage_error(self.plugin_id)
+                    recover(minimum=read_evidence(record["native"]))
+                    _native_matches(self.tracked.commit_evidence(), read_evidence(record["native"]))
                     if self.tracked.session is not None:
                         self.tracked.session.bind(self.tracked.store)
                     if self.tracked.on_mutation is not None:
