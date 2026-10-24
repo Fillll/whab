@@ -7,6 +7,7 @@ import {initTransactionRegister} from './transaction-register.js';
 import {hydrateCurrencyChoices, initAccountSettings} from './account-settings.js';
 import {bindLogos} from './logo-images.js';
 import {initCategorizationSettings} from './categorization-settings.js';
+import {initStorageCopies} from './storage-copies.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -601,3 +602,7 @@ document.addEventListener('click', async event => {
   if (await currentRegister.flush()) location.assign(target.href);
   else notify('Save the transaction edit before continuing.');
 });
+initStorageCopies({beforeChange: async () => {
+  if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'storage-copies'}}))) return false;
+  await requireSavedEdits();
+}});
