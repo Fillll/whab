@@ -197,6 +197,8 @@ class Authority:
 
     @contextmanager
     def _authority_write(self, *, financial=True):
+        if self._read_only:
+            raise StoreError("Read-only storage cannot accept mutations.")
         with self._lock:
             if not self._authority_enabled:
                 own = not self.db.in_transaction

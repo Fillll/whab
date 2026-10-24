@@ -340,6 +340,8 @@ plugin = Plugin(id="my-storage", display_name="My storage", storage=create_stora
 
 Register the descriptor in its own distribution's `whab.plugins` entry points and set `WHAB_STORAGE=my-storage` for the original workspace or initial CLI budget creation. Existing portable budgets instead use the required storage ID in their manifest; Settings creates new SQLite budgets. Its synchronous factory receives `StorageContext(home: Path, environment: str, config: Mapping[str, str])`: resolved runtime home, `sandbox`/`production`, and only backend-prefixed environment keys. The context is frozen; configuration is copied read-only and excluded from its representation. It supplies no bank credentials or token-decryption key.
 
+WHAB 2.37 adds `StorageContext(read_only=True, expected_instance_id=...)` for participating local storage workers. A read-only factory must validate an existing current native schema without creating files, adopting metadata or running an upgrader; an expected instance UUID must be proved through read-only validation before any writable constructor. SQLite 1.12 and JSON 1.3 declare `storage.worker` version 1 and compatible live code replacement. The host keeps durable caller bindings, validates native receipts and gates unknown mutation outcomes until explicit evidence recovery. See [local storage workers](storage-workers.md); this adapter does not cover remote client authority or implicitly change the selected backend.
+
 `StorageBackend` is a synchronous structural protocol. The signatures below omit `self`:
 
 ```python

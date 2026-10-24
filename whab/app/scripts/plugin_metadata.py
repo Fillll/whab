@@ -191,7 +191,18 @@ def descriptor_metadata(module_path, attribute, root):
         and not (present - {"id", "display_name", "api_version", "contract", "ui"})
         and _visual_adapter(descriptor["ui"])
     )
-    if lifecycle == "live" and not (live or optional or categorization or visual):
+    storage = (
+        not legacy and lifecycle == "live" and authority == "local" and "storage" in present
+        and state_version == 1 and not upgrades
+        and {"storage.worker", "storage.authority", "storage.commands"} <= set(capabilities) <= {
+            "ledger.read", "ledger.mutate", "provider.state", "provider.sync", "receipts",
+            "transfer.neutral", "transfer.prepare", "transfer.local", "storage.authority",
+            "storage.commands", "storage.replica", "storage.worker",
+        }
+        and all(row["version"] == 1 for row in capabilities.values())
+        and not (present - {"id", "display_name", "api_version", "contract", "storage", "storage_payload_paths"})
+    )
+    if lifecycle == "live" and not (live or optional or categorization or visual or storage):
         raise ValueError("Live metadata requires an explicit supported capability adapter.")
     return {"id": identifier, "display_name": display, "api_version": _literal(descriptor["api_version"]) if "api_version" in descriptor else 1,
             "capabilities": [capabilities[name] for name in sorted(capabilities)],
@@ -201,7 +212,7 @@ def descriptor_metadata(module_path, attribute, root):
             "state_version": state_version, "state_upgrades": [list(edge) for edge in upgrades],
             "live_support": ("declarative-api-worker" if optional and "interface" in present else
                              "stateless-report-worker" if live else "stateless-optional-worker" if optional
-                             else "categorization-worker" if categorization else "visual-ui-worker" if visual else "restart-required")}
+                             else "categorization-worker" if categorization else "visual-ui-worker" if visual else "local-storage-worker" if storage else "restart-required")}
 
 
 def source_inventory(root=ROOT):
@@ -280,7 +291,7 @@ def catalog_markdown(catalog):
     for row in catalog["plugins"]:
         lifecycle = "Legacy; restart required" if row["legacy"] else row["live_support"]
         lines.append(f'| [{row["id"]}]({row["documentation"]}) | `{row["distribution"]} {row["version"]}` | `{row["requires_host"]}` | {lifecycle} | {row["support"]} |')
-    lines.extend(["", "Explicit stateless report, branding, file-parser, declarative API interface, pure categorization and participating visual descriptors advertise their supported live-worker adapters. Other entries require restart; backend migration and copies are not inferred from package installation.", "",
+    lines.extend(["", "Explicit stateless report, branding, file-parser, declarative API interface, pure categorization and participating visual descriptors advertise their supported live-worker adapters. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.", "",
                   "## Recorded verification", "", "Evidence applies only to its exact host, artifacts and selection. Installed-only artifacts are not proof that their capabilities executed. Draft PR/source verification is not a release or deployment claim.", ""])
     for item in catalog["verifications"]:
         lines.extend([f'### {item["id"]}', "", f'Verified {item["date"]}; host `{item["host_version"]}`. Selected: ' + ", ".join(f'`{value}`' for value in item["selection"]) + ".", "", item["scope"], "",

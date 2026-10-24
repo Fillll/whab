@@ -1,5 +1,12 @@
 # SQLite budget storage plugin changelog
 
+## 1.12.0 — 2026-10-23
+
+PR: [#102](https://github.com/Fillll/whab/pull/102)
+
+- Declare the compatible local storage-worker contract on genuine WHAB 2.37+. Validate complete existing native state read-only before writable construction and preserve the selected native identity through compatible code replacement.
+- Fence all financial/authority paths in read-only candidates and retain owned writer/cleanup evidence through worker faults, explicit recovery and stopped-host repair, with complete owning statement/branch coverage.
+
 ## 1.11.0 — 2026-10-23
 
 PR: [#87](https://github.com/Fillll/whab/pull/87)

@@ -6,7 +6,7 @@ personal and fictional demo workspaces in one versioned JSON data file at
 different files. It uses no database driver or other storage implementation.
 The host supplies financial commands, currency rules and workspace projections.
 
-Install its wheel with a compatible host (WHAB 2.30+ within major 2), then select
+Install its wheel with a compatible host (WHAB 2.37+ within major 2), then select
 `WHAB_STORAGE=json` for a new original runtime or initial CLI budget creation.
 An opened budget chooses its backend through its manifest. Selecting JSON does
 not migrate an existing ledger. JSON belongs to the supported bundled set;
@@ -180,3 +180,21 @@ Reproduce the measurement with:
 ```sh
 .venv/bin/python plugins/storage/json/scripts/benchmark.py --counts 100 1000 10000 --repeats 5
 ```
+
+
+## Read-only readiness and live code
+
+The explicit version-1 `storage.worker` contract supports compatible live code
+replacement through the host's approved environment coordinator. The host drains
+financial/background work before releasing the old writer, durably chooses the
+new code before its first writable constructor, and retains native instance,
+authority epoch and financial generation. It uses native operation receipts to
+reconcile lost mutation replies; uncertainty gates this budget until explicit
+recovery. This does not change storage authority or select another backend.
+
+`StorageContext(read_only=True)` validates an existing current native schema
+without creating a ledger or upgrading older metadata, and rejects all mutations.
+Only compatible readers may pass candidate readiness; schema changes need an
+explicit reader/upgrader strategy. See [storage workers and stopped-host repair](../../../../docs/storage-workers.md)
+for the exact-host fence, protocol limits, durable request replay and recovery.
+The client backend requires a separate host-managed remote adapter.

@@ -33,7 +33,7 @@ STORAGE_OPERATIONS = frozenset({
     "add_account", "update_account", "add_category", "add_transaction", "edit_transaction",
     "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "save_item",
     "set_item_status", "disconnect_item", "apply_sync", "import_workspace", "restore_budget",
-    "save_receipt", "delete_receipt",
+    "save_receipt", "delete_receipt", "restore_budget_files", "prepare_budget_files",
 })
 _OPERATION_FIELDS = {
     "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype"}),
@@ -53,6 +53,8 @@ _OPERATION_FIELDS = {
     "restore_budget": ({"snapshot"}, set()),
     "save_receipt": ({"transactionId", "image"}, set()),
     "delete_receipt": ({"transactionId"}, set()),
+    "restore_budget_files": ({"files"}, set()),
+    "prepare_budget_files": ({"files", "existing"}, set()),
 }
 
 
@@ -402,6 +404,20 @@ def dispatch_storage_operation(backend, operation):
         return backend.import_workspace(workspace, payload["pluginId"], payload["fingerprint"], imported)
     if name == "restore_budget":
         return backend.restore_budget(workspace, validate_portable_budget(payload["snapshot"]))
+    if name in {"restore_budget_files", "prepare_budget_files"}:
+        if type(payload["files"]) is not dict or len(payload["files"]) > 10000:
+            _invalid()
+        files = {}
+        for key, encoded in payload["files"].items():
+            if type(key) is not str or type(encoded) is not str:
+                _invalid()
+            try:
+                files[key] = base64.b64decode(encoded, validate=True)
+            except (ValueError, binascii.Error):
+                _invalid()
+        if name == "prepare_budget_files":
+            return backend.prepare_budget_files(workspace, files, existing=payload["existing"])
+        return backend.restore_budget_files(workspace, files)
     if name == "save_receipt":
         image = payload["image"]
         if type(image) is not str or len(image) > 4 * ((MAX_RECEIPT_BYTES + 2) // 3):

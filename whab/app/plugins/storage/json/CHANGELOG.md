@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.3.0 — 2026-10-23
+
+PR: [#102](https://github.com/Fillll/whab/pull/102)
+
+- Declare compatible local storage workers on genuine WHAB 2.37+. Support complete read-only readiness without taking the live writer lease or creating replacement native data.
+- Preserve the stable native writer lease through drained compatible code handover, bounded cleanup and explicit uncertain-outcome recovery; retain native state, receipts and ownership with complete owning statement/branch coverage.
+
 ## 1.2.0 — 2026-10-23
 
 PR: [#87](https://github.com/Fillll/whab/pull/87)

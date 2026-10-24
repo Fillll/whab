@@ -271,6 +271,11 @@ class BudgetSession:
     def bind(self, store):
         """Restore only into a new isolated backend; never replace an existing ledger."""
         self.store = store
+        worker_recovery = getattr(store, "worker_recovery_required", None)
+        if callable(worker_recovery) and worker_recovery():
+            # Keep the original restore/checkpoint evidence untouched until
+            # native request recovery has proved this instance's exact state.
+            return
         if self.storage_authority:
             self.checkpoint()
             return
