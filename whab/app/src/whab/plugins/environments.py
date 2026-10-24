@@ -330,10 +330,15 @@ def _candidate_cleanup(created, plugin_id, probes=()):
 
 
 def _environment():
-    password = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
+    # Installation and artifact verification need process settings, never the
+    # caller's plugin configuration. A prefix denylist cannot know an author's
+    # custom URL/token names, and pip is already offline and isolated.
+    allowed = {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG", "LANGUAGE",
+               "LC_ALL", "LC_CTYPE", "LC_NUMERIC", "LC_TIME", "LC_COLLATE", "LC_MONETARY",
+               "LC_MESSAGES", "LC_PAPER", "LC_NAME", "LC_ADDRESS", "LC_TELEPHONE",
+               "LC_MEASUREMENT", "LC_IDENTIFICATION"}
     return {key: value for key, value in os.environ.items()
-            if not key.startswith(("WHAB_", "PLAID_", "SERVER_", "CLIENT_", "PYTHON", "PIP_"))
-            and key not in {password, "TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID", "VIRTUAL_ENV"}}
+            if key in allowed}
 
 
 def _run(command, deadline):
