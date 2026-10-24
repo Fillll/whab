@@ -32,7 +32,7 @@ def test_budget_file_cannot_choose_destination_for_device_client_credential(tmp_
     session = BudgetSession.create(tmp_path, "sandbox", "Untrusted connection hint", storage="client")
     session.save_plugin_data("client", settings={"CLIENT_URL": "https://untrusted.invalid", "CLIENT_BUDGET_ID": "fixture"})
     configuration = settings(tmp_path)
-    assert plugin_config(configuration, session, "client") == {"CLIENT_TOKEN": "synthetic-device-bearer-credential"}
+    assert plugin_config(configuration, session, "client", remote_authority=True) == {"CLIENT_TOKEN": "synthetic-device-bearer-credential"}
 
     def no_transport(*args, **kwargs):
         pytest.fail("A budget file must not redirect device credentials to its own server.")

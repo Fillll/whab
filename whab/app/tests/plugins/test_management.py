@@ -128,7 +128,7 @@ def test_save_enables_next_start_without_running_code_or_mutating_registry(tmp_p
     ledger.parent.mkdir()
     ledger.write_bytes(b"FICTIONAL_LEDGER_UNCHANGED")
     state = instance.save(("report", "bank"))
-    assert state["configured"] == ["report", "bank"]
+    assert state["configured"] == ["bank", "report"]
     assert state["active"] == [] and state["restart_required"]
     assert read_selection(tmp_path) == ("report", "bank")
     assert [row.id for row in instance.plugins.describe()] == ["sqlite", "web"]
@@ -227,7 +227,7 @@ def test_optional_selection_cannot_switch_storage_or_ui_and_headless_rejects_ui(
     entries = (*installed, second_storage, second_ui)
     monkeypatch.setattr("whab.plugins.management.metadata.entry_points", lambda **kwargs: entries)
     instance = manager(tmp_path, entries)
-    for name, code in (("alternate_storage", "multiple_storage_plugins"), ("alternate_ui", "multiple_ui_plugins")):
+    for name, code in (("alternate_storage", "conflicting_providers"), ("alternate_ui", "conflicting_providers")):
         with pytest.raises(PluginError) as error:
             instance.save((name,))
         assert error.value.code == code

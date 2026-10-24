@@ -18,6 +18,8 @@ from whab.domain.imports import ImportedAccount, SyncChanges
 from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
 
+from .contracts import Capability, PluginContract, Requirement
+
 API_VERSION = 1
 ENTRYPOINT_GROUP = "whab.plugins"
 _PLUGIN_NAME = re.compile(r"[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*\Z")
@@ -824,8 +826,19 @@ class Plugin:
     interface: Interface | None = None
     bind: Callable[[BudgetContext], Plugin] | None = None
     budget_connection: Callable[[Mapping[str, bytes]], Mapping[str, str]] | None = None
+    contract: PluginContract | None = None
+    # The host invokes one declared edge with detached staged namespace access.
+    # Callbacks must use that namespace only; active state is published by the host.
+    migrate_state: Callable[[BudgetContext, int, int], None] | None = None
 
     def __post_init__(self) -> None:
+        if self.contract is not None:
+            if type(self.contract) is not PluginContract:
+                raise ValueError("Plugin contract must use the public PluginContract record.")
+            self.contract.__post_init__()
+        if self.migrate_state is not None:
+            if not callable(self.migrate_state) or self.contract is None:
+                raise ValueError("Plugin state migration requires a callable and an explicit contract.")
         if not valid_plugin_name(self.id):
             raise ValueError("Plugin ID must be a lowercase slug of at most 64 characters.")
         _text(self.display_name, "Plugin display name", limit=120, empty=False)
@@ -908,6 +921,12 @@ class PluginDescription:
     has_settings: bool = False
     has_merchant_logos: bool = False
     has_categorization: bool = False
+    capabilities: tuple[Capability, ...] = ()
+    requirements: tuple[Requirement, ...] = ()
+    lifecycle: str = "restart"
+    authority: str = "unknown"
+    state_version: int = 1
+    legacy: bool = True
 
 
 @dataclass(frozen=True, slots=True)

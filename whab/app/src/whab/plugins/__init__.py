@@ -19,7 +19,16 @@ from whab.domain.receipts import MAX_RECEIPT_BYTES, receipt_media_type, validate
 from whab.domain.transactions import UNSET, validate_review_batch
 from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
 
-from .runtime import PluginError, PluginRegistry, copy_snapshot, load_plugins
+from .contracts import (
+    Capability,
+    CapabilityError,
+    PluginContract,
+    Requirement,
+    contract_for,
+    resolve_plugins,
+    state_upgrade_path,
+)
+from .runtime import PluginError, PluginRegistry, copy_snapshot, load_descriptors, load_plugins
 from .sdk import (
     API_VERSION,
     ENTRYPOINT_GROUP,
@@ -73,6 +82,13 @@ from .sdk import (
 )
 
 __all__ = [
+    "Capability",
+    "CapabilityError",
+    "PluginContract",
+    "Requirement",
+    "contract_for",
+    "resolve_plugins",
+    "state_upgrade_path",
     "AccountOverview",
     "AccountSettings",
     "TransactionRegisterPage",
@@ -150,6 +166,7 @@ __all__ = [
     "WorkspaceImporter",
     "copy_snapshot",
     "load_plugins",
+    "load_descriptors",
     "receipt_media_type",
     "bank_website",
 ]

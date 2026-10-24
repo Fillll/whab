@@ -82,7 +82,7 @@ def validate_manifest(value):
     try:
         if type(value) is not dict or set(value) != {"formatVersion", "id", "name", "storage", "plugins"}:
             raise ValueError()
-        if type(value["formatVersion"]) is not int or value["formatVersion"] != 1:
+        if type(value["formatVersion"]) is not int or value["formatVersion"] not in {1, 3}:
             raise ValueError()
         if str(UUID(value["id"])) != value["id"]:
             raise ValueError()
@@ -95,12 +95,21 @@ def validate_manifest(value):
             raise ValueError()
         ids = set()
         for plugin in value["plugins"]:
-            if type(plugin) is not dict or set(plugin) != {"id", "enabled", "apiVersion", "settings", "state"}:
+            keys = {"id", "enabled", "apiVersion", "settings", "state"}
+            if value["formatVersion"] == 3:
+                keys.add("stateVersion")
+            if type(plugin) is not dict or set(plugin) != keys:
+                raise ValueError()
+            if value["formatVersion"] == 3 and (type(plugin["stateVersion"]) is not int or not 1 <= plugin["stateVersion"] <= 65535):
                 raise ValueError()
             if not valid_plugin_name(plugin["id"]) or plugin["id"] in ids:
                 raise ValueError()
             ids.add(plugin["id"])
-            if type(plugin["enabled"]) is not bool or type(plugin["apiVersion"]) is not int or plugin["apiVersion"] != API_VERSION:
+            if type(plugin["enabled"]) is not bool or type(plugin["apiVersion"]) is not int:
+                raise ValueError()
+            if value["formatVersion"] == 1 and plugin["apiVersion"] != API_VERSION:
+                raise ValueError()
+            if not 1 <= plugin["apiVersion"] <= 65535:
                 raise ValueError()
             if type(plugin["settings"]) is not dict or type(plugin["state"]) is not dict:
                 raise ValueError()
@@ -111,6 +120,21 @@ def validate_manifest(value):
     except (ValueError, TypeError, AttributeError, KeyError):
         raise StoreError("This budget has an invalid or incompatible plugin manifest.") from None
     return copy.deepcopy(value)
+
+
+def upgrade_manifest(value):
+    """Explicitly upgrade v1 metadata to v3; retain every optional namespace.
+
+    Wire format 2 already belongs to plugin-file containers. Format 3 adds an
+    explicit saved-state version; historical unversioned state is schema 1.
+    This function never writes a file or invokes plugin code.
+    """
+    result = validate_manifest(value)
+    if result["formatVersion"] == 1:
+        result["formatVersion"] = 3
+        for plugin in result["plugins"]:
+            plugin["stateVersion"] = 1
+    return result
 
 
 def new_manifest(name, plugins=(), storage="sqlite"):

@@ -1,10 +1,12 @@
 """Installed-plugin metadata and restart-bound configuration, without factory execution."""
 
+from copy import deepcopy
 from importlib import metadata
 from threading import Lock
 
 from .configuration import read_selection, validate_selection, write_selection
-from .runtime import PluginError, PluginRegistry, load_plugins
+from .contracts import contract_for
+from .runtime import PluginError, PluginRegistry, load_descriptors
 from .sdk import ENTRYPOINT_GROUP, valid_plugin_name
 
 # Registration identity is package metadata, so disabled plugins remain unloaded.
@@ -86,7 +88,7 @@ class PluginManager:
     def projection(self):
         """Safe template/API data; a bad file can be repaired through an explicit save."""
         descriptions = {item.id: item for item in self.plugins.describe()}
-        active = tuple(name for name in descriptions if name not in self.required)
+        active = tuple(sorted(name for name in descriptions if name not in self.required))
         configured = tuple(name for name in self.settings.plugins if name not in self.required)
         errors = []
         try:
@@ -95,6 +97,7 @@ class PluginManager:
                 configured = tuple(name for name in saved if name not in self.required)
         except PluginError as error:
             errors.append(str(error))
+        configured = tuple(sorted(configured))
         try:
             entries = installed_entrypoints()
         except PluginError as error:
@@ -131,6 +134,14 @@ class PluginManager:
                 "category": plugin_category(name, matches, description),
                 "distribution": distribution,
                 "version": version,
+                "compatibility": {
+                    "legacy": description.legacy,
+                    "lifecycle": description.lifecycle,
+                    "authority": description.authority,
+                    "state_version": description.state_version,
+                    "capabilities": [{"name": item.name, "version": item.version, "composition": item.composition} for item in description.capabilities],
+                    "requirements": [{"name": item.name, "min_version": item.min_version, "max_version": item.max_version} for item in description.requirements],
+                } if description else None,
                 "active": name in descriptions,
                 "enabled": required or name in configured,
                 "required": required,
@@ -157,7 +168,7 @@ class PluginManager:
             # Preserve unavailable optional requirements carried by an opened budget;
             # they must not prevent configuring the installed capabilities.
             unavailable = set(self.budget_session.missing_plugins) if self.budget_session else set()
-            optional = load_plugins(tuple(name for name in selection if name not in unavailable), installed_entrypoints())
+            optional = load_descriptors(tuple(name for name in selection if name not in unavailable), installed_entrypoints())
             # Reuse already validated mandatory descriptors. In particular, do not
             # reimport custom/injected UI or storage code to toggle a bank/report.
             required = tuple(
@@ -165,9 +176,12 @@ class PluginManager:
             )
             missing = tuple(name for name in self.required if not any(p.id == name for p in required))
             if missing:
-                required += load_plugins(missing, installed_entrypoints()).descriptors()
-            proposed = PluginRegistry((*optional.descriptors(), *required))
+                required += load_descriptors(missing, installed_entrypoints())
+            proposed = PluginRegistry((*optional, *required))
             proposed.storage_plugin(self.settings.storage)
+            selected_storage = proposed.storage_plugin(self.settings.storage)
+            if contract_for(selected_storage).authority == "remote" and proposed.bank_plugins():
+                raise PluginError("Bank ingestion belongs on the server. Disable bank plugins in a client budget.", code="invalid_configuration", plugin_id=selected_storage.id)
             if self.settings.ui:
                 proposed.ui_plugin(self.settings.ui)
             elif any(item.has_ui for item in proposed.describe()):
@@ -176,7 +190,7 @@ class PluginManager:
                     code="invalid_configuration",
                 )
             if self.settings.ui:
-                for plugin in optional.file_import_plugins():
+                for plugin in (item for item in optional if item.file_import is not None):
                     capability = plugin.file_import
                     if capability.templates is not None and (
                         not (capability.templates / "accounts.html").is_file()
@@ -187,7 +201,7 @@ class PluginManager:
                             code="missing_resources",
                             plugin_id=plugin.id,
                         )
-                for plugin in optional.bank_plugins():
+                for plugin in (item for item in optional if item.bank is not None):
                     if plugin.bank_ui and (
                         not (plugin.bank_ui.templates / "accounts.html").is_file()
                         or not (plugin.bank_ui.static / "connect.js").is_file()
@@ -198,7 +212,14 @@ class PluginManager:
                             plugin_id=plugin.id,
                         )
             if self.budget_session:
-                self.budget_session.save_selection(selection)
+                from whab.budgets.plugin_state import check_saved_states
+
+                candidate = deepcopy(self.budget_session.manifest)
+                selected_ids = {plugin.id for plugin in proposed.descriptors()}
+                for record in candidate["plugins"]:
+                    record["enabled"] = record["id"] in selected_ids
+                check_saved_states(candidate, proposed.descriptors())
+                self.budget_session.save_selection(selection, state_versions={plugin.id: contract_for(plugin).state_version for plugin in proposed.descriptors()})
             else:
                 write_selection(self.settings.home, selection)
         return self.projection()

@@ -23,6 +23,7 @@ from .document import (
     encode_bundle,
     new_manifest,
     portable_values,
+    upgrade_manifest,
     validate_manifest,
 )
 
@@ -252,17 +253,22 @@ class BudgetSession:
             raise StoreError("Invalid plugin ID.")
         return next((p for p in self.manifest["plugins"] if p["id"] == plugin_id), None)
 
-    def save_selection(self, selection):
+    def save_selection(self, selection, *, state_versions=None):
         with self.lock:
             if type(selection) not in {tuple, list} or any(not valid_plugin_name(name) for name in selection):
                 raise StoreError("Choose valid plugin IDs for this budget.")
             updated = copy.deepcopy(self.manifest)
+            state_versions = state_versions or {}
+            if any(name not in {record["id"] for record in updated["plugins"]} and version != 1 for name, version in state_versions.items()):
+                updated = upgrade_manifest(updated)
             current = {p["id"]: p for p in updated["plugins"]}
             for plugin in current.values():
                 plugin["enabled"] = plugin["id"] in selection or plugin["id"] == self.manifest["storage"]
             for plugin_id in selection:
                 if plugin_id not in current:
                     current[plugin_id] = {"id": plugin_id, "enabled": True, "apiVersion": API_VERSION, "settings": {}, "state": {}}
+                    if updated["formatVersion"] == 3:
+                        current[plugin_id]["stateVersion"] = state_versions.get(plugin_id, 1)
             updated["plugins"] = list(current.values())
             self._save_manifest(updated)
 

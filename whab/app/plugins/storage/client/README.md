@@ -16,6 +16,12 @@ CLIENT_TOKEN=your-private-token-with-at-least-32-characters
 
 An existing portable budget chooses storage through its manifest rather than `WHAB_STORAGE`; Settings' new-budget action creates SQLite budgets. The installed client is not automatically enabled by installing the supported set.
 
+From client 1.5 / WHAB 2.22, the descriptor declares remote authority through
+`PluginContract(authority="remote")`. Host policies use that declaration (and the
+legacy connection-reader adapter), so independently named remote backends receive
+the same restriction on local bank ingestion and model training. Lifecycle support
+remains restart-only until the host supplies the live transition adapters.
+
 `CLIENT_URL` is an HTTPS origin without credentials, a path, query or fragment.
 TLS certificates are verified, redirects are refused and environment proxies are
 disabled. The client's contribution is `plugins/client/connection.json`: its payload version,
