@@ -234,6 +234,16 @@ Tests: `tests/plugins/test_process_environment.py`, `tests/plugins/test_storage_
 
 Review: [PR #103](https://github.com/Fillll/whab/pull/103).
 
+### pr107-installed-storage-primary-smoke
+
+Verified 2026-10-23; host `2.41.0`. Selected: `example-storage`.
+
+Built the exact clean source into genuine host 2.41, toolkit 0.10 and independent storage example 1.0 wheels, then installed outside the checkout. All 71 owning tests passed with zero skips and 100% statement/branch coverage. One native-local-storage-v1 configuration and its exact-artifact replay each verified the candidate as sole required primary, read-only readiness, approved-worker activation, three acknowledged financial writes, two saved-worker reopens, an invalid-selection public fault and complete owned-process cleanup over temporary-CA HTTPS. The independently tested SQLite reference was not co-selected with the primary. This completed smoke exposed and verified the host correction that separates native code readiness from migration/copy eligibility while retaining background-work draining. The earlier installed failure is retained separately. The example does not advertise transfer.local or storage.replica; those controls are explicitly inapplicable. This record claims neither distinct-version upgrades, the complete ten-configuration matrix, a complete contribution gate nor household deployment. The full report and exact artifact closure were retained; no real bank or household data was used.
+
+Tests: `plugins/example/example-storage/tests`, `native-local-storage-v1 configuration and exact-artifact replay`.
+
+Review: [PR #104](https://github.com/Fillll/whab/pull/104), [PR #107](https://github.com/Fillll/whab/pull/107).
+
 ### pr102-local-storage-source
 
 Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.

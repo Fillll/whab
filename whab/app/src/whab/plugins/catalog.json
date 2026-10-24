@@ -450,7 +450,9 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "teaching",
-      "verifications": [],
+      "verifications": [
+        "pr107-installed-storage-primary-smoke"
+      ],
       "version": "1.0.0"
     },
     {
@@ -1445,6 +1447,30 @@
         "tests/plugins/test_process_environment.py",
         "tests/plugins/test_storage_worker_faults.py::test_native_child_receives_scoped_config_without_custom_provider_or_api_environment_credentials",
         "tests/plugins/test_remote_client_workers.py::test_installed_host_client_uses_native_https_verified_runtime_ca_and_public_server"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.41.0",
+        "whab_plugin_devkit": "0.10.0",
+        "whab_plugin_example_storage": "1.0.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.41.0",
+      "id": "pr107-installed-storage-primary-smoke",
+      "method": "installed-wheel",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/104",
+        "https://github.com/Fillll/whab/pull/107"
+      ],
+      "scope": "Built the exact clean source into genuine host 2.41, toolkit 0.10 and independent storage example 1.0 wheels, then installed outside the checkout. All 71 owning tests passed with zero skips and 100% statement/branch coverage. One native-local-storage-v1 configuration and its exact-artifact replay each verified the candidate as sole required primary, read-only readiness, approved-worker activation, three acknowledged financial writes, two saved-worker reopens, an invalid-selection public fault and complete owned-process cleanup over temporary-CA HTTPS. The independently tested SQLite reference was not co-selected with the primary. This completed smoke exposed and verified the host correction that separates native code readiness from migration/copy eligibility while retaining background-work draining. The earlier installed failure is retained separately. The example does not advertise transfer.local or storage.replica; those controls are explicitly inapplicable. This record claims neither distinct-version upgrades, the complete ten-configuration matrix, a complete contribution gate nor household deployment. The full report and exact artifact closure were retained; no real bank or household data was used.",
+      "selection": [
+        "example-storage"
+      ],
+      "source_commit": "ac518313952022003face183c59f7b38a8742f34",
+      "tests": [
+        "plugins/example/example-storage/tests",
+        "native-local-storage-v1 configuration and exact-artifact replay"
       ]
     },
     {
