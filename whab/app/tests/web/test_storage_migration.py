@@ -30,6 +30,36 @@ async def migrate(client, app, destination, prefix=""):
     return (await client.get(f"{prefix}/api/storage/status")).json()
 
 
+def test_code_only_upgrade_does_not_require_transfer_but_keeps_background_guard(tmp_path, monkeypatch):
+    """Native worker support is independently usable without migration/copies."""
+    from whab.plugins import Capability, Plugin, PluginContract, PluginRegistry, load_plugins
+
+    original = load_plugins(("sqlite",)).storage_plugin("sqlite")
+    storage = replace(original, contract=replace(original.contract,
+        provides=tuple(cap for cap in original.contract.provides if cap.name not in {"transfer.local", "storage.replica"})))
+
+    async def scenario():
+        app = create_app(settings=settings(tmp_path), plugins=PluginRegistry((storage,)))
+        async with running(app):
+            assert app.state.storage_upgrade.supported()
+            assert app.state.storage_upgrade.check() is None
+            with pytest.raises(PluginError) as migration:
+                app.state.storage_runtime._source()
+            assert migration.value.code == "restart_required"
+            legacy = Plugin("fictional-legacy-bank", "Fictional legacy bank", bank=lambda _: None)
+            monkeypatch.setattr(app.state.storage_runtime, "registry", PluginRegistry((storage, legacy)))
+            with pytest.raises(PluginError) as background:
+                app.state.storage_upgrade.check()
+            assert (background.value.code, background.value.plugin_id) == ("restart_required", legacy.id)
+            drainable = replace(legacy, contract=PluginContract(provides=(Capability("lifecycle.background"),)))
+            monkeypatch.setattr(app.state.storage_runtime, "registry", PluginRegistry((storage, drainable)))
+            assert app.state.storage_upgrade.check() is None
+            with pytest.raises(PluginError):
+                app.state.storage_runtime._source()
+
+    asyncio.run(scenario())
+
+
 @pytest.mark.parametrize(("source", "destination"), [("sqlite", "json"), ("json", "sqlite")])
 def test_status_poll_waits_for_code_journal_handover(tmp_path, monkeypatch, source, destination):
     """Polling admitted control routes must never observe a retired journal."""
