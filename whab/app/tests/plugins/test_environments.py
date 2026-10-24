@@ -713,6 +713,59 @@ def local_closure(tmp_path_factory):
     return tuple(approve(path) for path in sorted(wheelhouse.glob("*.whl")))
 
 
+def test_offline_installation_and_readiness_do_not_inherit_custom_plugin_configuration(tmp_path, local_closure, monkeypatch):
+    blocked = {
+        "EXAMPLE_REMOTE_CLIENT_URL": "https://fictional.example/ledger",
+        "EXAMPLE_REMOTE_CLIENT_TOKEN": "fictional-provisioning-canary",
+        "EXAMPLE_REMOTE_CLIENT_BUDGET_ID": "fictional-budget",
+        "FICTIONAL_REPORTS_URL": "https://fictional.example/report",
+        "FICTIONAL_REPORTS_TOKEN": "fictional-readiness-canary",
+        "WHAB_BUDGET_PASSWORD_ENV": "FICTIONAL_UNLOCK",
+        "FICTIONAL_UNLOCK": "fictional-password-canary",
+        "HTTP_PROXY": "https://fictional.example/proxy",
+        "HTTPS_PROXY": "https://fictional.example/proxy",
+        "SSL_CERT_FILE": str(tmp_path / "fictional-ca.pem"),
+        "HOME": str(tmp_path / "fictional-home"),
+        "LC_CUSTOM_TOKEN": "fictional-locale-canary",
+        "PYTHONPATH": str(tmp_path / "untrusted-python"),
+        "PIP_CONFIG_FILE": str(tmp_path / "untrusted-pip.conf"),
+    }
+    for key, value in blocked.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setenv("LANG", "C")
+    monkeypatch.setenv("LC_ALL", "C")
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    expected_path = os.environ.get("PATH")
+    stages = []
+    original = subprocess.Popen
+
+    def spawn(command, **options):
+        if "pip" in command and "install" in command:
+            stage = "install"
+        elif environments._VERIFY in command:
+            stage = "verify"
+        elif "whab.plugins.report_worker" in command:
+            stage = "probe"
+        else:
+            stage = "setup"
+        environment = options["env"]
+        assert not blocked.keys() & environment.keys()
+        assert not set(blocked.values()) & set(environment.values())
+        assert environment["LANG"] == environment["LC_ALL"] == "C"
+        assert environment["TMPDIR"] == str(tmp_path)
+        assert environment.get("PATH") == expected_path
+        stages.append(stage)
+        return original(command, **options)
+
+    # A real offline installation and installed-code readiness probe must both
+    # succeed with no host plugin configuration in provisioning subprocesses.
+    monkeypatch.setattr(environments.subprocess, "Popen", spawn)
+    result = prepare_environment(tmp_path / "environments", "fictional-reports",
+                                 (*local_closure, approve(make_wheel(tmp_path))))
+    assert (result.path / "ready.json").is_file()
+    assert stages.count("install") == stages.count("verify") == stages.count("probe") == 1
+
+
 def test_real_versions_coexist_failed_candidate_preserves_active_worker_and_reuse_detects_tampering(tmp_path, local_closure, monkeypatch):
     root = tmp_path / "environments"
     first_wheel = approve(make_wheel(tmp_path, "1.0.0"))

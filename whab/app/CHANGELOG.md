@@ -4,6 +4,13 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.40.0 — 2026-10-23
+
+PR: [#103](https://github.com/Fillll/whab/pull/103)
+
+- Give plugin installation, installed-artifact verification and every owned worker process one explicit environment policy. Retain only reviewed standard process variables; exclude arbitrary caller configuration and the selected budget-password alias even when it names a standard variable.
+- Preserve explicit scoped configuration through the existing worker contracts. Verify real report, SQLite and JSON child startup and cleanup with fictional configuration canaries; document that trusted Python workers retain their operating-system access.
+
 ## 2.39.0 — 2026-10-23
 
 PR: [#100](https://github.com/Fillll/whab/pull/100)
@@ -18,7 +25,7 @@ PR: [#101](https://github.com/Fillll/whab/pull/101)
 
 - Add bounded bank-provider workers and approved immutable code upgrades. Keep encryption keys, native command brokerage, authorization and financial validation under host control; preserve existing connections, synchronization checkpoints and stable ledger services.
 - Bind browser Link and OAuth continuations to opaque budget/provider identities. Persist exchange intent before external work and encrypted responses plus exact native commands before application; retain uncertain outcomes without duplicate exchanges or automatic reconnects.
-- Drain generation-owned synchronization, webhooks and requests, defer retirement and authority changes during unfinished flows, and retain failed cleanup owners. Preserve unknown native outcomes after failed evidence or receipt publication instead of reporting a definite rejection.
+- Drain generation-owned synchronization, webhooks and requests, defer retirement and authority changes during unfinished flows, and retain failed cleanup owners.
 
 ## 2.37.0 — 2026-10-23
 

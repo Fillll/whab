@@ -24,6 +24,7 @@ from .bank_adapter import BankAdapter, ProviderFailure
 from .categorization_worker import CategorizationDispatcher
 from .contracts import contract_for
 from .effect_store import decode, encode
+from .process_environment import process_environment
 from .provider_worker import MAX_PROVIDER_BYTES, ProviderDispatcher, read_provider_result
 from .remote_client_adapter import supports_remote_client
 from .runtime import PluginError, load_plugins
@@ -288,12 +289,10 @@ class ReportWorker:
         if on_create is not None:
             on_create(self)
         try:
-            password_variable = os.environ.get("WHAB_BUDGET_PASSWORD_ENV")
-            env = {key: value for key, value in os.environ.items() if not key.startswith(("WHAB_", "PLAID_", "CLIENT_", "SERVER_", plugin_id.upper().replace("-", "_") + "_")) and key not in {"PYTHONPATH", "TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID"} and key != password_variable and not key.upper().endswith(("_TOKEN", "_SECRET", "_PASSWORD", "_KEY", "_AUTHORIZATION"))}
             self._process = subprocess.Popen(
                 [str(python), "-I", "-B", "-m", "whab.plugins.report_worker", plugin_id],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                env=env, bufsize=0, start_new_session=True,
+                env=process_environment(), bufsize=0, start_new_session=True,
             )
             hello = self._read(timeout)
             if hello.payload or set(hello.metadata) != {"kind", "worker", "sdk", "plugin", "distribution", "version", "host", "live", "capabilities", "insights", "export", "adapters", "contract"}:

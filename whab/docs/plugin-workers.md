@@ -29,6 +29,15 @@ explicit dependency closure containing the current host wheel and one selected
 optional plugin, and installs offline into a content-addressed environment.
 Runtime preparation performs no downloads and never upgrades active files.
 
+From WHAB 2.40, the offline installer, installed-artifact verification,
+readiness probes and active optional/native-storage workers share one explicit
+platform, executable-path, temporary-directory and locale environment policy.
+They receive no caller plugin settings, proxy settings, credential aliases or
+Python/pip configuration, including custom setting names. The configured
+password-variable alias is excluded even if it names a standard variable.
+This limits accidental inheritance; it does not restrict trusted code's access
+to the current user's files or network.
+
 The initial installer supports macOS/Linux POSIX locks, the current Python/host,
 wheel 1.0 purelib/platlib layouts and dependencies without extras. Unsupported
 layouts or closures fail explicitly. A stable lock serializes preparation; a
@@ -38,10 +47,8 @@ unexpected installed files before executing a reused environment. Interrupted
 preparations can be discarded under their lock; published environments are never
 repaired in place. Old versions remain on disk for inspection and explicit reuse.
 
-Workers use isolated Python startup and disable bytecode writes. Inherited WHAB,
-provider/client/server credentials, the worker plugin's own configuration prefix,
-credential-suffixed keys and the configured password-variable alias are
-removed. This reduces accidental exposure; plugins remain trusted Python code
+Workers use isolated Python startup and disable bytecode writes. Plugin runtime
+configuration reaches only its explicitly owned typed host adapter. Plugins remain trusted Python code
 with the current user's operating-system access. Processes and versioned venvs
 provide failure containment, **not a security sandbox**.
 
