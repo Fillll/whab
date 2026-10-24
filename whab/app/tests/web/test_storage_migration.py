@@ -4,6 +4,7 @@ import asyncio
 import subprocess
 import sys
 from dataclasses import replace
+from threading import Event
 
 import pytest
 
@@ -27,6 +28,52 @@ async def migrate(client, app, destination, prefix=""):
     assert started.status_code == 202, started.text
     await settled(app)
     return (await client.get(f"{prefix}/api/storage/status")).json()
+
+
+@pytest.mark.parametrize(("source", "destination"), [("sqlite", "json"), ("json", "sqlite")])
+def test_status_poll_waits_for_code_journal_handover(tmp_path, monkeypatch, source, destination):
+    """Polling admitted control routes must never observe a retired journal."""
+    from whab.budgets import storage_upgrade
+
+    async def scenario():
+        app = create_app(settings=replace(settings(tmp_path), storage=source))
+        entered, release, observing = Event(), Event(), Event()
+        journal = storage_upgrade._journal
+        status = app.state.storage_upgrade.status
+
+        def held_journal(home, budget_id, environment, plugin_id):
+            if plugin_id == destination:
+                entered.set()
+                assert release.wait(10)
+            return journal(home, budget_id, environment, plugin_id)
+
+        def observed_status():
+            observing.set()
+            return status()
+
+        async with running(app) as client:
+            monkeypatch.setattr(storage_upgrade, "_journal", held_journal)
+            monkeypatch.setattr(app.state.storage_upgrade, "status", observed_status)
+            preview = await client.post("/api/storage/preview", json={"destination": destination})
+            assert preview.status_code == 200, preview.text
+            ticket = await client.post("/api/storage/transition", json={"preview_id": preview.json()["preview_id"]})
+            assert ticket.status_code == 202, ticket.text
+            try:
+                assert await asyncio.to_thread(entered.wait, 10)
+                poll = asyncio.create_task(client.get("/api/storage/status"))
+                assert await asyncio.to_thread(observing.wait, 10)
+            finally:
+                release.set()
+            response = await poll
+            assert response.status_code == 200, response.text
+            assert response.json()["code"]["plugin"] == destination
+            await settled(app)
+            final = await client.get("/api/storage/status")
+            assert final.status_code == 200, final.text
+            assert final.json()["operations"][-1]["state"] == "complete"
+            assert final.json()["storage"] == destination
+
+    asyncio.run(scenario())
 
 
 @pytest.mark.parametrize(("source", "destination"), [("sqlite", "json"), ("json", "sqlite")])
