@@ -1,6 +1,6 @@
 """Example API v1 plugin: selected-month totals and a structured transaction export."""
 
-from whab.plugins import BudgetSnapshot, ExportTable, Insight, Plugin, format_money
+from whab.plugins import BudgetSnapshot, ExportTable, Insight, Plugin, PluginContract, format_money
 
 
 def insights(snapshot: BudgetSnapshot) -> tuple[Insight, ...]:
@@ -59,4 +59,5 @@ plugin = Plugin(
     api_version=1,
     insights=insights,
     export=export,
+    contract=PluginContract(lifecycle="live"),
 )
