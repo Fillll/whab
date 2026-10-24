@@ -5,6 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .contracts import Capability, PluginContract, Requirement, contract_for
+from .interface_adapter import interface_record, read_interface_record
 from .sdk import (
     BankLogos,
     Insight,
@@ -16,8 +17,8 @@ from .sdk import (
 from .wire import MAX_PAYLOAD_BYTES, WireError, _unique, _value
 from .worker_resources import capture_resources, resource_bundle
 
-LIVE_CAPABILITIES = frozenset({"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file"})
-OPERATIONS = frozenset({"bank.resolve", "bank.domain", "bank.fetch", "merchant.fetch", "cache.configure", "settings.read", "settings.act", "file.parse", "file.resources"})
+LIVE_CAPABILITIES = frozenset({"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file", "interface.api"})
+OPERATIONS = frozenset({"bank.resolve", "bank.domain", "bank.fetch", "merchant.fetch", "cache.configure", "settings.read", "settings.act", "file.parse", "file.resources", "interface.describe"})
 BINARY_OPERATIONS = frozenset({"bank.fetch", "merchant.fetch", "file.parse", "file.resources"})
 
 
@@ -31,8 +32,9 @@ def supports_live_plugin(plugin):
         and contract.state_version == 1 and not contract.state_upgrades
         and (plugin.branding_factory is None or capabilities <= {"branding.bank", "branding.merchant"})
         and all(getattr(plugin, name) is None for name in (
-            "bind", "migrate_state", "budget_connection", "categorization", "bank", "bank_ui", "storage", "ui", "interface",
+            "bind", "migrate_state", "budget_connection", "categorization", "bank", "bank_ui", "storage", "ui",
         ))
+        and (plugin.interface is None or plugin.interface.adapter is not None)
         and (plugin.settings is None or (plugin.file_import is None and (plugin.bank_logos is not None or plugin.merchant_logos is not None)))
     )
 
@@ -48,7 +50,9 @@ def adapter_info(plugin):
             "file_import": None if plugin.file_import is None else {
                 "ui": plugin.file_import.templates is not None or plugin.file_import.resources is not None,
             },
-            "settings": None if settings is None else {"actions": [asdict(row) for row in settings.actions]}}
+            "settings": None if settings is None else {"actions": [asdict(row) for row in settings.actions]},
+            "interface": None if plugin.interface is None or plugin.interface.adapter is None else interface_record(plugin.interface.adapter),
+            "ui": None}
 
 
 def contract_info(plugin):
@@ -75,8 +79,12 @@ def read_contract(value, capabilities):
 
 
 def validate_adapter_info(value):
-    if type(value) is not dict or set(value) != {"bank_logos", "merchant_logos", "file_import", "settings"}:
+    if type(value) is not dict or set(value) != {"bank_logos", "merchant_logos", "file_import", "settings", "interface", "ui"}:
         raise WireError()
+    if value["ui"] is not None:
+        raise WireError()
+    if value["interface"] is not None:
+        read_interface_record(value["interface"])
     if type(value["merchant_logos"]) is not bool:
         raise WireError()
     bank = value["bank_logos"]
@@ -135,6 +143,10 @@ def dispatch(registry, plugin, operation, arguments, payload):
         return {"format": "workspace-import-v1"}, import_bytes(plugin.file_import.parse(payload))
     if payload:
         raise WireError()
+    if operation == "interface.describe":
+        if arguments or plugin.interface is None or plugin.interface.adapter is None:
+            raise WireError()
+        return interface_record(plugin.interface.adapter), b""
     if operation == "file.resources":
         if arguments or plugin.file_import is None:
             raise WireError()

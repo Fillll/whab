@@ -1,11 +1,19 @@
 # Approved optional-worker upgrades
 
 WHAB 2.25 introduced explicitly live stateless reporting/export upgrades. The
-current adapter also replaces branding and file-parser code without restarting
+current adapter also replaces branding, file-parser and declarative API interface code without restarting
 its listener. Other families require their own adapters. The parent
 retains TLS, authorization, local-access guards, budget identity and financial
 validation. These data protocols accept no financial mutation, backend handle,
 router, callable or pickle.
+
+API workers advertise `adapters.interface` as a strict `RemoteLedgerInterface`
+record and answer only `interface.describe` for that capability. The parent
+compares the readiness response with the startup declaration and requires an
+exact current-host version. The reserved `adapters.ui` value remains `null` in
+this adapter. Private interface configuration and financial commands remain in
+the host; the worker does not implement an HTTP router. See the
+[API interface lifecycle](plugins.md#remote-interface-and-client).
 
 ## Artifacts and environments
 
@@ -27,7 +35,8 @@ preparations can be discarded under their lock; published environments are never
 repaired in place. Old versions remain on disk for inspection and explicit reuse.
 
 Workers use isolated Python startup and disable bytecode writes. Inherited WHAB,
-provider/client/server credentials and the configured password-variable alias are
+provider/client/server credentials, the worker plugin's own configuration prefix,
+credential-suffixed keys and the configured password-variable alias are
 removed. This reduces accidental exposure; plugins remain trusted Python code
 with the current user's operating-system access. Processes and versioned venvs
 provide failure containment, **not a security sandbox**.

@@ -180,3 +180,33 @@ def test_actual_catalog_has_exact_static_contracts_for_supported_packages(metada
         "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization",
     }
     assert json.loads(json.dumps(generated))["plugins"]
+
+
+@pytest.mark.parametrize("interface", [
+    "Interface(adapter=RemoteLedgerInterface())",
+    "Interface(adapter=RemoteLedgerInterface(token_setting='FICTIONAL_TOKEN',commands=False))",
+])
+def test_literal_api_adapter_is_classified_without_import_or_factory_execution(metadata_tool, static_repository, interface):
+    root, _, module = static_repository
+    path = module / "__init__.py"
+    path.write_text("raise RuntimeError('source must never execute')\nplugin=Plugin('fictional','Fictional',interface=" + interface + ",contract=PluginContract(lifecycle='live'))\n")
+    row = metadata_tool.descriptor_metadata(path, "plugin", root)
+    assert row["live_support"] == "declarative-api-worker"
+    assert row["capabilities"] == [{"name": "interface.api", "version": 1, "composition": "additive"}]
+
+
+@pytest.mark.parametrize("interface", [
+    "Interface(factory=RemoteLedgerInterface())", "Interface(factory)",
+    "Interface(adapter=dynamic())", "Interface(adapter=RemoteLedgerInterface(protocol_version=True))",
+    "Interface(adapter=RemoteLedgerInterface(protocol_version=2))",
+    "Interface(adapter=RemoteLedgerInterface(token_setting='PRIVATE.token'))",
+    "Interface(adapter=RemoteLedgerInterface(commands=1))",
+    "Interface(adapter=RemoteLedgerInterface(queries=False,commands=False))",
+    "Interface(adapter=RemoteLedgerInterface(unknown=True))",
+])
+def test_api_factories_dynamic_or_invalid_adapter_shapes_cannot_claim_live_support(metadata_tool, static_repository, interface):
+    root, _, module = static_repository
+    path = module / "__init__.py"
+    path.write_text("raise RuntimeError('source must never execute')\nplugin=Plugin('fictional','Fictional',interface=" + interface + ",contract=PluginContract(lifecycle='live'))\n")
+    with pytest.raises(ValueError, match="supported stateless worker"):
+        metadata_tool.descriptor_metadata(path, "plugin", root)

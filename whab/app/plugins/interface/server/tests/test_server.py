@@ -5,10 +5,11 @@ from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from whab_plugin_server.plugin import create_interface, plugin
+from whab_plugin_server.plugin import plugin
 
 from whab.domain.errors import StoreError
 from whab.services.ledger import LedgerService
+from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
 
 TOKEN = "synthetic-server-token-" + "a" * 32
 HEADERS = {"Authorization": "Bearer " + TOKEN}
@@ -21,14 +22,16 @@ def context(service, token=TOKEN):
 
 def client_for(service, **kwargs):
     app = FastAPI()
-    app.include_router(create_interface(context(service)))
+    binding = BoundRemoteInterface(plugin.interface.adapter, context(service))
+    app.include_router(create_remote_router(lambda: binding))
     return TestClient(app, base_url="https://testserver", **kwargs)
 
 
 def test_descriptor_configuration_and_auth(store):
-    assert plugin.id == "server" and plugin.interface.factory is create_interface
-    with pytest.raises(StoreError, match="SERVER_TOKEN"):
-        create_interface(context(LedgerService(store), "short"))
+    assert plugin.id == "server" and plugin.interface.factory is None
+    assert plugin.contract.lifecycle == "live"
+    with pytest.raises(StoreError, match="host bearer token"):
+        BoundRemoteInterface(plugin.interface.adapter, context(LedgerService(store), "short"))
     client = client_for(LedgerService(store))
     path = BASE + "/queries/accounts?workspace=demo"
     assert client.get(path).status_code == 401

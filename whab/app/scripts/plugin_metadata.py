@@ -98,6 +98,28 @@ def _hook_capabilities(root):
     return ast.literal_eval(loop.iter)
 
 
+def _interface_adapter(node):
+    """Recognize the literal SDK adapter without executing its module."""
+    try:
+        interface = _constructor(node, "Interface", ("factory", "adapter"))
+        if set(interface) != {"adapter"}:
+            return False
+        values = {name: _literal(value) for name, value in _constructor(
+            interface["adapter"], "RemoteLedgerInterface",
+            ("protocol_version", "token_setting", "queries", "commands")).items()}
+        fields = {"protocol_version": 1, "token_setting": "SERVER_TOKEN", "queries": True, "commands": True}
+        if values.keys() - fields.keys():
+            return False
+        fields.update(values)
+        return (type(fields["protocol_version"]) is int and fields["protocol_version"] == 1
+                and type(fields["token_setting"]) is str and len(fields["token_setting"]) <= 100
+                and re.fullmatch(r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*", fields["token_setting"]) is not None
+                and type(fields["queries"]) is bool and type(fields["commands"]) is bool
+                and (fields["queries"] or fields["commands"]))
+    except (ValueError, TypeError):
+        return False
+
+
 def descriptor_metadata(module_path, attribute, root):
     tree = ast.parse(source_text(module_path, root))
     descriptor = _constructor(_assignment(tree, attribute), "Plugin", ("id", "display_name", "api_version"))
@@ -126,14 +148,15 @@ def descriptor_metadata(module_path, attribute, root):
             and not unsupported and state_version == 1 and not upgrades
             and set(capabilities) <= {"reporting.insights", "reporting.export"}
             and all(row["version"] == 1 for row in capabilities.values()))
-    optional_hooks = {"insights", "export", "bank_logos", "merchant_logos", "file_import", "settings", "branding_factory"}
+    optional_hooks = {"insights", "export", "bank_logos", "merchant_logos", "file_import", "settings", "branding_factory", "interface"}
     optional = (
         not legacy and lifecycle == "live" and state_version == 1 and not upgrades
-        and bool(capabilities) and set(capabilities) <= {"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file"}
+        and bool(capabilities) and set(capabilities) <= {"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file", "interface.api"}
         and all(row["version"] == 1 for row in capabilities.values())
         and not (present - {"id", "display_name", "api_version", "contract"} - optional_hooks)
         and ("branding_factory" not in present or set(capabilities) <= {"branding.bank", "branding.merchant"})
         and ("settings" not in present or "file_import" not in present and bool({"bank_logos", "merchant_logos"} & present))
+        and ("interface" not in present or _interface_adapter(descriptor["interface"]))
     )
     categorization = (
         not legacy and lifecycle == "live" and "categorization" in present
@@ -149,7 +172,8 @@ def descriptor_metadata(module_path, attribute, root):
             "conflicts": list(_literal(contract["conflicts"])) if "conflicts" in contract else [],
             "lifecycle": lifecycle, "legacy": legacy, "authority": authority,
             "state_version": state_version, "state_upgrades": [list(edge) for edge in upgrades],
-            "live_support": ("stateless-report-worker" if live else "stateless-optional-worker" if optional
+            "live_support": ("declarative-api-worker" if optional and "interface" in present else
+                             "stateless-report-worker" if live else "stateless-optional-worker" if optional
                              else "categorization-host" if categorization else "restart-required")}
 
 
@@ -229,7 +253,7 @@ def catalog_markdown(catalog):
     for row in catalog["plugins"]:
         lifecycle = "Legacy; restart required" if row["legacy"] else row["live_support"]
         lines.append(f'| [{row["id"]}]({row["documentation"]}) | `{row["distribution"]} {row["version"]}` | `{row["requires_host"]}` | {lifecycle} | {row["support"]} |')
-    lines.extend(["", "Explicit stateless report, branding and file-parser descriptors advertise their supported live-worker adapters. Categorization supports host-process selection changes; its code upgrades still require an application restart. Other entries require restart; backend migration and copies are not inferred from package installation.", "",
+    lines.extend(["", "Explicit stateless report, branding, file-parser and declarative API interface descriptors advertise their supported live-worker adapters. Categorization supports host-process selection changes; its code upgrades still require an application restart. Other entries require restart; backend migration and copies are not inferred from package installation.", "",
                   "## Recorded verification", "", "Evidence applies only to its exact host, artifacts and selection. Installed-only artifacts are not proof that their capabilities executed. Draft PR/source verification is not a release or deployment claim.", ""])
     for item in catalog["verifications"]:
         lines.extend([f'### {item["id"]}', "", f'Verified {item["date"]}; host `{item["host_version"]}`. Selected: ' + ", ".join(f'`{value}`' for value in item["selection"]) + ".", "", item["scope"], "",

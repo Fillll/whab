@@ -444,7 +444,7 @@ def test_synthetic_saved_protocol1_environment_is_fenced_then_explicitly_reprepa
                 assert self.info["worker"] == 1 and self.info["distribution"] == expected_distribution and self.info["version"] == expected_version
                 # New preparation uses this explicit shim only for constructing
                 # a genuine old-format fixture. Restoring later never uses it.
-                self.info["adapters"] = {"bank_logos": None, "merchant_logos": False, "file_import": None, "settings": None}
+                self.info["adapters"] = {"bank_logos": None, "merchant_logos": False, "file_import": None, "settings": None, "interface": None, "ui": None}
             except BaseException:
                 self._stop()
                 raise
@@ -895,3 +895,108 @@ def test_root_filesystem_failures_are_sanitized_before_any_install(tmp_path, mon
     with pytest.raises(EnvironmentPreparationError) as raised:
         prepare_environment(root, "fictional-reports", (candidate,))
     assert raised.value.code == "environment_failed" and "synthetic-private" not in str(raised.value)
+
+
+def test_real_api_worker_upgrade_failed_preparation_disable_reenable_and_reopen(tmp_path, local_closure, store, monkeypatch):
+    """Exact installed workers only declare protocol data; host retains the ledger."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    from whab.app import create_app
+    from whab.config import Settings
+    from whab.plugins import (
+        Interface,
+        Plugin,
+        PluginContract,
+        PluginError,
+        PluginRegistry,
+        RemoteLedgerInterface,
+    )
+
+    identifier = "fictional-reports"
+    token = "fictional-api-worker-secret-" * 3
+    monkeypatch.setenv("FICTIONAL_REPORTS_CREDENTIAL", token)
+    template = Plugin(identifier, "Fictional API", interface=Interface(adapter=RemoteLedgerInterface(token_setting="FICTIONAL_REPORTS_CREDENTIAL")), contract=PluginContract(lifecycle="live"))
+    entry = SimpleNamespace(name=identifier, group="whab.plugins", load=lambda: template)
+    monkeypatch.setattr("whab.plugins.management.installed_entrypoints", lambda: (entry,))
+    monkeypatch.setattr("whab.app.installed_entrypoints", lambda: (entry,))
+    configuration = Settings(tmp_path / "runtime", 5173, "sandbox", "", "", "", False, "", "", (identifier,), ui="")
+
+    def wheel(version, *, commands=True, setting="FICTIONAL_REPORTS_CREDENTIAL"):
+        source = (
+            "import os\n"
+            "from whab.plugins import Interface, Plugin, PluginContract, RemoteLedgerInterface\n"
+            "assert 'FICTIONAL_REPORTS_CREDENTIAL' not in os.environ\n"
+            f"plugin=Plugin({identifier!r},'Fictional API',interface=Interface(adapter=RemoteLedgerInterface(token_setting={setting!r},commands={commands!r})),contract=PluginContract(lifecycle='live'))\n"
+        )
+        return make_wheel(tmp_path, version, source=source)
+
+    def application():
+        return create_app(store=store, settings=configuration, plugins=PluginRegistry((template,)))
+
+    app = application()
+    first = second = None
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        path = f"/remote/v1/budgets/{app.state.ledger_service.budget_id}"
+        headers = {"Authorization": "Bearer " + token}
+        ledger = app.state.ledger_service
+        body = {"operation": "add_account", "workspace": "personal", "payload": {"name": "Fictional wallet", "type": "depository", "balance": 125}, "expected_revision": ledger.revision, "request_id": "stable-retry"}
+        original = client.post(path + "/commands", json=body, headers=headers)
+        assert original.status_code == 200
+
+        def upgrade(version, **kwargs):
+            approvals = (*local_closure, approve(wheel(version, **kwargs)))
+            return client.portal.call(app.state.live_plugins.upgrade, identifier, approvals)
+
+        assert upgrade("1.0.0") == 2
+        first = app.state.budget_runtime._active.services["plugins"].workers[identifier]
+        original_binding = app.state.budget_runtime._active.services["interfaces"].binding
+        assert first.worker.info["version"] == "1.0.0" and first.worker.interface().commands
+        assert client.post(path + "/commands", json=body, headers=headers).json() == original.json()
+        with pytest.raises(PluginError) as failed:
+            upgrade("3.0.0", setting="UNCONFIGURED_TOKEN")
+        assert failed.value.plugin_id == identifier
+        assert first.worker.healthy and not original_binding._closed
+        assert app.state.budget_runtime.status()["generation"] == 2
+        assert client.get(path + "/queries/accounts?workspace=personal", headers=headers).status_code == 200
+        entered, finish = Event(), Event()
+        original_query = original_binding.query
+
+        def held_query(*args):
+            entered.set()
+            assert finish.wait(30)
+            return original_query(*args)
+
+        original_binding.query = held_query
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            request = pool.submit(client.get, path + "/queries/accounts?workspace=personal", headers=headers)
+            assert entered.wait(5)
+            approvals = (*local_closure, approve(wheel("2.0.0", commands=False)))
+            change = client.portal.start_task_soon(app.state.live_plugins.upgrade, identifier, approvals)
+            client.portal.call(app.state.budget_runtime.wait_for_phase, "draining")
+            assert first.worker.healthy and not original_binding._closed and not change.done()
+            finish.set()
+            assert request.result(timeout=5).status_code == 200
+            assert change.result(timeout=10) == 3
+        second = app.state.budget_runtime._active.services["plugins"].workers[identifier]
+        assert not first.worker.healthy and original_binding._closed
+        assert second.worker.info["version"] == "2.0.0" and not second.worker.interface().commands
+        assert client.post(path + "/commands", json=body, headers=headers).status_code == 405
+        assert app.state.ledger_service is ledger and len(store.accounts("personal")) == 1
+        client.portal.call(app.state.live_plugins.activate, ())
+        assert not second.worker.healthy
+        assert client.get(path + "/queries/accounts?workspace=personal", headers=headers).status_code == 404
+        client.portal.call(app.state.live_plugins.activate, (identifier,))
+        assert client.post(path + "/commands", json=body, headers=headers).status_code == 405
+        assert token not in repr(app.state.budget_runtime._active.services["plugins"].workers[identifier].worker.info)
+        assert "fictional_reports" not in sys.modules
+    app = application()
+    with TestClient(app, base_url="https://127.0.0.1:5173") as client:
+        assert client.get(path + "/queries/accounts?workspace=personal", headers=headers).status_code == 200
+        assert client.post(path + "/commands", json=body, headers=headers).status_code == 405
+        assert app.state.budget_runtime._active.services["plugins"].workers[identifier].worker.info["version"] == "2.0.0"
+        assert len(store.accounts("personal")) == 1
+    assert first and second and not first.worker.healthy and not second.worker.healthy
