@@ -21,6 +21,9 @@ _BUNDLED_METADATA = {
     ("client", "whab_plugin_client.plugin:plugin"): ("storage", "Remote budget client"),
     ("server", "whab_plugin_server.plugin:plugin"): ("interface", "Budget API server"),
     ("example", "whab_plugin_example:plugin"): ("example", "Month totals example"),
+    ("example-branding", "whab_plugin_example_branding:plugin"): ("example", "Fictional branding"),
+    ("example-file-import", "whab_plugin_example_file_import:plugin"): ("example", "Fictional account import"),
+    ("example-categorization", "whab_plugin_example_categorization:plugin"): ("example", "Exact merchant teaching model"),
 }
 
 

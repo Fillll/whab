@@ -4,6 +4,12 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.26.0 — 2026-10-23
+
+PR: [#83](https://github.com/Fillll/whab/pull/83)
+
+- Recognize the exact registrations of three new maintained teaching plugins as developer examples, keeping them hidden from ordinary Settings without importing disabled code. Verify their independent distributions in installed-wheel checks.
+
 ## 2.25.0 — 2026-10-23
 
 PR: [#81](https://github.com/Fillll/whab/pull/81)

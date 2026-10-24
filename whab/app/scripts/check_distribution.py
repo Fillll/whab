@@ -267,11 +267,12 @@ def main():
                 "distribution": metadata["name"], "version": metadata["version"],
                 "module": entrypoint.split(":", 1)[0].split(".", 1)[0],
             }
-        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "example", "random-forest-categorization"}
+        teaching = {"example", "example-branding", "example-file-import", "example-categorization"}
+        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", *teaching}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {
             f'{record["distribution"]}>={record["version"]},<2'
-            for identifier, record in expected.items() if identifier not in {"whab", "example"}
+            for identifier, record in expected.items() if identifier not in {"whab", *teaching}
         }
         run(
             "-m",
