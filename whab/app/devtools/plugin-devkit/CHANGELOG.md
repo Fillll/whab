@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.10.0 — 2026-10-23
+
+PR: [#107](https://github.com/Fillll/whab/pull/107)
+
+- Add an independent local storage generator, public conformance/read-only readiness helpers and the versioned native-local-storage-v1 replay profile. The candidate is the sole required primary; its SQLite reference is tested independently, and unsupported transfer/copy controls remain explicitly inapplicable.
+- Exercise ten distinct peer sets with exact approved-worker activation, financial writes before and after activation, saved-worker reopen and controlled public failures. Use the genuine WHAB 2.41 public storage-model floor for the complete POSIX teaching adapter while preserving the toolkit's 2.22 import floor.
+- Stage historical reference builds before comparing complete wheel member payloads, retaining the original approved bytes only when same-filename contents agree and refusing conflicting artifacts without overwriting them.
+
 ## 0.7.0 — 2026-10-23
 
 PR: [#99](https://github.com/Fillll/whab/pull/99)
