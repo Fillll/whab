@@ -228,9 +228,17 @@ print(json.dumps({
     assert json.loads(result.stdout) == {
         "backend": False, "schema": False, "seeding": False, "driver_imports": [],
     }
-    assert {path.name for path in tmp_path.iterdir()} == {"visual-ui"}
+    assert {path.name for path in tmp_path.iterdir()} == {"visual-ui", "plugin-workers"}
     assert {path.name for path in (tmp_path / "visual-ui").iterdir()} == {
         "visual-selection.json", "visual-selection.json.lock",
+    }
+    control = tmp_path / "plugin-workers" / "storage" / "memory"
+    assert {path.relative_to(tmp_path / "plugin-workers").as_posix()
+            for path in (tmp_path / "plugin-workers").rglob("*") if path.is_file()} == {
+        "storage/memory/storage-upgrade.json", "storage/memory/storage-upgrade.json.lock",
+    }
+    assert json.loads((control / "storage-upgrade.json").read_bytes())["body"] == {
+        "format": 2, "kind": "storage-code", "active": None, "native": None, "pending": None, "repair": None,
     }
 
 

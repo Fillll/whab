@@ -11,7 +11,7 @@ from whab.domain.file_imports import WorkspaceImport
 from whab.domain.transactions import UNSET
 
 from .runtime import PluginError
-from .storage_intents import StorageIntents, validate_receipt
+from .storage_intents import StorageIntents, validate_native_floor, validate_receipt
 from .storage_transfer import (
     OperationResult,
     StorageOperation,
@@ -184,6 +184,7 @@ class StorageWorkerProxy:
                     raise StoreError("Invalid native storage operation result.")
                 current = self._call("commit_evidence")
                 self.intents.finish(result.receipt, current)
+                self._before = current
                 self._attempted = None
                 return result
             except PluginError as error:
@@ -284,7 +285,10 @@ class StorageWorkerProxy:
                 self.intents.validate_current(current)
                 if replace(current, role=expected.role) != expected:
                     raise StoreError("Native authority source changed its retained content.")
-                self.worker, self._before = replacement, current
+                # Retain the financial predecision baseline. The authority
+                # coordinator may still choose to unfence this same source;
+                # observing its temporary role cannot rewrite that baseline.
+                self.worker, self._before = replacement, expected
                 self._fenced = False
                 self._control_unknown = None
                 return current
@@ -292,7 +296,7 @@ class StorageWorkerProxy:
                 replacement.close()
                 raise storage_error(self.worker.plugin_id, "storage_write_unknown") from None
 
-    def recover(self):
+    def recover(self, *, minimum=None):
         """Explicitly quiesce, reopen exact code, and reconcile without reissuing."""
         with self.lock:
             if self._control_unknown is not None:
@@ -306,8 +310,9 @@ class StorageWorkerProxy:
             try:
                 current = replacement.open(replace(self.context, expected_instance_id=self._before.instance_id))
                 self.intents.validate_current(current)
-                if current.role != "primary":
-                    raise StoreError("Native financial recovery requires the retained primary authority.")
+                validate_native_floor(current, self._before)
+                if minimum is not None:
+                    validate_native_floor(current, minimum)
                 pending = self.intents.snapshot()["pending"]
                 outcome = "unchanged"
                 if pending is not None:
@@ -330,6 +335,7 @@ class StorageWorkerProxy:
                 elif current.instance_id != self._before.instance_id or current.authority_epoch != self._before.authority_epoch:
                     raise StoreError("Native storage changed its approved authority.")
                 self.worker = replacement
+                self._before = current
                 self._fenced = False
                 self._attempted = None
                 return {"outcome": outcome}

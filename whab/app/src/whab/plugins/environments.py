@@ -534,6 +534,8 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                             adapters = probe.info["adapters"]
                             if adapters["interface"] is not None:
                                 probe.interface()
+                            if adapters["remote_client"] is not None:
+                                probe.remote_client()
                             if adapters["ui"] is not None:
                                 from .ui_worker import readiness_arguments
 

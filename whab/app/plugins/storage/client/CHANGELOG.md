@@ -1,5 +1,7 @@
 # HTTPS remote budget client plugin changelog
 
+## Unreleased
+
 ## 1.5.0 — 2026-10-23
 
 PR: [#76](https://github.com/Fillll/whab/pull/76)

@@ -10,7 +10,7 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
 | [bank-logos](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
-| [client](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
+| [client](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.6.0` | `whab>=2.39,<3` | declarative-remote-client-worker | maintained |
 | [example](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
 | [example-api](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.0` | `whab>=2.34,<3` | declarative-api-worker | teaching |
 | [example-branding](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
@@ -24,7 +24,7 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [web](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
 | [ynab](https://github.com/Fillll/whab/blob/59f216e9b0ea42bf7be627cf91b516c318662d44/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
-Explicit stateless report, branding, file-parser, declarative API interface, pure categorization and participating visual descriptors advertise their supported live-worker adapters. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
+Explicit stateless report, branding, file-parser, declarative API interface, pure categorization and participating visual descriptors advertise their supported live-worker adapters. Declarative remote-client workers return metadata only; the host retains their exact HTTPS authority, credentials, transport and financial intent. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
 
 ## Recorded verification
 

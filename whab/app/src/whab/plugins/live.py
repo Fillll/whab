@@ -204,6 +204,7 @@ class LivePluginSelection:
         self.visual_ids = frozenset()
         self.visual = None
         self.storage = None
+        self.remote_client = None
         self.initial_selection = frozenset(plugin.id for plugin in runtime._active.services["plugins"].descriptors()) - self.required
         self._lock = Lock()
         self._tickets = {}
@@ -313,6 +314,8 @@ class LivePluginSelection:
         return await self._activate(selection)
 
     async def upgrade(self, plugin_id, approvals):
+        if self.remote_client is not None and plugin_id == self.runtime._active.services["remote_client"].plugin_id:
+            return await self.remote_client.upgrade(plugin_id, approvals)
         from .worker_selection import upgrade_report
 
         if self.home is None:
@@ -322,6 +325,8 @@ class LivePluginSelection:
         return await upgrade_report(self, self.home, plugin_id, approvals)
 
     async def recover(self, authority):
+        if self.remote_client is not None and self.remote_client.pending is not None:
+            return await self.remote_client.recover(authority)
         from .worker_selection import validate_saved_generation
 
         if self.storage is not None and (self.storage.pending is not None or self.storage.status()["uncertain"]):

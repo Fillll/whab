@@ -219,7 +219,7 @@ def test_held_export_keeps_old_generation_and_new_requests_use_new_report(tmp_pa
             projection = (await client.get("/api/plugins/management")).json()
             assert projection["active"] == projection["configured"] == ["second"]
             assert not projection["restart_required"]
-            assert projection["live"]["families"] == ["branding.bank", "branding.merchant", "categorization", "ingestion.file", "interface.api", "interface.ui", "reporting.export", "reporting.insights"]
+            assert projection["live"]["families"] == ["branding.bank", "branding.merchant", "categorization", "ingestion.file", "interface.api", "interface.ui", "ledger.mutate", "ledger.read", "reporting.export", "reporting.insights"]
             assert projection["live"]["code_upgrades"] is True
 
     asyncio.run(scenario())

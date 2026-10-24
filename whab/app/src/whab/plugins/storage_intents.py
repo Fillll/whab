@@ -17,6 +17,17 @@ from .storage_transfer import (
 MAX_REQUESTS = 1024
 
 
+def validate_native_floor(current, before):
+    """A retained exact native baseline cannot be replaced by older content."""
+    if (type(current) is not CommitEvidence or type(before) is not CommitEvidence
+            or current.budget_id != before.budget_id or current.environment != before.environment
+            or current.instance_id != before.instance_id or current.authority_epoch != before.authority_epoch
+            or current.role != "primary" or before.role != "primary"
+            or current.generation < before.generation
+            or current.generation == before.generation and current != before):
+        raise StoreError("Native storage precedes or differs from its retained authority evidence.")
+
+
 def _hash(value):
     if type(value) is not str or len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
         raise StoreError("Invalid private storage request binding.")

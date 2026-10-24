@@ -144,3 +144,37 @@ def test_visual_worker_label_requires_the_singleton_visual_capability():
         next(row for row in malformed["plugins"] if row["id"] == "web").update(change)
         with pytest.raises(catalog.CatalogError):
             catalog.validate_catalog(malformed)
+
+
+def test_remote_client_label_requires_exact_remote_ledger_contract():
+    value = catalog.catalog_snapshot()
+    client = next(row for row in value["plugins"] if row["id"] == "client")
+    assert client["live_support"] == "declarative-remote-client-worker"
+    assert client["authority"] == "remote" and client["lifecycle"] == "live"
+    for change in (
+        {"authority": "local"}, {"live_support": "stateless-optional-worker"},
+        {"capabilities": [{"name": "ledger.read", "version": 1, "composition": "singleton"}]},
+        {"capabilities": [{"name": name, "version": 1, "composition": "additive"} for name in ("ledger.read", "ledger.mutate")]},
+        {"capabilities": [{"name": name, "version": 2, "composition": "singleton"} for name in ("ledger.read", "ledger.mutate")]},
+    ):
+        malformed = copy.deepcopy(value)
+        next(row for row in malformed["plugins"] if row["id"] == "client").update(change)
+        with pytest.raises(catalog.CatalogError):
+            catalog.validate_catalog(malformed)
+
+
+@pytest.mark.parametrize("identifier", ["sqlite", "json"])
+def test_local_storage_worker_label_requires_local_native_receipt_capabilities(identifier):
+    value = catalog.catalog_snapshot()
+    row = next(row for row in value["plugins"] if row["id"] == identifier)
+    assert row["live_support"] == "local-storage-worker" and row["authority"] == "local"
+    for change in (
+        {"authority": "remote"},
+        {"capabilities": [record for record in row["capabilities"] if record["name"] != "storage.worker"]},
+        {"capabilities": [{"name": "reporting.insights", "version": 1, "composition": "additive"}]},
+        {"state_version": 2},
+    ):
+        malformed = copy.deepcopy(value)
+        next(record for record in malformed["plugins"] if record["id"] == identifier).update(change)
+        with pytest.raises(catalog.CatalogError):
+            catalog.validate_catalog(malformed)
