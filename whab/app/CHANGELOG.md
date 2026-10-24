@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.31.0 — 2026-10-23
+
+PR: [#88](https://github.com/Fillll/whab/pull/88)
+
+- Add protocol-2 live branding/file-parser adapters, bounded immutable resource transfer and scoped branding factories. Keep host-owned security/import validation, stable services and failed-candidate behavior.
+- Bind preview/commit to parser identity, retain old resource generations and restore approved worker versions. Add explicit approved current-host worker-reference replacement with CAS, exact history and lost-reply retry.
+- Expand static metadata/catalog lifecycle accuracy and test actual historical protocol-1 recovery, immutable wheel upgrades, per-budget caches, resource coherence and the full contribution gate.
+
 ## 2.30.0 — 2026-10-23
 
 PR: [#87](https://github.com/Fillll/whab/pull/87)

@@ -122,16 +122,28 @@ def descriptor_metadata(module_path, attribute, root):
     state_version = _literal(contract["state_version"]) if "state_version" in contract else 1
     upgrades = _literal(contract["state_upgrades"]) if "state_upgrades" in contract else ()
     unsupported = present - {"id", "display_name", "api_version", "contract", "insights", "export"}
-    live = not legacy and lifecycle == "live" and bool({"insights", "export"} & present) and not unsupported and state_version == 1 and not upgrades and set(capabilities) <= {"reporting.insights", "reporting.export"}
-    if lifecycle == "live" and not live:
-        raise ValueError("Only an explicit stateless report descriptor can claim current live-worker support.")
+    live = (not legacy and lifecycle == "live" and bool({"insights", "export"} & present)
+            and not unsupported and state_version == 1 and not upgrades
+            and set(capabilities) <= {"reporting.insights", "reporting.export"}
+            and all(row["version"] == 1 for row in capabilities.values()))
+    optional_hooks = {"insights", "export", "bank_logos", "merchant_logos", "file_import", "settings", "branding_factory"}
+    optional = (
+        not legacy and lifecycle == "live" and state_version == 1 and not upgrades
+        and bool(capabilities) and set(capabilities) <= {"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file"}
+        and all(row["version"] == 1 for row in capabilities.values())
+        and not (present - {"id", "display_name", "api_version", "contract"} - optional_hooks)
+        and ("branding_factory" not in present or set(capabilities) <= {"branding.bank", "branding.merchant"})
+        and ("settings" not in present or "file_import" not in present and bool({"bank_logos", "merchant_logos"} & present))
+    )
+    if lifecycle == "live" and not (live or optional):
+        raise ValueError("Live metadata requires an explicit supported stateless worker adapter.")
     return {"id": identifier, "display_name": display, "api_version": _literal(descriptor["api_version"]) if "api_version" in descriptor else 1,
             "capabilities": [capabilities[name] for name in sorted(capabilities)],
             "requires": _requirements(contract["requires"]) if "requires" in contract else [],
             "conflicts": list(_literal(contract["conflicts"])) if "conflicts" in contract else [],
             "lifecycle": lifecycle, "legacy": legacy, "authority": authority,
             "state_version": state_version, "state_upgrades": [list(edge) for edge in upgrades],
-            "live_support": "stateless-report-worker" if live else "restart-required"}
+            "live_support": "stateless-report-worker" if live else "stateless-optional-worker" if optional else "restart-required"}
 
 
 def source_inventory(root=ROOT):
@@ -210,7 +222,7 @@ def catalog_markdown(catalog):
     for row in catalog["plugins"]:
         lifecycle = "Legacy; restart required" if row["legacy"] else row["live_support"]
         lines.append(f'| [{row["id"]}]({row["documentation"]}) | `{row["distribution"]} {row["version"]}` | `{row["requires_host"]}` | {lifecycle} | {row["support"]} |')
-    lines.extend(["", "Only explicit stateless report descriptors advertise live-worker compatibility. Other entries require restart; backend migration and copies are not inferred from package installation.", "",
+    lines.extend(["", "Explicit stateless report, branding and file-parser descriptors advertise their supported live-worker adapters. Other entries require restart; backend migration and copies are not inferred from package installation.", "",
                   "## Recorded verification", "", "Evidence applies only to its exact host, artifacts and selection. Installed-only artifacts are not proof that their capabilities executed. Draft PR/source verification is not a release or deployment claim.", ""])
     for item in catalog["verifications"]:
         lines.extend([f'### {item["id"]}', "", f'Verified {item["date"]}; host `{item["host_version"]}`. Selected: ' + ", ".join(f'`{value}`' for value in item["selection"]) + ".", "", item["scope"], "",

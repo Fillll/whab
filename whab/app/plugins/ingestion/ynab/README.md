@@ -10,6 +10,20 @@ Enable **Import from YNAB ZIP file** through Settings → Plugins, save, and res
 
 The destination is a new empty SQLite budget, so the current budget can already contain accounts or imported data. Existing financial data is never replaced or merged. Preview only reads and validates the ZIP; it creates no budget or financial records. Commit reparses and validates the same SHA-256 fingerprint, and SQLite saves the complete import and receipt in one transaction. Once creation starts, the name stays locked for retries. A failed request can be retried with the same import operation to open the same budget without duplicates or overwriting subsequent edits. Starting a new preview and import creates another separate budget, even for the same archive. Source account records, bank connections, credentials and plugin settings are not copied. The older API for importing directly into a pristine personal budget remains available to integrations.
 
+## Live parser lifecycle
+
+The parser explicitly supports [live selection and approved worker upgrades](../../../../docs/plugin-workers.md).
+Ordinary Settings saves still configure the next startup; the host lifecycle API
+can apply the supported live change. Each preview includes an opaque
+`parserIdentity`; integrations must echo it in `X-Import-Parser` on commit. A
+parser replacement, disable/re-enable or application restart invalidates pending
+previews. Preview again before retrying; the original file fingerprint and import
+operation ID remain unchanged, so a previously completed import is still detected.
+An admitted parsing/commit request finishes under its original runtime generation
+before handover. Retired previews are rejected before the replacement parser runs.
+The host captures templates and JavaScript together and uses generation-specific
+asset URLs, preventing an old page from loading a newer incompatible client.
+
 ## Preserved information
 
 - Accounts and category groups/categories, including categories found only in the register.

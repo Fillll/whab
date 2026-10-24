@@ -88,8 +88,9 @@ assert settings.storage == "sqlite" and settings.ui == "web"
 assert settings.plugins == ("plaid", "example", "bank-logos", "ynab")
 registry = load_plugins(settings.enabled_plugins())
 assert [p.id for p in registry.describe()] == ["bank-logos", "example", "plaid", "sqlite", "web", "ynab"]
-assert all(p.lifecycle == "restart" and p.legacy for p in registry.describe() if p.id not in {"example", "sqlite", "plaid"})
+assert all(p.lifecycle == "restart" and p.legacy for p in registry.describe() if p.id not in {"example", "bank-logos", "ynab", "sqlite", "plaid"})
 assert all(not p.legacy and p.lifecycle == "restart" for p in registry.describe() if p.id in {"sqlite", "plaid"})
+assert all(p.lifecycle == "live" and not p.legacy for p in registry.describe() if p.id in {"example", "bank-logos", "ynab"})
 assert next(p for p in registry.describe() if p.id == "example").lifecycle == "live"
 assert not next(p for p in registry.describe() if p.id == "example").legacy
 remote = load_plugins(("client",)).describe()[0]

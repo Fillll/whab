@@ -1,9 +1,10 @@
-# Approved report-worker upgrades
+# Approved optional-worker upgrades
 
-WHAB 2.25 can replace explicitly live, stateless reporting/export code without
-restarting its listener. Other families require their own adapters. The parent
+WHAB 2.25 introduced explicitly live stateless reporting/export upgrades. The
+current adapter also replaces branding and file-parser code without restarting
+its listener. Other families require their own adapters. The parent
 retains TLS, authorization, local-access guards, budget identity and financial
-validation. This report protocol accepts no financial mutation, backend handle,
+validation. These data protocols accept no financial mutation, backend handle,
 router, callable or pickle.
 
 ## Artifacts and environments
@@ -13,7 +14,7 @@ The operator supplies reviewed local wheels and their complete SHA-256 hashes.
 plugin code. It validates identity, Python/tags, requirements, entry points and
 all RECORD hashes. Preparation copies and rechecks those artifacts, validates an
 explicit dependency closure containing the current host wheel and one selected
-report plugin, and installs offline into a content-addressed environment.
+optional plugin, and installs offline into a content-addressed environment.
 Runtime preparation performs no downloads and never upgrades active files.
 
 The initial installer supports macOS/Linux POSIX locks, the current Python/host,
@@ -33,7 +34,7 @@ provide failure containment, **not a security sandbox**.
 
 ## Protocol and activation
 
-Protocol 1 uses an explicit WHAB header, 8 MiB bounded JSON metadata and at most
+Protocol 2 uses an explicit WHAB header, 8 MiB bounded JSON metadata and at most
 50 MiB binary payload, strict primitive types, bounded nesting and exact message
 shapes. Snapshots and report outputs also pass the public SDK validation. Startup
 negotiates protocol, SDK, host, distribution/version, report capabilities and the
@@ -43,7 +44,7 @@ fixed plugin-attributed diagnostics. Owned process groups are cleaned up on
 timeout, cancellation and shutdown. There is no automatic restart loop or retry
 of a mutation with an unknown outcome.
 
-Enable the stateless report first. Then send an authenticated local
+Enable the supported optional plugin first. Then send an authenticated local
 `POST /api/plugins/management/upgrade` request:
 
 ```json
@@ -74,11 +75,108 @@ The host validates the saved selection and content-addressed version reference
 before resuming; it refuses a decision inconsistent with the durable files.
 When a response is lost after the candidate decision, recovery selects that
 candidate and never silently reverts it. Closing the host retires both uncertain
-generations without deciding authority. Damaged startup files currently require
-preserving and repairing the approved environment or disabling that report from
-configuration before startup; minimal startup recovery controls are a later adapter.
+generations without deciding authority.
 
-This adapter covers stateless report code only. Protected storage writes and lost
-financial responses require durable typed command receipts; UI resources, bank
-flows, parsers and model training need capability-specific workers and barriers.
-Tests use only reviewed fictional wheels, temporary homes and mocked providers.
+Prepared environments have an exact host-version fence. This includes saved
+protocol 1 report environments created by WHAB 2.25: a newer host refuses the old
+environment before executing its interpreter, even when the plugin's declared
+host range still includes the new version. It preserves the old reference and
+environment and does not silently choose the host's installed plugin. Protocol 2
+does not reinterpret protocol 1 messages.
+
+To recover, **stop the host that owns this budget** and use its current Python
+environment. `worker_reference_revision(home, plugin_id)` returns the 64-character
+SHA-256 revision without loading the saved worker. Inspect that revision, approve
+a complete current-host wheel closure, and pass the observed revision to
+`replace_saved_worker`. The plugin wheel can be the same version when its host
+requirement permits the new host. The stopped-host control is available without
+a recovery HTTP endpoint; never invoke it against an admitted, running budget.
+
+For example, put the reviewed closure in a local JSON array, with one
+`{"path":"/absolute/reviewed/distribution.whl","sha256":"<complete lowercase hash>"}`
+record per wheel. This file authorizes the complete installation, including the
+current WHAB wheel and all runtime dependencies. Read the saved revision using:
+
+```sh
+/path/to/current/venv/bin/python - /absolute/runtime-home fictional-reports <<'PY'
+import sys
+from pathlib import Path
+from whab.plugins.runtime import PluginError
+from whab.plugins.worker_selection import worker_reference_revision
+try:
+    print(worker_reference_revision(Path(sys.argv[1]), sys.argv[2]))
+except PluginError as error:
+    print(error.code)
+    raise SystemExit(1)
+PY
+```
+
+Then run the replacement, supplying the exact revision that was inspected:
+
+```sh
+/path/to/current/venv/bin/python - /absolute/runtime-home fictional-reports /absolute/reviewed/closure.json OBSERVED_64_CHARACTER_SHA256 <<'PY'
+import json
+import sys
+from pathlib import Path
+from whab.plugins.environments import ApprovedWheel, EnvironmentPreparationError
+from whab.plugins.runtime import PluginError
+from whab.plugins.worker_selection import replace_saved_worker
+try:
+    with Path(sys.argv[3]).open("rb") as source:
+        raw = source.read(1024 * 1024 + 1)
+    if len(raw) > 1024 * 1024:
+        raise ValueError()
+    rows = json.loads(raw)
+    if type(rows) is not list or not 1 <= len(rows) <= 128:
+        raise ValueError()
+    if any(type(row) is not dict or set(row) != {"path", "sha256"} for row in rows):
+        raise ValueError()
+    approvals = tuple(ApprovedWheel(Path(row["path"]), row["sha256"]) for row in rows)
+    result = replace_saved_worker(Path(sys.argv[1]), sys.argv[2], approvals,
+                                  expected_reference_sha256=sys.argv[4])
+    print(json.dumps({"plugin": result.plugin_id, "version": result.version,
+                      "environment": result.identifier}, sort_keys=True))
+except (PluginError, EnvironmentPreparationError) as error:
+    print(json.dumps({"code": error.code}))
+    raise SystemExit(1)
+except Exception:
+    print('{"code":"invalid_replacement_request"}')
+    raise SystemExit(1)
+PY
+```
+
+The control prepares and probes the approved environment before changing the
+selection, then compares the saved reference under a writer lock. It preserves
+the exact previous reference bytes in
+`plugin-workers/history/<plugin>/<revision>.json` before publishing the new one.
+Those history files and all old immutable environments remain intact. A changed
+reference refuses replacement. After an uncertain or lost publication response,
+repeat the same closure and original expected revision: matching durable history
+and the already-published environment return the same decision. Do not substitute
+a new revision to bypass a conflict. Restart the host only after the control
+succeeds; startup validates and restores the newly approved worker.
+
+Branding workers receive bounded public institution/hostname text and opaque
+artwork keys. They return validated raster images and plain settings/action
+results. Cache directories belong to one budget and worker environment; candidate
+preparation never flushes the active version's cache.
+
+File-parser workers receive at most 10 MiB of upload bytes. They return only
+bounded, validated `WorkspaceImport` data; parent validation and financial writes
+remain unchanged. Preview responses include `parserIdentity`, which commits must
+echo in `X-Import-Parser`. Retired or missing identities fail before reparsing;
+raw file fingerprints and durable import operation IDs retain their meaning.
+Requests already admitted finish on the old generation before activation.
+
+`PluginResources` captures safe relative `templates/` and `static/` files as
+immutable bytes: at most 256 files, 2 MiB per file and 4 MiB total, with UTF-8
+templates. File import requires `templates/accounts.html` and `static/import.js`.
+The wire bundle carries exact sizes and SHA-256 hashes, without archive extraction
+or child filesystem paths. Versioned URLs keep each page attached to its matching
+assets. Up to eight parser resource versions and 8 MiB per plugin are retained in
+memory; older URLs, or previous-run URLs after restart, return 404 rather than
+serving a newer file. Unrelated report/branding transitions keep parser identities.
+
+UI rendering, API interfaces, protected bank flows and categorization still need
+their own adapters. Tests use reviewed fictional wheels, temporary homes and
+mocked providers; worker processes are not a security sandbox.

@@ -127,6 +127,35 @@ def test_static_boolean_cannot_impersonate_numeric_sdk_version(metadata_tool, st
         metadata_tool.source_inventory(root)
 
 
+@pytest.mark.parametrize("hooks, support", [
+    ("bank_logos=branding,settings=settings,branding_factory=fresh", "stateless-optional-worker"),
+    ("file_import=parser", "stateless-optional-worker"),
+    ("insights=insights,export=export", "stateless-report-worker"),
+])
+def test_supported_live_families_are_inspected_without_executing_factories(metadata_tool, static_repository, hooks, support):
+    root, _, module = static_repository
+    path = module / "__init__.py"
+    path.write_text("raise RuntimeError('must not execute')\nplugin=Plugin('fictional','Fictional'," + hooks +
+                    ",contract=PluginContract(lifecycle='live'))\n")
+    assert metadata_tool.descriptor_metadata(path, "plugin", root)["live_support"] == support
+
+
+@pytest.mark.parametrize("hooks, contract", [
+    ("file_import=parser,settings=settings", ""),
+    ("file_import=parser,branding_factory=fresh", ""),
+    ("bank_logos=branding,bind=binder", ""),
+    ("bank_logos=branding", ",state_version=2"),
+    ("insights=insights", ",provides=(Capability('reporting.insights',2),)"),
+])
+def test_unsupported_live_shapes_cannot_claim_worker_compatibility(metadata_tool, static_repository, hooks, contract):
+    root, _, module = static_repository
+    path = module / "__init__.py"
+    path.write_text("plugin=Plugin('fictional','Fictional'," + hooks +
+                    ",contract=PluginContract(lifecycle='live'" + contract + "))\n")
+    with pytest.raises(ValueError, match="supported stateless worker"):
+        metadata_tool.descriptor_metadata(path, "plugin", root)
+
+
 def test_static_source_reader_rejects_private_links_and_bounds(metadata_tool, static_repository, tmp_path, monkeypatch):
     root, project, module = static_repository
     private = tmp_path / "private.py"

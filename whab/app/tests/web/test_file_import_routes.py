@@ -87,8 +87,9 @@ def test_fingerprint_currency_empty_upload_and_disabled_plugin_are_guarded(store
         assert client.post(BASE + "commit", content=RAW, headers=HEADERS).status_code == 409
         assert client.post(BASE + "commit", content=RAW, headers={**HEADERS, "x-import-fingerprint": "0" * 64}).status_code == 409
     with client_for(store, tmp_path, enabled=False) as client:
-        assert client.post(BASE + "preview", json={}).status_code == 404
-        assert client.post(BASE + "commit", json={}).status_code == 404
+        assert client.post(BASE + "preview", json={}).status_code == 415
+        assert client.post(BASE + "preview", content=b"fictional", headers=HEADERS).status_code == 404
+        assert client.post(BASE + "commit", json={}).status_code == 415
     assert store.accounts("personal") == []
 
 
@@ -354,7 +355,7 @@ def test_new_import_routes_preserve_fingerprint_local_and_upload_guards(store, t
             larger = b"x" * 65536
             assert client.post(path, content=larger, headers=new_headers(larger)).status_code == 200
     with client_for(store, tmp_path, enabled=False) as client:
-        assert client.post(BASE + "new/preview", json={}).status_code == 404
+        assert client.post(BASE + "new/preview", json={}).status_code == 415
 
 
 def test_named_import_persists_unicode_name_and_retries_preserve_it(store, tmp_path):

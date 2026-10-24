@@ -640,7 +640,7 @@ class BankLogos:
 
 @dataclass(frozen=True, slots=True)
 class MerchantLogos:
-    """Fetch a bank provider's public artwork by an imported opaque key.
+    """Fetch public artwork by an imported opaque key, without bank authority.
 
     Keys contain 1–200 ASCII letters, digits, underscores or hyphens and begin
     with a letter or digit. Hooks receive no transaction or banking context.
@@ -695,16 +695,55 @@ class PluginSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class PluginResources:
+    """Detached UI files for one plugin version, without filesystem authority.
+
+    Files use ``templates/`` or ``static/`` relative names. At most 256 files,
+    2 MiB per file and 4 MiB total are accepted; templates must be UTF-8.
+    """
+
+    files: Mapping[str, bytes] = field(repr=False)
+
+    def __post_init__(self):
+        if type(self.files) not in {dict, MappingProxyType} or not 1 <= len(self.files) <= 256:
+            raise ValueError("Plugin resources must be a bounded file mapping.")
+        copied, total = {}, 0
+        for name, raw in self.files.items():
+            if type(name) is not str or not 1 <= len(name) <= 200 or "\\" in name or ":" in name or any(ord(character) < 32 or ord(character) == 127 for character in name):
+                raise ValueError("Import resource names must be safe relative paths.")
+            parts = name.split("/")
+            if not 2 <= len(parts) <= 16 or parts[0] not in {"templates", "static"} or any(part in {"", ".", ".."} for part in parts):
+                raise ValueError("Import resource names must be safe relative paths.")
+            name.encode("utf-8")
+            if type(raw) is not bytes or len(raw) > 2 * 1024 * 1024:
+                raise ValueError("Import resource files must contain at most 2 MiB of bytes.")
+            total += len(raw)
+            if total > 4 * 1024 * 1024:
+                raise ValueError("Import resources exceed their 4 MiB total bound.")
+            if parts[0] == "templates":
+                raw.decode("utf-8")
+            copied[name] = raw
+        object.__setattr__(self, "files", MappingProxyType(copied))
+
+
+@dataclass(frozen=True, slots=True)
 class FileImport:
     """Parse a bounded local file without ledger access; the host owns persistence."""
 
     parse: Callable[[bytes], WorkspaceImport]
     templates: Path | None = None
     static: Path | None = None
+    resources: PluginResources | None = None
 
     def __post_init__(self) -> None:
         if not callable(self.parse):
             raise ValueError("File import parser must be callable.")
+        if self.resources is not None:
+            if type(self.resources) is not PluginResources or self.templates is not None or self.static is not None:
+                raise ValueError("Import resources must use a detached SDK resource record, without paths.")
+            PluginResources(self.resources.files)
+            if not {"templates/accounts.html", "static/import.js"} <= self.resources.files.keys():
+                raise ValueError("Import resources require accounts.html and import.js.")
         if (self.templates is None) != (self.static is None):
             raise ValueError("File import UI requires both template and static directories.")
         if self.templates is not None and (
@@ -870,6 +909,9 @@ class Plugin:
     # Callbacks must use that namespace only; active state is published by the host.
     migrate_state: Callable[[BudgetContext, int, int], None] | None = None
     storage_payload_paths: tuple[str, ...] = ()
+    # A zero-authority factory creates independent optional artwork cache/hooks.
+    # It receives no configuration, budget namespace, backend or credentials.
+    branding_factory: Callable[[], Plugin] | None = None
 
     def __post_init__(self) -> None:
         if (type(self.storage_payload_paths) is not tuple or len(self.storage_payload_paths) > 32
@@ -903,6 +945,8 @@ class Plugin:
             raise ValueError("Plugin interface must be an Interface descriptor or None.")
         if self.bind is not None and not callable(self.bind):
             raise ValueError("Plugin budget binder must be callable or None.")
+        if self.branding_factory is not None and not callable(self.branding_factory):
+            raise ValueError("Plugin branding factory must be callable or None.")
         if self.budget_connection is not None and not callable(self.budget_connection):
             raise ValueError("Plugin budget connection reader must be callable or None.")
         if type(self.api_version) is not int:
@@ -931,7 +975,7 @@ class Plugin:
         if self.file_import is not None:
             if type(self.file_import) is not FileImport:
                 raise ValueError("Plugin file import must be a FileImport descriptor or None.")
-            FileImport(self.file_import.parse, self.file_import.templates, self.file_import.static)
+            FileImport(self.file_import.parse, self.file_import.templates, self.file_import.static, self.file_import.resources)
         if self.settings is not None:
             if type(self.settings) is not PluginSettings:
                 raise ValueError("Plugin settings must be a PluginSettings descriptor or None.")
@@ -940,8 +984,6 @@ class Plugin:
             if type(self.merchant_logos) is not MerchantLogos:
                 raise ValueError("Plugin merchant logos must be a MerchantLogos descriptor or None.")
             MerchantLogos(self.merchant_logos.fetch)
-            if self.bank is None:
-                raise ValueError("Plugin merchant logos require a bank factory.")
         if (
             self.categorization is None
             and self.insights is None
@@ -950,6 +992,7 @@ class Plugin:
             and self.storage is None
             and self.ui is None
             and self.bank_logos is None
+            and self.merchant_logos is None
             and self.file_import is None
             and self.interface is None
             and self.bind is None
