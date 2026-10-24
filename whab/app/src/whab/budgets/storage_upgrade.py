@@ -500,6 +500,7 @@ class StorageUpgrade:
         self.plugin_id = tracked.storage_plugin_id
         self.journal = None
         self._workers, self._proxies, self._worker_lock = {}, {}, RLock()
+        self._status_lock = RLock()
         self.pending = None
         self.closed = False
         self.binding = binding
@@ -554,11 +555,12 @@ class StorageUpgrade:
             return False
 
     def status(self):
-        backend = self.tracked.store
-        return {"supported": self.supported(), "plugin": self.plugin_id,
-                "mode": "worker" if self.binding is not None else "host",
-                "uncertain": bool(getattr(backend, "uncertain", False)),
-                "active": self.journal.snapshot()["active"], "runtime": self.runtime.status()}
+        with self._status_lock:
+            backend = self.tracked.store
+            return {"supported": self.supported(), "plugin": self.plugin_id,
+                    "mode": "worker" if self.binding is not None else "host",
+                    "uncertain": bool(getattr(backend, "uncertain", False)),
+                    "active": self.journal.snapshot()["active"], "runtime": self.runtime.status()}
 
     async def upgrade(self, plugin_id, approvals):
         if plugin_id != self.plugin_id or not self.supported():
@@ -727,21 +729,24 @@ class StorageUpgrade:
 
     def retarget(self, plugin_id, context):
         """Called by explicit backend migration/promotion while gated/drained."""
-        if self.runtime.status()["admission"] != "gated" or self.runtime.status()["active_leases"]:
-            raise storage_error(plugin_id)
-        self.journal.close()
-        self.plugin_id, self.context = plugin_id, context
-        self.journal = _journal(self.home, self.runtime.budget_id, context.environment, plugin_id)
-        record = self.journal.snapshot()
-        if record["active"] is not None:
-            self.journal.commit({**_current(record), "native": evidence_record(self.tracked.commit_evidence()), "repair": None})
+        # Control status requests remain admitted during a financial drain. Hold
+        # their read across the complete journal/worker ownership handover.
+        with self._status_lock:
+            if self.runtime.status()["admission"] != "gated" or self.runtime.status()["active_leases"]:
+                raise storage_error(plugin_id)
+            self.journal.close()
+            self.plugin_id, self.context = plugin_id, context
+            self.journal = _journal(self.home, self.runtime.budget_id, context.environment, plugin_id)
             record = self.journal.snapshot()
-        bind_owner = getattr(self.tracked.store, "_bind_storage_owner", None)
-        if bind_owner is not None:
-            bind_owner(self.journal)
-        self.binding = getattr(self.tracked.store, "_storage_worker_binding", None)
-        if self.binding is None and record["active"]:
-            self.binding = StorageBinding(_prepared(self.home, plugin_id, record["active"]), self.tracked.store)
+            if record["active"] is not None:
+                self.journal.commit({**_current(record), "native": evidence_record(self.tracked.commit_evidence()), "repair": None})
+                record = self.journal.snapshot()
+            bind_owner = getattr(self.tracked.store, "_bind_storage_owner", None)
+            if bind_owner is not None:
+                bind_owner(self.journal)
+            self.binding = getattr(self.tracked.store, "_storage_worker_binding", None)
+            if self.binding is None and record["active"]:
+                self.binding = StorageBinding(_prepared(self.home, plugin_id, record["active"]), self.tracked.store)
 
     def build_generation(self, active, prepared, target, source_id):
         generation = active.services["plugins"]
