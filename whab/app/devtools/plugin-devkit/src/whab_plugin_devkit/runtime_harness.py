@@ -19,8 +19,17 @@ from tempfile import TemporaryDirectory
 class NativeRuntime:
     """Launch one installed host in an entirely new disposable Sandbox home."""
 
-    def __init__(self, storage, selection, *, timeout=30, api_token_setting=None, ui=None, transition_timeout=180):
-        if storage not in {"sqlite", "json"} or type(timeout) not in {int, float} or not 0 < timeout <= 60:
+    def __init__(self, storage, selection, *, timeout=30, api_token_setting=None, ui=None, transition_timeout=180,
+                 storage_candidate=None):
+        if storage_candidate is not None:
+            from .local_storage import storage_declaration, storage_platform
+
+            declaration = storage_declaration(storage_candidate)
+            if (storage != storage_candidate.id or declaration["native"] != "supported"
+                    or storage_platform(storage_candidate) != "supported" or storage in selection):
+                raise ValueError("Use one reviewed, applicable local storage candidate as the sole required writer.")
+        if ((storage_candidate is None and storage not in {"sqlite", "json"})
+                or type(timeout) not in {int, float} or not 0 < timeout <= 60):
             raise ValueError("Choose a reviewed local backend and a bounded startup deadline.")
         self.storage, self.selection, self.timeout = storage, tuple(selection), timeout
         if type(transition_timeout) not in {int, float} or not 0 < transition_timeout <= 300:

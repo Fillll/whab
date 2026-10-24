@@ -5,7 +5,7 @@ outside runtime plugin discovery directories and contributes no runtime entry po
 Install it beside the host SDK and the plugin being tested; it does not require
 the bundled plugin set, a SQLite implementation, a provider account, or pytest at runtime.
 
-The toolkit provides synchronous storage conformance, eight complete teaching
+The toolkit provides synchronous storage conformance, nine complete teaching
 project generators and constrained configuration replay through public
 `whab.plugins` contracts. It requires Python 3.14+ and WHAB 2.22+ within major 2.
 Compatibility ranges require testing the minimum supported host artifact and the
@@ -37,6 +37,7 @@ embedded fictional bank logo, `file-import` for a bounded USD account JSON parse
 `categorization` for a complete saved exact-merchant model lifecycle, or `api` for
 a declarative API interface requiring WHAB 2.34+. The `ui`, `bank` and
 `remote-client` templates require their genuine 2.36, 2.38 and 2.40 floors.
+The `storage` template requires the genuine 2.41 public pure-model SDK.
 Generated
 projects include packaging, public-SDK source, regression tests, a README and an
 MIT license. The four original templates declare restart-only lifecycle support;
@@ -291,7 +292,7 @@ and coverage result. It contains no financial records, snapshots, credentials or
 temporary runtime paths. Dependencies/build tools may need network access while
 preparing wheels; no provider account or bank connection is used. This initial
 gate validates maintained artifacts. The separate generated-project gate builds
-all eight projects using an installed toolkit and validates every project wheel
+all nine projects using an installed toolkit and validates every project wheel
 outside the checkout:
 
 ```sh
@@ -354,7 +355,7 @@ file at 100% statement/branch coverage, ten distinct configurations, all adverti
 SQLite reference suites, and all ten exact-artifact replays. Missing/empty/skipped
 project tests and missing/broken advertised suites fail. Unsupported optional
 reference capabilities remain explicit `not-applicable` results; they are never
-used to hide failures. The installed profile covers the eight generated teaching families and their
+used to hide failures. The installed profile covers the nine generated teaching families and their
 explicit public probes. The API native recipe also tests its scoped HTTP/worker
 behavior; this is not arbitrary provider or all-family lifecycle certification. Add project-specific public-contract tests when extending them.
 
@@ -408,6 +409,8 @@ native configuration matrix and exact replays. These overall CI ceilings provide
 bounded room for that work and dependency installation; they are not runtime
 performance guarantees. Production readiness, RPC, startup, HTTP and transition
 deadlines are unchanged.
+
+
 
 Historical hosts may share an unchanged reference package version. The checker
 builds each source separately and reuses the first approved wheel only when every
@@ -489,3 +492,49 @@ stay in the fictional parent host and are absent from replay evidence. Both host
 their child processes and temporary homes are cleaned even after failure. The
 maintained [remote example](../../plugins/example/example-remote-client/README.md)
 uses these same public probes.
+
+
+## Independent local storage primary
+
+`whab-plugin new fictional-storage --capability storage` creates a complete
+independent POSIX snapshot adapter, multi-file owning regression suite and package
+metadata. It imports the genuine WHAB 2.41 public `storage_model` API instead of
+wrapping a bundled backend or copying monetary policy. The toolkit retains its
+2.22 floor and loads newer storage SDK records only when advertised native
+readiness is exercised; unsupported old SDK advertisement fails explicitly.
+The actual public-model minimum source is
+`f46f70a0a19e1e282d2646ad48829bb85b760591`, with no rewritten host version.
+It includes native-only code readiness independent of optional transfer support.
+When current and minimum share version 2.41, the checker records one artifact row
+with both roles. A separately executed archived minimum uses its own wheelhouse
+and source/hash evidence; differing same-version host artifacts are never mixed
+or overwritten to manufacture two rows.
+
+`storage_conformance(plugin)` runs mandatory ledger/provider/import/funding/rollover
+behavior plus every advertised optional suite. `assert_storage_readiness(plugin)`
+proves complete read-only observations and exact durable receipt retry after
+reopen. Native opens use the public plugin factory and records only. An explicit
+POSIX-only installed package classifier makes unsupported-platform profiles not
+applicable; such a result never contributes a native pass.
+
+Format-4 `native-local-storage-v1` manifests make the reviewed storage candidate
+the sole required primary. The separately executed SQLite reference is never
+co-selected as another writer. Ten distinct seeded peer sets activate the exact
+approved candidate worker over native CA-verified HTTPS, exercise validation and
+peer transitions, retain the required storage/code binding, reject bad approved
+hashes, and verify acknowledged data after graceful restart or SIGKILL.
+Writes are acknowledged before activation, through the active worker and after
+reopening, then all three are verified after a second restart. The profile does
+not infer HTTP mutation retry support from native command receipt support. Optional
+local transfer/copy controls run only when advertised; the generated adapter
+omits these and records explicit not-applicable outcomes. Distinct-version upgrades
+and private disk faults are outside this profile; its owning tests cover native
+commit/interruption boundaries separately. Existing manifest versions 1, 2 and 3
+retain their original readers and meanings.
+
+The maintained [independent local storage example](../../plugins/example/example-storage/README.md)
+uses the same native source/test contract as generated projects. New native and
+own-file formats require explicit versioned readers; opaque provider records stay
+host-encrypted and outside portable payloads. An incomplete initial native file or
+unknown native schema is preserved and refused rather than reset. No test uses an
+external provider connection, real budget, household key or OS trust change.
