@@ -28,6 +28,7 @@ from .bank_adapter import ProviderFailure as ProviderFailure
 from .bank_adapter import ProviderWebhook as ProviderWebhook
 from .contracts import Capability, PluginContract, Requirement
 from .interface_adapter import RemoteLedgerInterface
+from .remote_client_adapter import RemoteLedgerClient, client_record
 from .storage_replica import (
     ReplicaWatermark as ReplicaWatermark,
 )
@@ -942,7 +943,7 @@ class Plugin:
     export: ExportHook | None = None
     bank: BankFactory | None = None
     bank_ui: BankUI | None = None
-    storage: StorageFactory | None = None
+    storage: StorageFactory | RemoteLedgerClient | None = None
     ui: UserInterface | None = None
     bank_logos: BankLogos | None = None
     file_import: FileImport | None = None
@@ -1008,8 +1009,18 @@ class Plugin:
             raise ValueError("Plugin bank UI must be a BankUI descriptor or None.")
         if self.bank_ui is not None and self.bank is None:
             raise ValueError("Plugin bank UI requires a bank factory.")
-        if self.storage is not None and not callable(self.storage):
-            raise ValueError("Plugin storage factory must be callable or None.")
+        if type(self.storage) is RemoteLedgerClient:
+            client_record(self.storage)
+            prefix = self.id.upper().replace("-", "_") + "_"
+            if any(not getattr(self.storage, name).startswith(prefix)
+                   for name in ("url_setting", "token_setting", "budget_setting")):
+                raise ValueError("Remote client settings must belong to the declaring plugin.")
+            if self.contract is None or self.contract.authority != "remote":
+                raise ValueError("Remote client adapters require an explicit remote authority contract.")
+            if self.budget_connection is not None or self.storage_payload_paths:
+                raise ValueError("Remote client adapters use the host's fixed connection-file contract.")
+        elif self.storage is not None and not callable(self.storage):
+            raise ValueError("Plugin storage must use a factory or a supported remote client adapter.")
         if self.ui is not None and type(self.ui) is not UserInterface:
             raise ValueError("Plugin user interface must be a UserInterface descriptor or None.")
         if self.bank_logos is not None:

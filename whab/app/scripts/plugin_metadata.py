@@ -140,6 +140,26 @@ def _visual_adapter(node):
         return False
 
 
+def _remote_client_adapter(node, identifier):
+    """Recognize only public literal configuration-key metadata, never values."""
+    try:
+        fields = {"protocol_version": 1, "url_setting": "CLIENT_URL", "token_setting": "CLIENT_TOKEN",
+                  "budget_setting": "CLIENT_BUDGET_ID"}
+        values = {name: _literal(value) for name, value in _constructor(
+            node, "RemoteLedgerClient", tuple(fields)).items()}
+        if values.keys() - fields.keys():
+            return False
+        fields.update(values)
+        names = [fields[name] for name in ("url_setting", "token_setting", "budget_setting")]
+        prefix = identifier.upper().replace("-", "_") + "_"
+        return (type(fields["protocol_version"]) is int and fields["protocol_version"] == 1
+                and all(type(name) is str and len(name) <= 100 and name.startswith(prefix)
+                        and re.fullmatch(r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*", name) is not None for name in names)
+                and len(set(names)) == 3)
+    except (ValueError, TypeError):
+        return False
+
+
 def descriptor_metadata(module_path, attribute, root):
     tree = ast.parse(source_text(module_path, root))
     descriptor = _constructor(_assignment(tree, attribute), "Plugin", ("id", "display_name", "api_version"))
@@ -202,6 +222,13 @@ def descriptor_metadata(module_path, attribute, root):
         and all(row["version"] == 1 for row in capabilities.values())
         and not (present - {"id", "display_name", "api_version", "contract", "storage", "storage_payload_paths"})
     )
+    remote_client = (
+        not legacy and lifecycle == "live" and authority == "remote" and state_version == 1 and not upgrades
+        and "storage" in present and not (present - {"id", "display_name", "api_version", "contract", "storage"})
+        and set(capabilities) == {"ledger.read", "ledger.mutate"}
+        and all(row["version"] == 1 and row["composition"] == "singleton" for row in capabilities.values())
+        and _remote_client_adapter(descriptor["storage"], identifier)
+    )
     bank_node = descriptor.get("bank")
     bank_factory = None
     if isinstance(bank_node, ast.Call) and isinstance(bank_node.func, ast.Name) and bank_node.func.id == "BankAdapter":
@@ -216,7 +243,7 @@ def descriptor_metadata(module_path, attribute, root):
         and all(row["version"] == 1 for row in capabilities.values())
         and not (present - {"id", "display_name", "api_version", "contract", "bank", "bank_ui", "bank_logos", "merchant_logos"})
     )
-    if lifecycle == "live" and not (live or optional or categorization or visual or bank or storage):
+    if lifecycle == "live" and not (live or optional or categorization or visual or storage or remote_client or bank):
         raise ValueError("Live metadata requires an explicit supported capability adapter.")
     return {"id": identifier, "display_name": display, "api_version": _literal(descriptor["api_version"]) if "api_version" in descriptor else 1,
             "capabilities": [capabilities[name] for name in sorted(capabilities)],
@@ -224,7 +251,8 @@ def descriptor_metadata(module_path, attribute, root):
             "conflicts": list(_literal(contract["conflicts"])) if "conflicts" in contract else [],
             "lifecycle": lifecycle, "legacy": legacy, "authority": authority,
             "state_version": state_version, "state_upgrades": [list(edge) for edge in upgrades],
-            "live_support": ("declarative-api-worker" if optional and "interface" in present else
+            "live_support": ("declarative-remote-client-worker" if remote_client else
+                             "declarative-api-worker" if optional and "interface" in present else
                              "stateless-report-worker" if live else "stateless-optional-worker" if optional
                              else "categorization-worker" if categorization else "visual-ui-worker" if visual else "bank-provider-worker" if bank else "local-storage-worker" if storage else "restart-required")}
 
@@ -305,7 +333,7 @@ def catalog_markdown(catalog):
     for row in catalog["plugins"]:
         lifecycle = "Legacy; restart required" if row["legacy"] else row["live_support"]
         lines.append(f'| [{row["id"]}]({row["documentation"]}) | `{row["distribution"]} {row["version"]}` | `{row["requires_host"]}` | {lifecycle} | {row["support"]} |')
-    lines.extend(["", "Explicit stateless report, branding, file-parser, declarative API interface, pure categorization, typed bank-provider and participating visual descriptors advertise their supported live-worker adapters. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.", "",
+    lines.extend(["", "Explicit stateless report, branding, file-parser, declarative API interface, pure categorization, typed bank-provider and participating visual descriptors advertise their supported live-worker adapters. Declarative remote-client workers return metadata only; the host retains their exact HTTPS authority, credentials, transport and financial intent. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.", "",
                   "## Recorded verification", "", "Evidence applies only to its exact host, artifacts and selection. Installed-only artifacts are not proof that their capabilities executed. Draft PR/source verification is not a release or deployment claim.", ""])
     for item in catalog["verifications"]:
         lines.extend([f'### {item["id"]}', "", f'Verified {item["date"]}; host `{item["host_version"]}`. Selected: ' + ", ".join(f'`{value}`' for value in item["selection"]) + ".", "", item["scope"], "",

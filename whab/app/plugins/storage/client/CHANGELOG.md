@@ -1,5 +1,15 @@
 # HTTPS remote budget client plugin changelog
 
+## Unreleased
+
+## 1.6.0 — 2026-10-23
+
+PR: [#100](https://github.com/Fillll/whab/pull/100)
+
+- Require WHAB 2.39 and use its declarative live remote-client adapter. Keep endpoint, token, remote budget and transport in the host while approved descriptor workers return bounded metadata only.
+- Retain exact authority, pending command identity and revision through pause/resume, compatible code replacement and saved-version reopen. Preserve unknown outcomes across restart and expose explicit original-request completion without automatic reconciliation or discard.
+- Keep legacy factory and transport exports available with accurate restart-only compatibility.
+
 ## 1.5.0 — 2026-10-23
 
 PR: [#76](https://github.com/Fillll/whab/pull/76)
