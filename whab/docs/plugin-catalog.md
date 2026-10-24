@@ -9,23 +9,24 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
-| [bank-logos](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
-| [client](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.6.0` | `whab>=2.39,<3` | declarative-remote-client-worker | maintained |
-| [example](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
-| [example-api](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.0` | `whab>=2.34,<3` | declarative-api-worker | teaching |
-| [example-bank](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-bank/README.md) | `whab_plugin_example_bank 1.0.0` | `whab>=2.38,<3` | bank-provider-worker | teaching |
-| [example-branding](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-categorization](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-file-import](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
-| [example-remote-client](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-remote-client/README.md) | `whab_plugin_example_remote_client 1.0.0` | `whab>=2.40,<3` | declarative-remote-client-worker | teaching |
-| [example-ui](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/example/example-ui/README.md) | `whab_plugin_example_ui 1.0.0` | `whab>=2.36,<3` | visual-ui-worker | teaching |
-| [json](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.3.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
-| [plaid](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.3.0` | `whab>=2.38,<3` | bank-provider-worker | maintained |
-| [random-forest-categorization](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.3.0` | `whab>=2.35,<3` | categorization-worker | maintained |
-| [server](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
-| [sqlite](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.12.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
-| [web](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
-| [ynab](https://github.com/Fillll/whab/blob/1dfd7b1f98e443c4102a0444ff1f8e1bf7cfabe2/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
+| [bank-logos](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
+| [client](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.6.0` | `whab>=2.39,<3` | declarative-remote-client-worker | maintained |
+| [example](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
+| [example-api](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.0` | `whab>=2.34,<3` | declarative-api-worker | teaching |
+| [example-bank](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/example/example-bank/README.md) | `whab_plugin_example_bank 1.0.0` | `whab>=2.38,<3` | bank-provider-worker | teaching |
+| [example-branding](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-categorization](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-file-import](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
+| [example-remote-client](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/example/example-remote-client/README.md) | `whab_plugin_example_remote_client 1.0.0` | `whab>=2.40,<3` | declarative-remote-client-worker | teaching |
+| [example-storage](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/example/example-storage/README.md) | `whab_plugin_example_storage 1.0.0` | `whab>=2.41,<3` | local-storage-worker | teaching |
+| [example-ui](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/example/example-ui/README.md) | `whab_plugin_example_ui 1.0.0` | `whab>=2.36,<3` | visual-ui-worker | teaching |
+| [json](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/storage/json/README.md) | `whab_plugin_json 1.3.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
+| [plaid](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/ingestion/plaid/README.md) | `whab_plugin_plaid 1.3.0` | `whab>=2.38,<3` | bank-provider-worker | maintained |
+| [random-forest-categorization](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/automation/random-forest-categorization/README.md) | `whab_plugin_random_forest_categorization 1.3.0` | `whab>=2.35,<3` | categorization-worker | maintained |
+| [server](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/interface/server/README.md) | `whab_plugin_server 1.1.0` | `whab>=2.34,<3` | declarative-api-worker | maintained |
+| [sqlite](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/storage/sqlite/README.md) | `whab_plugin_sqlite 1.12.0` | `whab>=2.37,<3` | local-storage-worker | maintained |
+| [web](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
+| [ynab](https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
 Explicit stateless report, branding, file-parser, declarative API interface, pure categorization, typed bank-provider and participating visual descriptors advertise their supported live-worker adapters. Declarative remote-client workers return metadata only; the host retains their exact HTTPS authority, credentials, transport and financial intent. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
 
@@ -233,6 +234,16 @@ Tests: `tests/plugins/test_process_environment.py`, `tests/plugins/test_storage_
 
 Review: [PR #103](https://github.com/Fillll/whab/pull/103).
 
+### pr107-installed-storage-primary-smoke
+
+Verified 2026-10-23; host `2.41.0`. Selected: `example-storage`.
+
+Built the exact clean source into genuine host 2.41, toolkit 0.10 and independent storage example 1.0 wheels, then installed outside the checkout. All 71 owning tests passed with zero skips and 100% statement/branch coverage. One native-local-storage-v1 configuration and its exact-artifact replay each verified the candidate as sole required primary, read-only readiness, approved-worker activation, three acknowledged financial writes, two saved-worker reopens, an invalid-selection public fault and complete owned-process cleanup over temporary-CA HTTPS. The independently tested SQLite reference was not co-selected with the primary. This completed smoke exposed and verified the host correction that separates native code readiness from migration/copy eligibility while retaining background-work draining. The earlier installed failure is retained separately. The example does not advertise transfer.local or storage.replica; those controls are explicitly inapplicable. This record claims neither distinct-version upgrades, the complete ten-configuration matrix, a complete contribution gate nor household deployment. The full report and exact artifact closure were retained; no real bank or household data was used.
+
+Tests: `plugins/example/example-storage/tests`, `native-local-storage-v1 configuration and exact-artifact replay`.
+
+Review: [PR #104](https://github.com/Fillll/whab/pull/104), [PR #107](https://github.com/Fillll/whab/pull/107).
+
 ### pr102-local-storage-source
 
 Verified 2026-10-23; host `2.37.0`. Selected: `sqlite`, `json`.
@@ -292,3 +303,33 @@ Built genuine host 2.38, SQLite 1.12, JSON 1.3 and Web 1.27 wheels from the exac
 Tests: `installed native HTTPS v1/failed-candidate/v2 bank worker verification`, `installed native HTTPS exchange-uncertain and captured-native-apply recovery`, `ordinary stock CLI reopen after acknowledged-write process termination`.
 
 Review: [PR #101](https://github.com/Fillll/whab/pull/101).
+
+### pr105-bank-toolkit-source
+
+Verified 2026-10-23; host `2.38.0`. Selected: `example-bank`.
+
+The exact source passed 5176 Python cases, all sixteen runtime plugins at 100% statement/branch coverage and 354 browser checks. Genuine installed toolkit tests passed 224 cases each on WHAB 2.22 and 2.38 with zero skips; the current toolkit measured 1507 statements and 474 branches at 100%. The bank module remains lazy on the older SDK and requires actual 2.38 for its native behavior. The complete local command later stopped before generated configurations because two historical source recipes built the same reference-wheel filename. That original artifact-assembly failure is preserved; this record does not claim a complete canonical pass or final generated matrix. Separate prior installed bank records establish their exact tested snapshots.
+
+Tests: `devtools/plugin-devkit/tests`, `plugins/example/example-bank/tests`, `tests/test_plugin_generation_checks.py`, `scripts/check.py`.
+
+Review: [PR #105](https://github.com/Fillll/whab/pull/105).
+
+### pr105-installed-bank-example
+
+Verified 2026-10-23; host `2.38.0`. Selected: `example-bank`, `sqlite`, `json`.
+
+Built and installed the maintained example, toolkit and genuine host/reference wheels outside the checkout. The example passed all twelve owning behavioral tests at 100% of 63 statements and 20 branches, then ten distinct native configurations and ten exact-artifact replays. WHAB 2.38 served both minimum and current roles using one actual compatible artifact. The five variants (standard, ready restart, ready retirement deferral, update restart and completion replay) each ran against SQLite and JSON with distinct reviewed peer sets. Public native HTTPS used only the temporary runtime CA, host financial/continuation APIs and the explicitly approved offline fictional transport. Completed flow, sync, annotation, acknowledged-write/copy/promotion/migration/reopen and disconnect checks created no external connection. Approved same-artifact activation is readiness evidence; distinct-version bank upgrades are recorded in PR101. Exact hashes were retained and owned homes/processes removed.
+
+Tests: `plugins/example/example-bank/tests`, `scripts/check_plugin_generation.py`, `whab_plugin_devkit.bank_conformance`.
+
+Review: [PR #105](https://github.com/Fillll/whab/pull/105).
+
+### pr105-installed-generated-bank
+
+Verified 2026-10-23; host `2.38.0`. Selected: `sqlite`, `json`.
+
+The public generator created an independent generated-bank project outside the checkout. Its installed wheel passed twelve owning tests with complete statement/branch coverage, all ten distinct native-bank-v1 configurations and all ten exact replays using the same five offline flow variants in both reference-backend directions. The actual host 2.38 artifact fulfilled both minimum and current roles; the reviewed immutable recipe retains that genuine SDK floor for later host matrices. Explicit fictional-v1 approval, exact wheel hashes and saved manifests bound every replay. The selected curated packages here are the SQLite/JSON references; the generated bank distribution is a separate reviewed fixture, not the maintained example or bundled Plaid. The behavior used temporary-CA HTTPS and no external provider traffic.
+
+Tests: `scripts/check_plugin_generation.py`, `generated bank project owning tests`, `whab_plugin_devkit.bank_conformance`.
+
+Review: [PR #105](https://github.com/Fillll/whab/pull/105).

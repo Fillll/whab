@@ -1,5 +1,15 @@
 # macOS launcher changelog
 
+## Unreleased
+
+## 1.1.3 — 2026-10-23
+
+PR: [#98](https://github.com/Fillll/whab/pull/98)
+
+- Include private worker, visual, remote-client, storage-instance and authority roots in complete backups and fingerprints. Retain every native ledger, continuation, namespace effect, approved wheel and resource generation; refuse surviving lock owners or changed copies.
+- Archive only validated immutable-environment interpreter aliases as inert records. Require explicit reviewed environment rebuilding and refuse unsupported code-only rollback proofs.
+- Support reviewed local SQLite and JSON homes/budgets and interpret reference metadata only in host-owned scopes. Verify isolated manager and native bundle lifecycle behavior without household data.
+
 ## 1.1.2 — 2026-10-18
 
 PR: [#68](https://github.com/Fillll/whab/pull/68)
