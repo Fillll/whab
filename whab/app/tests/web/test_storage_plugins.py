@@ -1,5 +1,6 @@
 """Storage selection and lifecycle through the application composition root."""
 
+import asyncio
 import gc
 import inspect
 import json
@@ -300,7 +301,20 @@ def test_alternate_backend_owns_lifecycle_routes_and_scoped_banks(
         assert backend.get_item("other-item")["cursor"] is None
         assert backend.get_item("provider:fictional:item:shared")["cursor"] == "fixture-cursor"
         assert client.get("/api/export?workspace=personal").status_code == 200
-    assert events == ["storage-started", "bank-started", "bank-closed", "storage-closed"]
+    assert events[:2] == ["storage-started", "bank-started"]
+    assert events[-1] == "storage-closed"
+    assert events[2:-1] and set(events[2:-1]) == {"bank-closed"}
+    if fail_bank_close:
+        # Failed retirement retains the original service for explicit cleanup;
+        # repeated shutdown paths must not mistake its first failure for closure.
+        assert app.state.budget_runtime.status()["cleanup_failed"] > 0
+        pending, = app.state.bank_lifecycle.services
+        pending.fail_close = False
+        asyncio.run(app.state.budget_runtime.retry_cleanup())
+        assert app.state.budget_runtime.status()["cleanup_failed"] == 0
+        assert app.state.bank_lifecycle.services == []
+    else:
+        assert events == ["storage-started", "bank-started", "bank-closed", "storage-closed"]
     assert backend.closed is True
     assert not (tmp_path / "data").exists()
 

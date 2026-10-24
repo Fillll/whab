@@ -562,6 +562,11 @@ def prepare_environment(root, plugin_id, wheels: tuple[ApprovedWheel, ...], *, t
                                     if type(index) is not dict or type(index.get("models")) is not list or observed.digest != namespace.digest:
                                         raise EnvironmentPreparationError("environment_failed", plugin_id)
                                     probe.category({"engine": engine, "command": "close", "values": {}, "context": None}, namespace)
+                            if adapters["bank"] is not None:
+                                probe.provider('open', {'budget_id': 'readiness', 'environment': 'sandbox', 'config': {}})
+                                if adapters["bank"]["ui"] and probe.provider_resources() is None:
+                                    raise EnvironmentPreparationError("environment_failed", plugin_id)
+                                probe.provider('close', {})
                             snapshot = BudgetSnapshot("personal", "2000-01", (), (), ())
                             if probe.info["insights"]:
                                 probe.timeout = min(60, _remaining(deadline))

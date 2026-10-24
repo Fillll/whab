@@ -79,12 +79,26 @@ class NativeApplyEvidence:
             invalid()
 
 
+def _format(body):
+    if type(body) is not dict:
+        invalid()
+    if body.keys() == {"records"}:
+        return 1
+    if body.keys() != {"formatVersion", "records"} or type(body["formatVersion"]) is not int or body["formatVersion"] != 2:
+        invalid()
+    return 2
+
+
 def _validate(body):
-    if type(body) is not dict or body.keys() != {"records"} or type(body["records"]) is not list or len(body["records"]) > MAX_CONTINUATIONS:
+    version = _format(body)
+    if type(body["records"]) is not list or len(body["records"]) > MAX_CONTINUATIONS:
         invalid()
     ids, operations = set(), set()
     for row in body["records"]:
-        if type(row) is not dict or row.keys() != {"id", "generation", "kind", "created", "deadline", "stage", "input", "response", "result", "operation", "fingerprint", "native_fingerprint"}:
+        fields = {"id", "generation", "kind", "created", "deadline", "stage", "input", "response", "result", "operation", "fingerprint", "native_fingerprint"}
+        if version == 2:
+            fields.add("native_request")
+        if type(row) is not dict or row.keys() != fields:
             invalid()
         if type(row["id"]) is not str or _OPAQUE.fullmatch(row["id"]) is None or row["id"] in ids:
             invalid()
@@ -95,7 +109,7 @@ def _validate(body):
         created, deadline = generation(row["created"]), generation(row["deadline"])
         if not created <= deadline <= created + MAX_TTL_SECONDS * 1000:
             invalid()
-        for name in ("input", "response", "result"):
+        for name in ("input", "response", "result", *(('native_request',) if version == 2 else ())):
             if row[name] is not None:
                 cipher = _unbase64(row[name], MAX_CIPHERTEXT_BYTES)
                 if len(cipher) < 16:
@@ -120,6 +134,10 @@ def _validate(body):
             hash_value(row["native_fingerprint"])
         if row["stage"] in {"applying", "apply_uncertain", "complete"} and row["native_fingerprint"] is None:
             invalid()
+        if version == 2 and row["native_request"] is not None and (
+            row["native_fingerprint"] is None or row["stage"] not in {"captured", "applying", "apply_uncertain", "complete"}
+        ):
+            invalid()
 
 
 class BankContinuations:
@@ -136,10 +154,11 @@ class BankContinuations:
             invalid()
         self.seal, self.open, self.clock = seal, open, clock
         self._running = set()
-        self.store = EffectStore(root, "bank-continuations.json", self.scope.record(), {"records": []},
+        self.store = EffectStore(root, "bank-continuations.json", self.scope.record(), {"formatVersion": 2, "records": []},
                                  _validate, limit=MAX_CONTINUATION_BYTES)
         try:
             self._authenticate()
+            self._upgrade()
             self._recover_stages()
         except BaseException:
             self.store.close()
@@ -192,11 +211,24 @@ class BankContinuations:
         except Exception:
             raise EffectError("effect_unavailable") from None
 
+    def _upgrade(self):
+        """Explicit v1 reader/upgrader: preserve original encrypted captures.
+
+        The EffectStore publication is atomic. Failure leaves either exact v1 or
+        complete v2 authoritative, with ordinary uncertain-publication fencing.
+        The outer private EffectStore envelope retains its own format version.
+        """
+        body = self.store.snapshot()
+        if _format(body) == 1:
+            self.store.commit({"formatVersion": 2, "records": [
+                {**row, "native_request": None} for row in body["records"]]})
+
     def _authenticate(self):
         # Validate every retained field before admitting any external operation.
         # No decrypted payload is cached or included in diagnostic records.
-        for row in self.store.snapshot()["records"]:
-            for name in ("input", "response", "result"):
+        body = self.store.snapshot()
+        for row in body["records"]:
+            for name in ("input", "response", "result", *(('native_request',) if _format(body) == 2 else ())):
                 if row[name] is not None:
                     self._open(row, name)
 
@@ -227,7 +259,8 @@ class BankContinuations:
                 body["records"].remove(terminal)
             row = {"id": uuid4().hex, "generation": scope.generation, "kind": kind, "created": now,
                    "deadline": now + ttl * 1000, "stage": "ready", "input": None, "response": None,
-                   "result": None, "operation": None, "fingerprint": None, "native_fingerprint": None}
+                   "result": None, "operation": None, "fingerprint": None, "native_fingerprint": None,
+                   "native_request": None}
             row["input"] = self._seal(row, "input", secret)
             body["records"].append(row)
             self.store.commit(body)
@@ -249,6 +282,63 @@ class BankContinuations:
             if status.stage != "ready":
                 raise EffectError("continuation_expired" if status.stage == "expired" else "continuation_busy")
             return self._open(self._row(self.store.snapshot(), scope, token), "input")
+
+    def statuses(self):
+        """Bounded opaque host discovery; no provider payload or secret fields."""
+        with self.store.lock:
+            return tuple(self._status(row) for row in self.store.snapshot()["records"])
+
+    def scope_for(self, token):
+        """Resolve the original authenticated generation after unrelated handovers."""
+        if type(token) is not str or _OPAQUE.fullmatch(token) is None:
+            raise EffectError("continuation_missing")
+        with self.store.lock:
+            for row in self.store.snapshot()["records"]:
+                if row["id"] == token:
+                    return ContinuationScope(self.scope.budget_id, self.scope.environment, self.scope.plugin_id, row["generation"])
+        raise EffectError("continuation_missing")
+
+    def captured_response(self, scope, token):
+        with self.store.lock:
+            row = self._row(self.store.snapshot(), scope, token)
+            if row["response"] is None:
+                raise EffectError("exchange_uncertain")
+            return self._open(row, "response")
+
+    def exchange_request(self, scope, token):
+        with self.store.lock:
+            row = self._row(self.store.snapshot(), scope, token)
+            if row["operation"] is None:
+                raise EffectError("continuation_busy")
+            return self._open(row, "input")
+
+    def prepare_native(self, scope, token, fingerprint, request):
+        """Durably bind exact host-native command bytes before any dispatch.
+
+        The caller validates command/provider scope and its public fingerprint.
+        This record owns recovery input; the native receipt alone decides commit.
+        """
+        hash_value(fingerprint)
+        _binary(request, MAX_SECRET_BYTES)
+        with self.store.lock:
+            body = self.store.snapshot()
+            row = self._row(body, scope, token)
+            if row["native_request"] is not None:
+                if row["native_fingerprint"] != fingerprint or self._open(row, "native_request") != request:
+                    raise EffectError("effect_conflict")
+                return request
+            if row["stage"] != "captured" or row["native_fingerprint"] is not None:
+                raise EffectError("continuation_busy")
+            row.update(native_request=self._seal(row, "native_request", request), native_fingerprint=fingerprint)
+            self.store.commit(body)
+            return request
+
+    def native_request(self, scope, token):
+        with self.store.lock:
+            row = self._row(self.store.snapshot(), scope, token)
+            if row["native_request"] is None:
+                return None
+            return row["native_fingerprint"], self._open(row, "native_request")
 
     def cancel(self, scope, token):
         with self.store.lock:
@@ -419,6 +509,7 @@ class BankContinuations:
                 raise EffectError("continuation_busy")
             self.store.recover()
             self._authenticate()
+            self._upgrade()
             self._recover_stages()
 
     def close(self):

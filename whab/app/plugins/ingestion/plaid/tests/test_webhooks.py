@@ -1,59 +1,11 @@
 """Signed synthetic notifications validate authentication and safe state changes."""
 
 import asyncio
-import base64
-import hashlib
 import json
 
 import httpx
 import pytest
-import whab_plugin_plaid.service as provider
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from whab_plugin_plaid.service import PlaidService
-
-
-def url64(data):
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
-
-
-@pytest.fixture
-def webhook_signature(monkeypatch):
-    now = 1_800_000_000
-    monkeypatch.setattr(provider.time, "time", lambda: now)
-    private = ec.generate_private_key(ec.SECP256R1())
-    public = private.public_key().public_numbers()
-    key = {
-        "kid": "fixture-key",
-        "alg": "ES256",
-        "kty": "EC",
-        "crv": "P-256",
-        "x": url64(public.x.to_bytes(32)),
-        "y": url64(public.y.to_bytes(32)),
-    }
-
-    def sign(body, *, claims=None, header=None, signature=None):
-        header64 = url64(
-            json.dumps(
-                {"kid": "fixture-key", "alg": "ES256"} if header is None else header
-            ).encode()
-        )
-        payload64 = url64(
-            json.dumps(
-                {
-                    "iat": now,
-                    "request_body_sha256": hashlib.sha256(body).hexdigest(),
-                    **(claims or {}),
-                }
-            ).encode()
-        )
-        message = f"{header64}.{payload64}".encode()
-        r, s = decode_dss_signature(private.sign(message, ec.ECDSA(hashes.SHA256())))
-        raw_signature = r.to_bytes(32) + s.to_bytes(32) if signature is None else signature
-        return message.decode() + "." + url64(raw_signature)
-
-    return key, sign
 
 
 @pytest.mark.parametrize("signed", [None, 123, "x" * 8193, "%.invalid.encoding"])

@@ -89,7 +89,7 @@ assert settings.plugins == ("plaid", "example", "bank-logos", "ynab")
 registry = load_plugins(settings.enabled_plugins())
 assert [p.id for p in registry.describe()] == ["bank-logos", "example", "plaid", "sqlite", "web", "ynab"]
 assert {p.id: (p.lifecycle, p.legacy) for p in registry.describe()} == {
-    "bank-logos": ("live", False), "example": ("live", False), "plaid": ("restart", False),
+    "bank-logos": ("live", False), "example": ("live", False), "plaid": ("live", False),
     "sqlite": ("live", False), "web": ("live", False), "ynab": ("live", False),
 }
 assert registry.ui_plugin("web").ui.view_protocol == 1

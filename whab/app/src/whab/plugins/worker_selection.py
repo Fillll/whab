@@ -22,6 +22,7 @@ from .report_worker import ReportWorker
 from .runtime import PluginError, PluginRegistry
 from .sdk import (
     BankLogos,
+    BankUI,
     Categorization,
     FileImport,
     Interface,
@@ -347,7 +348,9 @@ class PreparationWorkers:
 
 
 def _start(template, prepared, home=None, *, worker_owner=None, resource_owner=None):
+    from .bank_adapter import BankAdapter
     from .categorization_worker import WorkerCategorizationFactory
+    from .provider_worker import WorkerBankFactory
 
     if not supports_live_plugin(template):
         raise PluginError("This optional plugin does not declare a supported live adapter.",
@@ -388,7 +391,9 @@ def _start(template, prepared, home=None, *, worker_owner=None, resource_owner=N
         if adapters["ui"] is not None:
             visual = UserInterface(None, None, proxy_context, resources=worker.visual_resources(),
                                    render=worker.render_ui, **adapters["ui"])
-        proxy = replace(template, insights=worker.insights if worker.info["insights"] else None,
+        bank_resources = worker.provider_resources() if adapters["bank"] is not None and adapters["bank"]["ui"] else None
+        proxy = replace(template, bank=BankAdapter(WorkerBankFactory(worker, code_identity=prepared.identifier)) if adapters["bank"] is not None else None,
+                        bank_ui=BankUI(resources=bank_resources) if bank_resources is not None else None, insights=worker.insights if worker.info["insights"] else None,
                         export=worker.export if worker.info["export"] else None,
                         bank_logos=None if bank is None else BankLogos(
                             worker.resolve, worker.fetch, configure_cache=worker.configure_cache if bank["cache"] else None,
@@ -454,12 +459,14 @@ async def upgrade_report(live, home, plugin_id, approvals):
     async def prepare(preparation):
         active = preparation.active.services["plugins"]
         template = next((plugin for plugin in active.descriptors() if plugin.id == plugin_id), None)
-        if template is None or template.ui is not None or not supports_live_plugin(template):
+        if template is None or template.ui is not None or not supports_live_plugin(template) or (template.bank is not None and getattr(live, "banks", None) is None):
             raise PluginError("Enable an explicitly live supported optional adapter before upgrading it.",
                               code="restart_required", plugin_id=plugin_id)
         if template.categorization is not None:
             preparation.active.services["categorization"].ensure_idle()
         probes = PreparationWorkers(preparation, plugin_id)
+        if template.bank is not None and getattr(live, "banks", None) is not None:
+            live.banks.preflight(preparation.active.services["banks"], (), changed={plugin_id})
         prepared = await run_in_threadpool(prepare_environment, Path(home) / "plugin-workers" / "environments",
                                           plugin_id, approvals, worker_owner=probes.own, worker_retired=probes.retired)
         proxy, binding = await run_in_threadpool(_start, template, prepared, home, resource_owner=preparation.own)
@@ -490,8 +497,10 @@ async def upgrade_report(live, home, plugin_id, approvals):
             live.categorization.committed(candidate)
 
     async def finalize(preparation, candidate):
-        if live.categorization is None:
-            return candidate
-        return await run_in_threadpool(live.categorization.finalize, preparation, candidate)
+        if live.categorization is not None:
+            candidate = await run_in_threadpool(live.categorization.finalize, preparation, candidate)
+        if getattr(live, 'banks', None) is not None:
+            candidate = await run_in_threadpool(live.banks.finalize, preparation, candidate)
+        return candidate
 
     return await live.runtime.transition(prepare, finalize=finalize, commit=commit, plugin_id=plugin_id)
