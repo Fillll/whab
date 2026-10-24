@@ -91,6 +91,21 @@ def test_storage_context_is_frozen_with_copied_configuration_and_no_bank_credent
         assert not hasattr(context, unavailable)
 
 
+@pytest.mark.parametrize("value", [False, 1, [], "private-fixture", "00000000000000000000000000000000", "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"])
+def test_storage_context_existing_instance_requires_plain_canonical_uuid(tmp_path, value):
+    with pytest.raises(ValueError):
+        StorageContext(tmp_path, "sandbox", {}, expected_instance_id=value)
+    assert not tuple(tmp_path.iterdir())
+
+
+def test_storage_context_read_only_and_expected_native_identity_are_explicit(tmp_path):
+    identity = "12345678-1234-5678-1234-567812345678"
+    context = StorageContext(tmp_path, "sandbox", {}, read_only=True, expected_instance_id=identity)
+    assert context.read_only and context.expected_instance_id == identity
+    with pytest.raises(ValueError):
+        StorageContext(tmp_path, "sandbox", {}, read_only="true")
+
+
 @pytest.mark.parametrize(
     ("home", "environment", "config"),
     [

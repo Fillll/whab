@@ -419,10 +419,11 @@ class StorageAuthorityCoordinator:
     details; this class never changes routes, provider connections or key files.
     """
 
-    def __init__(self, runtime, journal, namespace_evidence):
+    def __init__(self, runtime, journal, namespace_evidence, *, before_authority=None):
         if runtime.budget_id != journal.budget_id or not callable(namespace_evidence):
             raise StorageAuthorityError("identity_mismatch")
         self.runtime, self.journal, self.namespace_evidence = runtime, journal, namespace_evidence
+        self.before_authority = before_authority
         self._pending = None
         self._cleanup_errors = []
         self._serial = asyncio.Lock()
@@ -518,6 +519,11 @@ class StorageAuthorityCoordinator:
             self._pending = pending
             return candidate
 
+        async def finalize(preparation, candidate):
+            if self.before_authority is not None:
+                await _invoke(self.before_authority, preparation.active)
+            return candidate
+
         async def commit(candidate, number):
             source, destination = pending["source"], pending["destination"]
             if flush is not None:
@@ -595,7 +601,7 @@ class StorageAuthorityCoordinator:
                 source_retired = False
             pending.update(record=record, fenced=fenced, source_retired=source_retired)
 
-        generation = await self.runtime.transition(prepare, commit=commit, plugin_id=destination_plugin_id,
+        generation = await self.runtime.transition(prepare, finalize=finalize, commit=commit, plugin_id=destination_plugin_id,
                                                    drain_timeout=drain_timeout)
         # Authority has already committed and resumed. Cleanup cannot undo it.
         try:
@@ -633,6 +639,14 @@ class StorageAuthorityCoordinator:
             side = "candidate" if record["authority_instance_id"] == pending["initial_destination"].instance_id else "active"
 
         async def validate(authority, active, candidate):
+            if (active.services.get("storage") is not pending["source"]
+                    or candidate.services.get("storage") is not pending["destination"]):
+                return False
+            source = pending["source"]
+            recovery_required = getattr(source, "worker_recovery_required", None)
+            if callable(recovery_required) and await asyncio.to_thread(recovery_required):
+                expected = read_evidence(record["source"]) if new_journal else pending["source_evidence"]
+                await asyncio.to_thread(source.recover_control, expected)
             await asyncio.to_thread(pending["destination"].reopen, pending["reopen_destination"])
             if not new_journal:
                 current = await asyncio.to_thread(pending["source"].commit_evidence)

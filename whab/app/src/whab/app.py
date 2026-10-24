@@ -20,6 +20,7 @@ from whab.budgets.runtime import BudgetRuntime, RuntimeResource
 from whab.budgets.session import BudgetSession, TrackedStorage
 from whab.budgets.storage_replicas import StorageReplicas
 from whab.budgets.storage_runtime import StorageRuntime, open_saved_storage, saved_storage_selection
+from whab.budgets.storage_upgrade import StorageBinding, StorageUpgrade, storage_worker_descriptor
 from whab.config import Settings
 from whab.plugins import (
     BankContext,
@@ -37,6 +38,7 @@ from whab.plugins.live import (
     RegistryGeneration,
 )
 from whab.plugins.management import PluginManager, installed_entrypoints
+from whab.plugins.runtime import PluginRegistry
 from whab.plugins.storage import close_storage, open_storage
 from whab.plugins.ui_resources import UIResourceArchive
 from whab.plugins.ui_runtime import (
@@ -303,27 +305,50 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             )
     plugins.configure_logo_caches(budget_session.storage_home if budget_session else settings.home)
     owned_store = store is None
-    selected_storage = plugins.storage_plugin(settings.storage) if owned_store else None
-    resolved_config = storage_config(settings, budget_session, selected_storage) if owned_store else {}
-    if budget_session:
-        budget_session.storage_config = resolved_config
-    if owned_store:
-        store = open_saved_storage(settings, budget_session,
-            lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin))
-        store = store or open_storage(
-            selected_storage,
-            StorageContext(
-                home=budget_session.backend_home if budget_session else settings.home,
-                environment=settings.plaid_env,
-                config=resolved_config,
-                budget=budget_session.context(settings.storage) if budget_session else None,
-            ),
-        )
     startup = _StartupResources(worker_home, budget_session.id if budget_session else "default", settings.plaid_env)
-    if owned_store:
-        startup.own(store)
+    budget_id = budget_session.id if budget_session else "default"
+    storage_upgrade = None
+
+    def own_storage_worker(worker):
+        if storage_upgrade is None:
+            startup.worker(worker)
+        else:
+            storage_upgrade.own_worker(worker)
+
+    def own_storage_proxy(backend):
+        if storage_upgrade is None:
+            startup.own(backend)
+        else:
+            storage_upgrade.own_proxy(backend)
+
+    def descriptor_for(plugin):
+        if storage_upgrade is not None and plugin.id == storage_upgrade.plugin_id:
+            return runtime._active.services["plugins"].registry.storage_plugin(plugin.id)
+        return storage_worker_descriptor(worker_home, budget_id, settings.plaid_env, plugin,
+                                         worker_owner=own_storage_worker, storage_owner=own_storage_proxy)
+
+    try:
+        selected_storage = plugins.storage_plugin(settings.storage) if owned_store else None
+        if owned_store:
+            selected_storage = descriptor_for(selected_storage)
+            plugins = PluginRegistry(tuple(selected_storage if plugin.id == selected_storage.id else plugin
+                                           for plugin in plugins.descriptors()))
+        resolved_config = storage_config(settings, budget_session, selected_storage) if owned_store else {}
+        if budget_session:
+            budget_session.storage_config = resolved_config
+        if owned_store:
+            store = open_saved_storage(settings, budget_session,
+                lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin), descriptor_for)
+            store = store or open_storage(selected_storage, StorageContext(
+                home=budget_session.backend_home if budget_session else settings.home, environment=settings.plaid_env,
+                config=resolved_config, budget=budget_session.context(settings.storage) if budget_session else None))
+            startup.own(store)
+    except BaseException as error:
+        startup.close(error)
+        raise
     categorization_lifecycle, categorization, categorization_resource = None, None, None
     worker_bindings, banks = {}, {}
+    storage_binding = None
     try:
         startup_batch = budget_session.namespace_materialization() if budget_session else nullcontext()
         with startup_batch:
@@ -341,6 +366,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             plugins, worker_bindings = restore_visual_worker(worker_home, plugins, visual_choice, worker_owner=startup.worker)
             for binding in worker_bindings.values():
                 startup.worker(binding.worker)
+            prepared_storage = getattr(store.store, "prepared_environment", None)
+            if prepared_storage is not None:
+                storage_binding = StorageBinding(prepared_storage, store.store)
+                worker_bindings[settings.storage] = storage_binding
             plugins, worker_bindings = restore_workers(worker_home, plugins, worker_bindings, worker_owner=startup.worker)
             for binding in worker_bindings.values():
                 startup.worker(binding.worker)
@@ -400,13 +429,20 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         if categorization_lifecycle is not None:
             await run_in_threadpool(categorization_lifecycle.close)
 
+    async def close_storage_upgrade():
+        if storage_upgrade is not None:
+            await storage_upgrade.close()
+
     try:
         namespace_resources = ((RuntimeResource("categorization-namespaces", close_namespaces),)
                                if categorization_lifecycle is not None else ())
+        storage_resources = ((RuntimeResource(settings.storage, close_storage_upgrade),)
+                             if owned_store and not remote_authority else ())
         runtime = BudgetRuntime(service.budget_id, {
             "plugins": RegistryGeneration(plugins, workers=worker_bindings, resources_enabled=bool(ui)), "ledger": service,
             "storage": store.store, "banks": banks, "categorization": categorization, "interfaces": interfaces, "visual": visual,
-        }, (RuntimeResource("visual-selection", close_visual_selection), *namespace_resources, *tuple(binding.resource for binding in worker_bindings.values()),
+        }, (RuntimeResource("visual-selection", close_visual_selection), *namespace_resources, *storage_resources,
+            *tuple(binding.resource for binding in worker_bindings.values()),
             *((categorization_resource,) if categorization_resource else ()),
             *((interfaces.resource,) if interfaces.resource is not None else ())))
         if categorization is not None:
@@ -424,6 +460,17 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         live.visual = visual_controller
         storage_runtime = StorageRuntime(settings, budget_session, store, runtime, registry,
             lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin))
+        storage_runtime.descriptor_for = descriptor_for
+        if owned_store and not remote_authority:
+            selected = saved_storage_selection(worker_home, budget_id, settings.plaid_env)
+            backend_home = selected[0].home(selected[2]) if selected else (budget_session.backend_home if budget_session else settings.home)
+            storage_upgrade = StorageUpgrade(worker_home, runtime, store,
+                StorageContext(backend_home, settings.plaid_env, resolved_config,
+                    budget_session.context(settings.storage) if budget_session else None,
+                    expected_instance_id=selected[1]["authority_instance_id"] if selected else None),
+                registry, check=storage_runtime._source, binding=storage_binding,
+                on_create=lambda owner: startup.own(owner, owner.close_sync))
+            live.storage = storage_upgrade
         replicas = StorageReplicas(storage_runtime)
 
         @asynccontextmanager
@@ -487,8 +534,11 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                             await visual_controller.settle()
                             await live.close()
                         finally:
-                            if categorization_lifecycle is not None:
-                                categorization_lifecycle.close()
+                            try:
+                                await close_storage_upgrade()
+                            finally:
+                                if categorization_lifecycle is not None:
+                                    categorization_lifecycle.close()
                 finally:
                     try:
                         for bank in reversed(tuple(banks.values())):
@@ -570,6 +620,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         app.state.budget_runtime = runtime
         app.state.live_plugins = live
         app.state.storage_runtime = storage_runtime
+        app.state.storage_upgrade = storage_upgrade
+        if storage_upgrade is not None:
+            storage_upgrade.activated = lambda _registry: setattr(app.state, "store", store.store)
         storage_runtime.attach(app, plugin_manager, live)
         app.include_router(storage_runtime.router())
         app.state.storage_replicas = replicas

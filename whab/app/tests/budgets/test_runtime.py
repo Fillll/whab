@@ -1011,3 +1011,36 @@ def test_nested_other_budget_scopes_keep_independent_generation_and_admission():
         assert first.status()["active_leases"] == second.status()["active_leases"] == 0
 
     asyncio.run(scenario())
+def test_financial_fault_during_another_transition_retains_gate_and_requires_exact_owner():
+    async def scenario():
+        runtime = BudgetRuntime("fictional", {"storage": object()})
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def operation():
+            async with runtime.background():
+                entered.set()
+                await release.wait()
+                runtime.fence_storage("json")
+
+        async def prepare(preparation):
+            return RuntimeCandidate(dict(preparation.active.services))
+
+        work = asyncio.create_task(operation())
+        await entered.wait()
+        transition = asyncio.create_task(runtime.transition(prepare, plugin_id="fictional-report"))
+        await runtime.wait_for_phase("draining")
+        release.set()
+        await work
+        with pytest.raises(RuntimeTransitionError) as failed:
+            await transition
+        assert failed.value.code == "storage_write_unknown"
+        assert runtime.status()["admission"] == "gated" and runtime.status()["health"] == "recovery_required"
+        called = []
+        with pytest.raises(RuntimeTransitionError):
+            await runtime.recover_storage(lambda: called.append(True), plugin_id="sqlite")
+        assert called == []
+        assert await runtime.recover_storage(lambda: True, plugin_id="json") == 1
+        assert runtime.status()["admission"] == "open"
+        await runtime.close()
+
+    asyncio.run(scenario())

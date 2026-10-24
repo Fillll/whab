@@ -155,7 +155,7 @@ class EffectStore:
         self.fault = fault
         self.validate, self.limit = validate, limit
         try:
-            if type(filename) is not str or filename not in {"namespace-effects.json", "bank-continuations.json", "visual-selection.json"}:
+            if type(filename) is not str or filename not in {"namespace-effects.json", "bank-continuations.json", "visual-selection.json", "storage-intents.json", "storage-upgrade.json", "storage-writer.json"}:
                 invalid()
             if type(limit) is not int or not 1024 <= limit <= 128 * 1024 * 1024:
                 invalid()
