@@ -74,7 +74,7 @@ def supports_remote_client(plugin):
 def configuration(adapter, config):
     """Resolve one private host profile without constructing a transport."""
     from whab.domain.errors import StoreError
-    from whab.storage.remote import _connection
+    from whab.plugins.remote_transport import _connection
 
     client_record(adapter)
     url, budget = _connection(config.get(adapter.url_setting, ""), config.get(adapter.budget_setting, ""))
@@ -86,7 +86,7 @@ def configuration(adapter, config):
 
 def connection_settings(adapter, files):
     """Imported public connection metadata may only select its exact local profile."""
-    from whab.storage.remote import connection_configuration
+    from whab.plugins.remote_transport import connection_configuration
 
     values = connection_configuration(files)
     return {adapter.url_setting: values["CLIENT_URL"], adapter.budget_setting: values["CLIENT_BUDGET_ID"]}
@@ -94,6 +94,6 @@ def connection_settings(adapter, files):
 
 def create_client(adapter, context):
     """Construct the retained host transport; no context is sent to a worker."""
-    from whab.storage.remote import RemoteStore
+    from whab.plugins.remote_transport import RemoteStore
 
     return RemoteStore(*configuration(adapter, context.config))

@@ -20,8 +20,8 @@ from whab.plugins import (
     PluginRegistry,
     RemoteLedgerClient,
 )
+from whab.plugins.remote_transport import RemoteStore
 from whab.services.ledger import RequestConflict, RevisionConflict
-from whab.storage.remote import RemoteStore
 
 TOKEN = "fictional-client-" + "a" * 32
 URL = "https://fictional-authority.example"

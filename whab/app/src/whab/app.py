@@ -45,6 +45,7 @@ from whab.plugins.remote_client_adapter import (
     connection_settings,
     supports_remote_client,
 )
+from whab.plugins.remote_transport import RemoteStore
 from whab.plugins.storage import close_storage, open_storage
 from whab.plugins.ui_resources import UIResourceArchive
 from whab.plugins.ui_runtime import (
@@ -67,7 +68,6 @@ from whab.services.categorization_runtime import (
 )
 from whab.services.namespace_effects import NamespaceNotifications
 from whab.services.receipts import ReceiptService
-from whab.storage.remote import RemoteStore
 from whab.web.bank_resources import create_router as bank_resources_router
 from whab.web.errors import install_error_handlers
 from whab.web.import_resources import create_router as import_resources_router

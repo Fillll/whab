@@ -34,10 +34,10 @@ from whab.plugins.remote_client_adapter import (
     supports_remote_client,
 )
 from whab.plugins.remote_selection import RemoteSelectionStore
+from whab.plugins.remote_transport import RemoteStore
 from whab.plugins.runtime import PluginRegistry
 from whab.plugins.sdk import valid_plugin_name
 from whab.plugins.worker_selection import _start, reopen_environment
-from whab.storage.remote import RemoteStore
 
 from .runtime import RuntimeCandidate, RuntimeResource
 
