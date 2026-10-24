@@ -13,6 +13,7 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [client](https://github.com/Fillll/whab/blob/19191b95ab6bd7b61b047fb5ae9ece7424eac596/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.6.0` | `whab>=2.39,<3` | declarative-remote-client-worker | maintained |
 | [example](https://github.com/Fillll/whab/blob/19191b95ab6bd7b61b047fb5ae9ece7424eac596/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
 | [example-api](https://github.com/Fillll/whab/blob/19191b95ab6bd7b61b047fb5ae9ece7424eac596/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.0` | `whab>=2.34,<3` | declarative-api-worker | teaching |
+| [example-bank](https://github.com/Fillll/whab/blob/19191b95ab6bd7b61b047fb5ae9ece7424eac596/whab/app/plugins/example/example-bank/README.md) | `whab_plugin_example_bank 1.0.0` | `whab>=2.38,<3` | bank-provider-worker | teaching |
 | [example-branding](https://github.com/Fillll/whab/blob/19191b95ab6bd7b61b047fb5ae9ece7424eac596/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
 | [example-categorization](https://github.com/Fillll/whab/blob/19191b95ab6bd7b61b047fb5ae9ece7424eac596/whab/app/plugins/example/example-categorization/README.md) | `whab_plugin_example_categorization 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
 | [example-file-import](https://github.com/Fillll/whab/blob/19191b95ab6bd7b61b047fb5ae9ece7424eac596/whab/app/plugins/example/example-file-import/README.md) | `whab_plugin_example_file_import 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
@@ -280,3 +281,33 @@ The exact source passed six focused cases: the explicit process allowlist and pa
 Tests: `tests/plugins/test_process_environment.py`, `tests/plugins/test_storage_worker_faults.py::test_native_child_receives_scoped_config_without_custom_provider_or_api_environment_credentials`, `tests/plugins/test_remote_client_workers.py::test_installed_host_client_uses_native_https_verified_runtime_ca_and_public_server`.
 
 Review: [PR #103](https://github.com/Fillll/whab/pull/103).
+
+### pr105-bank-toolkit-source
+
+Verified 2026-10-23; host `2.38.0`. Selected: `example-bank`.
+
+The exact source passed 5176 Python cases, all sixteen runtime plugins at 100% statement/branch coverage and 354 browser checks. Genuine installed toolkit tests passed 224 cases each on WHAB 2.22 and 2.38 with zero skips; the current toolkit measured 1507 statements and 474 branches at 100%. The bank module remains lazy on the older SDK and requires actual 2.38 for its native behavior. The complete local command later stopped before generated configurations because two historical source recipes built the same reference-wheel filename. That original artifact-assembly failure is preserved; this record does not claim a complete canonical pass or final generated matrix. Separate prior installed bank records establish their exact tested snapshots.
+
+Tests: `devtools/plugin-devkit/tests`, `plugins/example/example-bank/tests`, `tests/test_plugin_generation_checks.py`, `scripts/check.py`.
+
+Review: [PR #105](https://github.com/Fillll/whab/pull/105).
+
+### pr105-installed-bank-example
+
+Verified 2026-10-23; host `2.38.0`. Selected: `example-bank`, `sqlite`, `json`.
+
+Built and installed the maintained example, toolkit and genuine host/reference wheels outside the checkout. The example passed all twelve owning behavioral tests at 100% of 63 statements and 20 branches, then ten distinct native configurations and ten exact-artifact replays. WHAB 2.38 served both minimum and current roles using one actual compatible artifact. The five variants (standard, ready restart, ready retirement deferral, update restart and completion replay) each ran against SQLite and JSON with distinct reviewed peer sets. Public native HTTPS used only the temporary runtime CA, host financial/continuation APIs and the explicitly approved offline fictional transport. Completed flow, sync, annotation, acknowledged-write/copy/promotion/migration/reopen and disconnect checks created no external connection. Approved same-artifact activation is readiness evidence; distinct-version bank upgrades are recorded in PR101. Exact hashes were retained and owned homes/processes removed.
+
+Tests: `plugins/example/example-bank/tests`, `scripts/check_plugin_generation.py`, `whab_plugin_devkit.bank_conformance`.
+
+Review: [PR #105](https://github.com/Fillll/whab/pull/105).
+
+### pr105-installed-generated-bank
+
+Verified 2026-10-23; host `2.38.0`. Selected: `sqlite`, `json`.
+
+The public generator created an independent generated-bank project outside the checkout. Its installed wheel passed twelve owning tests with complete statement/branch coverage, all ten distinct native-bank-v1 configurations and all ten exact replays using the same five offline flow variants in both reference-backend directions. The actual host 2.38 artifact fulfilled both minimum and current roles; the reviewed immutable recipe retains that genuine SDK floor for later host matrices. Explicit fictional-v1 approval, exact wheel hashes and saved manifests bound every replay. The selected curated packages here are the SQLite/JSON references; the generated bank distribution is a separate reviewed fixture, not the maintained example or bundled Plaid. The behavior used temporary-CA HTTPS and no external provider traffic.
+
+Tests: `scripts/check_plugin_generation.py`, `generated bank project owning tests`, `whab_plugin_devkit.bank_conformance`.
+
+Review: [PR #105](https://github.com/Fillll/whab/pull/105).

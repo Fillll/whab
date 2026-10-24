@@ -5,7 +5,7 @@ outside runtime plugin discovery directories and contributes no runtime entry po
 Install it beside the host SDK and the plugin being tested; it does not require
 the bundled plugin set, a SQLite implementation, a provider account, or pytest at runtime.
 
-The toolkit provides synchronous storage conformance, six complete teaching
+The toolkit provides synchronous storage conformance, seven complete teaching
 project generators and constrained configuration replay through public
 `whab.plugins` contracts. It requires Python 3.14+ and WHAB 2.22+ within major 2.
 Compatibility ranges require testing the minimum supported host artifact and the
@@ -289,7 +289,7 @@ and coverage result. It contains no financial records, snapshots, credentials or
 temporary runtime paths. Dependencies/build tools may need network access while
 preparing wheels; no provider account or bank connection is used. This initial
 gate validates maintained artifacts. The separate generated-project gate builds
-all six projects using an installed toolkit and validates every project wheel
+all seven projects using an installed toolkit and validates every project wheel
 outside the checkout:
 
 ```sh
@@ -350,7 +350,7 @@ file at 100% statement/branch coverage, ten distinct configurations, all adverti
 SQLite reference suites, and all ten exact-artifact replays. Missing/empty/skipped
 project tests and missing/broken advertised suites fail. Unsupported optional
 reference capabilities remain explicit `not-applicable` results; they are never
-used to hide failures. The installed profile covers the six generated teaching families and their
+used to hide failures. The installed profile covers the seven generated teaching families and their
 explicit public probes. The API native recipe also tests its scoped HTTP/worker
 behavior; this is not arbitrary provider or all-family lifecycle certification. Add project-specific public-contract tests when extending them.
 
@@ -396,3 +396,46 @@ CI calls this same reusable workflow for its maintained fictional branding examp
 The genuine visual minimum recipe is source `a866eda580c6e363a20636785bc4b4003db0652f`, WHAB 2.36.0. Toolkit imports and the original generated families retain their actual 2.22 floor; unsupported older-host visual runtime profiles are N/A, never passes. The generated JavaScript has no editable fields; an editable UI must preserve its own drafts and withhold its browser acknowledgement until saving/cancelling is complete.
 
 `NativeRuntime` keeps its startup/HTTP deadline separate from the bounded management deadline: `transition_timeout=180` allows the host's 120-second environment preparation and subsequent handover to finish. It accepts at most 300 seconds. A terminal failed operation fails the suite immediately; the longer preparation allowance does not convert failures to passes. Each genuine host also receives a compatible JSON reference wheel from its source recipe when the current backend requires a newer host.
+
+Historical hosts may share an unchanged reference package version. The checker
+builds each source separately and reuses the first approved wheel only when every
+member's contents, modes and flags match; ZIP timestamps may differ. A conflicting
+same-identity artifact or a failed build stops validation without replacing the
+approved wheel. Exact saved artifact hashes remain the replay authority.
+
+## Offline bank projects
+
+`whab-plugin new fictional-bank --capability bank` creates an independent typed
+`BankAdapter` fixture requiring genuine WHAB 2.38+ and toolkit 0.8+. Its default
+transport has no URLs or HTTP client. Owning tests cover mocked provider failures
+and actual CA-verified native HTTPS begin/complete/sync/update/disconnect on both
+SQLite and JSON. The toolkit remains importable on its genuine 2.22 SDK floor;
+the newer bank profile is explicitly inapplicable there.
+
+After reviewing and installing the exact fictional provider and its wheel closure:
+
+```sh
+whab-plugin check --plugin fictional-bank --runtime --bank-fixture fictional-v1 --combinations 10 --wheelhouse /approved/local/wheels --output /tmp/fictional-bank-check
+whab-plugin replay /tmp/fictional-bank-check/configuration-00.json --wheelhouse /approved/local/wheels
+```
+
+`--bank-fixture fictional-v1` is explicit authorization for the versioned offline
+fixture, not permission to use a real provider. Without it a bank candidate's
+runtime suite is N/A and starts no provider. An approved fixture's broken behavior
+fails. The generated metadata carries the same explicit opt-in for reusable CI.
+Ten `native-bank-v1` manifests vary five connection sequences across both local
+backends and ten distinct peer sets: ordinary completion, ready-flow restart,
+ready-flow retirement deferral/cancel, update restart and exact completion retry.
+Each then executes its recorded peer/candidate selections, native copy catch-up,
+promotion, reverse migration, reopen and cursor checks before disconnecting.
+Pending-to-posted annotations and demo isolation are checked using public HTTPS
+responses. Worker readiness uses the approved exact candidate artifact; this is
+not a distinct-version upgrade claim. The profile makes no external provider
+HTTP calls or private commit-boundary injection claim.
+
+The public `bank_conformance` module also exposes `BankRuntime`, `BankScenario`,
+`fictional_scenario`, `exercise_bank_runtime` and the pure `bank_declaration`
+predicate. These helpers never import a concrete provider or storage module.
+The native harness gives the fixture a fresh host-owned key, keeps it across its
+own process restarts, excludes caller credentials and removes its private home.
+Trusted Python remains executable code; the harness is not a network sandbox.
