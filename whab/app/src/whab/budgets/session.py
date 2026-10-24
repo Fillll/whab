@@ -5,6 +5,7 @@ import io
 import json
 import os
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
 from types import MappingProxyType
@@ -145,6 +146,10 @@ class BudgetSession:
         self.lock = RLock()
         self.store = None
         self.after_checkpoint = None
+        self._namespace_depth = 0
+        self._namespace_pending = False
+        self._namespace_failed = False
+        self._namespace_batch_failed = False
         self.missing_plugins = []
         self.destinations = []
         self.status = "saved"
@@ -438,6 +443,13 @@ class BudgetSession:
             self._save_files({name: raw for name, raw in self.files.items() if name != key})
 
     def bundle(self, *, include_credentials=False, password=None, preserve_credentials=False):
+        with self.lock:
+            if self._namespace_depth or self._namespace_failed:
+                raise StoreError("Recover the complete plugin namespace before exporting this budget.")
+            return self._bundle(include_credentials=include_credentials, password=password,
+                                preserve_credentials=preserve_credentials)
+
+    def _bundle(self, *, include_credentials=False, password=None, preserve_credentials=False):
         export_files = getattr(self.store, "export_budget_files", None)
         if callable(export_files):
             with self.lock:
@@ -469,10 +481,45 @@ class BudgetSession:
             raise StoreError("This storage plugin does not support plugin-owned budget files.")
         return encode_bundle(self.manifest, export("personal"))
 
+    @contextmanager
+    def namespace_materialization(self):
+        """Defer exports/copy notifications until complete effect recovery succeeds.
+
+        The caller owns the authoritative namespace journal. Nested callbacks
+        may save individual native files; none can publish a partial container.
+        A failed batch keeps exports fenced until a later complete recovery batch.
+        """
+        with self.lock:
+            outer = self._namespace_depth == 0
+            if outer:
+                self._namespace_batch_failed = False
+            self._namespace_depth += 1
+            failed = False
+            try:
+                yield
+            except BaseException:
+                failed = self._namespace_batch_failed = self._namespace_failed = True
+                raise
+            finally:
+                self._namespace_depth -= 1
+                if outer:
+                    self._namespace_failed = self._namespace_batch_failed
+                    if not self._namespace_failed and self._namespace_pending:
+                        self._namespace_pending = False
+                        self.checkpoint()
+                    elif self._namespace_failed and not failed:
+                        raise StoreError("The plugin namespace still requires complete recovery before exporting.")
+
     def checkpoint(self):
         if self.store is None:
             return
         with self.lock:
+            if self._namespace_depth or self._namespace_failed:
+                self._namespace_pending = True
+                self.status = "pending"
+                for destination in self.destinations:
+                    destination["status"] = "pending"
+                return
             try:
                 raw = self.bundle(preserve_credentials=True)
                 container = decode_container(raw, password=self.password)

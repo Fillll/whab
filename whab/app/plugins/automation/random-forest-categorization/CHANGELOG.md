@@ -1,5 +1,11 @@
 # Random forest categorization plugin changelog
 
+## 1.3.0 — 2026-10-23
+
+PR: [#95](https://github.com/Fillll/whab/pull/95)
+
+- Require WHAB 2.35+ for isolated categorization workers, complete durable model/index effects and approved compatible code upgrades. Preserve reviewed-only training, personal/demo isolation and the existing automatic cutoff; verify all owning statements and branches.
+
 ## 1.2.0 — 2026-10-23
 
 PR: [#89](https://github.com/Fillll/whab/pull/89)

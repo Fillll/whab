@@ -1,6 +1,7 @@
 """Run with: .venv/bin/python -m whab"""
 
 import argparse
+import asyncio
 import os
 import ssl
 
@@ -57,7 +58,13 @@ def main():
                 parser.error(str(error))
             session = BudgetSession.create(initial.home, initial.plaid_env, args.create, initial.plugins, initial.storage, path=path)
             created = create_app(settings=initial, budget_session=session)
-            created.state.store.close()
+            try:
+                # Construction owns journals/workers before ASGI startup.
+                runtime = getattr(created.state, "budget_runtime", None)
+                if runtime is not None:
+                    asyncio.run(runtime.shutdown())
+            finally:
+                created.state.store.close()
         os.environ["WHAB_BUDGET"] = str(path)
     if args.copy:
         os.environ["WHAB_BUDGET_COPIES"] = os.pathsep.join(str(Path(path).expanduser().resolve()) for path in args.copy)

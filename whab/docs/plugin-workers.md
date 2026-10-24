@@ -1,8 +1,9 @@
 # Approved optional-worker upgrades
 
 WHAB 2.25 introduced explicitly live stateless reporting/export upgrades. The
-current adapter also replaces branding, file-parser and declarative API interface code without restarting
-its listener. Other families require their own adapters. The parent
+current adapter also replaces branding, file-parser, declarative API interface
+and explicitly scoped categorization code without restarting its listener.
+Other families require their own adapters. The parent
 retains TLS, authorization, local-access guards, budget identity and financial
 validation. These data protocols accept no financial mutation, backend handle,
 router, callable or pickle.
@@ -186,6 +187,50 @@ assets. Up to eight parser resource versions and 8 MiB per plugin are retained i
 memory; older URLs, or previous-run URLs after restart, return 404 rather than
 serving a newer file. Unrelated report/branding transitions keep parser identities.
 
-UI rendering, API interfaces, protected bank flows and categorization still need
-their own adapters. Tests use reviewed fictional wheels, temporary homes and
-mocked providers; worker processes are not a security sandbox.
+## Categorization workers
+
+An explicit live descriptor providing only `Categorization(factory)` can run as
+a separate installed pure-engine child. Budget binders, settings hooks, saved-state
+upgrades and combined capabilities remain outside this adapter. Approved upgrades
+use the same immutable closure, readiness, drain, durable reference and recovery
+controls described above. Readiness opens and inspects both workspace engines
+without permitting namespace writes; final readiness uses the latest drained
+saved namespace. An unfinished training run returns `continuation_busy` until it
+finishes or is canceled. Unrelated plugin transitions retain that run.
+
+The child receives detached reviewed training rows, inference rows, read-only
+settings and a complete bounded own namespace. Engine objects, model objects and
+training iterators stay in the child; cooperative requests carry opaque engine
+and candidate-model IDs. No training happens between settings requests. Each
+namespace frame contains at most 1,000 files and 48 MiB of state plus files,
+including unknown files and isolated `demo/` data. Metadata is bounded to 3 MiB,
+JSON state to 1 MiB and training input to 20,000 rows / 6 MiB. Wire nesting and
+metadata bounds still apply; unsupported namespaces refuse without truncation.
+
+A save/select/rename/delete computes a detached full namespace. The host commits
+that namespace and original result receipt atomically through the private
+[namespace effect journal](plugin-state-effects.md), then materializes every
+state/file callback and verifies the complete digest. Portable checkpoints and
+copy notifications are suppressed until materialization completes. Startup
+recovers all retained journals, including disabled categorizer namespaces,
+before workers or copy observers can read them. The generic portable plugin-data
+state editor joins the same journal, including for disabled owners, and preserves
+their settings and unknown files. Interrupted materialization
+replays the original committed namespace without executing the plugin again.
+An uncertain publication blocks further effects pending explicit reconciliation
+or restart. A child crash before a complete reply publishes no namespace; the
+active generation reports a fixed error and has no automatic mutation retry or
+restart loop. Restart restores the last validated approved environment and
+recovers its authoritative namespace before exposing it.
+
+The host continues to own suggestion IDs, eligibility, currency/review validation,
+ledger commands, request receipts and session expiry. Private effect journals
+and immutable environments stay outside portable budgets; model/state files
+remain portable. Version upgrades preserve data rather than migrate unsupported
+model formats. The installed-version upgrade test uses distinct fictional v1/v2
+wheels, both workspaces and a failed candidate, then reopens from the saved v2
+reference. Random forest host tests also run the actual installed engine child.
+
+UI rendering, API interfaces and protected bank flows still need their own
+adapters. Tests use reviewed fictional wheels, temporary homes and mocked
+providers; worker processes are not a security sandbox.

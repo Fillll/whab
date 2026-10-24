@@ -326,9 +326,13 @@ def test_save_failure_does_not_chain_private_model_and_allows_retry(client, hist
 
 
 def test_model_size_failure_is_actionable_and_does_not_publish_model(client, history, monkeypatch):
-    from whab_plugin_random_forest_categorization import model
-
-    monkeypatch.setattr(model, 'LIMIT', 1)
+    # The host exercises an actionable save rejection at its public engine
+    # boundary. Plugin serialization limits have their own direct plugin tests;
+    # changing a parent module cannot affect an installed child interpreter.
+    engine = client.app.state.ledger_service.categorization.engines[PLUGIN]
+    def too_large(*_):
+        raise StoreError('Model is too large. Reduce trees, depth, or vocabulary.')
+    monkeypatch.setattr(engine, 'save', too_large)
     run = action(client, 'train', parameters={'trees': 10})
     result = {}
     while result.get('progress', 0) < 98:
@@ -342,15 +346,15 @@ def test_model_size_failure_is_actionable_and_does_not_publish_model(client, his
 
 
 def test_explicit_low_score_preview_preserves_cutoff_and_ledger(client, store, history, monkeypatch):
-    import numpy as np
-    from whab_plugin_random_forest_categorization import plugin as module
-
     model = train(client, threshold=.8)
     service = client.app.state.ledger_service.categorization
     engine = service.engines[PLUGIN]
     original = engine.context.read_file(f"models/{model['id']}.json")
     before = deepcopy(store.workspace('personal', '2026-10'))
-    monkeypatch.setattr(module, 'score', lambda _model, rows: np.array([[.4, .6]] * len(rows)))
+    monkeypatch.setattr(engine, 'predict', lambda rows: [])
+    monkeypatch.setattr(engine, 'preview', lambda rows: [
+        {'transactionId': row['id'], 'categoryId': history[1], 'score': .6,
+         'modelId': model['id'], 'belowCutoff': True} for row in rows])
     assert action(client, 'suggest')['suggested'] == 0
     assert action(client, 'status')['previewAvailable']
     assert action(client, 'preview') == {'suggested': 1, 'lowScore': 1}
