@@ -250,6 +250,46 @@ def test_invalid_or_legacy_visual_descriptor_cannot_claim_worker_participation(m
         metadata_tool.descriptor_metadata(path, "plugin", root)
 
 
+@pytest.mark.parametrize("identifier,adapter", [
+    ("client", "RemoteLedgerClient()"),
+    ("fictional", "RemoteLedgerClient(url_setting='FICTIONAL_URL',token_setting='FICTIONAL_TOKEN',budget_setting='FICTIONAL_BUDGET_ID')"),
+])
+def test_remote_client_literal_is_static_metadata_only(metadata_tool, static_repository, tmp_path, identifier, adapter):
+    root, _, module = static_repository
+    path, marker = module / "__init__.py", tmp_path / "must-not-execute"
+    path.write_text(f"from pathlib import Path\nPath({str(marker)!r}).touch()\n"
+                    f"plugin=Plugin({identifier!r},'Fictional',storage={adapter},contract=PluginContract(authority='remote',lifecycle='live'))\n")
+    row = metadata_tool.descriptor_metadata(path, "plugin", root)
+    assert row["live_support"] == "declarative-remote-client-worker" and row["authority"] == "remote"
+    assert row["capabilities"] == [{"name": name, "version": 1, "composition": "singleton"}
+                                   for name in ("ledger.mutate", "ledger.read")]
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize("adapter,extra,contract", [
+    ("factory", "", ""), ("dynamic()", "", ""),
+    ("RemoteLedgerClient(protocol_version=True)", "", ""),
+    ("RemoteLedgerClient(protocol_version=2)", "", ""),
+    ("RemoteLedgerClient(url_setting='https://fictional.example')", "", ""),
+    ("RemoteLedgerClient(token_setting='OTHER_TOKEN')", "", ""),
+    ("RemoteLedgerClient(token_setting='CLIENT_URL')", "", ""),
+    ("RemoteLedgerClient(budget_setting=[])", "", ""),
+    ("RemoteLedgerClient(private_token='must-not-evaluate')", "", ""),
+    ("RemoteLedgerClient()", ",budget_connection=reader", ""),
+    ("RemoteLedgerClient()", ",insights=reporter", ""),
+    ("RemoteLedgerClient()", ",bind=binder", ""),
+    ("RemoteLedgerClient()", "", ",state_version=2"),
+    ("RemoteLedgerClient()", "", ",provides=(Capability('custom.feature'),)"),
+])
+def test_remote_factory_dynamic_invalid_or_mixed_shapes_cannot_claim_live(metadata_tool, static_repository, adapter, extra, contract):
+    root, _, module = static_repository
+    path = module / "__init__.py"
+    path.write_text("raise RuntimeError('must not execute')\nplugin=Plugin('client','Client',storage=" + adapter + extra
+                    + ",contract=PluginContract(authority='remote',lifecycle='live'" + contract + "))\n")
+    with pytest.raises(ValueError, match="supported capability adapter"):
+        metadata_tool.descriptor_metadata(path, "plugin", root)
+
+
 @pytest.mark.parametrize("factory", ["BankAdapter(provider)", "BankAdapter(factory=provider)"])
 def test_static_typed_bank_marker_and_private_top_level_code_are_never_executed(metadata_tool, static_repository, factory):
     root, _, module = static_repository

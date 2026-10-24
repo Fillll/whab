@@ -14,6 +14,8 @@ from starlette.concurrency import run_in_threadpool
 from whab import __version__
 from whab.budgets.host import BudgetDispatch, BudgetHost, BudgetRuntimeRequests
 from whab.budgets.plugin_state import check_saved_states
+from whab.budgets.remote_runtime import RemoteClientLifecycle, bootstrap_remote, saved_remote_record
+from whab.budgets.remote_runtime import descriptor as remote_descriptor
 from whab.budgets.runtime import BudgetRuntime, RuntimeResource
 from whab.budgets.session import BudgetSession, TrackedStorage
 from whab.budgets.storage_replicas import StorageReplicas
@@ -24,7 +26,10 @@ from whab.plugins import (
     InterfaceContext,
     LedgerService,
     PluginError,
+    PluginRegistry,
+    RemoteLedgerClient,
     StorageContext,
+    load_descriptors,
     load_plugins,
 )
 from whab.plugins.contracts import contract_for
@@ -35,7 +40,12 @@ from whab.plugins.live import (
     RegistryGeneration,
 )
 from whab.plugins.management import PluginManager, installed_entrypoints
-from whab.plugins.runtime import PluginRegistry
+from whab.plugins.remote_client_adapter import (
+    configuration,
+    connection_settings,
+    supports_remote_client,
+)
+from whab.plugins.remote_transport import RemoteStore
 from whab.plugins.storage import close_storage, open_storage
 from whab.plugins.ui_resources import UIResourceArchive
 from whab.plugins.ui_runtime import (
@@ -212,12 +222,13 @@ def _approved_profile(profile, public):
 def storage_config(settings, session, plugin):
     """Bind a data-only connection to one complete approved credential profile."""
     device = settings.storage_configuration()
-    if not session or plugin.budget_connection is None:
+    if not session or (plugin.budget_connection is None and type(plugin.storage) is not RemoteLedgerClient):
         return plugin_config(settings, session, plugin.id, remote_authority=contract_for(plugin).authority == "remote")
     files = session.files_for(plugin.id)
     if not files:
         return device
-    public = dict(plugin.budget_connection(files))
+    public = (connection_settings(plugin.storage, files) if type(plugin.storage) is RemoteLedgerClient
+              else dict(plugin.budget_connection(files)))
     credentials = session.credentials.get(plugin.id)
     if credentials is not None:
         resolved = _approved_profile(credentials, public)
@@ -256,7 +267,24 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                                        settings.plaid_env, settings.ui)
     settings = apply_visual_choice(settings, visual_choice)
     budget_host = budget_host or BudgetHost(settings)
-    plugins = plugins if plugins is not None else load_plugins(settings.enabled_plugins())
+    remote_home = budget_session.storage_home if budget_session else settings.home
+    remote_saved = saved_remote_record(remote_home, budget_session.id if budget_session else "default", settings.plaid_env)
+    if remote_saved is not None:
+        if budget_session is None and saved_storage_selection(settings.home, "default", settings.plaid_env):
+            raise PluginError("This budget has conflicting retained local and remote authority decisions. Preserve both and validate its authority before reopening.",
+                              code="remote_recovery_required")
+        previous_storage = settings.storage
+        selected_id = remote_saved["choice"]["plugin"]
+        settings = replace(settings, storage=selected_id,
+                           plugins=tuple(name for name in settings.plugins if name not in {previous_storage, selected_id}))
+        retained = remote_descriptor(remote_saved["choice"])
+        if plugins is None:
+            others = load_descriptors(tuple(name for name in settings.enabled_plugins() if name != selected_id))
+        else:
+            others = tuple(plugin for plugin in plugins.descriptors() if plugin.storage is None)
+        plugins = PluginRegistry((*others, retained))
+    else:
+        plugins = plugins if plugins is not None else load_plugins(settings.enabled_plugins())
     validate_interface_owners(plugins.descriptors())
     nonlive = {plugin.id for plugin in plugins.descriptors() if not (supports_live_plugin(plugin) or live_categorizer(plugin))}
     if budget_session:
@@ -305,6 +333,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     startup = _StartupResources(worker_home, budget_session.id if budget_session else "default", settings.plaid_env)
     budget_id = budget_session.id if budget_session else "default"
     storage_upgrade = None
+    remote_bootstrap = None
 
     def own_storage_worker(worker):
         if storage_upgrade is None:
@@ -321,16 +350,26 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     def descriptor_for(plugin):
         if storage_upgrade is not None and plugin.id == storage_upgrade.plugin_id:
             return runtime._active.services["plugins"].registry.storage_plugin(plugin.id)
+        if type(plugin.storage) is RemoteLedgerClient:
+            return plugin
         return storage_worker_descriptor(worker_home, budget_id, settings.plaid_env, plugin,
                                          worker_owner=own_storage_worker, storage_owner=own_storage_proxy)
 
     try:
-        selected_storage = plugins.storage_plugin(settings.storage) if owned_store else None
+        selected_storage = plugins.storage_plugin(settings.storage) if owned_store else (
+            storage_descriptor if storage_descriptor and supports_remote_client(storage_descriptor) else None)
         if owned_store:
             selected_storage = descriptor_for(selected_storage)
             plugins = PluginRegistry(tuple(selected_storage if plugin.id == selected_storage.id else plugin
                                            for plugin in plugins.descriptors()))
-        resolved_config = storage_config(settings, budget_session, selected_storage) if owned_store else {}
+        resolved_config = storage_config(settings, budget_session, selected_storage) if selected_storage else {}
+        if selected_storage and supports_remote_client(selected_storage):
+            remote_bootstrap = bootstrap_remote(settings, budget_session, selected_storage, resolved_config,
+                                                remote_saved, worker_owner=startup.worker)
+            startup.own(remote_bootstrap)
+            plugins = PluginRegistry(tuple(remote_bootstrap.plugin if plugin.id == selected_storage.id else plugin
+                                          for plugin in plugins.descriptors()))
+            selected_storage = remote_bootstrap.plugin
         if budget_session:
             budget_session.storage_config = resolved_config
         if owned_store:
@@ -350,6 +389,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
     try:
         startup_batch = budget_session.namespace_materialization() if budget_session else nullcontext()
         with startup_batch:
+            if remote_bootstrap is not None and (type(store) is not RemoteStore or not store.matches_binding(
+                    *configuration(remote_bootstrap.plugin.storage, resolved_config))):
+                raise PluginError("The host transport does not match this exact remote client binding.",
+                                  code="remote_binding_changed", plugin_id=selected_storage.id)
             if budget_session:
                 budget_session.storage_payload_paths = selected_storage.storage_payload_paths if selected_storage else ()
                 budget_session.bind(store)
@@ -358,10 +401,12 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                     if not any(item["path"] == str(target) for item in budget_session.destinations):
                         budget_session.add_copy(path.stem, str(target))
             store = TrackedStorage(store, budget_session)
-            store.storage_plugin_id = settings.storage if owned_store else None
+            store.storage_plugin_id = settings.storage if owned_store or remote_bootstrap is not None else None
             service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
             store.on_mutation = service.invalidate_revision
             plugins, worker_bindings = restore_visual_worker(worker_home, plugins, visual_choice, worker_owner=startup.worker)
+            if remote_bootstrap is not None:
+                worker_bindings.update(remote_bootstrap.bindings)
             for binding in worker_bindings.values():
                 startup.worker(binding.worker)
             prepared_storage = getattr(store.store, "prepared_environment", None)
@@ -457,7 +502,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         runtime = BudgetRuntime(service.budget_id, {
             "plugins": RegistryGeneration(plugins, workers=worker_bindings, resources_enabled=bool(ui)), "ledger": service,
             "storage": store.store, "banks": banks, "categorization": categorization, "interfaces": interfaces, "visual": visual,
+            **({"remote_client": remote_bootstrap.generation} if remote_bootstrap else {}),
         }, (RuntimeResource("visual-selection", close_visual_selection), *namespace_resources, *storage_resources,
+            *((remote_bootstrap.resource,) if remote_bootstrap else ()),
             RuntimeResource("bank-continuations", close_banks), *bank_resources,
             *tuple(binding.resource for binding in worker_bindings.values()),
             *((categorization_resource,) if categorization_resource else ()),
@@ -482,6 +529,35 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         storage_runtime = StorageRuntime(settings, budget_session, store, runtime, registry,
             lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin))
         storage_runtime.descriptor_for = descriptor_for
+        remote_client = None
+        if remote_bootstrap is not None:
+            def remote_selected(identifier, registry):
+                nonlocal settings
+                from whab.budgets.storage_runtime import storage_manifest
+
+                previous = store.storage_plugin_id
+                plugin = registry.storage_plugin(identifier)
+                if budget_session is not None:
+                    budget_session.manifest = storage_manifest(budget_session.manifest, identifier)
+                    name = f"plugins/{identifier}/connection.json"
+                    if name not in budget_session.files:
+                        budget_session.files[name] = store.store.export_budget_files()["connection.json"]
+                    budget_session.storage_config = storage_config(replace(settings, storage=identifier), budget_session, plugin)
+                    budget_session.checkpoint()
+                store.storage_plugin_id = identifier
+                settings = replace(settings, storage=identifier,
+                                   plugins=tuple(name for name in settings.plugins if name not in {previous, identifier}))
+                plugin_manager.settings = settings
+                plugin_manager.required = tuple(identifier if name == previous else name for name in plugin_manager.required)
+                live.required = frozenset(plugin_manager.required)
+                storage_runtime.settings = settings
+                if remote_client is not None:
+                    remote_client.settings = settings
+
+            remote_client = RemoteClientLifecycle(settings, budget_session, store, runtime, remote_bootstrap,
+                lambda plugin: storage_config(replace(settings, storage=plugin.id), budget_session, plugin),
+                selected=remote_selected)
+            live.remote_client = remote_client
         if owned_store and not remote_authority:
             selected = saved_storage_selection(worker_home, budget_id, settings.plaid_env)
             backend_home = selected[0].home(selected[2]) if selected else (budget_session.backend_home if budget_session else settings.home)
@@ -605,6 +681,9 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             storage_upgrade.activated = lambda _registry: setattr(app.state, "store", store.store)
         storage_runtime.attach(app, plugin_manager, live)
         app.include_router(storage_runtime.router())
+        if remote_client is not None:
+            app.include_router(remote_client.router())
+        app.state.remote_client = remote_client
         app.state.storage_replicas = replicas
         app.include_router(replicas.router())
         app.state.bank_ui_available = any(plugin.id == "plaid" and plugin.bank_ui for plugin in descriptors)

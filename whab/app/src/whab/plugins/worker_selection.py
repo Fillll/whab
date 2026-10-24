@@ -29,6 +29,7 @@ from .sdk import (
     MerchantLogos,
     PluginAction,
     PluginSettings,
+    RemoteLedgerClient,
     UserInterface,
     valid_plugin_name,
 )
@@ -66,7 +67,7 @@ def _error(plugin_id):
                        code="worker_environment_unavailable", plugin_id=plugin_id)
 
 
-def reopen_environment(root, plugin_id, identifier):
+def reopen_environment(root, plugin_id, identifier, *, worker_owner=None):
     """Validate a content-addressed receipt before any interpreter executes."""
     try:
         if not valid_plugin_name(plugin_id) or type(identifier) is not str or not _HASH.fullmatch(identifier):
@@ -95,7 +96,8 @@ def reopen_environment(root, plugin_id, identifier):
             family = "storage"
         else:
             raise ValueError()
-        prepared = prepare_environment(root, plugin_id, tuple(approvals), family=family)
+        prepared = prepare_environment(root, plugin_id, tuple(approvals), family=family,
+                                       **({"worker_owner": worker_owner} if worker_owner else {}))
         if prepared.identifier != identifier:
             raise ValueError()
         return prepared
@@ -407,7 +409,8 @@ def _start(template, prepared, home=None, *, worker_owner=None, resource_owner=N
                             lambda: worker.settings()["insights"],
                             tuple(PluginAction(**row) for row in adapters["settings"]["actions"]), worker.settings_action,
                         ), interface=Interface(adapter=worker.interface()) if adapters["interface"] is not None else None,
-                        ui=visual, contract=worker.contract)
+                        ui=visual, storage=worker.remote_client() if adapters["remote_client"] is not None else None,
+                        contract=worker.contract)
         if not supports_live_plugin(proxy):
             raise _error(template.id)
     except BaseException:
@@ -428,8 +431,8 @@ def restore_workers(home, registry, existing=None, *, worker_owner=None, resourc
                 selected.append(plugin)
                 bindings[plugin.id] = existing[plugin.id]
                 continue
-            if plugin.ui is not None:
-                # Only the visual decision selects UI code and resources.
+            if plugin.ui is not None or type(plugin.storage) is RemoteLedgerClient:
+                # Visual and remote authorities have their separate exact decisions.
                 selected.append(plugin)
                 continue
             reference = Path(home) / "plugin-workers" / "active" / (plugin.id + ".json")

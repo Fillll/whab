@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "host_version": "2.38.0",
+  "host_version": "2.39.0",
   "plugins": [
     {
       "api_version": 1,
@@ -66,12 +66,12 @@
       },
       "id": "client",
       "legacy": false,
-      "lifecycle": "restart",
-      "live_support": "restart-required",
+      "lifecycle": "live",
+      "live_support": "declarative-remote-client-worker",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2.22,<3",
+      "requires_host": "whab>=2.39,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/storage/client",
@@ -79,11 +79,9 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [
-        "pr82-installed-sqlite-web",
-        "pr86-installed-sqlite-web",
-        "pr86-installed-json-web"
+        "pr100-remote-client-lifecycle"
       ],
-      "version": "1.5.0"
+      "version": "1.6.0"
     },
     {
       "api_version": 1,
@@ -543,7 +541,8 @@
       "support": "maintained",
       "verifications": [
         "pr92-live-api-interface",
-        "pr92-installed-native-api"
+        "pr92-installed-native-api",
+        "pr100-remote-client-lifecycle"
       ],
       "version": "1.1.0"
     },
@@ -640,7 +639,8 @@
         "pr102-local-storage-native-https",
         "pr102-cross-host-storage-repair",
         "pr101-native-outcome-phases",
-        "pr101-installed-native-bank"
+        "pr101-installed-native-bank",
+        "pr100-remote-client-lifecycle"
       ],
       "version": "1.12.0"
     },
@@ -1349,6 +1349,29 @@
         "installed native HTTPS v1/failed-candidate/v2 bank worker verification",
         "installed native HTTPS exchange-uncertain and captured-native-apply recovery",
         "ordinary stock CLI reopen after acknowledged-write process termination"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.39.0",
+        "whab_plugin_client": "1.6.0",
+        "whab_plugin_server": "1.1.0",
+        "whab_plugin_sqlite": "1.12.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.39.0",
+      "id": "pr100-remote-client-lifecycle",
+      "method": "source-tests",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/100"
+      ],
+      "scope": "Focused tests prepared separately approved synthetic descriptor wheels 1.0, 1.1 and 2.0 against the real current host closure. A missing-setting candidate preserved the active worker; compatible replacement retained the host transport, pending original command and revision, preserved the previous immutable environment and restored the exact saved version after pause/reopen. Explicit original-request completion preserved one acknowledged fictional account. Paused startup executed no descriptor, an incompatible host expectation refused before interpreter execution, and a stopped same-binding repair preserved prior ready metadata. An embedded separate installed native listener test built the real host, SQLite and server wheels outside the checkout, explicitly verified its runtime CA, observed unauthenticated 401/authenticated 200, and exercised the public host-owned remote transport with one acknowledged account. That native transport uses an explicitly supplied test CA; this does not prove stock client CLI private-CA configuration, distinct descriptor upgrades over a native listener, public receipt lookup, remote-server restart retry durability or household deployment. The canonical source suite passed before the narrow follow-ups, but its external API exact replay failed and is not certified by this record.",
+      "selection": [
+        "client"
+      ],
+      "source_commit": "df865488e5b7f9645c96e060c1d8fce4dd261086",
+      "tests": [
+        "tests/plugins/test_remote_client_workers.py"
       ]
     }
   ]

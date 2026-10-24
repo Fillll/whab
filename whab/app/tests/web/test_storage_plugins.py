@@ -230,13 +230,17 @@ print(json.dumps({
         "backend": False, "schema": False, "seeding": False, "driver_imports": [],
     }
     assert {path.name for path in tmp_path.iterdir()} == {"visual-ui", "plugin-workers"}
-    # This host metadata makes no native authority or live-worker claim for a
-    # legacy backend and must not import/create any concrete storage backend.
-    decision = json.loads((tmp_path / "plugin-workers/storage/memory/storage-upgrade.json").read_bytes())["body"]
-    assert decision == {"format": 2, "kind": "storage-code", "active": None, "native": None,
-                        "pending": None, "repair": None}
     assert {path.name for path in (tmp_path / "visual-ui").iterdir()} == {
         "visual-selection.json", "visual-selection.json.lock",
+    }
+    # An inactive host journal makes no native authority or live-worker claim.
+    control = tmp_path / "plugin-workers" / "storage" / "memory"
+    assert {path.relative_to(tmp_path / "plugin-workers").as_posix()
+            for path in (tmp_path / "plugin-workers").rglob("*") if path.is_file()} == {
+        "storage/memory/storage-upgrade.json", "storage/memory/storage-upgrade.json.lock",
+    }
+    assert json.loads((control / "storage-upgrade.json").read_bytes())["body"] == {
+        "format": 2, "kind": "storage-code", "active": None, "native": None, "pending": None, "repair": None,
     }
 
 

@@ -147,6 +147,23 @@ def test_visual_worker_label_requires_the_singleton_visual_capability():
             catalog.validate_catalog(malformed)
 
 
+def test_remote_client_label_requires_exact_remote_ledger_contract():
+    value = catalog.catalog_snapshot()
+    client = next(row for row in value["plugins"] if row["id"] == "client")
+    assert client["live_support"] == "declarative-remote-client-worker"
+    assert client["authority"] == "remote" and client["lifecycle"] == "live"
+    for change in (
+        {"authority": "local"}, {"live_support": "stateless-optional-worker"},
+        {"capabilities": [{"name": "ledger.read", "version": 1, "composition": "singleton"}]},
+        {"capabilities": [{"name": name, "version": 1, "composition": "additive"} for name in ("ledger.read", "ledger.mutate")]},
+        {"capabilities": [{"name": name, "version": 2, "composition": "singleton"} for name in ("ledger.read", "ledger.mutate")]},
+    ):
+        malformed = copy.deepcopy(value)
+        next(row for row in malformed["plugins"] if row["id"] == "client").update(change)
+        with pytest.raises(catalog.CatalogError):
+            catalog.validate_catalog(malformed)
+
+
 @pytest.mark.parametrize('change', [
     lambda row: row.update(authority='remote'),
     lambda row: row.update(state_version=2),

@@ -538,3 +538,20 @@ def test_register_filtered_capability_is_scoped_again_and_keeps_old_signature_co
     service = LedgerService(SimpleNamespace(transaction_register=lambda *args: legacy_calls.append(args) or data))
     service.transaction_register("personal", "2026-10", "USD", account_ids=["one"])
     assert legacy_calls == [("personal", "2026-10", "USD", None)]
+
+
+def test_public_command_validation_is_detached_and_never_queries_or_mutates_storage():
+    from whab.services.ledger import LedgerService
+
+    class UnavailableStorage:
+        def __getattr__(self, name):
+            raise AssertionError("Command validation accessed storage")
+
+    service = LedgerService(UnavailableStorage())
+    revision = service.revision
+    original = {"transactionIds": ["fictional-one", "fictional-two"], "reviewed": True}
+    validated = service.validate_command("review_transactions", "personal", original)
+    assert validated == original and validated is not original
+    validated["transactionIds"].clear()
+    assert original["transactionIds"] == ["fictional-one", "fictional-two"]
+    assert service.revision == revision
