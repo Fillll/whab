@@ -404,6 +404,13 @@ bounded room for that work and dependency installation; they are not runtime
 performance guarantees. Production readiness, RPC, startup, HTTP and transition
 deadlines are unchanged.
 
+
+Historical hosts may share an unchanged reference package version. The checker
+builds each source separately and reuses the first approved wheel only when every
+member's contents, modes and flags match; ZIP timestamps may differ. A conflicting
+same-identity artifact or a failed build stops validation without replacing the
+approved wheel. Exact saved artifact hashes remain the replay authority.
+
 ## Offline bank projects
 
 `whab-plugin new fictional-bank --capability bank` creates an independent typed

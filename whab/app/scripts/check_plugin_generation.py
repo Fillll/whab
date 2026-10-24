@@ -2,6 +2,7 @@
 
 import argparse
 import configparser
+import hashlib
 import importlib.util
 import json
 import os
@@ -202,6 +203,29 @@ def controlled_builder(helper, base, wheels, env):
     return python
 
 
+def wheel_payload(path):
+    """Compare bounded installed contents while ignoring ZIP timestamps."""
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 256 * 1024 * 1024:
+        raise ValueError("A built wheel must be a bounded regular file.")
+    with zipfile.ZipFile(path) as archive:
+        entries = archive.infolist()
+        if (not entries or len(entries) > 20_000
+                or len({entry.filename for entry in entries}) != len(entries)
+                or sum(entry.file_size for entry in entries) > 512 * 1024 * 1024):
+            raise ValueError("A built wheel has ambiguous or oversized member contents.")
+        attributes = ("filename", "compress_type", "create_system", "create_version", "extract_version",
+                      "flag_bits", "volume", "internal_attr", "external_attr", "CRC", "file_size",
+                      "compress_size", "extra", "comment")
+        result = []
+        for entry in entries:
+            digest = hashlib.sha256()
+            with archive.open(entry) as stream:
+                while chunk := stream.read(1024 * 1024):
+                    digest.update(chunk)
+            result.append((tuple(getattr(entry, name) for name in attributes), digest.digest()))
+        return archive.comment, tuple(result)
+
+
 def build_project(helper, python, project, wheels, base, env):
     # This executes only caller-authorized project build code. Its declared
     # build dependencies must already be in the controlled local wheelhouse.
@@ -216,13 +240,25 @@ def build_project(helper, python, project, wheels, base, env):
         if requirement.url or requirement.extras:
             raise ValueError("URL and extra build requirements require a separate reviewed build recipe.")
     helper.run([str(python), "-I", "-m", "pip", "install", "--no-index", "--find-links", str(wheels), *requirements], cwd=base, env=env)
-    before = set(wheels.glob("*.whl"))
-    helper.run([str(python), "-I", "-m", "pip", "wheel", "--no-index", "--no-build-isolation", "--no-deps",
-                "--wheel-dir", str(wheels), str(project)], cwd=base, env=env)
-    built = set(wheels.glob("*.whl")) - before
-    if len(built) != 1:
-        raise ValueError("A project must produce exactly one new wheel identity.")
-    return built.pop()
+    # Several genuine historical hosts may use the same unchanged reference
+    # distribution. Build independently before deciding whether its complete
+    # installed payload is identical; never overwrite an approved wheel first.
+    with tempfile.TemporaryDirectory(prefix="project-wheel-", dir=base) as temporary:
+        staging = Path(temporary)
+        helper.run([str(python), "-I", "-m", "pip", "wheel", "--no-index", "--no-build-isolation", "--no-deps",
+                    "--wheel-dir", str(staging), str(project)], cwd=base, env=env)
+        built = tuple(staging.glob("*.whl"))
+        if len(built) != 1:
+            raise ValueError("A project must produce exactly one wheel identity.")
+        candidate, = built
+        payload = wheel_payload(candidate)
+        destination = wheels / candidate.name
+        if destination.exists() or destination.is_symlink():
+            if wheel_payload(destination) != payload:
+                raise ValueError("The same wheel identity has different contents; review distinct artifact recipes.")
+        else:
+            candidate.replace(destination)
+        return destination
 
 
 def configuration_manifests(output):
