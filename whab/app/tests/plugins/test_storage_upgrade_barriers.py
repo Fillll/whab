@@ -557,7 +557,7 @@ def test_captured_bank_continuation_refuses_authority_change_after_drain_before_
             before = app.state.tracked_store.commit_evidence()
             journal = app.state.storage_runtime.coordinator.journal
             original = journal.read()
-            app.state.banks["fictional"] = SimpleNamespace(prepare_close=busy)
+            runtime._active.services["banks"]["fictional"] = SimpleNamespace(prepare_close=busy)
             if control == "migration":
                 status = await migrate(client, app, "json")
                 assert status["operations"][-1]["error"]["code"] == "continuation_busy"
@@ -572,7 +572,7 @@ def test_captured_bank_continuation_refuses_authority_change_after_drain_before_
             assert app.state.tracked_store.commit_evidence() == before
             assert runtime.status()["admission"] == "open"
             assert app.state.storage_plugin == "sqlite"
-            app.state.banks.pop("fictional")
+            runtime._active.services["banks"].pop("fictional")
     asyncio.run(scenario())
 
 
@@ -582,13 +582,13 @@ def test_code_only_storage_upgrade_keeps_captured_bank_and_native_authority(tmp_
         prepared = prepared_fixture(tmp_path, "json")
         monkeypatch.setattr(storage_upgrade, "prepare_environment", lambda *_args, **_kwargs: prepared)
         captured = SimpleNamespace(prepare_close=lambda: pytest.fail("Code-only upgrade must retain the captured continuation"))
-        app.state.banks["fictional"] = captured
+        app.state.budget_runtime._active.services["banks"]["fictional"] = captured
         try:
             before = app.state.tracked_store.commit_evidence()
             await app.state.storage_upgrade.upgrade("json", ())
             assert app.state.tracked_store.commit_evidence() == before
             assert app.state.budget_runtime._active.services["banks"]["fictional"] is captured
         finally:
-            app.state.banks.pop("fictional")
+            app.state.budget_runtime._active.services["banks"].pop("fictional")
             await finish(app)
     asyncio.run(scenario())
