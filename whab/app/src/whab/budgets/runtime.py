@@ -29,6 +29,7 @@ _MESSAGES = {
     "drain_timeout": "The runtime transition timed out waiting for active work. Existing work continues.",
     "prepare_failed": "The candidate runtime could not be prepared. The active runtime is unchanged.",
     "readiness_failed": "The candidate runtime did not pass readiness checks. The active runtime is unchanged.",
+    "continuation_busy": "Finish or cancel this plugin's unfinished operation before replacing or disabling it.",
     "commit_uncertain": "The runtime handover could not be confirmed. Validate authority before resuming this budget.",
     "recovery_required": "Validate this budget's runtime authority before another transition.",
     "recovery_failed": "Runtime authority could not be validated. This budget remains paused.",
@@ -451,25 +452,29 @@ class BudgetRuntime:
             self._phase = phase
             self._notify()
 
-    async def transition(self, prepare, *, readiness=None, commit=None, plugin_id=None,
+    async def transition(self, prepare, *, readiness=None, finalize=None, commit=None, plugin_id=None,
                          drain_timeout=30, retirement_timeout=5):
-        """Prepare/readiness, gate/drain, commit, activate, resume, then retire.
+        """Prepare/readiness, gate/drain, finalize, commit, activate, then retire.
 
         ``prepare(preparation)`` returns a RuntimeCandidate. Register acquired
         resources with preparation.own() before operations that can fail.
-        ``readiness(candidate)`` must return True. ``commit(candidate, number)``
+        ``readiness(candidate)`` must return True. Optional
+        ``finalize(preparation, candidate)`` returns a RuntimeCandidate using the
+        latest drained state. Its factories must use staged contexts; failure
+        resumes the unchanged active generation and retires acquired resources.
+        ``commit(candidate, number)``
         durably commits selection/authority when supplied; failure is uncertain.
         The coordinator does not cancel callbacks or admitted financial work.
         """
         self._check_transition()
-        if not callable(prepare) or (readiness is not None and not callable(readiness)) or (commit is not None and not callable(commit)) or (plugin_id is not None and not valid_plugin_name(plugin_id)):
+        if not callable(prepare) or any(callback is not None and not callable(callback) for callback in (readiness, finalize, commit)) or (plugin_id is not None and not valid_plugin_name(plugin_id)):
             raise RuntimeTransitionError("invalid_runtime")
         _timeout(drain_timeout)
         _timeout(retirement_timeout)
-        return await self._owned(self._transition(prepare, readiness, commit, plugin_id,
+        return await self._owned(self._transition(prepare, readiness, finalize, commit, plugin_id,
                                                  drain_timeout, retirement_timeout))
 
-    async def _transition(self, prepare, readiness, commit, plugin_id, drain_timeout, retirement_timeout):
+    async def _transition(self, prepare, readiness, finalize, commit, plugin_id, drain_timeout, retirement_timeout):
         async with self._serial:
             self._check_transition()
             active = self._begin(plugin_id)
@@ -493,12 +498,31 @@ class BudgetRuntime:
                 self._progress("draining", 50)
                 code = "drain_timeout"
                 await self._wait(lambda: not self._leases, drain_timeout, code)
-            except (Exception, asyncio.CancelledError):
+                if finalize is not None:
+                    self._progress("finalizing", 60)
+                    code = "readiness_failed"
+                    candidate = await _invoke(finalize, preparation, candidate)
+                    if type(candidate) is not RuntimeCandidate:
+                        raise RuntimeTransitionError("invalid_runtime")
+                    for resource in candidate.resources:
+                        preparation.own(resource)
+                    retained = {id(resource) for resource in candidate.resources}
+                    old = {id(resource) for resource in active.resources}
+                    candidate = RuntimeCandidate(candidate.services, tuple(
+                        resource for resource in preparation._resources
+                        if id(resource) not in old or id(resource) in retained
+                    ))
+            except (Exception, asyncio.CancelledError) as error:
+                owner = plugin_id
+                if isinstance(error, PluginError) and valid_plugin_name(error.plugin_id):
+                    owner = error.plugin_id
+                if isinstance(error, RuntimeTransitionError) and error.code == "continuation_busy":
+                    code, owner = error.code, error.plugin_id
                 with self._condition:
-                    self._error = self._diagnostic(code, plugin_id)
+                    self._error = self._diagnostic(code, owner)
                 self._resume("failed")
                 await self._retire(tuple(preparation._resources), active.resources, retirement_timeout)
-                raise RuntimeTransitionError(code, plugin_id) from None
+                raise RuntimeTransitionError(code, owner) from None
             self._progress("committing", 70)
             try:
                 if commit is not None:

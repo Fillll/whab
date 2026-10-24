@@ -17,6 +17,10 @@ managed calls remain owned by the host when their caller disconnects.
 Transitions serialize per budget. They prepare and check the candidate before
 gating admission, drain admitted operations, commit selection, activate the new
 generation, resume requests, and retire unretained resources in reverse order.
+An optional `finalize(preparation, candidate)` callback runs after draining and
+before durable commit. It returns a `RuntimeCandidate` prepared from the latest
+state using detached or read-only contexts. A failure there reopens the unchanged
+active generation and closes candidate resources; it is not a committed handover.
 Preparation must use detached/read-only contexts. Register acquired resources
 with `RuntimePreparation.own()` immediately so failed startup also cleans up.
 Blocking callbacks must explicitly use the thread pool.
@@ -68,3 +72,27 @@ resource adapters; this API does not upgrade the running Python environment.
 Tests use fictional temporary budgets, held-operation barriers, secondary-budget
 dispatch, cancelled callers, failed preparation/commit/cleanup and retry identities.
 They do not open external bank connections or update the household installation.
+
+## Live categorization selection
+
+The host supports enable/disable/replacement of an installed, independently
+scoped categorizer declaring `PluginContract(lifecycle="live")`. One categorizer
+may be active per budget. Its factory and methods are synchronous, receive only
+its budget namespace, and may provide `close()` for owned resources. Candidate
+factories receive a bounded detached read snapshot after active requests drain;
+they cannot publish state or files before the durable selection decision. Their
+host callbacks expire on failure or retirement.
+
+Cooperative training continues across settings requests. An unfinished run
+defers replacement with `continuation_busy` attributed to that plugin. Finish or
+cancel it through the existing settings action before retrying. Unchanged engines
+retain their training sessions during unrelated plugin transitions. The latest
+completed model is visible to a replacement after draining, and saved models,
+demo/personal separation, and disabled suggestion history survive re-enabling
+and reopening. Failed candidate readiness preserves the active service and data.
+
+Categorization selection currently executes in the host process. Runtime status
+lists it in `host_only_families`; `code_upgrade_families` lists the families with
+an available immutable worker upgrade adapter. Selecting a categorizer does not
+upgrade or replace imported Python package files. Ordinary saved selections still
+apply on the next startup.

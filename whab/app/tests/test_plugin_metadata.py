@@ -131,6 +131,7 @@ def test_static_boolean_cannot_impersonate_numeric_sdk_version(metadata_tool, st
     ("bank_logos=branding,settings=settings,branding_factory=fresh", "stateless-optional-worker"),
     ("file_import=parser", "stateless-optional-worker"),
     ("insights=insights,export=export", "stateless-report-worker"),
+    ("categorization=engine", "categorization-host"),
 ])
 def test_supported_live_families_are_inspected_without_executing_factories(metadata_tool, static_repository, hooks, support):
     root, _, module = static_repository

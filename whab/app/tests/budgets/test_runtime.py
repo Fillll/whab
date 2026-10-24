@@ -617,6 +617,7 @@ def test_invalid_transition_recovery_and_observation_inputs():
         for arguments in (
             {"prepare": None},
             {"prepare": lambda _: RuntimeCandidate({}), "readiness": 1},
+            {"prepare": lambda _: RuntimeCandidate({}), "finalize": 1},
             {"prepare": lambda _: RuntimeCandidate({}), "commit": 1},
             {"prepare": lambda _: RuntimeCandidate({}), "plugin_id": "BAD"},
         ):
@@ -633,6 +634,82 @@ def test_invalid_transition_recovery_and_observation_inputs():
         with pytest.raises(RuntimeTransitionError) as caught:
             await runtime.wait_for_phase("missing", timeout=0)
         assert caught.value.code == "admission_timeout"
+
+    asyncio.run(scenario())
+
+
+def test_finalization_uses_latest_drained_state_before_durable_commit():
+    async def scenario():
+        runtime = BudgetRuntime("budget", {"report": service("old")})
+        entered, finish = asyncio.Event(), asyncio.Event()
+        latest, observed = [], []
+
+        async def operation():
+            async with runtime.request():
+                entered.set()
+                await finish.wait()
+                latest.append("saved model")
+
+        task = asyncio.create_task(operation())
+        await entered.wait()
+
+        async def finalize(preparation, candidate):
+            assert runtime.status()["admission"] == "gated"
+            assert runtime.status()["active_leases"] == 0
+            assert latest == ["saved model"]
+            observed.append("finalize")
+            preparation.own(RuntimeResource("report", lambda: observed.append("close")))
+            return RuntimeCandidate({"report": service(latest[0])}, candidate.resources)
+
+        def commit(candidate, number):
+            observed.append((candidate.services["report"].read(), number))
+
+        change = asyncio.create_task(runtime.transition(
+            lambda _: RuntimeCandidate({"report": service("stale")}),
+            finalize=finalize, commit=commit,
+        ))
+        await runtime.wait_for_phase("draining")
+        assert observed == []
+        finish.set()
+        await task
+        assert await change == 2
+        assert observed == ["finalize", ("saved model", 2)]
+        assert runtime.handle("report").call("read") == "saved model"
+        await runtime.shutdown()
+        assert observed[-1] == "close"
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("failure", ["exception", "invalid", "cancel", "busy"])
+def test_failed_finalization_resumes_old_generation_and_retires_candidate(failure):
+    async def scenario():
+        closed, committed = [], []
+        old = RuntimeResource("old", lambda: closed.append("old"))
+        runtime = BudgetRuntime("budget", {"report": service("old")}, (old,))
+
+        def finalize(preparation, candidate):
+            preparation.own(RuntimeResource("candidate", lambda: closed.append("candidate")))
+            if failure == "invalid":
+                return object()
+            if failure == "cancel":
+                raise asyncio.CancelledError("private model bytes")
+            if failure == "busy":
+                raise RuntimeTransitionError("continuation_busy", "categorizer")
+            raise OSError("private model bytes")
+
+        with pytest.raises(RuntimeTransitionError) as caught:
+            await runtime.transition(lambda _: RuntimeCandidate({"report": service("new")}),
+                                     finalize=finalize, commit=lambda *_: committed.append(True))
+        assert caught.value.code == ("continuation_busy" if failure == "busy" else "readiness_failed")
+        assert caught.value.plugin_id == ("categorizer" if failure == "busy" else None)
+        assert not committed
+        assert closed == ["candidate"]
+        assert runtime.status()["generation"] == 1
+        assert runtime.status()["admission"] == "open"
+        assert runtime.status()["health"] == "ready"
+        assert runtime.handle("report").call("read") == "old"
+        assert "private model" not in str(runtime.status())
 
     asyncio.run(scenario())
 

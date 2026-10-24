@@ -8,7 +8,7 @@ import pytest
 
 from whab.budgets.document import new_manifest
 from whab.budgets.storage_replicas import NamespaceArchive
-from whab.plugins import PluginError
+from whab.plugins import PluginError, StoreError
 from whab.services.categorization import local_context
 
 
@@ -74,7 +74,7 @@ def test_namespace_aggregate_budget_is_checked_before_base64_expansion(tmp_path,
 def test_invalid_local_namespace_write_does_not_delete_existing_file(tmp_path):
     context = local_context(tmp_path, "default", "fictional")
     context.write_file("data.bin", b"preserved-model")
-    with pytest.raises(TypeError):
+    with pytest.raises(StoreError, match="bytes"):
         context.write_file("data.bin", None)
     assert context.read_file("data.bin") == b"preserved-model"
 

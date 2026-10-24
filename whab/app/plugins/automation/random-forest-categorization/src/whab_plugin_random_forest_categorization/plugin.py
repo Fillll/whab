@@ -9,7 +9,7 @@ import sklearn
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction import DictVectorizer
 
-from whab.plugins import Categorization, Plugin, StoreError
+from whab.plugins import Categorization, Plugin, PluginContract, StoreError
 
 from .model import DEFAULTS, decode, encode, features, metrics, parameters, score, split, tokens
 
@@ -150,4 +150,4 @@ class Engine:
 
 
 plugin = Plugin(id="random-forest-categorization", display_name="Random forest categorization",
-                categorization=Categorization(factory=Engine))
+                categorization=Categorization(factory=Engine), contract=PluginContract(lifecycle="live"))
