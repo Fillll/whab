@@ -138,8 +138,10 @@ def source_at_revision(base, environment, revision):
     return project
 
 
-def reference_projects(candidate, minimum, *, candidate_host=None):
+def reference_projects(candidate, minimum, *, candidate_host=None, plugin="sqlite"):
     """Pair each host with a genuine compatible reference from its source artifact."""
+    if plugin not in {"sqlite", "json"}:
+        raise ValueError("Choose a reviewed native reference backend.")
     def supports(project, version):
         metadata = tomllib.loads((project / "pyproject.toml").read_text())["project"]
         requirements = [Requirement(value) for value in metadata.get("dependencies", ())]
@@ -150,7 +152,7 @@ def reference_projects(candidate, minimum, *, candidate_host=None):
 
     if not supports(candidate, host_version(candidate_host if candidate_host is not None else ROOT)):
         raise ValueError("The candidate reference backend does not support the candidate host.")
-    selected = candidate if supports(candidate, MINIMUM_HOST_VERSION) else minimum / "plugins/storage/sqlite"
+    selected = candidate if supports(candidate, MINIMUM_HOST_VERSION) else minimum / "plugins/storage" / plugin
     if not supports(selected, MINIMUM_HOST_VERSION):
         raise ValueError("The pinned reference backend does not support the minimum host.")
     candidate_version = tomllib.loads((candidate / "pyproject.toml").read_text())["project"]["version"]

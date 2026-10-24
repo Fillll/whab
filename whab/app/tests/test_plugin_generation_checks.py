@@ -125,14 +125,18 @@ def test_project_minimum_recipe_is_explicit_and_must_match_actual_declared_host_
             checker.project_minimum(project)
 
 
-def test_api_minimum_uses_its_genuine_immutable_source_recipe_without_version_rewriting(checker, tmp_path):
+@pytest.mark.parametrize(("version", "revision"), [
+    ("2.34.0", "ebbff0d464dd67c0269428a6d4a339778e21ec57"),
+    ("2.36.0", "a866eda580c6e363a20636785bc4b4003db0652f"),
+])
+def test_interface_minimum_uses_its_genuine_immutable_source_recipe_without_version_rewriting(checker, tmp_path, version, revision):
     calls = []
     helper = SimpleNamespace(minimum_host_source=lambda base, env: calls.append(("legacy", base)) or "legacy-source",
                              source_at_revision=lambda base, env, revision: calls.append(("api", revision)) or "api-source",
-                             host_version=lambda _: "2.34.0")
+                             host_version=lambda _: version)
     assert checker.minimum_source(helper, tmp_path / "older", {}, "2.22.0") == "legacy-source"
-    assert checker.minimum_source(helper, tmp_path / "api", {}, "2.34.0") == "api-source"
-    assert calls[-1] == ("api", checker.API_MINIMUM_HOST_COMMIT)
+    assert checker.minimum_source(helper, tmp_path / "interface", {}, version) == "api-source"
+    assert calls[-1] == ("api", revision) and checker.MINIMUM_RECIPES[version] == revision
     helper.host_version = lambda _: "2.22.0"
     with pytest.raises(ValueError, match="advertised host"):
-        checker.minimum_source(helper, tmp_path / "wrong", {}, "2.34.0")
+        checker.minimum_source(helper, tmp_path / "wrong", {}, version)
