@@ -80,7 +80,7 @@ def storage_declaration(plugin):
         and contract.state_version == 1
         and not contract.state_upgrades
         and all(
-            getattr(plugin, name) is None
+            getattr(plugin, name, None) is None
             for name in (
                 "bind",
                 "migrate_state",

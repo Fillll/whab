@@ -56,6 +56,28 @@ def test_native_declarations_reject_false_advertisement_and_keep_legacy_inapplic
     )
 
 
+def test_absent_new_optional_hook_preserves_declaration_and_actual_sdk_gate():
+    candidate = descriptor()
+
+    class OlderPluginShape:
+        def __getattr__(self, name):
+            if name == "branding_factory":
+                raise AttributeError(name)
+            return getattr(candidate, name)
+
+    older = OlderPluginShape()
+    assert not hasattr(older, "branding_factory")
+    assert local.storage_declaration(older) == local.storage_declaration(candidate)
+    # This branch executes against the genuinely installed older host in the
+    # minimum-wheel gate. Metadata inspection cannot certify native execution.
+    if local.Version(local.metadata.version("whab")) < local.Version(local.MINIMUM_STORAGE_HOST):
+        with pytest.raises(ValueError, match="actual host SDK"):
+            local.assert_storage_readiness(older)
+    older.branding_factory = lambda _: None
+    with pytest.raises(ValueError, match="unsupported public declaration"):
+        local.storage_declaration(older)
+
+
 def test_platform_metadata_is_explicit_and_never_becomes_a_native_pass(monkeypatch):
     candidate = descriptor()
     message = Message()
