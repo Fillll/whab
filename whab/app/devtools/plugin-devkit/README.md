@@ -50,6 +50,44 @@ whab-plugin check --plugin household-report --combinations 10 --seed 42 --wheelh
 whab-plugin replay /tmp/household-report-check/configuration-00.json --wheelhouse /approved/local/wheels
 ```
 
+Add `--runtime` to `check` for the versioned `native-local-v1` profile. On a
+supported host (WHAB 2.32+) also install the reviewed JSON reference and the
+explicit [runtime peer fixture](fixtures/runtime-peers/README.md) wheels. The kit
+itself registers no runtime plugin. This profile starts the installed host CLI
+in a fresh temporary Sandbox home, provisions local TLS with the host's
+`whab.tls.prepare_local_tls` helper and verifies its CA and hostname. It uses the
+documented ledger, plugin-management, storage-migration and copy HTTP APIs.
+It never changes OS trust, borrows another runtime home, or opens a provider
+connection. The wheelhouse must include every exact installed runtime artifact.
+
+Format-2 manifests retain the seed, ordered peer selections, genuine host and
+artifact hashes, primary/copy direction, explicit selection sequence, fault and
+replay command. Each supported configuration executes real peer disable/enable,
+replacement or reordering, copy attachment/catch-up, explicit promotion, reverse
+migration, process restart and acknowledged-data checks. It exercises the
+candidate's applicable public hooks before and after; candidate disable/enable
+runs only when its declaration and peer dependencies permit it. Restart-only
+generated candidates remain selected, with that limitation recorded explicitly.
+Candidates with provider factories, interfaces or context binders are explicitly
+inapplicable to this bounded native profile; those factories are never started.
+Hook probes use the public SDK with fictional inputs. The profile verifies active
+candidate selection after reopen; it does not yet train and preserve an opaque
+host-owned model through these transitions.
+
+Precise faults are invalid selection preflight, consumed-preview reuse, stale
+copy authority requiring reattachment, and SIGKILL after an acknowledged primary
+write and settled transition. These are not injected disk/journal commit
+boundaries. The host and its owned process group are stopped and the disposable
+runtime is removed, including after failure. Results contain identifiers and
+case outcomes, never snapshots, certificates, private paths or raw errors.
+
+The genuine 2.22 minimum-host run still executes resolver/hooks and supported
+reference contracts. Its newer runtime profile is explicitly `not-applicable`
+and contributes **zero** runtime passes. Broken advertised behavior on a supported
+host fails. Version-1 resolver manifests remain readable; replay automatically
+selects their schema. Runtime profiles do not yet claim worker code upgrades,
+private commit-boundary injection or provider network behavior.
+
 The wheelhouse contains the exact approved installed artifacts. Matching compares
 installed package bytes with local wheel members before importing the candidate
 and SQLite entry points; editable installations cannot establish this evidence.
@@ -71,7 +109,7 @@ failures must be attributed; invalid imports must reject atomically. Results
 contain case outcomes and identifiers, without ledger snapshots or private
 exception text. Preserve a failed manifest for replay.
 
-Selection sequences resolve peer removal/restoration, replacement or reordering.
+The default version-1 selection sequences resolve peer removal/restoration, replacement or reordering.
 They do not activate live processes, migrate schemas, copy budgets or promote
 financial authority. Those unimplemented slots are explicit in every manifest.
 The synthetic snapshot and account-file probes are deliberately small teaching
@@ -141,6 +179,7 @@ Advertise optional suite names through `Capability`:
 | `monthly-rollover` | Saved policy, invalid policy rejection and reopen |
 | `neutral-transfer` | Financial round trip, empty-destination guard, private-record exclusion; deleted history when sync is also advertised |
 | `native-replica` | Complete local copy, native write fence, independent financial/namespace watermarks, stale-job rejection, durable replay/reopen and explicit prepared promotion |
+| `durable-commands` | Discarded public operation result, exact receipt after reopen, stale-generation replay, conflicting identity and unknown stale rejection, atomic invalid payload and receipt isolation |
 
 An unadvertised optional suite returns `not-applicable` with an explicit reason.
 An advertised capability with missing or broken methods returns `failed`; it is
@@ -164,12 +203,14 @@ are checked separately because the legacy neutral ledger transfer omits image by
 
 ## Scope and remaining work
 
-This is a starting conformance suite, not certification of a backend. It does not
-yet provide worker/lifecycle barriers, controlled transports, injected disk faults,
-termination recovery, schema upgrade fixtures, protected same-device transfer,
-receipt transfer on pending/posting, copy authority/promotion, retry evidence for
-unknown mutation outcomes, live configuration coordination or migration/copy replay.
-Those need the corresponding host contracts.
+This is a bounded conformance suite, not certification of a backend. The explicit
+native profile covers the public lifecycle, migration/copy and restart operations
+listed above. It does not yet provide worker-upgrade barriers, provider transports, injected disk faults,
+arbitrary commit-boundary termination recovery, schema upgrade fixtures, protected same-device transfer,
+or receipt transfer on pending/posting. The durable command suite discards a
+completed result and validates receipt resolution; it does not inject an uncertain
+native commit. Backend-specific commit-boundary termination tests remain with
+their owning backend and host coordinator.
 The current tests observe cleanup calls; they cannot prove a backend released every
 OS resource. SQLite-specific SQL/schema/failure tests remain with that plugin.
 
@@ -182,9 +223,16 @@ reference distribution is absent; candidate suite applicability never uses skips
 From `whab/app/`, during toolkit development:
 
 ```sh
-.venv/bin/python -m pip install --no-deps -e devtools/plugin-devkit
+.venv/bin/python scripts/install.py --dev --example --runtime-fixtures
 .venv/bin/python -m pytest devtools/plugin-devkit/tests
 ```
+
+`--runtime-fixtures` explicitly adds the six reviewed fixture registrations needed
+by current-host native tests and implies `--dev`. Normal/default installation and
+plain `--dev` do not add these runtime registrations. The canonical contribution
+gate collects source tests separately and runs toolkit tests in its own installed
+environment, building the exact fixture artifact there automatically. The flag is
+needed only for a direct source toolkit test invocation.
 
 For external validation, build wheels, install into a clean directory outside the
 checkout, clear source import paths, and verify the imported host/toolkit/candidate
@@ -201,12 +249,14 @@ The repository's full `scripts/check.py` runs this dedicated gate once:
 
 It builds the genuine minimum host **2.22.0** from pinned repository commit
 `bac249ca0e62638a40a6effc44af741c283e83d7`, the current candidate host, the toolkit,
-and the SQLite reference. CI fetches complete Git history for that controlled
+and the SQLite reference. Candidate hosts supporting the native profile also
+install exact JSON and reviewed runtime-peer fixture wheels. CI fetches complete Git history for that controlled
 baseline. Each host receives a fresh virtual environment outside the checkout,
 with only these WHAB distributions and their runtime/test dependency closures.
 Dependencies are downloaded to a local wheelhouse; installation uses `--no-index`.
 The gate clears source import paths, verifies installed module paths and versions,
-and requires SQLite to be the only runtime plugin entry point.
+and requires exactly the explicit reference/fixture runtime registrations for
+that host; the minimum artifact retains SQLite as its only registration.
 
 Both environments run the complete toolkit tests, including the advertised SQLite
 capability suites. Any skipped, missing or failed reference test fails the gate.

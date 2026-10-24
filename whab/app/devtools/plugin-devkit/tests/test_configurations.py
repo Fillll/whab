@@ -57,7 +57,7 @@ def test_ten_distinct_configurations_are_reproducible_and_exercise_actual_refere
         assert "candidate" in result["resolved"] and "sqlite" in result["resolved"]
         assert result["candidate_hooks"] == ["insights", "export"]
         assert result["peer_hooks"]
-        assert all(case["status"] == "passed" or (case["capability"] == "native-replica" and case["status"] == "not-applicable")
+        assert all(case["status"] == "passed" or (case["capability"] in {"native-replica", "durable-commands"} and case["status"] == "not-applicable")
                    for case in result["conformance"])
         assert len(result["deterministic_negatives"]) == 5
         assert "copies" in manifest["unsupported"] and "migration" in manifest["unsupported"]
@@ -67,8 +67,8 @@ def test_legacy_reference_reports_replica_not_applicable_without_hiding_broken_a
     legacy = replace(reference, contract=None)
     manifest = sample_configurations(candidate, legacy, artifacts, combinations_count=1)[0]
     result = replay_configuration(manifest, candidate, legacy)
-    replicas = [case for case in result["conformance"] if case["capability"] == "native-replica"]
-    assert [case["status"] for case in replicas] == ["not-applicable"]
+    replicas = [case for case in result["conformance"] if case["capability"] in {"native-replica", "durable-commands"}]
+    assert [case["status"] for case in replicas] == ["not-applicable", "not-applicable"]
     assert not any(case["status"] == "failed" for case in result["conformance"])
 
 

@@ -266,3 +266,29 @@ def test_failed_legacy_uninstall_is_reported_before_cleaning_metadata(tmp_path, 
     assert legacy.is_dir()
     assert legacy_plugin.is_dir()
     assert len(commands) == 2
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_reviewed_runtime_fixtures_are_explicit_and_imply_development_tools(tmp_path, monkeypatch, enabled):
+    toolkit = tmp_path / "devtools/plugin-devkit"
+    fixture = toolkit / "fixtures/runtime-peers"
+    fixture.mkdir(parents=True)
+    (toolkit / "pyproject.toml").write_text("")
+    (fixture / "pyproject.toml").write_text("")
+    commands = []
+    monkeypatch.setattr(installer, "ROOT", tmp_path)
+    monkeypatch.setattr(installer.subprocess, "run", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--runtime-fixtures"] if enabled else [str(SCRIPT), "--dev"])
+    installer.main()
+    assert str(tmp_path) + "[dev]" in commands[0]
+    assert (str(fixture) in commands[0]) is enabled
+    assert str(toolkit) in commands[0]
+
+
+def test_missing_requested_runtime_fixture_source_fails_before_install(tmp_path, monkeypatch):
+    monkeypatch.setattr(installer, "ROOT", tmp_path)
+    monkeypatch.setattr(installer.subprocess, "run", lambda *_, **__: pytest.fail("Do not install an incomplete requested fixture source"))
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--runtime-fixtures"])
+    with pytest.raises(SystemExit) as rejected:
+        installer.main()
+    assert rejected.value.code == 2

@@ -52,7 +52,12 @@ for name, version in expected.items():
 for name in ('whab', 'whab_plugin_devkit', 'whab_plugin_sqlite', module):
     assert pathlib.Path(importlib.import_module(name).__file__).resolve().is_relative_to(root), name
 entries = tuple(metadata.entry_points(group='whab.plugins'))
-assert len(entries) == 2 and {entry.name for entry in entries} == {'sqlite', identifier}
+selected = {'sqlite', identifier}
+if 'whab_plugin_json' in expected:
+    selected |= {'json', 'synthetic-report-a', 'synthetic-report-b', 'synthetic-brand-a', 'synthetic-brand-b', 'synthetic-import-a', 'synthetic-import-b'}
+    for name in ('whab_plugin_json', 'whab_devkit_runtime_peers'):
+        assert pathlib.Path(importlib.import_module(name).__file__).resolve().is_relative_to(root), name
+assert len(entries) == len(selected) and {entry.name for entry in entries} == selected
 candidate, = (entry for entry in entries if entry.name == identifier)
 assert normalized(candidate.dist.metadata['Name']) == normalized(distribution)
 assert candidate.load().id == identifier
@@ -187,6 +192,13 @@ def main(argv=None):
                         helper.copy_project(ROOT / "devtools/plugin-devkit", base / "toolkit"),
                         helper.copy_project(candidate_source / "plugins/storage/sqlite", base / "sqlite")]
             candidate_version = helper.host_version(projects[0])
+            from packaging.version import Version
+
+            runtime_projects = []
+            if Version(candidate_version) >= Version("2.32.0"):
+                runtime_projects = [helper.copy_project(candidate_source / "plugins/storage/json", base / "json"),
+                                    helper.copy_project(ROOT / "devtools/plugin-devkit/fixtures/runtime-peers", base / "runtime-peers")]
+                projects.extend(runtime_projects)
             if args.project is not None and candidate_version == MINIMUM_HOST_VERSION:
                 raise ValueError("External CI requires distinct genuine minimum and candidate host artifacts.")
             host_versions = [candidate_version]
@@ -212,6 +224,9 @@ def main(argv=None):
                               reference_versions["minimum" if version == MINIMUM_HOST_VERSION else "candidate"])
                              for version in host_versions}
             host_wheels = {version: helper.wheel_for(wheels, "whab", version) for version in host_versions}
+            runtime_wheels = [helper.wheel_for(wheels, helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["name"],
+                                               helper.tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"])
+                              for project in runtime_projects]
             for version, host in host_wheels.items():
                 helper.run([sys.executable, "-I", "-m", "pip", "--isolated", "download", "--index-url", "https://pypi.org/simple", "--disable-pip-version-check", "--only-binary=:all:", "--dest", str(wheels),
                             str(host), str(toolkit), str(sqlite_wheels[version]), *helper.TEST_REQUIREMENTS], cwd=base, env=env)
@@ -257,11 +272,14 @@ def main(argv=None):
                     module = candidate_registration(candidate, identifier)
                     candidate_record = helper.wheel_record(candidate)
                     command = [str(python), "-I", "-m", "pip", "install", "--no-index", "--find-links", str(wheels),
-                               str(host), str(toolkit), str(sqlite), str(candidate) + "[test]", *helper.TEST_REQUIREMENTS]
+                               str(host), str(toolkit), str(sqlite), str(candidate) + "[test]", *helper.TEST_REQUIREMENTS,
+                               *(str(wheel) for wheel in runtime_wheels if Version(version) >= Version("2.32.0"))]
                     subprocess.run(command, cwd=work, env=env, check=True)
                     subprocess.run([str(python), "-I", "-m", "pip", "check"], cwd=work, env=env, check=True)
                     expected = {"whab": version, "whab_plugin_devkit": toolkit_version,
                                 "whab_plugin_sqlite": sqlite_version, candidate_record["distribution"]: candidate_record["version"]}
+                    if Version(version) >= Version("2.32.0"):
+                        expected.update({record["distribution"]: record["version"] for record in map(helper.wheel_record, runtime_wheels)})
                     installation = work / "installation.json"
                     subprocess.run([str(python), "-I", "-c", VERIFY_PROJECT, json.dumps(expected), identifier,
                                     candidate_record["distribution"], module, str(wheels), str(installation)], cwd=work, env=env, check=True)
@@ -278,7 +296,7 @@ def main(argv=None):
                     helper.validate_toolkit_coverage(json.loads((work / "coverage.json").read_text()), installed["sources"], work, label="Candidate plugin")
                     output = work / "configurations"
                     subprocess.run([str(python), "-I", "-m", "whab_plugin_devkit.cli", "check", "--plugin", identifier,
-                                    "--combinations", "10", "--seed", "2026", "--wheelhouse", str(wheels), "--output", str(output)],
+                                    "--runtime", "--combinations", "10", "--seed", "2026", "--wheelhouse", str(wheels), "--output", str(output)],
                                    cwd=work, env=env, check=True)
                     manifests = configuration_manifests(output)
                     for path in sorted(output.glob("configuration-*.json")):
