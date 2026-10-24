@@ -5,7 +5,7 @@ outside runtime plugin discovery directories and contributes no runtime entry po
 Install it beside the host SDK and the plugin being tested; it does not require
 the bundled plugin set, a SQLite implementation, a provider account, or pytest at runtime.
 
-The toolkit provides synchronous storage conformance, five complete teaching
+The toolkit provides synchronous storage conformance, six complete teaching
 project generators and constrained configuration replay through public
 `whab.plugins` contracts. It requires Python 3.14+ and WHAB 2.22+ within major 2.
 Compatibility ranges require testing the minimum supported host artifact and the
@@ -289,7 +289,7 @@ and coverage result. It contains no financial records, snapshots, credentials or
 temporary runtime paths. Dependencies/build tools may need network access while
 preparing wheels; no provider account or bank connection is used. This initial
 gate validates maintained artifacts. The separate generated-project gate builds
-all five projects using an installed toolkit and validates every project wheel
+all six projects using an installed toolkit and validates every project wheel
 outside the checkout:
 
 ```sh
@@ -350,7 +350,7 @@ file at 100% statement/branch coverage, ten distinct configurations, all adverti
 SQLite reference suites, and all ten exact-artifact replays. Missing/empty/skipped
 project tests and missing/broken advertised suites fail. Unsupported optional
 reference capabilities remain explicit `not-applicable` results; they are never
-used to hide failures. The installed profile covers the five generated teaching families and their
+used to hide failures. The installed profile covers the six generated teaching families and their
 explicit public probes. The API native recipe also tests its scoped HTTP/worker
 behavior; this is not arbitrary provider or all-family lifecycle certification. Add project-specific public-contract tests when extending them.
 
@@ -388,3 +388,11 @@ success and failure. Archived evidence contains approved wheels, versions/hashes
 source commit identities, test counts and fictional replay files, without runtime
 homes or ledger payloads. Preserve the wheelhouse for offline replay. The repository
 CI calls this same reusable workflow for its maintained fictional branding example.
+
+## Visual interface projects
+
+`whab-plugin new fictional-ui --capability ui` generates a complete read-only visual project for WHAB 2.36+ and toolkit 0.7+. Select its singleton with `WHAB_UI=fictional-ui`, outside the optional peer list. The `native-ui-v1` format-2 recipe keeps earlier local/API profile meanings and tests this exact approved candidate in an immutable worker, four coherent HTTPS pages, public assets supplied in its resource record, dirty-view deferral, exact preview/commit correlation, disable/re-enable and exact saved-worker/generation reopen. It also retains the constrained peer/order/sequence, primary/copy directions and public faults of the local profile. It does not claim distinct-version upgrades or private durable-boundary faults. Authors can call `assert_visual_interface(runtime, plugin, asset_name="app.js")` to name an asset in their own behavioral tests.
+
+The genuine visual minimum recipe is source `a866eda580c6e363a20636785bc4b4003db0652f`, WHAB 2.36.0. Toolkit imports and the original generated families retain their actual 2.22 floor; unsupported older-host visual runtime profiles are N/A, never passes. The generated JavaScript has no editable fields; an editable UI must preserve its own drafts and withhold its browser acknowledgement until saving/cancelling is complete.
+
+`NativeRuntime` keeps its startup/HTTP deadline separate from the bounded management deadline: `transition_timeout=180` allows the host's 120-second environment preparation and subsequent handover to finish. It accepts at most 300 seconds. A terminal failed operation fails the suite immediately; the longer preparation allowance does not convert failures to passes. Each genuine host also receives a compatible JSON reference wheel from its source recipe when the current backend requires a newer host.
