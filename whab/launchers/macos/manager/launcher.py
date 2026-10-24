@@ -37,8 +37,11 @@ PLUGINS = (
 MAX_DOWNLOAD = 128 * 1024 * 1024
 MAX_EXTRACTED = 512 * 1024 * 1024
 DEFAULT_ROOT = Path.home() / "Library/Application Support/WHAB/launcher"
-RUNTIME_NAMES = {".env", "plugins.json", "data", "budgets", "tls", "cache"}
-SOURCE_PRIVATE = {".env", ".venv", ".git", "data", "budgets", "tls", "work", "build", "dist"}
+BACKUP_FORMAT = 2
+LOCAL_STORAGE = {"sqlite", "json"}
+RUNTIME_NAMES = {".env", "plugins.json", "data", "budgets", "tls", "cache",
+                 "plugin-workers", "visual-ui", "remote-client", "storage-authority", "storage-instances"}
+SOURCE_PRIVATE = RUNTIME_NAMES | {".venv", ".git", "work", "build", "dist"}
 SOURCE_CACHES = {"__pycache__", ".pytest_cache", ".ruff_cache"}
 
 
@@ -276,6 +279,8 @@ def source_files(app):
     for directory, directories, files in os.walk(app):
         root = Path(directory)
         ignored = SOURCE_CACHES | (SOURCE_PRIVATE if root == app else set())
+        if root == app:
+            ignored |= {name for name in (*directories, *files) if name.startswith((".whab-", ".plugins-"))}
         directories[:] = sorted(name for name in directories if name not in ignored)
         for name in directories:
             if (root / name).is_symlink():
@@ -296,7 +301,7 @@ def copy_seed_source(seed, destination):
     def ignore_private(directory, names):
         ignored = set(names) & SOURCE_CACHES
         if Path(directory) == app:
-            ignored |= set(names) & SOURCE_PRIVATE
+            ignored |= {name for name in names if name in SOURCE_PRIVATE or name.startswith((".whab-", ".plugins-"))}
         return ignored
     shutil.copytree(app, destination / "whab/app", symlinks=False, ignore=ignore_private)
 
@@ -343,21 +348,101 @@ def runtime_references(home):
             path = Path(values[key]).expanduser()
             references.append(path if path.is_absolute() else home / path)
     references.extend(Path(value).expanduser() for value in values.get("WHAB_BUDGET_COPIES", "").split(os.pathsep) if value)
-    if values.get("WHAB_STORAGE", "sqlite") != "sqlite":
+    if values.get("WHAB_STORAGE", "sqlite") not in LOCAL_STORAGE:
         raise LauncherError("external_runtime", "This runtime uses external storage. Back up that storage and update it manually.")
-    for pattern in ("index-*.json", "**/copies.json"):
-        for path in (home / "budgets").glob(pattern):
+    budgets = home / "budgets"
+    if budgets.is_symlink():
+        raise LauncherError("external_runtime", "Runtime budget directories must not be symbolic links.")
+    scopes = []
+    for budget in sorted(budgets.iterdir()) if budgets.is_dir() else ():
+        if budget.is_symlink():
+            raise LauncherError("external_runtime", "Runtime budget directories must not be symbolic links.")
+        if budget.is_dir():
+            for environment in ("sandbox", "production"):
+                scope = budget / environment
+                if scope.is_symlink():
+                    raise LauncherError("external_runtime", "Runtime budget directories must not be symbolic links.")
+                if scope.is_dir():
+                    scopes.append(scope)
+    # Only host-owned records describe budget references. Package resources
+    # inside a worker environment can also be named manifest.json/copies.json.
+    for paths in (budgets.glob("index-*.json"), (scope / "copies.json" for scope in scopes)):
+        for path in paths:
+            if not path.exists() and not path.is_symlink():
+                continue
             entries = read_json(path, [])
             if not isinstance(entries, list) or any(not isinstance(entry, dict) or not isinstance(entry.get("path"), str) for entry in entries):
                 raise LauncherError("invalid_runtime", "A saved budget location record could not be validated for backup.")
             references.extend(Path(entry["path"]).expanduser() for entry in entries)
-    for path in (home / "budgets").glob("**/manifest.json"):
+    for scope in scopes:
+        path = scope / "manifest.json"
+        if not path.exists() and not path.is_symlink():
+            continue
         manifest = read_json(path, {})
-        if not isinstance(manifest, dict) or manifest.get("storage", "sqlite") != "sqlite":
+        if (not isinstance(manifest, dict) or type(manifest.get("storage", "sqlite")) is not str
+                or manifest.get("storage", "sqlite") not in LOCAL_STORAGE):
             raise LauncherError("external_runtime", "A budget uses external storage. Back up that storage and update it manually.")
     if any(not path.is_absolute() or not path.resolve().is_relative_to(home.resolve()) for path in references):
         raise LauncherError("external_runtime", "This runtime references budgets, copies, or TLS files outside its home. Move those files and settings into the runtime home, or make a complete backup and update manually.")
     return [path.parent.resolve() / path.name for path in references]
+
+
+
+def _code_link_record(home, path, target):
+    """Describe a standard venv alias without traversing or executing its target.
+
+    Code archives require explicit rebuilding. A ready content-addressed manifest
+    identifies the only directories in which interpreter aliases may occur.
+    Financial/state paths never receive this exception.
+    """
+    relative = path.relative_to(home)
+    parts = relative.parts
+    offset = 0
+    if parts[:1] == ("budgets",):
+        if len(parts) < 4 or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}", parts[1]) or parts[2] not in {"sandbox", "production"}:
+            raise LauncherError("external_runtime", "A runtime code alias is outside a supported budget scope.")
+        offset = 3
+    code = parts[offset:]
+    if (len(code) not in {5, 6} or code[:2] != ("plugin-workers", "environments")
+            or not re.fullmatch(r"[a-f0-9]{64}", code[2]) or code[3] != "environment"):
+        raise LauncherError("external_runtime", "Runtime symbolic links require a separate complete backup plan.")
+    for parent in path.parents:
+        if parent == home:
+            break
+        if parent.is_symlink():
+            raise LauncherError("external_runtime", "Runtime code directories must not be symbolic links.")
+    ready = read_json(home.joinpath(*parts[:offset + 3]) / "ready.json", {})
+    if (not isinstance(ready, dict) or ready.get("identifier") != code[2]
+            or type(ready.get("installation_sha256")) is not str
+            or not re.fullmatch(r"[a-f0-9]{64}", ready["installation_sha256"])
+            or type(ready.get("format")) is not int or ready["format"] not in {1, 2}
+            or (ready["format"] == 1 and "family" in ready)
+            or (ready["format"] == 2 and ready.get("family") != "storage")):
+        raise LauncherError("invalid_runtime", "An immutable worker environment has no valid ready manifest. Preserve it and finish its stopped recovery before updating.")
+    manifest = {key: value for key, value in ready.items() if key not in {"identifier", "installation_sha256"}}
+    raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    if hashlib.sha256(raw).hexdigest() != code[2]:
+        raise LauncherError("invalid_runtime", "An immutable worker environment ready manifest does not match its content address.")
+    python = r"(?:python(?:3(?:\.(?:1[4-9]|[2-9][0-9]))?)?|𝜋thon)"
+    interpreter = len(code) == 6 and code[4] == "bin" and re.fullmatch(python, code[5])
+    internal = len(code) == 5 and code[4] == "lib64" and target == "lib"
+    if (type(target) is not str or not 1 <= len(target) <= 4096 or "\x00" in target
+            or not (internal or (interpreter and re.fullmatch(python, Path(target).name)
+                    and (Path(target).is_absolute() or "/" not in target)))):
+        raise LauncherError("external_runtime", "Only standard immutable worker interpreter aliases can be archived. Other symbolic links require a separate backup plan.")
+    return {"path": relative.as_posix(), "target": target}
+
+
+def runtime_code_links(home):
+    links, size = [], 0
+    for path in runtime_files(home):
+        if path.is_symlink() and path.name != ".env":
+            record = _code_link_record(home, path, os.readlink(path))
+            size += len(json.dumps(record).encode()) + 2
+            if len(links) >= 4096 or size > 1024 * 1024:
+                raise LauncherError("invalid_runtime", "Runtime worker code aliases exceed the supported backup metadata limit.")
+            links.append(record)
+    return links
 
 
 def runtime_files(home):
@@ -383,25 +468,74 @@ def runtime_files(home):
                 if path in seen:
                     continue
                 seen.add(path)
-                if path.is_symlink() or not (path.is_file() or path.is_dir()):
+                if path.is_symlink():
+                    _code_link_record(home, path, os.readlink(path))
+                elif not (path.is_file() or path.is_dir()):
                     raise LauncherError("external_runtime", "Keep runtime files inside the runtime home before updating; symbolic links and special files need a separate backup plan.")
                 yield path
 
 
-def runtime_fingerprint(home):
-    digest = hashlib.sha256()
-    if not home.exists():
-        return digest.hexdigest()
-    for path in runtime_files(home):
-        if path.is_file():
-            relative = str(path.relative_to(home)).encode()
-            digest.update(len(relative).to_bytes(8, "big"))
-            digest.update(relative)
-            digest.update(path.stat().st_size.to_bytes(8, "big"))
+
+@contextlib.contextmanager
+def runtime_backup_locks(home):
+    """A stopped child retaining a native/control lease cannot race the copy."""
+    descriptors = []
+    try:
+        for path in runtime_files(home):
+            if path.name.endswith(".lock") and not path.is_dir():
+                if len(descriptors) >= 4096:
+                    raise LauncherError("invalid_runtime", "Runtime lock ownership exceeds the supported backup limit.")
+                descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+                descriptors.append(descriptor)
+                try:
+                    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    raise LauncherError("runtime_busy", "A stopped runtime owner still holds a private state lease. Preserve the runtime and finish its cleanup before updating.") from None
+        yield
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
+def _fingerprint(home, paths, archived_links=()):
+    digest = hashlib.sha256(b"whab-runtime-backup-v2\x00")
+    entries = {path.relative_to(home).as_posix(): path for path in paths
+               if path.is_symlink() or path.is_file()}
+    if type(archived_links) not in {list, tuple} or len(archived_links) > 4096:
+        raise LauncherError("invalid_state", "Invalid archived worker code aliases.")
+    archived = {}
+    for record in archived_links:
+        if type(record) is not dict or record.keys() != {"path", "target"} or type(record["path"]) is not str:
+            raise LauncherError("invalid_state", "Invalid archived worker code aliases.")
+        path = home / record["path"]
+        if (Path(record["path"]).is_absolute() or not path.is_relative_to(home) or ".." in path.relative_to(home).parts
+                or record["path"] in entries or record["path"] in archived):
+            raise LauncherError("invalid_state", "Invalid archived worker code aliases.")
+        canonical = _code_link_record(home, path, record["target"])
+        if canonical != record:
+            raise LauncherError("invalid_state", "Invalid archived worker code aliases.")
+        archived[record["path"]] = canonical
+    for relative in sorted(set(entries) | set(archived)):
+        path = entries.get(relative)
+        record = archived.get(relative)
+        if record is None and path.is_symlink() and path.name != ".env":
+            record = _code_link_record(home, path, os.readlink(path))
+        raw_name = relative.encode()
+        digest.update(len(raw_name).to_bytes(8, "big"))
+        digest.update(raw_name)
+        if record is not None:
+            raw = record["target"].encode()
+            digest.update(b"link\x00" + len(raw).to_bytes(8, "big") + raw)
+        else:
+            digest.update(b"file\x00" + path.stat().st_size.to_bytes(8, "big"))
             with path.open("rb") as incoming:
                 while block := incoming.read(1024 * 1024):
                     digest.update(block)
     return digest.hexdigest()
+
+
+def runtime_fingerprint(home, *, archived_links=()):
+    return _fingerprint(home, runtime_files(home), archived_links)
 
 
 def available_port(port):
@@ -775,22 +909,42 @@ class Manager:
 
     def backup(self, home, previous):
         ensure_backup_scope(home)
+        with runtime_backup_locks(home):
+            return self._backup_files(home, previous)
+
+    def _backup_files(self, home, previous):
         private_directory(self.root / "backups")
         directory = self.root / "backups" / f"{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{uuid.uuid4().hex[:8]}"
         private_directory(directory)
         try:
             fingerprint = runtime_fingerprint(home)
+            code_links = runtime_code_links(home)
+            environments = [path.relative_to(home).as_posix() for path in runtime_files(home)
+                            if path.name == "environment" and path.is_dir()
+                            and path.parent.parent.name == "environments"
+                            and path.parent.parent.parent.name == "plugin-workers"
+                            and re.fullmatch(r"[a-f0-9]{64}", path.parent.name)]
+            if len(environments) > 4096:
+                raise LauncherError("invalid_runtime", "Too many immutable worker environments for a private backup.")
             private_directory(directory / "runtime")
+            copied = []
             for path in runtime_files(home):
                 target = directory / "runtime" / path.relative_to(home)
+                if path.is_symlink() and path.name != ".env":
+                    continue  # Literal aliases are archived as data, never followed.
                 if path.is_dir():
                     private_directory(target)
                 else:
                     private_directory(target.parent)
                     shutil.copyfile(path, target, follow_symlinks=True)
                     target.chmod(0o600)
-            write_json(directory / "backup.json", {"runtime_home": str(home), "environment_target": str((home / '.env').resolve()) if (home / '.env').is_symlink() else None, "build": previous.get("build") if previous else None, "fingerprint": fingerprint, "created_at": time.time()})
-            return {"directory": str(directory), "fingerprint": fingerprint}
+                    copied.append(target)
+            if (_fingerprint(directory / "runtime", copied, code_links) != fingerprint
+                    or runtime_fingerprint(home) != fingerprint):
+                raise LauncherError("invalid_runtime", "Runtime files changed while the private backup was being created. Preserve the stopped runtime and retry.")
+            write_json(directory / "backup.json", {"format": BACKUP_FORMAT, "runtime_home": str(home), "environment_target": str((home / '.env').resolve()) if (home / '.env').is_symlink() else None, "build": previous.get("build") if previous else None, "fingerprint": fingerprint, "code_links": code_links, "environment_archives": environments, "requires_environment_rebuild": bool(environments), "created_at": time.time()})
+            return {"format": BACKUP_FORMAT, "directory": str(directory), "fingerprint": fingerprint,
+                    "requires_environment_rebuild": bool(environments)}
         except (LauncherError, OSError, ValueError, subprocess.SubprocessError):
             shutil.rmtree(directory, ignore_errors=True)
             raise
@@ -902,8 +1056,11 @@ class Manager:
         if self.running_record():
             raise LauncherError("running", "Stop WHAB before considering rollback.")
         home = absolute(self.config()["runtime_home"])
+        backup = transition["backup"]
+        if type(backup) is not dict or backup.get("format") != BACKUP_FORMAT or backup.get("requires_environment_rebuild") is not False:
+            raise LauncherError("recovery_required", "This backup cannot prove code-only rollback under the complete runtime contract. Preserve the current home and recover a matching full backup separately; immutable worker environments require explicit reviewed rebuilding.")
         ensure_backup_scope(home)
-        if runtime_fingerprint(home) != transition["backup"]["fingerprint"]:
+        if runtime_code_links(home) or runtime_fingerprint(home) != backup["fingerprint"]:
             raise LauncherError("recovery_required", "Runtime files changed after the update. A code-only rollback cannot prove schema compatibility. Preserve the current runtime and manually recover the matching full backup into a separate directory before changing code.")
         write_json(self.root / "active.json", previous)
         transition["state"] = "rolled_back"
