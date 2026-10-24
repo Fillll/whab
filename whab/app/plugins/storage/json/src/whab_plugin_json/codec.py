@@ -13,7 +13,15 @@ from whab.domain.ledger_state import initial_state, portable_snapshot, restore_s
 from whab.domain.money import MAX_SAFE_INTEGER
 from whab.domain.portable import validate_portable_budget
 from whab.domain.receipts import MAX_RECEIPT_BYTES, receipt_media_type
-from whab.plugins.storage_transfer import encode_local_state, local_state_digest, storage_identifier
+from whab.plugins.storage_replica import read_replica_watermark
+from whab.plugins.storage_transfer import (
+    CommitEvidence,
+    LocalTransferSnapshot,
+    encode_local_state,
+    local_state_digest,
+    read_operation_receipt,
+    storage_identifier,
+)
 
 from .authority import validate_metadata
 
@@ -216,36 +224,57 @@ def _pack_ledger(state, *, portable=False, complete_associations=True):
 
 def decode(raw):
     value = parse(raw)
-    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2}:
+    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2, 3}:
         raise StoreError("This JSON storage schema is newer or unsupported; install a compatible plugin.")
     fields = {"formatVersion", "generation", "operationId", "authorityEpoch", "workspaces"}
-    _exact(value, fields | ({"authority"} if value["formatVersion"] == 2 else set()))
+    _exact(value, fields | ({"authority"} if value["formatVersion"] >= 2 else set()))
     _integer(value["generation"])
     if value["formatVersion"] == 1:
         _uuid(value["operationId"])
     else:
         if value["operationId"] is not None:
             storage_identifier(value["operationId"])
-        value["authority"] = validate_metadata(value["authority"])
+        value["authority"] = validate_metadata(value["authority"], replica=value["formatVersion"] == 3)
         if any(read["evidence"]["generation"] > value["generation"] for read in value["authority"]["receipts"]):
             _invalid()
     _uuid(value["authorityEpoch"])
     _exact(value["workspaces"], {"personal", "demo"})
     document = {**value, "workspaces": {
-        name: _read_ledger(value["workspaces"][name], name, complete_associations=value["formatVersion"] == 2)
+        name: _read_ledger(value["workspaces"][name], name, complete_associations=value["formatVersion"] >= 2)
         for name in ("personal", "demo")
     }}
-    if value["formatVersion"] == 2 and value["authority"]["receipts"]:
-        digest = local_state_digest(*encode_local_state(document["workspaces"], validate=False))
+    if value["formatVersion"] >= 2:
+        financial, protected = encode_local_state(document["workspaces"], validate=False)
+        digest = local_state_digest(financial, protected)
         if any(record["evidence"]["generation"] == value["generation"] and record["evidence"]["state_digest"] != digest
                for record in value["authority"]["receipts"]):
             _invalid()
+        if value["formatVersion"] == 3 and value["authority"]["replica"] is not None:
+            watermark = read_replica_watermark(value["authority"]["replica"])
+            if value["authority"]["role"] == "copy" and (
+                value["authorityEpoch"] != watermark.source_authority_epoch
+                or value["generation"] != watermark.source_generation
+                or value["operationId"] != watermark.source_operation_id
+                or digest != watermark.state_digest
+            ):
+                _invalid()
+            if value["authority"]["role"] == "copy":
+                source = CommitEvidence(
+                    value["authority"]["budgetId"], value["authority"]["environment"], watermark.source_instance_id,
+                    watermark.source_authority_epoch, watermark.source_generation, watermark.source_operation_id,
+                    "primary", watermark.state_digest,
+                )
+                snapshot = LocalTransferSnapshot(source, financial, protected, tuple(
+                    read_operation_receipt(record) for record in value["authority"]["receipts"]
+                ))
+                if snapshot.digest != watermark.transfer_digest:
+                    _invalid()
     return document
 
 
 def encode(document):
     value = {**document, "workspaces": {
-        name: _pack_ledger(state, complete_associations=document["formatVersion"] == 2)
+        name: _pack_ledger(state, complete_associations=document["formatVersion"] >= 2)
         for name, state in document["workspaces"].items()
     }}
     raw = serialize(value)

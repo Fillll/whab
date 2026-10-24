@@ -398,7 +398,7 @@ def test_transfer_target_policy_refuses_unsupported_or_non_staged_storage(author
         snapshot = None
     try:
         before = destination.commit_evidence()
-        assert not destination.preview_local(snapshot).supported
+        assert destination.preview_local(snapshot).supported is (kind == "copy")
         with pytest.raises(StoreError):
             destination.import_local("transfer", snapshot)
         assert destination.commit_evidence() == before

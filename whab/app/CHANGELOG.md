@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.30.0 — 2026-10-23
+
+PR: [#87](https://github.com/Fillll/whab/pull/87)
+
+- Synchronize a single authoritative SQLite or JSON primary to fenced native copies, retaining independent financial and opaque-namespace watermarks. Keep primary saves successful when copying fails and discover missed work after restart.
+- Add explicit caught-up promotion through the versioned authority journal, fresh epochs, validation and source fencing. Preserve acknowledged later writes, original containers and protected same-device state through interruption and repeated reopen.
+- Add public replica conformance without changing the toolkit minimum host; verify both concrete adapters, process termination and installed CA-verified HTTPS promotion in both directions.
+
 ## 2.29.0 — 2026-10-23
 
 PR: [#86](https://github.com/Fillll/whab/pull/86)

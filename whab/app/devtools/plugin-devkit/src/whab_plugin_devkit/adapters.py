@@ -35,9 +35,13 @@ class BackendAdapter:
         object.__setattr__(self, "capabilities", capabilities)
         object.__setattr__(self, "config", MappingProxyType(dict(self.config)))
 
-    def open(self, home: Path, *, reopen=False, environment="sandbox"):
+    def open(self, home: Path, *, reopen=False, environment="sandbox", initial_role="primary"):
         factory = self.reopen_factory if reopen and self.reopen_factory else self.factory
-        return factory(StorageContext(home, environment, self.config))
+        # Keep the ordinary path usable on the kit's oldest supported SDK.
+        context = StorageContext(home, environment, self.config) if initial_role == "primary" else StorageContext(
+            home, environment, self.config, initial_role=initial_role,
+        )
+        return factory(context)
 
 
 class BackendHarness:
@@ -57,12 +61,12 @@ class BackendHarness:
     def __enter__(self):
         return self
 
-    def open(self, name="budget-a", *, reopen=False, environment="sandbox"):
+    def open(self, name="budget-a", *, reopen=False, environment="sandbox", initial_role="primary"):
         if type(name) is not str or not name or name in {".", ".."} or "/" in name or "\\" in name:
             raise ValueError("Use one temporary budget name.")
         home = self.home / name
         home.mkdir(mode=0o700, exist_ok=True)
-        backend = self.adapter.open(home, reopen=reopen, environment=environment)
+        backend = self.adapter.open(home, reopen=reopen, environment=environment, initial_role=initial_role)
         self._backends.append(backend)
         return backend
 

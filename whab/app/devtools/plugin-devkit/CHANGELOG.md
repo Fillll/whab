@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.3.0 — 2026-10-23
+
+PR: [#87](https://github.com/Fillll/whab/pull/87)
+
+- Add the optional public native-replica suite for fenced copy updates, monotonic financial/namespace generations, exact retries, explicit promotion and acknowledged post-promotion reopen.
+- Retain actual WHAB 2.22 compatibility through public capability applicability and old-signature adapters; fail falsely advertised replica behavior instead of skipping it.
+
 ## 0.2.0 — 2026-10-23
 
 PR: [#82](https://github.com/Fillll/whab/pull/82)

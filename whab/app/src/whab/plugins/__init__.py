@@ -72,12 +72,14 @@ from .sdk import (
     ReceiptSelectionIndex,
     ReceiptStorage,
     ReceiptTransactionLookup,
+    ReplicaWatermark,
     StorageAuthority,
     StorageBackend,
     StorageCommands,
     StorageContext,
     StorageFactory,
     StorageOperation,
+    StorageReplica,
     TransactionRegister,
     TransactionRegisterFiltered,
     TransactionRegisterPage,
@@ -91,6 +93,8 @@ from .sdk import (
 )
 
 __all__ = [
+    "ReplicaWatermark",
+    "StorageReplica",
     "Capability",
     "CapabilityError",
     "PluginContract",

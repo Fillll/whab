@@ -6,7 +6,7 @@ personal and fictional demo workspaces in one versioned JSON data file at
 different files. It uses no database driver or other storage implementation.
 The host supplies financial commands, currency rules and workspace projections.
 
-Install its wheel with a compatible host (WHAB 2.23+ within major 2), then select
+Install its wheel with a compatible host (WHAB 2.30+ within major 2), then select
 `WHAB_STORAGE=json` for a new original runtime or initial CLI budget creation.
 An opened budget chooses its backend through its manifest. Selecting JSON does
 not migrate an existing ledger. JSON belongs to the supported bundled set;
@@ -47,17 +47,19 @@ separate coordination requirement.
 
 ## Local authority and complete transfer
 
-Native schema 2 adds persistent instance identity, role, transition identity and
-durable command receipts. Opening native schema 1 adds that metadata through the
-same atomic commit path, preserving its epoch, generation and financial records.
+Native schema 2 added persistent instance identity, role, transition identity and
+durable command receipts. Native schema 3 adds replica watermarks and prepared
+promotion identity. Opening schema 1 or 2 upgrades through the same atomic commit
+path, preserving its epoch, generation, financial records and existing identities.
 Before changing the active file, the upgrader durably saves its exact private
-bytes in a sibling `<active filename>.schema1-recovery` artifact with private file
+bytes in a sibling `<active filename>.schema1-recovery` or `.schema2-recovery`
+artifact with private file
 permissions. It never overwrites that artifact: an existing different recovery
 file stops the upgrade and preserves both originals. Disk-full or backup-flush
-failure retains schema 1 as authoritative. The recovery artifact is never selected
+failure retains the original schema as authoritative. The recovery artifact is never selected
 as active storage or included in portable exports; protect it like the live ledger.
-An older JSON plugin that supports only schema 1 must not open schema 2. Restore an
-appropriate preserved schema-1 artifact before downgrading; it represents the state
+An older JSON plugin must not open a newer native schema. Restore an
+appropriate preserved artifact before downgrading; it represents the state
 before upgrading and excludes later changes. Runtime keys remain outside both
 files. Portable `budget.json` payloads retain their sanitized format 1.
 
@@ -79,6 +81,24 @@ checking the old generation. Conflicting operation identities fail. At most 4,09
 receipts are retained; an expired or unknown operation with stale evidence is
 rejected instead of executed. The host owns migration decisions, copy promotion and
 recovery orchestration through these optional public contracts.
+
+The version-1 `storage.replica` contract updates a `copy` instance from a coherent
+primary snapshot. `apply_replica()` commits both workspaces, protected provider
+records, durable command receipts and its `ReplicaWatermark` in one replacement.
+The copy retains its own instance identity and records the source instance, epoch,
+generation and operation identity. The watermark also identifies the host-owned
+namespace generation/digest; opaque plugin files remain the host's responsibility.
+Exact replay is harmless after a missing response. Older financial or namespace
+generations, a changed source/epoch and conflicting same-generation payloads fail
+without replacing saved copy data. Reopening validates native copy data against
+its persisted watermark. Copy failure does not change the primary's commit.
+
+Promotion is explicit. `prepare_promotion()` compares complete copy evidence and
+the exact watermark, then durably records the transition and blocks further copy
+updates. A matching `abort_promotion()` removes that preparation without changing
+data. The host must catch up, validate namespaces, fence the primary and durably
+choose authority before `set_role()` activates the prepared copy with a fresh
+epoch. Neither a copy nor a stale queued update can activate itself.
 
 Serialization and durability are synchronous I/O. The host's existing blocking-I/O
 execution path must call storage methods; do not call a full-file mutation directly
@@ -123,7 +143,7 @@ silently truncate it or change authority.
 The parser rejects duplicate fields, excessive nesting, unsupported schemas,
 nonfinite values, invalid monetary types, dangling/duplicate references and malformed
 receipt encoding. Corrupted/truncated files fail explicitly and are preserved.
-No schema upgrade is currently needed or advertised beyond native/payload version 1.
+Portable payloads remain format 1 and never contain replica or authority metadata.
 
 ## Validation and measured limits
 

@@ -1,5 +1,12 @@
 # SQLite budget storage plugin changelog
 
+## 1.11.0 — 2026-10-23
+
+PR: [#87](https://github.com/Fillll/whab/pull/87)
+
+- Atomically persist fenced replica data, complete encrypted provider/receipt state and source/namespace watermarks. Reject stale jobs and ordinary copy writes; bind explicit promotion before fresh-epoch activation.
+- Preserve existing ledgers through additive replica metadata and require WHAB 2.30+. Verify transactional failures, process termination, promotion/reopen and public conformance at 100% statement and branch coverage.
+
 ## 1.10.0 — 2026-10-23
 
 PR: [#84](https://github.com/Fillll/whab/pull/84)

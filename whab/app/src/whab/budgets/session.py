@@ -144,6 +144,7 @@ class BudgetSession:
         self.storage_home = self.home / "budgets" / self.id / environment
         self.lock = RLock()
         self.store = None
+        self.after_checkpoint = None
         self.missing_plugins = []
         self.destinations = []
         self.status = "saved"
@@ -526,6 +527,11 @@ class BudgetSession:
                     destination["status"] = "saved"
                 except (OSError, StoreError):
                     destination["status"] = "pending"
+            if self.after_checkpoint:
+                try:
+                    self.after_checkpoint()
+                except Exception:
+                    pass
 
     def _check_copy_content(self, destination, candidate):
         path = Path(destination["path"])
@@ -610,6 +616,7 @@ class TrackedStorage:
         self.lock = session.lock if session else RLock()
         self.on_mutation = None
         self.after_ingestion = None
+        self.after_commit = None
         self.storage_plugin_id = None
 
     def retarget(self, backend, runtime, plugin_id):
@@ -639,6 +646,12 @@ class TrackedStorage:
                     self.session.checkpoint()
                 if name in {"apply_sync", "import_workspace"} and self.after_ingestion:
                     self.after_ingestion()
+                if self.after_commit:
+                    try:
+                        self.after_commit()
+                    except Exception:
+                        # Native financial success is independent of copy work.
+                        pass
                 return result
 
         return invoke

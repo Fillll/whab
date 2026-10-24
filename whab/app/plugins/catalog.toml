@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "3a492a368d840a87836669e9670168c697585e3b"
+documentation_ref = "a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -113,3 +113,18 @@ whab_plugin_web = "1.25.1"
 whab_plugin_client = "1.5.0"
 whab_plugin_json = "1.1.0"
 whab_plugin_sqlite = "1.10.0"
+
+[[verification]]
+id = "pr87-installed-copy-promotion"
+date = "2026-10-23"
+host_version = "2.30.0"
+source_commit = "a5d98b21e1dbcb5fd4a27eeeb41b366bdee1a8c7"
+selection = ["sqlite", "json"]
+method = "installed-wheel"
+tests = ["tests/web/test_storage_replicas.py", "tests/budgets/test_namespace_archives.py", "installed native HTTPS copy/promotion/reopen verification", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/87"]
+scope = "Built the exact committed host and two backend wheels into a fresh environment outside the checkout. Native HTTPS explicitly trusted only each temporary runtime CA. Separate fictional named-budget runs alternated SQLite-primary/JSON-copy and JSON-primary/SQLite-copy; these are explicit primary/copy roles, never two authoritative registrations in one registry. Verified preview/attachment, saved watermark, namespace-only revision with financial generation unchanged, late acknowledged primary writes, explicit promotion with fresh epoch and source fence, acknowledged destination writes, two complete process reopens, opaque model/file and exact original-container preservation. No bank/provider plugin or connection was used. Source tests additionally exercised fourteen process-termination promotion boundaries. The full gate passed 4356 Python tests, all thirteen plugins at 100% statement/branch coverage, browser checks and external minimum/current artifacts; visual copy controls and storage-worker upgrades were not implemented."
+[verification.artifacts]
+whab = "2.30.0"
+whab_plugin_sqlite = "1.11.0"
+whab_plugin_json = "1.2.0"

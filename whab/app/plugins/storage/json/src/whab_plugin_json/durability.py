@@ -59,18 +59,28 @@ def flush_directory(directory):
 
 
 def preserve_schema_one(path, raw):
-    """Keep exact private recovery bytes before acknowledging native schema 2.
+    """Keep exact private schema-1 bytes before acknowledging a native upgrade."""
+    _preserve_schema(path, raw, 1)
+
+
+def preserve_schema_two(path, raw):
+    """Keep exact private schema-2 bytes before acknowledging native schema 3."""
+    _preserve_schema(path, raw, 2)
+
+
+def _preserve_schema(path, raw, version):
+    """Keep exact private recovery bytes before acknowledging a native upgrade.
 
     A hard-link publication refuses to replace an existing recovery artifact.
     That artifact is never selected as an active file or a portable payload.
     """
-    recovery = path.with_name(path.name + ".schema1-recovery")
+    recovery = path.with_name(path.name + f".schema{version}-recovery")
     temporary = None
     try:
         previous = read_file(recovery)
         if previous is not None:
             if previous != raw:
-                raise StoreError("The existing schema-1 recovery artifact differs; preserve both files before upgrading JSON storage.")
+                raise StoreError(f"The existing schema-{version} recovery artifact differs; preserve both files before upgrading JSON storage.")
             descriptor = os.open(recovery, os.O_RDONLY | os.O_NOFOLLOW)
             try:
                 os.fchmod(descriptor, 0o600)
@@ -78,7 +88,7 @@ def preserve_schema_one(path, raw):
             finally:
                 os.close(descriptor)
         else:
-            descriptor, temporary = tempfile.mkstemp(prefix=".whab-schema1-", dir=path.parent)
+            descriptor, temporary = tempfile.mkstemp(prefix=f".whab-schema{version}-", dir=path.parent)
             try:
                 with os.fdopen(descriptor, "wb", closefd=False) as target:
                     target.write(raw)
@@ -90,7 +100,7 @@ def preserve_schema_one(path, raw):
             Path(temporary).unlink()
         flush_directory(path.parent)
     except OSError:
-        raise StoreError("JSON schema-1 recovery could not be durably saved; the original file remains authoritative.") from None
+        raise StoreError(f"JSON schema-{version} recovery could not be durably saved; the original file remains authoritative.") from None
     finally:
         if temporary is not None:
             try:
