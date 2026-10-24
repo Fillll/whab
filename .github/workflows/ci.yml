@@ -13,6 +13,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  external-plugin-contracts:
+    name: Reusable external plugin workflow
+    uses: ./.github/workflows/plugin-conformance.yml
+    with:
+      plugin-id: example-branding
+      project-directory: whab/app/plugins/example/example-branding
+      whab-ref: ${{ github.sha }}
+
   checks:
     name: CI (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest

@@ -5,6 +5,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -116,7 +117,25 @@ def minimum_host_source(base, environment):
     return project
 
 
-def reference_projects(candidate, minimum):
+def source_at_revision(base, environment, revision):
+    """Build candidate source from an exact local Git object, never an index host."""
+    if type(revision) is not str or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise ValueError("Choose a full lowercase 40-character candidate source commit.")
+    archive = base / "candidate-host.tar"
+    with archive.open("wb") as output:
+        run(["git", "archive", "--format=tar", revision, "--",
+             "whab/app/src", "whab/app/pyproject.toml", "whab/app/README.md", "whab/app/LICENSE",
+             "whab/app/plugins/storage/sqlite/src", "whab/app/plugins/storage/sqlite/pyproject.toml",
+             "whab/app/plugins/storage/sqlite/README.md", "whab/app/plugins/storage/sqlite/LICENSE"],
+            cwd=ROOT.parents[1], env=environment, stdout=output)
+    with tarfile.open(archive) as source:
+        source.extractall(base / "candidate-source", filter="data")
+    project = base / "candidate-source/whab/app"
+    host_version(project)
+    return project
+
+
+def reference_projects(candidate, minimum, *, candidate_host=None):
     """Pair each host with a genuine compatible reference from its source artifact."""
     def supports(project, version):
         metadata = tomllib.loads((project / "pyproject.toml").read_text())["project"]
@@ -126,7 +145,7 @@ def reference_projects(candidate, minimum):
             raise ValueError("The reference backend must declare one unconditional host compatibility range.")
         return version in hosts[0].specifier
 
-    if not supports(candidate, host_version(ROOT)):
+    if not supports(candidate, host_version(candidate_host if candidate_host is not None else ROOT)):
         raise ValueError("The candidate reference backend does not support the candidate host.")
     selected = candidate if supports(candidate, MINIMUM_HOST_VERSION) else minimum / "plugins/storage/sqlite"
     if not supports(selected, MINIMUM_HOST_VERSION):
@@ -140,7 +159,7 @@ def reference_projects(candidate, minimum):
 
 def wheel_record(path):
     with zipfile.ZipFile(path) as wheel:
-        metadata_name, = (name for name in wheel.namelist() if name.endswith(".dist-info/METADATA"))
+        metadata_name, = (name for name in wheel.namelist() if name.count("/") == 1 and name.endswith(".dist-info/METADATA"))
         metadata = BytesParser().parsebytes(wheel.read(metadata_name))
     return {"filename": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             "distribution": metadata["Name"], "version": metadata["Version"]}
@@ -154,24 +173,25 @@ def wheel_for(wheels, distribution, version):
     return matches[0]
 
 
-def validate_test_results(path):
+def validate_test_results(path, *, minimum_count=None):
     suites = tuple(ET.parse(path).getroot().iter("testsuite"))
     counts = {name: sum(int(suite.get(name, 0)) for suite in suites)
               for name in ("tests", "failures", "errors", "skipped")}
-    if counts["tests"] < MINIMUM_TEST_COUNT or any(counts[name] for name in ("failures", "errors", "skipped")):
+    minimum = MINIMUM_TEST_COUNT if minimum_count is None else minimum_count
+    if counts["tests"] < minimum or any(counts[name] for name in ("failures", "errors", "skipped")):
         raise ValueError("The external toolkit suite must run completely with no failed, errored, or skipped tests.")
     return counts
 
 
-def validate_toolkit_coverage(report, expected_sources, cwd):
+def validate_toolkit_coverage(report, expected_sources, cwd, *, label="Toolkit"):
     if report.get("meta", {}).get("branch_coverage") is not True:
-        raise ValueError("Toolkit coverage must measure branches.")
+        raise ValueError(f"{label} coverage must measure branches.")
     measured = {(cwd / name).resolve(): record for name, record in report["files"].items()}
     expected = {Path(name).resolve() for name in expected_sources}
     if not expected or expected - measured.keys():
-        raise ValueError("Toolkit source was omitted from installed-artifact coverage.")
+        raise ValueError(f"{label} source was omitted from installed-artifact coverage.")
     if any(measured[path]["summary"][name] for path in expected for name in ("missing_lines", "missing_branches")):
-        raise ValueError("Toolkit source requires 100% statement and branch coverage.")
+        raise ValueError(f"{label} source requires 100% statement and branch coverage.")
 
 
 def check_host(label, host_wheel, toolkit_wheel, sqlite_wheel, wheelhouse, tests, base, environment):

@@ -44,6 +44,24 @@ def test_artifact_evidence_binds_installed_files_versions_and_exact_wheel_hash(t
         artifacts.installed_artifacts(wheelhouse, ["fictional"])
 
 
+def test_vendored_metadata_is_package_data_and_not_an_ambiguous_outer_distribution(tmp_path, monkeypatch):
+    wheelhouse, installed, wheel, distribution = wheel_fixture(tmp_path)
+    name, raw = "fictional/_vendor/other-1.dist-info/METADATA", b"Name: other\nVersion: 1\n"
+    with zipfile.ZipFile(wheel, "a") as archive:
+        archive.writestr(name, raw)
+        archive.writestr("fictional/_vendor/other-1.dist-info/RECORD", b"vendored-record\n")
+    path = installed / name
+    path.parent.mkdir(parents=True)
+    path.write_bytes(raw)
+    record = path.with_name("RECORD")
+    record.write_bytes(b"vendored-record\n")
+    monkeypatch.setattr(artifacts.metadata, "distribution", lambda _: distribution)
+    assert artifacts.installed_artifacts(wheelhouse, ["fictional"])[0]["distribution"] == "fictional"
+    record.write_bytes(b"tampered-vendored-record\n")
+    with pytest.raises(ValueError, match="Installed artifacts"):
+        artifacts.installed_artifacts(wheelhouse, ["fictional"])
+
+
 def test_missing_or_wrong_installed_versions_do_not_count_as_approved_artifacts(tmp_path, monkeypatch):
     wheelhouse, _, _, distribution = wheel_fixture(tmp_path)
     monkeypatch.setattr(artifacts.metadata, "distribution", lambda _: SimpleNamespace(version="2"))
@@ -190,6 +208,8 @@ def test_selection_verifies_wheel_evidence_before_loading_any_descriptor(monkeyp
 
 def test_cli_new_check_and_replay_preserve_manifests_and_hide_failure_payloads(tmp_path, monkeypatch, capsys, candidate, reference, artifacts_data):
     assert cli.main(["new", "created", "--capability", "reporting", "--directory", str(tmp_path / "created")]) == 0
+    assert cli.main(["new", "with-ci", "--capability", "reporting", "--directory", str(tmp_path / "with-ci"), "--ci-ref", "a" * 40]) == 0
+    assert (tmp_path / "with-ci/.github/workflows/whab.yml").is_file()
     monkeypatch.chdir(tmp_path)
     assert cli.main(["new", "default", "--capability", "branding"]) == 0
     monkeypatch.setattr(cli, "_selected", lambda *_: (candidate, reference, artifacts_data))

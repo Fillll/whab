@@ -68,7 +68,7 @@ def installed_artifacts(wheelhouse, required):
                 names = [entry.filename for entry in entries]
                 if len(names) != len(set(names)):
                     raise ValueError()
-                metadata_name, = (name for name in names if name.endswith(".dist-info/METADATA"))
+                metadata_name, = (name for name in names if name.count("/") == 1 and name.endswith(".dist-info/METADATA"))
                 prefix = metadata_name.removesuffix("METADATA")
                 if not {prefix + "WHEEL", prefix + "RECORD"} <= set(names):
                     raise ValueError()
@@ -93,7 +93,7 @@ def installed_artifacts(wheelhouse, required):
                     parts = relative.rstrip("/").split("/")
                     if any(part in {"", ".", ".."} for part in parts) or "\\" in relative or ":" in relative:
                         raise ValueError()
-                    if entry.is_dir() or relative.endswith(".dist-info/RECORD"):
+                    if entry.is_dir() or relative == prefix + "RECORD":
                         continue
                     if ".data/" in relative:
                         _, scheme, relative = relative.split("/", 2)

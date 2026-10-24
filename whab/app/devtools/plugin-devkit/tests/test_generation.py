@@ -60,3 +60,20 @@ def test_generator_output_contains_no_unexpanded_identity_tokens(tmp_path):
     assert all("__PLUGIN_ID__" not in path.read_text() and "__MODULE__" not in path.read_text()
                for path in project.rglob("*") if path.is_file())
     assert json.dumps({"project": project.name})
+
+
+def test_generated_reusable_ci_pins_workflow_and_candidate_to_reviewed_commit(tmp_path):
+    revision = "a" * 40
+    project = generate_project("fictional-report", "reporting", tmp_path / "project", ci_ref=revision)
+    workflow = (project / ".github/workflows/whab.yml").read_text()
+    assert f"plugin-conformance.yml@{revision}" in workflow
+    assert f"whab-ref: {revision}" in workflow and "plugin-id: fictional-report" in workflow
+    assert "contents: read" in workflow and "secrets:" not in workflow
+    assert "__CI_REF__" not in workflow and "__PLUGIN_ID__" not in workflow
+
+
+@pytest.mark.parametrize("revision", ["main", "abcd", "A" * 40, 42])
+def test_generator_rejects_mutable_or_malformed_ci_revision_before_creating_project(tmp_path, revision):
+    with pytest.raises(ValueError, match="published full"):
+        generate_project("fictional", "reporting", tmp_path / "project", ci_ref=revision)
+    assert not tuple(tmp_path.iterdir())
