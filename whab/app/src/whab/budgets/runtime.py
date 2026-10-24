@@ -558,6 +558,36 @@ class BudgetRuntime:
         _timeout(retirement_timeout)
         return await self._owned(self._close(drain_timeout, retirement_timeout))
 
+    async def shutdown(self, *, drain_timeout=30, retirement_timeout=5):
+        """Retire all owned resources at host exit without deciding authority.
+
+        An uncertain activation remains uncertain in its owner's durable record.
+        Closing its resources grants neither candidate nor active new writes.
+        Recovery on the next process start must validate that record first.
+        """
+        if self._inherited() is not None:
+            raise RuntimeTransitionError("transition_in_operation")
+        _timeout(drain_timeout)
+        _timeout(retirement_timeout)
+        return await self._owned(self._shutdown(drain_timeout, retirement_timeout))
+
+    async def _shutdown(self, drain_timeout, retirement_timeout):
+        async with self._serial:
+            with self._condition:
+                if self._closed:
+                    return
+                self._gate = True
+                resources = list(self._active.resources)
+                if self._uncertain:
+                    resources.extend(resource for resource in self._uncertain[1].resources
+                                     if all(resource is not previous for previous in resources))
+            self._progress("draining", 50)
+            await self._wait(lambda: not self._leases, drain_timeout, "drain_timeout")
+            with self._condition:
+                self._closed = True
+            await self._retire(tuple(resources), (), retirement_timeout)
+            self._progress("closed", 100)
+
     async def _close(self, drain_timeout, retirement_timeout):
         async with self._serial:
             self._check_transition()

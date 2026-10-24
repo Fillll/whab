@@ -512,7 +512,7 @@ class BudgetRuntimeRequests:
         self.runtime = runtime
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope["path"] == "/api/plugins/runtime":
+        if scope["type"] != "http" or scope["path"] in {"/api/plugins/runtime", "/api/plugins/management/recover"}:
             await self.app(scope, receive, send)
             return
         try:
@@ -529,7 +529,7 @@ class BudgetDispatch:
         self.host = host
 
     async def _dispatch(self, target, identifier, scope, receive, send):
-        if scope["type"] != "http" or scope["path"] == "/api/plugins/runtime":
+        if scope["type"] != "http" or scope["path"] in {"/api/plugins/runtime", "/api/plugins/management/recover"}:
             await target(scope, receive, send)
             return
         # A catalog download deliberately reaches the default controller before

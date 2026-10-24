@@ -19,6 +19,35 @@ def service(value):
     return SimpleNamespace(read=lambda: value)
 
 
+def test_host_shutdown_retires_both_uncertain_generations_without_deciding_authority():
+    async def scenario():
+        closed = []
+        active = RuntimeResource("first", lambda: closed.append("active"))
+        prepared = RuntimeResource("second", lambda: closed.append("candidate"))
+        runtime = BudgetRuntime("fictional-budget", {"report": service("old")}, (active,))
+
+        def candidate(preparation):
+            preparation.own(prepared)
+            return RuntimeCandidate({"report": service("new")}, (prepared,))
+
+        def uncertain(*_):
+            raise OSError("synthetic lost activation response")
+
+        with pytest.raises(RuntimeTransitionError, match="handover"):
+            await runtime.transition(candidate, commit=uncertain)
+        assert not closed and runtime.status()["health"] == "recovery_required"
+        await runtime.shutdown()
+        await runtime.shutdown()  # Shutdown is idempotent, never a new decision.
+        assert closed == ["candidate", "active"]
+        assert runtime.status()["admission"] == "closed"
+        assert runtime.status()["health"] == "recovery_required"
+        assert runtime.status()["generation"] == 1
+        with pytest.raises(RuntimeTransitionError):
+            async with runtime.request():
+                pass
+    asyncio.run(scenario())
+
+
 def test_operations_keep_one_generation_and_other_budgets_remain_available():
     async def scenario():
         retired = []

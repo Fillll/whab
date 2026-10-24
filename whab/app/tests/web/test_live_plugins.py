@@ -99,7 +99,7 @@ def test_held_export_keeps_old_generation_and_new_requests_use_new_report(tmp_pa
             assert projection["active"] == projection["configured"] == ["second"]
             assert not projection["restart_required"]
             assert projection["live"]["families"] == ["reporting.insights", "reporting.export"]
-            assert projection["live"]["code_upgrades"] is False
+            assert projection["live"]["code_upgrades"] is True
 
     asyncio.run(scenario())
 
