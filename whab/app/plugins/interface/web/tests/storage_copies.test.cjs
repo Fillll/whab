@@ -300,7 +300,7 @@ test('opening the copy dialog blocks ordinary navigation but permits its own gua
 
 test('app integration uses the real save guard and honors existing navigation vetoes', async () => {
   const app = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/app.js'), 'utf8');
-  const hook = app.slice(app.lastIndexOf('initStorageCopies({beforeChange:'));
+  const hook = app.slice(app.lastIndexOf('initStorageCopies({beforeChange:'), app.indexOf('\nconst uiViews ='));
   const order = []; let options, allowed = true;
   const context = {initStorageCopies: value => {options = value;},
     document: {dispatchEvent: event => {order.push(event.type); assert.equal(event.detail.source, 'storage-copies'); return allowed;}},

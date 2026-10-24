@@ -114,6 +114,7 @@ def test_open_and_repeatable_copy_options_save_the_same_budget(launch, tmp_path)
         assert decode_bundle(second.read_bytes()) == original
         assert app.state.budget_session.name == "Household"
     finally:
+        asyncio.run(app.state.budget_runtime.shutdown())
         app.state.store.close()
     # A supervisor or ordinary repeated launch can keep the same --copy flags.
     reopened = create_app(settings=settings)
@@ -121,6 +122,7 @@ def test_open_and_repeatable_copy_options_save_the_same_budget(launch, tmp_path)
         assert len(reopened.state.budget_session.destinations) == 2
         assert decode_bundle(first.read_bytes()) == decode_bundle(path.read_bytes())
     finally:
+        asyncio.run(reopened.state.budget_runtime.shutdown())
         reopened.state.store.close()
 
 

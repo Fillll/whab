@@ -123,7 +123,9 @@ def validate_catalog(value):
                 if support == "declarative-api-worker":
                     allowed.add("interface.api")
                     _require("interface.api" in capability_names)
-                _require(not row["legacy"] and support in {"stateless-report-worker", "stateless-optional-worker", "declarative-api-worker", "categorization-host", "categorization-worker"}
+                if support == "visual-ui-worker":
+                    allowed = {"interface.ui"}
+                _require(not row["legacy"] and support in {"stateless-report-worker", "stateless-optional-worker", "declarative-api-worker", "categorization-host", "categorization-worker", "visual-ui-worker"}
                          and (support == "categorization-host" or row["state_version"] == 1)
                          and not row["state_upgrades"] and bool(capability_names)
                          and capability_names <= allowed and all(capability["version"] == 1 for capability in row["capabilities"]))

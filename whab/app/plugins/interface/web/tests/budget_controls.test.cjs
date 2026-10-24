@@ -377,7 +377,7 @@ function budgetForm(key, assigned, inline = true) {
     [inline ? 'data-inline-assignment' : 'data-budget-mutation']: ''});
 }
 
-function editorHarness({initialInline = 1000, validate = false, onDraft = () => {}, auto = false} = {}) {
+function editorHarness({initialInline = 1000, validate = false, onDraft = () => {}, auto = false, generation} = {}) {
   const tree = (inline = 1000, inspector = 1000) => element('div', 'budget-planner', [
     budgetForm('rent', inline), budgetForm('inspector', inspector, false),
     ...(auto ? [element('form', 'rollover', [
@@ -390,9 +390,11 @@ function editorHarness({initialInline = 1000, validate = false, onDraft = () => 
   const document = {activeElement: null, querySelector: () => planner, handlers: new Map(),
     addEventListener(event, handler) {this.handlers.set(event, handler);},
     removeEventListener(event, handler) {if (this.handlers.get(event) === handler) this.handlers.delete(event);}};
-  const state = {planner, document, calls, refreshes, navigations, fresh: tree(initialInline), tree};
+  const state = {planner, document, calls, refreshes, navigations, fresh: tree(initialInline), tree,
+    pageContext: {uiGeneration: generation}, responseGeneration: generation};
   const runtime = {
     document,
+    getContext: () => state.pageContext,
     window: {scrollY: 0, handlers: new Map(),
       addEventListener(event, handler) {this.handlers.set(event, handler);},
       removeEventListener(event, handler) {if (this.handlers.get(event) === handler) this.handlers.delete(event);}},
@@ -425,7 +427,7 @@ function editorHarness({initialInline = 1000, validate = false, onDraft = () => 
 }
 
 async function refreshEditor(state, index = state.refreshes.length - 1) {
-  state.refreshes[index].resolve({ok: true, text: async () => ''});
+  state.refreshes[index].resolve({ok: true, headers: {get: () => state.responseGeneration}, text: async () => ''});
   await tick();
 }
 
@@ -458,6 +460,7 @@ test('disposal refuses a fresh draft, an active write and its pending totals ref
   const form = state.planner.firstChild;
   const input = form.querySelector('input');
   input.value = '1200'; input.fire('input');
+  assert.equal(state.controller.dirty, true);
   assert.equal(state.controller.dispose(), false);
   assert.ok(listenerCount(state.planner) > 0);
   input.fire('blur');
@@ -468,8 +471,33 @@ test('disposal refuses a fresh draft, an active write and its pending totals ref
   state.fresh = state.tree(1200);
   await refreshEditor(state);
   assert.equal(state.controller.dispose(), true);
+  assert.equal(state.controller.dirty, false);
   assert.equal(listenerCount(state.planner), 0);
   assert.equal(state.calls.length, 1);
+});
+
+test('a different visual generation never patches an old budget editor or repeats its acknowledged save', async () => {
+  const state = editorHarness({generation: 'a'.repeat(64)});
+  const form = state.planner.firstChild;
+  const input = form.querySelector('input');
+  input.value = '1200'; input.fire('input'); input.fire('blur');
+  state.calls[0].resolve(); await tick();
+  state.fresh = state.tree(9999);
+  state.responseGeneration = 'b'.repeat(64);
+  await refreshEditor(state);
+  assert.equal(input.value, '1200');
+  assert.equal(state.calls.length, 1);
+  assert.equal(state.controller.dirty, true);
+  form.fire('submit');
+  const retry = state.controller.flush();
+  await tick();
+  assert.equal(state.calls.length, 1);
+  state.responseGeneration = state.pageContext.uiGeneration;
+  state.fresh = state.tree(1200);
+  await refreshEditor(state);
+  assert.equal(await retry, true);
+  assert.equal(state.controller.dirty, false);
+  state.controller.dispose();
 });
 
 test('validation and rejected-write errors keep their editor and unload protection until reverted', async () => {

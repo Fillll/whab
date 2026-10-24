@@ -109,6 +109,26 @@ class CategorizationLifecycle:
         self.ledger, self.context_factory, self.snapshot = ledger, context_factory, snapshot
         self.worker_home, self.environment, self.materialization = worker_home, environment, materialization
         self._effects = {}
+        self._pending_workers = []
+
+    def _close_partial_worker(self, worker):
+        failed = False
+        try:
+            worker.timeout = min(getattr(worker, "timeout", 1), 1)
+            worker.close()
+        except BaseException:
+            failed = True
+        if failed or worker.cleanup_pending:
+            if all(worker is not previous for previous in self._pending_workers):
+                self._pending_workers.append(worker)
+
+    def _retry_pending_workers(self):
+        pending, self._pending_workers = self._pending_workers, []
+        for worker in pending:
+            self._close_partial_worker(worker)
+        if self._pending_workers:
+            raise PluginError("The categorization worker still has pending cleanup.", code="worker_cleanup_pending",
+                              plugin_id=self._pending_workers[0].plugin_id)
 
     def _namespace(self, owner):
         from whab.plugins.namespace_effects import NamespaceScope
@@ -128,7 +148,8 @@ class CategorizationLifecycle:
         from whab.plugins.categorization_worker import WorkerCategorizationFactory
         from whab.plugins.report_worker import ReportWorker
 
-        factories, accesses, namespaces = [], {}, {}
+        self._retry_pending_workers()
+        factories, accesses, namespaces, allocated = [], {}, {}, []
         selected = []
         try:
             for plugin in plugins:
@@ -139,7 +160,8 @@ class CategorizationLifecycle:
                                         if entry.name == plugin.id and getattr(entry, "dist", None) is not None)
                         if entries:
                             entry, = entries
-                            worker = ReportWorker(plugin.id, expected_distribution=entry.dist.metadata["Name"], expected_version=entry.dist.version)
+                            worker = ReportWorker(plugin.id, expected_distribution=entry.dist.metadata["Name"], expected_version=entry.dist.version,
+                                                  on_create=allocated.append)
                             factory = WorkerCategorizationFactory(worker, owns_worker=True)
                     if isinstance(factory, WorkerCategorizationFactory):
                         # Own an installed child before journal open/recovery can
@@ -171,11 +193,18 @@ class CategorizationLifecycle:
             service._readiness_namespaces = tuple(namespaces.values())
             return service
         except BaseException:
+            closed = set()
             for factory in factories:
+                if factory.owns_worker:
+                    closed.add(id(factory.worker))
                 try:
                     factory.close()
                 except Exception:
-                    pass
+                    if factory.owns_worker:
+                        self._close_partial_worker(factory.worker)
+            for worker in allocated:
+                if id(worker) not in closed:
+                    self._close_partial_worker(worker)
             for access in (*accesses.values(), *namespaces.values()):
                 access.close()
             raise
@@ -210,9 +239,12 @@ class CategorizationLifecycle:
         return True
 
     def close(self):
-        for manager in self._effects.values():
-            manager.close()
-        self._effects.clear()
+        try:
+            self._retry_pending_workers()
+        finally:
+            for manager in self._effects.values():
+                manager.close()
+            self._effects.clear()
 
     @staticmethod
     def resource(service, owner):

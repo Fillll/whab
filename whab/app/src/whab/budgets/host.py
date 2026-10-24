@@ -30,7 +30,11 @@ from .runtime import RuntimeTransitionError
 from .session import BudgetSession, container_digest
 
 COOKIE = "whab-budget"
-_CONTROL_PATHS = frozenset({"/api/plugins/runtime", "/api/plugins/catalog", "/api/plugins/management/recover", "/api/storage/status", "/api/storage/recover", "/api/storage/copies"})
+_CONTROL_PATHS = frozenset({"/api/plugins/runtime", "/api/plugins/runtime/cleanup", "/api/plugins/catalog", "/api/plugins/management/recover", "/api/storage/status", "/api/storage/recover", "/api/storage/copies", "/api/ui/status", "/api/ui/recover", "/api/ui/views"})
+
+
+def runtime_control(path):
+    return path in _CONTROL_PATHS or path.startswith("/api/ui/views/")
 
 
 def request_password(request):
@@ -520,7 +524,7 @@ class BudgetRuntimeRequests:
         self.runtime = runtime
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope["path"] in _CONTROL_PATHS:
+        if scope["type"] != "http" or runtime_control(scope["path"]):
             await self.app(scope, receive, send)
             return
         try:
@@ -537,7 +541,7 @@ class BudgetDispatch:
         self.host = host
 
     async def _dispatch(self, target, identifier, scope, receive, send):
-        if scope["type"] != "http" or scope["path"] in _CONTROL_PATHS:
+        if scope["type"] != "http" or runtime_control(scope["path"]):
             await target(scope, receive, send)
             return
         # A catalog download deliberately reaches the default controller before
@@ -595,7 +599,7 @@ class BudgetDispatch:
         try:
             if not valid_route_key(key):
                 raise ValueError
-            if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/")):
+            if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/", "/ui/")):
                 if tail.endswith("/webhook"):
                     raise ValueError
             else:
@@ -638,7 +642,7 @@ class BudgetDispatch:
         scoped["whab.workspace"] = "demo" if key == "demo" else "personal"
         scoped["whab.personal_key"] = self.host.route_key(self.host.default_id)
         scoped["whab.routing"] = self.host
-        if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/")):
+        if tail.startswith(("/api/", "/static/", "/plugins/", "/imports/", "/ui/")):
             scoped["path"] = tail
             scoped["raw_path"] = tail.encode("utf-8")
             if tail.startswith("/api/"):

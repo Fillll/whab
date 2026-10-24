@@ -120,6 +120,26 @@ def _interface_adapter(node):
         return False
 
 
+def _visual_adapter(node):
+    try:
+        names = ("templates", "static", "build_context", "budget_months", "lightweight_transactions",
+                 "lightweight_accounts", "transaction_page_size", "resources", "render", "view_protocol")
+        fields = _constructor(node, "UserInterface", names)
+        if fields.keys() - set(names) or "build_context" not in fields:
+            return False
+        protocol = _literal(fields["view_protocol"]) if "view_protocol" in fields else 0
+        if type(protocol) is not int or protocol != 1 or "render" in fields and _literal(fields["render"]) is not None:
+            return False
+        for name, default, lower, upper in (("budget_months", 1, 1, 12), ("transaction_page_size", 0, 0, 1000)):
+            value = _literal(fields[name]) if name in fields else default
+            if type(value) is not int or not lower <= value <= upper:
+                return False
+        return all(name not in fields or type(_literal(fields[name])) is bool
+                   for name in ("lightweight_transactions", "lightweight_accounts"))
+    except (ValueError, TypeError, KeyError):
+        return False
+
+
 def descriptor_metadata(module_path, attribute, root):
     tree = ast.parse(source_text(module_path, root))
     descriptor = _constructor(_assignment(tree, attribute), "Plugin", ("id", "display_name", "api_version"))
@@ -164,7 +184,14 @@ def descriptor_metadata(module_path, attribute, root):
         and all(row["version"] == 1 for row in capabilities.values())
         and not (present - {"id", "display_name", "api_version", "contract", "categorization"})
     )
-    if lifecycle == "live" and not (live or optional or categorization):
+    visual = (
+        not legacy and lifecycle == "live" and "ui" in present
+        and set(capabilities) == {"interface.ui"} and state_version == 1 and not upgrades
+        and all(row["version"] == 1 for row in capabilities.values())
+        and not (present - {"id", "display_name", "api_version", "contract", "ui"})
+        and _visual_adapter(descriptor["ui"])
+    )
+    if lifecycle == "live" and not (live or optional or categorization or visual):
         raise ValueError("Live metadata requires an explicit supported capability adapter.")
     return {"id": identifier, "display_name": display, "api_version": _literal(descriptor["api_version"]) if "api_version" in descriptor else 1,
             "capabilities": [capabilities[name] for name in sorted(capabilities)],
@@ -174,7 +201,7 @@ def descriptor_metadata(module_path, attribute, root):
             "state_version": state_version, "state_upgrades": [list(edge) for edge in upgrades],
             "live_support": ("declarative-api-worker" if optional and "interface" in present else
                              "stateless-report-worker" if live else "stateless-optional-worker" if optional
-                             else "categorization-worker" if categorization else "restart-required")}
+                             else "categorization-worker" if categorization else "visual-ui-worker" if visual else "restart-required")}
 
 
 def source_inventory(root=ROOT):
@@ -253,7 +280,7 @@ def catalog_markdown(catalog):
     for row in catalog["plugins"]:
         lifecycle = "Legacy; restart required" if row["legacy"] else row["live_support"]
         lines.append(f'| [{row["id"]}]({row["documentation"]}) | `{row["distribution"]} {row["version"]}` | `{row["requires_host"]}` | {lifecycle} | {row["support"]} |')
-    lines.extend(["", "Explicit stateless report, branding, file-parser, declarative API interface and pure categorization descriptors advertise their supported live-worker adapters. Other entries require restart; backend migration and copies are not inferred from package installation.", "",
+    lines.extend(["", "Explicit stateless report, branding, file-parser, declarative API interface, pure categorization and participating visual descriptors advertise their supported live-worker adapters. Other entries require restart; backend migration and copies are not inferred from package installation.", "",
                   "## Recorded verification", "", "Evidence applies only to its exact host, artifacts and selection. Installed-only artifacts are not proof that their capabilities executed. Draft PR/source verification is not a release or deployment claim.", ""])
     for item in catalog["verifications"]:
         lines.extend([f'### {item["id"]}', "", f'Verified {item["date"]}; host `{item["host_version"]}`. Selected: ' + ", ".join(f'`{value}`' for value in item["selection"]) + ".", "", item["scope"], "",

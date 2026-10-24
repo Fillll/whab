@@ -644,3 +644,54 @@ def test_journal_open_failure_closes_child_acquired_before_namespace_binding(tmp
     with pytest.raises(EffectError):
         lifecycle.initial((descriptor(),))
     assert child.closed == 1
+
+
+def test_partial_worker_hello_failure_retains_owner_and_refuses_another_child_until_reaped(tmp_path, store, monkeypatch):
+    import base64
+    import os
+    import signal
+    import subprocess
+    import sys
+
+    from whab.plugins import report_worker
+    from whab.plugins.wire import Frame
+
+    packet = base64.b64encode(Frame({'bad': 'hello'}).encode()).decode()
+    source = (f'import base64,signal,sys;sys.stdout.buffer.write(base64.b64decode({packet!r}));'
+              'sys.stdout.buffer.flush();signal.pause()')
+    popen, children = subprocess.Popen, []
+    def start(_args, **kwargs):
+        child = popen([sys.executable, '-I', '-u', '-c', source], **kwargs)
+        children.append(child)
+        return child
+    entry = SimpleNamespace(name='first', dist=SimpleNamespace(metadata={'Name': 'fictional-package'}, version='1.0.0'))
+    lifecycle = CategorizationLifecycle(LedgerService(store, budget_id='fictional'),
+        lambda name: local_context(tmp_path, 'fictional', name), lambda _: {},
+        worker_home=tmp_path, materialization=nullcontext)
+    try:
+        with monkeypatch.context() as failure:
+            failure.setattr(report_worker.subprocess, 'Popen', start)
+            failure.setattr(report_worker, '_stop_process_group', lambda _: (_ for _ in ()).throw(OSError('fictional reap failure')))
+            failure.setattr('whab.services.categorization_runtime.metadata.entry_points', lambda **_: (entry,))
+            with pytest.raises(PluginError) as error:
+                lifecycle.initial((descriptor(),))
+            assert error.value.code == 'worker_startup_failed'
+            worker, = lifecycle._pending_workers
+            assert worker.cleanup_pending and children[0].poll() is None
+            with pytest.raises(PluginError) as error:
+                lifecycle.close()
+            assert error.value.code == 'worker_cleanup_pending'
+            with pytest.raises(PluginError) as error:
+                lifecycle._service((descriptor(),))
+            assert error.value.code == 'worker_cleanup_pending'
+            assert len(children) == 1 and lifecycle._pending_workers == [worker]
+        lifecycle.close()
+        assert children[0].poll() is not None and not lifecycle._pending_workers
+        service = lifecycle._service(())
+        assert not service.enabled()
+        service.close()
+    finally:
+        for child in children:
+            if child.poll() is None:
+                os.killpg(child.pid, signal.SIGKILL)
+            child.wait(timeout=5)

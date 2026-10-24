@@ -85,10 +85,12 @@ class PluginManager:
         self.budget_session = budget_session
         self.live = live
         self.required = tuple(dict.fromkeys(name for name in (settings.storage, settings.ui) if name))
+        self.visual_known = frozenset()
         self._lock = Lock()
 
     def _read_selection(self):
-        return self.budget_session.selection if self.budget_session else read_selection(self.settings.home)
+        selected = self.budget_session.selection if self.budget_session else read_selection(self.settings.home)
+        return tuple(name for name in selected if name not in self.visual_known) if selected is not None else None
 
     def projection(self):
         """Safe template/API data; a bad file can be repaired through an explicit save."""
