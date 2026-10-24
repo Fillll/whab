@@ -16,11 +16,15 @@ CLIENT_TOKEN=your-private-token-with-at-least-32-characters
 
 An existing portable budget chooses storage through its manifest rather than `WHAB_STORAGE`; Settings' new-budget action creates SQLite budgets. The installed client is not automatically enabled by installing the supported set.
 
-From client 1.5 / WHAB 2.22, the descriptor declares remote authority through
-`PluginContract(authority="remote")`. Host policies use that declaration (and the
-legacy connection-reader adapter), so independently named remote backends receive
-the same restriction on local bank ingestion and model training. Lifecycle support
-remains restart-only until the host supplies the live transition adapters.
+Client 1.6 requires WHAB 2.39 or newer. The bundled descriptor uses the data-only `RemoteLedgerClient` adapter and
+`PluginContract(authority="remote", lifecycle="live")`. The host owns HTTPS,
+credentials, remote requests, financial validation and the retained connection.
+An isolated descriptor worker returns only protocol/configuration-key metadata;
+it receives no endpoint, bearer token, remote budget ID or financial records.
+Independently named remote backends receive the same restriction on local bank
+ingestion and model training. Legacy callable factories remain restart-required;
+`create_storage`, `RemoteStore` and `connection_configuration` remain available
+as compatibility exports.
 
 `CLIENT_URL` is an HTTPS origin without credentials, a path, query or fragment.
 TLS certificates are verified, redirects are refused and environment proxies are
@@ -46,13 +50,54 @@ a token, and the client adapter never changes a credential's target from file
 contents. Client startup must disable bank ingestion plugins: bank connections
 remain on the server.
 
-A lost command response leaves its request ID, payload and original revision
-pending. Retry the same change to confirm its original result. A different change
-is blocked until that request is resolved. Conflicts require refreshing the
-budget and reviewing the desired change. Pending requests are held in memory;
-after restarting a client, inspect the saved budget before repeating any change
-whose result was unknown. There is no automatic offline write queue or background
-conflict resolution.
+The host provides these local management controls:
+
+- `GET /api/storage/remote/status` reports the exact selected descriptor/version,
+  enabled state, decision revision and unresolved remote outcome.
+- `POST /api/storage/remote/selection` takes `pluginId`, `enabled` and
+  `expectedRevision`. Pausing drains admitted work, retires its descriptor worker
+  and prevents new ledger requests. Local management remains available. Enabling
+  starts the retained approved version; it does not reconnect a bank.
+- Compatible approved wheel upgrades use the existing plugin-management upgrade
+  action. Preparation checks the same normalized HTTPS origin, remote budget and
+  credential binding before publishing one durable decision. Failed preparation
+  preserves the active transport, local revision/retry state and original intent.
+  Code upgrades cannot change authority or rotate credentials implicitly.
+- `POST /api/storage/remote/recover` with `authority` set to `active` or `candidate`
+  validates an uncertain local decision. It sends no financial command.
+
+A remote command first records bounded private intent metadata durably: its
+request ID, canonical command fingerprint, original server revision and scoped
+binding hash. Credentials and the financial body are excluded. A lost result
+blocks new financial changes after code replacement **and after client restart**;
+reads remain available while enabled. Reads, conflicts and restarts never clear
+that marker. The affected budget's status instructs the operator to preserve the
+original change; do not reconnect, discard it, refresh its revision or submit a
+new request identity.
+
+`POST /api/storage/remote/finish` accepts the original `operation`, `workspace`
+and `payload`. The host validates them with its ordinary financial validation and
+requires their canonical form to match the retained fingerprint exactly. It may
+explicitly submit only that original authorized request with its original ID and
+CAS revision. This can finish an originally unexecuted request under an unchanged
+revision; it is not a receipt lookup or automatic reconciliation. A correlated
+successful response durably acknowledges completion. Repeating an acknowledged
+Finish returns completion status, without inventing an original financial result.
+An already captured response with a failed local acknowledgment is flushed
+without another HTTP command. A `409`, including after server restart, retains
+the unknown outcome and requires independent evidence at the authority. There is
+no discard-unknown action, public receipt-proof endpoint, automatic offline write
+queue or background conflict resolution.
+
+Private decisions and outcome metadata remain under the runtime budget's
+`remote-client/` directory, outside portable connection containers. Preserve that
+runtime home and encryption key. A saved descriptor environment from another host
+SDK is refused before executing it; the stopped host helper
+`replace_saved_remote_worker` can prepare an explicitly approved current-host,
+same-binding descriptor using a decision CAS. Exact repair retries acknowledge
+their original receipt without executing old code. Retained immutable environments
+are preserved. Worker processes contain failures and are trusted executable code;
+they are not a security sandbox.
 
 WHAB 2.7 and client plugin 1.2 forward `assign_next_month(workspace, source_month, currency, assigned)` through the same revision and idempotency boundary as category assignments. The server owns persistence and funding validation. Core 2.9 projections advertise `monthlyFundingFlow: true` alongside `nextMonthFundingEditable: true`, exposing independent source-month set-asides and assignable carry-in. Interfaces leave older funding-floor servers read-only until upgraded. Unsupported or rejected commands return a clear error without making up a local allocation. Connection files continue to store only the remote reference; neutral snapshots preserve the server's target-month `futureFunding` records.
 

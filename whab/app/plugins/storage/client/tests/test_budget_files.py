@@ -42,7 +42,9 @@ def test_connection_descriptor_accepts_immutable_files_without_reading_any_ledge
     public = connection_configuration(MappingProxyType(reference()))
     assert public == {"CLIENT_URL": CONNECTION["url"], "CLIENT_BUDGET_ID": CONNECTION["budgetId"]}
     assert "CLIENT_TOKEN" not in public
-    assert plugin.budget_connection is connection_configuration
+    from whab.plugins.remote_client_adapter import connection_settings
+    assert plugin.budget_connection is None
+    assert connection_settings(plugin.storage, MappingProxyType(reference())) == public
 
 
 @pytest.mark.parametrize("existing", [False, True])

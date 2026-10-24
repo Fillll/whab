@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "host_version": "2.38.0",
+  "host_version": "2.39.0",
   "plugins": [
     {
       "api_version": 1,
@@ -15,7 +15,7 @@
       "conflicts": [],
       "display_name": "Bank logos (Icon Horse)",
       "distribution": "whab_plugin_bank_logos",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/interface/bank-logos/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/interface/bank-logos/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "bank-logos",
@@ -58,7 +58,7 @@
       "conflicts": [],
       "display_name": "Remote budget client",
       "distribution": "whab_plugin_client",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/storage/client/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/storage/client/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "client",
@@ -66,12 +66,12 @@
       },
       "id": "client",
       "legacy": false,
-      "lifecycle": "restart",
-      "live_support": "restart-required",
+      "lifecycle": "live",
+      "live_support": "declarative-remote-client-worker",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2.22,<3",
+      "requires_host": "whab>=2.39,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/storage/client",
@@ -79,11 +79,9 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [
-        "pr82-installed-sqlite-web",
-        "pr86-installed-sqlite-web",
-        "pr86-installed-json-web"
+        "pr100-remote-client-lifecycle"
       ],
-      "version": "1.5.0"
+      "version": "1.6.0"
     },
     {
       "api_version": 1,
@@ -103,7 +101,7 @@
       "conflicts": [],
       "display_name": "Month totals example",
       "distribution": "whab_plugin_example",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/example/example/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/example/example/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example",
@@ -143,7 +141,7 @@
       "conflicts": [],
       "display_name": "Fictional API interface",
       "distribution": "whab_plugin_example_api",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/example/example-api/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/example/example-api/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-api",
@@ -182,7 +180,7 @@
       "conflicts": [],
       "display_name": "Fictional branding",
       "distribution": "whab_plugin_example_branding",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/example/example-branding/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/example/example-branding/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-branding",
@@ -221,7 +219,7 @@
       "conflicts": [],
       "display_name": "Exact merchant teaching model",
       "distribution": "whab_plugin_example_categorization",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/example/example-categorization/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/example/example-categorization/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-categorization",
@@ -260,7 +258,7 @@
       "conflicts": [],
       "display_name": "Fictional account import",
       "distribution": "whab_plugin_example_file_import",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/example/example-file-import/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/example/example-file-import/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-file-import",
@@ -299,7 +297,7 @@
       "conflicts": [],
       "display_name": "Fictional visual interface",
       "distribution": "whab_plugin_example_ui",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/example/example-ui/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/example/example-ui/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "example-ui",
@@ -393,7 +391,7 @@
       "conflicts": [],
       "display_name": "JSON",
       "distribution": "whab_plugin_json",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/storage/json/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/storage/json/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "json",
@@ -445,7 +443,7 @@
       "conflicts": [],
       "display_name": "Plaid",
       "distribution": "whab_plugin_plaid",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/ingestion/plaid/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/ingestion/plaid/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "plaid",
@@ -483,7 +481,7 @@
       "conflicts": [],
       "display_name": "Random forest categorization",
       "distribution": "whab_plugin_random_forest_categorization",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/automation/random-forest-categorization/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/automation/random-forest-categorization/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "random-forest-categorization",
@@ -521,7 +519,7 @@
       "conflicts": [],
       "display_name": "Remote budget server",
       "distribution": "whab_plugin_server",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/interface/server/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/interface/server/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "server",
@@ -543,7 +541,8 @@
       "support": "maintained",
       "verifications": [
         "pr92-live-api-interface",
-        "pr92-installed-native-api"
+        "pr92-installed-native-api",
+        "pr100-remote-client-lifecycle"
       ],
       "version": "1.1.0"
     },
@@ -615,7 +614,7 @@
       "conflicts": [],
       "display_name": "SQLite",
       "distribution": "whab_plugin_sqlite",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/storage/sqlite/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/storage/sqlite/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "sqlite",
@@ -640,7 +639,8 @@
         "pr102-local-storage-native-https",
         "pr102-cross-host-storage-repair",
         "pr101-native-outcome-phases",
-        "pr101-installed-native-bank"
+        "pr101-installed-native-bank",
+        "pr100-remote-client-lifecycle"
       ],
       "version": "1.12.0"
     },
@@ -657,7 +657,7 @@
       "conflicts": [],
       "display_name": "WHAB web",
       "distribution": "whab_plugin_web",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/interface/web/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/interface/web/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "web",
@@ -697,7 +697,7 @@
       "conflicts": [],
       "display_name": "Import from YNAB ZIP file",
       "distribution": "whab_plugin_ynab",
-      "documentation": "https://github.com/Fillll/whab/blob/a3f47419af56c0e9052770054dc23ecbbfc34eb2/whab/app/plugins/ingestion/ynab/README.md",
+      "documentation": "https://github.com/Fillll/whab/blob/7edf32678a0a8671441247d934f00b4057ae7cba/whab/app/plugins/ingestion/ynab/README.md",
       "entry_point": {
         "group": "whab.plugins",
         "name": "ynab",
@@ -724,7 +724,7 @@
     }
   ],
   "publisher": {
-    "documentation_ref": "a3f47419af56c0e9052770054dc23ecbbfc34eb2",
+    "documentation_ref": "7edf32678a0a8671441247d934f00b4057ae7cba",
     "maintainer": "Fillll",
     "repository": "https://github.com/Fillll/whab",
     "security": "https://github.com/Fillll/whab/security/advisories/new",
@@ -1349,6 +1349,29 @@
         "installed native HTTPS v1/failed-candidate/v2 bank worker verification",
         "installed native HTTPS exchange-uncertain and captured-native-apply recovery",
         "ordinary stock CLI reopen after acknowledged-write process termination"
+      ]
+    },
+    {
+      "artifacts": {
+        "whab": "2.39.0",
+        "whab_plugin_client": "1.6.0",
+        "whab_plugin_server": "1.1.0",
+        "whab_plugin_sqlite": "1.12.0"
+      },
+      "date": "2026-10-23",
+      "host_version": "2.39.0",
+      "id": "pr100-remote-client-lifecycle",
+      "method": "source-tests",
+      "pull_requests": [
+        "https://github.com/Fillll/whab/pull/100"
+      ],
+      "scope": "Focused tests prepared separately approved synthetic descriptor wheels 1.0, 1.1 and 2.0 against the real current host closure. A missing-setting candidate preserved the active worker; compatible replacement retained the host transport, pending original command and revision, preserved the previous immutable environment and restored the exact saved version after pause/reopen. Explicit original-request completion preserved one acknowledged fictional account. Paused startup executed no descriptor, an incompatible host expectation refused before interpreter execution, and a stopped same-binding repair preserved prior ready metadata. An embedded separate installed native listener test built the real host, SQLite and server wheels outside the checkout, explicitly verified its runtime CA, observed unauthenticated 401/authenticated 200, and exercised the public host-owned remote transport with one acknowledged account. That native transport uses an explicitly supplied test CA; this does not prove stock client CLI private-CA configuration, distinct descriptor upgrades over a native listener, public receipt lookup, remote-server restart retry durability or household deployment. The canonical source suite passed before the narrow follow-ups, but its external API exact replay failed and is not certified by this record.",
+      "selection": [
+        "client"
+      ],
+      "source_commit": "df865488e5b7f9645c96e060c1d8fce4dd261086",
+      "tests": [
+        "tests/plugins/test_remote_client_workers.py"
       ]
     }
   ]

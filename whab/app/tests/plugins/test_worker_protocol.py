@@ -156,7 +156,7 @@ if mode == 'startup-timeout':
     sys.stdin.buffer.read()
     raise SystemExit(0)
 hello = {'kind':'ready','worker':PROTOCOL_VERSION,'sdk':1,'plugin':'fixture','distribution':'fixture-package','version':'1.0.0','host':__version__,'live':True,'capabilities':[{'name':'reporting.insights','version':1},{'name':'reporting.export','version':1}],'insights':True,'export':True,
-         'adapters':{'bank_logos':None,'merchant_logos':False,'file_import':None,'settings':None,'interface':None,'ui':None,'categorization':False,'bank':None},
+         'adapters':{'bank_logos':None,'merchant_logos':False,'file_import':None,'settings':None,'interface':None,'ui':None,'categorization':False,'remote_client':None,'bank':None},
          'contract':{'requires':[],'conflicts':[],'authority':'local','state_version':1,'state_upgrades':[],'lifecycle':'live','legacy':False}}
 if mode.startswith('hello:'):
     hello.update(json.loads(mode.removeprefix('hello:')))
@@ -603,7 +603,7 @@ def test_api_worker_requires_current_host_before_any_dispatch(host, fixture_proc
         "host": host, "insights": False, "export": False,
         "capabilities": [{"name": "interface.api", "version": 1}],
         "adapters": {"bank_logos": None, "merchant_logos": False, "file_import": None,
-                     "settings": None, "interface": adapter, "ui": None, "categorization": False, "bank": None},
+                     "settings": None, "interface": adapter, "ui": None, "categorization": False, "remote_client": None, "bank": None},
     }))
     with pytest.raises(PluginError) as rejected:
         ReportWorker("fixture", timeout=5)
@@ -616,7 +616,7 @@ def test_api_parent_rejects_worker_spec_drift_and_retires_process(fixture_proces
     processes, _ = fixture_process("hello:" + json.dumps({
         "insights": False, "export": False, "capabilities": [{"name": "interface.api", "version": 1}],
         "adapters": {"bank_logos": None, "merchant_logos": False, "file_import": None,
-                     "settings": None, "interface": adapter, "ui": None, "categorization": False, "bank": None},
+                     "settings": None, "interface": adapter, "ui": None, "categorization": False, "remote_client": None, "bank": None},
     }))
     worker = ReportWorker("fixture", timeout=5)
     # This reviewed fixture deliberately returns report-shaped data to a spec

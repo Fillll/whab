@@ -212,6 +212,11 @@ class LedgerService:
             _month(payload["month"])
         return payload
 
+    def validate_command(self, operation, workspace, payload):
+        """Validate and detach a public command without backend access or writes."""
+        self._workspace(workspace)
+        return deepcopy(self._validate(operation, payload))
+
     def command(
         self, operation: str, workspace: str, payload: dict, *,
         request_id: str, expected_revision: str,

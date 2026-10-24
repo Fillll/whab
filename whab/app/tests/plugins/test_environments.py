@@ -551,7 +551,7 @@ def test_synthetic_saved_protocol1_environment_is_fenced_then_explicitly_reprepa
                 assert self.info["worker"] == 1 and self.info["distribution"] == expected_distribution and self.info["version"] == expected_version
                 # New preparation uses this explicit shim only for constructing
                 # a genuine old-format fixture. Restoring later never uses it.
-                self.info["adapters"] = {"bank_logos": None, "merchant_logos": False, "file_import": None, "settings": None, "interface": None, "ui": None, "categorization": False, "bank": None}
+                self.info["adapters"] = {"bank_logos": None, "merchant_logos": False, "file_import": None, "settings": None, "interface": None, "ui": None, "categorization": False, "remote_client": None, "bank": None}
             except BaseException:
                 self._stop()
                 raise

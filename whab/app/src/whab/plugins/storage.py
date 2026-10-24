@@ -3,7 +3,7 @@
 import inspect
 
 from .runtime import PluginError
-from .sdk import StorageBackend
+from .sdk import RemoteLedgerClient, StorageBackend
 
 
 def close_storage(backend):
@@ -19,7 +19,12 @@ def close_storage(backend):
 def open_storage(plugin, context):
     backend = None
     try:
-        backend = plugin.storage(context)
+        if type(plugin.storage) is RemoteLedgerClient:
+            from .remote_client_adapter import create_client
+
+            backend = create_client(plugin.storage, context)
+        else:
+            backend = plugin.storage(context)
         if inspect.isawaitable(backend):
             if inspect.iscoroutine(backend):
                 backend.close()

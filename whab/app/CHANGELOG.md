@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.39.0 — 2026-10-23
+
+PR: [#100](https://github.com/Fillll/whab/pull/100)
+
+- Add declarative remote-client workers with host-owned HTTPS, credentials and financial validation. Drain live pause/resume and same-authority immutable code replacement while retaining the original transport and request/revision identity.
+- Durably retain bounded unknown-write intent across client restart. Explicit Finish accepts only the original validated request and CAS revision; reads, conflicts and restart never clear uncertainty or silently resubmit a new command.
+- Preserve failed candidates, exact saved worker versions and stopped same-binding repairs. Keep legacy client factories restart-required and remote authorities isolated from local ingestion and training.
+
 ## 2.38.0 — 2026-10-23
 
 PR: [#101](https://github.com/Fillll/whab/pull/101)
