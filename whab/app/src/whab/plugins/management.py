@@ -28,6 +28,7 @@ _BUNDLED_METADATA = {
     ("example-ui", "whab_plugin_example_ui:plugin"): ("example", "Fictional visual interface"),
     ("example-bank", "whab_plugin_example_bank:plugin"): ("example", "Offline fictional bank"),
     ("example-remote-client", "whab_plugin_example_remote_client:plugin"): ("example", "Fictional remote ledger client"),
+    ("example-storage", "whab_plugin_example_storage:plugin"): ("example", "Example independent snapshot storage"),
 }
 
 

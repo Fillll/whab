@@ -370,6 +370,87 @@
       "capabilities": [
         {
           "composition": "singleton",
+          "name": "ledger.mutate",
+          "version": 1
+        },
+        {
+          "composition": "singleton",
+          "name": "ledger.read",
+          "version": 1
+        },
+        {
+          "composition": "singleton",
+          "name": "provider.state",
+          "version": 1
+        },
+        {
+          "composition": "singleton",
+          "name": "provider.sync",
+          "version": 1
+        },
+        {
+          "composition": "additive",
+          "name": "receipts",
+          "version": 1
+        },
+        {
+          "composition": "additive",
+          "name": "storage.authority",
+          "version": 1
+        },
+        {
+          "composition": "additive",
+          "name": "storage.commands",
+          "version": 1
+        },
+        {
+          "composition": "additive",
+          "name": "storage.worker",
+          "version": 1
+        },
+        {
+          "composition": "additive",
+          "name": "transfer.neutral",
+          "version": 1
+        },
+        {
+          "composition": "additive",
+          "name": "transfer.prepare",
+          "version": 1
+        }
+      ],
+      "conflicts": [],
+      "display_name": "Example independent snapshot storage",
+      "distribution": "whab_plugin_example_storage",
+      "documentation": "https://github.com/Fillll/whab/blob/5d75262fbf9d7fb242a6873760cceb73a215d1c2/whab/app/plugins/example/example-storage/README.md",
+      "entry_point": {
+        "group": "whab.plugins",
+        "name": "example-storage",
+        "value": "whab_plugin_example_storage:plugin"
+      },
+      "id": "example-storage",
+      "legacy": false,
+      "lifecycle": "live",
+      "live_support": "local-storage-worker",
+      "maintainer": "Fillll",
+      "repository": "https://github.com/Fillll/whab",
+      "requires": [],
+      "requires_host": "whab>=2.41,<3",
+      "requires_python": ">=3.14",
+      "security": "https://github.com/Fillll/whab/security/advisories/new",
+      "source": "whab/app/plugins/example/example-storage",
+      "state_upgrades": [],
+      "state_version": 1,
+      "support": "teaching",
+      "verifications": [],
+      "version": "1.0.0"
+    },
+    {
+      "api_version": 1,
+      "authority": "local",
+      "capabilities": [
+        {
+          "composition": "singleton",
           "name": "interface.ui",
           "version": 1
         }

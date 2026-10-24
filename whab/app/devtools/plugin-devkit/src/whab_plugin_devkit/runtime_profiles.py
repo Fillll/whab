@@ -127,6 +127,10 @@ def _base(manifest):
 def sample_runtime_configurations(candidate, reference, artifacts, *, combinations_count=10, seed=42, bank_fixture=None):
     if bank_fixture is not None and (bank_fixture != "fictional-v1" or not _bank_candidate(candidate)):
         raise ValueError("Opt in only a reviewed pure offline fictional-v1 bank fixture.")
+    if callable(getattr(candidate, "storage", None)):
+        from .storage_profiles import sample_storage_configurations
+
+        return sample_storage_configurations(candidate, reference, artifacts, combinations_count=combinations_count, seed=seed)
     if getattr(candidate, "storage", None) is not None and not callable(candidate.storage):
         from .remote_profiles import sample_remote_configurations
 
@@ -178,6 +182,10 @@ def sample_runtime_configurations(candidate, reference, artifacts, *, combinatio
 
 
 def validate_runtime_manifest(manifest):
+    if type(manifest) is dict and manifest.get("formatVersion") == 4:
+        from .storage_profiles import validate_storage_manifest
+
+        return validate_storage_manifest(manifest)
     if type(manifest) is dict and manifest.get("formatVersion") == 3:
         from .remote_profiles import validate_remote_manifest
 
@@ -254,6 +262,10 @@ def _migrate(runtime, destination):
 
 
 def replay_runtime_configuration(manifest, candidate, reference, *, native=NativeRuntime, wheelhouse=None):
+    if type(manifest) is dict and manifest.get("formatVersion") == 4:
+        from .storage_profiles import replay_storage_configuration
+
+        return replay_storage_configuration(manifest, candidate, reference, wheelhouse=wheelhouse, native=native)
     if type(manifest) is dict and manifest.get("formatVersion") == 3:
         from .remote_profiles import replay_remote_configuration
 

@@ -26,10 +26,13 @@ BANK_MINIMUM_HOST_VERSION = "2.38.0"
 BANK_MINIMUM_HOST_COMMIT = "dd52ec9554ee3c36395f8f2a7c1d2ab5ff00353f"
 REMOTE_MINIMUM_HOST_VERSION = "2.40.0"
 REMOTE_MINIMUM_HOST_COMMIT = "e8fa8585c16d2f8a93b1966315c0fee34eb11d35"
+STORAGE_MINIMUM_HOST_VERSION = "2.41.0"
+STORAGE_MINIMUM_HOST_COMMIT = "c10bf14a96cfd3707124fc2916d794da1b69f41f"
 MINIMUM_RECIPES = {MINIMUM_HOST_VERSION: MINIMUM_HOST_COMMIT, API_MINIMUM_HOST_VERSION: API_MINIMUM_HOST_COMMIT,
                    UI_MINIMUM_HOST_VERSION: UI_MINIMUM_HOST_COMMIT, BANK_MINIMUM_HOST_VERSION: BANK_MINIMUM_HOST_COMMIT,
-                   REMOTE_MINIMUM_HOST_VERSION: REMOTE_MINIMUM_HOST_COMMIT}
-FAMILIES = ("reporting", "branding", "file-import", "categorization", "api", "ui", "bank", "remote-client")
+                   REMOTE_MINIMUM_HOST_VERSION: REMOTE_MINIMUM_HOST_COMMIT,
+                   STORAGE_MINIMUM_HOST_VERSION: STORAGE_MINIMUM_HOST_COMMIT}
+FAMILIES = ("reporting", "branding", "file-import", "categorization", "api", "ui", "bank", "remote-client", "storage")
 BUILD_REQUIREMENTS = ("setuptools==84.2.1",)
 
 
@@ -120,7 +123,7 @@ def project_minimum(project):
     value = tomllib.loads((project / "pyproject.toml").read_text())
     minimum = value.get("tool", {}).get("whab", {}).get("plugin-devkit", {}).get("minimum-host", MINIMUM_HOST_VERSION)
     if type(minimum) is not str or minimum not in MINIMUM_RECIPES:
-        raise ValueError("Choose a supported genuine minimum-host recipe: 2.22.0, 2.34.0, 2.36.0, 2.38.0 or 2.40.0.")
+        raise ValueError("Choose a supported genuine minimum-host recipe: 2.22.0, 2.34.0, 2.36.0, 2.38.0, 2.40.0 or 2.41.0.")
     hosts = [requirement for text in value["project"].get("dependencies", ())
              if canonicalize_name((requirement := Requirement(text)).name) == "whab"]
     if (len(hosts) != 1 or hosts[0].url or hosts[0].marker or hosts[0].extras
@@ -241,7 +244,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, help="Write exact artifacts and complete replay manifests to this JSON file.")
     parser.add_argument("--artifacts-directory", type=Path, help="Preserve approved wheels and replay files in a new directory, including on failure.")
-    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the eight projects.")
+    parser.add_argument("--project", type=Path, help="Build this caller-reviewed external teaching project instead of generating the nine projects.")
     parser.add_argument("--plugin", help="The external project's single public plugin entry-point ID.")
     parser.add_argument("--candidate-ref", help="Full source commit for the external CI candidate host; never downloads a host wheel from an index.")
     parser.add_argument("--extra-wheelhouse", type=Path, help="Additional caller-approved dependency wheels; no candidate dependencies are downloaded.")
@@ -273,7 +276,7 @@ def main(argv=None):
                                     helper.copy_project(ROOT / "devtools/plugin-devkit/fixtures/runtime-peers", base / "runtime-peers")]
                 projects.extend(runtime_projects)
             requested_floors = ({project_minimum(args.project.resolve())} if args.project is not None
-                                else {MINIMUM_HOST_VERSION, API_MINIMUM_HOST_VERSION, UI_MINIMUM_HOST_VERSION, BANK_MINIMUM_HOST_VERSION, REMOTE_MINIMUM_HOST_VERSION})
+                                else {MINIMUM_HOST_VERSION, API_MINIMUM_HOST_VERSION, UI_MINIMUM_HOST_VERSION, BANK_MINIMUM_HOST_VERSION, REMOTE_MINIMUM_HOST_VERSION, STORAGE_MINIMUM_HOST_VERSION})
             if any(Version(candidate_version) < Version(floor) for floor in requested_floors):
                 raise ValueError("The candidate host predates an advertised project minimum.")
             if args.project is not None and candidate_version == MINIMUM_HOST_VERSION:

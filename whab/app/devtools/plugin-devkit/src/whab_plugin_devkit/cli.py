@@ -92,7 +92,12 @@ def main(argv=None):
         if len(raw) > 1024 * 1024:
             raise ValueError("The configuration manifest exceeds its bound.")
         value = _parse(raw)
-        if type(value) is dict and value.get("formatVersion") == 3:
+        if type(value) is dict and value.get("formatVersion") == 4:
+            from .storage_profiles import replay_storage_configuration, validate_storage_manifest
+
+            manifest, execute = validate_storage_manifest(value), replay_storage_configuration
+            candidate, reference, artifacts = _selected(manifest["candidate"], arguments.wheelhouse, runtime=manifest["runtime"]["requested"])
+        elif type(value) is dict and value.get("formatVersion") == 3:
             from .remote_profiles import replay_remote_configuration, validate_remote_manifest
 
             manifest, execute = validate_remote_manifest(value), replay_remote_configuration
@@ -107,7 +112,7 @@ def main(argv=None):
             candidate, reference, artifacts = _selected(manifest["candidate"], arguments.wheelhouse)
         if artifacts != manifest["artifacts"]:
             raise ValueError("Replay requires the exact recorded installed wheels and hashes.")
-        print(json.dumps(execute(manifest, candidate, reference, **({"wheelhouse": arguments.wheelhouse} if manifest["formatVersion"] in {2, 3} else {})), indent=2))
+        print(json.dumps(execute(manifest, candidate, reference, **({"wheelhouse": arguments.wheelhouse} if manifest["formatVersion"] in {2, 3, 4} else {})), indent=2))
         return 0
     except Exception:
         print("Plugin check failed. Preserve its manifest, verify the approved installed artifacts and run the project's fictional regression tests. No private exception payload is displayed.", file=sys.stderr)
