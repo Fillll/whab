@@ -1,0 +1,42 @@
+[project]
+name = "whab_plugin_example_storage"
+version = "1.0.0"
+description = "Independent POSIX native snapshot-storage teaching plugin for WHAB"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2.41,<3"]
+classifiers = ["Operating System :: POSIX", "Programming Language :: Python :: 3"]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10", "whab_plugin_devkit>=0.10,<1"]
+
+[project.entry-points."whab.plugins"]
+example-storage = "whab_plugin_example_storage:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.whab.plugin-devkit]
+minimum-host = "2.41.0"
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{name="ledger.mutate", version=1, composition="singleton"}, {name="ledger.read", version=1, composition="singleton"}, {name="provider.state", version=1, composition="singleton"}, {name="provider.sync", version=1, composition="singleton"}, {name="receipts", version=1, composition="additive"}, {name="storage.authority", version=1, composition="additive"}, {name="storage.commands", version=1, composition="additive"}, {name="storage.worker", version=1, composition="additive"}, {name="transfer.neutral", version=1, composition="additive"}, {name="transfer.prepare", version=1, composition="additive"}]
+requires = []
+conflicts = []
+lifecycle = "live"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "teaching"

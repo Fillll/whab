@@ -95,7 +95,7 @@ This is the canonical supported-set inventory. Keep it aligned with the host's `
 
 ## Teaching examples
 
-The [teaching category](example/README.md) contains eight independently packaged public-SDK examples: reporting/export, branding, file import, categorization, a WHAB 2.34+ declarative API interface, a WHAB 2.36+ participating visual interface, a WHAB 2.38+ offline bank adapter and a WHAB 2.40+ declarative remote client. They are excluded from the supported bundled set and hidden from ordinary Settings. Install them with `scripts/install.py --dev --example`, then explicitly select the desired IDs; installation does not activate them. See the category guide and [activation instructions](../../docs/plugins.md#install-the-working-example).
+The [teaching category](example/README.md) contains nine independently packaged public-SDK examples: reporting/export, branding, file import, categorization, a WHAB 2.34+ declarative API interface, a WHAB 2.36+ participating visual interface, a WHAB 2.38+ offline bank adapter, a WHAB 2.40+ declarative remote client and a WHAB 2.41+ independent POSIX local storage primary. They are excluded from the supported bundled set and hidden from ordinary Settings. Install them with `scripts/install.py --dev --example`, then explicitly select the desired IDs; installation does not activate them. See the category guide and [activation instructions](../../docs/plugins.md#install-the-working-example).
 
 ## Installation and compatibility
 
