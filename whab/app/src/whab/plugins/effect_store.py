@@ -32,6 +32,7 @@ class EffectError(ValueError):
         "effect_commit_uncertain": "The plugin effect publication is uncertain. Recover its durable decision before retrying.",
         "effect_conflict": "The plugin operation identity or expected namespace no longer matches.",
         "materialization_pending": "The committed plugin namespace still requires recovery before activation.",
+        "remote_unknown": "A remote change has an unknown outcome. Reads remain available. Finish only its exact original request; do not discard or reconnect.",
         "read_only_effect": "This staged plugin context cannot change its namespace.",
         "continuation_missing": "The bank continuation is unavailable in this scope.",
         "continuation_busy": "Finish or reconcile the bank continuation before replacing this provider.",
@@ -155,7 +156,7 @@ class EffectStore:
         self.fault = fault
         self.validate, self.limit = validate, limit
         try:
-            if type(filename) is not str or filename not in {"namespace-effects.json", "bank-continuations.json", "visual-selection.json", "storage-intents.json", "storage-upgrade.json", "storage-writer.json"}:
+            if type(filename) is not str or filename not in {"namespace-effects.json", "bank-continuations.json", "visual-selection.json", "storage-intents.json", "storage-upgrade.json", "storage-writer.json", "remote-client.json"}:
                 invalid()
             if type(limit) is not int or not 1024 <= limit <= 128 * 1024 * 1024:
                 invalid()

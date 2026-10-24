@@ -157,6 +157,8 @@ class BudgetSession:
         self._incoming_content = content_digest(self.manifest, self.ledger if self.ledger is not None else self.files, self.credential_blob)
         from .storage_runtime import prepare_session_authority, storage_manifest
         preserved_original = prepare_session_authority(self)
+        from .remote_runtime import prepare_remote_session
+        preserved_original = prepare_remote_session(self) or preserved_original
         self._source = _read_source(self.storage_home / "source.json")
         if self.storage_authority and (
             self._source is None
@@ -171,7 +173,7 @@ class BudgetSession:
             saved_manifest = self.storage_home / "manifest.json"
             if self._source.get("formatVersion") == 2:
                 recovered = self._source["manifest"]
-                if self.storage_authority:
+                if self.storage_authority or self.remote_authority:
                     recovered = storage_manifest(recovered, self.manifest["storage"])
                 if recovered["id"] != self.id or recovered["storage"] != self.manifest["storage"]:
                     raise StoreError("The budget's saved plugin setup belongs to another budget or storage plugin.")
@@ -179,7 +181,7 @@ class BudgetSession:
             elif "restorePending" not in self._source and saved_manifest.exists():
                 try:
                     recovered = validate_manifest(json.loads(_read_bytes(saved_manifest, MAX_MANIFEST_BYTES)))
-                    if self.storage_authority:
+                    if self.storage_authority or self.remote_authority:
                         recovered = storage_manifest(recovered, self.manifest["storage"])
                     if recovered["id"] != self.id or recovered["storage"] != self.manifest["storage"]:
                         raise ValueError()
@@ -189,9 +191,15 @@ class BudgetSession:
             saved_files = self.storage_home / "plugin-data.whab"
             if ("restorePending" not in self._source or self._source.get("formatVersion") == 2) and saved_files.exists():
                 recovered = decode_container(_read_bytes(saved_files))
-                if recovered.manifest["id"] != self.id or (not self.storage_authority and recovered.manifest["storage"] != self.manifest["storage"]):
+                if recovered.manifest["id"] != self.id or (not (self.storage_authority or self.remote_authority) and recovered.manifest["storage"] != self.manifest["storage"]):
                     raise StoreError("The budget's saved plugin files are unreadable.")
                 self.files = recovered.files
+        if self.remote_authority:
+            origin = self.remote_authority["origin_plugin"]
+            target = self.remote_authority["choice"]["plugin"]
+            old, new = f"plugins/{origin}/connection.json", f"plugins/{target}/connection.json"
+            if new not in self.files and old in self.files:
+                self.files[new] = self.files[old]
         if self.storage_authority:
             # Native authority was explicitly journalled. Its data is validated
             # before bind; portable source snapshots cannot overwrite it.

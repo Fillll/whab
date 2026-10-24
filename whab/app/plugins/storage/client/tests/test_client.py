@@ -6,7 +6,7 @@ import httpx
 import pytest
 from whab_plugin_client.plugin import RemoteStore, create_storage, plugin
 
-from whab.plugins import StorageContext, StoreError
+from whab.plugins import RemoteLedgerClient, StorageContext, StoreError
 
 TOKEN = "synthetic-client-token-" + "b" * 32
 
@@ -26,7 +26,7 @@ def test_invalid_origin(url):
 
 
 def test_configuration_descriptor_and_private_methods():
-    assert plugin.id == "client" and plugin.storage is create_storage
+    assert plugin.id == "client" and plugin.storage == RemoteLedgerClient()
     with pytest.raises(StoreError, match="CLIENT_TOKEN"):
         RemoteStore("https://budget.example", "short", "budget-1")
     for budget in ("", "a" * 201, "bad\x00id"):

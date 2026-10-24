@@ -381,3 +381,19 @@ whab = "2.38.0"
 whab_plugin_sqlite = "1.12.0"
 whab_plugin_json = "1.3.0"
 whab_plugin_web = "1.27.0"
+
+[[verification]]
+id = "pr100-remote-client-lifecycle"
+date = "2026-10-23"
+host_version = "2.39.0"
+source_commit = "df865488e5b7f9645c96e060c1d8fce4dd261086"
+selection = ["client"]
+method = "source-tests"
+tests = ["tests/plugins/test_remote_client_workers.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/100"]
+scope = "Focused tests prepared separately approved synthetic descriptor wheels 1.0, 1.1 and 2.0 against the real current host closure. A missing-setting candidate preserved the active worker; compatible replacement retained the host transport, pending original command and revision, preserved the previous immutable environment and restored the exact saved version after pause/reopen. Explicit original-request completion preserved one acknowledged fictional account. Paused startup executed no descriptor, an incompatible host expectation refused before interpreter execution, and a stopped same-binding repair preserved prior ready metadata. An embedded separate installed native listener test built the real host, SQLite and server wheels outside the checkout, explicitly verified its runtime CA, observed unauthenticated 401/authenticated 200, and exercised the public host-owned remote transport with one acknowledged account. That native transport uses an explicitly supplied test CA; this does not prove stock client CLI private-CA configuration, distinct descriptor upgrades over a native listener, public receipt lookup, remote-server restart retry durability or household deployment. The canonical source suite passed before the narrow follow-ups, but its external API exact replay failed and is not certified by this record."
+[verification.artifacts]
+whab = "2.39.0"
+whab_plugin_client = "1.6.0"
+whab_plugin_server = "1.1.0"
+whab_plugin_sqlite = "1.12.0"

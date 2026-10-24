@@ -10,7 +10,7 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
 | [bank-logos](https://github.com/Fillll/whab/blob/477f9dc579bb1ec58c630fed6abbeeacfee8a804/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
-| [client](https://github.com/Fillll/whab/blob/477f9dc579bb1ec58c630fed6abbeeacfee8a804/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.5.0` | `whab>=2.22,<3` | restart-required | maintained |
+| [client](https://github.com/Fillll/whab/blob/477f9dc579bb1ec58c630fed6abbeeacfee8a804/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.6.0` | `whab>=2.39,<3` | declarative-remote-client-worker | maintained |
 | [example](https://github.com/Fillll/whab/blob/477f9dc579bb1ec58c630fed6abbeeacfee8a804/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.0` | `whab>=2.24,<3` | stateless-report-worker | teaching |
 | [example-api](https://github.com/Fillll/whab/blob/477f9dc579bb1ec58c630fed6abbeeacfee8a804/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.0` | `whab>=2.34,<3` | declarative-api-worker | teaching |
 | [example-branding](https://github.com/Fillll/whab/blob/477f9dc579bb1ec58c630fed6abbeeacfee8a804/whab/app/plugins/example/example-branding/README.md) | `whab_plugin_example_branding 1.0.0` | `whab>=2.22,<3` | restart-required | teaching |
@@ -25,7 +25,7 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | [web](https://github.com/Fillll/whab/blob/477f9dc579bb1ec58c630fed6abbeeacfee8a804/whab/app/plugins/interface/web/README.md) | `whab_plugin_web 1.27.0` | `whab>=2.36,<3` | visual-ui-worker | maintained |
 | [ynab](https://github.com/Fillll/whab/blob/477f9dc579bb1ec58c630fed6abbeeacfee8a804/whab/app/plugins/ingestion/ynab/README.md) | `whab_plugin_ynab 1.4.0` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 
-Explicit stateless report, branding, file-parser, declarative API interface, pure categorization, typed bank-provider and participating visual descriptors advertise their supported live-worker adapters. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
+Explicit stateless report, branding, file-parser, declarative API interface, pure categorization, typed bank-provider and participating visual descriptors advertise their supported live-worker adapters. Declarative remote-client workers return metadata only; the host retains their exact HTTPS authority, credentials, transport and financial intent. SQLite and JSON advertise compatible local storage workers; backend migration and copies remain explicit authority operations. Other entries require restart; activation is not inferred from package installation.
 
 ## Recorded verification
 
@@ -260,3 +260,13 @@ Built genuine host 2.38, SQLite 1.12, JSON 1.3 and Web 1.27 wheels from the exac
 Tests: `installed native HTTPS v1/failed-candidate/v2 bank worker verification`, `installed native HTTPS exchange-uncertain and captured-native-apply recovery`, `ordinary stock CLI reopen after acknowledged-write process termination`.
 
 Review: [PR #101](https://github.com/Fillll/whab/pull/101).
+
+### pr100-remote-client-lifecycle
+
+Verified 2026-10-23; host `2.39.0`. Selected: `client`.
+
+Focused tests prepared separately approved synthetic descriptor wheels 1.0, 1.1 and 2.0 against the real current host closure. A missing-setting candidate preserved the active worker; compatible replacement retained the host transport, pending original command and revision, preserved the previous immutable environment and restored the exact saved version after pause/reopen. Explicit original-request completion preserved one acknowledged fictional account. Paused startup executed no descriptor, an incompatible host expectation refused before interpreter execution, and a stopped same-binding repair preserved prior ready metadata. An embedded separate installed native listener test built the real host, SQLite and server wheels outside the checkout, explicitly verified its runtime CA, observed unauthenticated 401/authenticated 200, and exercised the public host-owned remote transport with one acknowledged account. That native transport uses an explicitly supplied test CA; this does not prove stock client CLI private-CA configuration, distinct descriptor upgrades over a native listener, public receipt lookup, remote-server restart retry durability or household deployment. The canonical source suite passed before the narrow follow-ups, but its external API exact replay failed and is not certified by this record.
+
+Tests: `tests/plugins/test_remote_client_workers.py`.
+
+Review: [PR #100](https://github.com/Fillll/whab/pull/100).
