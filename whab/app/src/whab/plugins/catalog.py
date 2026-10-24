@@ -118,8 +118,11 @@ def validate_catalog(value):
                 allowed = {"reporting.insights", "reporting.export"}
                 if support == "stateless-optional-worker":
                     allowed |= {"branding.bank", "branding.merchant", "ingestion.file"}
-                _require(not row["legacy"] and support in {"stateless-report-worker", "stateless-optional-worker"}
-                         and row["state_version"] == 1 and not row["state_upgrades"] and bool(capability_names)
+                if support == "categorization-host":
+                    allowed = {"categorization"}
+                _require(not row["legacy"] and support in {"stateless-report-worker", "stateless-optional-worker", "categorization-host"}
+                         and (support == "categorization-host" or row["state_version"] == 1)
+                         and not row["state_upgrades"] and bool(capability_names)
                          and capability_names <= allowed and all(capability["version"] == 1 for capability in row["capabilities"]))
             else:
                 _require(row["live_support"] == "restart-required")

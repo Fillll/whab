@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "692d757cfcf6e9d3838ed1b8ea3ecb4c286d41df"
+documentation_ref = "91442a81c9d0233241ed5a033d49d48c2ee96cbe"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -143,3 +143,17 @@ scope = "The exact source passed 4403 Python tests with all thirteen runtime plu
 whab = "2.31.0"
 whab_plugin_bank_logos = "1.4.0"
 whab_plugin_ynab = "1.4.0"
+
+[[verification]]
+id = "pr89-host-categorization"
+date = "2026-10-23"
+host_version = "2.32.0"
+source_commit = "91442a81c9d0233241ed5a033d49d48c2ee96cbe"
+selection = ["random-forest-categorization"]
+method = "source-tests"
+tests = ["tests/test_categorization_runtime.py", "tests/test_categorization.py", "tests/budgets/test_runtime.py", "plugins/automation/random-forest-categorization/tests", "scripts/check.py"]
+pull_requests = ["https://github.com/Fillll/whab/pull/89"]
+scope = "The exact implementation passed 4430 Python tests with all thirteen runtime plugins at 100% statement/branch coverage, browser checks, minimum/current toolkit and generated external artifacts, replays and installed distributions. Fictional live HTTP tests exercised enable/train/busy replacement/finish/replace/disable/re-enable/reopen, saved-model preservation, read-only candidate factories, latest drained state, callback revocation, stable ledger/retry services, other budgets and storage copy/recovery integration. The independently packaged Random Forest engine retained its reviewed-only training and automatic cutoff behavior. This evidence covers host-process selection changes; compatible categorization code upgrades still require the forthcoming stateful worker adapter. It is not a native TLS or household deployment claim."
+[verification.artifacts]
+whab = "2.32.0"
+whab_plugin_random_forest_categorization = "1.2.0"

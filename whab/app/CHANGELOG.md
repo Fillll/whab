@@ -4,6 +4,14 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+## 2.32.0 — 2026-10-23
+
+PR: [#89](https://github.com/Fillll/whab/pull/89)
+
+- Add drained final readiness for live categorization selection with read-only staged namespaces and revocable retired callbacks. Preserve ledger/retry services, unchanged engines and active training continuations; changed engines defer until unfinished training finishes or is cancelled.
+- Resolve categorization dynamically during bank ingestion and share namespace mutation locks/copy notifications. Report host-process selection support separately from pending stateful worker upgrades in management and static catalog metadata.
+- Verify live HTTP lifecycle/model preservation, preparation refusal, callback cleanup and storage-copy/recovery integration in the complete contribution gate.
+
 ## 2.31.0 — 2026-10-23
 
 PR: [#88](https://github.com/Fillll/whab/pull/88)

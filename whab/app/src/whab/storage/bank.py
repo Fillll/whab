@@ -128,7 +128,8 @@ class BankStore:
             for account in accounts or []
         ]
 
-        existing = {row["id"]: row for row in self._store.transactions("personal")} if self._suggestions_only else {}
+        suggestions_only = self._suggestions_only() if callable(self._suggestions_only) else self._suggestions_only
+        existing = {row["id"]: row for row in self._store.transactions("personal")} if suggestions_only else {}
 
         def scoped_transaction(transaction: ImportedTransaction) -> ImportedTransaction:
             pending = transaction.get("pendingTransactionId")
@@ -143,7 +144,7 @@ class BankStore:
                 if pending
                 else None,
                 "source": self._provider,
-                **({"suggestedCategoryId": previous.get("categoryId") if previous else None} if self._suggestions_only else {}),
+                **({"suggestedCategoryId": previous.get("categoryId") if previous else None} if suggestions_only else {}),
             }
 
         scoped_changes = {

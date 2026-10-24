@@ -122,7 +122,8 @@ def test_cancel_expiry_training_failures_and_invalid_inputs(client, history, mon
     action(client, 'cancel', session=run2['session'])
     service.after_import()
     assert service.error is None
-    monkeypatch.setattr(service, 'predict', lambda *_: (_ for _ in ()).throw(RuntimeError('private data')))
+    active = client.app.state.budget_runtime._active.services['categorization']
+    monkeypatch.setattr(active, 'predict', lambda *_: (_ for _ in ()).throw(RuntimeError('private data')))
     service.after_import()
     assert 'private data' not in service.error
     for payload in ({'action': 'unknown', 'pluginId': PLUGIN}, {'action': 'train', 'pluginId': PLUGIN, 'parameters': []}, {'action': 'train', 'pluginId': PLUGIN, 'unexpected': 1}):
@@ -261,7 +262,8 @@ def test_failed_training_clears_session_and_acceptance_provenance_failure_keeps_
     assert action(client, 'status')['models'][0]['name'] == 'Renamed model'
     action(client, 'suggest')
     suggestion = service.suggestions('personal')[history[-1]]
-    monkeypatch.setattr(service, '_save', lambda *_: (_ for _ in ()).throw(OSError('private file path')))
+    active = client.app.state.budget_runtime._active.services['categorization']
+    monkeypatch.setattr(active, '_save', lambda *_: (_ for _ in ()).throw(OSError('private file path')))
     client.app.state.ledger_service.edit_transaction('personal', history[-1], reviewed=True, suggestion_id=suggestion['id'])
     assert service.error == 'Review saved. Its suggestion history could not be updated.'
     assert next(row for row in client.app.state.store.transactions('personal') if row['id'] == history[-1])['reviewed']
