@@ -16,3 +16,15 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "reporting.export", "version" = 1, "composition" = "additive" }, { "name" = "reporting.insights", "version" = 1, "composition" = "additive" }]
+requires = []
+conflicts = []
+lifecycle = "live"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "teaching"

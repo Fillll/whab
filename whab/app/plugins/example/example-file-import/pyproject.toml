@@ -24,3 +24,15 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "ingestion.file", "version" = 1, "composition" = "additive" }]
+requires = []
+conflicts = []
+lifecycle = "restart"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "teaching"

@@ -12,6 +12,16 @@ The [approved report-worker adapter](plugin-workers.md) adds bounded framing,
 immutable local wheel environments, compatible report upgrades and validated
 recovery. Installed Python remains trusted executable code.
 
+The [curated catalog](plugin-catalog.md) records package identity, compatibility,
+static capabilities and exact verification evidence. Regenerate it with
+`.venv/bin/python scripts/plugin_metadata.py --write` from `whab/app/`; the normal
+documentation check rejects drift. Generation reads source declarations without
+importing plugin modules. `whab.plugins.catalog.catalog_snapshot()` reads a
+detached, validated copy of the packaged catalog without entry-point discovery,
+network access or installation. It describes reviewed source artifacts rather
+than the active or installed selection. Report vulnerabilities through the
+[security policy](../../SECURITY.md).
+
 ## Trust and enablement
 
 Application source paths in this guide are relative to `whab/app/`. Each concrete implementation lives in `plugins/<category>/<id>/` and owns its source package, assets, README, tests, `pyproject.toml` and dated `CHANGELOG.md`. The canonical [plugin inventory](../app/plugins/README.md#supported-plugins) identifies the supported set and the separately installed teaching example. The `bundled` extra selects that supported set when compatible distributions are available in the chosen package index or local wheelhouse; source checkouts use `.venv/bin/python scripts/install.py --dev` from `whab/app/`. The host wheel contains no concrete plugin package or entry point. A material plugin-only change bumps that plugin's `project.version` and local changelog; only host/core/SDK changes bump the app, with spanning changes updating each affected owner. Keep implementation tests beside their plugin and shared SDK/host contracts in `tests/`. See [folder ownership and test commands](../app/plugins/README.md). The public `whab.plugins` SDK stays in core under `src/whab/plugins/`.

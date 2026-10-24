@@ -30,7 +30,7 @@ from .runtime import RuntimeTransitionError
 from .session import BudgetSession, container_digest
 
 COOKIE = "whab-budget"
-_CONTROL_PATHS = frozenset({"/api/plugins/runtime", "/api/plugins/management/recover", "/api/storage/status", "/api/storage/recover"})
+_CONTROL_PATHS = frozenset({"/api/plugins/runtime", "/api/plugins/catalog", "/api/plugins/management/recover", "/api/storage/status", "/api/storage/recover"})
 
 
 def request_password(request):

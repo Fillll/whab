@@ -21,3 +21,15 @@ include = ["whab_plugin_plaid", "whab_plugin_plaid.*"]
 
 [tool.setuptools.package-data]
 whab_plugin_plaid = ["templates/*.html", "static/*.js"]
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{ "name" = "branding.merchant", "version" = 1, "composition" = "additive" }, { "name" = "ingestion.bank", "version" = 1, "composition" = "additive" }, { "name" = "lifecycle.background", "version" = 1, "composition" = "additive" }]
+requires = []
+conflicts = []
+lifecycle = "restart"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "maintained"

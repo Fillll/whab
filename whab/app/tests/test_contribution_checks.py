@@ -1,5 +1,6 @@
 """Contribution checks share CI behavior and never discover private runtime documents."""
 
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -11,9 +12,10 @@ import pytest
 
 
 @pytest.fixture
-def checker(request):
+def checker(request, monkeypatch):
     name = request.param
     path = Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py"
+    monkeypatch.syspath_prepend(str(path.parent))
     spec = util.spec_from_file_location(f"whab_{name}", path)
     module = util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -242,14 +244,35 @@ def inventory_fixture(root):
     plugin = application / "plugins/interface/web"
     plugin.mkdir(parents=True)
     (plugin / "pyproject.toml").write_text(
-        '[project]\nname = "whab_plugin_web"\n[project.entry-points."whab.plugins"]\nweb = "web:plugin"\n'
+        '[project]\nname = "whab_plugin_web"\nversion = "1.0.0"\nrequires-python = ">=3.14"\ndependencies = ["whab>=1,<3"]\n'
+        '[project.entry-points."whab.plugins"]\nweb = "web:plugin"\n'
+        '[tool.whab.plugin]\napi-version = 1\ncapabilities = [{name="interface.ui",version=1,composition="singleton"}]\n'
+        'requires = []\nconflicts = []\nlifecycle = "restart"\nlegacy = true\nauthority = "unknown"\nstate-version = 1\nstate-upgrades = []\nsupport = "maintained"\n'
     )
+    (plugin / "src").mkdir()
+    (plugin / "src/web.py").write_text("plugin = Plugin('web', 'Fictional UI', ui=object())\n")
+    sdk = application / "src/whab/plugins"
+    sdk.mkdir(parents=True)
+    (sdk.parent / "__init__.py").write_text("__version__ = '1.0.0'\n")
+    (sdk / "contracts.py").write_text("def contract_for(plugin):\n    for attribute,name,composition in (('ui','interface.ui','singleton'),):\n        pass\n")
     inventory = application / "plugins/README.md"
     inventory.write_text(
         "# Plugins\n\n## Supported plugins\n\n| Plugin ID | Distribution | Default enablement |\n"
         "| --- | --- | --- |\n| `web` | `whab_plugin_web` | Selected |\n\n"
         "## Teaching example\n\n| `example` | `whab_plugin_example` | Developer only |\n"
     )
+    (root / "SECURITY.md").write_text("# Fictional security policy\n")
+    (application / "plugins/catalog.toml").write_text(
+        'verification = []\n[publisher]\nmaintainer="Fillll"\nrepository="https://github.com/Fillll/whab"\n'
+        'documentation_ref="' + "0" * 40 + '"\nsecurity="https://github.com/Fillll/whab/security/advisories/new"\n'
+        'security_policy="https://github.com/Fillll/whab/security/policy"\nsecurity_verified_date="2026-10-23"\n'
+        'support_policy="Fictional support policy"\n'
+    )
+    (root / "whab/docs").mkdir()
+    from plugin_metadata import generated_outputs
+
+    for path, expected in generated_outputs(root).items():
+        path.write_text(expected)
     return inventory
 
 
@@ -266,7 +289,8 @@ def test_inventory_rejects_bundled_package_without_local_metadata(checker, tmp_p
     inventory_fixture(tmp_path)
     metadata = tmp_path / "whab/app/pyproject.toml"
     metadata.write_text('[project.optional-dependencies]\nbundled = ["whab_plugin_unknown>=1"]\n')
-    assert "do not match available supported plugin metadata" in checker.validate_inventory(tmp_path)[0]
+    with pytest.raises(ValueError, match="supported"):
+        checker.validate_inventory(tmp_path)
 
 
 @pytest.mark.parametrize("checker", ["check_docs"], indirect=True)
@@ -279,8 +303,7 @@ def test_inventory_rejects_symlinked_metadata_or_docs_before_reading(checker, mo
     secret.write_text("SENSITIVE INVALID METADATA MUST NOT BE READ")
     if kind == "plugin-directory":
         plugin = tmp_path / "whab/app/plugins/interface/web"
-        (plugin / "pyproject.toml").unlink()
-        plugin.rmdir()
+        shutil.rmtree(plugin)
         plugin.symlink_to(private, target_is_directory=True)
     else:
         path = inventory if kind == "inventory" else tmp_path / "whab/app/pyproject.toml"
