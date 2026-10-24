@@ -1,0 +1,44 @@
+[project]
+name = "whab_plugin_example_bank"
+version = "1.0.0"
+description = "Offline fictional bank teaching plugin for WHAB"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2.38,<3"]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9,<10", "pytest-cov>=7,<8", "whab_plugin_devkit>=0.8,<1",
+    "whab_plugin_sqlite>=1.11,<2", "whab_plugin_json>=1.2,<2",
+]
+
+[project.entry-points."whab.plugins"]
+example-bank = "whab_plugin_example_bank:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [
+    { name = "ingestion.bank", version = 1, composition = "additive" },
+    { name = "lifecycle.background", version = 1, composition = "additive" },
+]
+requires = []
+conflicts = []
+lifecycle = "live"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "teaching"
