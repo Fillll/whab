@@ -72,4 +72,3 @@ jobs:
           retention-days: 14
       - name: Lint launcher Python
         run: python -m ruff check --config pyproject.toml ../launchers/macos/manager ../launchers/macos/tests ../launchers/macos/scripts
-
