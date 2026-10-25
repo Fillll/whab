@@ -102,6 +102,16 @@ Version the owner of the material change in the same PR. Host/core/public-SDK ch
 
 The host package version, `python -m whab --version`, FastAPI metadata and About dialog derive from the host version source; installed plugin versions come from their own distribution metadata. Review the final diff and pass CI before requesting a squash merge. Final approval and merging belong to the human maintainer @Fillll. Agents must not approve or merge a PR unless @Fillll explicitly delegates that action for that specific PR. Create an immutable `vX.Y.Z` tag and GitHub release on the merged commit only when the user explicitly requests a release; version bumps and merges do not require publishing one. Do not reuse or move an existing release tag.
 
+### Nightly stable releases
+
+The maintainer has explicitly authorized automatic stable publication after the daily scheduled exhaustive certification. The release job runs only in the official repository on scheduled `main` runs, after both supported Python certification jobs, reusable external-project conformance and native macOS launcher checks succeed. It also verifies both required Python CI checks from GitHub Actions on that exact commit, and skips publication if `main` has advanced. Push-triggered and manually dispatched certification remain validation-only.
+
+The publisher reads the declared app version without importing application code, creates `vX.Y.Z` at the certified commit and publishes a non-draft, non-prerelease GitHub release marked Latest. Release notes include the certification run and automatically generated PR notes. Only the publisher job receives repository-content write access; test/build jobs remain read-only. This creates the source release consumed by the launcher's Stable channel; it does not upload native application installers or publish packages to an index.
+
+Each declared app version is released once. A previously published stable version is skipped, including when newer plugin-only or documentation commits retain that host version. There are no automatic version bumps, tag moves or replacement releases. A new stable bundle therefore needs a new declared app version through the normal reviewed version/changelog process. A conflicting unpublished tag, existing draft/prerelease, failed/skipped/incomplete check, or newer stable version stops publication for maintainer review. Retries may complete an interrupted same-commit tag/release creation without replacing existing release state.
+
+`scripts/publish_stable.py --sha <full-commit> --run-id <scheduled-certification-run>` performs read-only validation by default. The scheduled job supplies `--publish` and its scoped token. Outside this documented nightly policy, release creation still requires an explicit maintainer request.
+
 ### Authorization and completion stages
 
 Keep the intended outcome concrete and carry existing authorization through its stated scope. Technical repository/admin access does not itself authorize merging, deployment, production banking or releases.
@@ -111,7 +121,7 @@ Keep the intended outcome concrete and carry existing authorization through its 
 | Review, discuss or propose | Inspect and return findings or a concrete preview/proposal. Honor an explicit request to discuss before implementation |
 | Implement or fix | Make the focused change, update owning docs, validate, commit/push the feature branch and open a reviewable PR. Final merge remains with the maintainer |
 | Merge and deploy an identified PR | Treat this as explicit delegation for that PR. Complete required checks, merge through the allowed PR workflow, update the intended installation and verify the running result; do not ask for the same delegation again |
-| Publish a release | Only an explicit release request authorizes creating the version tag/GitHub release. A version bump, merge or deployment request alone does not |
+| Publish a release | An explicit release request authorizes creating the version tag/GitHub release. The documented nightly policy is standing authorization for its scheduled publisher only; a version bump, merge or deployment alone grants no other release authorization |
 
 Resolve the identified PR and target from the current task context. Ask only when a material target or required authorization is genuinely missing, after completing independent reviewable work. New unrelated PRs do not inherit a prior PR's merge authorization. Never bypass failing CI, unresolved substantive findings, protected direct-push restrictions or an explicit request to wait. Certificate trust and creation of live banking connections retain their separate explicit-action boundaries.
 
