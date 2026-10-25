@@ -24,7 +24,7 @@ jobs:
       whab-ref: ${{ github.sha }}
 
   checks:
-    name: CI (Python ${{ matrix.python-version }})
+    name: Certification (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     # Source coverage plus every genuine-host native configuration and exact replay.
     timeout-minutes: 180

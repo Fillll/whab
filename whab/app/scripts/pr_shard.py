@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,16 @@ def pytest_addoption(parser):
     group.addoption("--pr-shard-index", type=int, default=0)
     group.addoption("--pr-shard-count", type=int, default=1)
     group.addoption("--pr-collection-dir", type=Path)
+
+
+def pytest_configure(config):
+    worker = getattr(config, "workerinput", {}).get("workerid")
+    home = os.environ.get("WHAB_HOME")
+    if worker is not None and home:
+        # Concurrent tests must never share their default fictional runtime home.
+        isolated = Path(home) / worker
+        isolated.mkdir(exist_ok=True)
+        os.environ["WHAB_HOME"] = str(isolated)
 
 
 @pytest.hookimpl(trylast=True)

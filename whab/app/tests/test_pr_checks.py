@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -122,6 +123,16 @@ def test_local_iteration_does_not_substitute_for_authoritative_ci(checker):
     assert "tests/plugins/test_contracts.py" in checker.focused_paths(["whab/app/src/whab/plugins/contracts.py"])
     selected = checker.focused_paths(["whab/app/plugins/interface/web/src/whab_plugin_web/views.py"])
     assert "plugins/interface/web/tests" in selected and "tests/web" in selected
+
+
+def test_parallel_workers_own_separate_default_runtime_homes(checker, monkeypatch, tmp_path):
+    import pr_shard
+
+    for worker in ("gw0", "gw1"):
+        monkeypatch.setenv("WHAB_HOME", str(tmp_path))
+        pr_shard.pytest_configure(SimpleNamespace(workerinput={"workerid": worker}))
+        assert Path(pr_shard.os.environ["WHAB_HOME"]) == tmp_path / worker
+        assert (tmp_path / worker).is_dir()
 
 
 def test_certification_is_separate_and_existing_required_contexts_remain():

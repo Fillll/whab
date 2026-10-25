@@ -331,7 +331,8 @@ def test_unsaved_import_never_enters_catalog_and_preserves_source(store, tmp_pat
         assert not (tmp_path / "budgets" / headers["x-import-operation"]).exists()
 
 
-@pytest.mark.parametrize("operation", [None, "", "../escape", "not-a-uuid", str(uuid4()).upper()])
+@pytest.mark.parametrize("operation", [None, "", "../escape", "not-a-uuid",
+                                     pytest.param("AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA", id="uppercase-uuid")])
 def test_new_import_requires_explicit_canonical_operation(store, tmp_path, operation):
     headers = dict(HEADERS)
     if operation is not None:
