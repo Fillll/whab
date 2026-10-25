@@ -293,5 +293,6 @@ def test_workflow_gives_only_the_schedule_gated_publisher_write_permission():
     assert "needs: [checks, external-plugin-contracts, macos-launcher]" in publisher
     assert "contents: write" in publisher and "checks: read" in publisher and "actions: read" in publisher
     assert "ref: ${{ github.sha }}" in publisher and "persist-credentials: false" in publisher
+    assert 'python-version: "3.14"' in publisher
     assert "--publish" in publisher
     assert "pull_request_target" not in source
