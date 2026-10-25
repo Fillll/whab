@@ -434,3 +434,26 @@ test('each storage plugin owns a separate controller and opener', async () => {
   await first.dialog.emit('close'); await second.opener.emit('click');
   assert.equal(requests.length, 2); assert.match(second.panel.textContent, /PrimarySynced copyNot used/);
 });
+
+test('Synced copy on unused storage previews without optimistically changing the radio', async () => {
+  const state = domHarness(); await state.opener.emit('click');
+  const roles = state.panel.querySelectorAll('[data-storage-control]');
+  state.status({preview_id: C, destination: 'json', source_generation: 7, supported: true});
+  roles.find(node => node.value === 'unused').checked = false;
+  roles.find(node => node.value === 'synced').checked = true;
+  await roles.find(node => node.value === 'synced').emit('change');
+  assert.match(state.panel.textContent, /Review empty destination/);
+  assert.equal(state.panel.querySelectorAll('[data-storage-control]').find(node => node.value === 'unused').checked, true);
+  assert.deepEqual(plain(state.requests.filter(row => row.body !== undefined).map(row => row.body)), [{destination: 'json'}]);
+});
+
+test('Not used radio opens a retention review while its persisted role stays Synced copy', async () => {
+  const state = domHarness({initial: status({copies: [copy()]})}); await state.opener.emit('click');
+  await state.panel.querySelectorAll('[data-storage-control]').find(node => node.value === 'unused').emit('change');
+  assert.match(state.panel.textContent, /Stop syncing this plugin/);
+  assert.match(state.panel.textContent, /saved data is retained/);
+  assert.equal(state.panel.querySelectorAll('[data-storage-control]').find(node => node.value === 'synced').checked, true);
+  assert.equal(state.requests.filter(row => row.body !== undefined).length, 0);
+  state.controller.dismiss();
+  assert.equal(state.panel.textContent.includes('Stop syncing this plugin'), false);
+});
