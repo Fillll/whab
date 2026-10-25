@@ -317,7 +317,7 @@ export function initStoragePlugin({beforeChange, document: page = document, requ
     const copies = state.status.copies.filter(copy => copy.destination === destination);
     const attached = copies.filter(liveCopy);
     const isPrimary = primary.plugin_id === destination;
-    const role = isPrimary ? 'primary' : attached.length ? 'synced' : 'unused';
+    const role = primary.supported && !primary.authoritative ? null : isPrimary ? 'primary' : attached.length ? 'synced' : 'unused';
     const promotable = attached.filter(copy => ['saved', 'pending', 'failed'].includes(copy.state));
     const roles = text('fieldset', '', 'storage-roles');
     roles.append(text('legend', 'Role in this budget'));

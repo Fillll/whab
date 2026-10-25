@@ -458,3 +458,13 @@ test('Not used radio opens a retention review while its persisted role stays Syn
   state.controller.dismiss();
   assert.equal(state.panel.textContent.includes('Stop syncing this plugin'), false);
 });
+
+test('a gated or recovering authority cannot display a confirmed new Primary role', async () => {
+  for (const primary of [{plugin_id: 'json', admission: 'gated'}, {plugin_id: 'json', health: 'recovery_required'}]) {
+    const state = domHarness({initial: status({primary})}); await state.opener.emit('click');
+    const roles = state.panel.querySelectorAll('[data-storage-control]');
+    assert.equal(roles.every(node => !node.checked && node.disabled), true);
+    assert.match(state.panel.textContent, /paused until storage is ready and authoritative/);
+    assert.equal(state.requests.filter(row => row.body !== undefined).length, 0);
+  }
+});
