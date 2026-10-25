@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.10.0 — 2026-10-23
+
+PR: [#107](https://github.com/Fillll/whab/pull/107)
+
+- Add an independent local storage generator, public conformance/read-only readiness helpers and the versioned native-local-storage-v1 replay profile. The candidate is the sole required primary; its SQLite reference is tested independently, and unsupported transfer/copy controls remain explicitly inapplicable.
+- Exercise ten distinct peer sets with exact approved-worker activation, financial writes before and after activation, saved-worker reopen and controlled public failures. Use the genuine WHAB 2.41 public storage-model floor for the complete POSIX teaching adapter while preserving the toolkit's 2.22 import floor.
+- Stage historical reference builds before comparing complete wheel member payloads, retaining the original approved bytes only when same-filename contents agree and refusing conflicting artifacts without overwriting them. This shared checker correction originated in [#102](https://github.com/Fillll/whab/pull/102).
+- Keep storage metadata inspection compatible with older SDKs that omit later optional hooks, while advertised native execution still requires its actual compatible SDK.
+
 ## 0.9.0 — 2026-10-23
 
 PR: [#106](https://github.com/Fillll/whab/pull/106)
@@ -16,7 +25,7 @@ PR: [#105](https://github.com/Fillll/whab/pull/105)
 
 - Add public bank conformance, a complete bank project generator and the native-bank-v1 profile. Require explicit fictional-provider approval and exercise five continuation/reopen/retry variants across SQLite and JSON with distinct peer selections and exact-artifact replay.
 - Use the genuine WHAB 2.38 BankAdapter floor while retaining the toolkit's lazy 2.22 compatibility. Include an independently packaged offline teaching provider whose owning tests call the public native HTTPS helper.
-- Build historical reference wheels in staging. Reuse an approved wheel only after complete member payload, mode and flag equivalence, and preserve its bytes when a conflicting or failed build refuses validation.
+- Build historical reference wheels in staging. Reuse an approved wheel only after complete member payload, mode and flag equivalence, and preserve its bytes when a conflicting or failed build refuses validation. This shared checker correction originated in [#102](https://github.com/Fillll/whab/pull/102).
 
 ## 0.7.0 — 2026-10-23
 
@@ -70,4 +79,3 @@ PR: [#78](https://github.com/Fillll/whab/pull/78)
 
 - Add public storage factory/reopen adapters, isolated fictional homes, detached snapshots, required ledger tests and six explicitly applicable optional suites.
 - Gate independent toolkit wheels against the actual minimum WHAB 2.21.1 artifact and current candidate. Verify installed imports outside the checkout, zero skipped reference tests and 100% toolkit statement/branch coverage.
-

@@ -146,6 +146,11 @@ def exercise_candidate(plugin, registry=None):
     if plugin.storage is not None and not callable(plugin.storage):
         remote_declaration(plugin)
         exercised.append("storage.remote-declaration")
+    elif callable(plugin.storage):
+        from .local_storage import storage_conformance
+
+        storage_conformance(plugin)
+        exercised.append("storage")
     if getattr(plugin, "bank", None) is not None and not exercised:
         bank_declaration(plugin)
         exercised.append("ingestion.bank")
@@ -180,6 +185,10 @@ def deterministic_negatives():
 
 def sample_configurations(candidate, reference, artifacts, *, combinations_count=10, seed=42):
     """Sample distinct selected peer sets; order-only differences never count twice."""
+    if callable(candidate.storage):
+        from .storage_profiles import sample_storage_configurations
+
+        return sample_storage_configurations(candidate, reference, artifacts, combinations_count=combinations_count, seed=seed, runtime=False)
     if candidate.storage is not None and not callable(candidate.storage):
         from .remote_profiles import sample_remote_configurations
 
@@ -263,6 +272,10 @@ def reference_conformance(reference):
 
 def replay_configuration(manifest, candidate, reference, *, wheelhouse=None):
     """Run resolver stages and public contracts; actual authority never changes."""
+    if type(manifest) is dict and manifest.get("formatVersion") == 4:
+        from .storage_profiles import replay_storage_configuration
+
+        return replay_storage_configuration(manifest, candidate, reference, wheelhouse=wheelhouse)
     if type(manifest) is dict and manifest.get("formatVersion") == 3:
         from .remote_profiles import replay_remote_configuration
 
