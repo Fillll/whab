@@ -100,6 +100,15 @@ def test_passing_only_a_subset_or_skipping_regressions_fails(checker, tmp_path, 
         checker.test_counts(xml)
 
 
+def test_equal_counts_cannot_hide_a_repeated_test_and_an_omission(checker, tmp_path):
+    xml = tmp_path / "tests.xml"
+    xml.write_text('<testsuites><testsuite tests="2"><testcase classname="tests.test_rules" name="test_a"/>'
+                   '<testcase classname="tests.test_rules" name="test_a"/></testsuite></testsuites>')
+    with pytest.raises(ValueError, match="identities differ"):
+        checker.verify_test_ids(xml, ["tests/test_rules.py::test_a", "tests/test_rules.py::test_b"])
+    checker.verify_test_ids(xml, ["tests/test_rules.py::test_a", "tests/test_rules.py::test_a"])
+
+
 def test_real_pytest_collections_form_a_complete_partition(checker, tmp_path):
     source = tmp_path / "test_fictional.py"
     source.write_text("import pytest\n@pytest.mark.parametrize('n', range(12))\ndef test_money(n):\n    assert n >= 0\n")

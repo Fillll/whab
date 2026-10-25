@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from xml.etree import ElementTree
@@ -64,6 +65,21 @@ def test_counts(path):
     return counts["tests"]
 
 
+def verify_test_ids(path, selected):
+    """JUnit identities must match selected IDs, even if total counts agree."""
+    expected = []
+    for nodeid in selected:
+        address, bracket, parameters = nodeid.partition("[")
+        parts = address.split("::")
+        parts[0] = parts[0].replace("/", ".").removesuffix(".py")
+        parts[-1] += bracket + parameters
+        expected.append((".".join(parts[:-1]), parts[-1]))
+    actual = [(case.get("classname"), case.get("name"))
+              for case in ElementTree.parse(path).getroot().iter("testcase")]
+    if Counter(actual) != Counter(expected):
+        raise ValueError("Executed test identities differ from the selected source tests.")
+
+
 def verify_partition(manifests, count, identity):
     from pr_shard import partition
 
@@ -100,6 +116,7 @@ def shard(index, count, workers, output, env):
     if not rows or any(row != rows[0] for row in rows):
         raise ValueError("Workers did not collect the same complete test suite.")
     manifest = {**rows[0], "identity": before, "executed": test_counts(output / "tests.xml")}
+    verify_test_ids(output / "tests.xml", manifest["selected"])
     if manifest["executed"] != len(manifest["selected"]):
         raise ValueError("Selected test IDs and executed test count differ.")
     (output / "manifest.json").write_text(json.dumps(manifest) + "\n")
@@ -112,6 +129,10 @@ def aggregate(directory, count, env):
     for path in paths:
         if not (path.parent / ".coverage").is_file():
             raise ValueError("A source shard has no coverage data.")
+        row = json.loads(path.read_text())
+        if test_counts(path.parent / "tests.xml") != row["executed"]:
+            raise ValueError("Executed test counts differ from the source manifest.")
+        verify_test_ids(path.parent / "tests.xml", row["selected"])
     with TemporaryDirectory(prefix="whab-pr-coverage-") as temporary:
         env = {**env, "COVERAGE_FILE": str(Path(temporary) / ".coverage")}
         run([sys.executable, "-m", "coverage", "combine", "--keep",
