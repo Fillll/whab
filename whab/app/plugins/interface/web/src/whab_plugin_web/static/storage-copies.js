@@ -343,17 +343,15 @@ export function initStoragePlugin({beforeChange, document: page = document, requ
     panel.append(roles);
     if (isPrimary) panel.append(text('p', 'To stop using this primary, make another synced copy Primary first.', 'settings-notice'));
     const summary = text('section', '', 'storage-primary');
-    summary.append(text('p', `Current primary: ${storageLabel(primary.plugin_id)}`, 'settings-notice'));
     const health = {ready: 'Ready', degraded: 'Cleanup needs attention', recovery_required: 'Storage recovery required'}[primary.health] || 'Status unavailable';
-    summary.append(text('p', `${health} · ${primary.admission === 'open' ? 'Requests open' : 'Requests paused'}`, 'settings-notice'));
-    if (integer(primary.generation)) summary.append(text('p', `Budget revision ${primary.generation}`, 'storage-watermark'));
+    summary.append(text('p', `Current primary: ${storageLabel(primary.plugin_id)} · ${health}`, 'settings-notice'));
+    if (attached.length) summary.append(text('p', [...new Set(attached.map(copy => states[copy.state]))].join(' · '), 'storage-copy-state'));
     panel.append(summary);
     if (!primary.supported) {
       panel.append(text('p', 'This backend does not support synchronized local storage copies. Your primary remains in use.', 'settings-notice'));
       return;
     }
     if (!usable) panel.append(text('p', 'Copy controls are paused until storage is ready and authoritative.', 'settings-notice'));
-    panel.append(text('p', 'A successful primary save stays successful when a copy is pending or fails.', 'settings-notice'));
     for (const entry of Object.values(state.status.errors)) panel.append(text('p', fault(entry?.code), 'field-error'));
     const list = text('div', '', 'storage-copy-list');
     for (const copy of copies) {
@@ -375,10 +373,12 @@ export function initStoragePlugin({beforeChange, document: page = document, requ
       if (copy.state === 'reattach_required') row.append(text('p', 'Preview a new empty destination to copy the current primary. This older copy is retained.', 'settings-notice'));
       row.append(actions); list.append(row);
     }
-    if (copies.length) {
+    if (copies.length || integer(primary.generation)) {
       const details = text('details', '', 'storage-copy-details');
       details.open = Boolean(detailsOpen);
-      details.append(text('summary', 'Saved copies and status'), list);
+      details.append(text('summary', 'Saved copies and status'));
+      if (integer(primary.generation)) details.append(text('p', `Budget revision ${primary.generation}`, 'storage-watermark'));
+      details.append(text('p', 'A successful primary save stays successful when a copy is pending or fails.', 'settings-notice'), list);
       panel.append(details);
     }
     for (const operation of state.status.operations.filter(row => ['queued', 'running', 'recovery_required', 'failed'].includes(row.state))) {

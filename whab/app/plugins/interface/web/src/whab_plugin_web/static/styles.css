@@ -4319,17 +4319,16 @@ strong {
 .account-classification-fields {display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px;}
 .account-settings-dialog [data-account-settings-status]:empty {display:none;}
 
-.storage-roles {display:flex; flex-wrap:wrap; gap:10px 24px; border:0; padding:0; margin:16px 0;}
+.storage-roles {display:flex; flex-wrap:wrap; gap:10px 24px; min-width:0; border:0; padding:0; margin:16px 0;}
 .storage-roles > legend {font-size:12px; font-weight:600; margin-bottom:12px;}
 .storage-role-choice {display:flex; align-items:center; gap:7px; font-size:13px; cursor:pointer;}
-.storage-role-choice > input {width:16px; height:16px; margin:0; accent-color:var(--action);}
+.storage-role-choice > input {flex-shrink:0; width:16px; height:16px; min-height:0; margin:0; padding:0; accent-color:var(--action);}
 .storage-role-choice:has(input:disabled) {color:var(--text-secondary); cursor:default;}
 .storage-refresh {margin-top:16px; font-size:12px;}
 .storage-copy-details {margin-top:16px;}
 .storage-copy-details > summary {font-size:12px; color:var(--text-secondary); cursor:pointer;}
 .storage-primary {padding:0 0 12px;}
-.storage-primary h3, .storage-copy-review h3 {margin:0 0 10px; font-size:14px; font-weight:600;}
-.storage-primary > strong {font-size:19px; letter-spacing:-.4px;}
+.storage-copy-review h3 {margin:0 0 10px; font-size:14px; font-weight:600;}
 .storage-watermark {margin-top:8px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums;}
 .storage-copy-row {padding:20px 0; border-bottom:1px solid var(--line);}
 .storage-copy-row h4 {margin:0 0 8px; font-size:14px;}
