@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,38 +14,61 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  external-plugin-contracts:
-    name: Reusable external plugin workflow
-    uses: ./.github/workflows/plugin-conformance.yml
-    with:
-      plugin-id: example-branding
-      project-directory: whab/app/plugins/example/example-branding
-      whab-ref: ${{ github.sha }}
-
-  checks:
-    name: CI (Python ${{ matrix.python-version }})
+  plan:
     runs-on: ubuntu-latest
-    # Source coverage plus every genuine-host native configuration and exact replay.
-    timeout-minutes: 180
+    outputs:
+      application: ${{ steps.plan.outputs.application }}
+      launcher: ${{ steps.plan.outputs.launcher }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: plan
+        env:
+          BASE_REVISION: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: python whab/app/scripts/check_pr.py plan --base "$BASE_REVISION"
+
+  quick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "22"
+      - name: Install lint tool only
+        run: python -m pip install --disable-pip-version-check ruff==0.17.0
+      - name: Lint, provenance, docs and browser tests once
+        working-directory: whab/app
+        run: |
+          python scripts/check.py --quick
+          python -m ruff check --config pyproject.toml ../launchers/macos/manager ../launchers/macos/tests ../launchers/macos/scripts
+
+  source:
+    name: Source ${{ matrix.python-version }} / ${{ matrix.shard }}
+    needs: plan
+    if: needs.plan.outputs.application == 'true'
+    runs-on: ubuntu-latest
+    # A timeout fails validation; it never converts unfinished tests into success.
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.14", "3.15"]
-    env:
-      PLAID_ENV: sandbox
-      ALLOW_LIVE_PLAID: "false"
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     defaults:
       run:
         working-directory: whab/app
     steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Toolkit compatibility builds the genuine pinned minimum-host artifact.
-          fetch-depth: 0
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -52,47 +76,102 @@ jobs:
             whab/app/pyproject.toml
             whab/app/plugins/**/pyproject.toml
             whab/app/devtools/**/pyproject.toml
-      - name: Install dependencies
+      - name: Install source test dependencies
         run: python scripts/install.py --dev --example
-      - name: Set up Node for browser tests
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: "22"
-      - name: Run contribution checks
-        run: python scripts/check.py --evidence-dir "$RUNNER_TEMP/whab-plugin-evidence"
-      - name: Preserve reviewed plugin artifacts and replay manifests
-        if: always()
+      - name: Run complete source suite partition with subprocess coverage
+        run: python scripts/check_pr.py shard --index ${{ matrix.shard }} --count 8 --workers 2 --output "$RUNNER_TEMP/source-shard"
+      - name: Preserve coverage and complete collection evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: plugin-evidence-python-${{ matrix.python-version }}
-          path: ${{ runner.temp }}/whab-plugin-evidence
-          if-no-files-found: ignore
-          retention-days: 14
-      - name: Lint launcher Python
-        run: python -m ruff check --config pyproject.toml ../launchers/macos/manager ../launchers/macos/tests ../launchers/macos/scripts
+          name: pr-source-${{ matrix.python-version }}-${{ matrix.shard }}
+          path: ${{ runner.temp }}/source-shard
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  distribution:
+    needs: plan
+    if: needs.plan.outputs.application == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: whab/app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            whab/app/pyproject.toml
+            whab/app/plugins/**/pyproject.toml
+      - run: python scripts/install.py --example
+      - name: Verify independent installed wheels once
+        run: python scripts/check_pr.py distribution
+
+  checks:
+    name: CI (Python ${{ matrix.python-version }})
+    needs: [plan, quick, source, distribution, macos-launcher]
+    if: always()
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.14", "3.15"]
+    steps:
+      - name: Reject failed, cancelled or unexpectedly skipped dependencies
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python - <<'PY'
+          import json, os
+          jobs = json.loads(os.environ["RESULTS"])
+          assert jobs["plan"]["result"] == jobs["quick"]["result"] == "success", jobs
+          assert all(jobs["plan"]["outputs"].get(key) in {"true", "false"} for key in ("application", "launcher")), jobs
+          for name, enabled in (("source", "application"), ("distribution", "application"), ("macos-launcher", "launcher")):
+              expected = "success" if jobs["plan"]["outputs"][enabled] == "true" else "skipped"
+              assert jobs[name]["result"] == expected, (name, jobs[name]["result"], expected)
+          PY
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.plan.outputs.application == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: needs.plan.outputs.application == 'true'
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install coverage verifier only
+        if: needs.plan.outputs.application == 'true'
+        run: python -m pip install --disable-pip-version-check coverage==7.16.2 pytest==9.1.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.plan.outputs.application == 'true'
+        with:
+          pattern: pr-source-${{ matrix.python-version }}-*
+          path: ${{ runner.temp }}/source-coverage
+      - name: Require every source test and 100% plugin statement/branch coverage
+        if: needs.plan.outputs.application == 'true'
+        working-directory: whab/app
+        run: python scripts/check_pr.py aggregate --count 8 --output "$RUNNER_TEMP/source-coverage"
 
   macos-launcher:
+    needs: plan
+    if: needs.plan.outputs.launcher == 'true'
     name: macOS launcher
     runs-on: macos-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       CLANG_MODULE_CACHE_PATH: /tmp/whab-launcher-clang-cache
       SWIFT_MODULECACHE_PATH: /tmp/whab-launcher-swift-cache
     steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-      - name: Test launcher lifecycle manager
-        run: python -m unittest discover -s whab/launchers/macos/tests -p 'test_*.py'
-      - name: Test bundle source boundaries
-        run: python whab/launchers/macos/scripts/test_build.py
-      - name: Test native launcher
-        run: swift test --package-path whab/launchers/macos --scratch-path /tmp/whab-launcher-swift --disable-sandbox
-      - name: Build native application shell
-        # Distribution builds additionally bundle a relocatable Python and local wheels.
-        run: python whab/launchers/macos/scripts/build.py --skip-runtime --output /tmp/WHAB.app
+      - run: python -m unittest discover -s whab/launchers/macos/tests -p 'test_*.py'
+      - run: python whab/launchers/macos/scripts/test_build.py
+      - run: swift test --package-path whab/launchers/macos --scratch-path /tmp/whab-launcher-swift --disable-sandbox
+      - run: python whab/launchers/macos/scripts/build.py --skip-runtime --output /tmp/WHAB.app
