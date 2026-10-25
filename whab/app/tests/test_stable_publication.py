@@ -158,6 +158,22 @@ def test_interrupted_tag_creation_recovers_without_retagging(publisher):
     assert [path for path, _ in api.writes] == ["/releases"]
 
 
+def test_annotated_tag_recovery_keeps_its_original_object(publisher):
+    api = FakeGitHub(publisher)
+    api.tag = {"type": "tag", "sha": OTHER}
+    original = api.request
+
+    def request(method, path, payload=None, **kwargs):
+        if path.endswith("/git/tags/" + OTHER):
+            return {"object": {"type": "commit", "sha": SHA}}
+        return original(method, path, payload, **kwargs)
+
+    api.request = request
+    assert call(publisher, api, write=True)["status"] == "published"
+    assert api.tag == {"type": "tag", "sha": OTHER}
+    assert [path for path, _ in api.writes] == ["/releases"]
+
+
 @pytest.mark.parametrize("target", [SHA, OTHER])
 def test_tag_creation_races_only_accept_the_identical_certified_commit(publisher, target):
     api = FakeGitHub(publisher)
@@ -272,6 +288,7 @@ def test_workflow_gives_only_the_schedule_gated_publisher_write_permission():
     source = path.read_text()
     readonly, publisher = source.split("  stable-release:\n", 1)
     assert "contents: write" not in readonly
+    assert "name: macOS launcher certification" in readonly
     assert "github.event_name == 'schedule'" in publisher and "github.ref == 'refs/heads/main'" in publisher
     assert "needs: [checks, external-plugin-contracts, macos-launcher]" in publisher
     assert "contents: write" in publisher and "checks: read" in publisher and "actions: read" in publisher

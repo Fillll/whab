@@ -4,6 +4,10 @@ WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## Unreleased
 
+PR: [#110](https://github.com/Fillll/whab/pull/110)
+
+- Publish each new declared stable app version after successful scheduled certification, native launcher checks and exact-commit Python CI. Preserve immutable tags/releases, skip already released versions and keep push/manual certification validation-only.
+
 ## 2.41.0 — 2026-10-23
 
 PR: [#104](https://github.com/Fillll/whab/pull/104)
