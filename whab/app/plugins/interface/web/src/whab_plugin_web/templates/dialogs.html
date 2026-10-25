@@ -173,22 +173,9 @@
   {{ heading('Settings', 'Manage this local workspace.') }}
   <nav class="settings-menu" aria-label="Settings sections">
     <button type="button" data-dialog="budgets-dialog">{{ icon('budget', 18) }}<span><strong>Budgets</strong><small>Current budget · {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }}</small></span>{{ icon('chevron-right', 16) }}</button>
-    <button type="button" data-dialog="storage-copies-dialog">{{ icon('budget', 18) }}<span><strong>Storage copies</strong><small>Primary storage and synchronized copies</small></span>{{ icon('chevron-right', 16) }}</button>
     <button type="button" data-dialog="plugins-dialog">{{ icon('settings', 18) }}<span><strong>Plugins</strong><small>Installed plugins and their settings</small></span>{{ icon('chevron-right', 16) }}</button>
     <button type="button" data-dialog="about-dialog">{{ icon('help', 18) }}<span><strong>About this prototype</strong><small>WHAB · {{ version }}</small></span>{{ icon('chevron-right', 16) }}</button>
   </nav>
-</dialog>
-<dialog class="modal settings-modal" id="storage-copies-dialog" aria-label="Storage copies" data-workspace="{{ workspace }}">
-  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
-  {{ heading('Storage copies', 'One authoritative primary, with separately saved copies.') }}
-  {% if workspace=='personal' %}
-  <div class="storage-copy-toolbar"><p class="settings-notice" role="status" aria-live="polite" data-storage-copy-message>Open this dialog to check storage status.</p><button class="button secondary" type="button" data-storage-copy-refresh>Refresh status</button></div>
-  <p class="field-error" role="alert" data-storage-copy-error hidden></p>
-  <div data-storage-copy-panel></div>
-  {% else %}
-  <p class="settings-notice">Storage copies belong to your own budget. Demo data stays separate.</p>
-  <a class="button secondary" href="{{ url(workspace='personal', category=none) }}">Open my budget</a>
-  {% endif %}
 </dialog>
 <dialog class="modal settings-modal" id="budgets-dialog" aria-label="Budgets" data-workspace="{{ workspace }}">
   <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
@@ -318,7 +305,7 @@
   </section>
 </dialog>
 {% for plugin in visible_plugins %}
-<dialog class="modal settings-modal" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} settings" data-plugin-id="{{ plugin.id }}" data-plugin-active="{{ 'true' if plugin.active else 'false' }}" data-plugin-read-only="{{ 'true' if workspace=='demo' else 'false' }}">
+<dialog class="modal settings-modal" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} settings" data-plugin-id="{{ plugin.id }}"{% if plugin.category == 'storage' %} data-storage-plugin="{{ plugin.id }}" data-storage-label="{{ plugin.display_name }}" data-workspace="{{ workspace }}"{% endif %} data-plugin-active="{{ 'true' if plugin.active else 'false' }}" data-plugin-read-only="{{ 'true' if workspace=='demo' else 'false' }}">
   <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Installed plugins</button>
   {{ heading(plugin.display_name, 'Plugin settings') }}
   <dl class="plugin-details">
@@ -328,6 +315,19 @@
     <div><dt>Runtime</dt><dd>{{ 'Running' if plugin.active else 'Not running' }}</dd></div>
   </dl>
   {% if plugin.reason %}<p class="settings-notice">{{ plugin.reason }}</p>{% endif %}
+  {% if plugin.category == 'storage' %}
+  <section class="plugin-settings storage-plugin-settings" aria-label="Storage role for this budget">
+    <h3>Storage for this budget</h3>
+    {% if workspace == 'personal' %}
+    <p class="settings-notice" role="status" aria-live="polite" data-storage-copy-message>Open this plugin’s settings to check its role.</p>
+    <p class="field-error" role="alert" data-storage-copy-error hidden></p>
+    <div data-storage-copy-panel></div>
+    <button class="text-link storage-refresh" type="button" data-storage-copy-refresh>Refresh storage status</button>
+    {% else %}
+    <p class="settings-notice">Storage roles belong to your own budget. Demo data stays separate. <a class="text-link" href="{{ url(workspace='personal', category=none) }}">Open my budget</a></p>
+    {% endif %}
+  </section>
+  {% endif %}
   {% if plugin.id == 'web' and plugin.active %}
   <fieldset class="appearance-settings">
     <legend>Appearance</legend>

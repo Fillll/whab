@@ -34,12 +34,13 @@ def test_copy_management_is_addressed_accessible_and_demo_read_only(client, page
     response = client.get(f"/budgets/{key}/{page}/2026-10/usd")
     assert response.status_code == 200
     settings = dialog(response.text, "settings-dialog")
-    assert 'data-dialog="storage-copies-dialog"' in settings
-    assert "Primary storage and synchronized copies" in settings
-    copies = dialog(response.text, "storage-copies-dialog")
-    assert 'aria-label="Storage copies"' in copies
+    assert 'storage-copies-dialog' not in response.text
+    assert 'Storage copies' not in settings
+    copies = dialog(response.text, "plugin-options-sqlite")
+    assert 'data-storage-plugin="sqlite"' in copies
+    assert 'Storage for this budget' in copies
     assert f'data-workspace="{workspace}"' in copies
-    assert "data-close-dialog" in copies and ">Settings</button>" in copies
+    assert "data-close-dialog" in copies and ">Installed plugins</button>" in copies
     assert "No automatic" not in copies
     if workspace == "personal":
         tags = Tags(copies).tags

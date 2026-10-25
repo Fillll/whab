@@ -533,7 +533,7 @@ function renderPluginSettings(dialog, settings) {
     row.append(button);
     content.append(row);
   }
-  if (!settings.insights.length && !settings.actions.length && !dialog.querySelector('[data-appearance-choice], [data-file-import]')) content.append(settingsText('p', 'This plugin has no additional settings.', 'settings-notice'));
+  if (!settings.insights.length && !settings.actions.length && !dialog.querySelector('[data-appearance-choice], [data-file-import], [data-storage-copy-panel]')) content.append(settingsText('p', 'This plugin has no additional settings.', 'settings-notice'));
 }
 
 for (const button of document.querySelectorAll('[data-plugin-options]')) button.addEventListener('click', async () => {

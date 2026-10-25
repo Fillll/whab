@@ -19,6 +19,7 @@ const errors = {
   promotion_failed: 'Promotion did not complete. Check the primary and recovery status.',
 };
 const integer = value => Number.isSafeInteger(value) && value >= 0;
+const liveCopy = copy => !['disabled', 'promoted'].includes(copy.state);
 const label = value => names[value] || 'Other storage';
 const fault = code => errors[code] || 'The host could not confirm this copy. Refresh status before continuing.';
 const protocolError = () => new Error('invalid_copy_response');
@@ -39,7 +40,7 @@ function checkedStatus(value) {
 export function createStorageCopies({request, beforeChange, onState, schedule = callback => setTimeout(callback, 2000),
   cancel = clearTimeout, isCurrent = () => true}) {
   const state = {status: null, busy: false, loading: false, review: null, uncertain: null, ticket: null, message: '', error: ''};
-  let active = false, session = 0, timer = null, reading = null, readRevision = 0, readFailed = false;
+  let active = false, session = 0, timer = null, reading = null, readRevision = 0, readFailed = false, nextPrimary = null;
   const current = token => active && token === session && isCurrent();
   const publish = () => { if (active && isCurrent()) onState({...state}); };
   const stopTimer = () => { cancel(timer); timer = null; };
@@ -82,6 +83,15 @@ export function createStorageCopies({request, beforeChange, onState, schedule = 
       }
     }
   }
+  function reviewNextPrimary() {
+    if (!nextPrimary || !canChange() || state.uncertain || state.ticket) return;
+    const copy = state.status.copies.find(row => row.id === nextPrimary.id);
+    if (state.status.primary.authority_epoch !== nextPrimary.epoch) {nextPrimary = null; return;}
+    if (!copy || !['saved', 'pending', 'failed'].includes(copy.state)) return;
+    state.review = {kind: 'promote', id: copy.id, destination: copy.destination,
+      instance: state.status.primary.instance_id, epoch: state.status.primary.authority_epoch};
+    nextPrimary = null;
+  }
   async function refresh() {
     if (!active || !isCurrent()) return;
     if (reading?.session === session) return reading.promise;
@@ -95,6 +105,7 @@ export function createStorageCopies({request, beforeChange, onState, schedule = 
         state.status = status;
         if (readFailed) {state.error = ''; readFailed = false;}
         reconcile();
+        reviewNextPrimary();
       } catch (error) {
         if (!current(token) || revision !== readRevision) return;
         state.error = error?.status === 404 ? 'Storage copies are unavailable on this host. Your primary is unchanged.' :
@@ -153,10 +164,10 @@ export function createStorageCopies({request, beforeChange, onState, schedule = 
     await refresh();
   }
   const controller = {
-    start() {active = true; session += 1; state.review = null; state.error = ''; publish(); return refresh();},
-    stop() {active = false; session += 1; stopTimer(); state.review = null;},
+    start() {active = true; session += 1; state.review = null; nextPrimary = null; state.error = ''; publish(); return refresh();},
+    stop() {active = false; session += 1; stopTimer(); state.review = null; nextPrimary = null;},
     refresh,
-    dismiss() {if (!state.busy) {state.review = null; publish();}},
+    dismiss() {if (!state.busy) {state.review = null; nextPrimary = null; publish();}},
     async acknowledgeUnknown() {
       const token = session;
       await refresh();
@@ -167,19 +178,21 @@ export function createStorageCopies({request, beforeChange, onState, schedule = 
         publish();
       }
     },
-    preview(destination) {return change('preview', async token => {
-      if (!Object.hasOwn(names, destination) || destination === state.status.primary.plugin_id) throw protocolError();
+    preview(destination, role = 'synced') {return change('preview', async token => {
+      if (typeof destination !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(destination) || destination === state.status.primary.plugin_id) throw protocolError();
       const result = await request('/storage/copies/preview', {destination}, 200);
       if (!UUID.test(result?.preview_id) || result.destination !== destination || result.supported !== true || !integer(result.source_generation)) throw protocolError();
       if (!current(token)) return;
-      state.review = {kind: 'attach', id: result.preview_id, destination, generation: result.source_generation};
+      state.review = {kind: 'attach', id: result.preview_id, destination, generation: result.source_generation, role};
       state.message = ''; publish();
     });},
     attach() {return change('attach', async () => {
       const review = state.review;
       if (review?.kind !== 'attach') return;
+      if (review.role === 'primary') nextPrimary = {id: review.id, epoch: state.status.primary.authority_epoch};
       await mutation('attach', '/storage/copies/transition', {preview_id: review.id}, 202,
         {kind: 'attach', copyId: review.id}, result => result?.id === review.id && result.state === 'pending');
+      if (!state.uncertain && state.error) nextPrimary = null;
     });},
     reviewPromotion(id) {return change('review', async token => {
       await refresh();
@@ -213,14 +226,47 @@ export function createStorageCopies({request, beforeChange, onState, schedule = 
       await mutation('disable', `/storage/copies/${id}/disable`, {}, 200, {kind: 'disable', copyId: id},
         result => result?.id === id && result.state === 'disabled');
     });},
+    reviewDisable(destination) {return change('review', async token => {
+      await refresh();
+      if (!current(token) || !canChange() || destination === state.status.primary.plugin_id) return;
+      const copies = state.status.copies.filter(copy => copy.destination === destination && liveCopy(copy));
+      if (!copies.length || copies.some(copy => !['saved', 'pending', 'failed', 'reattach_required', 'unavailable'].includes(copy.state))) return;
+      state.review = {kind: 'disable', id: copies[0].id, destination, copies: copies.map(copy => copy.id)};
+      state.message = ''; publish();
+    });},
+    disableReviewed() {return change('disable', async token => {
+      const review = state.review;
+      if (review?.kind !== 'disable') return;
+      await refresh();
+      if (!current(token) || !canChange() || review.destination === state.status.primary.plugin_id ||
+          state.status.copies.some(copy => copy.destination === review.destination && liveCopy(copy) && !review.copies.includes(copy.id))) {
+        state.review = null; state.error = 'Storage changed. Review the unused role again.'; return;
+      }
+      for (const id of review.copies) {
+        const copy = state.status.copies.find(copy => copy.id === id);
+        if (!copy || copy.state === 'disabled') continue;
+        if (!current(token) || !canChange() || !['saved', 'pending', 'failed', 'reattach_required', 'unavailable'].includes(copy.state)) break;
+        await mutation('disable', `/storage/copies/${id}/disable`, {}, 200, {kind: 'disable', copyId: id},
+          result => result?.id === id && result.state === 'disabled');
+        if (state.uncertain || state.error) break;
+      }
+    });},
   };
   return controller;
 }
 
 export function initStorageCopies({beforeChange, document: page = document, request: suppliedRequest,
   context = getContext, schedule, cancel} = {}) {
-  const dialog = page.getElementById('storage-copies-dialog');
+  return [...page.querySelectorAll('[data-storage-plugin]')].map(dialog => initStoragePlugin({
+    beforeChange, document: page, request: suppliedRequest, context, schedule, cancel, dialog,
+  })).filter(Boolean);
+}
+
+export function initStoragePlugin({beforeChange, document: page = document, request: suppliedRequest,
+  context = getContext, schedule, cancel, dialog} = {}) {
   if (!dialog || dialog.dataset.workspace !== 'personal') return null;
+  const destination = dialog.dataset.storagePlugin;
+  const storageLabel = id => id === destination ? dialog.dataset.storageLabel : label(id);
   const scope = context().apiPrefix;
   const panel = dialog.querySelector('[data-storage-copy-panel]');
   const message = dialog.querySelector('[data-storage-copy-message]');
@@ -257,6 +303,7 @@ export function initStorageCopies({beforeChange, document: page = document, requ
     const focused = panel.contains(page.activeElement) ? page.activeElement : null;
     const focusKey = focused?.dataset.storageControl;
     const selection = focused?.tagName === 'SELECT' ? focused.value : null;
+    const detailsOpen = [...panel.children].find(node => node.className === 'storage-copy-details')?.open;
     panel.replaceChildren();
     if (!state.status) return;
     const primary = state.status.primary;
@@ -267,9 +314,36 @@ export function initStorageCopies({beforeChange, document: page = document, requ
       node.dataset.storageControl = key;
       node.disabled = blocked || !usable; node.addEventListener('click', handler); return node;
     };
+    const copies = state.status.copies.filter(copy => copy.destination === destination);
+    const attached = copies.filter(liveCopy);
+    const isPrimary = primary.plugin_id === destination;
+    const role = isPrimary ? 'primary' : attached.length ? 'synced' : 'unused';
+    const promotable = attached.filter(copy => ['saved', 'pending', 'failed'].includes(copy.state));
+    const roles = text('fieldset', '', 'storage-roles');
+    roles.append(text('legend', 'Role in this budget'));
+    for (const [value, caption] of [['primary', 'Primary'], ['synced', 'Synced copy'], ['unused', 'Not used']]) {
+      const choice = text('label', '', 'storage-role-choice');
+      const radio = page.createElement('input');
+      radio.type = 'radio'; radio.name = `storage-role-${destination}`; radio.value = value;
+      radio.checked = role === value;
+      radio.dataset.storageControl = `role-${value}`;
+      radio.disabled = blocked || !usable || isPrimary && value !== 'primary' || value === 'primary' && attached.length > 0 && promotable.length !== 1 ||
+        value === 'unused' && attached.some(copy => !['saved', 'pending', 'failed', 'reattach_required', 'unavailable'].includes(copy.state));
+      radio.addEventListener('change', () => {
+        // A radio reflects persisted status, never an unconfirmed request.
+        radio.checked = value === role;
+        for (const input of roles.querySelectorAll('[data-storage-control]')) input.checked = input.value === role;
+        if (value === role) return;
+        if (value === 'unused') return controller.reviewDisable(destination);
+        if (value === 'primary' && promotable.length === 1) return controller.reviewPromotion(promotable[0].id);
+        return controller.preview(destination, value);
+      });
+      choice.append(radio, text('span', caption)); roles.append(choice);
+    }
+    panel.append(roles);
+    if (isPrimary) panel.append(text('p', 'To stop using this primary, make another synced copy Primary first.', 'settings-notice'));
     const summary = text('section', '', 'storage-primary');
-    summary.append(text('h3', primary.authoritative ? 'Authoritative primary' : 'Primary storage status'));
-    summary.append(text('strong', label(primary.plugin_id)));
+    summary.append(text('p', `Current primary: ${storageLabel(primary.plugin_id)}`, 'settings-notice'));
     const health = {ready: 'Ready', degraded: 'Cleanup needs attention', recovery_required: 'Storage recovery required'}[primary.health] || 'Status unavailable';
     summary.append(text('p', `${health} · ${primary.admission === 'open' ? 'Requests open' : 'Requests paused'}`, 'settings-notice'));
     if (integer(primary.generation)) summary.append(text('p', `Budget revision ${primary.generation}`, 'storage-watermark'));
@@ -282,9 +356,9 @@ export function initStorageCopies({beforeChange, document: page = document, requ
     panel.append(text('p', 'A successful primary save stays successful when a copy is pending or fails.', 'settings-notice'));
     for (const entry of Object.values(state.status.errors)) panel.append(text('p', fault(entry?.code), 'field-error'));
     const list = text('div', '', 'storage-copy-list');
-    for (const copy of state.status.copies) {
+    for (const copy of copies) {
       const row = text('section', '', 'storage-copy-row');
-      row.append(text('h4', `${label(copy.destination)} copy`), text('p', states[copy.state], 'storage-copy-state'));
+      row.append(text('h4', `${storageLabel(copy.destination)} copy`), text('p', states[copy.state], 'storage-copy-state'));
       const watermark = copy.watermark;
       if (watermark && integer(watermark.source_generation) && integer(watermark.namespace_generation)) {
         row.append(text('p', `Budget revision ${watermark.source_generation} · Plugin state revision ${watermark.namespace_generation}`, 'storage-watermark'));
@@ -301,8 +375,12 @@ export function initStorageCopies({beforeChange, document: page = document, requ
       if (copy.state === 'reattach_required') row.append(text('p', 'Preview a new empty destination to copy the current primary. This older copy is retained.', 'settings-notice'));
       row.append(actions); list.append(row);
     }
-    if (!state.status.copies.length) list.append(text('p', 'No synchronized storage copies are attached.', 'settings-notice'));
-    panel.append(list);
+    if (copies.length) {
+      const details = text('details', '', 'storage-copy-details');
+      details.open = Boolean(detailsOpen);
+      details.append(text('summary', 'Saved copies and status'), list);
+      panel.append(details);
+    }
     for (const operation of state.status.operations.filter(row => ['queued', 'running', 'recovery_required', 'failed'].includes(row.state))) {
       panel.append(text('p', operation.state === 'recovery_required' ? 'Promotion requires storage recovery.' :
         operation.state === 'failed' ? 'A promotion failed. The primary status above shows the current authority.' :
@@ -316,28 +394,20 @@ export function initStorageCopies({beforeChange, document: page = document, requ
     if (state.review) {
       const review = text('section', '', 'storage-copy-review');
       review.tabIndex = -1;
-      review.setAttribute('aria-label', state.review.kind === 'attach' ? 'Review empty copy destination' : 'Review storage promotion');
-      review.append(text('h3', state.review.kind === 'attach' ? 'Review empty destination' : 'Review promotion'));
+      review.setAttribute('aria-label', state.review.kind === 'attach' ? 'Review empty copy destination' :
+        state.review.kind === 'disable' ? 'Review unused storage' : 'Review storage promotion');
+      review.append(text('h3', state.review.kind === 'attach' ? 'Review empty destination' :
+        state.review.kind === 'disable' ? 'Stop syncing this plugin?' : 'Review promotion'));
       review.append(text('p', state.review.kind === 'attach' ?
-        `${label(state.review.destination)} is ready as a new empty destination. Attaching copies the complete current budget and plugin state. The active primary stays in use.` :
-        `${label(state.review.destination)} will become the authoritative primary after the host finishes current work, catches up this copy, and validates it. The previous primary is retained and stops accepting writes.`, 'settings-notice'));
+        `${storageLabel(state.review.destination)} is ready as a new empty destination. Attaching copies the complete current budget and plugin state. The active primary stays in use.${state.review.role === 'primary' ? ' Next, review and confirm making this copy Primary separately.' : ''}` :
+        state.review.kind === 'disable' ? 'All synced copies for this plugin will stop updating. Their saved data is retained. The primary stays in use.' :
+        `${storageLabel(state.review.destination)} will become the authoritative primary after the host finishes current work, catches up this copy, and validates it. The previous primary is retained and stops accepting writes.`, 'settings-notice'));
       const actions = text('div', '', 'storage-copy-actions');
-      actions.append(button(state.review.kind === 'attach' ? 'Attach this empty copy' : 'Promote this copy', () =>
-        state.review.kind === 'attach' ? controller.attach() : controller.promote(), true));
+      actions.append(button(state.review.kind === 'attach' ? 'Attach this empty copy' : state.review.kind === 'disable' ? 'Stop syncing' : 'Promote this copy', () =>
+        state.review.kind === 'attach' ? controller.attach() : state.review.kind === 'disable' ? controller.disableReviewed() : controller.promote(), true));
       const dismiss = button('Cancel review', () => controller.dismiss()); dismiss.disabled = state.busy;
       actions.append(dismiss); review.append(actions); panel.append(review);
       if (focusReview) review.focus({preventScroll: true});
-    } else if (usable && !state.uncertain && !state.ticket) {
-      const form = text('form', '', 'modal-form storage-copy-add');
-      const wrapper = text('label', 'New empty copy destination');
-      const select = page.createElement('select'); select.name = 'destination'; select.dataset.storageControl = 'destination';
-      for (const [id, name] of Object.entries(names)) if (id !== primary.plugin_id) {
-        const option = text('option', name); option.value = id; select.append(option);
-      }
-      select.disabled = blocked; wrapper.append(select); form.append(wrapper);
-      const preview = button('Preview empty destination', () => {}, false); preview.type = 'submit'; form.append(preview);
-      form.addEventListener('submit', event => {event.preventDefault(); return controller.preview(select.value);});
-      panel.append(form);
     }
     if (focusKey && !focusReview) {
       const next = [...panel.querySelectorAll('[data-storage-control]')].find(node => node.dataset.storageControl === focusKey);
@@ -349,7 +419,7 @@ export function initStorageCopies({beforeChange, document: page = document, requ
   }
   controller = createStorageCopies({request, beforeChange, onState: render, isCurrent: current, schedule, cancel});
   refresh.addEventListener('click', controller.refresh);
-  for (const opener of page.querySelectorAll('[data-dialog="storage-copies-dialog"]')) opener.addEventListener('click', controller.start);
+  for (const opener of page.querySelectorAll(`[data-dialog="${dialog.id}"]`)) opener.addEventListener('click', controller.start);
   dialog.addEventListener('close', controller.stop);
   page.addEventListener('whab:before-navigate', event => {
     if (dialog.open && event.detail?.source !== 'storage-copies') event.preventDefault();
