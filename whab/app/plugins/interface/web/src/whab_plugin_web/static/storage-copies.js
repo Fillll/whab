@@ -341,10 +341,10 @@ export function initStoragePlugin({beforeChange, document: page = document, requ
       choice.append(radio, text('span', caption)); roles.append(choice);
     }
     panel.append(roles);
-    if (isPrimary) panel.append(text('p', 'To stop using this primary, make another synced copy Primary first.', 'settings-notice'));
+    if (role === 'primary') panel.append(text('p', 'To stop using this primary, make another synced copy Primary first.', 'settings-notice'));
     const summary = text('section', '', 'storage-primary');
     const health = {ready: 'Ready', degraded: 'Cleanup needs attention', recovery_required: 'Storage recovery required'}[primary.health] || 'Status unavailable';
-    summary.append(text('p', `Current primary: ${storageLabel(primary.plugin_id)} · ${health}`, 'settings-notice'));
+    summary.append(text('p', `${primary.supported && !primary.authoritative ? 'Storage awaiting confirmation' : 'Current primary'}: ${storageLabel(primary.plugin_id)} · ${health}`, 'settings-notice'));
     if (attached.length) summary.append(text('p', [...new Set(attached.map(copy => states[copy.state]))].join(' · '), 'storage-copy-state'));
     panel.append(summary);
     if (!primary.supported) {

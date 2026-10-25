@@ -465,6 +465,8 @@ test('a gated or recovering authority cannot display a confirmed new Primary rol
     const roles = state.panel.querySelectorAll('[data-storage-control]');
     assert.equal(roles.every(node => !node.checked && node.disabled), true);
     assert.match(state.panel.textContent, /paused until storage is ready and authoritative/);
+    assert.match(state.panel.textContent, /Storage awaiting confirmation/);
+    assert.equal(state.panel.textContent.includes('Current primary:'), false);
     assert.equal(state.requests.filter(row => row.body !== undefined).length, 0);
   }
 });
