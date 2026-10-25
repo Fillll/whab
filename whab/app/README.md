@@ -53,16 +53,16 @@ Installing a plugin does not enable it. Settings selects installed optional plug
 Install Node.js 22 or newer for the browser tests; the application has no Node build or React runtime. During iteration run focused regression tests and:
 
 ```sh
-.venv/bin/python scripts/check.py --quick
+.venv/bin/python scripts/check_pr.py local --base origin/main
 ```
 
-Before submitting code:
+Required PR CI runs the complete source suite in parallel on Python 3.14 and 3.15, verifies 100% plugin statement/branch coverage and checks installed wheels. Run exhaustive certification manually when needed:
 
 ```sh
 .venv/bin/python scripts/check.py
 ```
 
-The full command runs Python tests once with the required plugin statement/branch coverage, browser tests, lint, documentation/changelog checks and isolated wheel verification. Use `--docs` for documentation links and inventory only. See [contributing](CONTRIBUTING.md) for task ownership and PR policy, [development verification](../docs/development.md) for previews and troubleshooting, and [usage](../docs/usage.md) for user workflows.
+The exhaustive command also validates toolkit wheels, genuine historical hosts and generated-plugin configuration/replay matrices. It runs after merge and nightly; local focused checks are sufficient before pushing, with required PR CI providing comprehensive source validation. Use `scripts/check.py --docs` for documentation links and inventory only. See [contributing](CONTRIBUTING.md#tests-and-checks) for the timing target and validation policy, [development verification](../docs/development.md) for previews and troubleshooting, and [usage](../docs/usage.md) for user workflows.
 
 ## License
 
