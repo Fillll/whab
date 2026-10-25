@@ -407,7 +407,7 @@ export function initStoragePlugin({beforeChange, document: page = document, requ
         state.review.kind === 'attach' ? controller.attach() : state.review.kind === 'disable' ? controller.disableReviewed() : controller.promote(), true));
       const dismiss = button('Cancel review', () => controller.dismiss()); dismiss.disabled = state.busy;
       actions.append(dismiss); review.append(actions); panel.append(review);
-      if (focusReview) review.focus({preventScroll: true});
+      if (focusReview || focused?.className === 'storage-copy-review') review.focus({preventScroll: true});
     }
     if (focusKey && !focusReview) {
       const next = [...panel.querySelectorAll('[data-storage-control]')].find(node => node.dataset.storageControl === focusKey);

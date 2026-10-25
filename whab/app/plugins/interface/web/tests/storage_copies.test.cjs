@@ -323,6 +323,7 @@ test('a new explicit review receives focus on its explanatory section, not the c
   assert.equal(state.page.activeElement.tagName, 'SECTION');
   assert.equal(state.page.activeElement.tabIndex, -1);
   assert.match(state.page.activeElement.textContent, /new empty destination/);
+  assert.equal(state.panel.contains(state.page.activeElement), true);
 });
 
 test('a rejected change stays visible across successful status polls until another user action', async () => {
