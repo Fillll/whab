@@ -608,6 +608,7 @@ document.addEventListener('click', async event => {
   else notify('Save the transaction edit before continuing.');
 });
 initVisualSettings({
+  closeSettings: () => settingsNavigation.close({restoreOrigin: false}),
   async beforeChange() {
     if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'plugin-settings'}}))) return false;
     await requireSavedEdits();

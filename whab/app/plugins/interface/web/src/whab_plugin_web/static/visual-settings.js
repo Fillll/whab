@@ -187,7 +187,7 @@ export function createVisualSettings({request, beforeChange = async () => true, 
   return controller;
 }
 
-export function initVisualSettings({page = document, beforeChange, beforeCommit, onOptionalComplete,
+export function initVisualSettings({page = document, beforeChange, beforeCommit, onOptionalComplete, closeSettings,
   request: suppliedRequest, schedule, cancel} = {}) {
   const dialog = page.getElementById('plugins-dialog');
   const pane = dialog?.querySelector('[data-visual-settings]');
@@ -244,7 +244,8 @@ export function initVisualSettings({page = document, beforeChange, beforeCommit,
     if (await beforeCommit?.(kind) === false) return false;
     if (kind === 'visual') {
       transferring = true;
-      for (const opened of page.querySelectorAll('#settings-dialog[open]')) opened.close();
+      if (closeSettings && closeSettings() === false) {transferring = false; return false;}
+      if (!closeSettings) page.getElementById('settings-dialog')?.close();
     }
     return true;
   }, onState: render, isCurrent, schedule, cancel});

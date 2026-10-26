@@ -168,7 +168,7 @@ test('visual Apply closes the single Settings window before host submission so b
   settings.addEventListener('close', () => {dialog.hidden = true; dialog.fire('close');});
   dialog.querySelector = selector => selector === '[data-visual-settings]' ? pane : selection;
   dialog.querySelectorAll = () => [];
-  const page = new Node(); page.getElementById = () => dialog;
+  const page = new Node(); page.getElementById = id => id === 'settings-dialog' ? settings : dialog;
   page.querySelectorAll = selector => selector === '#settings-dialog[open]' && settings.open ? [settings] : [];
   const context = {getContext: () => ({apiPrefix: '/budgets/fictional/api'}), notify() {}, setTimeout, clearTimeout};
   vm.runInNewContext(navigationSource + source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function ') + '\nthis.init = initVisualSettings;', context);

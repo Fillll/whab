@@ -112,3 +112,12 @@ test('disabled openers are ignored; Back buttons navigate inside the same window
   const back = {parent: h.window, closest: selector => selector === '[data-settings-back]' ? back : null};
   assert.equal(click(h.page, back).defaultPrevented, true); assert.equal(h.isSettingsPageOpen(h.home), true);
 });
+
+
+test('visual handover closes Settings without restoring an account dialog that would block readiness', async () => {
+  const h = await fixture(), account = new Element('account-settings'); account.open = true;
+  h.navigation.open(h.web.id, opener(h.web.id, account));
+  assert.equal(h.navigation.close({restoreOrigin: false}), true);
+  assert.equal(account.open, false); assert.equal(h.window.open, false);
+  assert.equal(h.pages.some(page => h.isSettingsPageOpen(page)), false);
+});

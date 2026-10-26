@@ -83,5 +83,11 @@ export function initSettingsNavigation({document: page = document, beforeOpen = 
       previous.opener.focus({preventScroll: true});
     }
   });
-  return {open, back};
+  function close({restoreOrigin = true} = {}) {
+    if (busy()) return false;
+    if (!restoreOrigin) origin = null;
+    window.close();
+    return true;
+  }
+  return {open, back, close};
 }
