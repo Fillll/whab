@@ -4370,3 +4370,18 @@ strong {
   [data-visual-settings] .settings-actions > .button,
   [data-plugin-selection] .settings-actions > .button {flex:1 1 140px;}
 }
+
+/* Installed plugins and marketplace share the six capability-family sections. */
+.plugin-category-group { padding: 18px 0 14px; border-top: 2px solid var(--line); }
+.plugin-category-group > h4 { margin: 0 0 12px; font-size: 14px; color: var(--text-primary); letter-spacing: 0; text-transform: none; }
+.plugin-category-group > h4 > span { margin-left: 8px; font-size: 11px; }
+.plugin-category-empty { margin: 4px 0 8px; }
+.marketplace-link { margin: 0 0 20px; display: inline-flex; gap: 12px; align-items: center; }
+.marketplace-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.marketplace-row:last-child { border-bottom: 0; }
+.marketplace-row strong { font-size: 12px; font-weight: 600; }
+.marketplace-row small { display: block; margin-top: 4px; }
+.marketplace-row button { flex-shrink: 0; font-size: 11px; }
+.plugin-install-review { margin-top: 20px; padding-top: 18px; border-top: 2px solid var(--line); }
+.plugin-install-review li { font-size: 12px; margin: 8px 0; overflow-wrap: anywhere; }
+@media (max-width: 520px) { .marketplace-row { align-items: flex-start; flex-direction: column; gap: 8px; } }

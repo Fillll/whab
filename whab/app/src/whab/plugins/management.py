@@ -6,6 +6,7 @@ from threading import Lock
 
 from .configuration import read_selection, validate_selection, write_selection
 from .contracts import contract_for
+from .manifests import installed_manifest
 from .runtime import PluginError, PluginRegistry, load_descriptors
 from .sdk import ENTRYPOINT_GROUP, valid_plugin_name
 
@@ -138,12 +139,20 @@ class PluginManager:
                 reason = "Storage and user interfaces are selected with WHAB_STORAGE and WHAB_UI."
             distribution, version = package_details(matches[0]) if len(matches) == 1 else ("", "")
             known = bundled_metadata(name, matches)
+            manifest = None
+            if len(matches) == 1:
+                try:
+                    manifest = installed_manifest(matches[0])
+                except PluginError as error:
+                    reason = str(error)
             display_name = known[1] if known else name
             catalog.append({
                 "id": name,
                 "display_name": description.display_name if description else display_name,
                 "kinds": list(description.kinds) if description else [],
-                "category": plugin_category(name, matches, description),
+                "category": manifest["category"] if manifest else plugin_category(name, matches, description),
+                "installed": bool(matches) or description is not None,
+                "dependencies": manifest["dependencies"] if manifest else [],
                 "distribution": distribution,
                 "version": version,
                 "compatibility": {

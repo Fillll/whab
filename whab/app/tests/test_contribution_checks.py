@@ -251,8 +251,9 @@ def inventory_fixture(root):
         '[tool.whab.plugin]\napi-version = 1\ncapabilities = [{name="interface.ui",version=1,composition="singleton"}]\n'
         'requires = []\nconflicts = []\nlifecycle = "restart"\nlegacy = true\nauthority = "unknown"\nstate-version = 1\nstate-upgrades = []\nsupport = "maintained"\n'
     )
-    (plugin / "src").mkdir()
-    (plugin / "src/web.py").write_text("plugin = Plugin('web', 'Fictional UI', ui=object())\n")
+    (plugin / "src/web").mkdir(parents=True)
+    (plugin / "src/web/__init__.py").write_text("plugin = Plugin('web', 'Fictional UI', ui=object())\n")
+    (plugin / "src/web/plugin.json").write_text('{"schema_version":1,"id":"web","category":"interface","dependencies":[]}')
     sdk = application / "src/whab/plugins"
     sdk.mkdir(parents=True)
     (sdk.parent / "__init__.py").write_text("__version__ = '1.0.0'\n")
@@ -268,7 +269,7 @@ def inventory_fixture(root):
         'verification = []\n[publisher]\nmaintainer="Fillll"\nrepository="https://github.com/Fillll/whab"\n'
         'documentation_ref="' + "0" * 40 + '"\nsecurity="https://github.com/Fillll/whab/security/advisories/new"\n'
         'security_policy="https://github.com/Fillll/whab/security/policy"\nsecurity_verified_date="2026-10-23"\n'
-        'support_policy="Fictional support policy"\n'
+        'support_policy="Fictional support policy"\n[marketplace]\nsource_ref="' + "0" * 40 + '"\n'
     )
     (root / "whab/docs").mkdir()
     from plugin_metadata import generated_outputs

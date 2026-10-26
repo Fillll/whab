@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_example_remote_client"
-version = "1.0.0"
+version = "1.0.1"
 description = "Fictional declarative WHAB remote-client teaching plugin"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -40,3 +40,6 @@ authority = "remote"
 state-version = 1
 state-upgrades = []
 support = "teaching"
+
+[tool.setuptools.package-data]
+whab_plugin_example_remote_client = ["plugin.json"]

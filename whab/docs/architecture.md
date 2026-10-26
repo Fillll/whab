@@ -16,6 +16,20 @@ These are the durable choices behind the current implementation. Change their do
 
 The [categorization plan](automatic-categorization-plan.md) is a historical delivery record. Current behavior belongs in the owning plugin README and public SDK guide; proposed experiments there are not additional runtime requirements.
 
+## Choosing the owner of a change
+
+Before implementing a feature, answer these questions and record the conclusion in the PR:
+
+1. Is this a financial rule that must hold with every interface, provider and storage implementation? Put the rule in the financial domain core; express outside needs through ports and immutable domain records.
+2. Is this shared composition, discovery, dependency validation, installation, lifecycle, access control or compatibility? Put the generic contract in the SDK/host outside the financial core. Do not put concrete providers or presentation in the host.
+3. Is the behavior replaceable or specific to an adapter? Extend the owning plugin. Choose its primary category: Interfaces, Ingestion, Insights, Storage, Automation or Extensions. A plugin can expose several capabilities while keeping one owner.
+4. Does it require another plugin? Prefer a public capability requirement when interchangeable providers suffice. Declare an explicit plugin ID and compatible package-version range in `plugin.json` when the named implementation is actually required. Keep Python distribution requirements aligned. Do not invent dependencies merely because plugins cooperate.
+5. Could a different interface, storage or provider replace this implementation without changing financial correctness? If not, recheck whether a domain invariant or shared port is in the wrong layer.
+
+Plugins remain independently packaged and versioned, and may depend on other plugins. Cross-plugin work uses public SDK contracts; importing another plugin's implementation or reading its private namespace is unsupported. Installation is environment-wide, activation and saved state belong to each budget, and disabling retains saved data. A remote client talks to a server in another environment; that relationship is configuration, not an instruction to install the server locally.
+
+The host owns marketplace dependency resolution and package preparation; the Web interface plugin owns its layout and controls. All six plugin categories stay visible, and unavailable portable-budget plugins are reported separately from installed plugins. See [plugin dependency manifests](plugins.md#plugin-dependency-manifests).
+
 ## Package map
 
 | Package | Owns | Depends on |

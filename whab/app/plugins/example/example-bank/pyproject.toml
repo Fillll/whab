@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_example_bank"
-version = "1.0.0"
+version = "1.0.1"
 description = "Offline fictional bank teaching plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -46,3 +46,6 @@ authority = "local"
 state-version = 1
 state-upgrades = []
 support = "teaching"
+
+[tool.setuptools.package-data]
+whab_plugin_example_bank = ["plugin.json"]

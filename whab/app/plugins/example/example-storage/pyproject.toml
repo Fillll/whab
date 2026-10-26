@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_example_storage"
-version = "1.0.0"
+version = "1.0.1"
 description = "Independent POSIX native snapshot-storage teaching plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -40,3 +40,6 @@ authority = "local"
 state-version = 1
 state-upgrades = []
 support = "teaching"
+
+[tool.setuptools.package-data]
+whab_plugin_example_storage = ["plugin.json"]

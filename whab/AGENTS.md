@@ -1,5 +1,7 @@
 # WHAB product
 
+Keep WHAB's hexagonal financial core and plugin architecture central to every change. Before implementation, choose the domain, shared host/SDK or concrete plugin owner using the [architecture placement guide](docs/architecture.md#choosing-the-owner-of-a-change). Categorize replaceable behavior deliberately; plugins may declare dependencies through public contracts and packaged JSON metadata, without importing another plugin's private implementation.
+
 The Python application, core, SDK and plugins live in `app/`; shared product documentation lives in `docs/`; platform companions live in `launchers/`. Read and follow [`app/AGENTS.md`](app/AGENTS.md) before changing application code, plugins, tests or product documentation. Run application commands from `whab/app/`. Follow each launcher's own instructions for native builds and lifecycle tests.
 
 Prioritize [clarity and simplicity](app/CONTRIBUTING.md#clarity-and-simplicity) in product design and implementation; apply those rules during development and review.

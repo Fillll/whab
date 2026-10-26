@@ -11,8 +11,10 @@ from whab.plugins import catalog
 
 
 def corrupt_linked_artifact(value):
-    row = next(row for row in value["plugins"] if row["verifications"])
-    evidence = next(record for record in value["verifications"] if record["id"] == row["verifications"][0])
+    evidence = value["verifications"][0]
+    row = next(row for row in value["plugins"] if row["id"] in evidence["selection"])
+    row["version"] = evidence["artifacts"][row["distribution"]]
+    row["verifications"] = [evidence["id"]]
     evidence["artifacts"][row["distribution"]] = "9.9.9"
 
 

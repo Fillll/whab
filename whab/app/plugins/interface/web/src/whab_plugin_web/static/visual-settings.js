@@ -190,7 +190,8 @@ export function createVisualSettings({request, beforeChange = async () => true, 
 export function initVisualSettings({page = document, beforeChange, beforeCommit, onOptionalComplete, closeSettings,
   request: suppliedRequest, schedule, cancel} = {}) {
   const dialog = page.getElementById('plugins-dialog');
-  const pane = dialog?.querySelector('[data-visual-settings]');
+  const visualDialog = page.getElementById('plugin-options-web') || dialog;
+  const pane = visualDialog?.querySelector('[data-visual-settings]') || dialog?.querySelector('[data-visual-settings]');
   if (!pane || pane.dataset.workspace !== 'personal') return null;
   const scope = getContext().apiPrefix;
   const isCurrent = () => getContext().apiPrefix === scope;
@@ -260,11 +261,15 @@ export function initVisualSettings({page = document, beforeChange, beforeCommit,
     void controller.reviewOptional(new FormData(dialog.querySelector('[data-plugin-selection]')).getAll('plugin'));
   });
   dialog.querySelector('[data-plugin-selection]')?.addEventListener('change', controller.invalidate);
+  if (visualDialog !== dialog) {
+    visualDialog.addEventListener('whab:settings-enter', () => {transferring = false; void controller.start();});
+    visualDialog.addEventListener('close', () => {if (!transferring) controller.stop();});
+  }
   dialog.addEventListener('whab:settings-enter', () => {transferring = false; void controller.start();});
   dialog.addEventListener('close', () => {if (!transferring) controller.stop();});
   page.defaultView?.addEventListener('pagehide', controller.stop);
   page.addEventListener('whab:before-navigate', event => {
-    if (isSettingsPageOpen(dialog) && event.detail?.source !== 'plugin-settings') event.preventDefault();
+    if ((isSettingsPageOpen(dialog) || isSettingsPageOpen(visualDialog)) && event.detail?.source !== 'plugin-settings') event.preventDefault();
   });
   if (isSettingsPageOpen(dialog)) void controller.start();
   return controller;

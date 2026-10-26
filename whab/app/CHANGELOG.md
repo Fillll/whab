@@ -2,6 +2,12 @@
 
 WHAB uses Semantic Versioning. Released tags are immutable.
 
+## 2.42.0 — 2026-10-25
+
+PR: [#113](https://github.com/Fillll/whab/pull/113)
+
+- Add curated marketplace installation reviews and enforce packaged named-plugin dependency manifests. Keep installation separate from per-budget activation; document architecture placement and public cross-plugin contracts.
+
 ## Unreleased
 
 PR: [#110](https://github.com/Fillll/whab/pull/110)

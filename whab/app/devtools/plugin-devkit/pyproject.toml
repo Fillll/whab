@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_devkit"
-version = "0.10.0"
+version = "0.10.1"
 description = "Public-contract conformance tools for WHAB plugin authors"
 readme = "README.md"
 requires-python = ">=3.14"

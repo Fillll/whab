@@ -20,6 +20,8 @@ def plugin(identifier, **changes):
         "required": False,
         "manageable": True,
         "reason": None,
+        "installed": True,
+        "dependencies": [],
         **changes,
     }
 
@@ -178,10 +180,10 @@ def test_plugin_categories_and_names_are_sorted_and_examples_are_hidden(client, 
     )
     installed = dialog(text, "plugins-dialog")
     assert re.findall(r'data-plugin-category="([^"]+)"', installed) == [
-        "ingestion", "interface", "storage",
+        "interface", "ingestion", "insight", "storage", "automation", "extension",
     ]
     assert re.findall(r'<strong>([^<]+)</strong>', installed) == [
-        "Import from YNAB ZIP file", "Plaid", "Bank logos", "WHAB web", "SQLite",
+        "Bank logos", "WHAB web", "Import from YNAB ZIP file", "Plaid", "SQLite",
     ]
     assert '<h4 id="plugin-category-interface">Interfaces<span>2</span></h4>' in installed
     assert 'value="example">Examples' not in installed
@@ -220,7 +222,7 @@ def test_each_plugin_has_settings_with_saved_and_running_state(client, monkeypat
     label = re.search(r'<label class="plugin-toggle">(.*?)</label>', row, re.S)[1]
     assert '<strong>Sample</strong>' in label
     assert "whab-sample" not in label  # Package details do not clutter the checkbox's accessible name.
-    assert row.index('</label>') < row.index('whab-sample · 1.0.0') < row.index(
+    assert row.index('</label>') < row.index('Version 1.0.0') < row.index(
         f'<span class="plugin-state">{selection}</span>'
     ) < row.index('aria-label="Settings for Sample"')
     assert re.findall(r'<button\b[^>]*aria-label="([^"]+)"', row) == ["Settings for Sample"]
@@ -249,6 +251,22 @@ def test_empty_installed_list_explains_what_is_available(client, monkeypatch):
     assert "No installed plugins were found." in dialog(text, "plugins-dialog")
     assert "data-plugin-options" not in text
 
+
+def test_six_empty_sections_marketplace_and_dependency_details_preserve_missing_selections(client, monkeypatch):
+    text = render(client, monkeypatch,
+                  plugin('missing', installed=False, enabled=True),
+                  plugin('consumer', dependencies=[{'id': 'provider', 'version': '>=1,<2'}]),
+                  plugin('provider'))
+    installed = dialog(text, 'plugins-dialog')
+    assert len(re.findall(r'data-plugin-category="', installed)) == 6
+    assert installed.count('No installed plugins</p>') == 5
+    assert 'data-dialog="plugin-marketplace-dialog"' in installed
+    assert 'data-dialog="plugin-options-missing"' not in installed
+    assert 'Missing is unavailable' in installed
+    assert '<input type="hidden" name="plugin" value="missing">' in installed
+    assert 'provider &gt;=1,&lt;2' in dialog(text, 'plugin-options-consumer')
+    assert 'Required by: Consumer' in dialog(text, 'plugin-options-provider')
+    assert 'data-marketplace' in dialog(text, 'plugin-marketplace-dialog')
 
 def test_related_settings_are_sections_in_one_modal_with_one_close_control(client):
     text = client.get('/budgets/demo/budget/current-month/usd').text

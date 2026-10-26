@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_client"
-version = "1.6.0"
+version = "1.6.1"
 description = "HTTPS remote budget client plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -30,3 +30,6 @@ authority = "remote"
 state-version = 1
 state-upgrades = []
 support = "maintained"
+
+[tool.setuptools.package-data]
+whab_plugin_client = ["plugin.json"]

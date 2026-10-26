@@ -2,6 +2,10 @@
 
 Start with [README.md](README.md) for setup, supported behavior and limitations, then read [the architecture guide](../docs/architecture.md). Keep a change focused on the layer that owns its behavior. The repository's current visibility and licensing are unchanged by these contributor instructions.
 
+## Architecture placement
+
+Before coding, apply the [owner decision guide](../docs/architecture.md#choosing-the-owner-of-a-change) and state the chosen owner in the PR. WHAB combines a hexagonal financial core with a plugin architecture. Separately packaged plugins may have explicit dependencies; modularity does not require every plugin to operate alone. Keep those dependencies in packaged `plugin.json` files and use public SDK capabilities across boundaries.
+
 ## Clarity and simplicity
 
 Clarity and simplicity are the primary product and development priorities. Choose the smallest understandable design that fully solves the user's problem while preserving financial correctness, security and saved-data compatibility.

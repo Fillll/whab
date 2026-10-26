@@ -5,7 +5,14 @@ import ast
 import json
 import re
 import tomllib
+from importlib import util
 from pathlib import Path
+
+# Load only our standard-library schema, without importing the application or plugins.
+_SCHEMA_SPEC = util.spec_from_file_location("whab_manifest_schema", Path(__file__).resolve().parents[1] / "src/whab/plugins/manifest_schema.py")
+_SCHEMA = util.module_from_spec(_SCHEMA_SPEC)
+_SCHEMA_SPEC.loader.exec_module(_SCHEMA)
+validate_manifest = _SCHEMA.validate_manifest
 
 ROOT = Path(__file__).resolve().parents[3]
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
@@ -292,6 +299,10 @@ def source_inventory(root=ROOT):
         requirements = [value for value in project.get("dependencies", ()) if re.match(r"(?i)^whab(?:\s|[<>=!~;\[]|$)", value)]
         if len(requirements) != 1:
             raise ValueError("Curated plugin packages require one explicit WHAB compatibility declaration.")
+        manifest_path = path.parent / "src" / module.split(".")[0] / "plugin.json"
+        manifest = validate_manifest(json.loads(source_text(manifest_path, root)))
+        if manifest["id"] != identifier or manifest["category"] != path.parent.parent.name:
+            raise ValueError("Plugin JSON identity/category differs from its owning folder.")
         distributions.add(name)
         packages.append({**descriptor, "distribution": project["name"], "version": project["version"],
                          "entry_point": {"group": "whab.plugins", "name": identifier, "value": entry},
@@ -345,7 +356,13 @@ def catalog_markdown(catalog):
 def generated_outputs(root=ROOT):
     root = Path(root)
     catalog = build_catalog(root)
-    return {root / "whab/app/src/whab/plugins/catalog.json": json.dumps(catalog, sort_keys=True, indent=2) + "\n",
+    configuration = tomllib.loads(source_text(root / "whab/app/plugins/catalog.toml", root))
+    manifests = []
+    for row in source_inventory(root):
+        package = row["entry_point"]["value"].split(":")[0].split(".")[0]
+        manifests.append(json.loads(source_text(root / row["source"] / "src" / package / "plugin.json", root)))
+    return {root / "whab/app/src/whab/plugins/manifests.json": json.dumps({"source_ref": configuration["marketplace"]["source_ref"], "plugins": manifests}, indent=2) + "\n",
+            root / "whab/app/src/whab/plugins/catalog.json": json.dumps(catalog, sort_keys=True, indent=2) + "\n",
             root / "whab/docs/plugin-catalog.md": catalog_markdown(catalog)}
 
 

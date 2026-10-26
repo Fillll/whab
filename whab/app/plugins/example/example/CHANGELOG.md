@@ -1,5 +1,11 @@
 # Example report and export plugin changelog
 
+## 1.4.1 — 2026-10-25
+
+PR: [#113](https://github.com/Fillll/whab/pull/113)
+
+- Ship a packaged JSON manifest declaring the primary category and named plugin dependencies.
+
 ## 1.4.0 — 2026-10-23
 
 PR: [#80](https://github.com/Fillll/whab/pull/80)

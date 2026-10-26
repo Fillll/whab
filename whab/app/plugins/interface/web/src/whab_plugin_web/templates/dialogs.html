@@ -166,8 +166,8 @@
 </form>
 </dialog>
 {% set manager = plugin_management|default({'plugins': [], 'restart_required': false, 'error': none}) %}
-{% set plugin_categories = {'automation': 'Automation', 'extension': 'Extensions', 'ingestion': 'Ingestion', 'insight': 'Insights', 'interface': 'Interfaces', 'storage': 'Storage'} %}
-{% set visible_plugins = manager.plugins|rejectattr('category', 'equalto', 'example')|rejectattr('id', 'equalto', 'example')|list %}
+{% set plugin_categories = {'interface': 'Interfaces', 'ingestion': 'Ingestion', 'insight': 'Insights', 'storage': 'Storage', 'automation': 'Automation', 'extension': 'Extensions'} %}
+{% set visible_plugins = manager.plugins|rejectattr('installed', 'equalto', false)|rejectattr('category', 'equalto', 'example')|rejectattr('id', 'equalto', 'example')|list %}
 {% macro plugin_status(plugin) %}{% if plugin.required %}Required{% elif plugin.active and plugin.enabled %}Enabled{% elif plugin.active %}Will disable after restart{% elif plugin.enabled %}Will enable after restart{% else %}Disabled{% endif %}{% endmacro %}
 <dialog class="modal settings-modal settings-window" id="settings-dialog" aria-label="Settings">
   <button class="icon-button settings-close" type="button" data-close-dialog aria-label="Close Settings">{{ icon('close', 20) }}</button>
@@ -246,26 +246,8 @@
 </article>
 <article data-settings-page hidden data-settings-parent="settings-home" id="plugins-dialog" aria-label="Plugins">
   <button class="settings-back" type="button" data-settings-back>{{ icon('chevron-left', 14) }}Settings</button>
-  {{ heading('Plugins', 'Choose the plugins for this budget.', false) }}
-  <section class="plugin-settings" aria-labelledby="visual-settings-title" data-visual-settings data-workspace="{{ workspace }}">
-    <h3 id="visual-settings-title">Visual interface</h3>
-    {% if workspace=='personal' %}
-    <p class="settings-notice">Current: <strong data-visual-current>Checking host status…</strong></p>
-    <p class="settings-notice" data-visual-runtime></p>
-    <form class="modal-form" data-visual-form>
-      <label>Target<select data-visual-mode><option value="installed">Installed visual interface</option><option value="headless">Headless · no browser interface</option></select></label>
-      <label>Installed plugin ID<input data-visual-target value="{{ ui_plugin_id|default('web', true) }}" pattern="[a-z][a-z0-9-]{0,63}" maxlength="64" required autocomplete="off" spellcheck="false" aria-describedby="visual-target-hint"></label>
-      <p class="settings-notice" id="visual-target-hint">Enter the exact visual plugin ID, such as web. API interface plugins use the optional selection below. Preview checks the target before you apply it.</p>
-      <button class="button secondary" type="submit" disabled>Preview interface change</button>
-    </form>
-    <p class="settings-notice" data-visual-review hidden></p>
-    <div class="settings-actions"><button class="button primary" type="button" data-visual-apply hidden disabled>Apply reviewed change</button><button class="button secondary" type="button" data-visual-dismiss hidden>Cancel review</button><button class="button secondary" type="button" data-visual-refresh>Refresh status</button><button class="button secondary" type="button" data-visual-cleanup hidden>Retry cleanup</button><button class="button secondary" type="button" data-visual-unknown hidden>Review refreshed status</button></div>
-    <p class="settings-notice" role="status" aria-live="polite" data-visual-message>Open this dialog to check the active generation.</p>
-    <p class="field-error" role="alert" data-visual-error hidden></p>
-    {% else %}
-    <p class="settings-notice">Interface changes belong to your own budget. Demo is read-only. <a class="text-link" href="{{ url(workspace='personal', category=none) }}">Open my budget</a></p>
-    {% endif %}
-  </section>
+  {{ heading('Plugins', 'Installed on this device. Enable plugins for this budget.', false) }}
+  <button class="button secondary marketplace-link" type="button" data-dialog="plugin-marketplace-dialog">Plugin Marketplace {{ icon('chevron-right', 14) }}</button>
   <section class="plugin-manager" aria-labelledby="plugin-manager-title">
     <div class="plugin-list-heading">
       <h3 id="plugin-manager-title">Installed</h3>
@@ -273,13 +255,14 @@
     </div>
     {% if workspace=='demo' %}<p class="settings-notice">Plugin changes are available in your own budget. <a class="text-link" href="{{ url(workspace='personal', category=none) }}">Open my budget</a></p>
     {% else %}<p class="settings-notice">Review supported live changes below, or save your selection for the next restart. Use Settings to manage each plugin.</p>{% endif %}
+    {% for plugin in manager.plugins if plugin.installed is defined and not plugin.installed %}<p class="settings-notice">{{ plugin.display_name }} is unavailable on this device. Its saved budget data is retained.</p>{% endfor %}
     {% if manager.error %}<p class="field-error" role="alert">{{ manager.error }}</p>{% endif %}
     <form data-plugin-selection{% if workspace=='demo' %} data-read-only{% endif %}>
+      {% for plugin in manager.plugins if plugin.installed is defined and not plugin.installed and plugin.enabled and not plugin.required %}<input type="hidden" name="plugin" value="{{ plugin.id }}">{% endfor %}
       {% for plugin in manager.plugins if (plugin.category=='example' or plugin.id=='example') and plugin.enabled and plugin.manageable and not plugin.required %}<input type="hidden" name="plugin" value="{{ plugin.id }}">{% endfor %}
       <div class="plugin-list">
         {% for category, label in plugin_categories.items() %}
         {% set category_plugins = visible_plugins|selectattr('category', 'equalto', category)|sort(attribute='display_name')|list %}
-        {% if category_plugins %}
         <section class="plugin-category-group" data-plugin-category="{{ category }}" aria-labelledby="plugin-category-{{ category }}">
           <h4 id="plugin-category-{{ category }}">{{ label }}<span>{{ category_plugins|length }}</span></h4>
         {% for plugin in category_plugins %}
@@ -288,14 +271,14 @@
               <input type="checkbox" value="{{ plugin.id }}"{% if not plugin.required %} name="plugin"{% endif %}{% if plugin.enabled %} checked{% endif %}{% if workspace=='demo' or plugin.required or (not plugin.manageable and not plugin.enabled) %} disabled{% endif %}>
               <strong>{% if plugin.id=='random-forest-categorization' %}{{ icon('forest', 16) }} {% endif %}{{ plugin.display_name }}</strong>
             </label>
-            <small class="plugin-meta">{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</small>
+            <small class="plugin-meta">{% if plugin.version %}Version {{ plugin.version }}{% endif %}</small>
             <span class="plugin-state">{{ plugin_status(plugin) }}</span>
             <button class="button plugin-settings-button" type="button" data-dialog="plugin-options-{{ plugin.id }}" data-plugin-options aria-label="Settings for {{ plugin.display_name }}">Settings{{ icon('chevron-right', 14) }}</button>
             {% if plugin.reason %}<small class="plugin-reason">{{ plugin.reason }}</small>{% endif %}
           </div>
         {% endfor %}
+        {% if not category_plugins %}<p class="settings-notice plugin-category-empty">No installed plugins</p>{% endif %}
         </section>
-        {% endif %}
         {% endfor %}
         {% if not visible_plugins %}<p class="settings-notice">No installed plugins were found.</p>{% endif %}
         <p class="settings-notice" data-plugin-category-empty hidden>No installed plugins in this category.</p>
@@ -304,6 +287,21 @@
       <p class="field-error" role="alert" hidden></p>
       <div class="settings-actions"><button class="button primary" type="submit"{% if workspace=='demo' %} disabled{% endif %}>Save selection for restart</button><button class="button secondary" type="button" data-plugin-live-review{% if workspace=='demo' %} disabled{% endif %}>Review live selection</button></div>
     </form>
+  </section>
+</article>
+<article data-settings-page hidden data-settings-parent="plugins-dialog" id="plugin-marketplace-dialog" aria-label="Plugin Marketplace" data-marketplace data-workspace="{{ workspace }}">
+  <button class="settings-back" type="button" data-settings-back>{{ icon('chevron-left', 14) }}Installed plugins</button>
+  {{ heading('Plugin Marketplace', 'Browse maintained WHAB plugins for this device.', false) }}
+  <p class="settings-notice">Installation makes a plugin available to all budgets. Enable it separately in the budget that needs it.</p>
+  <p class="field-error" role="alert" data-marketplace-error hidden></p>
+  <p class="settings-notice" role="status" aria-live="polite" data-marketplace-status></p>
+  <div class="plugin-list" data-marketplace-list></div>
+  <section class="plugin-install-review" data-marketplace-review hidden aria-label="Review installation">
+    <h3>Review installation</h3>
+    <p class="settings-notice">Required plugins and packages will be installed together. Existing packages keep their versions.</p>
+    <ul data-marketplace-packages></ul>
+    <button class="button primary" type="button" data-marketplace-install>Install reviewed packages</button>
+    <button class="button secondary" type="button" data-marketplace-cancel>Cancel</button>
   </section>
 </article>
 {% for plugin in visible_plugins %}
@@ -317,6 +315,34 @@
     <div><dt>Runtime</dt><dd>{{ 'Running' if plugin.active else 'Not running' }}</dd></div>
   </dl>
   {% if plugin.reason %}<p class="settings-notice">{{ plugin.reason }}</p>{% endif %}
+  <section class="plugin-settings" aria-label="Plugin dependencies">
+    <h3>Dependencies</h3>
+    {% if plugin.dependencies %}<ul>{% for dependency in plugin.dependencies %}<li>{{ dependency.id }} {{ dependency.version or '(any version)' }} · must be installed and enabled</li>{% endfor %}</ul>{% else %}<p class="settings-notice">No required plugins.</p>{% endif %}
+    {% if plugin.compatibility and plugin.compatibility.requirements %}<p class="settings-notice">Required capabilities: {% for requirement in plugin.compatibility.requirements %}{{ requirement.name }} ({{ requirement.min_version }}{% if requirement.max_version %}–{{ requirement.max_version }}{% else %}+{% endif %}){% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+    {% set dependents = namespace(names=[]) %}{% for other in visible_plugins %}{% for dependency in other.dependencies %}{% if dependency.id == plugin.id %}{% set dependents.names = dependents.names + [other.display_name] %}{% endif %}{% endfor %}{% endfor %}
+    {% if dependents.names %}<p class="settings-notice">Required by: {{ dependents.names|join(', ') }}. Disable dependent plugins first.</p>{% endif %}
+  </section>
+  {% if plugin.id == ui_plugin_id|default('web', true) %}
+  <section class="plugin-settings" aria-labelledby="visual-settings-title" data-visual-settings data-workspace="{{ workspace }}">
+    <h3 id="visual-settings-title">Visual interface</h3>
+    {% if workspace=='personal' %}
+    <p class="settings-notice">Current: <strong data-visual-current>Checking host status…</strong></p>
+    <p class="settings-notice" data-visual-runtime></p>
+    <form class="modal-form" data-visual-form>
+      <label>Target<select data-visual-mode><option value="installed">Installed visual interface</option><option value="headless">Headless · no browser interface</option></select></label>
+      <label>Installed plugin ID<input data-visual-target value="{{ ui_plugin_id|default('web', true) }}" pattern="[a-z][a-z0-9-]{0,63}" maxlength="64" required autocomplete="off" spellcheck="false" aria-describedby="visual-target-hint"></label>
+      <p class="settings-notice" id="visual-target-hint">Enter the exact visual plugin ID, such as web. Select API interface plugins in the installed list. Preview checks the target before you apply it.</p>
+      <button class="button secondary" type="submit" disabled>Preview interface change</button>
+    </form>
+    <p class="settings-notice" data-visual-review hidden></p>
+    <div class="settings-actions"><button class="button primary" type="button" data-visual-apply hidden disabled>Apply reviewed change</button><button class="button secondary" type="button" data-visual-dismiss hidden>Cancel review</button><button class="button secondary" type="button" data-visual-refresh>Refresh status</button><button class="button secondary" type="button" data-visual-cleanup hidden>Retry cleanup</button><button class="button secondary" type="button" data-visual-unknown hidden>Review refreshed status</button></div>
+    <p class="settings-notice" role="status" aria-live="polite" data-visual-message>Open this dialog to check the active generation.</p>
+    <p class="field-error" role="alert" data-visual-error hidden></p>
+    {% else %}
+    <p class="settings-notice">Interface changes belong to your own budget. Demo is read-only. <a class="text-link" href="{{ url(workspace='personal', category=none) }}">Open my budget</a></p>
+    {% endif %}
+  </section>
+  {% endif %}
   {% if plugin.category == 'storage' %}
   <section class="plugin-settings storage-plugin-settings" aria-label="Storage role for this budget">
     <h3>Storage for this budget</h3>

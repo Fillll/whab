@@ -234,6 +234,8 @@ test('app guard preserves optional drafts and other dialogs before visual submis
   events.length = 0; dirty = true; assert.equal(await options.beforeCommit('visual'), false); assert.deepEqual(events, []);
   assert.equal(await options.beforeCommit('optional'), true); assert.deepEqual(events, ['plugin-settings', 'flush']);
   events.length = 0; dirty = false; activePage = 'plugin-options-web';
+  assert.equal(await options.beforeCommit('visual'), true); assert.deepEqual(events, ['plugin-settings', 'flush']);
+  events.length = 0; activePage = 'plugin-options-bank-logos';
   assert.equal(await options.beforeCommit('visual'), false); assert.deepEqual(events, ['plugin-settings']);
   events.length = 0; activePage = 'plugins-dialog'; dialogs.push({id: 'transaction-dialog'});
   assert.equal(await options.beforeCommit('visual'), false); assert.deepEqual(events, ['plugin-settings']);

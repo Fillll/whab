@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_plaid"
-version = "1.3.0"
+version = "1.3.1"
 description = "Plaid bank ingestion plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -20,7 +20,7 @@ where = ["src"]
 include = ["whab_plugin_plaid", "whab_plugin_plaid.*"]
 
 [tool.setuptools.package-data]
-whab_plugin_plaid = ["templates/*.html", "static/*.js"]
+whab_plugin_plaid = ["plugin.json", "templates/*.html", "static/*.js"]
 
 [tool.whab.plugin]
 api-version = 1

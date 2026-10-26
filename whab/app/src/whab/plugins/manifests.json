@@ -1,0 +1,113 @@
+{
+  "source_ref": "063f7d37b5dee43b00e71bd77cc127d80fe3e09c",
+  "plugins": [
+    {
+      "schema_version": 1,
+      "id": "bank-logos",
+      "category": "interface",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "client",
+      "category": "storage",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "example",
+      "category": "example",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "example-api",
+      "category": "example",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "example-bank",
+      "category": "example",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "example-branding",
+      "category": "example",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "example-categorization",
+      "category": "example",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "example-file-import",
+      "category": "example",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "example-remote-client",
+      "category": "example",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "example-storage",
+      "category": "example",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "example-ui",
+      "category": "example",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "json",
+      "category": "storage",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "plaid",
+      "category": "ingestion",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "random-forest-categorization",
+      "category": "automation",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "server",
+      "category": "interface",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "sqlite",
+      "category": "storage",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "web",
+      "category": "interface",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "ynab",
+      "category": "ingestion",
+      "dependencies": []
+    }
+  ]
+}

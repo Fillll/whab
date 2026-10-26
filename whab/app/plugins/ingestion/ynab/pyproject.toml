@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_ynab"
-version = "1.4.0"
+version = "1.4.1"
 description = "Local YNAB ZIP import plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -20,7 +20,7 @@ where = ["src"]
 include = ["whab_plugin_ynab", "whab_plugin_ynab.*"]
 
 [tool.setuptools.package-data]
-whab_plugin_ynab = ["templates/*.html", "static/*.js"]
+whab_plugin_ynab = ["plugin.json", "templates/*.html", "static/*.js"]
 
 [tool.whab.plugin]
 api-version = 1

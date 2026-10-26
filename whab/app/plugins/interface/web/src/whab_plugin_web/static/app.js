@@ -9,6 +9,7 @@ import {bindLogos} from './logo-images.js';
 import {initCategorizationSettings} from './categorization-settings.js';
 import {initStorageCopies} from './storage-copies.js';
 import {createUIViews} from './ui-lifecycle.js';
+import {initMarketplace} from './marketplace.js';
 import {initVisualSettings} from './visual-settings.js';
 import {initSettingsNavigation, isSettingsPageOpen} from './settings-navigation.js';
 
@@ -607,6 +608,8 @@ document.addEventListener('click', async event => {
   if (await currentRegister.flush()) location.assign(target.href);
   else notify('Save the transaction edit before continuing.');
 });
+initMarketplace({api, beforeChange: requireSavedEdits, onInstalled() {location.hash = 'plugins'; location.reload();}});
+
 initVisualSettings({
   closeSettings: () => settingsNavigation.close({restoreOrigin: false}),
   async beforeChange() {
@@ -618,7 +621,7 @@ initVisualSettings({
     if (kind === 'visual' && optionalSelectionDirty()) return false;
     if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'plugin-settings'}}))) return false;
     if ([...document.querySelectorAll('dialog[open]')].some(dialog => dialog.id !== 'settings-dialog') ||
-        document.querySelector('#settings-dialog[open] [data-settings-page]:not([hidden])')?.id !== 'plugins-dialog') return false;
+        !['plugins-dialog', 'plugin-options-web'].includes(document.querySelector('#settings-dialog[open] [data-settings-page]:not([hidden])')?.id)) return false;
     await requireSavedEdits();
     return true;
   },
