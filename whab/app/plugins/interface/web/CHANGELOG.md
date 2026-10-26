@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.28.0 — 2026-10-24
+
+PR: [#108](https://github.com/Fillll/whab/pull/108)
+
+- Keep Settings compact by moving storage controls into each installed storage plugin’s Settings page. Show budget-specific Primary, Synced copy and Not used radio controls, with copy status and recovery actions in an expandable section.
+- Retain confirmed roles until the host confirms a change. Review attachment before a separate primary promotion, and review stopping synchronization while retaining every saved copy.
+
 ## 1.27.0 — 2026-10-23
 
 PR: [#97](https://github.com/Fillll/whab/pull/97)

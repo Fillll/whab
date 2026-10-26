@@ -856,12 +856,8 @@
       "state_upgrades": [],
       "state_version": 1,
       "support": "maintained",
-      "verifications": [
-        "pr97-visual-interface-source",
-        "pr97-visual-interface-native-https",
-        "pr101-installed-native-bank"
-      ],
-      "version": "1.27.0"
+      "verifications": [],
+      "version": "1.28.0"
     },
     {
       "api_version": 1,

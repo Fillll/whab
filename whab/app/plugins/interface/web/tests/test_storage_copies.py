@@ -34,12 +34,13 @@ def test_copy_management_is_addressed_accessible_and_demo_read_only(client, page
     response = client.get(f"/budgets/{key}/{page}/2026-10/usd")
     assert response.status_code == 200
     settings = dialog(response.text, "settings-dialog")
-    assert 'data-dialog="storage-copies-dialog"' in settings
-    assert "Primary storage and synchronized copies" in settings
-    copies = dialog(response.text, "storage-copies-dialog")
-    assert 'aria-label="Storage copies"' in copies
+    assert 'storage-copies-dialog' not in response.text
+    assert 'Storage copies' not in settings
+    copies = dialog(response.text, "plugin-options-sqlite")
+    assert 'data-storage-plugin="sqlite"' in copies
+    assert 'Storage for this budget' in copies
     assert f'data-workspace="{workspace}"' in copies
-    assert "data-close-dialog" in copies and ">Settings</button>" in copies
+    assert "data-close-dialog" in copies and ">Installed plugins</button>" in copies
     assert "No automatic" not in copies
     if workspace == "personal":
         tags = Tags(copies).tags
@@ -108,3 +109,14 @@ def test_dialog_api_roundtrip_reports_pending_saved_promotion_and_new_primary(tm
         assert promoted["operations"][-1]["state"] == "complete"
         assert next(row for row in promoted["copies"] if row["id"] == identifier)["state"] == "promoted"
         assert "data-storage-copy-panel" in client.get("/budgets/home/accounts/current-month/usd").text
+
+    # Reopen the same isolated runtime: roles come from persisted host authority,
+    # not a radio choice or the original process's configured storage default.
+    with TestClient(create_app(settings=configuration), base_url="https://127.0.0.1:5173") as reopened:
+        durable = reopened.get("/api/storage/copies").json()
+        assert durable["primary"]["plugin_id"] == destination
+        assert durable["primary"]["authoritative"] is True
+        assert next(row for row in durable["copies"] if row["id"] == identifier)["state"] == "promoted"
+        assert 'data-storage-plugin="' + destination + '"' in reopened.get(
+            "/budgets/home/accounts/current-month/usd"
+        ).text
