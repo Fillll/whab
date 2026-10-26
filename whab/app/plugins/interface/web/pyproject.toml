@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_web"
-version = "1.28.0"
+version = "1.29.0"
 description = "Web interface plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -20,7 +20,7 @@ where = ["src"]
 include = ["whab_plugin_web", "whab_plugin_web.*"]
 
 [tool.setuptools.package-data]
-whab_plugin_web = ["templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]
+whab_plugin_web = ["plugin.json", "templates/*.html", "static/*.css", "static/*.js", "static/*.svg"]
 
 [tool.whab.plugin]
 api-version = 1

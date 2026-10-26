@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_example"
-version = "1.4.0"
+version = "1.4.1"
 description = "A small trusted insights and CSV export extension for WHAB"
 requires-python = ">=3.14"
 license = "MIT"
@@ -28,3 +28,6 @@ authority = "local"
 state-version = 1
 state-upgrades = []
 support = "teaching"
+
+[tool.setuptools.package-data]
+whab_plugin_example = ["plugin.json"]

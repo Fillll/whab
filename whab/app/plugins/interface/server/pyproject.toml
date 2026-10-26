@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_server"
-version = "1.1.0"
+version = "1.1.1"
 description = "Remote budget server plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -30,3 +30,6 @@ authority = "local"
 state-version = 1
 state-upgrades = []
 support = "maintained"
+
+[tool.setuptools.package-data]
+whab_plugin_server = ["plugin.json"]

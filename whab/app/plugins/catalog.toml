@@ -494,3 +494,6 @@ whab_plugin_devkit = "0.8.0"
 whab_plugin_generated_bank = "0.1.0"
 whab_plugin_sqlite = "1.12.0"
 whab_plugin_json = "1.3.0"
+
+[marketplace]
+source_ref = "b319530e8b31599e8b2206657333fcd21b06cf6d"

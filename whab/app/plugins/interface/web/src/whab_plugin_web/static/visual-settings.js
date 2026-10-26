@@ -189,7 +189,8 @@ export function createVisualSettings({request, beforeChange = async () => true, 
 export function initVisualSettings({page = document, beforeChange, beforeCommit, onOptionalComplete,
   request: suppliedRequest, schedule, cancel} = {}) {
   const dialog = page.getElementById('plugins-dialog');
-  const pane = dialog?.querySelector('[data-visual-settings]');
+  const visualDialog = page.getElementById('plugin-options-web') || dialog;
+  const pane = visualDialog?.querySelector('[data-visual-settings]') || dialog?.querySelector('[data-visual-settings]');
   if (!pane || pane.dataset.workspace !== 'personal') return null;
   const scope = getContext().apiPrefix;
   const isCurrent = () => getContext().apiPrefix === scope;
@@ -243,7 +244,7 @@ export function initVisualSettings({page = document, beforeChange, beforeCommit,
     if (await beforeCommit?.(kind) === false) return false;
     if (kind === 'visual') {
       transferring = true;
-      for (const opened of page.querySelectorAll('#settings-dialog[open], #plugins-dialog[open]')) opened.close();
+      for (const opened of page.querySelectorAll('#settings-dialog[open], #plugins-dialog[open], #plugin-options-web[open]')) opened.close();
     }
     return true;
   }, onState: render, isCurrent, schedule, cancel});
@@ -259,6 +260,8 @@ export function initVisualSettings({page = document, beforeChange, beforeCommit,
   });
   dialog.querySelector('[data-plugin-selection]')?.addEventListener('change', controller.invalidate);
   for (const opener of page.querySelectorAll('[data-dialog="plugins-dialog"]')) opener.addEventListener('click', () => {transferring = false; void controller.start();});
+  for (const opener of page.querySelectorAll('[data-dialog="plugin-options-web"]')) opener.addEventListener('click', () => {transferring = false; void controller.start();});
+  if (visualDialog !== dialog) visualDialog.addEventListener('close', () => {if (!transferring) controller.stop();});
   dialog.addEventListener('close', () => {if (!transferring) controller.stop();});
   page.defaultView?.addEventListener('pagehide', controller.stop);
   page.addEventListener('whab:before-navigate', event => {

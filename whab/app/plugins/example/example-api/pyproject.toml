@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_example_api"
-version = "1.0.0"
+version = "1.0.1"
 description = "Fictional WHAB teaching plugin example-api"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -39,3 +39,6 @@ authority = "local"
 state-version = 1
 state-upgrades = []
 support = "teaching"
+
+[tool.setuptools.package-data]
+whab_plugin_example_api = ["plugin.json"]

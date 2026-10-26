@@ -119,3 +119,9 @@ Choose **Settings → Plugins → Installed → WHAB web → Settings → Appear
 ## Development checks
 
 From `whab/app/`, use `.venv/bin/python -m pytest plugins/interface/web/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. The runner covers browser-module tests as well as Python checks; a passing automated suite still needs the [UI acceptance criteria](#ui-acceptance-criteria) relevant to the change. Documentation-only edits can use `--docs`. See [plugin contribution rules](../../README.md#test-ownership) and the [two-budget isolation recipe](../../../../docs/architecture.md#budget-isolation-verification).
+
+## Installed plugins and marketplace
+
+Settings → Plugins shows installed packages, including disabled ones, in six persistent sections: Interfaces, Ingestion, Insights, Storage, Automation and Extensions. Empty sections say “No installed plugins”. Missing portable-budget packages are reported separately and their saved state is retained. Teaching examples remain hidden. Plugin Settings displays named dependencies, required runtime capabilities and reverse dependents; the current visual interface's change controls live in its own Settings.
+
+Plugin Marketplace opens within Settings and lists maintained catalog plugins with installed and compatibility status. Review prepares the complete dependency set, then the user installs the reviewed packages. Package installation is environment-wide and separate from budget activation. The host owns all resolution and installation; Web only presents the review and refreshed status. Existing package versions are preserved. Demo allows browsing only. See the [manifest and installation contract](../../../../docs/plugins.md#plugin-dependency-manifests).

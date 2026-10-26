@@ -241,3 +241,9 @@ An existing compatible ledger may retain its earlier filename; back up the file 
 - [OAuth guide](https://plaid.com/docs/link/oauth/)
 - [Webhook verification](https://plaid.com/docs/api/webhooks/webhook-verification/)
 - [Institution coverage](https://plaid.com/docs/institutions/)
+
+### Plugin Marketplace
+
+Open Settings → Plugins for installed plugins, including disabled ones, grouped into Interfaces, Ingestion, Insights, Storage, Automation and Extensions. Empty categories remain visible. Each plugin's Settings shows its dependencies; selecting a plugin requires its dependencies to be installed and enabled for that budget.
+
+Choose **Plugin Marketplace** to browse maintained plugins and their installation status. **Review installation** prepares the required plugin and Python package list; **Install reviewed packages** installs it on this device. Refresh the installed list, then enable optional plugins for the intended budget. Installing does not enable a plugin or change its saved data. Required plugins cannot be disabled while their dependents remain selected. See [the installation contract](plugins.md#plugin-dependency-manifests) for compatibility, failed installs and supported environments.

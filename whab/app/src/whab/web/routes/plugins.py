@@ -31,6 +31,14 @@ class RuntimeCleanupBody(Body):
     pass
 
 
+class MarketplaceReviewBody(Body):
+    pluginId: str
+
+
+class MarketplaceInstallBody(Body):
+    token: str
+
+
 def create_router(store, plugins, plugin_manager=None):
     router = APIRouter(prefix="/api/plugins")
 
@@ -44,6 +52,28 @@ def create_router(store, plugins, plugin_manager=None):
             return JSONResponse(catalog_snapshot(), headers={"Cache-Control": "no-store"})
         except CatalogError as error:
             raise HTTPException(503, str(error)) from None
+
+    from whab.plugins.marketplace import marketplace
+
+    @router.get("/marketplace")
+    def browse_marketplace():
+        return marketplace.projection()
+
+    def marketplace_operation(request, operation, argument):
+        if request.scope.get("whab.workspace") == "demo" or "demo" in request.query_params.getlist("workspace"):
+            raise HTTPException(403, "This operation requires your own budget")
+        try:
+            return operation(argument)
+        except PluginError as error:
+            return JSONResponse({"error": str(error), "code": error.code, "plugin_id": error.plugin_id}, status_code=409)
+
+    @router.post("/marketplace/review")
+    def review_installation(request: Request, body: MarketplaceReviewBody):
+        return marketplace_operation(request, marketplace.review, body.pluginId)
+
+    @router.post("/marketplace/install")
+    def install_plugin(request: Request, body: MarketplaceInstallBody):
+        return marketplace_operation(request, marketplace.install, body.token)
 
     @router.get("/runtime")
     def runtime_status():

@@ -73,3 +73,33 @@ def test_headless_management_keeps_ledger_and_never_loads_an_inactive_ui(tmp_pat
         assert client.put("/api/plugins/management", json={"plugins": []}).status_code == 200
         assert client.get("/api/workspace?workspace=demo").status_code == 200
         assert [(row["id"], row["kinds"]) for row in client.get("/api/plugins").json()["plugins"]] == [("sqlite", ["storage"])]
+
+
+def test_marketplace_browsing_is_data_only_and_mutations_keep_demo_and_origin_guards(client, monkeypatch):
+    from whab.plugins.marketplace import marketplace
+
+    response = client.get('/api/plugins/marketplace')
+    assert response.status_code == 200 and response.headers['cache-control'] == 'no-store'
+    assert 'web' in {row['id'] for row in response.json()['plugins']}
+    calls = []
+    monkeypatch.setattr(marketplace, 'review', lambda identifier: calls.append(identifier) or {'token': 'reviewed'})
+    monkeypatch.setattr(marketplace, 'install', lambda token: calls.append(token) or {'installed': ['fictional']})
+    for path, body in (('/review', {'pluginId': 'fictional'}), ('/install', {'token': 'reviewed'})):
+        address = '/api/plugins/marketplace' + path
+        assert client.post(address + '?workspace=demo', json=body).status_code == 403
+        assert client.post(address, json=body, headers={'origin': 'https://foreign.example'}).status_code == 403
+        assert not calls
+    assert client.post('/api/plugins/marketplace/review', json={'pluginId': 'fictional'}).json() == {'token': 'reviewed'}
+    assert client.post('/api/plugins/marketplace/install', json={'token': 'reviewed'}).json() == {'installed': ['fictional']}
+    assert calls == ['fictional', 'reviewed']
+
+
+def test_marketplace_install_errors_are_actionable_without_private_output(client, monkeypatch):
+    from whab.plugins import PluginError
+    from whab.plugins.marketplace import marketplace
+
+    def refuse(_):
+        raise PluginError('Review again.', code='stale_installation')
+    monkeypatch.setattr(marketplace, 'install', refuse)
+    response = client.post('/api/plugins/marketplace/install', json={'token': 'old'})
+    assert response.status_code == 409 and response.json()['code'] == 'stale_installation'

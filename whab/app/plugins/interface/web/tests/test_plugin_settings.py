@@ -20,6 +20,8 @@ def plugin(identifier, **changes):
         "required": False,
         "manageable": True,
         "reason": None,
+        "installed": True,
+        "dependencies": [],
         **changes,
     }
 
@@ -178,10 +180,10 @@ def test_plugin_categories_and_names_are_sorted_and_examples_are_hidden(client, 
     )
     installed = dialog(text, "plugins-dialog")
     assert re.findall(r'data-plugin-category="([^"]+)"', installed) == [
-        "ingestion", "interface", "storage",
+        "interface", "ingestion", "insight", "storage", "automation", "extension",
     ]
     assert re.findall(r'<strong>([^<]+)</strong>', installed) == [
-        "Import from YNAB ZIP file", "Plaid", "Bank logos", "WHAB web", "SQLite",
+        "Bank logos", "WHAB web", "Import from YNAB ZIP file", "Plaid", "SQLite",
     ]
     assert '<h4 id="plugin-category-interface">Interfaces<span>2</span></h4>' in installed
     assert 'value="example">Examples' not in installed
@@ -248,3 +250,20 @@ def test_empty_installed_list_explains_what_is_available(client, monkeypatch):
     text = render(client, monkeypatch, plugin("example", category="example"))
     assert "No installed plugins were found." in dialog(text, "plugins-dialog")
     assert "data-plugin-options" not in text
+
+
+def test_six_empty_sections_marketplace_and_dependency_details_preserve_missing_selections(client, monkeypatch):
+    text = render(client, monkeypatch,
+                  plugin('missing', installed=False, enabled=True),
+                  plugin('consumer', dependencies=[{'id': 'provider', 'version': '>=1,<2'}]),
+                  plugin('provider'))
+    installed = dialog(text, 'plugins-dialog')
+    assert len(re.findall(r'data-plugin-category="', installed)) == 6
+    assert installed.count('No installed plugins</p>') == 5
+    assert 'data-dialog="plugin-marketplace-dialog"' in installed
+    assert 'data-dialog="plugin-options-missing"' not in installed
+    assert 'Missing is unavailable' in installed
+    assert '<input type="hidden" name="plugin" value="missing">' in installed
+    assert 'provider &gt;=1,&lt;2' in dialog(text, 'plugin-options-consumer')
+    assert 'Required by: Consumer' in dialog(text, 'plugin-options-provider')
+    assert 'data-marketplace' in dialog(text, 'plugin-marketplace-dialog')

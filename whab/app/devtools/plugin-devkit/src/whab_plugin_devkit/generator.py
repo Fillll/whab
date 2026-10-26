@@ -1,5 +1,6 @@
 """Small complete teaching projects using only the public WHAB SDK."""
 
+import json
 import re
 from importlib.resources import files
 from pathlib import Path
@@ -34,6 +35,9 @@ def generate_project(plugin_id, capability, destination, *, ci_ref=None):
     module = "whab_plugin_" + plugin_id.replace("-", "_")
     source = destination / "src" / module
     source.mkdir(parents=True)
+    category = {"reporting": "insight", "branding": "interface", "file-import": "ingestion", "categorization": "automation",
+                "api": "interface", "ui": "interface", "bank": "ingestion", "remote-client": "storage", "storage": "storage"}[capability]
+    (source / "plugin.json").write_text(json.dumps({"schema_version": 1, "id": plugin_id, "category": category, "dependencies": []}, indent=2) + "\n")
     tests = destination / "tests"
     tests.mkdir()
     template = files("whab_plugin_devkit").joinpath("templates")

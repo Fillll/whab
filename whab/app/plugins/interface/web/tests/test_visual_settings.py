@@ -8,8 +8,8 @@ from importlib.metadata import version
 import pytest
 
 
-def dialog(text):
-    return re.search(r'<dialog\b[^>]*id="plugins-dialog".*?</dialog>', text, re.S)[0]
+def dialog(text, identifier="plugin-options-web"):
+    return re.search(rf'<dialog\b[^>]*id="{identifier}".*?</dialog>', text, re.S)[0]
 
 
 class Tags(HTMLParser):
@@ -29,6 +29,7 @@ def test_visual_pane_is_accessible_addressed_and_demo_cannot_mutate(client, page
     response = client.get(f"/budgets/{key}/{page}/2026-10/usd")
     assert response.status_code == 200
     pane = dialog(response.text)
+    installed = dialog(response.text, "plugins-dialog")
     assert '<h3 id="visual-settings-title">Visual interface</h3>' in pane
     assert f'data-visual-settings data-workspace="{workspace}"' in pane
     tags = Tags(pane).tags
@@ -41,13 +42,13 @@ def test_visual_pane_is_accessible_addressed_and_demo_cannot_mutate(client, page
         assert target["maxlength"] == "64" and target["aria-describedby"] == "visual-target-hint"
         assert 'value="headless"' in pane and "Preview interface change" in pane
         assert "Apply reviewed change" in pane and "Review refreshed status" in pane
-        assert "API interface plugins use the optional selection below" in pane
-        assert "Review live selection" in pane and "Save selection for restart" in pane
+        assert "Select API interface plugins in the installed list" in pane
+        assert "Review live selection" in installed and "Save selection for restart" in installed
         assert "Saved selections apply when you restart WHAB" not in pane
     else:
         assert "Demo is read-only" in pane
         assert "data-visual-form" not in pane and "data-visual-apply" not in pane
-        button = next(attrs for _, attrs in tags if "data-plugin-live-review" in attrs)
+        button = next(attrs for _, attrs in Tags(installed).tags if "data-plugin-live-review" in attrs)
         assert "disabled" in button
     context = json.loads(re.search(r'<script id="whab-context"[^>]*>(.*?)</script>', response.text, re.S)[1])
     asset = f"/budgets/{key}/ui/{context['uiGeneration']}/static/visual-settings.js"
@@ -57,7 +58,7 @@ def test_visual_pane_is_accessible_addressed_and_demo_cannot_mutate(client, page
     assert "innerHTML" not in module.text
     app = client.get(asset.replace("visual-settings.js", "app.js")).text
     assert "initVisualSettings" in app and "source: 'plugin-settings'" in app
-    assert "['settings-dialog', 'plugins-dialog']" in app
+    assert "['settings-dialog', 'plugins-dialog', 'plugin-options-web']" in app
 
 
 def test_control_status_is_host_confirmed_and_demo_mutations_are_rejected(client):

@@ -54,6 +54,7 @@ state-upgrades=[]
 support="maintained"
 ''')
     (module / "__init__.py").write_text("plugin=Plugin('fictional','Fictional',insights=insights)\n")
+    (module / "plugin.json").write_text(json.dumps({"schema_version": 1, "id": "fictional", "category": "insight", "dependencies": []}))
     (app / "plugins/catalog.toml").write_text('''verification=[]
 [publisher]
 maintainer="Fillll"
@@ -63,6 +64,8 @@ security="https://github.com/Fillll/whab/security/advisories/new"
 security_policy="https://github.com/Fillll/whab/security/policy"
 security_verified_date="2026-10-23"
 support_policy="Fictional test policy"
+[marketplace]
+source_ref="b4c555cc437357a833a858d37d46938f93e6a48f"
 ''')
     (root / "whab/docs").mkdir()
     return root, project, module
@@ -77,7 +80,7 @@ def test_inventory_and_generation_never_execute_plugin_top_level(metadata_tool, 
     before = dict(sys.modules)
     assert metadata_tool.source_inventory(root)[0]["id"] == "fictional"
     outputs = metadata_tool.generated_outputs(root)
-    assert len(outputs) == 2 and all("fictional" in text for text in outputs.values())
+    assert len(outputs) == 3 and all("fictional" in text for text in outputs.values())
     assert not marker.exists()
     assert "whab_plugin_fictional" not in sys.modules
     assert before == sys.modules

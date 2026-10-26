@@ -762,3 +762,28 @@ The host owns suggestion identities, input fingerprints, currency checks, dismis
 `GET /api/categorization/suggestions?workspace=personal` returns eligible current suggestions. `POST /api/categorization` accepts `{workspace, payload}`. Payload actions are `status`, `train`, `step`, `cancel`, `select`, `rename`, `delete`, `suggest`, and `dismiss`, scoped by `pluginId`; training steps carry an opaque session ID. Each settings request advances at most one engine yield, with no training between requests. Only the initiating view retains that session ID; close/pagehide cancels it and inactivity expires it. `PATCH /api/transactions/{id}` accepts `suggestionId` with `reviewed: true` and an optional selected `categoryId`, validating the displayed identity before committing category and review together. Stale suggestions cannot be silently accepted.
 
 The same behavior is available through public ledger query `category_suggestions`, command `categorization`, and the additive `suggestionId` edit field. The API interface remains budget-scoped and bearer-authenticated; the remote client forwards requests to the authority rather than training locally. Older hosts report unsupported operations. Installed categorization plugins remain optional and disabled until selected. See [Random forest categorization](../app/plugins/automation/random-forest-categorization/README.md) for features, settings, evaluation, limits, and usage.
+
+## Plugin dependency manifests
+
+Every maintained and teaching plugin ships a data-only `plugin.json` in its top-level Python package, included through setuptools package data. The developer toolkit generates it for new projects. Example:
+
+```json
+{
+  "schema_version": 1,
+  "id": "monthly-dashboard",
+  "category": "insight",
+  "dependencies": [
+    {"id": "shared-analysis", "version": ">=1.2,<2"}
+  ]
+}
+```
+
+Use the primary category `interface`, `ingestion`, `insight`, `storage`, `automation` or `extension`; repository teaching packages use `example` and stay hidden in normal Settings. An empty dependency list explicitly declares no required named plugins. Existing plugins currently use capability contracts without named plugin dependencies; this change does not manufacture new couplings. Host and third-party Python requirements remain in `pyproject.toml`. Add matching Python distribution requirements for named plugin dependencies. Capability requirements in `PluginContract.requires` remain separate: they permit interchangeable compatible providers.
+
+The host reads manifests without importing inactive plugin modules. It rejects missing or disabled named dependencies, incompatible package versions and cycles before activating the selected registry. To disable a required plugin, disable its dependents in the same selection first. External legacy packages without a manifest remain supported through the existing capability contracts; new projects must ship one. Normal Settings exposes dependencies, required capabilities and reverse dependents. There is no package-uninstall control: disabling preserves installed code and every budget's saved state, and the marketplace never removes or replaces existing packages.
+
+The Plugin Marketplace under Settings lists the maintained WHAB catalog, including installed status and host/Python compatibility. Review prepares the complete named plugin dependency closure and any missing Python dependencies as wheels. It pins existing installed package versions, presents the package list, and issues a one-use review valid for 15 minutes. Installation verifies artifact hashes and the unchanged environment, installs those prepared wheels offline without dependency resolution, and refreshes discovery. Installation never activates plugins, changes financial data or silently upgrades the host. A failed preparation leaves the environment unchanged; an interrupted pip installation can leave newly added packages installed, so review again before retrying. Demo budgets may browse but cannot install.
+
+Source environments build detached copies of their matching local plugin sources; installed distributions use the immutable official repository revision recorded in the packaged manifest index. No arbitrary package names, URLs or paths are accepted from the browser. Internet access and a writable Python environment with pip are required; the repository-source fallback also requires Git. This is curated trusted Python installation, not a security sandbox or an open third-party registry. Update WHAB to refresh the catalog and resolve existing-version conflicts.
+
+After metadata changes, run `scripts/plugin_metadata.py --write`; quick checks reject drift between JSON identities/categories, source ownership, generated packaged metadata and the curated catalog. See the [architecture placement guide](architecture.md#choosing-the-owner-of-a-change) before extending shared contracts.

@@ -73,6 +73,12 @@ Replace `ingestion/plaid` with the category and plugin folder being changed. Foc
 
 Every plugin must have **100% Python statement and branch coverage**. The full runner's coverage gate measures every file in each `plugins/*/*/src/` tree using the complete local/shared suite; an unimported module or any missed branch fails the gate. It discovers new plugin folders automatically. Keep the regression tests that close gaps inside the owning plugin's `tests/` folder. Type-only imports are outside runtime coverage; runtime exclusions and coverage pragmas are unsupported. Rendering, browser behavior and distribution checks verify templates and static assets. Budget creation/import, routing, binders and plugin persistence also need the [two-budget isolation checks](../../docs/architecture.md#budget-isolation-verification); UI changes need the owning [web acceptance checks](interface/web/README.md#ui-acceptance-criteria).
 
+## Dependency metadata and architecture placement
+
+Before choosing a folder, use the [architecture owner decision guide](../../docs/architecture.md#choosing-the-owner-of-a-change). Financial invariants belong to the hexagonal financial core; generic composition belongs to the host/SDK; replaceable behavior belongs to its plugin. Do not expand core to avoid a plugin boundary.
+
+Each plugin owns a packaged `src/<python_package>/plugin.json` with its ID, primary category and explicit named dependencies. See [the manifest schema and enforcement](../../docs/plugins.md#plugin-dependency-manifests). Plugins can depend on other plugins while retaining separate packages and versions. Prefer capability requirements for interchangeable providers. Never import another plugin's private implementation or access its saved-state namespace. Keep manifest/Python distribution dependencies aligned, update existing contracts and tests, then regenerate static metadata with `scripts/plugin_metadata.py --write`.
+
 ## Packaging and contracts
 
 The `whab` distribution contains only the host/core and public SDK. Supported plugins are independent distributions; each owns its `pyproject.toml` entry point, package data, dependency compatibility range and `project.version`. Their initial independent version is 1.0.0. The teaching example is a separate distribution.

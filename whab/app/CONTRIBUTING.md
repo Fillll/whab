@@ -2,6 +2,10 @@
 
 Start with [README.md](README.md) for setup, supported behavior and limitations, then read [the architecture guide](../docs/architecture.md). Keep a change focused on the layer that owns its behavior. The repository's current visibility and licensing are unchanged by these contributor instructions.
 
+## Architecture placement
+
+Before coding, apply the [owner decision guide](../docs/architecture.md#choosing-the-owner-of-a-change) and state the chosen owner in the PR. WHAB combines a hexagonal financial core with a plugin architecture. Separately packaged plugins may have explicit dependencies; modularity does not require every plugin to operate alone. Keep those dependencies in packaged `plugin.json` files and use public SDK capabilities across boundaries.
+
 ## Development environment
 
 WHAB supports Python 3.14 and newer; CI exercises Python 3.14 and 3.15. Run all application commands below from the application directory (`whab/app/`):

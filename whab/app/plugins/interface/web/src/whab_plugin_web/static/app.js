@@ -9,6 +9,7 @@ import {bindLogos} from './logo-images.js';
 import {initCategorizationSettings} from './categorization-settings.js';
 import {initStorageCopies} from './storage-copies.js';
 import {createUIViews} from './ui-lifecycle.js';
+import {initMarketplace} from './marketplace.js';
 import {initVisualSettings} from './visual-settings.js';
 
 const toast = document.getElementById('toast');
@@ -163,6 +164,7 @@ document.addEventListener('click', event => {
     const dialog = document.getElementById(button.dataset.dialog);
     for (const select of dialog?.querySelectorAll('select[data-currency-choices-lazy]') || []) hydrateCurrencyChoices(select);
     dialog?.showModal();
+    dialog?.dispatchEvent(new Event('whab:dialog-open'));
   }
 });
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => {
@@ -606,6 +608,8 @@ document.addEventListener('click', async event => {
   if (await currentRegister.flush()) location.assign(target.href);
   else notify('Save the transaction edit before continuing.');
 });
+initMarketplace({api, beforeChange: requireSavedEdits, onInstalled() {location.hash = 'plugins'; location.reload();}});
+
 initVisualSettings({
   async beforeChange() {
     if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'plugin-settings'}}))) return false;
@@ -615,7 +619,7 @@ initVisualSettings({
   async beforeCommit(kind) {
     if (kind === 'visual' && optionalSelectionDirty()) return false;
     if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'plugin-settings'}}))) return false;
-    if ([...document.querySelectorAll('dialog[open]')].some(dialog => !['settings-dialog', 'plugins-dialog'].includes(dialog.id))) return false;
+    if ([...document.querySelectorAll('dialog[open]')].some(dialog => !['settings-dialog', 'plugins-dialog', 'plugin-options-web'].includes(dialog.id))) return false;
     await requireSavedEdits();
     return true;
   },

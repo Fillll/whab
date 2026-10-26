@@ -65,6 +65,9 @@ class PluginRegistry:
     """A resolved set of enabled plugins; host code owns rendering and CSV downloads."""
 
     def __init__(self, plugins: tuple[Plugin, ...] = ()) -> None:
+        from .manifests import validate_dependencies
+
+        validate_dependencies(plugin.id for plugin in plugins)
         try:
             self._plugins = resolve_plugins(plugins)
         except CapabilityError as error:
@@ -546,4 +549,9 @@ def load_plugins(
     entrypoints: Sequence[metadata.EntryPoint] | None = None,
 ) -> PluginRegistry:
     """Load and resolve one complete selection before hooks or factories execute."""
-    return PluginRegistry(load_descriptors(enabled, entrypoints))
+    descriptors = load_descriptors(enabled, entrypoints)
+    if entrypoints is not None:
+        from .manifests import validate_dependencies
+
+        validate_dependencies(enabled, entrypoints)
+    return PluginRegistry(descriptors)
