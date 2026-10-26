@@ -22,6 +22,8 @@ Sections stay mounted so Back preserves the parent’s selections and drafts. En
 
 ## UI acceptance criteria
 
+The sidebar version and Settings footer keeps the same bottom inset while the account list scrolls, including at its final position. Long lists retain access to the last account. Compact navigation keeps its Settings control at the same inset too.
+
 For a material layout or interaction redesign, prepare a reviewable preview before implementation and retain the accepted layout/filtering feedback with the change. Use desktop and compact viewports, both appearances, and fictional data. Keep financial calculations in Python and preserve these interactions:
 
 | Area | Acceptance check |
@@ -123,6 +125,8 @@ Enabled file importers render their upload form in **Settings**, from every page
 Choose **Settings → Plugins → Installed → WHAB web → Settings → Appearance**, then **Light** or **Dark**. The change applies immediately across the web interface. The preference is remembered in this browser for the current origin (hostname and port), independently of financial data and portable budget settings. With no saved choice, the initial appearance follows the browser's system preference. When browser storage is unavailable, switching still works for the current page. The appearance script restores a saved choice before the stylesheet loads; web assets use the web plugin's version so plugin-only updates refresh their styling.
 
 ## Development checks
+
+For the footer layout regression, serve this plugin's static source with `python -m http.server 5181 --bind 127.0.0.1 --directory plugins/interface/web` from `whab/app/`, then open `http://127.0.0.1:5181/tests/fixtures/sidebar-footer.html`. This fictional fixture checks the shipped stylesheet in ten desktop/compact, short/tall, light/dark cases. Every row must pass: the gear's bottom inset remains constant at each scroll position and the last account remains visible. This static fixture does not start WHAB or open a runtime home.
 
 From `whab/app/`, use `.venv/bin/python -m pytest plugins/interface/web/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. The runner covers browser-module tests as well as Python checks; a passing automated suite still needs the [UI acceptance criteria](#ui-acceptance-criteria) relevant to the change. Documentation-only edits can use `--docs`. See [plugin contribution rules](../../README.md#test-ownership) and the [two-budget isolation recipe](../../../../docs/architecture.md#budget-isolation-verification).
 

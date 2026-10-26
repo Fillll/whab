@@ -3283,7 +3283,7 @@ strong {
 }
 .sidebar-bottom {
   position: sticky;
-  bottom: -14px;
+  bottom: 0;
   margin-top: auto;
   padding-top: 24px;
   padding-bottom: 0;
@@ -4129,7 +4129,6 @@ strong {
     margin-bottom: 5px;
   }
   .sidebar-bottom {
-    bottom: -12px;
     width: 100%;
     padding-top: 20px;
   }

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Sidebar footer regression</title>
+<style>
+  body { font: 14px system-ui; margin: 24px; }
+  table { border-collapse: collapse; }
+  th, td { padding: 8px 16px; border-bottom: 1px solid #bbb; text-align: left; }
+  iframe { display: block; border: 1px solid #888; margin: 16px 0; }
+</style>
+<h1>Sidebar footer regression</h1>
+<p>Fictional navigation using the shipped stylesheet. The gear must keep the sidebar's bottom inset at the start, middle and end of scrolling, with every account reachable.</p>
+<table><thead><tr><th>Viewport / theme / accounts</th><th>Gear bottom gaps</th><th>Result</th></tr></thead><tbody></tbody></table>
+<script type="module">
+const stylesheet = new URL('../../src/whab_plugin_web/static/styles.css', location.href);
+const nextFrame = win => new Promise(resolve => win.requestAnimationFrame(resolve));
+for (const [width, height, count] of [[1280, 800, 0], [1280, 800, 31], [980, 360, 31], [700, 200, 0], [390, 200, 0]]) {
+  for (const theme of ['light', 'dark']) {
+    const frame = document.createElement('iframe');
+    frame.width = width;
+    frame.height = height;
+    frame.title = `${width} x ${height}, ${theme}, ${count} accounts`;
+    const loaded = new Promise(resolve => frame.onload = resolve);
+    frame.srcdoc = `<!doctype html><html lang="en" data-theme="${theme}"><meta charset="utf-8"><link rel="stylesheet" href="${stylesheet}">
+      <aside class="sidebar">
+        <a class="brand" href="#"><span class="brand-symbol">W</span><span><strong>WHAB</strong><small>We Have A Budget</small></span></a>
+        <div class="nav-label">WORKSPACE</div>
+        <nav aria-label="Main navigation">${['Budget', 'Transactions', 'Insights', 'Accounts'].map(name => `<a class="nav-item" href="#">◇<span>${name}</span></a>`).join('')}</nav>
+        <div class="sidebar-accounts"><div class="nav-label">ACCOUNTS</div>${Array.from({length: count}, (_, i) => `<a class="sidebar-account" href="#"><span><span>Fictional account ${i + 1}</span></span><small>$100</small></a>`).join('')}</div>
+        <div class="sidebar-bottom"><div class="local-status"><span class="local-status-dot"></span><span class="local-status-label">WHAB v2.42.0</span><button class="settings-trigger" aria-label="Settings">⚙</button></div></div>
+      </aside></html>`;
+    document.body.append(frame);
+    await loaded;
+    const win = frame.contentWindow;
+    const sidebar = frame.contentDocument.querySelector('.sidebar');
+    const gear = frame.contentDocument.querySelector('.settings-trigger');
+    const inset = parseFloat(win.getComputedStyle(sidebar).paddingBottom);
+    const maximum = sidebar.scrollHeight - sidebar.clientHeight;
+    const gaps = [];
+    let lastAccountVisible = !count;
+    for (const position of [0, maximum / 2, maximum]) {
+      sidebar.scrollTop = position;
+      await nextFrame(win);
+      gaps.push(Math.round((sidebar.getBoundingClientRect().bottom - gear.getBoundingClientRect().bottom) * 100) / 100);
+    }
+    const lastAccount = frame.contentDocument.querySelector('.sidebar-account:last-child');
+    if (lastAccount) {
+      const bounds = lastAccount.getBoundingClientRect();
+      lastAccountVisible = bounds.top >= 0 && bounds.bottom <= frame.contentDocument.querySelector('.sidebar-bottom').getBoundingClientRect().top;
+    }
+    const passed = gaps.every(gap => Math.abs(gap - inset) <= 1) && lastAccountVisible;
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${width} × ${height} / ${theme} / ${count}</td><td>${gaps.join(', ')} px (expected ${inset})</td><td>${passed ? 'PASS' : 'FAIL'}${lastAccountVisible ? '' : ': last account covered'}</td>`;
+    document.querySelector('tbody').append(row);
+  }
+}
+const failures = [...document.querySelectorAll('tbody tr')].filter(row => row.lastElementChild.textContent.startsWith('FAIL')).length;
+document.title = failures ? `FAIL: ${failures} sidebar cases` : 'PASS: 10 sidebar cases';
+document.querySelector('h1').textContent = document.title;
+</script>
+</html>
