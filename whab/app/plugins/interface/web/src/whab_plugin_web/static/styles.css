@@ -3225,7 +3225,7 @@ strong {
 /* The web interface owns the skin; every amount is rendered by core queries. */
 .sidebar {
   width: 208px;
-  padding: 24px 12px 14px;
+  padding: 24px 12px 0;
   overflow: auto;
 }
 .sidebar > .brand,
@@ -3286,7 +3286,7 @@ strong {
   bottom: 0;
   margin-top: auto;
   padding-top: 24px;
-  padding-bottom: 0;
+  padding-bottom: 14px;
   background: var(--sidebar);
   flex-shrink: 0;
 }
@@ -4101,7 +4101,7 @@ strong {
 @media (max-width: 760px) {
   .sidebar {
     width: 62px;
-    padding: 20px 7px 12px;
+    padding: 20px 7px 0;
     align-items: center;
     overflow-x: hidden;
   }
@@ -4131,6 +4131,7 @@ strong {
   .sidebar-bottom {
     width: 100%;
     padding-top: 20px;
+    padding-bottom: 12px;
   }
   .local-status {
     width: 46px;

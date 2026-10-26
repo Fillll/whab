@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.30.2 — 2026-10-25
+
+PR: [#115](https://github.com/Fillll/whab/pull/115)
+
+- Extend the sticky footer's opaque background to the sidebar's bottom edge so account rows cannot show below the version and Settings button, while preserving their fixed inset.
+
 ## 1.30.1 — 2026-10-25
 
 PR: [#114](https://github.com/Fillll/whab/pull/114)

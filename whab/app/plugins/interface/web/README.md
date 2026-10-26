@@ -22,7 +22,7 @@ Sections stay mounted so Back preserves the parent’s selections and drafts. En
 
 ## UI acceptance criteria
 
-The sidebar version and Settings footer keeps the same bottom inset while the account list scrolls, including at its final position. Long lists retain access to the last account. Compact navigation keeps its Settings control at the same inset too.
+The sidebar version and Settings footer keeps the same bottom inset while the account list scrolls, including at its final position. The footer's opaque background extends to the bottom edge, covering account rows beneath it. Long lists retain access to the last account. Compact navigation keeps its Settings control at the same inset too.
 
 For a material layout or interaction redesign, prepare a reviewable preview before implementation and retain the accepted layout/filtering feedback with the change. Use desktop and compact viewports, both appearances, and fictional data. Keep financial calculations in Python and preserve these interactions:
 
@@ -126,7 +126,7 @@ Choose **Settings → Plugins → Installed → WHAB web → Settings → Appear
 
 ## Development checks
 
-For the footer layout regression, serve this plugin's static source with `python -m http.server 5181 --bind 127.0.0.1 --directory plugins/interface/web` from `whab/app/`, then open `http://127.0.0.1:5181/tests/fixtures/sidebar-footer.html`. This fictional fixture checks the shipped stylesheet in ten desktop/compact, short/tall, light/dark cases. Every row must pass: the gear's bottom inset remains constant at each scroll position and the last account remains visible. This static fixture does not start WHAB or open a runtime home.
+For the footer layout regression, serve this plugin's static source with `python -m http.server 5181 --bind 127.0.0.1 --directory plugins/interface/web` from `whab/app/`, then open `http://127.0.0.1:5181/tests/fixtures/sidebar-footer.html`. This fictional fixture checks the shipped stylesheet in ten desktop/compact, short/tall, light/dark cases. Every row must pass: the gear's bottom inset remains constant at five scroll positions, the opaque footer covers the bottom strip across its width, and the last account remains visible. This static fixture does not start WHAB or open a runtime home.
 
 From `whab/app/`, use `.venv/bin/python -m pytest plugins/interface/web/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. The runner covers browser-module tests as well as Python checks; a passing automated suite still needs the [UI acceptance criteria](#ui-acceptance-criteria) relevant to the change. Documentation-only edits can use `--docs`. See [plugin contribution rules](../../README.md#test-ownership) and the [two-budget isolation recipe](../../../../docs/architecture.md#budget-isolation-verification).
 
