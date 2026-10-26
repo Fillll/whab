@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const navigationSource = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/settings-navigation.js'), 'utf8').replaceAll('export function ', 'function ');
 const source = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/storage-copies.js'), 'utf8');
 const C = '11111111-1111-4111-8111-111111111111';
 const I = '22222222-2222-4222-8222-222222222222';
@@ -23,7 +24,7 @@ function copy(state = 'saved') {
 function operation(state) {return {id: T, copy_id: C, state, error: state === 'failed' ? {code: 'promotion_failed'} : null};}
 function runtime(overrides = {}) {
   const context = {setTimeout, clearTimeout, ...overrides};
-  vm.runInNewContext(source.replace(/^import .*$/m, '').replaceAll('export function ', 'function ') +
+  vm.runInNewContext(navigationSource + source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function ') +
     '\nthis.create = createStorageCopies; this.init = initStoragePlugin; this.initAll = initStorageCopies;', context);
   return context;
 }
@@ -259,7 +260,7 @@ function domHarness({workspace = 'personal', initial = status(), supplied = true
 test('DOM status uses fixed text for hostile metadata and never interprets server HTML or paths', async () => {
   const state = domHarness({initial: status({copies: [{...copy('failed'), destination: '<script>/private/model</script>',
     error: {code: '<img src=x onerror=private>'}}], errors: {scheduler: {code: 'copy_scheduling_failed', path: '/private/key'}}})});
-  await state.opener.emit('click');
+  await state.dialog.emit('whab:settings-enter');
   assert.match(state.panel.textContent, /PrimarySynced copyNot used/);
   assert.match(state.panel.textContent, /primary is saved|primary save stays successful/);
   assert.equal(state.panel.textContent.includes('<script>'), false);
@@ -268,7 +269,7 @@ test('DOM status uses fixed text for hostile metadata and never interprets serve
 });
 
 test('unchanged polls retain the focused role and review controls', async () => {
-  const state = domHarness(); await state.opener.emit('click');
+  const state = domHarness(); await state.dialog.emit('whab:settings-enter');
   const select = state.panel.querySelectorAll('[data-storage-control]').find(node => node.value === 'primary');
   select.focus(); const original = [...state.panel.children]; await state.controller.refresh();
   assert.equal(state.page.activeElement, select); assert.deepEqual(state.panel.children, original);
@@ -280,12 +281,12 @@ test('unchanged polls retain the focused role and review controls', async () => 
 test('unsupported backends and Demo show no changing controls or provider calls', async () => {
   const demo = domHarness({workspace: 'demo'}); assert.equal(demo.controller, null); assert.equal(demo.requests.length, 0);
   const state = domHarness({initial: status({primary: {supported: false, plugin_id: 'client'}})});
-  await state.opener.emit('click'); assert.match(state.panel.textContent, /does not support/);
+  await state.dialog.emit('whab:settings-enter'); assert.match(state.panel.textContent, /does not support/);
   assert.equal(state.panel.querySelectorAll('[data-storage-control]').every(node => node.disabled), true);
 });
 
 test('request paths are captured per budget and closing stops only browser polling', async () => {
-  const state = domHarness({supplied: false}); await state.opener.emit('click');
+  const state = domHarness({supplied: false}); await state.dialog.emit('whab:settings-enter');
   assert.equal(state.requests[0].path, '/budgets/fictional/api/storage/copies');
   state.prefix('/budgets/other/api'); await state.controller.refresh(); assert.equal(state.requests.length, 1);
   await state.dialog.emit('close'); assert.equal(state.scheduled.size, 0);
@@ -293,7 +294,7 @@ test('request paths are captured per budget and closing stops only browser polli
 });
 
 test('opening the copy dialog blocks ordinary navigation but permits its own guarded save event', async () => {
-  const state = domHarness(); await state.opener.emit('click');
+  const state = domHarness(); await state.dialog.emit('whab:settings-enter');
   assert.equal((await state.page.emit('whab:before-navigate')).defaultPrevented, true);
   assert.equal((await state.page.emit('whab:before-navigate', {detail: {source: 'storage-copies'}})).defaultPrevented, undefined);
 });
@@ -316,7 +317,7 @@ test('app integration uses the real save guard and honors existing navigation ve
 });
 
 test('a new explicit review receives focus on its explanatory section, not the confirm action', async () => {
-  const state = domHarness(); await state.opener.emit('click');
+  const state = domHarness(); await state.dialog.emit('whab:settings-enter');
   state.status({preview_id: C, destination: 'json', source_generation: 7, supported: true});
   await state.controller.preview('json');
   assert.equal(state.page.activeElement.className, 'storage-copy-review');
@@ -397,11 +398,11 @@ test('Not used cannot disable primary storage or a copy added after review', asy
 });
 
 test('roles reflect persisted plugin state, preserve primary exclusivity, and review radio changes', async () => {
-  const primary = domHarness({plugin: 'sqlite'}); await primary.opener.emit('click');
+  const primary = domHarness({plugin: 'sqlite'}); await primary.dialog.emit('whab:settings-enter');
   const primaryRoles = primary.panel.querySelectorAll('[data-storage-control]');
   assert.equal(primaryRoles.find(node => node.value === 'primary').checked, true);
   assert.equal(primaryRoles.filter(node => node.value !== 'primary').every(node => node.disabled), true);
-  const state = domHarness({initial: status({copies: [copy()]})}); await state.opener.emit('click');
+  const state = domHarness({initial: status({copies: [copy()]})}); await state.dialog.emit('whab:settings-enter');
   const roles = state.panel.querySelectorAll('[data-storage-control]');
   assert.equal(roles.find(node => node.value === 'synced').checked, true);
   await roles.find(node => node.value === 'primary').emit('change');
@@ -411,7 +412,7 @@ test('roles reflect persisted plugin state, preserve primary exclusivity, and re
 });
 
 test('disabled copies are Not used and copy details stay expanded across status changes', async () => {
-  const state = domHarness({initial: status({copies: [copy('disabled')]})}); await state.opener.emit('click');
+  const state = domHarness({initial: status({copies: [copy('disabled')]})}); await state.dialog.emit('whab:settings-enter');
   assert.equal(state.panel.querySelectorAll('[data-storage-control]').find(node => node.value === 'unused').checked, true);
   const details = state.panel.children.find(node => node.tagName === 'DETAILS'); details.open = true;
   state.status(status({copies: [copy('disabled')], primary: {generation: 8}})); await state.controller.refresh();
@@ -420,7 +421,7 @@ test('disabled copies are Not used and copy details stay expanded across status 
 
 test('each storage plugin owns a separate controller and opener', async () => {
   const first = domHarness({plugin: 'sqlite'}), second = domHarness();
-  first.opener.listeners = {}; second.opener.listeners = {};
+  first.dialog.listeners = {}; second.dialog.listeners = {};
   const page = new Node('document'); page.activeElement = null;
   page.createElement = tag => new Node(tag, page);
   page.querySelectorAll = selector => selector === '[data-storage-plugin]' ? [first.dialog, second.dialog] :
@@ -430,14 +431,14 @@ test('each storage plugin owns a separate controller and opener', async () => {
     request: async path => {requests.push(path); return status();}, beforeChange: async () => true,
     schedule: () => null, cancel: () => {}});
   assert.equal(controllers.length, 2); assert.equal(requests.length, 0);
-  await first.opener.emit('click'); assert.equal(requests.length, 1);
+  await first.dialog.emit('whab:settings-enter'); assert.equal(requests.length, 1);
   assert.match(first.panel.textContent, /Current primary: SQLite/); assert.equal(second.panel.textContent, '');
-  await first.dialog.emit('close'); await second.opener.emit('click');
+  await first.dialog.emit('close'); await second.dialog.emit('whab:settings-enter');
   assert.equal(requests.length, 2); assert.match(second.panel.textContent, /PrimarySynced copyNot used/);
 });
 
 test('Synced copy on unused storage previews without optimistically changing the radio', async () => {
-  const state = domHarness(); await state.opener.emit('click');
+  const state = domHarness(); await state.dialog.emit('whab:settings-enter');
   const roles = state.panel.querySelectorAll('[data-storage-control]');
   state.status({preview_id: C, destination: 'json', source_generation: 7, supported: true});
   roles.find(node => node.value === 'unused').checked = false;
@@ -449,7 +450,7 @@ test('Synced copy on unused storage previews without optimistically changing the
 });
 
 test('Not used radio opens a retention review while its persisted role stays Synced copy', async () => {
-  const state = domHarness({initial: status({copies: [copy()]})}); await state.opener.emit('click');
+  const state = domHarness({initial: status({copies: [copy()]})}); await state.dialog.emit('whab:settings-enter');
   await state.panel.querySelectorAll('[data-storage-control]').find(node => node.value === 'unused').emit('change');
   assert.match(state.panel.textContent, /Stop syncing this plugin/);
   assert.match(state.panel.textContent, /saved data is retained/);
@@ -461,7 +462,7 @@ test('Not used radio opens a retention review while its persisted role stays Syn
 
 test('a gated or recovering authority cannot display a confirmed new Primary role', async () => {
   for (const primary of [{plugin_id: 'json', admission: 'gated'}, {plugin_id: 'json', health: 'recovery_required'}]) {
-    const state = domHarness({initial: status({primary})}); await state.opener.emit('click');
+    const state = domHarness({initial: status({primary})}); await state.dialog.emit('whab:settings-enter');
     const roles = state.panel.querySelectorAll('[data-storage-control]');
     assert.equal(roles.every(node => !node.checked && node.disabled), true);
     assert.match(state.panel.textContent, /paused until storage is ready and authoritative/);

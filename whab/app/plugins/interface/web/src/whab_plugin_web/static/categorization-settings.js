@@ -1,3 +1,4 @@
+import {isSettingsPageOpen} from './settings-navigation.js';
 /* Explicit settings sessions: each request advances training; leaving cancels it. */
 import {api, apiUrl, getContext} from './client.js';
 
@@ -44,7 +45,7 @@ export async function initCategorizationSettings(dialog, content) {
   }
   async function render() {
     const data = await call('status');
-    if (!dialog.open) return;
+    if (!isSettingsPageOpen(dialog)) return;
     const readOnly = dialog.dataset.pluginReadOnly === 'true';
     content.replaceChildren();
     content.append(text('p', `${data.eligible} reviewed, categorized transactions available. Training and evaluation use reviewed transactions only.`, 'settings-notice'));
@@ -83,16 +84,16 @@ export async function initCategorizationSettings(dialog, content) {
           session = result.session;
           progress.hidden = false; stop.hidden = false; stop.disabled = false;
           for (const input of form.querySelectorAll('input')) input.disabled = true;
-          while (session && !stopped && dialog.open) {
+          while (session && !stopped && isSettingsPageOpen(dialog)) {
             status.textContent = result.stage; progress.value = result.progress;
             // Yield a paint before advancing the next bounded block of trees.
             await new Promise(resolve => requestAnimationFrame(resolve));
-            if (stopped || !dialog.open) break;
+            if (stopped || !isSettingsPageOpen(dialog)) break;
             result = await call('step', {session});
             if (result.complete) { session = null; progress.value = 100; status.textContent = result.stage; }
           }
           await cancel();
-          if (dialog.open) await render();
+          if (isSettingsPageOpen(dialog)) await render();
         } finally { progress.hidden = true; stop.hidden = true; }
       });
     });

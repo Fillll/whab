@@ -2101,6 +2101,20 @@ strong {
 .settings-modal {
   width: 650px;
 }
+.settings-window {
+  height: min(680px, calc(100dvh - 40px));
+}
+.settings-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+}
+.settings-window .modal-heading {
+  padding-right: 32px;
+}
+.settings-window [data-settings-page][hidden] {
+  display: none;
+}
 .plugin-list-heading > h3 {
   font-size: 14px;
   font-weight: 600;

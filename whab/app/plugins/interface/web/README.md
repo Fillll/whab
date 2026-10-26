@@ -14,6 +14,12 @@ The browser registers opaque generation/edit flags with `/api/ui/views`; draft v
 
 The host's local `/api/ui/status`, `/preview`, `/commit` and `/recover` controls prepare, review, schedule and reconcile the selection. A scheduled operation remains pending until its status confirms completion. Approved compatible code uses immutable worker environments; templates/helpers render inside the child from bounded public projections. Financial rules, HTTPS and access guards remain host-owned. Legacy visual descriptors with browser protocol zero retain restart-required behavior. The private device-local visual decision overrides initial `WHAB_UI` on reopen and preserves disabled interfaces and exact retained worker references; see [visual worker lifecycle](../../../../docs/plugin-workers.md#visual-interface-workers).
 
+## Settings navigation
+
+Settings uses one modal window with one backdrop and close control. Budgets, Plugins, each plugin’s settings and About are sections inside it. Forward navigation changes the visible section without reopening or animating a new dialog. Back restores the preceding section, its scroll position and the opening control’s keyboard focus. Close, Escape and clicking the backdrop dismiss the whole Settings window; reopening starts at Settings. Direct `#budgets` and `#plugins` links retain their parent path.
+
+Sections stay mounted so Back preserves the parent’s selections and drafts. Entering or leaving a section starts or stops its existing plugin status/training lifecycle; hidden sections must not block navigation or keep training sessions alive. Opening plugin settings from an account temporarily closes the account dialog and restores it when Settings closes, preserving the account draft. A visual-interface handover closes Settings without restoring another modal so the browser can acknowledge readiness. Existing busy budget operations still block dismissal and section changes. Follow the project’s [clarity and simplicity rules](../../../CONTRIBUTING.md#clarity-and-simplicity).
+
 ## UI acceptance criteria
 
 For a material layout or interaction redesign, prepare a reviewable preview before implementation and retain the accepted layout/filtering feedback with the change. Use desktop and compact viewports, both appearances, and fictional data. Keep financial calculations in Python and preserve these interactions:
