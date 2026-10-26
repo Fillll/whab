@@ -1,3 +1,4 @@
+import {isSettingsPageOpen} from './settings-navigation.js';
 /* Selection status is host-owned. A 202 response never proves activation. */
 import {getContext, notify} from './client.js';
 
@@ -231,19 +232,19 @@ export function initVisualSettings({page = document, beforeChange, beforeCommit,
     reviewed = reviewKey;
     for (const button of dialog.querySelectorAll('[data-plugin-live-review]')) button.disabled = !usable;
     if (active && !target.dataset.edited && active.plugin_id) target.value = active.plugin_id;
-    if (!dialog.open && state.error && state.error !== notice) {notice = state.error; notify(state.error);}
+    if (!isSettingsPageOpen(dialog) && state.error && state.error !== notice) {notice = state.error; notify(state.error);}
     if (state.completed && state.completed.id !== completed) {
       completed = state.completed.id;
       if (state.completed.kind === 'optional') onOptionalComplete?.();
     }
     pane.setAttribute('aria-busy', String(state.busy || state.loading));
-    if (transferring && !dialog.open && !state.ticket && !state.busy) {transferring = false; controller.stop();}
+    if (transferring && !isSettingsPageOpen(dialog) && !state.ticket && !state.busy) {transferring = false; controller.stop();}
   }
   controller = createVisualSettings({request, beforeChange, beforeCommit: async kind => {
     if (await beforeCommit?.(kind) === false) return false;
     if (kind === 'visual') {
       transferring = true;
-      for (const opened of page.querySelectorAll('#settings-dialog[open], #plugins-dialog[open]')) opened.close();
+      for (const opened of page.querySelectorAll('#settings-dialog[open]')) opened.close();
     }
     return true;
   }, onState: render, isCurrent, schedule, cancel});
@@ -258,12 +259,12 @@ export function initVisualSettings({page = document, beforeChange, beforeCommit,
     void controller.reviewOptional(new FormData(dialog.querySelector('[data-plugin-selection]')).getAll('plugin'));
   });
   dialog.querySelector('[data-plugin-selection]')?.addEventListener('change', controller.invalidate);
-  for (const opener of page.querySelectorAll('[data-dialog="plugins-dialog"]')) opener.addEventListener('click', () => {transferring = false; void controller.start();});
+  dialog.addEventListener('whab:settings-enter', () => {transferring = false; void controller.start();});
   dialog.addEventListener('close', () => {if (!transferring) controller.stop();});
   page.defaultView?.addEventListener('pagehide', controller.stop);
   page.addEventListener('whab:before-navigate', event => {
-    if (dialog.open && event.detail?.source !== 'plugin-settings') event.preventDefault();
+    if (isSettingsPageOpen(dialog) && event.detail?.source !== 'plugin-settings') event.preventDefault();
   });
-  if (dialog.open) void controller.start();
+  if (isSettingsPageOpen(dialog)) void controller.start();
   return controller;
 }

@@ -2,6 +2,7 @@
 
 Run application commands from `whab/app/`. Start with [README.md](README.md), then use the [task ownership map](CONTRIBUTING.md#task-ownership) to read the contracts for the area being changed.
 
+- Prioritize [clarity and simplicity](CONTRIBUTING.md#clarity-and-simplicity) in product flows and implementation. Keep related settings in one window with in-place sections and Back; do not stack settings dialogs.
 - Support Python 3.14 and newer only. Keep package requirements, tooling and CI aligned. Node is used for browser tests; there is no Node build or React runtime.
 - Keep budgeting rules in the financial core, independent of HTTP, storage, providers and concrete plugins. Use the public `whab.plugins` SDK. Follow [code boundaries](CONTRIBUTING.md#code-boundaries) and the [architecture and financial invariants](../docs/architecture.md).
 - Use integer currency minor units; never aggregate unlike currencies. Preserve annotations, atomic transaction/cursor saves and saved-data compatibility. Keep demo/personal, Sandbox/production and each budget's plugin state isolated.

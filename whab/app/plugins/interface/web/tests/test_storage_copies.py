@@ -24,7 +24,7 @@ class Tags(HTMLParser):
 
 
 def dialog(text, name):
-    return re.search(rf'<dialog\b[^>]*id="{name}".*?</dialog>', text, re.S)[0]
+    return re.search(rf'<article\b[^>]*id="{name}".*?</article>', text, re.S)[0]
 
 
 @pytest.mark.parametrize("page", ["budget", "transactions", "accounts", "insights"])
@@ -33,14 +33,14 @@ def test_copy_management_is_addressed_accessible_and_demo_read_only(client, page
     key = "home" if workspace == "personal" else "demo"
     response = client.get(f"/budgets/{key}/{page}/2026-10/usd")
     assert response.status_code == 200
-    settings = dialog(response.text, "settings-dialog")
+    settings = dialog(response.text, "settings-home")
     assert 'storage-copies-dialog' not in response.text
     assert 'Storage copies' not in settings
     copies = dialog(response.text, "plugin-options-sqlite")
     assert 'data-storage-plugin="sqlite"' in copies
     assert 'Storage for this budget' in copies
     assert f'data-workspace="{workspace}"' in copies
-    assert "data-close-dialog" in copies and ">Installed plugins</button>" in copies
+    assert "data-settings-back" in copies and ">Installed plugins</button>" in copies
     assert "No automatic" not in copies
     if workspace == "personal":
         tags = Tags(copies).tags

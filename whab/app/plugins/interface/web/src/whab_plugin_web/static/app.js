@@ -10,6 +10,7 @@ import {initCategorizationSettings} from './categorization-settings.js';
 import {initStorageCopies} from './storage-copies.js';
 import {createUIViews} from './ui-lifecycle.js';
 import {initVisualSettings} from './visual-settings.js';
+import {initSettingsNavigation, isSettingsPageOpen} from './settings-navigation.js';
 
 const toast = document.getElementById('toast');
 document.addEventListener('whab:notice', event => {
@@ -156,9 +157,11 @@ initAccountSettings({
   },
 });
 
+const settingsNavigation = initSettingsNavigation({beforeOpen: () => accountNavigation.cancelPending()});
+
 document.addEventListener('click', event => {
   const button = event.target.closest('[data-dialog]');
-  if (button && !button.disabled) {
+  if (button && !button.disabled && !event.defaultPrevented) {
     accountNavigation.cancelPending();
     const dialog = document.getElementById(button.dataset.dialog);
     for (const select of dialog?.querySelectorAll('select[data-currency-choices-lazy]') || []) hydrateCurrencyChoices(select);
@@ -167,7 +170,7 @@ document.addEventListener('click', event => {
 });
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => {
   const dialog = button.closest('dialog');
-  if (!dialog.querySelector('[data-account-classification][data-busy]')) dialog.close();
+  if (!dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy]')) dialog.close();
 });
 for (const dialog of document.querySelectorAll('dialog')) {
   if (dialog.hasAttribute('data-transaction-receipt-dialog')) continue;
@@ -222,9 +225,8 @@ if (pluginSelection) {
       submit.disabled = false;
     }
   });
-  if (['#settings', '#budgets', '#plugins'].includes(location.hash)) document.getElementById('settings-dialog').showModal();
-  if (location.hash === '#budgets') document.getElementById('budgets-dialog').showModal();
-  if (location.hash === '#plugins') document.getElementById('plugins-dialog').showModal();
+  const initialSettingsPage = {'#settings': 'settings-home', '#budgets': 'budgets-dialog', '#plugins': 'plugins-dialog'}[location.hash];
+  if (initialSettingsPage) settingsNavigation.open(initialSettingsPage);
 }
 
 
@@ -290,7 +292,7 @@ async function loadBudgetControls() {
     error.hidden = false;
   }
 }
-for (const button of document.querySelectorAll('[data-dialog="budgets-dialog"]')) button.addEventListener('click', loadBudgetControls);
+budgetDialog.addEventListener('whab:settings-enter', loadBudgetControls);
 if (location.hash === '#budgets') loadBudgetControls();
 budgetDialog.querySelector('[data-budget-save]').addEventListener('click', async event => {
   const button = event.currentTarget;
@@ -400,7 +402,6 @@ function budgetForm(selector, action) {
     try {
       await requireSavedEdits();
       const result = await action(form);
-      budgetDialog.close();
       document.getElementById('settings-dialog').close();
       location.assign(result.url);
     } catch (failure) {
@@ -536,8 +537,7 @@ function renderPluginSettings(dialog, settings) {
   if (!settings.insights.length && !settings.actions.length && !dialog.querySelector('[data-appearance-choice], [data-file-import], [data-storage-copy-panel]')) content.append(settingsText('p', 'This plugin has no additional settings.', 'settings-notice'));
 }
 
-for (const button of document.querySelectorAll('[data-plugin-options]')) button.addEventListener('click', async () => {
-  const dialog = document.getElementById(button.dataset.dialog);
+for (const dialog of document.querySelectorAll('[data-settings-page][data-plugin-id]')) dialog.addEventListener('whab:settings-enter', async () => {
   if (dialog.dataset.pluginActive !== 'true' || dialog.dataset.busy) return;
   const error = dialog.querySelector('[data-plugin-settings-error]');
   const status = dialog.querySelector('[data-plugin-settings-status]');
@@ -547,6 +547,7 @@ for (const button of document.querySelectorAll('[data-plugin-options]')) button.
   status.textContent = 'Loading settings…';
   try {
     const settings = await api(`/plugins/${encodeURIComponent(dialog.dataset.pluginId)}/settings`);
+    if (!isSettingsPageOpen(dialog)) return;
     renderPluginSettings(dialog, settings);
     status.textContent = '';
   } catch (failure) {
@@ -615,7 +616,8 @@ initVisualSettings({
   async beforeCommit(kind) {
     if (kind === 'visual' && optionalSelectionDirty()) return false;
     if (!document.dispatchEvent(new CustomEvent('whab:before-navigate', {cancelable: true, detail: {source: 'plugin-settings'}}))) return false;
-    if ([...document.querySelectorAll('dialog[open]')].some(dialog => !['settings-dialog', 'plugins-dialog'].includes(dialog.id))) return false;
+    if ([...document.querySelectorAll('dialog[open]')].some(dialog => dialog.id !== 'settings-dialog') ||
+        document.querySelector('#settings-dialog[open] [data-settings-page]:not([hidden])')?.id !== 'plugins-dialog') return false;
     await requireSavedEdits();
     return true;
   },
