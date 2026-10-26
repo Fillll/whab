@@ -5,3 +5,5 @@ The Python application, core, SDK and plugins live in `app/`; shared product doc
 Launchers manage installed WHAB versions and processes through the application CLI. Keep budgeting rules, data access and plugin behavior in the application. Keep runtime homes separate from code and preserve existing homes and encryption keys across upgrades. Existing ignored runtime files under `whab/` remain in place when application sources move; set `WHAB_HOME` explicitly to reuse them.
 
 Keep secrets, runtime data, private backups and generated builds out of Git. Preserve HTTPS on every route and leave certificate trust changes to explicit user action. Use feature branches and pull requests; final approval and merging belong to the human maintainer unless explicitly delegated for the specific PR. Create version tags and GitHub releases only on an explicit release request.
+
+Scheduled stable publication follows the maintainer-authorized [nightly release policy](app/CONTRIBUTING.md#nightly-stable-releases). Never move existing version tags or treat a push/manual certification run as release authorization.

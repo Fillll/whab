@@ -64,6 +64,8 @@ Required PR CI runs the complete source suite in parallel on Python 3.14 and 3.1
 
 The exhaustive command also validates toolkit wheels, genuine historical hosts and generated-plugin configuration/replay matrices. It runs after merge and nightly; local focused checks are sufficient before pushing, with required PR CI providing comprehensive source validation. Use `scripts/check.py --docs` for documentation links and inventory only. See [contributing](CONTRIBUTING.md#tests-and-checks) for the timing target and validation policy, [development verification](../docs/development.md) for previews and troubleshooting, and [usage](../docs/usage.md) for user workflows.
 
+Successful scheduled certification can publish a new declared app version as a stable source release. Existing versions are immutable; push/manual runs do not publish. See the [nightly stable release policy](CONTRIBUTING.md#nightly-stable-releases).
+
 ## License
 
 WHAB's code, SDK, bundled plugins, example, documentation and assets use the [MIT License](LICENSE). Commercial use, proprietary plugins and forks are permitted with the required notices. Third-party dependencies, services and institution logos retain their own licenses or terms.

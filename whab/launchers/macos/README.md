@@ -47,7 +47,7 @@ in this row and the row is disabled; routine status checks retain the last statu
 The update channels are:
 
 - **Latest tested main**: the newest recent official `main` revision with successful CI.
-- **Stable releases**: a supported official GitHub release with successful CI.
+- **Stable releases**: a supported official GitHub release with successful CI. The [nightly publisher](../../app/CONTRIBUTING.md#nightly-stable-releases) releases new declared app versions after exhaustive scheduled certification; existing stable versions are never replaced.
 - **Alpha — latest main**: the current official `main` commit, even when CI is pending,
   missing or failing. Alpha resolves one exact revision and downloads its source
   snapshot without cloning a Git repository or downloading its history. It still

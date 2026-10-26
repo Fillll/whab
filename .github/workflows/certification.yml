@@ -72,3 +72,54 @@ jobs:
           retention-days: 14
       - name: Lint launcher Python
         run: python -m ruff check --config pyproject.toml ../launchers/macos/manager ../launchers/macos/tests ../launchers/macos/scripts
+
+  macos-launcher:
+    name: macOS launcher certification
+    runs-on: macos-latest
+    timeout-minutes: 15
+    env:
+      CLANG_MODULE_CACHE_PATH: /tmp/whab-launcher-clang-cache
+      SWIFT_MODULECACHE_PATH: /tmp/whab-launcher-swift-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - run: python -m unittest discover -s whab/launchers/macos/tests -p 'test_*.py'
+      - run: python whab/launchers/macos/scripts/test_build.py
+      - run: swift test --package-path whab/launchers/macos --scratch-path /tmp/whab-launcher-swift --disable-sandbox
+      - run: python whab/launchers/macos/scripts/build.py --skip-runtime --output /tmp/WHAB.app
+
+  stable-release:
+    name: Publish certified stable release
+    needs: [checks, external-plugin-contracts, macos-launcher]
+    if: >-
+      github.event_name == 'schedule' && github.repository == 'Fillll/whab' &&
+      github.ref == 'refs/heads/main' && needs.checks.result == 'success' &&
+      needs.external-plugin-contracts.result == 'success' && needs.macos-launcher.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+      checks: read
+    concurrency:
+      group: nightly-stable-publication
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Publish the declared version from the exact green nightly commit
+        working-directory: whab/app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.sha }}
+          CERTIFICATION_RUN: ${{ github.run_id }}
+        run: python scripts/publish_stable.py --sha "$RELEASE_SHA" --run-id "$CERTIFICATION_RUN" --publish
