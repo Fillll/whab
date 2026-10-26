@@ -13,7 +13,11 @@
 <table><thead><tr><th>Viewport / theme / accounts</th><th>Gear bottom gaps</th><th>Bottom covered</th><th>Result</th></tr></thead><tbody></tbody></table>
 <script type="module">
 const stylesheet = new URL('../../src/whab_plugin_web/static/styles.css', location.href);
-const nextFrame = win => new Promise(resolve => win.requestAnimationFrame(resolve));
+// Let composited scrolling paint before testing which element covers each pixel.
+const afterPaint = async win => {
+  await new Promise(resolve => win.requestAnimationFrame(resolve));
+  await new Promise(resolve => win.requestAnimationFrame(resolve));
+};
 for (const [width, height, count] of [[1280, 800, 0], [1280, 800, 31], [980, 360, 31], [700, 200, 0], [390, 200, 0]]) {
   for (const theme of ['light', 'dark']) {
     const frame = document.createElement('iframe');
@@ -38,21 +42,28 @@ for (const [width, height, count] of [[1280, 800, 0], [1280, 800, 31], [980, 360
     const inset = width > 760 ? 14 : 12;
     const maximum = sidebar.scrollHeight - sidebar.clientHeight;
     const gaps = [];
+    const coverageSamples = [];
     let bottomCovered = true;
     let lastAccountVisible = !count;
     for (const position of [0, maximum / 4, maximum / 2, maximum * 3 / 4, maximum]) {
       sidebar.scrollTop = position;
-      await nextFrame(win);
+      await afterPaint(win);
       const sidebarBounds = sidebar.getBoundingClientRect();
       const footerBounds = footer.getBoundingClientRect();
       gaps.push(Math.round((sidebarBounds.bottom - gear.getBoundingClientRect().bottom) * 100) / 100);
-      bottomCovered &&= Math.abs(footerBounds.bottom - sidebarBounds.bottom) <= 1
+      let covered = Math.abs(footerBounds.bottom - sidebarBounds.bottom) <= 1
         && win.getComputedStyle(footer).backgroundColor === win.getComputedStyle(sidebar).backgroundColor;
+      const uncovered = [];
       for (const x of [footerBounds.left + 1, (footerBounds.left + footerBounds.right) / 2, footerBounds.right - 1]) {
         for (let offset = 1; offset < inset; offset++) {
-          bottomCovered &&= footer.contains(frame.contentDocument.elementFromPoint(x, sidebarBounds.bottom - offset));
+          const hit = frame.contentDocument.elementFromPoint(x, sidebarBounds.bottom - offset);
+          // An overlay scrollbar is hit-tested as the sidebar itself.
+          if (!footer.contains(hit) && hit !== sidebar) uncovered.push({ x, offset, hit: hit?.className ?? null });
         }
       }
+      covered &&= !uncovered.length;
+      bottomCovered &&= covered;
+      coverageSamples.push({ position, footerBottom: footerBounds.bottom, sidebarBottom: sidebarBounds.bottom, uncovered });
     }
     const lastAccount = frame.contentDocument.querySelector('.sidebar-account:last-child');
     if (lastAccount) {
@@ -61,6 +72,7 @@ for (const [width, height, count] of [[1280, 800, 0], [1280, 800, 31], [980, 360
     }
     const passed = gaps.every(gap => Math.abs(gap - inset) <= 1) && bottomCovered && lastAccountVisible;
     const row = document.createElement('tr');
+    row.dataset.coverage = JSON.stringify(coverageSamples);
     row.innerHTML = `<td>${width} × ${height} / ${theme} / ${count}</td><td>${gaps.join(', ')} px (expected ${inset})</td><td>${bottomCovered ? 'Yes' : 'No'}</td><td>${passed ? 'PASS' : 'FAIL'}${lastAccountVisible ? '' : ': last account covered'}</td>`;
     document.querySelector('tbody').append(row);
   }
