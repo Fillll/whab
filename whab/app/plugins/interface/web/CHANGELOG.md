@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.30.1 — 2026-10-25
+
+PR: [#114](https://github.com/Fillll/whab/pull/114)
+
+- Keep the version and Settings footer at a constant bottom inset while scrolling the sidebar, including at the end of long account lists and in compact navigation.
+
 ## 1.30.0 — 2026-10-25
 
 PR: [#113](https://github.com/Fillll/whab/pull/113)
