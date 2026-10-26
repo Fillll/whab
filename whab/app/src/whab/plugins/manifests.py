@@ -7,26 +7,12 @@ from pathlib import Path
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
-CATEGORIES = ("interface", "ingestion", "insight", "storage", "automation", "extension")
+from .manifest_schema import CATEGORIES as CATEGORIES
+from .manifest_schema import validate_manifest as _validate_manifest
 
 
 def validate_manifest(value):
-    from .sdk import valid_plugin_name
-
-    if (type(value) is not dict or value.keys() != {"schema_version", "id", "category", "dependencies"}
-            or type(value["schema_version"]) is not int or value["schema_version"] != 1
-            or not valid_plugin_name(value["id"]) or value["category"] not in (*CATEGORIES, "example")
-            or type(value["dependencies"]) is not list or len(value["dependencies"]) > 100):
-        raise ValueError("Invalid plugin manifest.")
-    seen = {value["id"]}
-    for dependency in value["dependencies"]:
-        if (type(dependency) is not dict or dependency.keys() != {"id", "version"}
-                or not valid_plugin_name(dependency["id"]) or dependency["id"] in seen
-                or type(dependency["version"]) is not str or len(dependency["version"]) > 200):
-            raise ValueError("Invalid plugin dependency.")
-        SpecifierSet(dependency["version"])
-        seen.add(dependency["id"])
-    return value
+    return _validate_manifest(value, parse_specifier=SpecifierSet)
 
 
 def installed_manifest(entry):

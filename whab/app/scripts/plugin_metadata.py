@@ -5,7 +5,14 @@ import ast
 import json
 import re
 import tomllib
+from importlib import util
 from pathlib import Path
+
+# Load only our standard-library schema, without importing the application or plugins.
+_SCHEMA_SPEC = util.spec_from_file_location("whab_manifest_schema", Path(__file__).resolve().parents[1] / "src/whab/plugins/manifest_schema.py")
+_SCHEMA = util.module_from_spec(_SCHEMA_SPEC)
+_SCHEMA_SPEC.loader.exec_module(_SCHEMA)
+validate_manifest = _SCHEMA.validate_manifest
 
 ROOT = Path(__file__).resolve().parents[3]
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
@@ -292,8 +299,6 @@ def source_inventory(root=ROOT):
         requirements = [value for value in project.get("dependencies", ()) if re.match(r"(?i)^whab(?:\s|[<>=!~;\[]|$)", value)]
         if len(requirements) != 1:
             raise ValueError("Curated plugin packages require one explicit WHAB compatibility declaration.")
-        from whab.plugins.manifests import validate_manifest
-
         manifest_path = path.parent / "src" / module.split(".")[0] / "plugin.json"
         manifest = validate_manifest(json.loads(source_text(manifest_path, root)))
         if manifest["id"] != identifier or manifest["category"] != path.parent.parent.name:

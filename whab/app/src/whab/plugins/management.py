@@ -151,7 +151,7 @@ class PluginManager:
                 "display_name": description.display_name if description else display_name,
                 "kinds": list(description.kinds) if description else [],
                 "category": manifest["category"] if manifest else plugin_category(name, matches, description),
-                "installed": bool(matches),
+                "installed": bool(matches) or description is not None,
                 "dependencies": manifest["dependencies"] if manifest else [],
                 "distribution": distribution,
                 "version": version,

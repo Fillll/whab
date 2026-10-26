@@ -778,6 +778,8 @@ Every maintained and teaching plugin ships a data-only `plugin.json` in its top-
 }
 ```
 
+Named plugin dependency enforcement requires WHAB 2.42 or newer; set that host minimum when declaring a named dependency. Empty manifests remain compatible with earlier hosts.
+
 Use the primary category `interface`, `ingestion`, `insight`, `storage`, `automation` or `extension`; repository teaching packages use `example` and stay hidden in normal Settings. An empty dependency list explicitly declares no required named plugins. Existing plugins currently use capability contracts without named plugin dependencies; this change does not manufacture new couplings. Host and third-party Python requirements remain in `pyproject.toml`. Add matching Python distribution requirements for named plugin dependencies. Capability requirements in `PluginContract.requires` remain separate: they permit interchangeable compatible providers.
 
 The host reads manifests without importing inactive plugin modules. It rejects missing or disabled named dependencies, incompatible package versions and cycles before activating the selected registry. To disable a required plugin, disable its dependents in the same selection first. External legacy packages without a manifest remain supported through the existing capability contracts; new projects must ship one. Normal Settings exposes dependencies, required capabilities and reverse dependents. There is no package-uninstall control: disabling preserves installed code and every budget's saved state, and the marketplace never removes or replaces existing packages.
