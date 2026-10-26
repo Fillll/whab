@@ -27,7 +27,7 @@ def plugin(identifier, **changes):
 
 
 def dialog(text, identifier):
-    return re.search(rf'<dialog\b[^>]*\bid="{identifier}".*?</dialog>', text, re.S)[0]
+    return re.search(rf'<article\b[^>]*\bid="{identifier}".*?</article>', text, re.S)[0]
 
 
 class Tags(HTMLParser):
@@ -54,7 +54,7 @@ def test_settings_links_to_installed_plugins_with_all_categories_as_default(clie
         plugin("web", active=True, enabled=True, required=True, manageable=False, category="interface"),
         plugin("report", category="insight"),
     )
-    settings = dialog(text, "settings-dialog")
+    settings = dialog(text, "settings-home")
     assert 'data-dialog="plugins-dialog"' in settings
     assert "Installed plugins and their settings" in settings
     assert "data-plugin-selection" not in settings
@@ -74,7 +74,7 @@ def test_settings_links_to_installed_plugins_with_all_categories_as_default(clie
     assert 'data-dialog="plugin-options-web" data-plugin-options' in installed
     assert 'data-dialog="plugin-options-report" data-plugin-options' in installed
     assert 'data-plugin-category-empty hidden' in installed
-    assert 'data-close-dialog' in installed and '>Settings</button>' in installed
+    assert 'data-settings-back' in installed and '>Settings</button>' in installed
 
 
 @pytest.mark.parametrize(("workspace", "label"), [("demo", "Demo budget"), ("personal", "My budget")])
@@ -84,7 +84,7 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     )
     assert response.status_code == 200
     text = response.text
-    settings = dialog(text, "settings-dialog")
+    settings = dialog(text, "settings-home")
     assert re.findall(r'data-dialog="([^"]+)"', settings) == [
         "budgets-dialog", "plugins-dialog", "about-dialog",
     ]
@@ -101,7 +101,7 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
         switched = client.get(href)
         assert switched.status_code == 200
         next_label = "Demo budget" if destination == "demo" else "My budget"
-        assert f"Current budget · {next_label}" in dialog(switched.text, "settings-dialog")
+        assert f"Current budget · {next_label}" in dialog(switched.text, "settings-home")
     fieldset = re.search(r'<fieldset\b[^>]*\bdata-available-budgets\b.*?</fieldset>', switch, re.S)[0]
     assert 'class="budget-list"' in fieldset
     choices = [attrs for tag, attrs in Tags(fieldset).tags if tag == "input"]
@@ -222,7 +222,7 @@ def test_each_plugin_has_settings_with_saved_and_running_state(client, monkeypat
     label = re.search(r'<label class="plugin-toggle">(.*?)</label>', row, re.S)[1]
     assert '<strong>Sample</strong>' in label
     assert "whab-sample" not in label  # Package details do not clutter the checkbox's accessible name.
-    assert row.index('</label>') < row.index('whab-sample · 1.0.0') < row.index(
+    assert row.index('</label>') < row.index('Version 1.0.0') < row.index(
         f'<span class="plugin-state">{selection}</span>'
     ) < row.index('aria-label="Settings for Sample"')
     assert re.findall(r'<button\b[^>]*aria-label="([^"]+)"', row) == ["Settings for Sample"]
@@ -267,3 +267,22 @@ def test_six_empty_sections_marketplace_and_dependency_details_preserve_missing_
     assert 'provider &gt;=1,&lt;2' in dialog(text, 'plugin-options-consumer')
     assert 'Required by: Consumer' in dialog(text, 'plugin-options-provider')
     assert 'data-marketplace' in dialog(text, 'plugin-marketplace-dialog')
+
+def test_related_settings_are_sections_in_one_modal_with_one_close_control(client):
+    text = client.get('/budgets/demo/budget/current-month/usd').text
+    window = re.search(r'<dialog\b[^>]*id="settings-dialog".*?</dialog>', text, re.S)[0]
+    tags = Tags(window).tags
+    assert sum(tag == 'dialog' for tag, _ in tags) == 1
+    pages = [attrs for tag, attrs in tags if tag == 'article' and 'data-settings-page' in attrs]
+    by_id = {attrs['id']: attrs for attrs in pages}
+    assert {'settings-home', 'budgets-dialog', 'plugins-dialog', 'about-dialog'} <= by_id.keys()
+    assert 'plugin-options-web' in by_id
+    assert [attrs['id'] for attrs in pages if 'hidden' not in attrs] == ['settings-home']
+    assert by_id['plugins-dialog']['data-settings-parent'] == 'settings-home'
+    assert by_id['plugin-options-web']['data-settings-parent'] == 'plugins-dialog'
+    close_controls = [attrs for tag, attrs in tags if tag == 'button' and 'data-close-dialog' in attrs]
+    assert len(close_controls) == 1
+    assert close_controls[0]['aria-label'] == 'Close Settings'
+    assert 'data-settings-back' in dialog(text, 'plugin-options-web')
+    for attrs in pages:
+        assert 'data-close-dialog' not in dialog(text, attrs['id'])

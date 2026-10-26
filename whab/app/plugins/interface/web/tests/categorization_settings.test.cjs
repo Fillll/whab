@@ -14,6 +14,8 @@ class Element {
   get elements() {return Object.fromEntries(this.querySelectorAll('input').map(input => [input.name, input]));}
   emit(event) {for (const callback of this.listeners[event] || []) callback({preventDefault() {}});}
 }
+const navigationSource = readFileSync(resolve(__dirname, '../src/whab_plugin_web/static/settings-navigation.js'), 'utf8');
+const navigation = import(`data:text/javascript;base64,${Buffer.from(navigationSource).toString('base64')}`);
 const defaults = {trees: 300, depth: 20, leaf: 2, vocabulary: 1500, threshold: .8};
 async function fixture({pause = false, readOnly = false, fail = false, failStep = false} = {}) {
   const requests = [];
@@ -35,11 +37,13 @@ async function fixture({pause = false, readOnly = false, fail = false, failStep 
     if (payload.action === 'preview') return {suggested: 10, lowScore: 10};
     return {ok: true};
   };
+  globalThis.__settingsNavigationTest = await navigation;
   globalThis.__categorizationTest = {api, apiUrl: value => value, getContext: () => ({workspace: 'personal'})};
   globalThis.document = {createElement: tag => new Element(tag)};
   globalThis.window = new Element('window');
   globalThis.requestAnimationFrame = callback => pause ? frames.push(callback) : queueMicrotask(callback);
   const source = readFileSync(resolve(__dirname, '../src/whab_plugin_web/static/categorization-settings.js'), 'utf8')
+    .replace(/import .* from '.\/settings-navigation.js';/, 'const {isSettingsPageOpen} = globalThis.__settingsNavigationTest;')
     .replace(/import .* from '.\/client.js';/, 'const {api, apiUrl, getContext} = globalThis.__categorizationTest;');
   const module = await import(`data:text/javascript;base64,${Buffer.from(source + `\n// ${Math.random()}`).toString('base64')}`);
   await module.initCategorizationSettings(dialog, content);

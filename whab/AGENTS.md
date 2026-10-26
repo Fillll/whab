@@ -4,6 +4,8 @@ Keep WHAB's hexagonal financial core and plugin architecture central to every ch
 
 The Python application, core, SDK and plugins live in `app/`; shared product documentation lives in `docs/`; platform companions live in `launchers/`. Read and follow [`app/AGENTS.md`](app/AGENTS.md) before changing application code, plugins, tests or product documentation. Run application commands from `whab/app/`. Follow each launcher's own instructions for native builds and lifecycle tests.
 
+Prioritize [clarity and simplicity](app/CONTRIBUTING.md#clarity-and-simplicity) in product design and implementation; apply those rules during development and review.
+
 Launchers manage installed WHAB versions and processes through the application CLI. Keep budgeting rules, data access and plugin behavior in the application. Keep runtime homes separate from code and preserve existing homes and encryption keys across upgrades. Existing ignored runtime files under `whab/` remain in place when application sources move; set `WHAB_HOME` explicitly to reuse them.
 
 Keep secrets, runtime data, private backups and generated builds out of Git. Preserve HTTPS on every route and leave certificate trust changes to explicit user action. Use feature branches and pull requests; final approval and merging belong to the human maintainer unless explicitly delegated for the specific PR. Create version tags and GitHub releases only on an explicit release request.

@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const navigationSource = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/settings-navigation.js'), 'utf8').replaceAll('export function ', 'function ');
 const source = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/visual-settings.js'), 'utf8');
 const P = '11111111-1111-4111-8111-111111111111';
 const T = '22222222-2222-4222-8222-222222222222';
@@ -17,7 +18,7 @@ function visual({operations = [], pluginId = 'web', generation = G, runtime = re
 const operation = (state, pluginId = 'other', error = null) => ({id: T, preview_id: P, state, plugin_id: pluginId, error});
 function harness({beforeChange = async () => true, beforeCommit = async () => true} = {}) {
   const context = {setTimeout, clearTimeout};
-  vm.runInNewContext(source.replace(/^import .*$/m, '').replaceAll('export function ', 'function ') + '\nthis.create = createVisualSettings;', context);
+  vm.runInNewContext(navigationSource + source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function ') + '\nthis.create = createVisualSettings;', context);
   let current = true, visualStatus = visual(), optionalStatus = {runtime: ready, operations: []}, reply = null, timer = null, state;
   const calls = [];
   const controller = context.create({beforeChange, beforeCommit, isCurrent: () => current,
@@ -127,7 +128,7 @@ test('optional plugins use separate reviewed live route and host terminal operat
 
 test('Demo initializer never requests metadata or mutates', () => {
   const context = {getContext: () => {throw Error('Demo must not read personal controls');}};
-  vm.runInNewContext(source.replace(/^import .*$/m, '').replaceAll('export function ', 'function ') + '\nthis.init = initVisualSettings;', context);
+  vm.runInNewContext(navigationSource + source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function ') + '\nthis.init = initVisualSettings;', context);
   const page = {getElementById: () => ({querySelector: () => ({dataset: {workspace: 'demo'}})})};
   assert.equal(context.init({page}), null);
 });
@@ -148,7 +149,7 @@ test('explicit cleanup attempts use counts, never resubmit change, and preserve 
   assert.equal(h.controller.canChange(), false); assert.equal(h.mutations().length, 1);
 });
 
-test('visual Apply closes only Settings and Plugins before host submission so browser ACK can proceed', async () => {
+test('visual Apply closes the single Settings window before host submission so browser ACK can proceed', async () => {
   class Node {
     constructor() {this.dataset = {}; this.events = {}; this.open = true; this.value = ''; this.hidden = false;}
     addEventListener(type, handler) {(this.events[type] ||= []).push(handler);}
@@ -161,13 +162,16 @@ test('visual Apply closes only Settings and Plugins before host submission so br
   const previewButton = new Node(); fields.form.querySelector = () => previewButton; fields.mode.value = 'installed';
   const pane = new Node(); pane.dataset.workspace = 'personal';
   pane.querySelector = selector => fields[selector.match(/data-visual-([^\]]+)/)[1]];
-  const dialog = new Node(), settings = new Node(), selection = new Node(); dialog.open = false;
+  const dialog = new Node(), settings = new Node(), selection = new Node();
+  delete dialog.open; dialog.dataset.settingsPage = ''; dialog.hidden = true;
+  dialog.closest = () => settings;
+  settings.addEventListener('close', () => {dialog.hidden = true; dialog.fire('close');});
   dialog.querySelector = selector => selector === '[data-visual-settings]' ? pane : selection;
   dialog.querySelectorAll = () => [];
-  const page = new Node(); page.getElementById = () => dialog;
-  page.querySelectorAll = selector => selector.includes('[open]') ? [settings, dialog].filter(node => node.open) : [];
+  const page = new Node(); page.getElementById = id => id === 'settings-dialog' ? settings : dialog;
+  page.querySelectorAll = selector => selector === '#settings-dialog[open]' && settings.open ? [settings] : [];
   const context = {getContext: () => ({apiPrefix: '/budgets/fictional/api'}), notify() {}, setTimeout, clearTimeout};
-  vm.runInNewContext(source.replace(/^import .*$/m, '').replaceAll('export function ', 'function ') + '\nthis.init = initVisualSettings;', context);
+  vm.runInNewContext(navigationSource + source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function ') + '\nthis.init = initVisualSettings;', context);
   const calls = [], timers = [];
   let committed = false;
   const controller = context.init({page, beforeChange: async () => true, beforeCommit: async () => true,
@@ -176,10 +180,10 @@ test('visual Apply closes only Settings and Plugins before host submission so br
       calls.push(url);
       if (body === undefined) return url === '/ui/status' ? visual({operations: committed ? [operation('queued')] : []}) : {runtime: ready, operations: []};
       if (url === '/ui/preview') return {preview_id: P, plugin_id: 'other', selection_revision: G, requires_saved_views: true, code: 'installed'};
-      assert.equal(url, '/ui/commit'); assert.equal(dialog.open, false); assert.equal(settings.open, false);
+      assert.equal(url, '/ui/commit'); assert.equal(dialog.hidden, true); assert.equal(settings.open, false);
       committed = true; return {id: T, accepted: true};
     }});
-  const opening = controller.start(); dialog.open = true; await opening; await controller.preview('other');
+  dialog.hidden = false; const opening = controller.start(); await opening; await controller.preview('other');
   assert.equal(fields.apply.disabled, false); assert.equal(fields.review.focused, true);
   await controller.apply();
   assert.equal(fields.apply.hidden, true); assert.match(fields.message.textContent, /queued|Waiting/);
@@ -219,9 +223,9 @@ test('changing target during an outstanding preview invalidates its late review'
 test('app guard preserves optional drafts and other dialogs before visual submission', async () => {
   const app = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/app.js'), 'utf8');
   const hook = app.slice(app.lastIndexOf('initVisualSettings({'), app.lastIndexOf('initStorageCopies({beforeChange:'));
-  const events = []; let options, dirty = false, allowed = true, dialogs = [{id: 'settings-dialog'}, {id: 'plugins-dialog'}];
+  const events = []; let options, dirty = false, allowed = true, activePage = 'plugins-dialog', dialogs = [{id: 'settings-dialog'}];
   const context = {initVisualSettings: value => {options = value;}, optionalSelectionDirty: () => dirty,
-    document: {dispatchEvent(event) {events.push(event.detail.source); return allowed;}, querySelectorAll: () => dialogs},
+    document: {dispatchEvent(event) {events.push(event.detail.source); return allowed;}, querySelectorAll: () => dialogs, querySelector: () => ({id: activePage})},
     CustomEvent: class {constructor(type, options) {this.type = type; Object.assign(this, options);}},
     requireSavedEdits: async () => {events.push('flush');}, location: {reload() {events.push('reload');}},
   };
@@ -229,7 +233,11 @@ test('app guard preserves optional drafts and other dialogs before visual submis
   assert.equal(await options.beforeCommit('visual'), true); assert.deepEqual(events, ['plugin-settings', 'flush']);
   events.length = 0; dirty = true; assert.equal(await options.beforeCommit('visual'), false); assert.deepEqual(events, []);
   assert.equal(await options.beforeCommit('optional'), true); assert.deepEqual(events, ['plugin-settings', 'flush']);
-  events.length = 0; dirty = false; dialogs.push({id: 'transaction-dialog'});
+  events.length = 0; dirty = false; activePage = 'plugin-options-web';
+  assert.equal(await options.beforeCommit('visual'), true); assert.deepEqual(events, ['plugin-settings', 'flush']);
+  events.length = 0; activePage = 'plugin-options-bank-logos';
+  assert.equal(await options.beforeCommit('visual'), false); assert.deepEqual(events, ['plugin-settings']);
+  events.length = 0; activePage = 'plugins-dialog'; dialogs.push({id: 'transaction-dialog'});
   assert.equal(await options.beforeCommit('visual'), false); assert.deepEqual(events, ['plugin-settings']);
   events.length = 0; allowed = false; assert.equal(await options.beforeChange(), false); assert.deepEqual(events, ['plugin-settings']);
   events.length = 0; options.onOptionalComplete(); assert.deepEqual(events, ['reload']);

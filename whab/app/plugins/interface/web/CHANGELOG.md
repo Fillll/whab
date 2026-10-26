@@ -1,10 +1,15 @@
 # Web interface plugin changelog
 
-## 1.29.0 — 2026-10-25
+## 1.30.0 — 2026-10-25
 
 PR: [#113](https://github.com/Fillll/whab/pull/113)
 
 - Separate installed plugins into six persistent category sections, add reviewed marketplace installation, show dependency details and move visual controls into Web settings.
+
+PR: [#112](https://github.com/Fillll/whab/pull/112)
+
+- Navigate Settings, Budgets, Plugins, plugin settings and About inside one window with one backdrop and close control. Back restores the previous section, scroll and focus; Close and Escape dismiss Settings.
+- Preserve parent selections, account-setting drafts, busy budget guards and plugin lifecycle cleanup while switching sections. Keep visual handover checks scoped to the visible section.
 
 ## 1.28.0 — 2026-10-24
 

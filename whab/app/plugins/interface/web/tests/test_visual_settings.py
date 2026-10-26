@@ -9,7 +9,7 @@ import pytest
 
 
 def dialog(text, identifier="plugin-options-web"):
-    return re.search(rf'<dialog\b[^>]*id="{identifier}".*?</dialog>', text, re.S)[0]
+    return re.search(rf'<article\b[^>]*id="{identifier}".*?</article>', text, re.S)[0]
 
 
 class Tags(HTMLParser):
@@ -58,7 +58,8 @@ def test_visual_pane_is_accessible_addressed_and_demo_cannot_mutate(client, page
     assert "innerHTML" not in module.text
     app = client.get(asset.replace("visual-settings.js", "app.js")).text
     assert "initVisualSettings" in app and "source: 'plugin-settings'" in app
-    assert "['settings-dialog', 'plugins-dialog', 'plugin-options-web']" in app
+    assert "dialog.id !== 'settings-dialog'" in app
+    assert "['plugins-dialog', 'plugin-options-web'].includes" in app
 
 
 def test_control_status_is_host_confirmed_and_demo_mutations_are_rejected(client):

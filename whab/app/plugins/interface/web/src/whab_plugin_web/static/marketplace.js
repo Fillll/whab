@@ -83,7 +83,7 @@ export function initMarketplace({api, beforeChange = async () => {}, onInstalled
     if (current === generation) render(result.plugins);
   });
   dialog.addEventListener('whab:dialog-open', load);
-  for (const opener of document.querySelectorAll('[data-dialog="plugin-marketplace-dialog"]')) opener.addEventListener('click', load);
+  dialog.addEventListener('whab:settings-enter', load);
   dialog.addEventListener('close', () => {generation++; reset();});
   cancel.addEventListener('click', () => {generation++; reset();});
   install.addEventListener('click', () => task(async () => {

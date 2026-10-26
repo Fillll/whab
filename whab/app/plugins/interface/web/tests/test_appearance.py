@@ -21,7 +21,7 @@ class Tags(HTMLParser):
 
 
 def dialog(text, identifier):
-    return re.search(rf'<dialog\b[^>]*\bid="{identifier}".*?</dialog>', text, re.S)[0]
+    return re.search(rf'<article\b[^>]*\bid="{identifier}".*?</article>', text, re.S)[0]
 
 
 def render_plugins(client, monkeypatch, *, web_active=True, web_enabled=True):
@@ -66,7 +66,7 @@ def test_appearance_is_an_accessible_two_choice_setting_only_in_web_options(clie
     # Appearance survives the separately loaded generic settings section.
     generic_settings = re.search(r"<section\b[^>]*data-plugin-settings.*?</section>", options, re.S)[0]
     assert "data-appearance-choice" not in generic_settings
-    assert "data-appearance-choice" not in dialog(text, "settings-dialog")
+    assert "data-appearance-choice" not in dialog(text, "settings-home")
     assert "data-appearance-choice" not in dialog(text, "plugins-dialog")
     assert "data-appearance-choice" not in dialog(text, "plugin-options-report")
 

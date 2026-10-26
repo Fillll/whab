@@ -1,12 +1,12 @@
-{% macro heading(title, subtitle) %}
+{% macro heading(title, subtitle, closable=true) %}
   <div class="modal-heading">
     <div>
       <h2>{{ title }}</h2>
       <p>{{ subtitle }}</p>
     </div>
-    <button class="icon-button"
+    {% if closable %}<button class="icon-button"
             data-close-dialog
-            aria-label="Close dialog">{{ icon('close', 20) }}</button>
+            aria-label="Close dialog">{{ icon('close', 20) }}</button>{% endif %}
   </div>
 {% endmacro %}
 {% macro account_classification() %}
@@ -169,17 +169,19 @@
 {% set plugin_categories = {'interface': 'Interfaces', 'ingestion': 'Ingestion', 'insight': 'Insights', 'storage': 'Storage', 'automation': 'Automation', 'extension': 'Extensions'} %}
 {% set visible_plugins = manager.plugins|rejectattr('installed', 'equalto', false)|rejectattr('category', 'equalto', 'example')|rejectattr('id', 'equalto', 'example')|list %}
 {% macro plugin_status(plugin) %}{% if plugin.required %}Required{% elif plugin.active and plugin.enabled %}Enabled{% elif plugin.active %}Will disable after restart{% elif plugin.enabled %}Will enable after restart{% else %}Disabled{% endif %}{% endmacro %}
-<dialog class="modal settings-modal" id="settings-dialog" aria-label="Settings">
-  {{ heading('Settings', 'Manage this local workspace.') }}
+<dialog class="modal settings-modal settings-window" id="settings-dialog" aria-label="Settings">
+  <button class="icon-button settings-close" type="button" data-close-dialog aria-label="Close Settings">{{ icon('close', 20) }}</button>
+<article id="settings-home" data-settings-page aria-label="Settings">
+  {{ heading('Settings', 'Manage this local workspace.', false) }}
   <nav class="settings-menu" aria-label="Settings sections">
     <button type="button" data-dialog="budgets-dialog">{{ icon('budget', 18) }}<span><strong>Budgets</strong><small>Current budget · {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }}</small></span>{{ icon('chevron-right', 16) }}</button>
     <button type="button" data-dialog="plugins-dialog">{{ icon('settings', 18) }}<span><strong>Plugins</strong><small>Installed plugins and their settings</small></span>{{ icon('chevron-right', 16) }}</button>
     <button type="button" data-dialog="about-dialog">{{ icon('help', 18) }}<span><strong>About this prototype</strong><small>WHAB · {{ version }}</small></span>{{ icon('chevron-right', 16) }}</button>
   </nav>
-</dialog>
-<dialog class="modal settings-modal" id="budgets-dialog" aria-label="Budgets" data-workspace="{{ workspace }}">
-  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
-  {{ heading('Budgets', 'Open, create or add a budget.') }}
+</article>
+<article data-settings-page hidden data-settings-parent="settings-home" id="budgets-dialog" aria-label="Budgets" data-workspace="{{ workspace }}">
+  <button class="settings-back" type="button" data-settings-back>{{ icon('chevron-left', 14) }}Settings</button>
+  {{ heading('Budgets', 'Open, create or add a budget.', false) }}
   <p class="field-error" data-budget-load-error role="alert" hidden></p>
   <section class="budget-section" aria-labelledby="open-budget-title">
     <h3 id="open-budget-title">Open budget</h3>
@@ -241,10 +243,10 @@
       <button class="button secondary" type="submit">Add saved copy</button>
     </form>
   </details>
-</dialog>
-<dialog class="modal settings-modal" id="plugins-dialog" aria-label="Plugins">
-  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Settings</button>
-  {{ heading('Plugins', 'Installed on this device. Enable plugins for this budget.') }}
+</article>
+<article data-settings-page hidden data-settings-parent="settings-home" id="plugins-dialog" aria-label="Plugins">
+  <button class="settings-back" type="button" data-settings-back>{{ icon('chevron-left', 14) }}Settings</button>
+  {{ heading('Plugins', 'Installed on this device. Enable plugins for this budget.', false) }}
   <button class="button secondary marketplace-link" type="button" data-dialog="plugin-marketplace-dialog">Plugin Marketplace {{ icon('chevron-right', 14) }}</button>
   <section class="plugin-manager" aria-labelledby="plugin-manager-title">
     <div class="plugin-list-heading">
@@ -286,10 +288,10 @@
       <div class="settings-actions"><button class="button primary" type="submit"{% if workspace=='demo' %} disabled{% endif %}>Save selection for restart</button><button class="button secondary" type="button" data-plugin-live-review{% if workspace=='demo' %} disabled{% endif %}>Review live selection</button></div>
     </form>
   </section>
-</dialog>
-<dialog class="modal settings-modal" id="plugin-marketplace-dialog" aria-label="Plugin Marketplace" data-marketplace data-workspace="{{ workspace }}">
-  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Installed plugins</button>
-  {{ heading('Plugin Marketplace', 'Browse maintained WHAB plugins for this device.') }}
+</article>
+<article data-settings-page hidden data-settings-parent="plugins-dialog" id="plugin-marketplace-dialog" aria-label="Plugin Marketplace" data-marketplace data-workspace="{{ workspace }}">
+  <button class="settings-back" type="button" data-settings-back>{{ icon('chevron-left', 14) }}Installed plugins</button>
+  {{ heading('Plugin Marketplace', 'Browse maintained WHAB plugins for this device.', false) }}
   <p class="settings-notice">Installation makes a plugin available to all budgets. Enable it separately in the budget that needs it.</p>
   <p class="field-error" role="alert" data-marketplace-error hidden></p>
   <p class="settings-notice" role="status" aria-live="polite" data-marketplace-status></p>
@@ -301,11 +303,11 @@
     <button class="button primary" type="button" data-marketplace-install>Install reviewed packages</button>
     <button class="button secondary" type="button" data-marketplace-cancel>Cancel</button>
   </section>
-</dialog>
+</article>
 {% for plugin in visible_plugins %}
-<dialog class="modal settings-modal" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} settings" data-plugin-id="{{ plugin.id }}"{% if plugin.category == 'storage' %} data-storage-plugin="{{ plugin.id }}" data-storage-label="{{ plugin.display_name }}" data-workspace="{{ workspace }}"{% endif %} data-plugin-active="{{ 'true' if plugin.active else 'false' }}" data-plugin-read-only="{{ 'true' if workspace=='demo' else 'false' }}">
-  <button class="settings-back" type="button" data-close-dialog>{{ icon('chevron-left', 14) }}Installed plugins</button>
-  {{ heading(plugin.display_name, 'Plugin settings') }}
+<article data-settings-page hidden data-settings-parent="plugins-dialog" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} settings" data-plugin-id="{{ plugin.id }}"{% if plugin.category == 'storage' %} data-storage-plugin="{{ plugin.id }}" data-storage-label="{{ plugin.display_name }}" data-workspace="{{ workspace }}"{% endif %} data-plugin-active="{{ 'true' if plugin.active else 'false' }}" data-plugin-read-only="{{ 'true' if workspace=='demo' else 'false' }}">
+  <button class="settings-back" type="button" data-settings-back>{{ icon('chevron-left', 14) }}Installed plugins</button>
+  {{ heading(plugin.display_name, 'Plugin settings', false) }}
   <dl class="plugin-details">
     <div><dt>Category</dt><dd>{{ plugin_categories.get(plugin.category|default('extension'), 'Extensions') }}</dd></div>
     <div><dt>Plugin</dt><dd>{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</dd></div>
@@ -371,10 +373,9 @@
   {% endfor %}
   <p class="settings-notice" role="status" data-plugin-settings-status></p>
   <p class="field-error" role="alert" data-plugin-settings-error hidden></p>
-</dialog>
+</article>
 {% endfor %}
-<dialog class="modal"
-        id="about-dialog">{{ heading('We Have A Budget', 'WHAB · ' ~ version) }}
+<article data-settings-page hidden data-settings-parent="settings-home" id="about-dialog" aria-label="About WHAB">{{ heading('We Have A Budget', 'WHAB · ' ~ version, false) }}
   <div class="about-copy">
     <p>A place to categorize spending, review your habits, and plan each month.</p>
     <p>This app runs on your computer. Python handles pages, budget calculations, storage, and enabled bank providers. Small browser modules handle controls and provider connection flows.</p>
@@ -382,5 +383,6 @@
     <p>Balances are imported snapshots. Category planning conservatively reserves card debt; reconcile against your accounts before relying on allocations.</p>
     <p>Demo, Sandbox, and production data are isolated. Sandbox connections contain test data.</p>
   </div>
-  <button class="button primary full-width" data-close-dialog>Back to settings</button>
+  <button class="button primary full-width" data-settings-back>Back to settings</button>
+</article>
 </dialog>

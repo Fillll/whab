@@ -6,6 +6,18 @@ Start with [README.md](README.md) for setup, supported behavior and limitations,
 
 Before coding, apply the [owner decision guide](../docs/architecture.md#choosing-the-owner-of-a-change) and state the chosen owner in the PR. WHAB combines a hexagonal financial core with a plugin architecture. Separately packaged plugins may have explicit dependencies; modularity does not require every plugin to operate alone. Keep those dependencies in packaged `plugin.json` files and use public SDK capabilities across boundaries.
 
+## Clarity and simplicity
+
+Clarity and simplicity are the primary product and development priorities. Choose the smallest understandable design that fully solves the user's problem while preserving financial correctness, security and saved-data compatibility.
+
+- Give each screen or section one clear purpose. Keep common actions easy to find, use familiar language and make the current location and next action clear.
+- Prefer fewer controls, states and navigation layers. Put related settings together; reveal advanced details only when needed. Do not hide errors, pending work or necessary review to make a screen look simpler.
+- Navigate related settings inside one window. Change its visible section in place, provide Back for the previous section, and use Close or Escape to dismiss the whole window. Do not stack settings dialogs or add a new backdrop at each level.
+- Reuse existing product patterns and keep implementation direct. Avoid duplicate sources of truth, speculative abstractions and dependencies that add more complexity than they remove.
+- Before adding UI or architecture, consider whether an existing section or a smaller change solves the same problem. Document a necessary exception in the owning contract and explain its user benefit in the PR.
+
+Agents and contributors must apply these rules during implementation and review, together with the owning area’s correctness and acceptance checks.
+
 ## Development environment
 
 WHAB supports Python 3.14 and newer; CI exercises Python 3.14 and 3.15. Run all application commands below from the application directory (`whab/app/`):

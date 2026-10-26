@@ -1,3 +1,4 @@
+import {isSettingsPageOpen} from './settings-navigation.js';
 /* Copy status belongs to the host; this view never infers a successful handover. */
 import {getContext} from './client.js';
 
@@ -419,10 +420,10 @@ export function initStoragePlugin({beforeChange, document: page = document, requ
   }
   controller = createStorageCopies({request, beforeChange, onState: render, isCurrent: current, schedule, cancel});
   refresh.addEventListener('click', controller.refresh);
-  for (const opener of page.querySelectorAll(`[data-dialog="${dialog.id}"]`)) opener.addEventListener('click', controller.start);
+  dialog.addEventListener('whab:settings-enter', controller.start);
   dialog.addEventListener('close', controller.stop);
   page.addEventListener('whab:before-navigate', event => {
-    if (dialog.open && event.detail?.source !== 'storage-copies') event.preventDefault();
+    if (isSettingsPageOpen(dialog) && event.detail?.source !== 'storage-copies') event.preventDefault();
   });
   return controller;
 }
