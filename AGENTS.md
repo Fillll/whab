@@ -7,3 +7,5 @@ Keep credentials, runtime data and generated files, including `budgets/` and `tl
 Every populated changelog entry must link the pull request(s) that introduced its changes, including core, all plugins, examples and platform launchers. Use the originating PR for historical entries, and cite individual bullets when a version combines multiple PRs. Open a draft PR to obtain its URL before finalizing a new entry; no placeholder links may remain before merge. See [the changelog policy](whab/app/CONTRIBUTING.md#changelog-pr-links).
 
 Create version tags and GitHub releases only when the user explicitly requests a release. Version bumps and merges do not require publishing a release.
+
+The [nightly stable release policy](whab/app/CONTRIBUTING.md#nightly-stable-releases) records standing maintainer authorization for the scheduled publisher after successful certification. Other release/tag creation still requires an explicit request.

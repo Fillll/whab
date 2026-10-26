@@ -24,24 +24,29 @@ Read [runtime setup and HTTPS](../docs/usage.md#runtime-setup), [budget-owned st
 
 ## Tests and checks
 
-Use the same runner locally and in CI. During iteration, run focused regression tests for the changed behavior and the fast checks:
+Use focused local feedback and the authoritative required PR gate. During iteration, run:
 
 ```sh
-.venv/bin/python scripts/check.py --quick
-.venv/bin/python -m pytest plugins/ingestion/plaid/tests
+.venv/bin/python scripts/check_pr.py local --base origin/main
 ```
 
-Replace the focused path with the owning tests from the task map. Quick mode checks Python lint, changelog provenance, local documentation links/inventory and browser JavaScript; it does not run Python regressions, coverage or installed-wheel verification. It is not the submission gate.
+This runs quick checks, always includes core financial/architecture regressions and selects owning tests from changed source paths. Add focused regressions from the task map when a change spans another contract. Local success is iteration feedback; it does not establish complete coverage or installed-wheel compatibility. `scripts/check.py --quick` remains available for Python lint, changelog provenance, documentation and JavaScript checks alone.
 
-Before submitting code, run:
+Required `CI (Python 3.14)` and `CI (Python 3.15)` checks retain their existing names and branch protection. For application, test, tooling, workflow, dependency and unknown changes, they require the **complete** source collection split across eight independent shards per Python version, with four pytest workers per shard on the public four-core Linux runners. The final gates reject failed/cancelled jobs, missing shards, different source/interpreter identities, inconsistent collections, duplicated/omitted/skipped tests and missing coverage. Coverage is combined per Python version and every plugin must retain 100% statement and branch coverage, including unimported modules. Lint/docs/JavaScript and installed-wheel verification run once, in parallel with source tests. Documentation-only changes omit application regressions; launcher checks run for native changes and application CLI/installation contracts. Unknown changes fall back to the complete source suite.
+
+The PR feedback target is **under five minutes from workflow creation to both required gates completing** on available hosted runners. Queue/cold-cache time counts in reported timings. A timeout or unfinished validation is a failure, never a shortened success. Measure actual runs and investigate overshoots; the target is not a guarantee of GitHub runner capacity. Do not rerun a successful full local suite, PR matrix and exhaustive certification for the same unchanged inputs before reporting a PR ready.
+
+Exhaustive certification runs after every merge to `main`, nightly and through manual dispatch. To run it locally when explicitly needed:
 
 ```sh
 .venv/bin/python scripts/check.py
 ```
 
-The full command runs quick checks, the complete central/plugin Python suite **once** through `check_plugin_coverage.py`, and isolated distribution verification. It requires Python 3.14+, the development dependencies and Node.js 22+. It does not install missing dependencies. Child checks run with a fresh temporary `WHAB_HOME` and Sandbox defaults. Only explicit platform, executable-path, temporary-directory and locale variables are inherited; custom settings, credential aliases and caller Python/pip/pytest/coverage configuration are excluded. The external toolkit and generated-project checks use the same boundary and set their own reviewed test/index configuration. CI uses this command on its supported Python matrix and additionally lints launcher Python and runs the separate macOS launcher job. Native launcher changes also require the [platform checks](../launchers/macos/README.md#development-and-diagnostics).
+The exhaustive command runs quick checks, the complete central/plugin Python suite **once** through `check_plugin_coverage.py`, independent toolkit wheels on genuine minimum/current hosts, generated-plugin configurations and exact-artifact replays, and isolated distribution verification. The separate certification workflow retains both supported Python versions and the reusable external-project conformance workflow. Historical compatibility or replay failures can therefore be discovered after merge; a green PR gate establishes source regressions and packaging, not exhaustive certification. Inspect certification before claiming a fully certified build and fix failures promptly.
 
-For documentation iteration, `.venv/bin/python scripts/check.py --docs` checks local paths, anchors, fences and the canonical supported-plugin inventory without network requests. Run the changelog check as well if editing changelogs. The full command remains required for contribution tooling or code changes. Documentation-only changes need the docs/changelog checks and any checks for executable examples they change.
+Both runners require Python 3.14+, development dependencies and Node.js 22+ where browser checks run. They do not install missing dependencies. Child checks run with a fresh temporary `WHAB_HOME` and Sandbox defaults. Only explicit platform, executable-path, temporary-directory and locale variables are inherited; custom settings, credential aliases and caller Python/pip/pytest/coverage configuration are excluded. The external toolkit and generated-project checks use the same boundary and set their own reviewed test/index configuration. Native launcher changes also require the [platform checks](../launchers/macos/README.md#development-and-diagnostics).
+
+For documentation iteration, `.venv/bin/python scripts/check.py --docs` checks local paths, anchors, fences and the canonical supported-plugin inventory without network requests. Run the changelog check as well if editing changelogs. Documentation-only changes need the docs/changelog checks and any checks for executable examples they change. Contribution tooling and code changes use focused local checks plus the complete required PR gate; exhaustive local certification is no longer a prerequisite for each PR.
 
 The distribution check builds the host, supported plugin set and teaching example, installs independent wheels into an isolated temporary target and checks pages, packaged assets, version metadata, runtime paths and entry points outside the checkout. It uses fictional data and no financial institution; build dependencies may require a download.
 
@@ -97,6 +102,16 @@ Version the owner of the material change in the same PR. Host/core/public-SDK ch
 
 The host package version, `python -m whab --version`, FastAPI metadata and About dialog derive from the host version source; installed plugin versions come from their own distribution metadata. Review the final diff and pass CI before requesting a squash merge. Final approval and merging belong to the human maintainer @Fillll. Agents must not approve or merge a PR unless @Fillll explicitly delegates that action for that specific PR. Create an immutable `vX.Y.Z` tag and GitHub release on the merged commit only when the user explicitly requests a release; version bumps and merges do not require publishing one. Do not reuse or move an existing release tag.
 
+### Nightly stable releases
+
+The maintainer has explicitly authorized automatic stable publication after the daily scheduled exhaustive certification. The release job runs only in the official repository on scheduled `main` runs, after both supported Python certification jobs, reusable external-project conformance and native macOS launcher checks succeed. It also verifies both required Python CI checks from GitHub Actions on that exact commit, and skips publication if `main` has advanced. Push-triggered and manually dispatched certification remain validation-only.
+
+The publisher reads the declared app version without importing application code, creates `vX.Y.Z` at the certified commit and publishes a non-draft, non-prerelease GitHub release marked Latest. Release notes include the certification run and automatically generated PR notes. Only the publisher job receives repository-content write access; test/build jobs remain read-only. This creates the source release consumed by the launcher's Stable channel; it does not upload native application installers or publish packages to an index.
+
+Each declared app version is released once. A previously published stable version is skipped, including when newer plugin-only or documentation commits retain that host version. There are no automatic version bumps, tag moves or replacement releases. A new stable bundle therefore needs a new declared app version through the normal reviewed version/changelog process. A conflicting unpublished tag, existing draft/prerelease, failed/skipped/incomplete check, or newer stable version stops publication for maintainer review. Retries may complete an interrupted same-commit tag/release creation without replacing existing release state.
+
+`scripts/publish_stable.py --sha <full-commit> --run-id <scheduled-certification-run>` performs read-only validation by default. The scheduled job supplies `--publish` and its scoped token. Outside this documented nightly policy, release creation still requires an explicit maintainer request.
+
 ### Authorization and completion stages
 
 Keep the intended outcome concrete and carry existing authorization through its stated scope. Technical repository/admin access does not itself authorize merging, deployment, production banking or releases.
@@ -106,7 +121,7 @@ Keep the intended outcome concrete and carry existing authorization through its 
 | Review, discuss or propose | Inspect and return findings or a concrete preview/proposal. Honor an explicit request to discuss before implementation |
 | Implement or fix | Make the focused change, update owning docs, validate, commit/push the feature branch and open a reviewable PR. Final merge remains with the maintainer |
 | Merge and deploy an identified PR | Treat this as explicit delegation for that PR. Complete required checks, merge through the allowed PR workflow, update the intended installation and verify the running result; do not ask for the same delegation again |
-| Publish a release | Only an explicit release request authorizes creating the version tag/GitHub release. A version bump, merge or deployment request alone does not |
+| Publish a release | An explicit release request authorizes creating the version tag/GitHub release. The documented nightly policy is standing authorization for its scheduled publisher only; a version bump, merge or deployment alone grants no other release authorization |
 
 Resolve the identified PR and target from the current task context. Ask only when a material target or required authorization is genuinely missing, after completing independent reviewable work. New unrelated PRs do not inherit a prior PR's merge authorization. Never bypass failing CI, unresolved substantive findings, protected direct-push restrictions or an explicit request to wait. Certificate trust and creation of live banking connections retain their separate explicit-action boundaries.
 
