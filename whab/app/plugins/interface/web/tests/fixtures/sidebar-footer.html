@@ -9,8 +9,8 @@
   iframe { display: block; border: 1px solid #888; margin: 16px 0; }
 </style>
 <h1>Sidebar footer regression</h1>
-<p>Fictional navigation using the shipped stylesheet. The gear must keep the sidebar's bottom inset at the start, middle and end of scrolling, with every account reachable.</p>
-<table><thead><tr><th>Viewport / theme / accounts</th><th>Gear bottom gaps</th><th>Result</th></tr></thead><tbody></tbody></table>
+<p>Fictional navigation using the shipped stylesheet. The gear must keep its bottom inset throughout scrolling, the opaque footer must cover the bottom edge, and every account must remain reachable.</p>
+<table><thead><tr><th>Viewport / theme / accounts</th><th>Gear bottom gaps</th><th>Bottom covered</th><th>Result</th></tr></thead><tbody></tbody></table>
 <script type="module">
 const stylesheet = new URL('../../src/whab_plugin_web/static/styles.css', location.href);
 const nextFrame = win => new Promise(resolve => win.requestAnimationFrame(resolve));
@@ -33,24 +33,35 @@ for (const [width, height, count] of [[1280, 800, 0], [1280, 800, 31], [980, 360
     await loaded;
     const win = frame.contentWindow;
     const sidebar = frame.contentDocument.querySelector('.sidebar');
+    const footer = frame.contentDocument.querySelector('.sidebar-bottom');
     const gear = frame.contentDocument.querySelector('.settings-trigger');
-    const inset = parseFloat(win.getComputedStyle(sidebar).paddingBottom);
+    const inset = width > 760 ? 14 : 12;
     const maximum = sidebar.scrollHeight - sidebar.clientHeight;
     const gaps = [];
+    let bottomCovered = true;
     let lastAccountVisible = !count;
-    for (const position of [0, maximum / 2, maximum]) {
+    for (const position of [0, maximum / 4, maximum / 2, maximum * 3 / 4, maximum]) {
       sidebar.scrollTop = position;
       await nextFrame(win);
-      gaps.push(Math.round((sidebar.getBoundingClientRect().bottom - gear.getBoundingClientRect().bottom) * 100) / 100);
+      const sidebarBounds = sidebar.getBoundingClientRect();
+      const footerBounds = footer.getBoundingClientRect();
+      gaps.push(Math.round((sidebarBounds.bottom - gear.getBoundingClientRect().bottom) * 100) / 100);
+      bottomCovered &&= Math.abs(footerBounds.bottom - sidebarBounds.bottom) <= 1
+        && win.getComputedStyle(footer).backgroundColor === win.getComputedStyle(sidebar).backgroundColor;
+      for (const x of [footerBounds.left + 1, (footerBounds.left + footerBounds.right) / 2, footerBounds.right - 1]) {
+        for (let offset = 1; offset < inset; offset++) {
+          bottomCovered &&= footer.contains(frame.contentDocument.elementFromPoint(x, sidebarBounds.bottom - offset));
+        }
+      }
     }
     const lastAccount = frame.contentDocument.querySelector('.sidebar-account:last-child');
     if (lastAccount) {
       const bounds = lastAccount.getBoundingClientRect();
       lastAccountVisible = bounds.top >= 0 && bounds.bottom <= frame.contentDocument.querySelector('.sidebar-bottom').getBoundingClientRect().top;
     }
-    const passed = gaps.every(gap => Math.abs(gap - inset) <= 1) && lastAccountVisible;
+    const passed = gaps.every(gap => Math.abs(gap - inset) <= 1) && bottomCovered && lastAccountVisible;
     const row = document.createElement('tr');
-    row.innerHTML = `<td>${width} × ${height} / ${theme} / ${count}</td><td>${gaps.join(', ')} px (expected ${inset})</td><td>${passed ? 'PASS' : 'FAIL'}${lastAccountVisible ? '' : ': last account covered'}</td>`;
+    row.innerHTML = `<td>${width} × ${height} / ${theme} / ${count}</td><td>${gaps.join(', ')} px (expected ${inset})</td><td>${bottomCovered ? 'Yes' : 'No'}</td><td>${passed ? 'PASS' : 'FAIL'}${lastAccountVisible ? '' : ': last account covered'}</td>`;
     document.querySelector('tbody').append(row);
   }
 }
