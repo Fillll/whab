@@ -8,19 +8,7 @@ A highly extensible budgeting app built with Python. Plan with monthly envelopes
 
 ## Quick start
 
-The [macOS launcher](whab/launchers/macos/README.md) provides a native companion for local installation, launch and updates. The product is organized as [`whab/app/`, `whab/launchers/` and `whab/docs/`](whab/README.md).
-
-Source development requires **Python 3.14 or newer**. [Existing checkouts must retain their runtime home when adopting the new layout](whab/README.md#existing-development-checkouts). From the repository root:
-
-```sh
-cd whab/app
-python3.14 -m venv .venv
-.venv/bin/python scripts/install.py --dev
-.venv/bin/python scripts/setup.py
-.venv/bin/python -m whab
-```
-
-Setup creates a local certificate authority and localhost certificate without changing your system's trust settings. [Trust the local CA explicitly](whab/docs/usage.md#local-https) before opening [127.0.0.1:5173](https://127.0.0.1:5173) to explore fictional **Demo Budget** data, or open **My Budget** and add a manual account. Browser addresses identify the budget, page, month and currency using lowercase paths; see [budget addresses](whab/docs/usage.md#budget-addresses). WHAB requires HTTPS for every request; Plaid credentials are only needed for bank connections.
+Use the [macOS launcher](whab/launchers/macos/README.md) to install, launch and update WHAB locally. Follow the [usage guide](whab/docs/usage.md) to explore **Demo Budget** or start your own budget.
 
 ## Architecture
 
@@ -44,7 +32,7 @@ Each surrounding box is a plugin family. A plugin can provide several capabiliti
 
 Plugin code is installed in WHAB. A portable `.whab` container owns its plugin manifest, settings and plugin data. A local budget carries its storage data; remote storage contributes connection information alongside the manifest and saved plugin state, with financial records staying on the server. Credentials stay with the machine by default; remote access credentials can optionally travel encrypted with a password. Bank-provider tokens stay on the machine or server. See the [architecture guide](whab/docs/architecture.md) and [budget and plugin model](whab/docs/target-architecture.md) for the implemented contracts and capability boundaries.
 
-The `whab` host/core wheel and its [supported plugins](whab/app/plugins/README.md#supported-plugins) have independent distributions, versions and changelogs. The `bundled` extra selects the supported plugin set when compatible host/plugin distributions are available in the chosen package index or local wheelhouse; the source installer above installs the checkout's local packages together without requiring those plugin releases to be published. Installation and enablement are separate: Web and SQLite are selected defaults, Plaid is optional and enabled by default, and the other supported plugins start disabled. The teaching example is separately installed and hidden from ordinary Settings. Concrete plugins live under `whab/app/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/app/plugins/README.md).
+The `whab` host/core wheel and its [supported plugins](whab/app/plugins/README.md#supported-plugins) have independent distributions, versions and changelogs. The `bundled` extra selects the supported plugin set when compatible host/plugin distributions are available in the chosen package index or local wheelhouse; the [source installer](whab/app/README.md#run-locally) installs the checkout's local packages together without requiring those plugin releases to be published. Installation and enablement are separate: Web and SQLite are selected defaults, Plaid is optional and enabled by default, and the other supported plugins start disabled. The teaching example is separately installed and hidden from ordinary Settings. Concrete plugins live under `whab/app/plugins/<category>/<id>/`. The categories are `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` and `example`; the last holds teaching plugins. See [folder ownership and naming](whab/app/plugins/README.md).
 
 ### Client/server deployment
 
