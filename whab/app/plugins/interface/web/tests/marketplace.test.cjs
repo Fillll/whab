@@ -21,7 +21,7 @@ function harness({workspace = 'personal', reply} = {}) {
   for (const name of ['list', 'error', 'status', 'review', 'packages', 'install', 'cancel']) nodes[name] = new Node();
   dialog.querySelector = selector => nodes[selector.match(/data-marketplace-(\w+)/)[1]];
   dialog.querySelectorAll = selector => [...nodes.list.all().filter(node => node.dataset.marketplaceAction), ...(selector.includes('install') ? [nodes.install] : [])];
-  const context = {document: {querySelector: () => dialog, createElement: () => new Node()}};
+  const context = {document: {querySelector: () => dialog, querySelectorAll: () => [], createElement: () => new Node()}};
   vm.runInNewContext(source.replaceAll('export ', '') + '\nthis.init = initMarketplace;', context);
   let completed = 0;
   const row = {id: 'fictional', display_name: '<fictional>', category: 'extension', version: '1.0.0', dependencies: [{id: 'provider', version: '>=1'}], compatible: true, installed_version: null};

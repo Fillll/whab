@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 — 2026-10-25
+
+PR: [#113](https://github.com/Fillll/whab/pull/113)
+
+- Ship a packaged JSON manifest declaring the primary category and named plugin dependencies.
+
 ## Unreleased
 
 ## 1.3.0 — 2026-10-23

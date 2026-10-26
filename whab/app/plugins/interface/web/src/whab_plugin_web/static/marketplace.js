@@ -75,13 +75,15 @@ export function initMarketplace({api, beforeChange = async () => {}, onInstalled
       list.append(section);
     }
   }
-  dialog.addEventListener('whab:dialog-open', () => task(async () => {
+  const load = () => task(async () => {
     reset();
     const current = ++generation;
     status.textContent = 'Loading marketplace…';
     const result = await api('/plugins/marketplace');
     if (current === generation) render(result.plugins);
-  }));
+  });
+  dialog.addEventListener('whab:dialog-open', load);
+  for (const opener of document.querySelectorAll('[data-dialog="plugin-marketplace-dialog"]')) opener.addEventListener('click', load);
   dialog.addEventListener('close', () => {generation++; reset();});
   cancel.addEventListener('click', () => {generation++; reset();});
   install.addEventListener('click', () => task(async () => {

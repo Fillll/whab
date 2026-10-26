@@ -164,7 +164,6 @@ document.addEventListener('click', event => {
     const dialog = document.getElementById(button.dataset.dialog);
     for (const select of dialog?.querySelectorAll('select[data-currency-choices-lazy]') || []) hydrateCurrencyChoices(select);
     dialog?.showModal();
-    dialog?.dispatchEvent(new Event('whab:dialog-open'));
   }
 });
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => {

@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.29.0 — 2026-10-25
+
+PR: [#113](https://github.com/Fillll/whab/pull/113)
+
+- Separate installed plugins into six persistent category sections, add reviewed marketplace installation, show dependency details and move visual controls into Web settings.
+
 ## 1.28.0 — 2026-10-24
 
 PR: [#108](https://github.com/Fillll/whab/pull/108)
