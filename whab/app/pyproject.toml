@@ -27,7 +27,7 @@ bundled = [
   "whab_plugin_plaid>=1.3.1,<2",
   "whab_plugin_server>=1.1.1,<2",
   "whab_plugin_sqlite>=1.12.1,<2",
-  "whab_plugin_web>=1.32.0,<2",
+  "whab_plugin_web>=1.32.1,<2",
   "whab_plugin_ynab>=1.4.1,<2",
 ]
 
