@@ -38,17 +38,6 @@ def row():
             "accountId": "private-account-id", "note": "private note", "balance": 1000}
 
 
-def save_profile(engine, config, rows=()):
-    iterator = engine.train(list(rows), config)
-    assert next(iterator)["progress"] == 90
-    try:
-        next(iterator)
-    except StopIteration as result:
-        profile = engine.save(result.value, "Fictional profile")
-    engine.select(profile["id"])
-    return profile
-
-
 @pytest.fixture
 def fake_attempt():
     return SimpleNamespace(status="connected", error=None, url="https://auth.openai.com/authorize", close=lambda: None)

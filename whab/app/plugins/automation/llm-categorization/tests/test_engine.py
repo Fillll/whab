@@ -8,8 +8,19 @@ from whab_plugin_llm_categorization import providers
 from whab_plugin_llm_categorization.engine import Engine, settings, text, transaction
 from whab_plugin_llm_categorization.private import Vault, document, identifier
 
-from conftest import save_profile
 from whab.plugins import StoreError
+
+
+def save_profile(engine, config, rows=()):
+    iterator = engine.train(list(rows), config)
+    assert next(iterator)["progress"] == 90
+    try:
+        next(iterator)
+    except StopIteration as result:
+        profile = engine.save(result.value, "Fictional profile")
+    engine.select(profile["id"])
+    return profile
+
 
 
 def test_profile_lifecycle_and_no_data_sent_on_save(engine, config, row, monkeypatch):

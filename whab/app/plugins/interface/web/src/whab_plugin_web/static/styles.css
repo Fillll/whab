@@ -4360,6 +4360,12 @@ strong {
 .categorization-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0}
 .categorization-form label{display:flex;flex-direction:column;gap:5px;font-size:12px}
 .categorization-form input{min-width:0}.categorization-model{padding:16px 0;border-bottom:1px solid var(--border,#ddd)}
+.llm-settings-form label:has(select),.llm-settings-form label:has(input[type="checkbox"]),.llm-settings-form>button[type="submit"]{grid-column:1/-1}
+.llm-settings-form label:has(input[type="checkbox"]){flex-direction:row;align-items:flex-start;gap:8px}
+.llm-settings-form input[type="checkbox"]{order:-1;flex:0 0 auto}
+.llm-settings-form>button{align-self:end;justify-self:start}
+.llm-provider-credentials{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:end;gap:8px}
+.llm-provider-credentials>label{flex:1 1 200px}
 .categorization-model .button{margin:8px 8px 0 0}.plugin-settings progress{width:100%;accent-color:var(--accent,#b32125)}
 @media(max-width:500px){.categorization-form{grid-template-columns:1fr}}
 

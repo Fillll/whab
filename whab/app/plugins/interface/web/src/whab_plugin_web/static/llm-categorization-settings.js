@@ -43,7 +43,7 @@ export async function initLlmSettings(dialog, content) {
     content.append(text('p', 'Suggest categories with your chosen LLM. Suggestions stay unreviewed until you accept them in Transactions.', 'settings-notice'));
     content.append(text('p', 'Requests send payee names, amounts, currencies, category names and up to 50 reviewed examples to the selected provider. Subscription sign-in still uses OpenAI’s cloud. API calls may incur charges. Account IDs, dates, notes, receipts and balances are excluded.', 'settings-notice'));
     if (saved.error) content.append(text('p', saved.error, 'field-error'));
-    const form = document.createElement('form'); form.className = 'categorization-form';
+    const form = document.createElement('form'); form.className = 'categorization-form llm-settings-form';
     const providerLabel = text('label', 'Provider and connection'); const provider = document.createElement('select');
     provider.name = 'provider';
     for (const row of connection.providers) {
@@ -51,7 +51,7 @@ export async function initLlmSettings(dialog, content) {
       provider.append(option);
     }
     provider.value = 'openai'; providerLabel.append(provider); form.append(providerLabel);
-    const credentials = document.createElement('section'); form.append(credentials);
+    const credentials = document.createElement('section'); credentials.className = 'llm-provider-credentials'; form.append(credentials);
     const model = field(form, 'Model ID', 'model', ''); model.required = true; model.maxLength = 200;
     const choices = document.createElement('datalist'); choices.id = 'llm-model-options';
     model.setAttribute('list', choices.id); form.append(choices);
