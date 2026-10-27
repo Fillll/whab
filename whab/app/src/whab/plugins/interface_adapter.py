@@ -49,7 +49,7 @@ def validate_interface_owners(plugins):
     """Reject ambiguous v1 ownership before binding any plugin configuration."""
     from .runtime import PluginError
 
-    interfaces = sorted((plugin for plugin in plugins if plugin.interface is not None), key=lambda row: row.id)
+    interfaces = sorted((plugin for plugin in plugins if plugin.interface is not None and not plugin.interface.local_settings), key=lambda row: row.id)
     declarative = [plugin for plugin in interfaces if plugin.interface.adapter is not None]
     if declarative and len(interfaces) != 1:
         raise PluginError("Select exactly one declarative API interface and remove other API interfaces before retrying.",

@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "host_version": "2.42.0",
+  "host_version": "2.43.0",
   "plugins": [
     {
       "api_version": 1,
@@ -560,6 +560,47 @@
       "capabilities": [
         {
           "composition": "additive",
+          "name": "categorization",
+          "version": 1
+        },
+        {
+          "composition": "additive",
+          "name": "interface.api",
+          "version": 1
+        }
+      ],
+      "conflicts": [],
+      "display_name": "LLM categorization",
+      "distribution": "whab_plugin_llm_categorization",
+      "documentation": "https://github.com/Fillll/whab/blob/c95f1045909cc5918eade69b180086823d3cd0bf/whab/app/plugins/automation/llm-categorization/README.md",
+      "entry_point": {
+        "group": "whab.plugins",
+        "name": "llm-categorization",
+        "value": "whab_plugin_llm_categorization.plugin:plugin"
+      },
+      "id": "llm-categorization",
+      "legacy": false,
+      "lifecycle": "restart",
+      "live_support": "restart-required",
+      "maintainer": "Fillll",
+      "repository": "https://github.com/Fillll/whab",
+      "requires": [],
+      "requires_host": "whab>=2.43,<3",
+      "requires_python": ">=3.14",
+      "security": "https://github.com/Fillll/whab/security/advisories/new",
+      "source": "whab/app/plugins/automation/llm-categorization",
+      "state_upgrades": [],
+      "state_version": 1,
+      "support": "maintained",
+      "verifications": [],
+      "version": "1.0.0"
+    },
+    {
+      "api_version": 1,
+      "authority": "local",
+      "capabilities": [
+        {
+          "composition": "additive",
           "name": "branding.merchant",
           "version": 1
         },
@@ -797,7 +838,7 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [],
-      "version": "1.30.2"
+      "version": "1.31.0"
     },
     {
       "api_version": 1,

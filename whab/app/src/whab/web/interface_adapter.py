@@ -109,7 +109,7 @@ class InterfaceGeneration:
 
 def prepare_interfaces(registry, context, previous=None):
     """Prepare private host bindings; no credentials or services reach a worker."""
-    plugins = registry.interface_plugins()
+    plugins = tuple(plugin for plugin in registry.interface_plugins() if not plugin.interface.local_settings)
     validate_interface_owners(plugins)
     for plugin in plugins:
         if plugin.interface.adapter is not None:

@@ -1,0 +1,1 @@
+# LLM categorization plugin changelog
