@@ -6,6 +6,13 @@ PR: [#117](https://github.com/Fillll/whab/pull/117)
 
 - Add LLM provider/model selection, machine-local credential entry, ChatGPT sign-in controls, prompt profiles, explicit sending consent and manual suggestions. Distinguish LLM suggestions in Transactions; automatic import requests default off.
 
+## 1.30.3 — 2026-10-26
+
+PR: [#116](https://github.com/Fillll/whab/pull/116)
+
+- Reserve the full Add category button and bottom inset when scrolling long budgets, including compact layouts and the sample-data banner.
+- Keep the Carried in label concise, with its component explanation inside Where it comes from.
+
 ## 1.30.2 — 2026-10-25
 
 PR: [#115](https://github.com/Fillll/whab/pull/115)
