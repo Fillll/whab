@@ -186,3 +186,16 @@ def test_missing_machine_credentials_and_separate_namespace(context, config):
     other = Engine(context)
     with pytest.raises(StoreError, match="Connect this provider"):
         next(other.train([], config))
+
+
+def test_imported_profiles_cannot_smuggle_extra_data_into_requests(engine, config, row, monkeypatch):
+    save_profile(engine, config, [{**row, "reviewed": True, "categoryId": "food"}])
+    raw = engine.context.read_file("profiles.json")
+    saved = json.loads(raw)
+    monkeypatch.setattr(providers, "complete", lambda *args: pytest.fail("Invalid imported profile must not send data"))
+    saved["models"][0]["examples"][0]["note"] = "private data outside consent"
+    engine.context.write_file("profiles.json", json.dumps(saved).encode())
+    with pytest.raises(StoreError, match="profiles are invalid"):
+        engine.preview([row])
+    engine.context.write_file("profiles.json", raw)
+    assert engine.index()["models"]

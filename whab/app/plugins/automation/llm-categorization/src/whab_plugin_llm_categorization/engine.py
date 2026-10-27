@@ -57,10 +57,17 @@ class Engine:
                     or len({row["id"] for row in saved["models"]}) != len(saved["models"])):
                 raise ValueError()
             for row in saved["models"]:
-                if (not identifier(row["id"]) or not text(row["name"], 100) or type(row["examples"]) is not list
+                if (set(row) != {"id", "name", "trainedAt", "parameters", "examples"}
+                        or not identifier(row["id"]) or not text(row["name"], 100) or type(row["examples"]) is not list
                         or len(row["examples"]) > 50 or not text(row["trainedAt"], 80)):
                     raise ValueError()
-                settings(row["parameters"])
+                config = settings(row["parameters"])
+                categories = {item["id"]: item["currency"] for item in config["categories"]}
+                if any(type(item) is not dict or set(item) != {"transactionId", "merchant", "amount", "currency", "categoryId"}
+                       or type(item["transactionId"]) is not str or type(item["merchant"]) is not str or len(item["merchant"]) > 200
+                       or type(item["amount"]) is not int or type(item["categoryId"]) is not str
+                       or categories.get(item["categoryId"]) != item["currency"] for item in row["examples"]):
+                    raise ValueError()
             if saved["active"] is not None and saved["active"] not in {row["id"] for row in saved["models"]}:
                 raise ValueError()
             return saved

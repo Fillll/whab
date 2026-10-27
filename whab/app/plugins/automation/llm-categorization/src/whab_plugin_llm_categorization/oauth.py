@@ -77,6 +77,10 @@ class SignIn:
         attempt = self
 
         class Callback(BaseHTTPRequestHandler):
+            def setup(self):
+                self.request.settimeout(5)
+                super().setup()
+
             def log_message(self, *args):
                 pass  # Authorization codes and query strings never enter logs.
 
@@ -137,6 +141,13 @@ class SignIn:
         if (values.get("error") or not values.get("code") or not client or client == "dynamic_agent_client"
                 or values.get("client_id", client) != client):
             raise StoreError("ChatGPT authorization was not completed.")
+        # Keep the issued registration if a one-time code exchange fails.
+        # Retrying must not register another app or discard an active token set.
+        with LOCK:
+            if self.status != "pending" or time.monotonic() >= self.deadline:
+                raise StoreError("This sign-in attempt was canceled or expired. Start again.")
+            self.saved["client_id"] = client
+            self.vault.write("chatgpt", self.saved)
         value = request("POST", AUTH + "/api/accounts/oauth/token",
                         data={"grant_type": "authorization_code", "client_id": client, "code": values["code"],
                               "code_verifier": self.verifier, "redirect_uri": self.redirect, "resource": RESOURCE})

@@ -106,6 +106,16 @@ def test_returning_client_cannot_be_replaced(attempt):
         attempt.finish({"code": "x", "client_id": "other-client"})
 
 
+def test_failed_exchange_retains_issued_registration_for_retry(attempt, monkeypatch):
+    def fail(*args, **kwargs):
+        raise StoreError("Fictional invalid grant")
+    monkeypatch.setattr(oauth, "request", fail)
+    with pytest.raises(StoreError):
+        attempt.finish({"code": "x", "client_id": "issued-client"})
+    assert attempt.vault.read("chatgpt")["client_id"] == "issued-client"
+    assert not attempt.vault.read("chatgpt").get("access_token")
+
+
 @pytest.mark.parametrize("claims", [{"nonce": "wrong"}, {"sub": ""}, {"iss": "https://attacker.example"},
                                    {"aud": "other-client"}, {"exp": 1}])
 def test_invalid_oidc_claims_are_rejected(attempt, signing_key, monkeypatch, claims):
@@ -136,6 +146,19 @@ def test_signature_tampering_is_rejected(attempt, signing_key, monkeypatch):
 def test_canceled_sign_in_cannot_restore_credentials(attempt, signing_key, monkeypatch):
     responses(monkeypatch, attempt, signing_key)
     attempt.close()
+    with pytest.raises(StoreError, match="canceled or expired"):
+        attempt.finish({"code": "x", "client_id": "issued-client"})
+    assert not attempt.vault.read("chatgpt").get("access_token")
+
+
+def test_cancellation_during_token_exchange_cannot_restore_credentials(attempt, signing_key, monkeypatch):
+    responses(monkeypatch, attempt, signing_key)
+    original = oauth.request
+    def cancel_during_request(*args, **kwargs):
+        result = original(*args, **kwargs)
+        attempt.status = "canceled"
+        return result
+    monkeypatch.setattr(oauth, "request", cancel_during_request)
     with pytest.raises(StoreError, match="canceled or expired"):
         attempt.finish({"code": "x", "client_id": "issued-client"})
     assert not attempt.vault.read("chatgpt").get("access_token")
