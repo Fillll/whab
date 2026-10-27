@@ -139,3 +139,8 @@ Plugin Marketplace opens within Settings and lists maintained catalog plugins wi
 ## LLM categorization settings
 
 The optional [LLM Automation plugin](../../automation/llm-categorization/README.md) has one settings page for subscription sign-in or API keys, provider/model selection, prompt profiles and explicit manual suggestions. Keys use the plugin's guarded local settings endpoint, never ledger commands or browser storage. Automatic import requests default off and require a saved opt-in profile. Transactions distinguish LLM suggestions with a sparkles icon and the same acceptance/dismissal controls. Configure credentials locally on the budget authority; remote clients retain public categorization commands after setup.
+
+
+LLM settings load the active profile into one editor with model and effort side by side and a visible editable prompt. Expand **Full prompt sent to the model** to inspect the composed instructions and fixed response rules. **Save and use profile** saves and activates the displayed settings; **Suggest for uncategorized** saves them before generating provisional suggestions. Secondary example/automation, provider connection, plugin information and profile management controls use disclosures. The wider responsive window keeps its heading and Close control visible while the editor scrolls, and stacks fields on compact screens.
+
+For a fictional preview, serve this plugin folder as described above and open `/tests/fixtures/llm-settings.html`. It loads the shipped editor and CSS with mocked provider/settings responses, shows desktop light and compact dark cases, and checks horizontal overflow, control bounds and sticky headings without accessing a WHAB runtime or account.

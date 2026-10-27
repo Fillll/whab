@@ -49,6 +49,7 @@ def router(context):
             categories = context.service.query("categories", body.workspace)["data"]
             return {"providers": [{"id": key, "name": name, "connected": bool(vault.read(key).get("access_token" if key == "chatgpt" else "api_key"))}
                                   for key, name in PROVIDERS.items()],
+                    "promptRules": providers.INSTRUCTIONS, "efforts": providers.EFFORTS,
                     "categories": [{"id": row["id"], "name": row["name"], "currency": row.get("currency", "USD")}
                                    for row in categories if row.get("parentId") or row.get("group")]}
         if action == "save-key":

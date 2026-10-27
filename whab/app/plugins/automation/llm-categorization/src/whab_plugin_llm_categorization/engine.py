@@ -10,7 +10,8 @@ from whab.plugins import StoreError
 from . import providers
 from .private import PROVIDERS, Vault, document, identifier
 
-DEFAULTS = {"provider": "openai", "model": "", "threshold": 0.8, "examples": 20, "automatic": False}
+DEFAULTS = {"provider": "openai", "model": "", "threshold": 0.8, "examples": 20, "automatic": False,
+            "prompt": providers.DEFAULT_PROMPT, "effort": "default"}
 
 
 def text(value, limit):
@@ -22,6 +23,9 @@ def settings(values):
     categories = config.get("categories")
     if (set(config) != {*DEFAULTS, "categories", "consent"} or config["consent"] is not True
             or type(config["provider"]) is not str or config["provider"] not in PROVIDERS or not text(config["model"], 200)
+            or type(config["effort"]) is not str or config["effort"] not in providers.EFFORTS[config["provider"]]
+            or type(config["prompt"]) is not str or not 0 < len(config["prompt"].strip()) <= 8000
+            or any(ord(c) < 32 and c not in "\r\n\t" for c in config["prompt"])
             or type(config["threshold"]) not in (int, float) or not 0.8 <= config["threshold"] <= 1
             or type(config["examples"]) is not int or not 0 <= config["examples"] <= 50
             or type(config["automatic"]) is not bool or type(categories) is not list or not 1 <= len(categories) <= 500):
@@ -62,6 +66,7 @@ class Engine:
                         or len(row["examples"]) > 50 or not text(row["trainedAt"], 80)):
                     raise ValueError()
                 config = settings(row["parameters"])
+                row["parameters"] = config
                 categories = {item["id"]: item["currency"] for item in config["categories"]}
                 if any(type(item) is not dict or set(item) != {"transactionId", "merchant", "amount", "currency", "categoryId"}
                        or type(item["transactionId"]) is not str or type(item["merchant"]) is not str or len(item["merchant"]) > 200
@@ -86,7 +91,11 @@ class Engine:
         return {"active": saved["active"], "models": [self.public(row) for row in saved["models"]]}
 
     def train(self, rows, parameters):
-        config = settings(parameters)
+        values = dict(parameters)
+        replacement = values.pop("replaceProfile", None)
+        if replacement is not None:
+            self._selected(replacement)
+        config = settings(values)
         providers.credential(self.vault, config["provider"])
         categories = {row["id"]: row["currency"] for row in config["categories"]}
         eligible = [row for row in rows if row.get("reviewed") is True and not row.get("pending")
@@ -97,14 +106,21 @@ class Engine:
                     for index, row in enumerate(eligible[:config["examples"]])]
         yield {"stage": "Prepared prompt profile; no transactions sent", "progress": 90}
         return {"id": str(uuid4()), "trainedAt": datetime.now(timezone.utc).isoformat(),
-                "parameters": config, "examples": examples}
+                "parameters": config, "examples": examples, "replaceProfile": replacement}
 
     def save(self, model, name):
         saved = self._read()
+        replacement = model.get("replaceProfile")
+        if replacement is not None:
+            saved, old = self._selected(replacement)
+            saved["models"].remove(old)
         if len(saved["models"]) >= 20 or not text(name, 100):
             raise StoreError("Choose a profile name and keep at most 20 saved profiles.")
-        row = {**model, "name": name.strip()}
+        row = {key: value for key, value in model.items() if key != "replaceProfile"}
+        row["name"] = name.strip()
         saved["models"].append(row)
+        if replacement is not None and saved["active"] == replacement:
+            saved["active"] = row["id"]
         self._write(saved)
         return self.public(row)
 
@@ -157,7 +173,7 @@ class Engine:
             by_id = {str(index): row for index, row in enumerate(chunk)}
             payload = {"categories": config["categories"], "reviewedExamples": profile["examples"],
                        "transactions": [transaction(row, key) for key, row in by_id.items()]}
-            value = providers.complete(self.vault, config["provider"], config["model"], payload)
+            value = providers.complete(self.vault, config["provider"], config["model"], payload, config["prompt"], config["effort"])
             try:
                 parsed = json.loads(value)
                 if type(parsed) is not dict or set(parsed) != {"suggestions"} or type(parsed["suggestions"]) is not list or len(parsed["suggestions"]) > len(chunk):

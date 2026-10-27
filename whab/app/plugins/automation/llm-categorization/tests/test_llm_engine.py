@@ -57,7 +57,8 @@ def test_manual_and_automatic_predictions_minimize_data_and_preserve_inputs(engi
     assert engine.predict([row]) == []
     assert engine.preview([]) == []
     sent = []
-    def respond(vault, provider, model, payload):
+    def respond(vault, provider, model, payload, prompt, effort):
+        assert prompt == providers.DEFAULT_PROMPT and effort == "default"
         sent.append(deepcopy(payload))
         return json.dumps({"suggestions": [{"transactionId": item["transactionId"], "categoryId": "food", "score": .95}
                                            for item in payload["transactions"]]})
@@ -199,3 +200,57 @@ def test_imported_profiles_cannot_smuggle_extra_data_into_requests(engine, confi
         engine.preview([row])
     engine.context.write_file("profiles.json", raw)
     assert engine.index()["models"]
+
+
+@pytest.mark.parametrize("change", [
+    {"effort": []}, {"effort": "ultra"}, {"provider": "openai", "effort": "max"},
+    {"prompt": None}, {"prompt": " "}, {"prompt": "x" * 8001}, {"prompt": "hidden\x00control"},
+])
+def test_prompt_and_effort_validation(config, change):
+    with pytest.raises(StoreError):
+        settings({**config, **change})
+
+
+def test_profile_revision_replaces_atomically_and_upgrades_legacy_defaults(engine, config):
+    first = save_profile(engine, config)
+    raw = json.loads(engine.context.read_file("profiles.json"))
+    del raw["models"][0]["parameters"]["prompt"]
+    del raw["models"][0]["parameters"]["effort"]
+    engine.context.write_file("profiles.json", json.dumps(raw).encode())
+    assert engine.index()["models"][0]["parameters"]["effort"] == "default"
+    revised = save_profile(engine, {**config, "replaceProfile": first["id"], "prompt": "Use purpose.\nAbstain if unclear.", "effort": "medium"})
+    assert revised["id"] != first["id"]
+    assert engine.index()["active"] == revised["id"]
+    assert len(engine.index()["models"]) == 1
+    assert revised["parameters"]["effort"] == "medium"
+    other = save_profile(engine, config)
+    save_profile(engine, {**config, "replaceProfile": revised["id"]})
+    assert len(engine.index()["models"]) == 2
+    with pytest.raises(StoreError, match="saved LLM profile"):
+        next(engine.train([], {**config, "replaceProfile": first["id"]}))
+    # A deleted profile cannot be resurrected by an unfinished edit session.
+    iterator = engine.train([], {**config, "replaceProfile": other["id"]})
+    next(iterator)
+    with pytest.raises(StopIteration) as result:
+        next(iterator)
+    engine.delete(other["id"])
+    before = engine.context.read_file("profiles.json")
+    with pytest.raises(StoreError):
+        engine.save(result.value.value, "Deleted revision")
+    assert engine.context.read_file("profiles.json") == before
+
+
+def test_revision_at_profile_limit_and_invalid_name_preserves_original(engine, config):
+    for _ in range(20):
+        original = save_profile(engine, config)
+    iterator = engine.train([], {**config, "replaceProfile": original["id"]})
+    next(iterator)
+    with pytest.raises(StopIteration) as result:
+        next(iterator)
+    before = engine.context.read_file("profiles.json")
+    with pytest.raises(StoreError):
+        engine.save(result.value.value, " ")
+    assert engine.context.read_file("profiles.json") == before
+    replacement = engine.save(result.value.value, "Revision at limit")
+    assert len(engine.index()["models"]) == 20
+    assert engine.index()["active"] == replacement["id"]

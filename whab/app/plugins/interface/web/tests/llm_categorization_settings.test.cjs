@@ -10,6 +10,7 @@ class Element {
   addEventListener(event, handler) { (this.listeners[event] ||= []).push(handler); }
   setAttribute(name, value) { this[name] = value; }
   querySelectorAll(selector) { return this.children.flatMap(child => [...(selector.split(',').includes(child.tag) ? [child] : []), ...child.querySelectorAll(selector)]); }
+  reportValidity() { return this.valid !== false; }
   emit(event) { for (const handler of this.listeners[event] || []) handler({preventDefault() {}}); }
 }
 const settle = async () => { for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve)); };
@@ -23,11 +24,11 @@ async function fixture({readOnly = false, fail = '', saved = false} = {}) {
     const payload = body.payload || body; requests.push({path, ...payload});
     if (payload.action === fail) throw new Error('Fictional provider failure');
     if (path.includes('plugin-settings') && payload.action === 'status') return {
-      categories, providers: [{id: 'openai', name: 'OpenAI API key', connected: false}, {id: 'chatgpt', name: 'OpenAI subscription', connected: false}]
+      categories, promptRules: 'Fixed category and output rules.', efforts: {openai: ['default','low','medium','high'], chatgpt: ['default','low','medium','high']}, providers: [{id: 'openai', name: 'OpenAI API key', connected: false}, {id: 'chatgpt', name: 'OpenAI subscription', connected: false}]
     };
-    if (payload.action === 'status') return {models: saved ? [{id: 'profile', name: 'Saved profile', parameters: {provider: 'openai', model: 'test-model', threshold: .8, automatic: false}}] : [], active: 'profile'};
+    if (payload.action === 'status') return {defaults: {provider:'openai', prompt:'Suggested prompt.', effort:'default', examples:20, threshold:.8}, models: saved ? [{id: 'profile', name: 'Saved profile', parameters: {provider: 'chatgpt', model: 'test-model', prompt:'Saved prompt.', effort:'medium', threshold: .9, examples:0, automatic: false, consent:true}}] : [], active: 'profile'};
     if (payload.action === 'train') return {session: 'session'};
-    if (payload.action === 'step') return {complete: true};
+    if (payload.action === 'step') return {complete: true, model:{id:'new-profile'}};
     if (payload.action === 'models') return {models: [{id: 'test-model', name: 'Test model'}]};
     if (payload.action === 'connect') return {url: 'https://auth.openai.com/authorize?state=fictional'};
     if (payload.action === 'auth-status') return {status: 'connected'};
@@ -41,44 +42,71 @@ async function fixture({readOnly = false, fail = '', saved = false} = {}) {
     .replace(/import .* from '.\/settings-navigation.js';/, 'const {isSettingsPageOpen} = globalThis.__llmSettings;');
   const module = await import(`data:text/javascript;base64,${Buffer.from(source + `\n// ${Math.random()}`).toString('base64')}`);
   await module.initLlmSettings(dialog, content);
-  const controls = () => content.querySelectorAll('input,select,button');
+  const controls = () => content.querySelectorAll('input,select,textarea,button');
   return {content, dialog, status, error, requests, controls, categories,
     field: name => controls().find(node => node.name === name),
     button: label => controls().find(node => node.textContent === label)};
 }
 
-test('LLM profile explicitly opts into sending, preserves automatic-off default and sends no key to ledger', async () => {
+test('new profile saves the visible prompt and effort, activates it and keeps keys outside ledger commands', async () => {
   const ui = await fixture();
   assert.equal(ui.field('automatic').checked, false);
   assert.equal(ui.field('consent').checked, false);
+  assert.equal(ui.field('prompt').value, 'Suggested prompt.');
   ui.field('api_key').value = 'fictional-secret';
   ui.button('Save API key').emit('click'); await settle();
   assert.equal(ui.field('api_key').value, '');
-  const keyRequest = ui.requests.find(row => row.action === 'save-key');
-  assert.match(keyRequest.path, /plugin-settings/);
-  assert.equal(keyRequest.api_key, 'fictional-secret');
+  assert.match(ui.requests.find(row => row.action === 'save-key').path, /plugin-settings/);
   ui.field('model').value = 'test-model'; ui.field('consent').checked = true;
+  ui.field('prompt').value = 'Custom prompt.'; ui.field('prompt').emit('input');
+  ui.field('effort').value = 'high';
+  assert.equal(ui.content.querySelectorAll('pre')[0].textContent, 'Custom prompt.\n\nFixed category and output rules.');
   ui.content.children.find(node => node.tag === 'form').emit('submit'); await settle();
   const train = ui.requests.find(row => row.action === 'train');
   assert.equal(train.parameters.automatic, false);
   assert.equal(train.parameters.consent, true);
+  assert.equal(train.parameters.prompt, 'Custom prompt.');
+  assert.equal(train.parameters.effort, 'high');
   assert.deepEqual(train.parameters.categories, ui.categories);
-  assert.equal(train.parameters.model, 'test-model');
   assert.equal(JSON.stringify(train).includes('fictional-secret'), false);
-  assert.match(ui.status.textContent, /Profile saved/);
-  assert.equal(ui.requests.some(row => row.action === 'select' || row.action === 'preview'), false);
+  assert.equal(train.parameters.replaceProfile, undefined);
+  assert.equal(ui.requests.find(row => row.action === 'select').modelId, 'new-profile');
+  assert.match(ui.status.textContent, /Profile saved and active/);
+  assert.equal(ui.requests.some(row => row.action === 'preview'), false);
 });
 
-test('provider changes clear old models, subscription uses explicit sign-in and model choices stay editable', async () => {
+test('active profile loads its actual provider, prompt, effort, examples and consent', async () => {
+  const ui = await fixture({saved:true});
+  assert.equal(ui.field('provider').value, 'chatgpt');
+  assert.equal(ui.field('model').value, 'test-model');
+  assert.equal(ui.field('prompt').value, 'Saved prompt.');
+  assert.equal(ui.field('effort').value, 'medium');
+  assert.equal(ui.field('examples').value, 0);
+  assert.equal(ui.field('threshold').value, .9);
+  assert.equal(ui.field('consent').checked, true);
+  assert.equal(ui.field('rename'), undefined);
+  ui.button('Restore suggested prompt').emit('click'); await settle();
+  assert.equal(ui.field('prompt').value, 'Suggested prompt.');
+  ui.button('Suggest for uncategorized').emit('click'); await settle();
+  const train = ui.requests.find(row => row.action === 'train');
+  assert.equal(train.parameters.replaceProfile, 'profile');
+  const actions = ui.requests.map(row => row.action);
+  assert(actions.indexOf('train') < actions.indexOf('select'));
+  assert(actions.indexOf('select') < actions.indexOf('preview'));
+  assert.match(ui.status.textContent, /2 category suggestions/);
+});
+
+test('provider change clears model and consent, sign-in controls and models remain available', async () => {
   const ui = await fixture();
   ui.button('Load available models').emit('click'); await settle();
   assert.match(ui.status.textContent, /1 models loaded/);
+  ui.field('consent').checked = true;
   const provider = ui.field('provider'); provider.value = 'chatgpt'; provider.emit('change');
   assert.equal(ui.field('model').value, '');
+  assert.equal(ui.field('consent').checked, false);
   assert.equal(ui.field('api_key'), undefined);
   ui.button('Continue with ChatGPT').emit('click'); await settle();
-  const links = ui.content.querySelectorAll('a');
-  assert(links.some(link => link.href.startsWith('https://auth.openai.com/')));
+  assert(ui.content.querySelectorAll('a').some(link => link.href.startsWith('https://auth.openai.com/')));
   ui.button('Check sign-in').emit('click'); await settle();
   assert.match(ui.status.textContent, /ChatGPT connected/);
   ui.button('Disconnect provider').emit('click'); await settle();
@@ -87,22 +115,29 @@ test('provider changes clear old models, subscription uses explicit sign-in and 
   assert.equal(ui.requests.at(-1).action, 'cancel-sign-in');
 });
 
-test('saved profiles and manual suggestions use existing categorization commands', async () => {
-  const ui = await fixture({saved: true});
-  for (const label of ['Rename', 'Use profile', 'Delete', 'Suggest for existing transactions']) {
-    ui.button(label).emit('click'); await settle();
-  }
-  for (const action of ['rename', 'select', 'delete', 'preview']) assert(ui.requests.some(row => row.action === action));
-  assert.match(ui.status.textContent, /2 category suggestions/);
+test('new profile and deletion controls are separate from the editor', async () => {
+  const ui = await fixture({saved:true});
+  ui.button('Save as a new profile').emit('click'); await settle();
+  assert.equal(ui.requests.find(row => row.action === 'train').parameters.replaceProfile, undefined);
+  ui.field('profile').value = ''; ui.field('profile').emit('change'); await settle();
+  assert.equal(ui.field('model').value, '');
+  assert.equal(ui.field('consent').checked, false);
+  const second = await fixture({saved:true});
+  second.button('Delete profile').emit('click'); await settle();
+  assert.equal(second.requests.find(row => row.action === 'delete').modelId, 'profile');
 });
 
-test('failed requests are visible, failed sessions cancel and read-only forms cannot send', async () => {
-  const failed = await fixture({fail: 'step'});
+test('validation stops sending, failures are visible, sessions cancel, and read-only disables every editor', async () => {
+  const invalid = await fixture();
+  invalid.content.children.find(node => node.tag === 'form').valid = false;
+  invalid.button('Suggest for uncategorized').emit('click'); await settle();
+  assert.equal(invalid.requests.length, 2);
+  const failed = await fixture({fail:'step'});
   failed.content.children.find(node => node.tag === 'form').emit('submit'); await settle();
   assert.equal(failed.error.textContent, 'Fictional provider failure');
   assert.equal(failed.error.hidden, false);
   assert(failed.requests.some(row => row.action === 'cancel'));
-  const locked = await fixture({readOnly: true});
+  const locked = await fixture({readOnly:true});
   assert(locked.controls().every(node => node.disabled));
   locked.button('Save API key').emit('click'); await settle();
   assert.equal(locked.requests.length, 2);

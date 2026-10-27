@@ -4380,12 +4380,6 @@ main:has(.budget-planner) > .demo-ribbon,
 .categorization-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0}
 .categorization-form label{display:flex;flex-direction:column;gap:5px;font-size:12px}
 .categorization-form input{min-width:0}.categorization-model{padding:16px 0;border-bottom:1px solid var(--border,#ddd)}
-.llm-settings-form label:has(select),.llm-settings-form label:has(input[type="checkbox"]),.llm-settings-form>button[type="submit"]{grid-column:1/-1}
-.llm-settings-form label:has(input[type="checkbox"]){flex-direction:row;align-items:flex-start;gap:8px}
-.llm-settings-form input[type="checkbox"]{order:-1;flex:0 0 auto}
-.llm-settings-form>button{align-self:end;justify-self:start}
-.llm-provider-credentials{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:end;gap:8px}
-.llm-provider-credentials>label{flex:1 1 200px}
 .categorization-model .button{margin:8px 8px 0 0}.plugin-settings progress{width:100%;accent-color:var(--accent,#b32125)}
 @media(max-width:500px){.categorization-form{grid-template-columns:1fr}}
 
@@ -4411,3 +4405,36 @@ main:has(.budget-planner) > .demo-ribbon,
 .plugin-install-review { margin-top: 20px; padding-top: 18px; border-top: 2px solid var(--line); }
 .plugin-install-review li { font-size: 12px; margin: 8px 0; overflow-wrap: anywhere; }
 @media (max-width: 520px) { .marketplace-row { align-items: flex-start; flex-direction: column; gap: 8px; } }
+
+/* LLM profiles have one editor and a stable heading within the settings window. */
+.settings-window:has(#plugin-options-llm-categorization:not([hidden])) { width: 660px; height: min(880px, calc(100dvh - 40px)); overflow: hidden; }
+#plugin-options-llm-categorization:not([hidden]) { height: 100%; overflow-y: auto; padding-right: 10px; scrollbar-gutter: stable; }
+#plugin-options-llm-categorization > .settings-back { position: sticky; top: 0; z-index: 2; background: var(--page); padding: 4px 0 10px; margin: 0; width: 100%; text-align: left; }
+#plugin-options-llm-categorization > .modal-heading { position: sticky; top: 32px; z-index: 2; background: var(--page); padding-bottom: 14px; margin-bottom: 0; }
+.settings-window:has(#plugin-options-llm-categorization:not([hidden])) > .settings-close { z-index: 3; background: var(--page); }
+.llm-plugin-information { margin: 0 0 16px; }
+.llm-plugin-information summary, .llm-disclosure summary { cursor: pointer; font-size: 12px; font-weight: 600; padding: 12px 0; }
+.llm-settings { margin-top: 0; padding-top: 0; border-top: 0; }
+.llm-intro { font-size: 12px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 18px; }
+.llm-profile-form { display: flex; flex-direction: column; gap: 16px; }
+.llm-profile-form label, .llm-provider-credentials label { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 12px; }
+.llm-profile-form input, .llm-profile-form select, .llm-profile-form textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.llm-profile-form textarea { resize: vertical; min-height: 110px; max-height: 360px; font: inherit; line-height: 1.6; padding: 12px; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
+.llm-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.llm-inline-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+.llm-inline-actions .settings-notice { flex: 1 1 200px; margin: 0; }
+.llm-disclosure { border-top: 1px solid var(--line); }
+.llm-disclosure > :last-child { margin-bottom: 12px; }
+.llm-prompt-preview { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; font: 11px/1.7 ui-monospace, monospace; padding: 12px; background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
+.llm-profile-form .llm-check { flex-direction: row; align-items: flex-start; line-height: 1.6; }
+.llm-profile-form .llm-check input { flex: 0 0 auto; order: -1; width: 16px; margin-top: 2px; }
+.llm-provider-credentials { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 12px; }
+.llm-provider-credentials > label { flex: 1 1 240px; }
+.llm-profile-actions { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+.llm-settings > .llm-disclosure { margin-top: 12px; }
+.llm-settings > .llm-disclosure > button { margin: 8px 10px 0 0; }
+@media(max-width: 540px) {
+ .settings-window:has(#plugin-options-llm-categorization:not([hidden])) { padding: 18px; }
+ .llm-grid { grid-template-columns: 1fr; gap: 12px; }
+ .llm-profile-actions > .button { flex: 1 1 180px; }
+}
