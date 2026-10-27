@@ -39,7 +39,7 @@ export async function initLlmSettings(dialog, content) {
     const node = document.createElement('details'); node.className = 'llm-disclosure';
     node.append(text('summary', title)); parent.append(node); return node;
   }
-  dialog.addEventListener('close', () => { void local('cancel-sign-in').catch(() => {}); });
+  dialog.addEventListener('close', () => { void local('cancel-sign-in').catch(() => {}); }, {once: true});
   async function render(selectedId) {
     const [connection, saved] = await Promise.all([local('status'), call('status')]);
     if (!isSettingsPageOpen(dialog)) return;
