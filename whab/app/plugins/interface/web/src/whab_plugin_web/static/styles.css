@@ -3341,6 +3341,29 @@ strong {
 .page-content:has(.budget-planner) {
   padding: 0 14px 20px;
 }
+/* Reserve the footer's actual height instead of estimating the table viewport. */
+.app-shell > main:has(.budget-planner) {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.page-content:has(.budget-planner),
+.budget-planner,
+.budget-workspace,
+.budget-table-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+main:has(.budget-planner) > .topbar,
+main:has(.budget-planner) > .demo-ribbon,
+.budget-toolbar,
+.budget-editing-key,
+.budget-flow-update,
+.budget-table-footer {
+  flex-shrink: 0;
+}
 .button.primary {
   color: var(--action-ink);
 }
@@ -3418,7 +3441,7 @@ strong {
 }
 .budget-matrix-scroll {
   overflow: auto;
-  max-height: calc(100dvh - 185px);
+  min-height: 0;
   isolation: isolate;
   scrollbar-color: var(--line) var(--page);
   scrollbar-width: thin;
@@ -4200,9 +4223,6 @@ strong {
   }
   .budget-matrix {
     --category-width: 186px;
-  }
-  .budget-matrix-scroll {
-    max-height: calc(100dvh - 190px);
   }
   .budget-table-footer {
     flex-wrap: wrap;

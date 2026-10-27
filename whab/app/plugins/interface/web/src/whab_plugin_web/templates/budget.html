@@ -82,7 +82,7 @@
               {% endfor %}
             </tr>
             <tr class="budget-overview-row budget-carried-in-row" data-budget-key="carried-in">
-              <th scope="row">Carried in<small class="budget-row-note">Previously unassigned + set aside + overall carryover</small></th>
+              <th scope="row">Carried in</th>
               {% for period in periods %}
                 <td colspan="{{ period.column_count }}" class="month-start{% if period.carried_in is not none and period.carried_in<0 %} negative{% endif %}" data-budget-key="{{ period.month }}">
                   {{ money_number(period.carried_in) if period.carried_in is not none else '—' }}

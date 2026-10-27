@@ -148,7 +148,8 @@ def test_combined_row_formats_core_currency_and_has_an_explanatory_read_only_bre
     attributes, markup = re.findall(r'<td([^>]*)>(.*?)</td>', row, re.S)[0]
     assert total(markup) == money_number(amount, currency)
     assert ("negative" in attributes) is (amount < 0)
-    assert "Previously unassigned + set aside + overall carryover" in row
+    assert '<th scope="row">Carried in</th>' in row
+    assert 'class="budget-row-note"' not in row
     assert "Where it comes from" in markup
     assert "Previously unassigned money" in markup and "Set aside for this month" in markup
     assert "Overall category balance" not in markup
