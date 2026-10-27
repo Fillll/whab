@@ -446,3 +446,52 @@ def test_new_import_and_blank_budget_cannot_use_source_models_or_training_histor
         assert source['eligible'] == 60 and source['active'] == model['id']
         assert source['models'][0]['id'] == model['id']
         assert scoped('home', 'cancel', session=run['session']).status_code == 200
+
+
+@pytest.mark.parametrize('outcome', ['replace', 'abstain', 'fail'])
+def test_manual_preview_refreshes_pending_only_after_success(client, store, history, monkeypatch, outcome):
+    account, one, two, _, pending = history
+    dismissed = store.add_transaction('personal', {'accountId': account, 'merchant': 'Market', 'amount': 2000,
+                                                  'date': '2026-10-02', 'categoryId': None})
+    accepted = store.add_transaction('personal', {'accountId': account, 'merchant': 'Market', 'amount': 2000,
+                                                 'date': '2026-10-03', 'categoryId': None})
+    train(client)
+    action(client, 'suggest')
+    service = client.app.state.ledger_service.categorization
+    old = service.suggestions('personal')
+    action(client, 'dismiss', transactionId=dismissed, suggestionId=old[dismissed]['id'])
+    assert client.patch(f'/api/transactions/{accepted}', json={'workspace': 'personal', 'reviewed': True,
+                                                            'suggestionId': old[accepted]['id']}).status_code == 200
+    active = train(client)
+    state_before = deepcopy(service.state(PLUGIN, 'personal'))
+    ledger_before = deepcopy(store.export_budget('personal'))
+    seen = []
+    engine = client.app.state.budget_runtime._active.services['categorization'].engines[PLUGIN]
+    monkeypatch.setattr(engine, 'predict', lambda rows: pytest.fail('Imports must retain unchanged suggestions'))
+    service.after_import()
+    assert service.state(PLUGIN, 'personal') == state_before
+    def preview(rows):
+        seen.extend(row['id'] for row in rows)
+        if outcome == 'fail':
+            raise StoreError('Fictional provider failure')
+        return [] if outcome == 'abstain' else [{'transactionId': pending, 'categoryId': two,
+                                                'modelId': active['id'], 'score': .95}]
+    monkeypatch.setattr(engine, 'preview', preview)
+    result = client.post('/api/categorization', json={'workspace': 'personal',
+                         'payload': {'pluginId': PLUGIN, 'action': 'preview'}})
+    assert seen == [pending]
+    state_after = service.state(PLUGIN, 'personal')
+    assert state_after[dismissed] == state_before[dismissed]
+    assert state_after[accepted] == state_before[accepted]
+    assert store.export_budget('personal') == ledger_before
+    if outcome == 'fail':
+        assert result.status_code == 400
+        assert state_after == state_before
+    elif outcome == 'abstain':
+        assert result.json()['suggested'] == 0
+        assert pending not in state_after
+    else:
+        assert result.json()['suggested'] == 1
+        fresh = service.suggestions('personal')[pending]
+        assert fresh['id'] != old[pending]['id']
+        assert fresh['modelId'] == active['id'] and fresh['categoryId'] == two

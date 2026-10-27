@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.43.1 — 2026-10-26
+
+PR: [#120](https://github.com/Fillll/whab/pull/120)
+
+- Regenerate pending category suggestions during explicit previews so an edited prompt or newly selected model is applied to unchanged uncategorized transactions. Publish replacements only after success, remove old pending guesses on abstention, and preserve dismissals, accepted provenance and import caching.
+
+
 ## 2.43.0 — 2026-10-26
 
 PR: [#117](https://github.com/Fillll/whab/pull/117)

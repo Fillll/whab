@@ -311,7 +311,15 @@ class CategorizationService:
                 if not callable(predict):
                     raise StoreError("This categorization plugin does not support low-score previews. Update it first.")
                 state = self.state(identifier, workspace)
-                rows = [row for row in self.rows(workspace, False) if row["id"] not in state or state[row["id"]]["fingerprint"] != fingerprint(row)]
+                eligible = self.rows(workspace, False)
+                if preview:
+                    # A manual preview must evaluate the displayed model/prompt again.
+                    # Publish replacements only after the entire request succeeds;
+                    # unchanged dismissals and accepted provenance stay authoritative.
+                    current_ids = {row["id"] for row in eligible}
+                    state = {key: value for key, value in state.items()
+                             if key not in current_ids or value.get("dismissed") or value.get("accepted")}
+                rows = [row for row in eligible if row["id"] not in state or state[row["id"]]["fingerprint"] != fingerprint(row)]
                 categories = {row["id"]: row for row in self.ledger.categories(workspace)}
                 for batch in range(0, len(rows), 100):
                     chunk = rows[batch:batch + 100]
