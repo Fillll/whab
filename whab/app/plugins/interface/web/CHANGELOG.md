@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.32.1 — 2026-10-26
+
+PR: [#121](https://github.com/Fillll/whab/pull/121)
+
+- Remove the extra outer focus rectangle from the LLM model field, using its existing border to indicate focus.
+
+
 ## 1.32.0 — 2026-10-26
 
 PR: [#119](https://github.com/Fillll/whab/pull/119)
