@@ -14,7 +14,7 @@ class Element {
   emit(event) { for (const handler of this.listeners[event] || []) handler({preventDefault() {}}); }
 }
 const settle = async () => { for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve)); };
-async function fixture({readOnly = false, fail = '', saved = false} = {}) {
+async function fixture({readOnly = false, fail = '', saved = false, legacy = false} = {}) {
   const content = new Element('section'), status = new Element('p'), error = new Element('p'), dialog = new Element('dialog');
   dialog.dataset.pluginReadOnly = String(readOnly); dialog.open = true;
   dialog.querySelector = selector => selector.includes('error') ? error : status;
@@ -24,7 +24,7 @@ async function fixture({readOnly = false, fail = '', saved = false} = {}) {
     const payload = body.payload || body; requests.push({path, ...payload});
     if (payload.action === fail) throw new Error('Fictional provider failure');
     if (path.includes('plugin-settings') && payload.action === 'status') return {
-      categories, promptRules: 'Fixed category and output rules.', efforts: {openai: ['default','low','medium','high'], chatgpt: ['default','low','medium','high']}, providers: [{id: 'openai', name: 'OpenAI API key', connected: false}, {id: 'chatgpt', name: 'OpenAI subscription', connected: false}]
+      categories, promptRules: 'Fixed category and output rules.', efforts: legacy ? undefined : {openai: ['default','low','medium','high'], chatgpt: ['default','low','medium','high']}, providers: [{id: 'openai', name: 'OpenAI API key', connected: false}, {id: 'chatgpt', name: 'OpenAI subscription', connected: false}]
     };
     if (payload.action === 'status') return {defaults: {provider:'openai', prompt:'Suggested prompt.', effort:'default', examples:20, threshold:.8}, models: saved ? [{id: 'profile', name: 'Saved profile', parameters: {provider: 'chatgpt', model: 'test-model', prompt:'Saved prompt.', effort:'medium', threshold: .9, examples:0, automatic: false, consent:true}}] : [], active: 'profile'};
     if (payload.action === 'train') return {session: 'session'};
@@ -141,4 +141,11 @@ test('validation stops sending, failures are visible, sessions cancel, and read-
   assert(locked.controls().every(node => node.disabled));
   locked.button('Save API key').emit('click'); await settle();
   assert.equal(locked.requests.length, 2);
+});
+
+test('independent Web upgrade explains when the installed LLM plugin needs updating', async () => {
+  const ui = await fixture({legacy:true});
+  assert.match(ui.content.children[0].textContent, /Update the LLM categorization plugin to 1.1.0/);
+  assert.equal(ui.controls().length, 0);
+  assert.equal(ui.requests.length, 2);
 });

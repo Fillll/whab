@@ -43,6 +43,10 @@ export async function initLlmSettings(dialog, content) {
   async function render(selectedId) {
     const [connection, saved] = await Promise.all([local('status'), call('status')]);
     if (!isSettingsPageOpen(dialog)) return;
+    if (!connection.efforts || !connection.promptRules || !saved.defaults?.prompt) {
+      content.replaceChildren(text('p', 'Update the LLM categorization plugin to 1.1.0 or newer to configure prompts and effort.', 'settings-notice'));
+      return;
+    }
     const current = saved.models.find(row => row.id === (selectedId ?? saved.active));
     const config = {...saved.defaults, ...current?.parameters};
     content.replaceChildren(); content.className = 'plugin-settings llm-settings';
