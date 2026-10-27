@@ -4419,6 +4419,7 @@ main:has(.budget-planner) > .demo-ribbon,
 .llm-profile-form { display: flex; flex-direction: column; gap: 16px; }
 .llm-profile-form label, .llm-provider-credentials label { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 12px; }
 .llm-profile-form input, .llm-profile-form select, .llm-profile-form textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.llm-profile-form input[name="model"]:focus-visible { outline: none; border-color: var(--focus); }
 .llm-profile-form textarea { resize: vertical; min-height: 110px; max-height: 360px; font: inherit; line-height: 1.6; padding: 12px; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
 .llm-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .llm-inline-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
