@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.31.0 — 2026-10-26
+
+PR: [#117](https://github.com/Fillll/whab/pull/117)
+
+- Add LLM provider/model selection, machine-local credential entry, ChatGPT sign-in controls, prompt profiles, explicit sending consent and manual suggestions. Distinguish LLM suggestions in Transactions; automatic import requests default off.
+
 ## 1.30.3 — 2026-10-26
 
 PR: [#116](https://github.com/Fillll/whab/pull/116)

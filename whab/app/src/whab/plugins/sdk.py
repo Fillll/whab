@@ -431,12 +431,20 @@ class InterfaceContext:
 
 @dataclass(frozen=True, slots=True)
 class Interface:
-    """Trusted transport factory. The host owns shared access guards and lifecycle."""
+    """Trusted transport factory. The host owns shared access guards and lifecycle.
+
+    local_settings factories own only /api/plugin-settings/{plugin-id} routes and
+    coexist with the selected remote ledger interface. Ordinary TLS/local guards
+    still apply; these routes do not advertise or implement the remote protocol.
+    """
 
     factory: Callable[[InterfaceContext], object] | None = None
     adapter: RemoteLedgerInterface | None = None
+    local_settings: bool = False
 
     def __post_init__(self):
+        if type(self.local_settings) is not bool or self.local_settings and self.factory is None:
+            raise ValueError("Local settings interfaces require an explicit factory.")
         if self.factory is None and self.adapter is None:
             raise ValueError("Interface factory must be callable or use a supported host adapter.")
         if self.factory is not None and self.adapter is not None:

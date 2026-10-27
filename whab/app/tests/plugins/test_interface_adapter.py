@@ -11,6 +11,24 @@ from whab.plugins.interface_adapter import interface_record, read_interface_reco
 from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
 
 
+def test_local_settings_are_distinct_from_the_remote_ledger_owner():
+    from fastapi import APIRouter
+
+    from whab.plugins import Plugin, PluginRegistry
+    from whab.plugins.interface_adapter import validate_interface_owners
+    from whab.web.interface_adapter import prepare_interfaces
+
+    local = Plugin("fictional-settings", "Fictional settings", interface=Interface(lambda _: APIRouter(), local_settings=True))
+    remote = Plugin("fictional-server", "Fictional server", interface=Interface(adapter=RemoteLedgerInterface()))
+    validate_interface_owners((local, remote))
+    generation = prepare_interfaces(PluginRegistry((local,)), lambda _: None)
+    assert not generation.enabled() and not generation.legacy_routes()
+    for values in ({"local_settings": "true", "factory": lambda _: None},
+                   {"local_settings": True, "adapter": RemoteLedgerInterface()}):
+        with pytest.raises(ValueError, match="Local settings"):
+            Interface(**values)
+
+
 @pytest.mark.parametrize("changes", [
     {"protocol_version": True}, {"protocol_version": 2}, {"token_setting": ""},
     {"token_setting": "SERVER_TOKEN\n"}, {"token_setting": "private.token"},

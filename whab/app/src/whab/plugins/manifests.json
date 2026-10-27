@@ -75,6 +75,12 @@
     },
     {
       "schema_version": 1,
+      "id": "llm-categorization",
+      "category": "automation",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
       "id": "plaid",
       "category": "ingestion",
       "dependencies": []

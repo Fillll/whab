@@ -4,6 +4,10 @@ import {api, apiUrl, getContext} from './client.js';
 
 export async function initCategorizationSettings(dialog, content) {
   const pluginId = dialog.dataset.pluginId;
+  if (pluginId === 'llm-categorization') {
+    const {initLlmSettings} = await import('./llm-categorization-settings.js');
+    return initLlmSettings(dialog, content);
+  }
   const workspace = getContext().workspace;
   const status = dialog.querySelector('[data-plugin-settings-status]');
   const error = dialog.querySelector('[data-plugin-settings-error]');

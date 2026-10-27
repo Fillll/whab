@@ -708,11 +708,17 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             if plugin.interface.factory is None:
                 continue
             try:
-                app.include_router(plugin.interface.factory(InterfaceContext(
+                plugin_router = plugin.interface.factory(InterfaceContext(
                     service=service, config=plugin_config(settings, budget_session, plugin.id),
                     environment=settings.plaid_env, budget_id=service.budget_id,
-                    budget=budget_session.context(plugin.id) if budget_session else None,
-                )))
+                    budget=budget_session.context(plugin.id) if budget_session else (
+                        context_factory(plugin.id) if not remote_authority and plugin.categorization else None),
+                ))
+                if plugin.interface.local_settings:
+                    prefix = f"/api/plugin-settings/{plugin.id}"
+                    if any(route.path != prefix and not route.path.startswith(prefix + "/") for route in plugin_router.routes):
+                        raise ValueError("Local settings routes must use their plugin's path namespace.")
+                app.include_router(plugin_router)
             except Exception:
                 raise PluginError("Interface plugin could not start. Check its configuration.", code="interface_startup_failed", plugin_id=plugin.id) from None
         if not _child:

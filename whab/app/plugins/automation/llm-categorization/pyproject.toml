@@ -1,0 +1,34 @@
+[project]
+name = "whab_plugin_llm_categorization"
+version = "1.0.0"
+description = "Optional LLM category suggestions for WHAB"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2.43,<3", "httpx==0.28.1", "PyJWT[crypto]==2.15.1"]
+
+[project.entry-points."whab.plugins"]
+llm-categorization = "whab_plugin_llm_categorization.plugin:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+whab_plugin_llm_categorization = ["plugin.json"]
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{ name = "categorization", version = 1, composition = "additive" }, { name = "interface.api", version = 1, composition = "additive" }]
+requires = []
+conflicts = []
+lifecycle = "restart"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "maintained"

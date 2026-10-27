@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.43.0 — 2026-10-26
+
+PR: [#117](https://github.com/Fillll/whab/pull/117)
+
+- Add a bundled, disabled-by-default LLM categorization Automation plugin and a public local-settings interface contract that coexists with the remote API owner. Keep default local budget namespaces available to categorization settings transports.
+
 WHAB uses Semantic Versioning. Released tags are immutable.
 
 ## 2.42.0 — 2026-10-25

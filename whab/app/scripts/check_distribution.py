@@ -304,7 +304,7 @@ def main():
                 "module": entrypoint.split(":", 1)[0].split(".", 1)[0],
             }
         teaching = {"example", "example-api", "example-ui", "example-bank", "example-remote-client", "example-storage", "example-branding", "example-file-import", "example-categorization"}
-        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", *teaching}
+        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", *teaching}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {
             f'{record["distribution"]}>={record["version"]},<2'
