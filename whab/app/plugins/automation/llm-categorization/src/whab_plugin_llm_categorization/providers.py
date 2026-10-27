@@ -13,6 +13,13 @@ Use only the supplied category IDs and match each transaction's currency. Positi
 negative amounts are inflows. Abstain when uncertain. Return only a JSON object with a "suggestions" array.
 Each item must contain "transactionId", "categoryId", and "score" (a number from 0 to 1).
 Do not return explanations, tools, new categories, or any other fields.'''
+DEFAULT_PROMPT = "Categorize each transaction by its most likely purpose. Use reviewed examples as guidance. Prefer the closest matching budget category and abstain when the payee or purpose is ambiguous."
+EFFORTS = {
+    "chatgpt": ["default", "low", "medium", "high", "xhigh"],
+    "openai": ["default", "low", "medium", "high", "xhigh"],
+    "anthropic": ["default", "low", "medium", "high", "xhigh", "max"],
+    "openrouter": ["default", "low", "medium", "high", "xhigh", "max"],
+}
 
 
 def request(method, url, *, headers=None, data=None, payload=None, stream=False):
@@ -22,7 +29,7 @@ def request(method, url, *, headers=None, data=None, payload=None, stream=False)
                 if not 200 <= response.status_code < 300:
                     messages = {401: "Sign in again or replace the API key.", 403: "This account cannot access the selected model.",
                                 429: "Provider usage limit reached. Check your plan or API billing before retrying."}
-                    raise StoreError(messages.get(response.status_code, "The LLM provider rejected the request. Check the provider and model settings."))
+                    raise StoreError(messages.get(response.status_code, "The LLM provider rejected the request. Check the model or choose Provider default effort."))
                 raw = bytearray()
                 for chunk in response.iter_bytes():
                     raw.extend(chunk)
@@ -86,14 +93,16 @@ def models(vault, provider):
         raise StoreError("The provider returned an invalid model catalog. Enter a model ID manually.") from None
 
 
-def complete(vault, provider, model, data):
+def complete(vault, provider, model, data, guidance=DEFAULT_PROMPT, effort="default"):
     prompt = json.dumps(data, ensure_ascii=False, allow_nan=False)
+    instructions = guidance + "\n\n" + INSTRUCTIONS
+    options = {} if effort == "default" else {"output_config" if provider == "anthropic" else "reasoning": {"effort": effort}}
     auth = headers(vault, provider)
     base = ORIGINS[provider]
     try:
         if provider in {"openai", "chatgpt"}:
             result = request("POST", base + "/responses", headers=auth, stream=provider == "chatgpt",
-                             payload={"model": model, "instructions": INSTRUCTIONS,
+                             payload={"model": model, "instructions": instructions, **options,
                                       "input": [{"role": "user", "content": prompt}], "store": False,
                                       "stream": provider == "chatgpt"})
             if result.get("status") != "completed":
@@ -103,14 +112,14 @@ def complete(vault, provider, model, data):
             return text or result.get("_stream_text", "")
         if provider == "anthropic":
             result = request("POST", base + "/messages", headers=auth,
-                             payload={"model": model, "max_tokens": 4096, "system": INSTRUCTIONS,
+                             payload={"model": model, "max_tokens": 4096, "system": instructions, **options,
                                       "messages": [{"role": "user", "content": prompt}]})
             if result.get("stop_reason") != "end_turn":
                 raise StoreError("The model stopped before completing its suggestions. Choose another model or retry.")
             return "".join(part["text"] for part in result["content"] if part["type"] == "text")
         result = request("POST", base + "/chat/completions", headers=auth,
-                         payload={"model": model, "max_tokens": 4096,
-                                  "messages": [{"role": "system", "content": INSTRUCTIONS}, {"role": "user", "content": prompt}]})
+                         payload={"model": model, "max_tokens": 4096, "provider": {"require_parameters": True}, **options,
+                                  "messages": [{"role": "system", "content": instructions}, {"role": "user", "content": prompt}]})
         if result["choices"][0].get("finish_reason") != "stop":
             raise StoreError("The model stopped before completing its suggestions. Choose another model or retry.")
         return result["choices"][0]["message"]["content"]

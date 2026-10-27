@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_llm_categorization"
-version = "1.0.1"
+version = "1.1.0"
 description = "Optional LLM category suggestions for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"

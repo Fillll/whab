@@ -172,3 +172,30 @@ def test_malformed_stream_text_is_rejected_without_private_error_details(wire, e
     wire(sse(event, {"type": "response.completed", "response": {"status": "completed", "output": []}}))
     with pytest.raises(StoreError, match="valid response"):
         providers.request("POST", "https://api.openai.com/v1/responses", stream=True)
+
+
+@pytest.mark.parametrize("provider", ["openai", "chatgpt", "anthropic", "openrouter"])
+@pytest.mark.parametrize("effort", ["default", "medium"])
+def test_visible_prompt_and_effort_are_sent_on_the_provider_wire(engine, wire, monkeypatch, provider, effort):
+    engine.vault.write(provider, {"api_key": "fictional-key"})
+    monkeypatch.setattr("whab_plugin_llm_categorization.oauth.access_token", lambda _: "fictional-oauth")
+    response = {"status": "completed", "output": []}
+    if provider == "chatgpt":
+        response = sse({"type": "response.completed", "response": response})
+    elif provider == "anthropic":
+        response = {"stop_reason": "end_turn", "content": []}
+    elif provider == "openrouter":
+        response = {"choices": [{"finish_reason": "stop", "message": {"content": ""}}]}
+    sent = wire(response)
+    guidance = "Choose the closest category.\nAbstain when uncertain."
+    providers.complete(engine.vault, provider, "test-model", {"transactions": []}, guidance, effort)
+    payload = json.loads(sent[0].content)
+    expected = guidance + "\n\n" + providers.INSTRUCTIONS
+    assert expected == (payload["instructions"] if provider in {"chatgpt", "openai"} else payload["system"] if provider == "anthropic" else payload["messages"][0]["content"])
+    if provider == "openrouter":
+        assert payload["provider"]["require_parameters"] is True
+    key = "output_config" if provider == "anthropic" else "reasoning"
+    if effort == "default":
+        assert key not in payload
+    else:
+        assert payload[key] == {"effort": effort}

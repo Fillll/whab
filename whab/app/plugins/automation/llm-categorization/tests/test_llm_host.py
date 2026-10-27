@@ -100,7 +100,19 @@ def test_actual_profile_suggestions_review_and_reopen(client, store, monkeypatch
     result = category(client, "step", session=token).json()
     profile = result["model"]["id"]
     assert category(client, "select", modelId=profile).status_code == 200
-    monkeypatch.setattr(providers, "complete", lambda *args: json.dumps({"suggestions": [{"transactionId": "0", "categoryId": one, "score": .95}]}))
+    revision = category(client, "train", name="Edited profile", parameters={**config, "replaceProfile": profile,
+                         "prompt": "Use the purchase purpose.", "effort": "medium"}).json()
+    category(client, "step", session=revision["session"])
+    revised = category(client, "step", session=revision["session"]).json()["model"]
+    assert revised["id"] != profile
+    profile = revised["id"]
+    state = category(client, "status").json()
+    assert state["active"] == profile and len(state["models"]) == 1
+    assert revised["parameters"]["effort"] == "medium"
+    def respond(vault, provider, model, data, prompt, effort):
+        assert prompt == "Use the purchase purpose." and effort == "medium"
+        return json.dumps({"suggestions": [{"transactionId": "0", "categoryId": one, "score": .95}]})
+    monkeypatch.setattr(providers, "complete", respond)
     assert category(client, "suggest").json()["suggested"] == 0  # Automatic sending stays off.
     assert category(client, "preview").json()["suggested"] == 1
     suggestion = client.get("/api/categorization/suggestions?workspace=personal").json()[tx]
@@ -116,7 +128,7 @@ def test_actual_profile_suggestions_review_and_reopen(client, store, monkeypatch
     from whab_plugin_llm_categorization.engine import Engine
     reopened = Engine(namespace)
     assert reopened.index()["active"] == profile
-    assert reopened.index()["models"][0]["name"] == "Zero-shot profile"
+    assert reopened.index()["models"][0]["name"] == "Edited profile"
     assert "fictional-key" not in json.dumps(reopened.index())
 
 

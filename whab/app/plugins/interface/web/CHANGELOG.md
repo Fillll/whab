@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.32.0 — 2026-10-26
+
+PR: [#119](https://github.com/Fillll/whab/pull/119)
+
+- Replace competing new/saved LLM forms with one active-profile editor, visible prompt and effort controls, and save-and-use actions. Generate suggestions using the displayed settings.
+- Widen the responsive LLM settings window, retain its heading and Close control during scrolling, and move connection, profile management and plugin details into disclosures. Add fictional desktop/compact layout coverage.
+
 ## 1.31.0 — 2026-10-26
 
 PR: [#117](https://github.com/Fillll/whab/pull/117)

@@ -308,6 +308,7 @@
 <article data-settings-page hidden data-settings-parent="plugins-dialog" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} settings" data-plugin-id="{{ plugin.id }}"{% if plugin.category == 'storage' %} data-storage-plugin="{{ plugin.id }}" data-storage-label="{{ plugin.display_name }}" data-workspace="{{ workspace }}"{% endif %} data-plugin-active="{{ 'true' if plugin.active else 'false' }}" data-plugin-read-only="{{ 'true' if workspace=='demo' else 'false' }}">
   <button class="settings-back" type="button" data-settings-back>{{ icon('chevron-left', 14) }}Installed plugins</button>
   {{ heading(plugin.display_name, 'Plugin settings', false) }}
+  {% if plugin.id == 'llm-categorization' %}<details class="llm-plugin-information"><summary>Plugin information</summary>{% endif %}
   <dl class="plugin-details">
     <div><dt>Category</dt><dd>{{ plugin_categories.get(plugin.category|default('extension'), 'Extensions') }}</dd></div>
     <div><dt>Plugin</dt><dd>{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</dd></div>
@@ -322,6 +323,7 @@
     {% set dependents = namespace(names=[]) %}{% for other in visible_plugins %}{% for dependency in other.dependencies %}{% if dependency.id == plugin.id %}{% set dependents.names = dependents.names + [other.display_name] %}{% endif %}{% endfor %}{% endfor %}
     {% if dependents.names %}<p class="settings-notice">Required by: {{ dependents.names|join(', ') }}. Disable dependent plugins first.</p>{% endif %}
   </section>
+  {% if plugin.id == 'llm-categorization' %}</details>{% endif %}
   {% if plugin.id == ui_plugin_id|default('web', true) %}
   <section class="plugin-settings" aria-labelledby="visual-settings-title" data-visual-settings data-workspace="{{ workspace }}">
     <h3 id="visual-settings-title">Visual interface</h3>
