@@ -192,6 +192,8 @@ def test_visible_prompt_and_effort_are_sent_on_the_provider_wire(engine, wire, m
     payload = json.loads(sent[0].content)
     expected = guidance + "\n\n" + providers.INSTRUCTIONS
     assert expected == (payload["instructions"] if provider in {"chatgpt", "openai"} else payload["system"] if provider == "anthropic" else payload["messages"][0]["content"])
+    if provider == "openrouter":
+        assert payload["provider"]["require_parameters"] is True
     key = "output_config" if provider == "anthropic" else "reasoning"
     if effort == "default":
         assert key not in payload

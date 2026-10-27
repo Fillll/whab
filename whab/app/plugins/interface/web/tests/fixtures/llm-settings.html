@@ -5,6 +5,7 @@
 <script id="whab-context" type="application/json">{"workspace":"personal","apiPrefix":"/fixture-api"}</script><div id="toast" hidden><span></span></div>
 <script type="module">
 if (!location.search) {
+ window.addEventListener('message', event => { if(event.origin === location.origin && event.data.type === 'llm-layout') { const result=document.createElement('p'); result.textContent=event.data.theme+': '+event.data.result; document.body.append(result); } });
  document.body.insertAdjacentHTML('beforeend', '<h1>LLM categorization settings</h1><p>Fictional preview of the shipped editor. No account, budget or provider is accessed.</p><div class="cases"><div><h2 class="case-title">Desktop · light</h2><iframe title="Desktop preview" width="800" src="?frame=light"></iframe></div><div><h2 class="case-title">Compact · dark</h2><iframe title="Compact preview" width="390" src="?frame=dark"></iframe></div></div>');
 } else {
  document.body.className='frame'; document.documentElement.dataset.theme=new URLSearchParams(location.search).get('frame');
@@ -35,6 +36,7 @@ if (!location.search) {
  const escaped=[...page.querySelectorAll('input,select,textarea,button')].some(node=>{const r=node.getBoundingClientRect();return r.width&& (r.left<rect.left||r.right>rect.right)});
  const passed=!overflow&&!escaped&&Math.abs(before-after)<2&&rect.top>=0;
  document.querySelector('#result').textContent=passed?'PASS: controls fit; heading stays visible; no horizontal overflow':'FAIL: '+JSON.stringify({overflow,escaped,before,after,rect:rect.toJSON()});
+ window.parent.postMessage({type:'llm-layout',theme:document.documentElement.dataset.theme,result:document.querySelector('#result').textContent},location.origin);
  page.scrollTop=0;
 }
 </script></body></html>
