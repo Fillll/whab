@@ -58,7 +58,7 @@ def test_completion_wire_formats_and_no_tools_or_storage(engine, wire, provider,
     response = {"status": "completed", "output": [{"type": "reasoning"}, {"type": "message", "content": [
         {"type": "refusal"}, {"type": "output_text", "text": output}]}]}
     if provider == "chatgpt":
-        response = b'data: {"type":"response.output_text.delta","delta":"ignored"}\n\n' + (
+        response = b'data: {"type":"response.output_text.delta","delta":"ignored","output_index":0,"content_index":0}\n\n' + (
             "data: " + json.dumps({"type": "response.completed", "response": response}) + "\n\ndata: [DONE]\n").encode()
     elif provider == "anthropic":
         response = {"stop_reason": "end_turn", "content": [{"type": "thinking"}, {"type": "text", "text": output}]}
@@ -124,3 +124,51 @@ def test_invalid_model_catalog(engine, wire):
     wire({})
     with pytest.raises(StoreError, match="model catalog"):
         providers.models(engine.vault, "openai")
+
+
+def sse(*events):
+    return b"".join(("data: " + json.dumps(event) + "\n\n").encode() for event in events)
+
+
+@pytest.mark.parametrize("mode", ["deltas", "done", "both", "multiple_parts"])
+def test_subscription_text_survives_empty_terminal_output(engine, wire, monkeypatch, mode):
+    """The public subscription route can omit final output after streaming it."""
+    monkeypatch.setattr("whab_plugin_llm_categorization.oauth.access_token", lambda _: "fictional-oauth")
+    first, second = '{"suggestions":', '[]}'
+    events = []
+    if mode in {"deltas", "both"}:
+        events.extend({"type": "response.output_text.delta", "output_index": 0, "content_index": 0, "delta": value}
+                      for value in (first, second))
+    if mode in {"done", "both"}:
+        events.append({"type": "response.output_text.done", "output_index": 0, "content_index": 0, "text": first + second})
+    if mode == "multiple_parts":
+        events.extend([
+            {"type": "response.output_text.done", "output_index": 1, "content_index": 0, "text": second},
+            {"type": "response.output_text.done", "output_index": 0, "content_index": 1, "text": first[5:]},
+            {"type": "response.output_text.done", "output_index": 0, "content_index": 0, "text": first[:5]},
+        ])
+    events.append({"type": "response.completed", "response": {"status": "completed", "output": []}})
+    wire(sse(*events))
+    assert providers.complete(engine.vault, "chatgpt", "fictional-model", {}) == first + second
+
+
+@pytest.mark.parametrize("terminal", ["response.failed", "response.incomplete", "error", "missing"])
+def test_text_events_never_bypass_terminal_success(wire, terminal):
+    events = [{"type": "response.output_text.done", "output_index": 0, "content_index": 0, "text": '{"suggestions":[]}'}]
+    events.append({"type": terminal})
+    wire(sse(*events))
+    with pytest.raises(StoreError):
+        providers.request("POST", "https://api.openai.com/v1/responses", stream=True)
+
+
+@pytest.mark.parametrize("event", [
+    [], {"type": "response.output_text.delta"},
+    {"type": "response.output_text.delta", "output_index": False, "content_index": 0, "delta": "x"},
+    {"type": "response.output_text.delta", "output_index": 0, "content_index": -1, "delta": "x"},
+    {"type": "response.output_text.delta", "output_index": 0, "content_index": 0, "delta": None},
+    {"type": "response.output_text.done", "output_index": 0, "content_index": 0, "text": {}},
+])
+def test_malformed_stream_text_is_rejected_without_private_error_details(wire, event):
+    wire(sse(event, {"type": "response.completed", "response": {"status": "completed", "output": []}}))
+    with pytest.raises(StoreError, match="valid response"):
+        providers.request("POST", "https://api.openai.com/v1/responses", stream=True)
