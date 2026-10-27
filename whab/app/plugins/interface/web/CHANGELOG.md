@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.30.3 — 2026-10-26
+
+PR: [#116](https://github.com/Fillll/whab/pull/116)
+
+- Reserve the full Add category button and bottom inset when scrolling long budgets, including compact layouts and the sample-data banner.
+- Keep the Carried in label concise, with its component explanation inside Where it comes from.
+
 ## 1.30.2 — 2026-10-25
 
 PR: [#115](https://github.com/Fillll/whab/pull/115)
