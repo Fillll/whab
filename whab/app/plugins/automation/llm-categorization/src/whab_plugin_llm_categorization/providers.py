@@ -30,17 +30,29 @@ def request(method, url, *, headers=None, data=None, payload=None, stream=False)
                         raise StoreError("The LLM provider response exceeded the supported size.")
                 if stream:
                     completed = None
+                    text_parts = {}
                     for line in raw.decode().splitlines():
                         if not line.startswith("data: ") or line == "data: [DONE]":
                             continue
                         event = json.loads(line[6:])
+                        if type(event) is not dict:
+                            raise ValueError()
                         if event.get("type") in {"response.failed", "response.incomplete", "error"}:
                             raise StoreError("The LLM request did not complete. Check account usage and retry from settings.")
+                        if event.get("type") in {"response.output_text.delta", "response.output_text.done"}:
+                            key = (event["output_index"], event["content_index"])
+                            value = event["delta"] if event["type"] == "response.output_text.delta" else event["text"]
+                            if any(type(index) is not int or index < 0 for index in key) or type(value) is not str:
+                                raise ValueError()
+                            if event["type"] == "response.output_text.done":
+                                text_parts[key] = [value]
+                            else:
+                                text_parts.setdefault(key, []).append(value)
                         if event.get("type") == "response.completed":
                             completed = event["response"]
                     if completed is None:
                         raise StoreError("The LLM stream ended before completion. Retry from settings.")
-                    return completed
+                    return {**completed, "_stream_text": "".join("".join(text_parts[key]) for key in sorted(text_parts))}
                 return json.loads(raw) if raw else {}
     except (httpx.HTTPError, ValueError, UnicodeError, KeyError, TypeError):
         raise StoreError("The LLM provider could not complete a valid response. Check the connection and model before retrying.") from None
@@ -86,8 +98,9 @@ def complete(vault, provider, model, data):
                                       "stream": provider == "chatgpt"})
             if result.get("status") != "completed":
                 raise StoreError("The model stopped before completing its suggestions. Choose another model or retry.")
-            return "".join(part["text"] for item in result["output"] if item["type"] == "message"
+            text = "".join(part["text"] for item in result["output"] if item["type"] == "message"
                            for part in item["content"] if part["type"] == "output_text")
+            return text or result.get("_stream_text", "")
         if provider == "anthropic":
             result = request("POST", base + "/messages", headers=auth,
                              payload={"model": model, "max_tokens": 4096, "system": INSTRUCTIONS,
