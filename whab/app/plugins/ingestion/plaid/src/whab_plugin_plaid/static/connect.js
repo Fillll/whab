@@ -9,7 +9,7 @@ function accountsUrl() {
   segments[3] = 'accounts';
   url.pathname = segments.join('/');
   url.search = '';
-  url.hash = '';
+  url.hash = 'plugin-settings-plaid';
   return url;
 }
 async function api(path, body, method = 'POST') {
@@ -49,7 +49,7 @@ async function loadPlaid() {
 const sessionKeys = ['whab-link-token', 'whab-link-item', 'whab-link-budget', 'whab-link-return-url', 'whab-link-redirect-uri', 'whab-link-context'];
 const stages = new Set(['ready', 'exchanging', 'exchange_uncertain', 'captured', 'applying', 'apply_uncertain', 'complete', 'cancelled', 'expired']);
 const pendingMessage = 'This connection has an unfinished operation. Check its status; do not connect or exchange again.';
-const expiredMessage = 'The bank connection session expired. Open Accounts and connect again.';
+const expiredMessage = 'The bank connection session expired. Open Plaid plugin settings and connect again.';
 let finishable = false;
 function environment() {
   const value = document.querySelector('[data-bank-provider="plaid"]')?.dataset.bankEnvironment;
@@ -123,6 +123,10 @@ async function cancel(context) {
   if (!['cancelled', 'expired', 'complete'].includes(result.stage)) throw new Error(pendingMessage);
   clearSession();
 }
+function settings(open) {
+  document.dispatchEvent(new CustomEvent('whab:plugin-settings', {detail: {pluginId: 'plaid', open}}));
+}
+function reloadSettings() {location.hash = 'plugin-settings-plaid'; location.reload();}
 let linking = false;
 let activeRequests = 0;
 async function connect(itemId, resumeToken) {
@@ -132,6 +136,7 @@ async function connect(itemId, resumeToken) {
   buttons.forEach(button => {button.disabled = true;});
   const unlock = () => {
     linking = false;
+    settings(true);
     buttons.forEach(button => {button.disabled = false;});
   };
   let context, handler, completing = false;
@@ -240,6 +245,7 @@ async function connect(itemId, resumeToken) {
         }
       },
     });
+    settings(false);
     handler.open();
   } catch (failure) {
     // A prepared continuation remains visible for explicit status/cancellation.
@@ -257,7 +263,7 @@ function bindButtons(selector, callback) {
   }
 }
 function bind() {
-  bindButtons('[data-plaid-close-dialog]', button => button.closest('dialog').close());
+  bindButtons('[data-plaid-close-dialog]', button => document.getElementById('plaid-disconnect-dialog').hidden = true);
   bindButtons('[data-plaid-connect]', button => connect(button.dataset.plaidConnect || undefined));
   bindButtons('[data-plaid-check-link]', async () => {
     if (linking || activeRequests) return;
@@ -315,7 +321,7 @@ function bind() {
     activeRequests += 1;
     try {
       await api('/plaid/sync', {});
-      location.reload();
+      reloadSettings();
     } catch (failure) {
       notify(failure.message);
       button.disabled = false;
@@ -324,7 +330,8 @@ function bind() {
   bindButtons('[data-plaid-disconnect]', button => {
     disconnectId = button.dataset.plaidDisconnect;
     document.querySelector('#plaid-disconnect-dialog h2').textContent = `Disconnect ${button.dataset.institution}?`;
-    document.getElementById('plaid-disconnect-dialog').showModal();
+    document.getElementById('plaid-disconnect-dialog').hidden = false;
+    document.getElementById('plaid-confirm-disconnect').focus();
   });
   bindButtons('#plaid-confirm-disconnect', async button => {
     if (button.disabled) return;
@@ -332,7 +339,7 @@ function bind() {
     activeRequests += 1;
     try {
       await api(`/plaid/items/${encodeURIComponent(disconnectId)}`, {}, 'DELETE');
-      location.reload();
+      reloadSettings();
     } catch (failure) {
       notify(failure.message);
       button.disabled = false;
@@ -348,7 +355,7 @@ document.addEventListener('whab:before-navigate', event => {
 if (new URL(location.href).searchParams.has('oauth_state_id')) {
   const token = sessionStorage.getItem('whab-link-token');
   if (token) connect(sessionStorage.getItem('whab-link-item') || undefined, token);
-  else notify('The bank connection session expired. Open Accounts and connect again.');
+  else notify('The bank connection session expired. Open Plaid plugin settings and connect again.');
 }
 
 const previousNotice = sessionStorage.getItem('whab-notice');

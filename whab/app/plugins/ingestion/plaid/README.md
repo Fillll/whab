@@ -31,7 +31,7 @@ After status confirms a captured response or uncertain native save, Finish savin
 can resume only that retained native command. It sends the flow ID without a
 public token, rechecks status before submission, and keeps the intent if its reply
 is lost. It cannot retry an external exchange. A rejected OAuth callback also
-preserves known durable or uncertain work for the original Accounts page.
+preserves known durable or uncertain work for the original budget’s Plaid plugin settings.
 A ready session whose public token submission was interrupted can be cancelled
 explicitly; it is not automatically reopened. Closing the tab does not cancel a
 server operation.
@@ -82,3 +82,8 @@ The existing Plaid plugin also displays merchant artwork when a transaction supp
 Artwork downloads happen only through a local image request, separately from synchronization and page rendering. They use public Plaid CDN URLs without banking credentials, accept at most 128 KiB of PNG data, and reject redirects. The host caches successful artwork for 24 hours and unavailable artwork for 5 minutes in memory. No new token or secret is required. Previously saved transactions receive artwork only when Plaid supplies them again in an added or modified sync record.
 
 From the application directory, use `.venv/bin/python -m pytest plugins/ingestion/plaid/tests` or `.venv/bin/python scripts/check.py --quick` during iteration. Run `.venv/bin/python scripts/check.py` before submitting; use `--docs` for documentation-only edits. See [plugin contribution rules](../../README.md#test-ownership) for the complete check contract.
+
+
+### Connection settings
+
+Open **Settings → Plugins → Plaid → Settings** to connect, manage, reconnect, sync or disconnect banks. Accounts lists financial accounts without connection setup controls. Disconnect confirmation stays inside the same settings page, and imported records remain in the budget. OAuth continuation keeps its existing addressed Accounts return path and original budget/environment checks, then returns to Plaid settings. The provider emits the public `whab:plugin-settings` document event while opening/exiting Link so a visual adapter can suspend its native settings modal without stacking dialogs. Completed operations reopen `#plugin-settings-plaid`.

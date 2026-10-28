@@ -4445,3 +4445,41 @@ main:has(.budget-planner) > .demo-ribbon,
  .llm-grid { grid-template-columns: 1fr; gap: 12px; }
  .llm-profile-actions > .button { flex: 1 1 180px; }
 }
+
+/* The red frame follows a continuous drag and settles on whole months. */
+.month-strip[data-month-range] {
+  position: relative;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 13px 10px;
+  min-width: 0;
+  scrollbar-width: thin;
+}
+.month-strip[data-month-range] > * {flex-shrink: 0;}
+.month-range-frame {
+  position: absolute;
+  border: 2px solid var(--brand-red);
+  border-radius: 10px;
+  pointer-events: none;
+  transition: left 160ms ease-out, width 160ms ease-out;
+  z-index: 1;
+}
+.month-range-frame.is-dragging {transition: none;}
+.month-range-frame button {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  color: var(--brand-red);
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+}
+.month-range-handle {top: 0; bottom: 0; width: 12px; cursor: ew-resize; display: grid; place-items: center;}
+.month-range-handle.start {left: -9px;}
+.month-range-handle.end {right: -9px;}
+.month-range-move {height: 12px; left: 10px; right: 10px; bottom: -8px; cursor: grab;}
+.month-range-move::after {content: ''; position: absolute; left: calc(50% - 10px); top: 4px; width: 20px; height: 3px; background: var(--brand-red); border-radius: 3px;}
+.month-range-frame.is-dragging .month-range-move {cursor: grabbing;}
+.month-range-frame button:focus-visible {outline: 2px solid var(--brand-red); outline-offset: 2px; border-radius: 3px;}
+@media (prefers-reduced-motion: reduce) {.month-range-frame {transition: none;}}

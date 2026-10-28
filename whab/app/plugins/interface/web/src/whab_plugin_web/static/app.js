@@ -1,6 +1,7 @@
 /* WHAB controls. Business rules live in Python; bank UI is loaded by enabled plugins. */
 import {api, apiUrl, getContext, notify, pageUrl} from './client.js';
 import {initBudgetEdits, syncBudgetGroups} from './budget-edits.js';
+import {initMonthRange} from './month-range.js';
 import {initBudgetSourceLinks} from './budget-source-links.js';
 import {initAccountNavigation} from './account-navigation.js';
 import {initTransactionRegister} from './transaction-register.js';
@@ -23,6 +24,7 @@ document.addEventListener('whab:notice', event => {
 bindLogos();
 
 let currentRegister = null;
+let monthRange = null;
 async function flushEdits() {
   if (!(await budgetEdits.flush())) return false;
   return !currentRegister || await currentRegister.flush();
@@ -41,6 +43,7 @@ const accountNavigation = initAccountNavigation({
     !currentRegister?.dirty && budgetEdits.dispose(),
   onReplace({content}) {
     currentRegister?.dispose();
+    monthRange?.dispose();
     budgetEdits = initBudgetEdits({readForm: formBody, onDraft: () => accountNavigation.cancelPending()});
     currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination(), cancelNavigation: () => accountNavigation.cancelPending()});
     initPageControls(content);
@@ -228,10 +231,36 @@ if (pluginSelection) {
   });
   const initialSettingsPage = {'#settings': 'settings-home', '#budgets': 'budgets-dialog', '#plugins': 'plugins-dialog'}[location.hash];
   if (initialSettingsPage) settingsNavigation.open(initialSettingsPage);
+  const pluginPage = /^#plugin-settings-([a-z][a-z0-9-]*)$/.exec(location.hash);
+  if (pluginPage) settingsNavigation.open(`plugin-options-${pluginPage[1]}`);
 }
 
 
+// Public provider-to-visual settings bridge; providers never import this module.
+document.addEventListener('whab:plugin-settings', event => {
+  if (event.detail?.open === false) settingsNavigation.close({restoreOrigin: false});
+  else if (typeof event.detail?.pluginId === 'string') settingsNavigation.open(`plugin-options-${event.detail.pluginId}`);
+});
+
 const budgetDialog = document.getElementById('budgets-dialog');
+const budgetCurrency = budgetDialog.querySelector('[data-budget-currency]');
+budgetCurrency.addEventListener('submit', async event => {
+  event.preventDefault();
+  const error = budgetCurrency.querySelector('.field-error');
+  const button = budgetCurrency.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+  error.hidden = true; button.disabled = true;
+  try {
+    await requireSavedEdits();
+    const result = await api('/ui/preferences', {workspace: getContext().workspace, defaultCurrency: budgetCurrency.elements.defaultCurrency.value}, 'PUT');
+    const target = pageUrl({page: 'budget', currency: result.defaultCurrency});
+    target.hash = 'budgets';
+    location.assign(target);
+  } catch (failure) {
+    error.textContent = failure.message; error.hidden = false; button.disabled = false;
+  }
+});
+
 function budgetChoice(entry, workspace, current, description) {
   const row = settingsText('div', '', 'budget-choice');
   if (current) row.setAttribute('aria-current', 'true');
@@ -403,8 +432,15 @@ function budgetForm(selector, action) {
     try {
       await requireSavedEdits();
       const result = await action(form);
+      const target = new URL(result.url, location.href);
+      const prefix = target.pathname.split('/').slice(0, 3).join('/');
+      const workspace = prefix === '/budgets/demo' ? 'demo' : 'personal';
+      const preferenceResponse = await fetch(`${prefix}/api/ui/preferences?workspace=${workspace}`);
+      const preferences = await preferenceResponse.json();
+      if (!preferenceResponse.ok) throw new Error(preferences.error || 'The budget default currency could not be loaded.');
+      target.pathname = target.pathname.replace(/\/[a-z]{3}$/, '/' + preferences.defaultCurrency.toLowerCase());
       document.getElementById('settings-dialog').close();
-      location.assign(result.url);
+      location.assign(target);
     } catch (failure) {
       error.textContent = failure.message;
       error.hidden = false;
@@ -535,7 +571,7 @@ function renderPluginSettings(dialog, settings) {
     row.append(button);
     content.append(row);
   }
-  if (!settings.insights.length && !settings.actions.length && !dialog.querySelector('[data-appearance-choice], [data-file-import], [data-storage-copy-panel]')) content.append(settingsText('p', 'This plugin has no additional settings.', 'settings-notice'));
+  if (!settings.insights.length && !settings.actions.length && !dialog.querySelector('[data-appearance-choice], [data-file-import], [data-storage-copy-panel], [data-bank-provider]')) content.append(settingsText('p', 'This plugin has no additional settings.', 'settings-notice'));
 }
 
 for (const dialog of document.querySelectorAll('[data-settings-page][data-plugin-id]')) dialog.addEventListener('whab:settings-enter', async () => {
@@ -562,6 +598,7 @@ for (const dialog of document.querySelectorAll('[data-settings-page][data-plugin
 
 const pageControls = new WeakSet();
 function initPageControls(root = document) {
+  monthRange = initMonthRange({root, navigate: (url, cancel) => navigationReady() ? budgetEdits.navigate(url, cancel) : cancel()});
   for (const input of root.querySelectorAll('[data-navigation]')) {
     if (input.closest('[data-transaction-register]')) continue;
     if (pageControls.has(input)) continue;

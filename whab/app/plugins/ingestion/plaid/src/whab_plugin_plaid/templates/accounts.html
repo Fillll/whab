@@ -69,12 +69,12 @@
 {% endfor %}
 </section>
 {% endif %}
-<dialog class="modal"
+<section class="plaid-disconnect-confirm" hidden role="region" aria-label="Confirm bank disconnection"
         id="plaid-disconnect-dialog"><div class="modal-heading"><div><h2>Disconnect this bank?</h2><p>Imported transactions will stay in your budget.</p></div><button class="icon-button" data-plaid-close-dialog aria-label="Close dialog">{{ icon('close', 20) if icon is defined else '' }}</button></div>
   <p class="modal-description">This stops bank importing and revokes this connection. A new connection will use another Trial slot.</p>
   <div class="modal-actions">
     <button class="button secondary" data-plaid-close-dialog>Keep connected</button><button class="button primary" id="plaid-confirm-disconnect">Disconnect</button>
   </div>
-</dialog>
+</section>
 
 </section>

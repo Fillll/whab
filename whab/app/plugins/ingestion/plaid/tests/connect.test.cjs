@@ -20,7 +20,7 @@ class Target {
   emit(type) {return Promise.all([...(this.listeners.get(type) || [])].map(callback => callback(new Event(type, {target: this, currentTarget: this}))));}
 }
 function panel() {
-  const dialog = new Target({open: false, showModal() {this.open = true;}, close() {this.open = false;}});
+  const dialog = new Target({hidden: true});
   const buttons = {
     '[data-plaid-connect]': [new Target({dataset: {}}), new Target({dataset: {plaidConnect: 'fictional-item'}})],
     '[data-plaid-sync]': [new Target()],
@@ -28,7 +28,7 @@ function panel() {
     '[data-plaid-cancel-link]': [new Target()],
     '[data-plaid-finish-link]': [new Target({hidden: true})],
     '[data-plaid-disconnect]': [new Target({dataset: {plaidDisconnect: 'fictional/item', institution: 'Fictional Bank'}})],
-    '#plaid-confirm-disconnect': [new Target()],
+    '#plaid-confirm-disconnect': [new Target({focus() {this.focused = true;}})],
     '[data-plaid-close-dialog]': [new Target({closest: () => dialog})],
   };
   return {buttons, dialog, heading: {textContent: ''}, provider: {dataset: {bankEnvironment: 'sandbox'}}, pending: {hidden: true}};
@@ -42,7 +42,7 @@ function harness({initialPanel = false, sdk = true, href = 'https://localhost:51
   const document = new Target({
     querySelectorAll: selector => current?.buttons[selector] || [],
     querySelector: selector => selector === '#plaid-disconnect-dialog h2' ? current?.heading : selector === '[data-bank-provider="plaid"]' ? current?.provider : selector === '[data-plaid-continuation]' ? current?.pending : selector === '[data-plaid-finish-link]' ? current?.buttons[selector][0] : null,
-    getElementById: id => id === 'plaid-disconnect-dialog' ? current?.dialog : null,
+    getElementById: id => id === 'plaid-disconnect-dialog' ? current?.dialog : id === 'plaid-confirm-disconnect' ? current?.buttons['#plaid-confirm-disconnect'][0] : null,
     createElement: () => new Target({remove() {this.removed = true;}}),
     head: {appendChild: script => scripts.push(script)},
   });
@@ -80,10 +80,10 @@ test('Accounts re-entry binds fresh provider controls once without repeating mod
   const first = state.replace(); state.ready(); state.ready();
   for (const buttons of Object.values(first.buttons)) for (const button of buttons) assert.equal(button.listeners.get('click').size, 1);
   await first.buttons['[data-plaid-disconnect]'][0].emit('click');
-  assert.equal(first.dialog.open, true);
+  assert.equal(first.dialog.hidden, false);
   assert.equal(first.heading.textContent, 'Disconnect Fictional Bank?');
   await first.buttons['[data-plaid-close-dialog]'][0].emit('click');
-  assert.equal(first.dialog.open, false);
+  assert.equal(first.dialog.hidden, true);
   const second = state.replace(); state.ready();
   for (const buttons of Object.values(second.buttons)) for (const button of buttons) assert.equal(button.listeners.get('click').size, 1);
   const syncing = second.buttons['[data-plaid-sync]'][0].emit('click');
@@ -143,7 +143,7 @@ test('Link completion retains the addressed budget and remains guarded through i
   assert.deepEqual(JSON.parse(state.requests[1].options.body), {itemId: 'fictional-item'});
   assert.equal(state.canNavigate(), false);
   state.requests[1].reply(); await tick(); state.requests[2].reply({items: []}); await completing; state.runTimers();
-  assert.deepEqual(state.redirects, ['https://localhost:5173/budgets/fictional/accounts/2026-10/usd']);
+  assert.deepEqual(state.redirects, ['https://localhost:5173/budgets/fictional/accounts/2026-10/usd#plugin-settings-plaid']);
   assert.equal(state.canNavigate(), true);
   assert.equal(state.values.size, 0);
   assert.equal(state.links[0].handler.destroys, 1);

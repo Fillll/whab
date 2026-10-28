@@ -82,6 +82,7 @@ from whab.web.routes.plugins import create_router as plugins_router
 from whab.web.routes.receipts import create_router as receipts_router
 from whab.web.routes.ui_views import create_router as ui_views_router
 from whab.web.routes.visual_ui import create_router as visual_ui_router
+from whab.web.ui_preferences import UIPreferences
 from whab.web.visual_interface import LeasedVisualUI, VisualGeneration, VisualTemplates
 from whab.web.visual_interface import create_resource_router as visual_resources_router
 
@@ -649,6 +650,21 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         app.include_router(bank_resources_router(registry))
         app.include_router(ui_views_router(lambda: visual_controller.views))
         app.include_router(visual_ui_router(visual_controller))
+        def view_context(*, writable=False):
+            with runtime.lease() as lease:
+                identifier = lease.service("visual").plugin_id
+                if identifier is None:
+                    raise PluginError("A visual interface is unavailable.", code="ui_unavailable")
+                if budget_session and budget_session.plugin_record(identifier) is None:
+                    if not writable:
+                        return None
+                    budget_session.save_selection([*budget_session.selection, identifier])
+                return budget_session.context(identifier) if budget_session else local_context(
+                    settings.home / "data" / "plugin-state" / settings.plaid_env,
+                    service.budget_id, identifier, lock=store.lock, on_change=notifications.changed)
+
+        view_preferences = UIPreferences(view_context)
+        app.include_router(view_preferences.router())
         app.include_router(ledger_router(service))
         receipt_service = ReceiptService(store, store.lock)
         app.include_router(receipts_router(receipt_service))
@@ -664,7 +680,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 store, leased_banks, bank_stores, registry, templates, settings.plaid_env, visual_ui,
                 plugin_manager=plugin_manager,
                 budget_name=budget_session.name if budget_session else "My budget",
-                service=service,
+                service=service, preferences=view_preferences,
             )
         )
         app.state.store = store.store

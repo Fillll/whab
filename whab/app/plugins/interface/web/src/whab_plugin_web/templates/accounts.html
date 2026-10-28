@@ -7,18 +7,15 @@
   </div>
   <button class="button primary" data-dialog="account-dialog">{{ icon('plus', 16) }}Add manual account</button>
 </div>
-{% for bank in bank_panels %}
-  {% with status=bank.status, items=bank['items'] %}
-    {% include bank.template %}
-  {% endwith %}
-{% endfor %}
-{% if data.accounts %}
-  <dl class="account-summary" aria-label="Account totals in {{ currency }}">
-    <div><dt>Assets</dt><dd>{{ money(account_summary.assets) }}</dd></div>
-    <div><dt>Liabilities</dt><dd>{{ money(account_summary.liabilities) }}</dd></div>
-    <div><dt>Net worth</dt><dd>{{ money(account_summary.netWorth) }}</dd></div>
+{% if all_accounts %}
+  {% for code, totals in account_totals.items() %}
+  <dl class="account-summary" aria-label="Account totals in {{ code }}">
+    <div><dt>Assets · {{ code }}</dt><dd>{{ currency_money(totals.assets, code) }}</dd></div>
+    <div><dt>Liabilities · {{ code }}</dt><dd>{{ currency_money(totals.liabilities, code) }}</dd></div>
+    <div><dt>Net worth · {{ code }}</dt><dd>{{ currency_money(totals.netWorth, code) }}</dd></div>
   </dl>
-  <p class="account-summary-note">{{ currency }} only · Current known balances. Stale and unavailable snapshots are excluded from totals.</p>
+  {% endfor %}
+  <p class="account-summary-note">Current known balances, separated by currency. Stale and unavailable snapshots are excluded from totals.</p>
   {% for group in account_groups %}
   <section class="account-group" aria-label="{{ group.label }} accounts">
   <div class="section-title accounts-heading"><h2>{{ group.label }} accounts <span>{{ group.accounts|length }}</span></h2></div>
@@ -30,7 +27,7 @@
         <div class="account-description">
           <strong>{{ account.name }}</strong><span>{{ account.institution }}
             {% if account.mask %} · ••{{ account.mask }}
-            {% endif %} · {{ account_label(account) }}
+            {% endif %} · {{ account.currency }} · {{ account_label(account) }}
             {% if account.stale %} · Stale snapshot
             {% endif %}
           </span>
@@ -38,21 +35,18 @@
         </div>
         <span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' and account.source in bank_source_ids else account.source|capitalize }}</span>
         <div class="account-balance">
-          <strong>{{ 'Unavailable' if account.balanceUnknown else money(account.balance) }}</strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small>
+          <strong>{{ 'Unavailable' if account.balanceUnknown else account_money(account) }}</strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small>
         </div>
       </div>
     {% else %}<p class="empty-inline">No {{ group.label|lower }} accounts yet.</p>{% endfor %}
   </div>
   </section>
   {% endfor %}
-  <div class="accounts-total">
-    <span>On-budget cash balances · {{ currency }}</span><strong>{{ money(cash_balance) }}</strong>
-  </div>
 {% else %}
   <div class="empty-state">
     <span>{{ icon('accounts', 28) }}</span>
     <h2>Start with one account</h2>
-    <p>{% if bank_panels %}Connect an account with an enabled bank provider, or add a manual account.{% else %}Add a manual account to start planning your budget.{% endif %}</p>
+    <p>{% if bank_panels %}Connect an account in its bank plugin’s settings, or add a manual account.{% else %}Add a manual account to start planning your budget.{% endif %}</p>
   </div>
 {% endif %}
 {% if workspace=="demo" %}

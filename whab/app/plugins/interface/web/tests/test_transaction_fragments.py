@@ -106,7 +106,9 @@ def test_register_fragment_preserves_account_date_currency_and_escaping(client, 
     response = client.get(base, headers=header)
     assert response.status_code == 200
     assert "JPY &lt;script&gt;fixture&lt;/script&gt;" in response.text
-    assert "USD wallet" not in response.text and "USD &lt;script&gt;" not in response.text
+    assert "USD &lt;script&gt;" not in response.text
+    if "X-WHAB-Transactions-Fragment" in header:
+        assert "USD wallet" in response.text  # The sidebar lists accounts in every currency.
     assert "2026-09-05" in response.text and "2026-08-05" not in response.text
     assert "<script>fixture</script>" not in response.text
     assert 'data-transaction-id=' in response.text

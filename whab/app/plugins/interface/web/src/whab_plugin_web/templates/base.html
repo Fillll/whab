@@ -54,9 +54,7 @@
     <div class="breadcrumb">
       {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }} {{ icon('chevron-right', 14) }}<span>{{ page|capitalize }}</span>
     </div>
-    <div class="topbar-right"><select aria-label="Budget currency" data-navigation="currency">
-      {% for code in currencies %}<option value="{{ code }}"{% if code==currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
-      </select><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' if status.environment=='sandbox' else 'Live data' }}</span>
+    <div class="topbar-right"><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' if status.environment=='sandbox' else 'Live data' }}</span>
     </div>
   </header>
   {% if workspace=="demo" %}
