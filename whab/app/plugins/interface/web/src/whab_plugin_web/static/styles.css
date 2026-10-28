@@ -3826,12 +3826,6 @@ main:has(.budget-planner) > .demo-ribbon,
 .budget-group-toggle[aria-expanded='false'] svg {
   transform: rotate(-90deg);
 }
-.budget-group-note {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 400;
-}
 .budget-category-row td {
   height: 36px;
   border-bottom: 1px solid var(--line);

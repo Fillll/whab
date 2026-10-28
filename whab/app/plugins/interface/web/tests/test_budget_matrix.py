@@ -213,11 +213,10 @@ def test_calculated_rows_and_group_totals_are_read_only_while_child_assignments_
     text = client.get("/budgets/demo/budget/2026-10/usd").text
     assert "Editable assigned amounts" in text and "Read-only summaries" in text
     overview = re.findall(r'<tr class="budget-overview-row[^"]*"[^>]*>(.*?)</tr>', text, re.S)
+    assert "Summary</small>" not in text
     for index in (0, 3, 4):
-        assert '<small class="budget-row-note">Summary</small>' in overview[index]
         assert "<input" not in overview[index] and "<form" not in overview[index]
     for row in re.findall(r'<tr class="budget-group-row"[^>]*>(.*?)</tr>', text, re.S):
-        assert "Summary</small>" in row
         assert "<input" not in row and "<form" not in row
         assert 'data-budget-group="' in row
         assert len(re.findall(r'<td\b', row)) == 13
