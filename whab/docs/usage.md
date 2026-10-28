@@ -167,7 +167,7 @@ This prototype requests **Transactions**. Investments import is the next separat
 - User category changes are kept separate from automatic category suggestions. Reviewing a transaction does not create a category override.
 - If a bank transfer suggestion is actually a purchase, assigning a category includes it in spending. Clearing that category restores the original transfer exclusion.
 - Bank balances are imported snapshots. Removed/disconnected accounts retain their records with a stale label, and stale cash is excluded from assignable money.
-- Manual transactions are accepted only for demo/manual accounts. Matching manual purchases to later bank imports is not implemented.
+- Manual transactions are accepted for every existing account, including YNAB imports and bank-connected accounts. Entries retain manual provenance, and later bank refreshes preserve them while updating the provider balance snapshot. Matching manual purchases to later bank imports is not implemented.
 - Initial history requests up to 730 days. Institutions may provide less. Automatic bank checks are generally one to four times daily; a local manual sync fetches changes Plaid already has and does not force a fresh bank fetch.
 - Optional `PLAID_WEBHOOK_URL` must be public HTTPS. Registered webhook paths bypass localhost Host/origin checks so Plaid can reach them; Plaid's ES256 signature, timestamp, and hash of the exact body must verify before scheduling a sync. TLS encrypts transport and does not replace that provider authentication. Without a webhook endpoint, use manual sync while working locally.
 - Disconnect removes the remote Item before marking the local connection disconnected. Imported transactions remain.
@@ -256,3 +256,8 @@ Choose **Plugin Marketplace** to browse maintained plugins and their installatio
 Choose **Settings → Budgets → Default currency** to set the currency used when opening that budget. Each account displays and retains its own currency in Accounts. Accounts totals are listed separately per currency; changing this view default never converts, relabels or combines account balances, transactions or categories. Account settings can change currency only before transaction history exists.
 
 On Budget, the red rounded frame marks the visible month range. Drag the bottom grip to move it and either side to resize from one to five months. The first month stays strong yellow and subsequent months pale yellow. The frame settles at month boundaries. Use Left/Right arrow keys on the focused grip for keyboard control. Wider budgets scroll horizontally below the month strip.
+
+
+### Add a manual transaction
+
+Open **Transactions → Add transaction** to record spending or an inflow in any account, including YNAB-imported and connected bank accounts. The account list uses the current currency view; an individual account’s sidebar link opens its currency. Date, currency, category and money validation remain in force. The action is unavailable only when there is no account in that currency view. Manual entries update the local balance and stay separate from bank-imported records; a future bank refresh supplies its current balance snapshot and preserves the manual entries.

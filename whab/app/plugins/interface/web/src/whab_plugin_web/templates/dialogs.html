@@ -118,7 +118,7 @@
   </form>
 </dialog>
 <dialog class="modal"
-        id="transaction-dialog">{{ heading('Add transaction', 'Record spending or income in a manual account.') }}
+        id="transaction-dialog">{{ heading('Add transaction', 'Record spending or income in any account.') }}
   <form class="modal-form" data-api="/transactions">
     <input type="hidden" name="workspace" value="{{ workspace }}">
     <label>
@@ -145,7 +145,7 @@
       </label>
       <label>
         Account<select name="accountId" required>
-      {% for account in manual_accounts %}<option value="{{ account.id }}">{{ account.name }}</option>
+      {% for account in transaction_accounts %}<option value="{{ account.id }}"{% if selected_account and account.id==selected_account.id %} selected{% endif %}>{{ account.name }}</option>
     {% endfor %}
     </select>
   </label>

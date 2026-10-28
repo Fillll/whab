@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.46.0 — 2026-10-27
+
+PR: [#127](https://github.com/Fillll/whab/pull/127)
+
+- Allow manual transactions in every existing account, including imported and connected accounts. Preserve manual transaction provenance, account origin, currency validation, snapshot flags and atomic asset/liability balance updates. Bank refreshes retain manual entries; automatic manual/import matching remains separate.
+
 ## 2.45.0 — 2026-10-27
 
 PR: [#126](https://github.com/Fillll/whab/pull/126)

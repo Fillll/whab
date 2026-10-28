@@ -81,7 +81,7 @@ def update_account(state: dict, account_id: str, changes: dict) -> None:
 def add_transaction(
     state: dict, transaction_id: str, transaction: dict, source: str = "manual",
 ) -> str:
-    """Apply a validated entry and its account balance change together."""
+    """Apply a validated entry to any account and its balance change together."""
     amount = cents(transaction["amount"])
     validate_date(transaction["date"])
     merchant = validate_label(transaction["merchant"])
@@ -91,10 +91,6 @@ def add_transaction(
     account = state["accounts"].get(transaction["accountId"])
     if not account:
         raise StoreError("Account not found.")
-    if source == "manual" and account["source"] not in {"manual", "demo"}:
-        raise StoreError(
-            "Use a manual account for manual entries; bank imports cannot yet reconcile them."
-        )
     category = transaction.get("categoryId")
     if category is not None:
         child = ensure_child_category(state["categories"], category)

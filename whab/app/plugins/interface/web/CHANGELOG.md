@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.35.0 — 2026-10-27
+
+PR: [#127](https://github.com/Fillll/whab/pull/127)
+
+- Enable Add transaction for all accounts in the current currency, including YNAB imports and connected accounts. Populate full and retained-navigation account pickers consistently, select the account on a full individual-register load, and explain an empty currency view’s account precondition. Require WHAB 2.46 or newer.
+
 ## 1.34.0 — 2026-10-27
 
 PR: [#126](https://github.com/Fillll/whab/pull/126)

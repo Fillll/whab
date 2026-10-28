@@ -373,7 +373,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         ),
         "is_liability": is_liability,
         "is_on_budget": is_on_budget,
-        "manual_accounts": [a for a in data["accounts"] if a["source"] in {"manual", "demo"}],
+        "transaction_accounts": data["accounts"],
         "to_review": data.get("toReview", sum(not t["reviewed"] and not t["pending"] for t in transactions)),
         "cash_balance": sum(
             a["balance"]

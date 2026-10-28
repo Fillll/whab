@@ -150,7 +150,7 @@ An envelope's available amount is prior assignments minus prior cleared category
 
 Ready to assign uses on-budget depository balance snapshots, subtracts on-budget positive credit-card debt and positive envelope availability, and excludes stale or unknown cash. Unknown on-budget credit balances cannot create positive funding. Imported income is never added again to cash snapshots. This conservatively reserves card debt; it is not a full YNAB-style credit-card payment category model. Historical cash estimates reverse later cleared account flows and are approximate, rather than audited month-end reconciliations.
 
-Manual transactions update manual-account balances; entries into connected Plaid accounts are rejected to avoid unsupported reconciliation and duplicates. Ordinary public transaction views omit internal mutation metadata. Raw store state and Item records are internal and may contain encrypted credentials; do not pass them directly to browser responses or plugins.
+Manual transactions can be added to any existing account, including imported, connected, stale and off-budget accounts. Each entry retains manual provenance and updates that account’s balance with the core asset/liability sign convention. Account origin, connection ownership, currency and snapshot freshness are preserved. A later bank refresh keeps manual entries and supplies a fresh provider balance snapshot; automatic matching between a manual entry and a later imported entry is not implemented. Ordinary public transaction views omit internal mutation metadata. Raw store state and Item records are internal and may contain encrypted credentials; do not pass them directly to browser responses or plugins.
 
 ## Plaid synchronization and secrets
 

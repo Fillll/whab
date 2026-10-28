@@ -149,17 +149,6 @@ def test_transfers_history_and_card_debt_never_invent_cash(
         with pytest.raises(StoreError, match="available money"):
             action()
         assert store.state("personal") == before
-    with pytest.raises(StoreError, match="manual account"):
-        store.add_transaction(
-            "personal",
-            {
-                "accountId": "bank",
-                "date": "2026-10-01",
-                "merchant": "Duplicate",
-                "amount": 100,
-                "categoryId": None,
-            },
-        )
 
 
 def test_category_reduction_can_repair_deficit(store):
