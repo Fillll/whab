@@ -65,7 +65,7 @@
           </thead>
           <tbody class="budget-overview" data-budget-key="overview">
             <tr class="budget-overview-row" data-budget-key="income">
-              <th scope="row">Income<small class="budget-row-note">Summary</small></th>
+              <th scope="row">Income</th>
               {% for period in periods %}
                 {% set income_valid = valid_money(period.summary.income) %}
                 <td colspan="{{ period.column_count }}" class="month-start" data-budget-key="{{ period.month }}">
@@ -130,7 +130,7 @@
               {% endfor %}
             </tr>
             <tr class="budget-overview-row budget-assigned-row" data-budget-key="assigned">
-              <th scope="row">Assigned this month<small class="budget-row-note">Summary</small></th>
+              <th scope="row">Assigned this month</th>
               {% for period in periods %}
                 {% set assigned_valid = period.month>=data.budgetStartMonth and valid_money(period.summary.assigned) %}
                 <td id="assigned-summary-{{ period.month }}-{{ currency|lower }}" colspan="{{ period.column_count }}" class="month-start" data-budget-key="{{ period.month }}">
@@ -145,7 +145,7 @@
               {% endfor %}
             </tr>
             <tr class="budget-overview-row budget-ready-row" data-budget-key="ready">
-              <th scope="row">Available to assign<small class="budget-row-note">Summary</small></th>
+              <th scope="row">Available to assign</th>
               {% for period in periods %}
                 {% set ready_valid = period.monthlyFundingFlow is sameas true and period.month>=data.budgetStartMonth and valid_money(period.summary.readyToAssign) %}
                 <td colspan="{{ period.column_count }}" class="month-start{% if ready_valid and period.summary.readyToAssign<0 %} negative{% elif ready_valid and period.summary.readyToAssign>0 %} positive{% endif %}" data-budget-key="{{ period.month }}">
@@ -187,7 +187,7 @@
             {% for group in groups %}
               {% set group_index = loop.index %}
               <tr class="budget-group-row" data-budget-key="group:{{ group.name }}">
-                <td data-budget-key="category"><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}<span>{{ group.name }}</span><small class="budget-group-note">Summary</small></button></td>
+                <td data-budget-key="category"><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}<span>{{ group.name }}</span></button></td>
                 {% for total in group.periods %}
                   {% set period = periods[loop.index0] %}
                   {% if period.show_carryover %}<td class="month-start budget-carryover{% if valid_money(total.carryover) and total.carryover<0 %} negative{% elif total.carryover==0 %} zero{% endif %}" data-budget-key="{{ period.month }}:carryover">{{ money_number(total.carryover) if valid_money(total.carryover) else '—' }}</td>{% endif %}

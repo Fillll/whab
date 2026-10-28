@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.32.2 — 2026-10-27
+
+PR: [#122](https://github.com/Fillll/whab/pull/122)
+
+- Remove redundant Summary captions from budget overview rows and category-group totals while preserving read-only amounts, explanations and assignment controls.
+
+
 ## 1.32.1 — 2026-10-26
 
 PR: [#121](https://github.com/Fillll/whab/pull/121)
