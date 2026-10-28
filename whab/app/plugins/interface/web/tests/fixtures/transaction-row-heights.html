@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Transaction row layout checks</title>
+<style>body{font:14px system-ui;margin:24px}table{border-collapse:collapse}td,th{padding:6px 12px;border-bottom:1px solid #ccc;text-align:left}iframe{display:block;border:1px solid #aaa;margin:16px 0}</style>
+<h1>Transaction row layout checks</h1><p>Fictional records with the shipped stylesheet. Suggested categories and their compact markers must share a line; every cell must retain the same height before and after dismissal.</p>
+<table><thead><tr><th>Viewport / theme / accounts</th><th>Row heights</th><th>Result</th></tr></thead><tbody></tbody></table>
+<script type="module">
+const stylesheet = new URL('../../src/whab_plugin_web/static/styles.css', location.href);
+const icon = '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 10 6 15 8 10 10 8 15 6 10 1 8 6 6Z" fill="none" stroke="currentColor"/></svg>';
+const rows = [
+ {category:'Uncategorized'}, {category:'Groceries'}, {category:'Restaurants',suggestion:'LLM'},
+ {category:'Home Maintenance and long category wording',suggestion:'LLM'},
+ {category:'Travel',suggestion:'ML',low:true}, {category:'Groceries',note:'First line\nSecond line\nThird line'},
+ {category:'Shopping',payee:'Fictional merchant with a very long name that must truncate in the table',logo:true},
+ {category:'Uncategorized',pending:true}, {category:'Restaurants',suggestion:'LLM',note:'A long fictional memo that must stay inside the cell without making the row taller'},
+];
+const markup = multi => `<div class="table-scroll transactions-scroll"><table class="transactions-table${multi?' transactions-table-multi-account':''}"><thead><tr><th class="transaction-select-cell">✓</th><th class="date-cell">Date</th>${multi?'<th class="account-cell">Account</th>':''}<th class="transaction-receipt-cell">▧</th><th>Payee</th><th class="transaction-category-cell">Category</th><th class="transaction-memo-cell">Memo</th><th class="amount-cell">Amount</th><th class="transaction-currency-cell">Currency</th><th class="transaction-review-cell">R</th></tr></thead><tbody>${rows.map((row,i)=>`<tr class="transaction-row"><td class="transaction-select-cell"><input type="checkbox" aria-label="Select fictional row ${i}"/></td><td class="date-cell">2026-10-27</td>${multi?'<td class="account-cell">Fictional checking account</td>':''}<td class="transaction-receipt-cell"><button class="transaction-receipt-button">▧</button></td><td class="transaction-payee-cell"><div class="transaction-payee">${row.logo?'<span class="merchant-mark">F</span>':''}<strong>${row.payee||'Fictional cafe'}</strong>${row.pending?'<span class="transaction-status">◷</span>':''}</div></td><td class="transaction-category-cell"><div class="transaction-category-editor"><select class="${row.suggestion||row.category==='Uncategorized'?'uncategorized':''}" aria-label="Category"><option>${row.category}</option></select>${row.suggestion?`<span class="ml-suggestion" role="group" aria-label="${row.suggestion} suggested category" title="Provisional fictional suggestion${row.low?' · 60% · Low score':''}">${icon}<span>${row.suggestion}</span>${row.low?'<span aria-hidden="true">60%</span>':''}<button data-dismiss-suggestion aria-label="Dismiss fictional suggestion">×</button></span>`:''}</div></td><td class="transaction-memo-cell"><textarea rows="1" aria-label="Memo">${row.note||'Fictional memo'}</textarea></td><td class="amount-cell">-$12.00</td><td class="transaction-currency-cell">USD</td><td class="transaction-review-cell"><button class="transaction-review-button">R</button></td></tr>`).join('')}</tbody></table></div>`;
+for (const width of [1280,760,390]) for (const theme of ['light','dark']) for (const multi of [false,true]) {
+ const frame=document.createElement('iframe');frame.width=width;frame.height=420;frame.title=`${width} ${theme} ${multi?'multiple':'single'} account`;
+ const loaded=new Promise(resolve=>frame.onload=resolve);
+ frame.srcdoc=`<!doctype html><html lang="en" data-theme="${theme}"><meta charset="utf-8"><link rel="stylesheet" href="${stylesheet}"><style>body{padding:12px}.transactions-scroll{height:390px;max-height:390px}</style>${markup(multi)}</html>`;
+ document.body.append(frame);await loaded;
+ const doc=frame.contentDocument,win=frame.contentWindow;
+ await new Promise(resolve=>win.requestAnimationFrame(()=>win.requestAnimationFrame(resolve)));
+ const table=doc.querySelector('.transactions-table'), expected=parseFloat(win.getComputedStyle(table).getPropertyValue('--transaction-row-height'));
+ const heights=[...table.querySelectorAll('tr')].map(row=>row.getBoundingClientRect().height);
+ const uniform=heights.every(height=>Math.abs(height-expected)<.6)&&[...table.querySelectorAll('td,th')].every(cell=>Math.abs(cell.getBoundingClientRect().height-expected)<.6);
+ const inline=[...doc.querySelectorAll('.transaction-category-editor')].every(editor=>{
+   const select=editor.querySelector('select').getBoundingClientRect(), badge=editor.querySelector('.ml-suggestion')?.getBoundingClientRect();
+   return editor.scrollWidth<=editor.clientWidth+1&&(!badge||(badge.left>=select.right&&Math.abs((badge.top+badge.bottom-select.top-select.bottom)/2)<1));
+ });
+ // Dismissing the marker must retain the same cell/row geometry.
+ const badge=doc.querySelector('.ml-suggestion');badge.remove();
+ await new Promise(resolve=>win.requestAnimationFrame(resolve));
+ const stable=[...table.querySelectorAll('tr')].every((row,i)=>Math.abs(row.getBoundingClientRect().height-heights[i])<.6);
+ const passed=uniform&&inline&&stable&&doc.documentElement.scrollWidth<=width;
+ const result=document.createElement('tr'); result.dataset.measurements=JSON.stringify({expected,heights,uniform,inline,stable});
+ result.innerHTML=`<td>${frame.title}</td><td>${[...new Set(heights)]} px</td><td>${passed?'PASS':'FAIL'}</td>`;document.querySelector('tbody').append(result);
+}
+const results=[...document.querySelectorAll('body>table tbody tr')],failures=results.filter(row=>row.lastElementChild.textContent==='FAIL').length;
+document.title=failures?`FAIL: ${failures} transaction layouts`:`PASS: ${results.length} transaction layouts`;document.querySelector('h1').textContent=document.title;
+</script></html>
