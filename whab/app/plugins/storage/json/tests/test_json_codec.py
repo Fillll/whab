@@ -177,12 +177,17 @@ def test_portable_payload_rejects_runtime_records_and_incompatible_version(json_
 
 
 def test_pdf_receipts_use_shared_validation_and_survive_native_reopen(json_store, json_import):
+    from io import BytesIO
+
+    from pypdf import PdfWriter
     from whab_plugin_json.store import Store
 
-    from tests.receipt_images import pdf
-
     json_store.import_workspace("personal", "fictional", "fingerprint", json_import)
-    document = pdf()
+    output = BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.write(output)
+    document = output.getvalue()
     before = json_store.export_budget("personal")
     json_store.save_receipt("personal", "import-transaction", document)
     assert json_store.get_receipt("personal", "import-transaction") == document

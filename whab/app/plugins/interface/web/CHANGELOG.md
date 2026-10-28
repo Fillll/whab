@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.34.0 — 2026-10-27
+
+PR: [#126](https://github.com/Fillll/whab/pull/126)
+
+- Offer exactly JPEG, PNG and PDF, in that order, for receipt uploads. Show saved PDFs through a private Open PDF receipt link while retaining raster previews, safe close/reset behavior and the 5 MiB limit.
+
 ## 1.33.1 — 2026-10-27
 
 PR: [#125](https://github.com/Fillll/whab/pull/125)

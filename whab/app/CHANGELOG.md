@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.45.0 — 2026-10-27
+
+PR: [#126](https://github.com/Fillll/whab/pull/126)
+
+- Accept JPEG, PNG and PDF for new receipt uploads. Validate PDFs through the shared SDK outside the financial domain, serve verified private document content types and filenames, reject new WebP uploads, and retain existing WebP read/portable compatibility.
+
 ## 2.44.0 — 2026-10-27
 
 PR: [#124](https://github.com/Fillll/whab/pull/124)
