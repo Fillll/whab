@@ -33,7 +33,7 @@ def test_accounts_show_all_currencies_but_provider_controls_only_in_plugin_setti
         response = client.get("/budgets/home/accounts/2026-10/usd")
         assert response.status_code == 200
         text = response.text
-        content = text.split('<div class="page-content"', 1)[1].split('<div id="toast"', 1)[0]
+        content = text.split('<div class="page-content"', 1)[1].split('</main>', 1)[0]
         assert 'data-bank-provider="plaid"' not in content
         assert Placement(text).provider_owner == "plaid"
         assert '<dialog class="modal"\n        id="plaid-disconnect-dialog"' not in text

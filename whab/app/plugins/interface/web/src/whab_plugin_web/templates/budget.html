@@ -1,4 +1,4 @@
-{% set month_count = budget_month_count(request.query_params.get('months')) %}
+{% set month_count = [budget_month_count(request.query_params.get('months')), periods|length]|min %}
 {% set periods = periods[:month_count] %}
 {% set period_months = period_months[:month_count] %}
 {% macro summary_details(period, label, carry_in=false) -%}
