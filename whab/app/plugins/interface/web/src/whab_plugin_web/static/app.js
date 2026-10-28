@@ -5,7 +5,7 @@ import {initMonthRange} from './month-range.js';
 import {initBudgetSourceLinks} from './budget-source-links.js';
 import {initAccountNavigation} from './account-navigation.js';
 import {initTransactionRegister} from './transaction-register.js';
-import {hydrateCurrencyChoices, initAccountSettings} from './account-settings.js';
+import {hydrateCurrencyChoices, initAccountSettings, initSettingsCurrencyChoices} from './account-settings.js';
 import {bindLogos} from './logo-images.js';
 import {initCategorizationSettings} from './categorization-settings.js';
 import {initStorageCopies} from './storage-copies.js';
@@ -243,6 +243,7 @@ document.addEventListener('whab:plugin-settings', event => {
 });
 
 const budgetDialog = document.getElementById('budgets-dialog');
+initSettingsCurrencyChoices(budgetDialog);
 const budgetCurrency = budgetDialog.querySelector('[data-budget-currency]');
 budgetCurrency.addEventListener('submit', async event => {
   event.preventDefault();

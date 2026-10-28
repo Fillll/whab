@@ -18,6 +18,15 @@ export function hydrateCurrencyChoices(select) {
   select.removeAttribute('data-currency-choices-lazy');
 }
 
+/* In-place settings pages use an enter event rather than a native dialog opener. */
+export function initSettingsCurrencyChoices(page) {
+  const hydrate = () => {
+    for (const select of page.querySelectorAll('select[data-currency-choices-lazy]')) hydrateCurrencyChoices(select);
+  };
+  page.addEventListener('whab:settings-enter', hydrate);
+  if (!page.hidden) hydrate();
+}
+
 /* Account metadata stays in the addressed budget; opening settings loads one account. */
 export function initAccountSettings({api, readForm, updateFields, flush, refresh}) {
   const form = document.querySelector('[data-account-classification]');

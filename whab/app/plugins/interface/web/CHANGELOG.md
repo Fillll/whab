@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.33.1 — 2026-10-27
+
+PR: [#125](https://github.com/Fillll/whab/pull/125)
+
+- Load the complete currency choices when opening Budgets inside Settings, including addressed startup pages. Preserve draft selections on reopening.
+
+
 ## 1.33.0 — 2026-10-27
 
 PR: [#124](https://github.com/Fillll/whab/pull/124)
