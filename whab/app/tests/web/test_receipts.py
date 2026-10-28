@@ -120,3 +120,32 @@ def test_original_workspace_and_demo_exports_keep_their_own_receipt_bytes(store,
             snapshot, receipts = read_files(files, with_receipts=True)
             assert receipts == [(key, image)]
             assert any(transaction["id"] == key for transaction in snapshot["transactions"])
+
+
+def test_pdf_upload_round_trip_and_export_preserve_documents_and_ledger(store, tmp_path):
+    from whab_plugin_sqlite.portable import read_files
+
+    from tests.receipt_images import pdf, webp
+
+    document = pdf()
+    with client_for(store, tmp_path) as client:
+        key = add_transaction(client)
+        endpoint = f"/api/transactions/{key}/receipt?workspace=personal"
+        before = store.export_budget()
+        assert client.put(endpoint, content=document, headers={"content-type": "application/pdf"}).status_code == 200
+        saved = client.get(endpoint)
+        assert saved.content == document and saved.headers["content-type"] == "application/pdf"
+        assert saved.headers["content-disposition"] == 'inline; filename="receipt.pdf"'
+        assert saved.headers["cache-control"] == "no-store" and saved.headers["x-content-type-options"] == "nosniff"
+        assert "sandbox" in saved.headers["content-security-policy"]
+        assert store.export_budget() == before
+        container = decode_container(client.get("/api/budget/export?workspace=personal").content)
+        _, receipts = read_files({name.removeprefix("plugins/sqlite/"): raw for name, raw in container.files.items()}, with_receipts=True)
+        assert receipts == [(key, document)]
+        for raw, media_type, expected in [(webp(), "image/webp", 415), (webp(), "image/png", 400), (png(), "application/pdf", 400), (document[:-10], "application/pdf", 400)]:
+            assert client.put(endpoint, content=raw, headers={"content-type": media_type}).status_code == expected
+            assert client.get(endpoint).content == document
+        # Existing WebP remains readable/exportable through the storage compatibility path.
+        store.save_receipt("personal", key, webp())
+        assert client.get(endpoint).content == webp()
+        assert client.get(endpoint).headers["content-type"] == "image/webp"

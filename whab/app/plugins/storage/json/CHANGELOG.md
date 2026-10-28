@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0 — 2026-10-27
+
+PR: [#126](https://github.com/Fillll/whab/pull/126)
+
+- Use the public host/SDK receipt validator for JPEG, PNG and PDF attachments, retaining legacy WebP compatibility and byte-for-byte receipt persistence across native reopening. Require WHAB 2.45 or newer.
+
 ## 1.3.1 — 2026-10-25
 
 PR: [#113](https://github.com/Fillll/whab/pull/113)

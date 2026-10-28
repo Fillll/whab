@@ -57,7 +57,7 @@ function harness(count = 5, options = {}) {
   const selectionBar = element({querySelector: selector => selector === '[data-clear-selection]' ? clear : selectionCount,
     querySelectorAll: () => [bulk]});
   const feedbackText = element(), feedback = element({hidden: true, querySelector: () => feedbackText});
-  const receiptControls = Object.fromEntries(['[data-receipt-preview]', '[data-receipt-error]',
+  const receiptControls = Object.fromEntries(['[data-receipt-preview]', '[data-receipt-pdf]', '[data-receipt-error]',
     '[data-receipt-status]', '[data-receipt-file]', '[data-receipt-remove]', '[data-receipt-close]',
     '[data-receipt-form]', '[data-receipt-payee]', '[data-receipt-empty]', '[data-receipt-save]'].map(selector => [selector, element()]));
   receiptControls['[data-receipt-file]'].files = [];

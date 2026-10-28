@@ -25,9 +25,10 @@ from whab.domain.ledger_state import (
     require_pristine,
     restore_snapshot,
 )
-from whab.domain.receipts import receipt_media_type, validate_receipt_selection
+from whab.domain.receipts import validate_receipt_selection
 from whab.domain.transactions import UNSET, transaction_rows, validate_review_batch
 from whab.domain.validation import validate_label, validate_month
+from whab.plugins import receipt_media_type
 from whab.plugins.storage_transfer import require_primary
 
 from . import codec

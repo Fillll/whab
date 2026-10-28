@@ -24,9 +24,10 @@ def create_router(service):
         if image is None:
             raise HTTPException(404, "No receipt saved for this transaction.")
         raw, media_type = image
+        extension = {"image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf", "image/webp": "webp"}[media_type]
         return Response(raw, media_type=media_type, headers={
             "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": 'inline; filename="receipt"',
+            "Content-Disposition": f'inline; filename="receipt.{extension}"',
             "Content-Security-Policy": "default-src 'none'; sandbox",
         })
 

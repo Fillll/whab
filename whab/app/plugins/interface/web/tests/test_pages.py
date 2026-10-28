@@ -211,3 +211,14 @@ def test_portable_budget_name_labels_personal_pages_and_preserves_demo(client):
     breadcrumb = re.search(r'<div class="breadcrumb">(.*?)</div>', demo, re.S)[1]
     assert "Demo budget" in breadcrumb and "Household" not in breadcrumb
     assert "Current budget · Demo budget" in demo
+
+
+def test_receipt_picker_offers_only_jpeg_png_and_pdf_in_that_order(client):
+    import re
+
+    text = client.get('/budgets/demo/transactions/2026-10/usd').text
+    assert re.search(r'data-receipt-file accept="image/jpeg,image/png,application/pdf"', text)
+    assert 'JPEG, PNG or PDF · up to 5 MiB' in text
+    assert 'Receipt file<input' in text
+    assert 'data-receipt-pdf target="_blank" rel="noopener noreferrer" hidden>Open PDF receipt</a>' in text
+    assert 'image/webp' not in text and 'JPEG, PNG or WebP' not in text

@@ -273,7 +273,7 @@ class BulkReviewStorage(Protocol):
 
 
 class ReceiptStorage(Protocol):
-    """Optional private raster attachments, isolated and portable with their ledger."""
+    """Optional private image and PDF attachments, isolated and portable with their ledger."""
 
     def receipt_ids(self, workspace: str) -> list[str]: ...
 

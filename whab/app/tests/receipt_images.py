@@ -22,3 +22,18 @@ def jpeg():
 def webp():
     chunk = b"VP8L\x06\x00\x00\x00\x2f\x00\x00\x00\x00\x00"
     return b"RIFF" + struct.pack("<I", len(chunk) + 4) + b"WEBP" + chunk
+
+
+def pdf(*, encrypted=False):
+    """A real one-page fictional PDF with no financial or device metadata."""
+    from io import BytesIO
+
+    from pypdf import PdfWriter
+
+    output = BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    if encrypted:
+        writer.encrypt("fictional-receipt-password")
+    writer.write(output)
+    return output.getvalue()

@@ -206,11 +206,11 @@ def test_workspace_supported_and_media_validation_keep_their_existing_order():
     for workspace in ("invalid", None, {}):
         with pytest.raises(StoreError, match="^Invalid workspace\\.$"):
             service.get(workspace, "active")
-    with pytest.raises(StoreError, match="does not support receipt images"):
+    with pytest.raises(StoreError, match="does not support receipt files"):
         service.get("personal", "active")
     assert service.index("invalid") == {"supported": False, "transactionIds": []}
     before = lock.entries
-    with pytest.raises(StoreError, match="valid PNG, JPEG or WebP"):
+    with pytest.raises(StoreError, match="valid JPEG, PNG or PDF"):
         service.save("invalid", "missing", b"not an image", "image/png")
     with pytest.raises(StoreError, match="does not match its file type"):
         service.save("invalid", "missing", png(), "image/jpeg")
