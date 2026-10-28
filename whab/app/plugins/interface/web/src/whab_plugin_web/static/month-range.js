@@ -38,12 +38,12 @@ export function initMonthRange({root = document, navigate}) {
     frame.querySelector('[data-range-handle="move"]').setAttribute('aria-label',
       `Move ${value.count}-month range, ${links[value.start].getAttribute('aria-label')} through ${links[value.start + value.count - 1].getAttribute('aria-label')}. Use left and right arrow keys.`);
   }
-  function commit(value) {
+  function commit(value, mode) {
     selection = value; draw();
     if (value.start === initial.start && value.count === initial.count) return;
     const url = new URL(links[value.start].href);
     url.searchParams.set('months', value.count);
-    navigate(url, () => {selection = initial; draw();});
+    navigate(url, () => {if (selection === value) {selection = initial; draw();}}, mode);
   }
   listen(frame, 'pointerdown', event => {
     const handle = event.target.closest('[data-range-handle]');
@@ -72,10 +72,10 @@ export function initMonthRange({root = document, navigate}) {
   });
   function finish(event, cancel = false) {
     if (!drag || drag.id !== event.pointerId) return;
-    const value = cancel ? drag.selection : drag.preview;
+    const value = cancel ? drag.selection : drag.preview, mode = drag.mode;
     drag = null; frame.classList.remove('is-dragging');
     if (frame.hasPointerCapture(event.pointerId)) frame.releasePointerCapture(event.pointerId);
-    if (cancel) {selection = value; draw();} else commit(value);
+    if (cancel) {selection = value; draw();} else commit(value, mode);
   }
   listen(frame, 'pointerup', event => finish(event));
   listen(frame, 'pointercancel', event => finish(event, true));
@@ -84,7 +84,7 @@ export function initMonthRange({root = document, navigate}) {
     const handle = event.target.closest('[data-range-handle]');
     if (!handle || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     event.preventDefault();
-    commit(rangeStep(selection.start, selection.count, handle.dataset.rangeHandle, event.key === 'ArrowLeft' ? -1 : 1, links.length));
+    commit(rangeStep(selection.start, selection.count, handle.dataset.rangeHandle, event.key === 'ArrowLeft' ? -1 : 1, links.length), handle.dataset.rangeHandle);
   });
   const observer = new ResizeObserver(() => {if (!drag) draw();});
   observer.observe(strip);

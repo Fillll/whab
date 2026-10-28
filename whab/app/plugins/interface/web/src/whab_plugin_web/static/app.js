@@ -598,7 +598,10 @@ for (const dialog of document.querySelectorAll('[data-settings-page][data-plugin
 
 const pageControls = new WeakSet();
 function initPageControls(root = document) {
-  monthRange = initMonthRange({root, navigate: (url, cancel) => navigationReady() ? budgetEdits.navigate(url, cancel) : cancel()});
+  monthRange = initMonthRange({root, async navigate(url, cancel, handle) {
+    const handled = await accountNavigation.navigate(url, {onCancel: cancel, focus: `[data-range-handle="${handle}"]`});
+    if (!handled) budgetEdits.navigate(url, cancel);
+  }});
   for (const input of root.querySelectorAll('[data-navigation]')) {
     if (input.closest('[data-transaction-register]')) continue;
     if (pageControls.has(input)) continue;
