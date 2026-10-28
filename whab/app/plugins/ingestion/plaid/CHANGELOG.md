@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.4.0 — 2026-10-27
+
+PR: [#124](https://github.com/Fillll/whab/pull/124)
+
+- Present bank connection, management, sync and disconnect controls in Plaid plugin settings. Keep disconnect confirmation inline, suspend/restore visual settings around Link, and return completed operations to Plaid settings while retaining original OAuth scope checks.
+
 ## 1.3.1 — 2026-10-25
 
 PR: [#113](https://github.com/Fillll/whab/pull/113)

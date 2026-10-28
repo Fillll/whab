@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.33.0 — 2026-10-27
+
+PR: [#124](https://github.com/Fillll/whab/pull/124)
+
+- Remove the header currency selector; save the budget default in Budgets settings and show each account in its own currency with separate totals. Place bank connection controls in provider plugin settings.
+- Add a red rounded month-range frame with continuous dragging, month snapping, one-to-five-month resizing, keyboard controls and reduced motion. Preserve the selected range in links and wait for pending budget edits before navigation.
+
 ## 1.32.3 — 2026-10-27
 
 PR: [#123](https://github.com/Fillll/whab/pull/123)

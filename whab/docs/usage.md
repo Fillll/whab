@@ -143,7 +143,7 @@ WHAB sends only the public bank domain to Icon Horse, without account names, IDs
 
 1. Open the Plaid Dashboard's **Team settings → Keys** and find your Client ID and **Sandbox** secret.
 2. Add them to your local `.env` as `PLAID_CLIENT_ID` and `PLAID_SECRET`. Keep `WHAB_ENV=sandbox` and `ALLOW_LIVE_PLAID=false`.
-3. Restart WHAB. Open **Accounts → Connect account**.
+3. Restart WHAB. Open **Settings → Plugins → Plaid → Settings → Connect account**.
 4. Connect a Plaid Sandbox test institution/account. The standard test credentials are `user_good` / `pass_good` where a credential-based Sandbox institution asks for them. Sandbox OAuth institutions have their own simulated flow.
 5. After Link finishes, the server exchanges the public token, saves an encrypted access token, and starts a transaction sync. Use **Sync now** again if the initial import is still loading.
 
@@ -249,3 +249,10 @@ An existing compatible ledger may retain its earlier filename; back up the file 
 Open Settings → Plugins for installed plugins, including disabled ones, grouped into Interfaces, Ingestion, Insights, Storage, Automation and Extensions. Empty categories remain visible. Each plugin's Settings shows its dependencies; selecting a plugin requires its dependencies to be installed and enabled for that budget.
 
 Choose **Plugin Marketplace** to browse maintained plugins and their installation status. **Review installation** prepares the required plugin and Python package list; **Install reviewed packages** installs it on this device. Refresh the installed list, then enable optional plugins for the intended budget. Installing does not enable a plugin or change its saved data. Required plugins cannot be disabled while their dependents remain selected. See [the installation contract](plugins.md#plugin-dependency-manifests) for compatibility, failed installs and supported environments.
+
+
+### Budget default currency and visible months
+
+Choose **Settings → Budgets → Default currency** to set the currency used when opening that budget. Each account displays and retains its own currency in Accounts. Accounts totals are listed separately per currency; changing this view default never converts, relabels or combines account balances, transactions or categories. Account settings can change currency only before transaction history exists.
+
+On Budget, the red rounded frame marks the visible month range. Drag the bottom grip to move it and either side to resize from one to five months. The first month stays strong yellow and subsequent months pale yellow. The frame settles at month boundaries. Use Left/Right arrow keys on the focused grip for keyboard control. Wider budgets scroll horizontally below the month strip.

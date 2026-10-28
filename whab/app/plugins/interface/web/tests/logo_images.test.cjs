@@ -151,7 +151,7 @@ test('register replacement binds refreshed sidebar artwork as well as main conte
   const navigation = app.slice(app.indexOf('const accountNavigation = initAccountNavigation'), app.indexOf('function minorAmount'));
   let options, disposed = false;
   Object.assign(state.context, {
-    currentRegister: {dispose() {disposed = true;}},
+    monthRange: null, currentRegister: {dispose() {disposed = true;}},
     flushEdits: async () => true, notify() {},
     initAccountNavigation(value) {options = value; return {};},
     initTransactionRegister: () => ({dispose() {}}),
