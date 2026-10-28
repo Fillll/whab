@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.32.3 — 2026-10-27
+
+PR: [#123](https://github.com/Fillll/whab/pull/123)
+
+- Keep proposed categories, short LLM/ML markers and dismissal controls on one line. Preserve model provenance and low-score metadata through accessible labels and tooltips.
+- Give register headers and cells a uniform height, including long text, multiline memos and suggestion removal, with fictional desktop/narrow and light/dark layout coverage.
+
+
 ## 1.32.2 — 2026-10-27
 
 PR: [#122](https://github.com/Fillll/whab/pull/122)
