@@ -428,6 +428,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
 
   const receiptDialog = root.querySelector('[data-transaction-receipt-dialog]');
   const receiptImage = receiptDialog.querySelector('[data-receipt-preview]');
+  const receiptPdf = receiptDialog.querySelector('[data-receipt-pdf]');
   const receiptError = receiptDialog.querySelector('[data-receipt-error]');
   const receiptStatus = receiptDialog.querySelector('[data-receipt-status]');
   const receiptFile = receiptDialog.querySelector('[data-receipt-file]');
@@ -442,6 +443,8 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     receiptObjectUrl = null;
     receiptImage.removeAttribute('src');
     receiptImage.hidden = true;
+    receiptPdf.removeAttribute('href');
+    receiptPdf.hidden = true;
   }
   function markReceipt(row, exists) {
     if (exists) receiptIds.add(row.dataset.transactionId); else receiptIds.delete(row.dataset.transactionId);
@@ -463,6 +466,11 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       if (!response.ok) throw new Error('The receipt could not be loaded.');
       const blob = await response.blob();
       if (revision !== receiptRequest || disposed) return;
+      if (blob.type === 'application/pdf') {
+        receiptPdf.href = receiptUrl(row);
+        receiptPdf.hidden = false;
+        return;
+      }
       receiptObjectUrl = URL.createObjectURL(blob);
       receiptImage.src = receiptObjectUrl;
       receiptImage.hidden = false;
@@ -511,8 +519,8 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     event.preventDefault();
     const file = receiptFile.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024 || !['image/png','image/jpeg','image/webp'].includes(file.type)) {
-      receiptError.textContent = 'Choose a JPEG, PNG or WebP image no larger than 5 MiB.'; receiptError.hidden = false; return;
+    if (file.size > 5 * 1024 * 1024 || !['image/jpeg','image/png','application/pdf'].includes(file.type)) {
+      receiptError.textContent = 'Choose a JPEG, PNG or PDF file no larger than 5 MiB.'; receiptError.hidden = false; return;
     }
     receiptPromise = saveReceipt('PUT', file).finally(() => { receiptPromise = null; });
   });

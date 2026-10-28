@@ -1,7 +1,8 @@
 """Budget-scoped receipt access over an optional storage capability."""
 
 from whab.domain.errors import StoreError
-from whab.domain.receipts import receipt_media_type, validate_receipt_selection
+from whab.domain.receipts import RECEIPT_TYPES, validate_receipt_selection
+from whab.receipts import receipt_media_type
 
 
 class ReceiptService:
@@ -15,7 +16,7 @@ class ReceiptService:
         if type(workspace) is not str or workspace not in {"personal", "demo"}:
             raise StoreError("Invalid workspace.")
         if not self.supported:
-            raise StoreError("This storage plugin does not support receipt images.")
+            raise StoreError("This storage plugin does not support receipt files.")
         if transaction_id is not None:
             lookup = getattr(self.store, "receipt_transaction_exists", None)
             if callable(lookup):
@@ -70,8 +71,10 @@ class ReceiptService:
 
     def save(self, workspace, transaction_id, raw, media_type):
         actual = receipt_media_type(raw)
+        if actual not in RECEIPT_TYPES:
+            raise StoreError("Choose a JPEG, PNG or PDF receipt file.")
         if actual != media_type:
-            raise StoreError("The receipt image does not match its file type.")
+            raise StoreError("The receipt file does not match its file type.")
         with self.lock:
             self._check(workspace, transaction_id)
             self.store.save_receipt(workspace, transaction_id, raw)

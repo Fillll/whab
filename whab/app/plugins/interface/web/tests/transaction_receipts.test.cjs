@@ -235,3 +235,36 @@ test('invalid file choices stay local and upload/delete failures preserve the pr
     state.register.dispose();
   }
 });
+
+
+test('PDF receipts upload and open through the private endpoint without a broken image preview', async () => {
+  const state = await ready();
+  receipt(state.rows[0]).emit('click');
+  const file = {type: 'application/pdf', size: 512};
+  state.receiptControls['[data-receipt-file]'].files = [file];
+  state.receiptControls['[data-receipt-form]'].emit('submit');
+  const saving = state.register.flush();
+  assert.equal(state.imageRequests[0].details.body, file);
+  assert.equal(state.imageRequests[0].details.headers['Content-Type'], 'application/pdf');
+  respond(state.imageRequests[0]); await tick();
+  respond(state.imageRequests[1], {blob: {type: 'application/pdf'}});
+  assert.equal(await saving, true);
+  const link = state.receiptControls['[data-receipt-pdf]'];
+  assert.equal(link.hidden, false);
+  assert.match(link.href, /\/transactions\/transaction-0\/receipt\?workspace=personal$/);
+  assert.equal(state.receiptControls['[data-receipt-preview]'].hidden, true);
+  assert.equal(state.objectUrls.length, 0);
+  state.receiptDialog.close();
+  assert.equal(link.hidden, true);
+  state.register.dispose();
+});
+
+test('new WebP receipt uploads are rejected before any request', async () => {
+  const state = await ready();
+  receipt(state.rows[0]).emit('click');
+  state.receiptControls['[data-receipt-file]'].files = [{type: 'image/webp', size: 100}];
+  state.receiptControls['[data-receipt-form]'].emit('submit');
+  assert.equal(state.imageRequests.length, 0);
+  assert.match(state.receiptControls['[data-receipt-error]'].textContent, /JPEG, PNG or PDF/);
+  state.register.dispose();
+});

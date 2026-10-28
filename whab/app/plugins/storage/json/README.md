@@ -129,7 +129,7 @@ committed live data and private connections. Legacy neutral `export_budget()` an
 provider state.
 
 Native files are bounded to 64 MiB; portable payloads to 50 MiB. Limits include
-base64 expansion. Individual receipts retain the shared 5 MiB/25-megapixel limits.
+base64 expansion. Individual receipts retain the shared 5 MiB limit and raster images the 25-megapixel limit. The public host/SDK validates JPEG, PNG and PDF receipts; existing WebP attachments remain readable and portable. PDF-bearing budgets require WHAB 2.45 or newer.
 Native validation also uses the neutral snapshot limits: 1,000 accounts, 10,000
 categories, 250,000 transactions and 250,000 records per planning collection.
 For each currency, the cumulative absolute values across balances, targets,

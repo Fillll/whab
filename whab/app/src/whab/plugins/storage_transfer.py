@@ -23,7 +23,8 @@ from whab.domain.imports import bank_identifier
 from whab.domain.ledger_state import initial_state, portable_snapshot, restore_snapshot
 from whab.domain.money import MAX_SAFE_INTEGER
 from whab.domain.portable import validate_portable_budget
-from whab.domain.receipts import MAX_RECEIPT_BYTES, receipt_media_type
+from whab.domain.receipts import MAX_RECEIPT_BYTES
+from whab.receipts import receipt_media_type
 
 MAX_LOCAL_TRANSFER_BYTES = 128 * 1024 * 1024
 MAX_OPERATION_BYTES = 32 * 1024 * 1024

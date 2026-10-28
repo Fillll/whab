@@ -174,3 +174,20 @@ def test_portable_payload_rejects_runtime_records_and_incompatible_version(json_
     value.update(change)
     with pytest.raises(StoreError):
         codec.read_files({"budget.json": json.dumps(value).encode()})
+
+
+def test_pdf_receipts_use_shared_validation_and_survive_native_reopen(json_store, json_import):
+    from whab_plugin_json.store import Store
+
+    from tests.receipt_images import pdf
+
+    json_store.import_workspace("personal", "fictional", "fingerprint", json_import)
+    document = pdf()
+    before = json_store.export_budget("personal")
+    json_store.save_receipt("personal", "import-transaction", document)
+    assert json_store.get_receipt("personal", "import-transaction") == document
+    assert json_store.export_budget("personal") == before
+    json_store.close()
+    reopened = Store(json_store.path)
+    assert reopened.get_receipt("personal", "import-transaction") == document
+    reopened.close()

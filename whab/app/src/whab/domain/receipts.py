@@ -7,7 +7,7 @@ from .errors import StoreError
 
 MAX_RECEIPT_BYTES = 5 * 1024 * 1024
 MAX_RECEIPT_PIXELS = 25_000_000
-RECEIPT_TYPES = frozenset({"image/png", "image/jpeg", "image/webp"})
+RECEIPT_TYPES = frozenset({"image/jpeg", "image/png", "application/pdf"})
 
 
 def validate_receipt_selection(transaction_ids) -> tuple[str, ...]:
@@ -118,7 +118,7 @@ def _webp(raw):
 def receipt_media_type(raw):
     """Check bounded raster structure; never trust extensions or upload MIME labels."""
     if type(raw) is not bytes or not 1 <= len(raw) <= MAX_RECEIPT_BYTES:
-        raise StoreError("Choose a receipt image no larger than 5 MiB.")
+        raise StoreError("Choose a receipt file no larger than 5 MiB.")
     try:
         if raw.startswith(b"\x89PNG\r\n\x1a\n"):
             _png(raw)

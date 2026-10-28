@@ -126,10 +126,11 @@
   <div class="modal-heading"><h2 id="receipt-title">Receipt</h2><button class="icon-button" type="button" data-receipt-close aria-label="Close receipt">{{ icon('close', 16) }}</button></div>
   <p class="settings-notice" data-receipt-payee></p>
   <img class="receipt-preview" data-receipt-preview alt="Saved transaction receipt" hidden>
+  <a class="button secondary" data-receipt-pdf target="_blank" rel="noopener noreferrer" hidden>Open PDF receipt</a>
   <p class="settings-notice" data-receipt-empty>No receipt saved.</p>
   <form data-receipt-form class="modal-form">
-    <label>Receipt image<input type="file" data-receipt-file accept="image/jpeg,image/png,image/webp" required></label>
-    <p class="settings-notice">JPEG, PNG or WebP · up to 5 MiB</p>
+    <label>Receipt file<input type="file" data-receipt-file accept="image/jpeg,image/png,application/pdf" required></label>
+    <p class="settings-notice">JPEG, PNG or PDF · up to 5 MiB</p>
     <p class="field-error" data-receipt-error role="alert" hidden></p>
     <p class="settings-notice" data-receipt-status role="status"></p>
     <div class="receipt-actions"><button class="button primary" type="submit" data-receipt-save>Save receipt</button><button class="button secondary" type="button" data-receipt-remove hidden>Remove receipt</button></div>

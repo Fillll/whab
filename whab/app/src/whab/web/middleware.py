@@ -124,7 +124,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
                 request.method != "DELETE"
                 and (actual_type not in RECEIPT_TYPES if receipt_upload else actual_type != content_type)
             ):
-                return JSONResponse({"error": "Use a PNG, JPEG or WebP image" if receipt_upload else f"Use {content_type}"}, status_code=415)
+                return JSONResponse({"error": "Use a JPEG, PNG or PDF file" if receipt_upload else f"Use {content_type}"}, status_code=415)
             limit = MAX_RECEIPT_BYTES if receipt_upload else (50 * 1024 * 1024 if request.url.path == "/api/budget/open" else 10 * 1024 * 1024) if file_import else 128 * 1024 if webhook else 32 * 1024
             try:
                 if int(request.headers.get("content-length", "0")) > limit:
