@@ -110,7 +110,9 @@ def test_multi_month_ui_receives_currency_scoped_core_periods_only_for_budget(tm
             assert {row["currency"] for row in period["accounts"]} == {"EUR"}
             assert {row["id"] for row in period["categories"]} == {euro_category}
             assert period["summary"] == service.workspace("personal", period["month"])["summariesByCurrency"]["EUR"]
-        assert {key: value for key, value in data.items() if key != "periods"} == data["periods"][0]
+        assert {key: value for key, value in data.items() if key not in {"periods", "allAccounts", "viewPreferences"}} == data["periods"][0]
+        assert data["allAccounts"] == service.accounts("personal")
+        assert data["viewPreferences"] == {"defaultCurrency": "USD"}
         for page in ("transactions", "insights", "accounts"):
             assert client.get(f"/budgets/home/{page}/{month}/eur").status_code == 200
             assert "periods" not in seen[-1]

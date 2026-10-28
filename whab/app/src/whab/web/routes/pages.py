@@ -149,10 +149,11 @@ def create_router(
         else:
             data = select_currency(service.workspace(workspace, month), currency)
         data = {**data, "allAccounts": all_accounts,
-                "viewPreferences": preferences.read(workspace) if preferences else {"defaultCurrency": "USD"},
-                "accountSummariesByCurrency": {
-                    code: account_summary([row for row in all_accounts if row.get("currency", "USD") == code])
-                    for code in sorted({row.get("currency", "USD") for row in all_accounts})} if page == "accounts" else {}}
+                "viewPreferences": preferences.read(workspace) if preferences else {"defaultCurrency": "USD"}}
+        if page == "accounts":
+            data["accountSummariesByCurrency"] = {
+                code: account_summary([row for row in all_accounts if row.get("currency", "USD") == code])
+                for code in sorted({row.get("currency", "USD") for row in all_accounts})}
         selected_account = next((row for row in data["accounts"] if row["id"] == account), None)
         if account_slug is not None and selected_account is None:
             raise HTTPException(404, "Account address not found for this currency")
