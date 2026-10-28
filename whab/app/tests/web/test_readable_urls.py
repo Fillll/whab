@@ -83,7 +83,7 @@ def test_account_alias_renames_collisions_and_registry_stay_device_local(tmp_pat
         template = re.search(r'<template data-account-list>(.*?)</template>', fragment.text, re.S)[1]
         assert "Daily cash" in template and f'data-account-id="{first}"' in template
         assert '/daily-cash/transactions/2026-10/usd?all_dates=true' in template
-        assert 'title="Daily cash"' in template
+        assert 'title="Daily cash · USD"' in template
         assert context(client.get(f'/budgets/my-budget/{data["accountSlugs"][second]}/transactions/2026-10/usd'))["selectedAccountId"] == second
         raw = client.get("/budgets/home/api/budget/export").content
         assert b"routes-sandbox.json" not in raw

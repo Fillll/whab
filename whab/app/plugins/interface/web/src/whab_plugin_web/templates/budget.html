@@ -1,3 +1,6 @@
+{% set month_count = [budget_month_count(request.query_params.get('months')), periods|length]|min %}
+{% set periods = periods[:month_count] %}
+{% set period_months = period_months[:month_count] %}
 {% macro summary_details(period, label, carry_in=false) -%}
   <details class="budget-summary-details{% if carry_in %} budget-carry-in-details{% endif %}" data-budget-key="details:{{ period.month }}:{{ label }}">
     <summary aria-label="{{ label }} for {{ month_label(period.month) }}: Where it comes from">Where it comes from</summary>
@@ -7,17 +10,22 @@
 {% macro equation_amount(amount, operator) -%}
   <span class="budget-equation-operator">{{ operator }}</span> {% if amount<0 %}({{ money_number(amount) }}){% else %}{{ money_number(amount) }}{% endif %}
 {%- endmacro %}
-<div class="budget-planner" data-budget-key="budget-planner" data-month="{{ month }}" data-currency="{{ currency }}" data-workspace="{{ workspace }}" data-budget-id="{{ budget_id }}" data-budget-route="{{ client_context.budgetKey }}">
+<div class="budget-planner" data-budget-key="budget-planner" data-month="{{ month }}" data-month-count="{{ month_count }}" data-currency="{{ currency }}" data-workspace="{{ workspace }}" data-budget-id="{{ budget_id }}" data-budget-route="{{ client_context.budgetKey }}">
   <div class="budget-toolbar" data-budget-key="toolbar">
-    <nav class="month-strip" aria-label="Budget month">
-      {% if shift_month(month,-1)!=month %}<a class="icon-button" href="{{ url(month=shift_month(month,-1)) }}" aria-label="Previous month">{{ icon('chevron-left', 17) }}</a>{% endif %}
+    <nav class="month-strip" data-month-range aria-label="Budget month">
+      {% if shift_month(month,-1)!=month %}<a class="icon-button" href="{{ url(months=month_count,month=shift_month(month,-1)) }}" aria-label="Previous month">{{ icon('chevron-left', 17) }}</a>{% endif %}
       {% for strip_month in month_strip %}
         {% if loop.first or strip_month[:4]!=month_strip[loop.index0-1][:4] %}<span class="month-strip-year">{{ strip_month[:4] }}</span>{% endif %}
-        <a class="month-link {% if strip_month==month %}is-selected {% elif strip_month in period_months %}in-range {% endif %}" href="{{ url(month=strip_month) }}" aria-label="{{ month_label(strip_month) }}"{% if strip_month==month %} aria-current="date"{% endif %}>{{ month_label(strip_month,true) }}</a>
+        <a data-month="{{ strip_month }}" class="month-link {% if strip_month==month %}is-selected {% elif strip_month in period_months %}in-range {% endif %}" href="{{ url(months=month_count,month=strip_month) }}" aria-label="{{ month_label(strip_month) }}"{% if strip_month==month %} aria-current="date"{% endif %}>{{ month_label(strip_month,true) }}</a>
       {% endfor %}
-      {% if shift_month(month,1)!=month %}<a class="icon-button" href="{{ url(month=shift_month(month,1)) }}" aria-label="Next month">{{ icon('chevron-right', 17) }}</a>{% endif %}
+      {% if shift_month(month,1)!=month %}<a class="icon-button" href="{{ url(months=month_count,month=shift_month(month,1)) }}" aria-label="Next month">{{ icon('chevron-right', 17) }}</a>{% endif %}
+      <div class="month-range-frame" data-month-frame data-budget-key="month-range-frame" data-budget-local hidden>
+        <button type="button" class="month-range-handle start" data-range-handle="start" aria-label="Resize start of month range" title="Drag to resize; arrow keys change the start">{{ icon('chevron-left', 12) }}</button>
+        <button type="button" class="month-range-move" data-range-handle="move" aria-label="Move selected month range" title="Drag to move; arrow keys move one month"></button>
+        <button type="button" class="month-range-handle end" data-range-handle="end" aria-label="Resize end of month range" title="Drag to resize; arrow keys change the end">{{ icon('chevron-right', 12) }}</button>
+      </div>
     </nav>
-    <a class="button secondary budget-today" href="{{ url(month='current-month') }}">This month</a>
+    <a class="button secondary budget-today" href="{{ url(months=month_count,month='current-month') }}">This month</a>
   </div>
   <div class="budget-workspace{% if selected %} has-inspector{% endif %}" data-budget-key="workspace">
     <section class="budget-table-section" aria-label="Monthly category budget" data-budget-key="table-section">
@@ -188,7 +196,7 @@
               {% set group_index = loop.index %}
               <tr class="budget-group-row" data-budget-key="group:{{ group.name }}">
                 <td data-budget-key="category"><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}<span>{{ group.name }}</span></button></td>
-                {% for total in group.periods %}
+                {% for total in group.periods[:month_count] %}
                   {% set period = periods[loop.index0] %}
                   {% if period.show_carryover %}<td class="month-start budget-carryover{% if valid_money(total.carryover) and total.carryover<0 %} negative{% elif total.carryover==0 %} zero{% endif %}" data-budget-key="{{ period.month }}:carryover">{{ money_number(total.carryover) if valid_money(total.carryover) else '—' }}</td>{% endif %}
                   <td{% if not period.show_carryover %} class="month-start"{% endif %} data-budget-key="{{ period.month }}:assigned">{{ money_number(total.assigned) }}</td>
@@ -199,7 +207,7 @@
               {% for row in group.rows %}
                 <tr class="budget-category-row{% if selected and selected.id==row.category.id %} selected{% endif %}" data-budget-group-member="{{ group_index }}" data-budget-key="category:{{ row.category.id }}">
                   <td data-budget-key="category"><a class="budget-category-link" href="{{ url(category=row.category.id) }}">{{ row.category.name }}</a></td>
-                  {% for cell in row.periods %}
+                  {% for cell in row.periods[:month_count] %}
                     {% set period = periods[loop.index0] %}
                     {% if period.show_carryover %}<td class="month-start budget-carryover{% if cell.month==month %} selected-month{% endif %}{% if valid_money(cell.carryover) and cell.carryover<0 %} negative{% elif cell.carryover==0 %} zero{% endif %}" data-budget-key="{{ cell.month }}:carryover">{{ money_number(cell.carryover) if valid_money(cell.carryover) else '—' }}</td>{% endif %}
                     <td class="{% if not period.show_carryover %}month-start{% endif %}{% if cell.month==month %} selected-month{% endif %}" data-budget-key="{{ cell.month }}:assigned">

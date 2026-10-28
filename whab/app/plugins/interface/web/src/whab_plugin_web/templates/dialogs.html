@@ -183,6 +183,15 @@
   <button class="settings-back" type="button" data-settings-back>{{ icon('chevron-left', 14) }}Settings</button>
   {{ heading('Budgets', 'Open, create or add a budget.', false) }}
   <p class="field-error" data-budget-load-error role="alert" hidden></p>
+  <section class="budget-section" aria-labelledby="budget-currency-title">
+    <h3 id="budget-currency-title">Default currency</h3>
+    <form class="modal-form" data-budget-currency>
+      <label>Budget default currency<select name="defaultCurrency" data-currency-choices-lazy>{% for code in [default_currency] %}<option value="{{ code }}" selected>{{ code }}</option>{% endfor %}</select></label>
+      <p class="settings-notice">Budget opens in this currency. Each account keeps its own currency; amounts are never converted or combined across currencies.</p>
+      <p class="field-error" role="alert" hidden></p>
+      <button class="button secondary" type="submit">Save default currency</button>
+    </form>
+  </section>
   <section class="budget-section" aria-labelledby="open-budget-title">
     <h3 id="open-budget-title">Open budget</h3>
     <form class="modal-form" data-budget-switch data-personal-url="{{ url(workspace='personal', category=none) }}" data-demo-url="{{ url(workspace='demo', category=none) }}">
@@ -370,6 +379,9 @@
   </fieldset>
   {% endif %}
   <section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings>{% if not plugin.active %}<p class="settings-notice">{% if plugin.enabled %}Apply a supported live selection or restart WHAB to view this plugin’s settings.{% else %}Enable this plugin, then review a supported live selection or save it for restart to view its settings.{% endif %}</p>{% endif %}</section>
+  {% for bank in bank_panels if bank.id == plugin.id %}
+    {% with status=bank.status, items=bank['items'] %}{% include bank.template %}{% endwith %}
+  {% endfor %}
   {% for importer in import_panels if importer.id == plugin.id %}
     {% include importer.template %}
   {% endfor %}

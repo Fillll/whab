@@ -47,8 +47,10 @@ def test_closed_account_dialogs_keep_only_selected_currency_and_one_shared_catal
     response = client.get(f"/budgets/home/accounts/2026-10/{currency.lower()}")
     assert response.status_code == 200
     markup = CurrencyMarkup(response.text)
-    assert len(markup.selects) == 2
-    for select in markup.selects:
+    assert len(markup.selects) == 3
+    assert markup.selects[2]["attrs"]["name"] == "defaultCurrency"
+    assert markup.selects[2]["options"] == [{"value": "USD", "selected": None}]
+    for select in markup.selects[:2]:
         assert select["attrs"]["name"] == "currency"
         assert select["options"] == [{
             "value": currency, "data-minor-units": str(currency_minor_units(currency)), "selected": None,

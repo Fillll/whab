@@ -88,6 +88,7 @@ function harness(initial = 'budget') {
     api(url, body) {const pending = deferred(); requests.push({url, body, ...pending}); return pending.promise;},
     fetch(url, options) {const pending = deferred(); refreshes.push({url, options, ...pending}); return pending.promise;},
     DOMParser: class {parseFromString() {return {querySelector: () => page('budget', String(requests.at(-1).body.assigned)).planner};}},
+    initMonthRange() {return {dispose() {}};},
     initAccountNavigation(options) {navigationOptions = options; return navigator;},
     initTransactionRegister() {
       const register = {dirty: false, disposed: false, flushes: 0,

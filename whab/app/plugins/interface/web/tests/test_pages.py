@@ -59,7 +59,7 @@ def test_default_formats_and_only_children_in_category_choices(client):
     assert re.search(r'class="date-cell">2026-10-\d{2}</td>', text)
     assert 'Date (YYYY-MM-DD)' in text
     assert 'name="date" type="text" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"' in text
-    assert 'aria-label="Budget currency" data-navigation="currency"' in text
+    assert 'aria-label="Budget currency"' not in text
     assert '<optgroup label="Everyday">' in text
     category_selects = re.findall(r'<select name="categoryId"[^>]*>(.*?)</select>', text, re.S)
     assert category_selects
@@ -112,9 +112,9 @@ def test_pages_keep_currency_totals_and_categories_separate(client):
         assert f'{currency} food' in text and f'{currency} wallet' in text
         assert f'value="{amount_input}"' in text
         assert f'/2026-10/{currency.lower()}' in text
-        assert '<option value="JPY"' in text and '<option value="KWD"' in text
+        assert 'aria-label="Budget currency"' not in text
         for other in accounts.keys() - {currency}:
-            assert f'{other} wallet' not in text and f'{other} food' not in text
+            assert f'{other} wallet' in text and f'{other} food' not in text
         transactions = client.get(
             f"/budgets/home/transactions/2026-10/{currency.lower()}"
         ).text
@@ -125,7 +125,7 @@ def test_pages_keep_currency_totals_and_categories_separate(client):
 
 def test_empty_selected_currency_remains_selected_when_switching_workspaces(client):
     text = client.get("/budgets/demo/budget/2026-10/eur").text
-    assert '<option value="EUR" selected>EUR</option>' in text
+    assert 'aria-label="Budget currency"' not in text
     assert "All amounts in EUR" in text
     ready = re.search(
         r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', text, re.S,
@@ -157,10 +157,9 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
     assert 'aria-label="On-budget accounts"' in text
     assert 'aria-label="Off-budget accounts"' in text
     assert 'aria-label="Account totals in USD"' in text
-    assert '<dt>Assets</dt><dd>$8,500.00</dd>' in text
-    assert '<dt>Liabilities</dt><dd>$1,000.00</dd>' in text
-    assert '<dt>Net worth</dt><dd>$7,500.00</dd>' in text
-    assert 'On-budget cash balances · USD</span><strong>$500.00' in text
+    assert '<dt>Assets · USD</dt><dd>$8,500.00</dd>' in text
+    assert '<dt>Liabilities · USD</dt><dd>$1,000.00</dd>' in text
+    assert '<dt>Net worth · USD</dt><dd>$7,500.00</dd>' in text
     assert '401(k)' in text and 'Brokerage' in text and 'Mortgage' in text
     assert 'Certificate of deposit (CD)' in text
     assert 'name="onBudget" data-boolean-value' in text
@@ -174,8 +173,7 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
     }).status_code == 200
     text = client.get("/budgets/home/accounts/2026-10/usd").text
     assert 'data-account-on-budget="false" data-account-subtype="savings"' in text
-    assert 'On-budget cash balances · USD</span><strong>$0.00' in text
-    assert '<dt>Net worth</dt><dd>$7,500.00</dd>' in text
+    assert '<dt>Net worth · USD</dt><dd>$7,500.00</dd>' in text
 
 
 def test_off_budget_transactions_remain_visible_and_marked_excluded(client):

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.44.0 — 2026-10-27
+
+PR: [#124](https://github.com/Fillll/whab/pull/124)
+
+- Add budget-scoped default currency preferences and public all-account projections with separate core-derived totals per currency. Preserve ledger amounts, account history safeguards, portable containers and workspace isolation.
+
 ## 2.43.1 — 2026-10-26
 
 PR: [#120](https://github.com/Fillll/whab/pull/120)

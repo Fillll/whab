@@ -170,8 +170,14 @@ def uncategorized_spending(data):
     )
 
 
+def budget_month_count(value):
+    """A malformed or unsupported view range retains the three-month default."""
+    return int(value) if value in ("1", "2", "3", "4", "5") else 3
+
+
 def build_context(data, status, items, *, workspace, page, month, selected=None):
     categories = data["categories"]
+    all_accounts = data.get("allAccounts", data["accounts"])
     currency = currency_code(data.get("currency", "USD"))
     budgets = {row["categoryId"]: row for row in data.get("budget", [])}
     selected = next((c for c in categories if c["id"] == selected), None)
@@ -309,6 +315,13 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "currencies": data.get("currencies", [currency]),
         "currency_choices": [(code, currency_minor_units(code)) for code in SUPPORTED_CURRENCIES],
         "minor_units": currency_minor_units(currency),
+        "default_currency": data.get("viewPreferences", {}).get("defaultCurrency", "USD"),
+        "account_totals": data.get("accountSummariesByCurrency", {}),
+        "all_accounts": all_accounts,
+        "currency_money": format_money,
+        "account_money": lambda account: format_money(account["balance"], account.get("currency", "USD")),
+        "account_sidebar_money": lambda value, account: sidebar_money(value, account.get("currency", "USD")),
+        "budget_month_count": budget_month_count,
         "money": lambda value: format_money(value, currency),
         "sidebar_money": lambda value: sidebar_money(value, currency),
         "money_input": lambda value: money_input(value, currency),
@@ -323,7 +336,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "monthly_funding_flow_available": all(
             period.get("monthlyFundingFlow") is True for period in periods
         ),
-        "month_strip": list(dict.fromkeys(shift_month(month, step) for step in range(-3, 6))),
+        "month_strip": list(dict.fromkeys(shift_month(month, step) for step in range(-4, 9))),
         "period_months": [period["month"] for period in periods],
         "category_path": lambda identifier: quote(identifier, safe=""),
         "category_names": category_names,
@@ -338,7 +351,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
             {
                 "label": "On-budget", "on_budget": True,
                 "description": "Checking, savings and credit accounts used for everyday budgeting.",
-                "accounts": [a for a in data["accounts"] if is_on_budget(a)],
+                "accounts": [a for a in all_accounts if is_on_budget(a)],
             },
             {
                 "label": "Off-budget", "on_budget": False,
@@ -346,7 +359,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
                     "Investments, retirement, property, loans and deposits tracked in your net worth. "
                     "Their balances and transactions stay outside your budget."
                 ),
-                "accounts": [a for a in data["accounts"] if not is_on_budget(a)],
+                "accounts": [a for a in all_accounts if not is_on_budget(a)],
             },
         ],
         "account_types": ACCOUNT_TYPES,

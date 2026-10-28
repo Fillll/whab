@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from whab import __version__
+from whab.domain.accounts import account_summary
 from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.plugins import PluginError
@@ -19,7 +20,7 @@ from whab.web.transaction_filters import transaction_period
 
 def create_router(
     store, banks, bank_stores, plugins, templates, environment, ui, plugin_manager=None,
-    budget_name="My budget", service=None,
+    budget_name="My budget", service=None, preferences=None,
 ):
     router = APIRouter()
 
@@ -50,7 +51,7 @@ def create_router(
         routing = request.scope.get("whab.routing")
         personal_key = routing.route_key(service.budget_id) if routing else budget_key(service.budget_id)
         key = personal_key if service.budget_id != "default" or request.cookies.get("whab-budget") else "demo"
-        target = page_url(key)
+        target = page_url(key, currency=preferences.read("demo" if key == "demo" else "personal")["defaultCurrency"] if preferences else "USD")
         if "oauth_state_id" in request.query_params:
             if not any(p.id == "plaid" and p.bank_ui for p in plugins.bank_plugins()):
                 raise HTTPException(400, "Bank OAuth continuation is unavailable.")
@@ -147,6 +148,12 @@ def create_router(
             data = {**periods[0], "periods": periods}
         else:
             data = select_currency(service.workspace(workspace, month), currency)
+        data = {**data, "allAccounts": all_accounts,
+                "viewPreferences": preferences.read(workspace) if preferences else {"defaultCurrency": "USD"}}
+        if page == "accounts":
+            data["accountSummariesByCurrency"] = {
+                code: account_summary([row for row in all_accounts if row.get("currency", "USD") == code])
+                for code in sorted({row.get("currency", "USD") for row in all_accounts})}
         selected_account = next((row for row in data["accounts"] if row["id"] == account), None)
         if account_slug is not None and selected_account is None:
             raise HTTPException(404, "Account address not found for this currency")
@@ -187,7 +194,7 @@ def create_router(
         def url(next_page=page, **overrides):
             target_workspace = overrides.pop("workspace", workspace)
             target_key = key if target_workspace == workspace else ("demo" if target_workspace == "demo" else personal_key)
-            target_currency = overrides.pop("currency", currency)
+            target_currency = overrides.pop("currency", data["viewPreferences"]["defaultCurrency"] if next_page == "budget" and page != "budget" else currency)
             target_account = overrides.pop("account", None)
             target_slug = account_slugs.get(target_account) if target_workspace == workspace and next_page == "transactions" else None
             if target_account is not None and target_slug is None:
@@ -250,6 +257,7 @@ def create_router(
 
         context["bank_panels"] = [
             {
+                "id": p.id,
                 "template": f"banks/{p.id}/{plugins.bank_identity(p.id)}/accounts.html",
                 "status": public_bank_status(banks[p.id], environment),
                 "items": bank_stores[p.id].items() if workspace == "personal" else [],
@@ -283,12 +291,12 @@ def create_router(
             identity: plugins.bank_logo(identity[0], website=identity[1])
             for identity in dict.fromkeys(
                 (account.get("institution", ""), account.get("bankWebsite"))
-                for account in data["accounts"]
+                for account in all_accounts
             )
         }
         context["account_logos"] = {
             account["id"]: f"{api_prefix}/plugins/{logo[0]}/bank-logos/{logo[1]}"
-            for account in data["accounts"]
+            for account in all_accounts
             if (logo := institution_logos.get((account.get("institution", ""), account.get("bankWebsite")))) is not None
         }
         context["account_logo_provider"] = plugins.bank_logo_provider()

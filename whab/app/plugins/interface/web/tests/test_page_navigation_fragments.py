@@ -146,7 +146,8 @@ def test_fragment_options_are_fresh_currency_scoped_and_escaped(client, store, p
     assert {(row["value"], row["text"]) for row in after.options["account"]} == {(original, account_name), (added, "New wallet")}
     assert {"value": category, "text": category_name, "group": group_name} in after.options["category"]
     assert group_name in {row["value"] for row in after.options["group"]}
-    assert "Other currency" not in response.text and "Original wallet" not in response.text
+    assert "Other currency category" not in response.text and "Other currency group" not in response.text
+    assert "Other currency wallet" in response.text and "Original wallet" not in response.text
     assert account_name not in response.text and category_name not in response.text and group_name not in response.text
     assert "&lt;img" in response.text and "&lt;script&gt;" in response.text and "&lt;svg" in response.text
     assert not [name for _, attrs in after.tags for name in attrs if name.startswith("on")]

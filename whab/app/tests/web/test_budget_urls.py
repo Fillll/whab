@@ -163,8 +163,8 @@ def test_current_month_alias_rolls_forward_and_navigation_preserves_its_meaning(
         assert november["month"] == "2026-11" and november["monthToken"] == "current-month"
         fixed = client.get("/budgets/demo/budget/2026-10/eur")
         assert page_context(fixed)["month"] == "2026-10"
-        assert 'href="/budgets/demo/budget/current-month/eur">This month</a>' in fixed.text
-        assert 'href="/budgets/demo/budget/2026-11/eur"' in fixed.text
+        assert 'href="/budgets/demo/budget/current-month/eur?months=3">This month</a>' in fixed.text
+        assert 'href="/budgets/demo/budget/2026-11/eur?months=3"' in fixed.text
 
 
 def test_saved_budget_path_reopens_its_runtime_despite_unknown_cookie(tmp_path):
