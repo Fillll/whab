@@ -95,7 +95,7 @@ function harness({flush = async () => true, logo = true, lazyCurrency = false, i
     currencyEditable: false, ...override});
   }
   return {requests, refreshed, updates, order, error, status, submit, elements, dialog, form, open, metadata,
-    hydrateCurrencyChoices: context.hydrateCurrencyChoices, metadataReads: () => metadataReads};
+    initSettingsCurrencyChoices: context.initSettingsCurrencyChoices, hydrateCurrencyChoices: context.hydrateCurrencyChoices, metadataReads: () => metadataReads};
 }
 
 test('lazy currency choices preserve current selection, reset defaults and unrelated form drafts', () => {
@@ -334,4 +334,28 @@ test('unsaved transaction failures block account mutation and retain the setting
   assert.equal(state.dialog.open, true);
   assert.equal(state.error.textContent, 'Save the transaction or budget edit before continuing.');
   assert.equal(state.submit.disabled, false);
+});
+
+
+test('budget settings load currency choices on entry and preserve the selected draft on reopening', async () => {
+  const state = harness();
+  const currency = currencySelect('USD');
+  const page = events({hidden: true, querySelectorAll: () => [currency]});
+  state.initSettingsCurrencyChoices(page);
+  assert.equal(currency.options.length, 1);
+  await page.emit('whab:settings-enter');
+  assert.ok(currency.options.some(option => option.value === 'JPY'));
+  assert.ok(currency.options.some(option => option.value === 'KWD'));
+  currency.value = 'JPY';
+  await page.emit('whab:settings-enter');
+  assert.equal(currency.value, 'JPY');
+  assert.equal(currency.replacements, 1);
+});
+
+test('an addressed settings page already open at startup hydrates its currency picker', () => {
+  const state = harness();
+  const currency = currencySelect('KWD');
+  state.initSettingsCurrencyChoices(events({hidden: false, querySelectorAll: () => [currency]}));
+  assert.ok(currency.options.length > 1);
+  assert.equal(currency.value, 'KWD');
 });
