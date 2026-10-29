@@ -276,6 +276,9 @@ class Store(Authority):
         identifier = transaction.get("id") or str(uuid4())
         return self._mutate(workspace, lambda state: commands.add_transaction(state, identifier, transaction, source))
 
+    def edit_transaction_details(self, workspace, transaction_id, changes):
+        return self._mutate(workspace, lambda state: commands.edit_transaction_details(state, transaction_id, changes))
+
     def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET):
         return self._mutate(workspace, lambda state: commands.edit_transaction(state, transaction_id, category_id, reviewed, note))
 

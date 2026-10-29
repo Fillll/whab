@@ -31,7 +31,7 @@ MAX_OPERATION_BYTES = 32 * 1024 * 1024
 MAX_OPERATION_RECEIPTS = 4096
 STORAGE_ROLES = frozenset({"primary", "staged", "copy", "fenced", "retired"})
 STORAGE_OPERATIONS = frozenset({
-    "add_account", "update_account", "add_category", "add_transaction", "edit_transaction",
+    "add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details",
     "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "save_item",
     "set_item_status", "disconnect_item", "apply_sync", "import_workspace", "restore_budget",
     "save_receipt", "delete_receipt", "restore_budget_files", "prepare_budget_files",
@@ -41,6 +41,7 @@ _OPERATION_FIELDS = {
     "update_account": ({"accountId"}, {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}),
     "add_category": ({"name", "target"}, {"group", "parentId", "currency"}),
     "add_transaction": ({"accountId", "date", "merchant", "amount", "categoryId"}, {"note", "source", "id"}),
+    "edit_transaction_details": ({"transactionId", "changes"}, set()),
     "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed", "note"}),
     "review_transactions": ({"transactionIds", "reviewed"}, set()),
     "assign": ({"categoryId", "month", "assigned"}, set()),
@@ -369,6 +370,8 @@ def dispatch_storage_operation(backend, operation):
     if name == "update_account":
         identifier = payload.pop("accountId")
         return backend.update_account(workspace, identifier, payload)
+    if name == "edit_transaction_details":
+        return backend.edit_transaction_details(workspace, payload["transactionId"], payload["changes"])
     if name == "edit_transaction":
         identifier = payload.pop("transactionId")
         fields = {"categoryId": "category_id", "reviewed": "reviewed", "note": "note"}

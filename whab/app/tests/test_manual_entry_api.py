@@ -64,3 +64,62 @@ def test_native_bank_refresh_retains_manual_entries_and_rejects_provider_deletio
     with pytest.raises(StoreError, match="does not belong"):
         store.apply_sync("item", {**empty, "removed": [key]}, "three", [account])
     assert store.export_budget("personal") == before
+
+
+def test_register_corrections_save_atomically_and_adjust_manual_balances(imported_store, tmp_path):
+    store = imported_store
+    cash = store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+    card = store.add_account("personal", {"name": "Card", "type": "credit", "balance": 0})
+    foreign = store.add_account("personal", {"name": "Euro cash", "type": "depository", "balance": 0, "currency": "EUR"})
+    key = store.add_transaction("personal", {"accountId": cash, "date": "2026-10-01", "merchant": "Original", "amount": 500, "categoryId": None})
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
+    with TestClient(create_app(store=store, settings=settings), base_url="https://127.0.0.1:5173") as client:
+        change = {"workspace": "personal", "accountId": card, "amount": 750, "date": "2026-10-02", "merchant": "Corrected", "note": "Saved memo"}
+        assert client.patch(f"/api/transactions/{key}", json=change).status_code == 200
+        rows = store.transactions("personal")
+        assert rows[0]["merchant"] == "Corrected" and rows[0]["amount"] == 750
+        assert rows[0]["date"] == "2026-10-02" and rows[0]["note"] == "Saved memo"
+        balances = {row["id"]: row["balance"] for row in store.accounts("personal")}
+        assert balances[cash] == 10000 and balances[card] == 750
+        before = store.export_budget()
+        for invalid in ({"amount": 0}, {"amount": True}, {"amount": None}, {"date": "bad"}, {"accountId": foreign}, {"note": "x" * 1001}):
+            assert client.patch(f"/api/transactions/{key}", json={**change, **invalid}).status_code == 400
+            assert store.export_budget() == before
+
+
+def test_imported_corrections_survive_refresh_and_portable_roundtrip(imported_store, tmp_path):
+    store = imported_store
+    store.save_item("item", "fictional-ciphertext", "Fictional Bank")
+    account = {"id": "bank", "itemId": "item", "name": "Bank", "institution": "Fictional Bank", "type": "depository", "balance": 10000, "currency": "USD", "source": "plaid"}
+    record = {"id": "pending", "accountId": "bank", "date": "2026-10-01", "merchant": "Bank description", "amount": 125, "suggestedCategoryId": None, "pending": True, "source": "plaid", "inferredTransfer": False, "pendingTransactionId": None}
+    store.apply_sync("item", {"added": [record], "modified": [], "removed": []}, "one", [account])
+    moved = store.add_account("personal", {"name": "Tracking", "type": "depository", "balance": 0})
+    store.edit_transaction_details("personal", "pending", {"accountId": moved, "date": "2026-10-03", "merchant": "My payee", "amount": 150, "note": "Retained note"})
+    assert store.accounts("personal")[0]["balance"] == 10000
+    posted = {**record, "id": "posted", "pending": False, "pendingTransactionId": "pending", "amount": 130}
+    store.apply_sync("item", {"added": [posted], "modified": [], "removed": ["pending"]}, "two", [account])
+    row = store.transactions("personal")[0]
+    assert (row["accountId"], row["date"], row["merchant"], row["amount"]) == (moved, "2026-10-03", "My payee", 150)
+    original = store.export_budget()["transactions"][-1]["original"]
+    assert original["amount"] == 130 and original["accountId"] == "bank"
+    files = store.export_budget_files()
+    restored = type(store)(tmp_path / "restored-budget", month="2026-10")
+    try:
+        restored.restore_budget_files("personal", files)
+        assert restored.transactions("personal") == store.transactions("personal")
+        assert restored.export_budget()["transactions"][-1]["original"] == original
+    finally:
+        restored.close()
+
+
+def test_new_row_request_identity_prevents_duplicate_creation(imported_store, tmp_path):
+    store = imported_store
+    account = store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
+    with TestClient(create_app(store=store, settings=settings), base_url="https://127.0.0.1:5173") as client:
+        payload = {"workspace": "personal", "accountId": account, "date": "2026-10-27", "merchant": "Once", "amount": 125, "categoryId": None, "requestId": "new-row-request"}
+        assert client.post("/api/transactions", json=payload).status_code == 200
+        assert client.post("/api/transactions", json=payload).status_code == 200
+        assert len(store.transactions("personal")) == 1
+        assert client.post("/api/transactions", json={**payload, "amount": 200}).status_code == 400
+        assert store.accounts("personal")[0]["balance"] == 9875

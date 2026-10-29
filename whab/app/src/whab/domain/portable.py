@@ -101,7 +101,7 @@ def validate_portable_budget(data: object) -> dict:
             account["type"] = "other"
         accounts[index] = normalize_account(account)
     categories = _records(data["categories"], CATEGORY_FIELDS, 10000)
-    transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000)
+    transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000, optional=frozenset({"original"}))
     assignments = _records(data["assignments"], ASSIGNMENT_FIELDS, 250000)
     future_funding = _records(data.get("futureFunding", []), FUTURE_FUNDING_FIELDS, 250000)
     rollover_modes = _records(data.get("rolloverModes", []), ROLLOVER_MODE_FIELDS, 250000)
@@ -158,6 +158,21 @@ def validate_portable_budget(data: object) -> dict:
             "pending", "reviewed", "isTransfer", "inferredTransfer", "categoryEdited", "deleted",
         ))
         money(transaction["amount"], account["currency"])
+        if "original" in transaction:
+            original = transaction["original"]
+            if type(original) is not dict or not original or original.keys() - {"accountId", "date", "merchant", "amount"}:
+                raise StoreError("Invalid original transaction fields.")
+            if "accountId" in original:
+                _text(original["accountId"])
+                original_account = account_map.get(original["accountId"])
+                if original_account is None or original_account["currency"] != account["currency"]:
+                    raise StoreError("Invalid original transaction account.")
+            if "date" in original:
+                validate_date(original["date"])
+            if "merchant" in original:
+                _text(original["merchant"])
+            if "amount" in original:
+                minor_units(original["amount"], account["currency"])
     assignment_keys = set()
     for assignment in assignments:
         _text(assignment["month"], limit=7)

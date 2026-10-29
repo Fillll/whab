@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from collections.abc import Mapping
@@ -206,6 +207,7 @@ class Store(Authority):
                 "inferredTransfer": bool(row["inferred_transfer"]),
                 "categoryEdited": bool(row["category_edited"]),
                 "deleted": bool(row["deleted"]),
+                **({"original": json.loads(row["original_details"])} if "original_details" in row.keys() and row["original_details"] is not None else {}),
             }
         for row in self.db.execute("SELECT * FROM budget WHERE workspace=?", (workspace,)):
             state["budget"].setdefault(row["month"], {})[row["category_id"]] = row["assigned"]
@@ -269,7 +271,7 @@ class Store(Authority):
             ],
         )
         self.db.executemany(
-            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer,merchant_logo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer,merchant_logo=excluded.merchant_logo",
+            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer,merchant_logo,original_details) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer,merchant_logo=excluded.merchant_logo,original_details=excluded.original_details",
             [
                 (
                     t["id"],
@@ -288,6 +290,7 @@ class Store(Authority):
                     int(t.get("deleted", False)),
                     int(t.get("inferredTransfer", False)),
                     t.get("merchantLogo"),
+                    json.dumps(t["original"]) if "original" in t else None,
                 )
                 for t in state["transactions"].values()
             ],
@@ -726,6 +729,9 @@ class Store(Authority):
             workspace, lambda state: commands.add_transaction(state, transaction_id, transaction, source),
         )
 
+    def edit_transaction_details(self, workspace, transaction_id, changes):
+        return self._mutate(workspace, lambda state: commands.edit_transaction_details(state, transaction_id, changes))
+
     def edit_transaction(
         self,
         workspace: str,
@@ -838,7 +844,7 @@ class Store(Authority):
             provider = item.get("provider", "plaid")
 
             def owned_transaction(transaction: dict) -> bool:
-                account = state["accounts"].get(transaction["accountId"])
+                account = state["accounts"].get(transaction.get("original", {}).get("accountId", transaction["accountId"]))
                 return (
                     account is not None
                     and account.get("itemId") == item_id

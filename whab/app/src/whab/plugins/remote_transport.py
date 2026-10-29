@@ -311,6 +311,9 @@ class RemoteStore:
     def categorize(self, workspace, payload):
         return self._command("categorization", workspace, payload)
 
+    def edit_transaction_details(self, workspace, transaction_id, changes):
+        return self._command("edit_transaction", workspace, {"transactionId": transaction_id, **changes})
+
     def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET, suggestion_id=None):
         payload = {"transactionId": transaction_id}
         if suggestion_id is not None:

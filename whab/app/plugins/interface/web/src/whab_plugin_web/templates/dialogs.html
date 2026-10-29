@@ -117,54 +117,6 @@
     <button class="button primary full-width" type="submit" disabled>Save account</button>
   </form>
 </dialog>
-<dialog class="modal"
-        id="transaction-dialog">{{ heading('Add transaction', 'Record spending or income in any account.') }}
-  <form class="modal-form" data-api="/transactions">
-    <input type="hidden" name="workspace" value="{{ workspace }}">
-    <label>
-      Payee<input name="merchant"
-       required
-       maxlength="120"
-       placeholder="Who was it with?"
-       autofocus>
-    </label>
-    <div class="form-columns">
-      <label>
-        Amount ({{ currency }})<input name="amount" data-cents data-minor-units="{{ minor_units }}" required inputmode="decimal">
-      </label>
-      <label>
-        Type<select name="_kind">
-        <option value="expense">Expense</option>
-        <option value="income">Inflow / refund</option>
-        </select>
-      </label>
-    </div>
-    <div class="form-columns">
-      <label>
-        Date (YYYY-MM-DD)<input name="date" type="text" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" placeholder="YYYY-MM-DD" value="{{ today }}" required>
-      </label>
-      <label>
-        Account<select name="accountId" required>
-      {% for account in transaction_accounts %}<option value="{{ account.id }}"{% if selected_account and account.id==selected_account.id %} selected{% endif %}>{{ account.name }}</option>
-    {% endfor %}
-    </select>
-  </label>
-</div>
-<label>
-  Category<select name="categoryId" data-null>
-  <option value="">Income / uncategorized</option>
-{% for group in groups %}<optgroup label="{{ group.name }}">
-  {% for row in group.rows %}<option value="{{ row.category.id }}">{{ row.category.name }}</option>{% endfor %}
-</optgroup>{% endfor %}
-</select>
-</label>
-<label>
-  Note<input name="note" maxlength="300" placeholder="Optional">
-</label>
-<p class="field-error" role="alert" hidden></p>
-<button class="button primary full-width">Save transaction</button>
-</form>
-</dialog>
 {% set manager = plugin_management|default({'plugins': [], 'restart_required': false, 'error': none}) %}
 {% set plugin_categories = {'interface': 'Interfaces', 'ingestion': 'Ingestion', 'insight': 'Insights', 'storage': 'Storage', 'automation': 'Automation', 'extension': 'Extensions'} %}
 {% set visible_plugins = manager.plugins|rejectattr('installed', 'equalto', false)|rejectattr('category', 'equalto', 'example')|rejectattr('id', 'equalto', 'example')|list %}

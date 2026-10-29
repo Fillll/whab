@@ -6,7 +6,7 @@ personal and fictional demo workspaces in one versioned JSON data file at
 different files. It uses no database driver or other storage implementation.
 The host supplies financial commands, currency rules and workspace projections.
 
-Install its wheel with a compatible host (WHAB 2.37+ within major 2), then select
+Install its wheel with a compatible host (WHAB 2.47+ within major 2), then select
 `WHAB_STORAGE=json` for a new original runtime or initial CLI budget creation.
 An opened budget chooses its backend through its manifest. Selecting JSON does
 not migrate an existing ledger. JSON belongs to the supported bundled set;
@@ -198,3 +198,7 @@ Only compatible readers may pass candidate readiness; schema changes need an
 explicit reader/upgrader strategy. See [storage workers and stopped-host repair](../../../../docs/storage-workers.md)
 for the exact-host fence, protocol limits, durable request replay and recovery.
 The client backend requires a separate host-managed remote adapter.
+
+## Transaction detail corrections
+
+The optional `edit_transaction_details(workspace, transaction_id, changes)` capability commits core-validated date, payee, amount, same-currency account and annotation edits atomically. Manual entries adjust balances together; imported corrections retain their provider balances and original edited fields. Provider refreshes preserve those overrides through posting replacements. Optional `original` records survive native reopen, portable export and copies. Existing records without corrections retain their earlier format.

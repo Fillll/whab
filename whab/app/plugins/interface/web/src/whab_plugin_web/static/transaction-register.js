@@ -2,6 +2,7 @@
 import {api, apiUrl, getContext, notify, pageUrl, updateContext} from './client.js';
 import {initAccountPicker} from './account-picker.js';
 import {initPeriodPicker} from './period-picker.js';
+import {initTransactionGrid, parseRegisterAmount} from './transaction-grid.js';
 
 export function createTransactionWriter(save, {saved = () => {}, state = () => {}} = {}) {
   let pending = {};
@@ -103,6 +104,10 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   if (!root) return {flush: async () => true, dispose() {}};
   const rows = [...root.querySelectorAll('.transaction-row')];
   const workspace = root.dataset.workspace;
+  const grid = initTransactionGrid(root.querySelector('.transactions-table'));
+  const createForm = root.querySelector('[data-transaction-create]');
+  const draft = root.querySelector('[data-new-transaction]');
+  let creating = false, createRequestId = null;
   const search = root.querySelector('#transaction-search');
   const account = root.querySelector('#account-filter');
   const reviewFilter = root.querySelector('#review-filter');
@@ -205,6 +210,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       if (!disposed && !filterNavigationPending && !pendingDestination() && !timers.size && !searchTimer &&
           search.value === displayedSearch && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
           document.activeElement?.matches?.('[data-transaction-field="note"]') !== true &&
+          !document.activeElement?.closest?.('td.grid-current') && (!draft || draft.hidden) &&
           !receiptDialog.open && !receiptBusy && !bulkBusy &&
           ![...editors.values()].some(writer => writer.dirty)) {
         void go(new URL(location.href), false, true, !search.value && displayedReview === 'all');
@@ -240,7 +246,12 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   });
   const periodPicker = initPeriodPicker(root, changes => applyFilters(changes, '#transaction-period-toggle'));
   const categoryOptions = root.querySelector('template[data-transaction-categories]');
+  const accountOptions = root.querySelector('template[data-transaction-accounts]');
   const hydrateCategory = event => {
+    if (event.target.matches('select[data-account-options-lazy]') && accountOptions?.content) {
+      const value = event.target.value; event.target.replaceChildren(accountOptions.content.cloneNode(true));
+      event.target.value = value; event.target.removeAttribute('data-account-options-lazy');
+    }
     if (event.target.matches('select[data-category-options-lazy]')) {
       hydrateTransactionCategories(event.target, categoryOptions);
     }
@@ -318,7 +329,9 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     const memo = row.querySelector('[data-transaction-field="note"]');
     const category = row.querySelector('[data-transaction-field="categoryId"]');
     const reviewed = row.querySelector('[data-transaction-reviewed]');
-    const committed = {note: memo.value, categoryId: category.value || null, reviewed: row.dataset.reviewed === 'true'};
+    const detailFields = [...row.querySelectorAll('[data-transaction-detail]')];
+    const detailValue = control => control.dataset.transactionDetail === 'amount' ? parseRegisterAmount(control.value, Number(control.dataset.minorUnits)) : control.value;
+    const committed = { ...Object.fromEntries(detailFields.map(control => [control.dataset.transactionDetail, detailValue(control)])), note: memo.value, categoryId: category.value || null, reviewed: row.dataset.reviewed === 'true'};
     const prepareReview = patch => row.dataset.suggestionId && patch.reviewed === true ?
       {...patch, categoryId: category.value || null, suggestionId: row.dataset.suggestionId} : patch;
     const writer = createTransactionWriter(patch => {
@@ -332,10 +345,14 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
           delete row.dataset.suggestionId;
           row.querySelector('.ml-suggestion')?.remove();
         }
+        if ('merchant' in patch) row.dataset.merchant = patch.merchant;
+        if ('accountId' in patch) row.dataset.account = patch.accountId;
+        const amountField = detailFields.find(control => control.dataset.transactionDetail === 'amount');
+        if (amountField) amountField.closest('td').classList.toggle('inflow', Number(amountField.value) > 0);
         row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
         onMutation();
         if (!paged) filter();
-        else if (!bulkBusy && (refreshNeeded || search.value && 'note' in patch && document.activeElement !== memo || 'reviewed' in patch)) {
+        else if (!bulkBusy && (refreshNeeded || search.value && 'note' in patch && document.activeElement !== memo || 'reviewed' in patch || detailFields.some(control => control.dataset.transactionDetail in patch))) {
           refreshAfterMutation();
         }
       },
@@ -353,10 +370,27 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     const saveMemo = () => {
       clearTimeout(timers.get(row));
       timers.delete(row);
-      if (memo.value !== committed.note) return writer.push({note: memo.value});
-      return writer.flush();
+      const patch = {};
+      try {
+        for (const control of detailFields) {
+          control.setCustomValidity('');
+          if (!control.checkValidity()) throw new Error(control.validationMessage);
+          const value = detailValue(control);
+          if (value !== committed[control.dataset.transactionDetail]) patch[control.dataset.transactionDetail] = value;
+        }
+      } catch (failure) {error(failure.message); row.classList.add('has-error'); return Promise.resolve(false);}
+      if (memo.value !== committed.note) patch.note = memo.value;
+      return Object.keys(patch).length ? writer.push(patch) : writer.flush();
     };
     row.saveMemo = saveMemo;
+    row.hasDraft = () => {
+      try {return memo.value !== committed.note || detailFields.some(control => detailValue(control) !== committed[control.dataset.transactionDetail]);}
+      catch {return true;}
+    };
+    for (const control of detailFields) {
+      listen(control, 'input', () => {editStarted(); row.classList.remove('is-saved');});
+      listen(control, 'change', () => {editStarted(); void saveMemo();});
+    }
     listen(row.querySelector('[data-select-transaction]'), 'change', selection);
     listen(category, 'change', () => {
       editStarted();
@@ -537,7 +571,42 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       else button.title = 'Receipts are unavailable with this storage plugin.';
     }
   }).catch(() => { if (!disposed) for (const row of rows) row.querySelector('[data-transaction-receipt]').title = 'Receipts could not be loaded.'; });
-  async function flush() {
+  if (createForm && draft) {
+    listen(root.querySelector('[data-add-transaction]'), 'click', () => {
+      editStarted(); draft.hidden = false; createRequestId ||= crypto.randomUUID();
+      const empty = root.querySelector('.empty-state'); if (empty) empty.hidden = true;
+      grid.focus(draft.querySelector('[name="merchant"]'));
+    });
+    listen(root.querySelector('[data-cancel-transaction]'), 'click', () => {
+      if (creating) return;
+      createForm.reset(); draft.hidden = true; createRequestId = null; feedback.hidden = true;
+      const empty = root.querySelector('.empty-state'); if (empty) empty.hidden = false;
+      root.querySelector('[data-add-transaction]').focus();
+    });
+    listen(draft, 'input', editStarted);
+    listen(draft, 'change', editStarted);
+    listen(createForm, 'submit', async event => {
+      event.preventDefault();
+      if (creating) return;
+      for (const control of createForm.elements) if ('readOnly' in control) control.readOnly = false;
+      if (!createForm.reportValidity()) return;
+      const fields = Object.fromEntries(new FormData(createForm));
+      try {
+        const amountControl = createForm.elements.namedItem('amount');
+        fields.amount = parseRegisterAmount(fields.amount, Number(amountControl.dataset.minorUnits));
+        fields.categoryId ||= null;
+        if (!(await flushRows())) return;
+        creating = true; editStarted();
+        for (const control of createForm.elements) control.disabled = true;
+        await api('/transactions', {workspace, ...fields, requestId: createRequestId});
+        draft.hidden = true; createForm.reset(); createRequestId = null; creating = false;
+        onMutation(); notify('Transaction saved. Active filters determine where it appears.');
+        await go(new URL(location.href), false, true);
+      } catch (failure) {error(failure.message || 'The transaction could not be saved.');}
+      finally {creating = false; for (const control of createForm.elements) control.disabled = false;}
+    });
+  }
+  async function flushRows() {
     if (disposed) return true;
     if (bulkPromise) await bulkPromise;
     const results = await Promise.all(rows.map(row => row.saveMemo()));
@@ -546,19 +615,24 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     if (ok) feedback.hidden = true;
     return ok;
   }
+  async function flush() {
+    if (draft && !draft.hidden) return false;
+    return flushRows();
+  }
   function beforeUnload(event) {
-    if (bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
+    if (creating || draft && !draft.hidden || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
   }
   listen(window, 'beforeunload', beforeUnload);
   if (paged) selection();
   else filter();
   return {
     flush,
-    get dirty() { return bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy; },
+    get dirty() { return creating || Boolean(draft && !draft.hidden) || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy; },
     dispose() {
       disposed = true;
       clearTimeout(searchTimer);
       clearTimeout(refreshTimer);
+      grid.dispose();
       accountPicker.dispose();
       periodPicker.dispose();
       for (const timer of timers.values()) clearTimeout(timer);

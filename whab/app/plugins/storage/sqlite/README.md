@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.37 or newer for the public local-authority and
+This version requires WHAB 2.47 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -118,3 +118,7 @@ Only compatible readers may pass candidate readiness; schema changes need an
 explicit reader/upgrader strategy. See [storage workers and stopped-host repair](../../../../docs/storage-workers.md)
 for the exact-host fence, protocol limits, durable request replay and recovery.
 The client backend requires a separate host-managed remote adapter.
+
+## Transaction detail corrections
+
+The optional `edit_transaction_details(workspace, transaction_id, changes)` capability delegates date, payee, amount, same-currency account and combined annotation validation to core in one atomic mutation. Manual entries adjust the old and new account balances together. Imported corrections retain provider snapshots and original edited fields in an additive nullable `original_details` column; later syncs preserve explicit overrides, including pending-to-posted replacement. Portable exports and reopening retain those annotations, and earlier SQLite schemas remain readable without running untrusted migrations. This schema addition needs a stopped-host update before candidate read-only readiness can succeed on an older native schema.

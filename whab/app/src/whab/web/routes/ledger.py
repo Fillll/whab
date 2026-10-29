@@ -104,11 +104,13 @@ def create_router(store):
 
     @router.patch("/api/transactions/{transaction_id}")
     def review(transaction_id: str, body: ReviewBody):
-        if not body.model_fields_set.intersection({"categoryId", "reviewed", "note"}):
+        if not body.model_fields_set.intersection({"categoryId", "reviewed", "note", "accountId", "date", "merchant", "amount"}):
             raise HTTPException(400, "No changes provided")
         category = body.categoryId if "categoryId" in body.model_fields_set else UNSET
         store.edit_transaction(
             body.workspace, transaction_id, category_id=category, reviewed=body.reviewed,
+            **({"details": body.model_dump(include=body.model_fields_set & {"accountId", "date", "merchant", "amount"})}
+               if body.model_fields_set & {"accountId", "date", "merchant", "amount"} else {}),
             **({"suggestion_id": body.suggestionId} if body.suggestionId is not None else {}),
             **({"note": body.note} if "note" in body.model_fields_set else {}),
         )
@@ -123,7 +125,8 @@ def create_router(store):
 
     @router.post("/api/transactions")
     def add_transaction(body: TransactionBody):
-        store.add_transaction(body.workspace, body.model_dump(exclude={"workspace"}))
+        store.add_transaction(body.workspace, body.model_dump(exclude={"workspace", "requestId"}),
+                              **({"request_id": body.requestId} if body.requestId is not None else {}))
         return {"ok": True}
 
     @router.put("/api/budget/funding/next-month")

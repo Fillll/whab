@@ -39,6 +39,10 @@ class Body(BaseModel):
 
 
 class ReviewBody(Body):
+    date: str | None = None
+    merchant: Label | None = None
+    amount: Cents | None = None
+    accountId: Id | None = None
     suggestionId: Id | None = None
     workspace: Workspace
     categoryId: Id | None = None
@@ -71,6 +75,7 @@ class ReceiptSelectionBody(Body):
 
 
 class TransactionBody(Body):
+    requestId: Id | None = None
     workspace: Workspace
     accountId: Id
     date: str

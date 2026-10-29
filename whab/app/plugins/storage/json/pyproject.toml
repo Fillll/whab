@@ -1,12 +1,12 @@
 [project]
 name = "whab_plugin_json"
-version = "1.4.0"
+version = "1.5.0"
 description = "Independent persistent local JSON budget storage for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.45,<3"]
+dependencies = ["whab>=2.47,<3"]
 classifiers = ["Operating System :: POSIX", "Operating System :: MacOS"]
 
 [project.entry-points."whab.plugins"]

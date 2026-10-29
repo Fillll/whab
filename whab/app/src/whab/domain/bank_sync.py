@@ -30,7 +30,7 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
     provider = item.get("provider", "plaid")
 
     def owned_transaction(transaction):
-        account = state["accounts"].get(transaction["accountId"])
+        account = state["accounts"].get(transaction.get("original", {}).get("accountId", transaction["accountId"]))
         return account is not None and account.get("itemId") == item_id and transaction["source"] == provider
 
     for account in state["accounts"].values():
