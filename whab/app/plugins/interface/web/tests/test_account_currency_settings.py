@@ -41,7 +41,7 @@ def test_accounts_show_all_currencies_but_provider_controls_only_in_plugin_setti
         assert 'aria-label="Budget currency"' not in text
         for code in ("USD", "JPY", "KWD"):
             assert f'Account totals in {code}' in content
-            assert f'Fictional {code}' in content and f' · {code} · ' in content
+            assert f'Fictional {code}' in content and f'aria-label="Change currency for Fictional {code}">{code}</button>' in content
         assert '<strong>$125.00</strong>' in content
         assert '<strong>JPY 3,456</strong>' in content
         assert '<strong>KWD 1.234</strong>' in content

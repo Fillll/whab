@@ -163,8 +163,8 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
     assert '401(k)' in text and 'Brokerage' in text and 'Mortgage' in text
     assert 'Certificate of deposit (CD)' in text
     assert 'name="onBudget" data-boolean-value' in text
-    assert 'data-edit-account="' + accounts["Long term investments"] + '"' in text
-    assert 'data-account-subtype="brokerage"' in text
+    assert 'data-inline-account="' + accounts["Long term investments"] + '"' in text
+    assert 'value="brokerage" data-account-type="investment" selected>Brokerage' in text
     assert 'Budget scope applies to all transactions' in text
     assert 'data-on-budget="false" data-liability="true" disabled hidden>Loan' in text
     assert client.patch("/api/accounts/" + accounts["Everyday cash"], json={
@@ -172,7 +172,8 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
         "subtype": "savings",
     }).status_code == 200
     text = client.get("/budgets/home/accounts/2026-10/usd").text
-    assert 'data-account-on-budget="false" data-account-subtype="savings"' in text
+    row = text.split('data-inline-account="' + accounts["Everyday cash"] + '"', 1)[1].split('</form>', 1)[0]
+    assert 'value="false" selected>Off-budget' in row and 'value="savings" data-account-type="depository" selected>Savings' in row
     assert '<dt>Net worth · USD</dt><dd>$7,500.00</dd>' in text
 
 

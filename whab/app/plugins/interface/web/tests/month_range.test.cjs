@@ -5,7 +5,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/month-range.js'), 'utf8');
 function harness(present = true) {
-  const calls = [], observers = [];
+  const calls = [], observers = [], scrolls = [];
   function target(properties = {}) {
     const events = new Map();
     return Object.assign({style: {}, addEventListener(name, callback) {events.set(name, callback);},
@@ -18,14 +18,14 @@ function harness(present = true) {
   let capture = false;
   const frame = target({querySelector: () => handles.move, setPointerCapture() {capture = true;}, hasPointerCapture: () => capture, releasePointerCapture() {capture = false;}});
   const links = Array.from({length: 13}, (_, index) => target({href: `https://localhost/budgets/demo/budget/2027-${String(index + 1).padStart(2, '0')}/usd`,
-    getAttribute: () => `Month ${index + 1}`, getBoundingClientRect: () => ({left: index * 40 + (index >= 5 ? 20 : 0), width: 36, top: 13, height: 29})}));
+    dataset: {month: `2027-${String(index + 1).padStart(2, '0')}`}, getAttribute: () => `Month ${index + 1}`, getBoundingClientRect: () => ({left: index * 40 + (index >= 5 ? 20 : 0) - strip.scrollLeft, width: 36, top: 13, height: 29})}));
   links[4].classList.add('is-selected');
-  const strip = target({scrollLeft: 0, scrollTop: 0, clientWidth: 800, closest: () => ({dataset: {monthCount: '3'}}),
+  const strip = target({scrollLeft: 0, scrollTop: 0, clientWidth: 800, scrollWidth: 800, dataset: {timelineScope: 'fictional/USD'}, scrollTo(value) {scrolls.push(value); if (!this.deferScroll) this.scrollLeft = value.left;}, closest: () => ({dataset: {monthCount: '3'}}),
     querySelector: () => frame, querySelectorAll: () => links, getBoundingClientRect: () => ({left: 0, top: 0})});
-  const context = {URL, AbortController, ResizeObserver: class {constructor(callback) {this.callback = callback; observers.push(this);} observe() {} disconnect() {this.disconnected = true;}}, document: {querySelector: () => present ? strip : null}};
+  const context = {URL, AbortController, window: {matchMedia: () => ({matches: false})}, ResizeObserver: class {constructor(callback) {this.callback = callback; observers.push(this);} observe() {} disconnect() {this.disconnected = true;}}, document: {querySelector: () => present ? strip : null}};
   vm.runInNewContext(source.replaceAll('export function ', 'function '), context);
   const control = context.initMonthRange({navigate: (url, onCancel) => calls.push({url, onCancel})});
-  return {context, calls, control, frame, handles, observers, links};
+  return {context, calls, control, frame, handles, observers, links, strip, scrolls};
 }
 test('range endpoints stay within one to five months, including both calendar edges', () => {
   const {context: {rangeStep}} = harness(false);
@@ -66,4 +66,45 @@ test('cancelled pointers restore selection and keyboard resizing preserves the o
   assert.equal(h.calls[1].url.pathname, '/budgets/demo/budget/2027-06/usd');
   h.control.dispose(); assert.equal(h.observers[0].disconnected, true);
   harness(false).control.dispose();
+});
+
+test('timeline stays still with room, recenters only near an edge, and clamps calendar ends', () => {
+  const {context: {timelineScrollTarget}} = harness(false);
+  assert.equal(timelineScrollTarget(220, 350, 100, 500, 900), 100);
+  assert.equal(timelineScrollTarget(590, 740, 100, 500, 900), 415);
+  assert.equal(timelineScrollTarget(90, 220, 100, 500, 900), 0);
+  assert.equal(timelineScrollTarget(990, 1140, 100, 500, 600), 600);
+});
+test('range arrows preserve the timeline position until the selection reaches its edge', () => {
+  const h = harness();
+  h.strip.clientWidth = 400; h.strip.scrollWidth = 800; h.strip.scrollLeft = 80;
+  h.frame.emit('keydown', {target: h.handles.move, key: 'ArrowRight'});
+  assert.equal(h.strip.scrollLeft, 80);
+  h.strip.clientWidth = 240;
+  h.frame.emit('keydown', {target: h.handles.move, key: 'ArrowRight'});
+  assert.equal(h.scrolls.at(-1).behavior, 'smooth');
+  assert.ok(h.strip.scrollLeft > 80);
+});
+
+test('captured timeline position survives disposal after the old strip loses layout', () => {
+  const h = harness(); h.strip.clientWidth = 400; h.strip.scrollWidth = 800; h.strip.scrollLeft = 80;
+  h.control.capture(); h.strip.isConnected = false; h.strip.scrollLeft = 0;
+  h.control.dispose();
+  h.strip.isConnected = true;
+  const fresh = h.context.initMonthRange({navigate() {}});
+  assert.equal(h.strip.scrollLeft, 80);
+  fresh.dispose();
+});
+
+test('a smooth edge scroll finishes centering after a fragment replaces an intermediate animation frame', () => {
+  const h = harness(); h.strip.clientWidth = 240; h.strip.scrollWidth = 800;
+  h.strip.scrollLeft = 100; h.strip.deferScroll = true;
+  h.frame.emit('keydown', {target:h.handles.move, key:'ArrowRight'});
+  const destination = h.scrolls.at(-1).left;
+  h.strip.scrollLeft = 130; // Enough gap, but the requested animation has not finished.
+  h.control.capture(); h.strip.isConnected = false; h.strip.scrollLeft = 0; h.control.dispose();
+  h.strip.isConnected = true;
+  h.context.initMonthRange({navigate() {}});
+  assert.equal(h.scrolls.at(-1).left, destination);
+  assert.equal(h.scrolls.at(-1).behavior, 'smooth');
 });

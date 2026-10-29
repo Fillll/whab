@@ -4506,3 +4506,41 @@ main:has(.budget-planner) > .demo-ribbon,
 .transactions-table td input:not([type='hidden']):not([type='checkbox']):hover,
 .transactions-table td select:hover,
 .transactions-table td textarea:hover {border-color: var(--line); background: var(--field);}
+
+/* Account names and classification are edited where the accounts are listed. */
+.account-inline {align-items:flex-start; padding:20px 3px; gap:14px;}
+.account-inline .account-logo-toggle {border:1px solid var(--line); cursor:pointer; margin-top:18px; padding:0;}
+.account-logo-toggle:hover, .account-logo-toggle:focus-visible {border-color:var(--brand-red);}
+.account-inline-fields {display:grid; grid-template-columns:minmax(180px,1.5fr) repeat(3,minmax(135px,1fr)); gap:12px;}
+.account-inline-fields label, .account-inline-extra label {display:grid; gap:5px; font-size:10px; color:var(--muted);}
+.account-inline-fields input, .account-inline-fields select, .account-inline-extra input, .account-inline-extra select {min-width:0; width:100%; height:36px; font-size:12px; padding:6px 9px; border:1px solid var(--line); border-radius:5px; background:var(--surface); color:var(--ink);}
+.account-inline-fields .account-name-field input {font-weight:600;}
+.account-inline-meta {display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin-top:10px; color:var(--muted); font-size:10px;}
+.account-inline-meta .text-link {font-size:10px;}
+.account-sidebar-choice {display:flex; align-items:center; gap:6px; cursor:pointer;}
+.account-sidebar-choice input {width:14px; height:14px; margin:0; accent-color:var(--brand-red);}
+.account-row-aside {display:flex; align-items:center; gap:12px; margin-top:19px;}
+.account-row-aside .source-label {margin:0;}
+.account-inline-extra {margin-top:14px; max-width:640px; padding:14px; border:1px solid var(--line); border-radius:7px;}
+.account-inline-extra > label {max-width:170px;}
+.account-inline-actions {display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:12px;}
+.account-inline-actions .button {padding:8px 12px; min-height:32px; font-size:11px;}
+.account-inline-status {font-size:11px; color:var(--muted); margin:8px 0 0;}
+.account-inline [hidden] {display:none;}
+@media (max-width:1200px) {
+  .account-inline-fields {grid-template-columns:repeat(2,minmax(130px,1fr));}
+  .account-row-aside {flex-direction:column; align-items:flex-end;}
+}
+@media (max-width:600px) {
+  .account-inline {flex-wrap:wrap; gap:10px;}
+  .account-inline .account-description {min-width:calc(100% - 55px);}
+  .account-inline-fields {grid-template-columns:1fr;}
+  .account-row-aside {flex-direction:row; width:100%; justify-content:flex-end; margin-top:0;}
+}
+
+.month-navigation {display:flex; align-items:center; min-width:0; flex:1; max-width:850px;}
+.month-navigation > .icon-button {flex-shrink:0; width:28px; height:36px;}
+.month-navigation .month-strip {flex:1;}
+.month-jump {display:grid; gap:3px; flex-shrink:0; font-size:10px; color:var(--muted);}
+.month-jump input {width:148px; height:32px; border:1px solid var(--line); border-radius:5px; background:var(--surface); color:var(--ink); padding:4px 7px; font:inherit; font-size:11px;}
+@media (max-width:700px) {.budget-toolbar {flex-wrap:wrap;} .month-navigation {flex-basis:100%;} .month-jump {margin-left:auto;}}

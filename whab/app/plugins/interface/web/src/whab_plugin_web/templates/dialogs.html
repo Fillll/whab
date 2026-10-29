@@ -9,25 +9,7 @@
             aria-label="Close dialog">{{ icon('close', 20) }}</button>{% endif %}
   </div>
 {% endmacro %}
-{% macro account_classification() %}
-    <label>
-      Budget scope<select name="onBudget" data-boolean-value data-account-scope>
-      <option value="true">On-budget · everyday budgeting</option>
-      <option value="false">Off-budget · assets and debts</option>
-      </select>
-    </label>
-    <label>
-      Account type<select name="type" data-account-type>
-      {% for account_type, label in account_types.items() %}<option value="{{ account_type }}" data-on-budget="{{ 'true' if account_type in on_budget_account_types else 'false' }}" data-liability="{{ 'true' if is_liability({'type': account_type}) else 'false' }}"{% if account_type not in on_budget_account_types %} disabled hidden{% endif %}>{{ label }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>
-      Account detail<select name="subtype" data-null data-account-subtype>
-      <option value="">General / unspecified</option>
-      {% for account_type, choices in account_subtypes.items() %}{% for subtype, label in choices.items() %}<option value="{{ subtype }}" data-account-type="{{ account_type }}"{% if account_type!='depository' %} disabled hidden{% endif %}>{{ label }}</option>{% endfor %}{% endfor %}
-      </select>
-    </label>
-{% endmacro %}
+{% from "account-fields.html" import account_classification with context %}
 <script id="account-currency-choices" type="application/json">{{ dict(currency_choices)|tojson }}</script>
 <dialog class="modal"
         id="category-dialog">{{ heading('New category', 'Make space for something you want to budget for.') }}

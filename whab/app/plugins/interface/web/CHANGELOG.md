@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.38.0 — 2026-10-28
+
+PR: [#133](https://github.com/Fillll/whab/pull/133)
+
+- Edit account names, classification and relevant details in place; expand currency and logo controls by clicking them. Save row changes together without losing other drafts, and hide selected accounts from the sidebar while retaining them in Accounts and financial calculations.
+- Keep timeline months anchored during interior range movement, scroll gently near edges, retain fixed navigation arrows and add a direct starting month/year picker.
+
 ## 1.37.0 — 2026-10-28
 
 PR: [#132](https://github.com/Fillll/whab/pull/132)

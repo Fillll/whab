@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "host_version": "2.48.0",
+  "host_version": "2.49.0",
   "plugins": [
     {
       "api_version": 1,
@@ -830,7 +830,7 @@
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2.48,<3",
+      "requires_host": "whab>=2.49,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/interface/web",
@@ -838,7 +838,7 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [],
-      "version": "1.37.0"
+      "version": "1.38.0"
     },
     {
       "api_version": 1,

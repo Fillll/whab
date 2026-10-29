@@ -1,0 +1,19 @@
+{% macro account_classification(account=none) %}
+    <label>
+      Budget scope<select name="onBudget" data-boolean-value data-account-scope{% if account %} aria-label="Budget scope for {{ account.name }}"{% endif %}>
+      <option value="true"{% if account and is_on_budget(account) %} selected{% endif %}>On-budget · everyday budgeting</option>
+      <option value="false"{% if account and not is_on_budget(account) %} selected{% endif %}>Off-budget · assets and debts</option>
+      </select>
+    </label>
+    <label>
+      Account type<select name="type" data-account-type{% if account %} aria-label="Account type for {{ account.name }}"{% endif %}>
+      {% for account_type, label in account_types.items() %}<option value="{{ account_type }}" data-on-budget="{{ 'true' if account_type in on_budget_account_types else 'false' }}" data-liability="{{ 'true' if is_liability({'type': account_type}) else 'false' }}"{% if (not account or is_on_budget(account)) and account_type not in on_budget_account_types %} disabled hidden{% endif %}{% if account and account.type==account_type %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      Account detail<select name="subtype" data-null data-account-subtype{% if account %} aria-label="Account detail for {{ account.name }}"{% endif %}>
+      <option value="">General / unspecified</option>
+      {% for account_type, choices in account_subtypes.items() %}{% for subtype, label in choices.items() %}<option value="{{ subtype }}" data-account-type="{{ account_type }}"{% if account_type!=(account.type if account else 'depository') %} disabled hidden{% endif %}{% if account and account.subtype==subtype %} selected{% endif %}>{{ label }}</option>{% endfor %}{% endfor %}
+      </select>
+    </label>
+{% endmacro %}
