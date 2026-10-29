@@ -148,10 +148,9 @@ def test_periods_preserve_core_values_without_recalculating_budget_rules():
     context = build_context(data, {}, [], workspace="demo", page="budget", month="2026-12")
     assert context["selected"] is None and context["selected_budget"] is None
     assert context["period_months"] == ["2026-12", "2027-01", "2027-02"]
-    assert context["month_strip"] == [
-        "2026-08", "2026-09", "2026-10", "2026-11", "2026-12", "2027-01",
-        "2027-02", "2027-03", "2027-04", "2027-05", "2027-06", "2027-07", "2027-08",
-    ]
+    assert len(context["month_strip"]) == 37
+    assert context["month_strip"][0] == "2025-06" and context["month_strip"][-1] == "2028-06"
+    assert context["month_strip"][18:21] == context["period_months"]
     assert context["groups"][0]["periods"] == [
         {"month": period["month"], "carryover": 0, **{field: period["summary"][field]
          for field in ("assigned", "spent", "available")}}

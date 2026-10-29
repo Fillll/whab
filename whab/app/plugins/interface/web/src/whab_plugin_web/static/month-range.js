@@ -1,4 +1,12 @@
 /* A discrete month selection with a continuous pointer preview. */
+let viewportState = null;
+
+export function timelineScrollTarget(left, right, position, width, maximum, center = false) {
+  const gap = Math.min(24, width / 8);
+  if (!center && left - position >= gap && right - position <= width - gap) return position;
+  return Math.max(0, Math.min(maximum, (left + right - width) / 2));
+}
+
 export function rangeStep(start, count, mode, delta, length) {
   const end = start + count - 1;
   const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -23,6 +31,20 @@ export function initMonthRange({root = document, navigate}) {
   function bounds(index) {
     const rect = links[index].getBoundingClientRect(), parent = strip.getBoundingClientRect();
     return {left: rect.left - parent.left + strip.scrollLeft, width: rect.width, top: rect.top - parent.top + strip.scrollTop, height: rect.height};
+  }
+  function reveal(value, center = false, smooth = true) {
+    const first = bounds(value.start), last = bounds(value.start + value.count - 1);
+    const target = timelineScrollTarget(first.left - 6, last.left + last.width + 6,
+      strip.scrollLeft, strip.clientWidth, Math.max(0, strip.scrollWidth - strip.clientWidth), center);
+    if (target === strip.scrollLeft) return;
+    if (strip.scrollTo) strip.scrollTo({left: target, behavior: smooth && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'instant'});
+    else strip.scrollLeft = target;
+  }
+  function remember() {
+    if (strip.isConnected === false) return;
+    const index = links.findIndex((_, index) => bounds(index).left + bounds(index).width > strip.scrollLeft);
+    if (index >= 0) viewportState = {scope: strip.dataset?.timelineScope, month: links[index].dataset?.month,
+      offset: bounds(index).left - strip.scrollLeft};
   }
   function draw(value = selection, offset = 0, mode = 'move') {
     const first = bounds(value.start), last = bounds(value.start + value.count - 1);
@@ -49,13 +71,13 @@ export function initMonthRange({root = document, navigate}) {
     const handle = event.target.closest('[data-range-handle]');
     if (!handle || event.button !== 0 || drag) return;
     event.preventDefault();
-    drag = {id: event.pointerId, x: event.clientX, mode: handle.dataset.rangeHandle, selection, preview: selection};
+    drag = {id: event.pointerId, x: event.clientX, scroll: strip.scrollLeft, mode: handle.dataset.rangeHandle, selection, preview: selection};
     frame.setPointerCapture(event.pointerId); frame.classList.add('is-dragging');
   });
   listen(frame, 'pointermove', event => {
     if (!drag || drag.id !== event.pointerId) return;
     const index = drag.selection.start + (drag.mode === 'end' ? drag.selection.count - 1 : 0);
-    const source = bounds(index), x = source.left + source.width / 2 + event.clientX - drag.x;
+    const source = bounds(index), x = source.left + source.width / 2 + event.clientX - drag.x + strip.scrollLeft - drag.scroll;
     let nearest = 0, distance = Infinity;
     links.forEach((_, candidate) => {
       const box = bounds(candidate), difference = Math.abs(box.left + box.width / 2 - x);
@@ -69,6 +91,7 @@ export function initMonthRange({root = document, navigate}) {
     const limited = nearest !== allowed;
     const remainder = limited ? 0 : (x - (target.left + target.width / 2)) * 0.65;
     draw(drag.preview, remainder, drag.mode);
+    reveal(drag.preview);
   });
   function finish(event, cancel = false) {
     if (!drag || drag.id !== event.pointerId) return;
@@ -76,6 +99,7 @@ export function initMonthRange({root = document, navigate}) {
     drag = null; frame.classList.remove('is-dragging');
     if (frame.hasPointerCapture(event.pointerId)) frame.releasePointerCapture(event.pointerId);
     if (cancel) {selection = value; draw();} else commit(value, mode);
+    reveal(value);
   }
   listen(frame, 'pointerup', event => finish(event));
   listen(frame, 'pointercancel', event => finish(event, true));
@@ -85,11 +109,15 @@ export function initMonthRange({root = document, navigate}) {
     if (!handle || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     event.preventDefault();
     commit(rangeStep(selection.start, selection.count, handle.dataset.rangeHandle, event.key === 'ArrowLeft' ? -1 : 1, links.length), handle.dataset.rangeHandle);
+    reveal(selection);
   });
   const observer = new ResizeObserver(() => {if (!drag) draw();});
   observer.observe(strip);
   draw();
-  // Keep the first selected month visible when the navigation strip must scroll.
-  strip.scrollLeft = Math.max(0, bounds(initial.start).left - strip.clientWidth / 3);
-  return {dispose() {controller.abort(); observer.disconnect();}};
+  const anchor = viewportState && viewportState.scope === strip.dataset?.timelineScope && viewportState.month && links.findIndex(link => link.dataset?.month === viewportState.month);
+  if (typeof anchor === 'number' && anchor >= 0) {
+    strip.scrollLeft = Math.max(0, bounds(anchor).left - viewportState.offset);
+    reveal(initial);
+  } else reveal(initial, true, false);
+  return {capture: remember, dispose() {remember(); controller.abort(); observer.disconnect();}};
 }

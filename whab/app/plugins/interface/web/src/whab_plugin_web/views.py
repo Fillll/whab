@@ -316,6 +316,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "currency_choices": [(code, currency_minor_units(code)) for code in SUPPORTED_CURRENCIES],
         "minor_units": currency_minor_units(currency),
         "default_currency": data.get("viewPreferences", {}).get("defaultCurrency", "USD"),
+        "hidden_account_ids": data.get("viewPreferences", {}).get("hiddenAccountIds", []),
         "account_totals": data.get("accountSummariesByCurrency", {}),
         "all_accounts": all_accounts,
         "currency_money": format_money,
@@ -336,7 +337,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "monthly_funding_flow_available": all(
             period.get("monthlyFundingFlow") is True for period in periods
         ),
-        "month_strip": list(dict.fromkeys(shift_month(month, step) for step in range(-4, 9))),
+        "month_strip": list(dict.fromkeys(shift_month(month, step) for step in range(-18, 19))),
         "period_months": [period["month"] for period in periods],
         "category_path": lambda identifier: quote(identifier, safe=""),
         "category_names": category_names,

@@ -22,7 +22,7 @@ function harness({budgetFlush = async () => true, registerFlush = async () => tr
     setAttribute() {}, removeAttribute() {},
   };
   const context = {
-    document: {querySelectorAll: () => [form]},
+    document: {querySelectorAll: () => [form]}, currentAccounts: null,
     currentRegister: {flush: async () => {order.push('register'); return registerFlush();}},
     initBudgetEdits: () => ({flush: async () => {order.push('budget'); return budgetFlush();}}),
     formBody: () => ({workspace: 'personal', merchant: 'New transaction'}),
@@ -74,7 +74,7 @@ test('the app wires budget draft cancellation and guarded editor disposal into p
   let options, drafts, releases = 0, cancellations = 0, allowRelease = false;
   const context = {
     document: {querySelectorAll: () => [], querySelector: () => null, dispatchEvent: () => true},
-    navigationReady: () => true, currentRegister: null, CustomEvent: class {},
+    navigationReady: () => true, currentRegister: null, currentAccounts: null, monthRange: null, CustomEvent: class {},
     formBody() {}, flushEdits() {}, notify() {},
     initAccountNavigation(value) {options = value; return {cancelPending() {cancellations += 1;}};},
     initBudgetEdits(value) {drafts = value.onDraft; return {dispose() {releases += 1; return allowRelease;}};},

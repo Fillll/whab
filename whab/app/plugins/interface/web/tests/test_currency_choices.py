@@ -47,16 +47,17 @@ def test_closed_account_dialogs_keep_only_selected_currency_and_one_shared_catal
     response = client.get(f"/budgets/home/accounts/2026-10/{currency.lower()}")
     assert response.status_code == 200
     markup = CurrencyMarkup(response.text)
-    assert len(markup.selects) == 3
-    assert markup.selects[2]["attrs"]["name"] == "defaultCurrency"
-    assert markup.selects[2]["options"] == [{"value": "USD", "selected": None}]
-    for select in markup.selects[:2]:
+    assert len(markup.selects) == 4
+    assert markup.selects[3]["attrs"]["name"] == "defaultCurrency"
+    assert markup.selects[3]["options"] == [{"value": "USD", "selected": None}]
+    for select in markup.selects[:3]:
         assert select["attrs"]["name"] == "currency"
         assert select["options"] == [{
             "value": currency, "data-minor-units": str(currency_minor_units(currency)), "selected": None,
         }]
-    assert "disabled" not in markup.selects[0]["attrs"]
-    assert "disabled" in markup.selects[1]["attrs"]
+    assert "disabled" in markup.selects[0]["attrs"]  # Inline currency waits for a history-aware read.
+    assert "disabled" not in markup.selects[1]["attrs"]
+    assert "disabled" in markup.selects[2]["attrs"]
     assert response.text.count('id="account-currency-choices"') == 1
     assert json.loads("".join(markup.metadata)) == {
         code: currency_minor_units(code) for code in SUPPORTED_CURRENCIES

@@ -1,3 +1,5 @@
+{% from "account-fields.html" import account_classification with context %}
+<div data-account-management data-workspace="{{ workspace }}">
 {% set logos = account_logos|default({}) %}
 <div class="page-title-row">
   <div>
@@ -8,6 +10,7 @@
   <button class="button primary" data-dialog="account-dialog">{{ icon('plus', 16) }}Add manual account</button>
 </div>
 {% if all_accounts %}
+  <div data-account-totals>
   {% for code, totals in account_totals.items() %}
   <dl class="account-summary" aria-label="Account totals in {{ code }}">
     <div><dt>Assets · {{ code }}</dt><dd>{{ currency_money(totals.assets, code) }}</dd></div>
@@ -16,29 +19,45 @@
   </dl>
   {% endfor %}
   <p class="account-summary-note">Current known balances, separated by currency. Stale and unavailable snapshots are excluded from totals.</p>
+  </div>
   {% for group in account_groups %}
-  <section class="account-group" aria-label="{{ group.label }} accounts">
-  <div class="section-title accounts-heading"><h2>{{ group.label }} accounts <span>{{ group.accounts|length }}</span></h2></div>
+  <section class="account-group" data-account-group="{{ 'true' if group.on_budget else 'false' }}" aria-label="{{ group.label }} accounts">
+  <div class="section-title accounts-heading"><h2>{{ group.label }} accounts <span data-account-group-count>{{ group.accounts|length }}</span></h2></div>
   <p class="account-group-description">{{ group.description }}</p>
   <div class="account-list">
     {% for account in group.accounts %}
-      <div class="account-row">
-        <span class="bank-mark" aria-hidden="true"><span>{{ account.institution[:1] }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo data-logo-src="{{ logos[account.id] }}" alt="" width="39" height="39" decoding="async" hidden>{% endif %}</span>
+      <form class="account-row account-inline" data-inline-account="{{ account.id }}">
+        <button class="bank-mark account-logo-toggle" type="button" data-account-more aria-expanded="false" aria-controls="account-extra-{{ account.id }}" aria-label="Change logo for {{ account.name }}" title="Change account logo"><span aria-hidden="true">{{ account.institution[:1] }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo data-logo-src="{{ logos[account.id] }}" alt="" width="39" height="39" decoding="async" hidden>{% endif %}</button>
         <div class="account-description">
-          <strong>{{ account.name }}</strong><span>{{ account.institution }}
-            {% if account.mask %} · ••{{ account.mask }}
-            {% endif %} · {{ account.currency }} · {{ account_label(account) }}
-            {% if account.stale %} · Stale snapshot
-            {% endif %}
-          </span>
-          <button class="text-link account-edit" data-dialog="account-classification-dialog" data-edit-account="{{ account.id }}" data-account-name="{{ account.name }}" data-account-type="{{ account.type }}" data-account-on-budget="{{ 'true' if is_on_budget(account) else 'false' }}" data-account-subtype="{{ account.subtype or '' }}" aria-label="Account settings for {{ account.name }}">Account settings</button>
+          <div class="account-inline-fields">
+            <label class="account-name-field">Account name<input name="name" value="{{ account.name }}" required maxlength="200" autocomplete="off" aria-label="Account name for {{ account.name }}"></label>
+            {{ account_classification(account) }}
+          </div>
+          <div class="account-inline-meta"><span data-account-facts>{{ account.institution }}{% if account.mask %} · ••{{ account.mask }}{% endif %}{% if account.stale %} · Stale snapshot{% endif %}</span>
+            <button class="text-link" type="button" data-account-more aria-label="Change currency for {{ account.name }}">{{ account.currency }}</button>
+            <label class="account-sidebar-choice"><input type="checkbox" data-sidebar-visible{% if account.id not in hidden_account_ids %} checked{% endif %} aria-label="Show {{ account.name }} in sidebar">Show in sidebar</label>
+            <a class="text-link" href="{{ url('transactions',account=account.id,currency=account.currency,all_dates='true') }}" data-account-register>Transactions {{ icon('arrow-right', 12) }}</a>
+          </div>
+          <div class="account-inline-extra" id="account-extra-{{ account.id }}" data-account-extra hidden>
+            <label>Account currency<select name="currency" data-currency-choices-lazy disabled aria-label="Currency for {{ account.name }}"><option value="{{ account.currency }}" data-minor-units="{{ dict(currency_choices)[account.currency] }}" selected>{{ account.currency }}</option></select></label>
+            <p class="settings-notice">Currency can change only before this account has transaction history. Amounts are never converted.</p>
+            {% if account_logo_provider|default(none) %}
+            <div class="account-logo-input-row">
+              <label>Bank website<input type="text" name="bankWebsite" inputmode="url" maxlength="2048" autocomplete="off" placeholder="example.com" disabled aria-label="Bank website for {{ account.name }}"></label>
+              <button class="button secondary" type="button" data-account-logo-retrieve disabled>Retrieve logo</button>
+            </div>
+            <p class="settings-notice">Provided by {{ account_logo_provider.display_name }}. Only the public domain goes to <a href="{{ account_logo_provider.provider_url }}" target="_blank" rel="noopener noreferrer">{{ account_logo_provider.provider_name }}</a>. Retrieval is optional; saved logos never expire.</p>
+            <div class="account-logo-retrieval"><img class="account-logo-preview" data-account-logo-preview alt="Bank logo preview" width="48" height="48" hidden><span class="settings-notice" data-account-logo-status role="status"></span></div>
+            {% else %}<p class="settings-notice">Enable Bank logos in Plugins to choose account artwork.</p>{% endif %}
+          </div>
+          <div class="account-inline-actions" data-account-actions hidden><button class="button primary" type="submit">Save changes</button><button class="button secondary" type="button" data-account-cancel>Cancel</button><span class="settings-notice">Budget scope applies to all transactions in this account.</span></div>
+          <p class="account-inline-status" data-account-status role="status" hidden></p>
+          <p class="field-error" role="alert" hidden></p>
         </div>
-        <span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' and account.source in bank_source_ids else account.source|capitalize }}</span>
-        <div class="account-balance">
-          <strong>{{ 'Unavailable' if account.balanceUnknown else account_money(account) }}</strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small>
-        </div>
-      </div>
-    {% else %}<p class="empty-inline">No {{ group.label|lower }} accounts yet.</p>{% endfor %}
+        <div class="account-row-aside"><span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' and account.source in bank_source_ids else account.source|capitalize }}</span>
+        <div class="account-balance" data-account-balance><strong>{{ 'Unavailable' if account.balanceUnknown else account_money(account) }}</strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small></div></div>
+      </form>
+    {% endfor %}<p class="empty-inline" data-account-group-empty{% if group.accounts %} hidden{% endif %}>No {{ group.label|lower }} accounts yet.</p>
   </div>
   </section>
   {% endfor %}
@@ -54,3 +73,5 @@
     <span>These accounts only contain sample data.</span><a class="text-link" href="{{ url('accounts',workspace='personal') }}">Open my budget {{ icon('arrow-right', 15) }}</a>
   </div>
 {% endif %}
+
+</div>

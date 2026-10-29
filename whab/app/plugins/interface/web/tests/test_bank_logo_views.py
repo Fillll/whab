@@ -32,7 +32,7 @@ def test_pages_resolve_only_institution_names_and_defer_local_logo_fetch(importe
         assert all(f'data-logo-src="/budgets/home{LOGO_PATH}"' in image and " hidden" in image for image in images)
         assert all(re.search(r"\ssrc=", image) is None for image in images)
         assert all("onerror=" not in image and 'alt=""' in image for image in images)
-        assert '<span class="bank-mark" aria-hidden="true"><span>U</span></span>' in accounts.text
+        assert re.search(r'<button class="bank-mark account-logo-toggle"[^>]+aria-label="Change logo for [^"]+"[^>]*><span aria-hidden="true">U</span></button>', accounts.text)
 
         seen.clear()
         budget = client.get("/budgets/home/budget/2026-10/usd")
@@ -47,5 +47,5 @@ def test_disabled_logos_keep_existing_marks_and_no_image_route(imported_store, t
     with client_for(imported_store, tmp_path) as client:
         result = client.get("/budgets/home/accounts/2026-10/usd")
         assert result.status_code == 200 and "data-bank-logo" not in result.text
-        assert '<span class="bank-mark" aria-hidden="true"><span>C</span></span>' in result.text
+        assert re.search(r'<button class="bank-mark account-logo-toggle"[^>]*><span aria-hidden="true">C</span></button>', result.text)
         assert client.get(LOGO_PATH).status_code == 404

@@ -12,18 +12,21 @@
 {%- endmacro %}
 <div class="budget-planner" data-budget-key="budget-planner" data-month="{{ month }}" data-month-count="{{ month_count }}" data-currency="{{ currency }}" data-workspace="{{ workspace }}" data-budget-id="{{ budget_id }}" data-budget-route="{{ client_context.budgetKey }}">
   <div class="budget-toolbar" data-budget-key="toolbar">
-    <nav class="month-strip" data-month-range aria-label="Budget month">
+    <div class="month-navigation">
       {% if shift_month(month,-1)!=month %}<a class="icon-button" href="{{ url(months=month_count,month=shift_month(month,-1)) }}" aria-label="Previous month">{{ icon('chevron-left', 17) }}</a>{% endif %}
+    <nav class="month-strip" data-month-range data-timeline-scope="{{ budget_id }}/{{ workspace }}/{{ currency }}" aria-label="Budget month">
       {% for strip_month in month_strip %}
         <a data-month="{{ strip_month }}" class="month-link {% if strip_month==month %}is-selected {% elif strip_month in period_months %}in-range {% endif %}" href="{{ url(months=month_count,month=strip_month) }}" aria-label="{{ month_label(strip_month) }}"{% if strip_month==month %} aria-current="date"{% endif %}><small class="month-link-year" aria-hidden="true">{{ strip_month[:4] }}</small><span>{{ month_label(strip_month,true) }}</span></a>
       {% endfor %}
-      {% if shift_month(month,1)!=month %}<a class="icon-button" href="{{ url(months=month_count,month=shift_month(month,1)) }}" aria-label="Next month">{{ icon('chevron-right', 17) }}</a>{% endif %}
       <div class="month-range-frame" data-month-frame data-budget-key="month-range-frame" data-budget-local hidden>
         <button type="button" class="month-range-handle start" data-range-handle="start" aria-label="Resize start of month range" title="Drag to resize; arrow keys change the start">{{ icon('chevron-left', 12) }}</button>
         <button type="button" class="month-range-move" data-range-handle="move" aria-label="Move selected month range" title="Drag to move; arrow keys move one month"></button>
         <button type="button" class="month-range-handle end" data-range-handle="end" aria-label="Resize end of month range" title="Drag to resize; arrow keys change the end">{{ icon('chevron-right', 12) }}</button>
       </div>
     </nav>
+      {% if shift_month(month,1)!=month %}<a class="icon-button" href="{{ url(months=month_count,month=shift_month(month,1)) }}" aria-label="Next month">{{ icon('chevron-right', 17) }}</a>{% endif %}
+    </div>
+    <label class="month-jump">Starting month<input type="month" data-navigation="month" aria-label="Starting month" value="{{ month }}" min="1900-01" max="2200-12" required></label>
     <a class="button secondary budget-today" href="{{ url(months=month_count,month='current-month') }}">This month</a>
   </div>
   <div class="budget-workspace{% if selected %} has-inspector{% endif %}" data-budget-key="workspace">

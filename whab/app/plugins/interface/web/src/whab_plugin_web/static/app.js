@@ -6,6 +6,7 @@ import {initBudgetSourceLinks} from './budget-source-links.js';
 import {initAccountNavigation} from './account-navigation.js';
 import {initTransactionRegister} from './transaction-register.js';
 import {hydrateCurrencyChoices, initAccountSettings, initSettingsCurrencyChoices} from './account-settings.js';
+import {initAccountList} from './account-list.js';
 import {bindLogos} from './logo-images.js';
 import {initCategorizationSettings} from './categorization-settings.js';
 import {initStorageCopies} from './storage-copies.js';
@@ -24,10 +25,12 @@ document.addEventListener('whab:notice', event => {
 bindLogos();
 
 let currentRegister = null;
+let currentAccounts = null;
 let monthRange = null;
 async function flushEdits() {
   if (!(await budgetEdits.flush())) return false;
-  return !currentRegister || await currentRegister.flush();
+  if (currentRegister && !(await currentRegister.flush())) return false;
+  return !currentAccounts || await currentAccounts.flush();
 }
 async function requireSavedEdits() {
   if (!(await flushEdits())) throw new Error('Save the transaction or budget edit before continuing.');
@@ -39,10 +42,14 @@ function navigationReady() {
 initBudgetSourceLinks();
 const accountNavigation = initAccountNavigation({
   flush: () => navigationReady() ? flushEdits() : false,
-  beforeReplace: () => navigationReady() &&
-    !currentRegister?.dirty && budgetEdits.dispose(),
+  beforeReplace() {
+    const ready = navigationReady() && !currentRegister?.dirty && !currentAccounts?.dirty && budgetEdits.dispose();
+    if (ready) monthRange?.capture?.();
+    return ready;
+  },
   onReplace({content}) {
     currentRegister?.dispose();
+    currentAccounts?.dispose();
     monthRange?.dispose();
     budgetEdits = initBudgetEdits({readForm: formBody, onDraft: () => accountNavigation.cancelPending()});
     currentRegister = initTransactionRegister({navigate: (...args) => accountNavigation.navigate(...args), pendingDestination: () => accountNavigation.pendingDestination(), cancelNavigation: () => accountNavigation.cancelPending()});
@@ -599,6 +606,7 @@ for (const dialog of document.querySelectorAll('[data-settings-page][data-plugin
 
 const pageControls = new WeakSet();
 function initPageControls(root = document) {
+  currentAccounts = initAccountList({root, api, updateFields: updateAccountFields, onDraft: () => accountNavigation.cancelPending()});
   monthRange = initMonthRange({root, async navigate(url, cancel, handle) {
     const handled = await accountNavigation.navigate(url, {onCancel: cancel, focus: `[data-range-handle="${handle}"]`});
     if (!handled) budgetEdits.navigate(url, cancel);
@@ -686,7 +694,7 @@ const uiViews = createUIViews({
     if (!response.ok) throw Object.assign(new Error(result.error || 'Interface status is unavailable.'), {code: result.code});
     return result;
   },
-  isDirty: () => Boolean(currentRegister?.dirty || budgetEdits.dirty ||
+  isDirty: () => Boolean(currentRegister?.dirty || currentAccounts?.dirty || budgetEdits.dirty ||
     document.querySelector('dialog[open], form[data-busy], [data-save-state="saving"], [data-save-state="error"]') || !navigationReady()),
   async ready() {
     accountNavigation.cancelPending();

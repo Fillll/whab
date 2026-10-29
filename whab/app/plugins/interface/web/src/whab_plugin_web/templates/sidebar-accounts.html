@@ -1,8 +1,12 @@
 {% set logos = account_logos|default({}) %}
 <div class="nav-label">ACCOUNTS <a href="{{ url('accounts') }}" aria-label="Add bank account">{{ icon('plus', 15) }}</a></div>
-{% for group in account_groups if group.accounts %}
+{% set shown = namespace(count=0) %}
+{% for group in account_groups %}
+  {% set visible_accounts = group.accounts|rejectattr("id", "in", hidden_account_ids|default([]))|list %}
+  {% if visible_accounts %}
+  {% set shown.count = shown.count + visible_accounts|length %}
   <div class="sidebar-account-scope">{{ group.label }}</div>
-  {% for account in group.accounts %}
+  {% for account in visible_accounts %}
     {# YNAB exports store a signed transaction total, even after classification as a liability. #}
     {% set estimated = account.balanceUnknown and account.source == 'ynab' %}
     {% set unavailable = account.balanceUnknown and not estimated %}
@@ -13,4 +17,6 @@
       <small title="{{ balance_label }}" aria-label="{{ balance_label }}{% if not unavailable %}: {{ account_sidebar_money(balance, account) }}{% endif %}">{% if unavailable %}—{% else %}{{ account_sidebar_money(balance, account) }}{% endif %}</small>
     </a>
   {% endfor %}
-{% else %}<p class="sidebar-empty">Connect an account to get started.</p>{% endfor %}
+{% endif %}
+{% endfor %}
+{% if not shown.count %}<p class="sidebar-empty">{% if all_accounts %}Choose visible accounts on the Accounts page.{% else %}Connect an account to get started.{% endif %}</p>{% endif %}
