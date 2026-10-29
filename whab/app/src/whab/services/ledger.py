@@ -442,6 +442,19 @@ class LedgerService:
         self, workspace, month, currency, account_id=None, *, account_ids=None,
         start_date=None, end_date=None, search="", review="all", page=1, page_size=100,
     ) -> dict:
+        """Tag each bounded register read with the same locked ledger revision."""
+        with self._lock:
+            data = self._transaction_page(
+                workspace, month, currency, account_id, account_ids=account_ids,
+                start_date=start_date, end_date=end_date, search=search, review=review,
+                page=page, page_size=page_size,
+            )
+            return {**data, "transactionPage": {**data["transactionPage"], "revision": self._revision}}
+
+    def _transaction_page(
+        self, workspace, month, currency, account_id=None, *, account_ids=None,
+        start_date=None, end_date=None, search="", review="all", page=1, page_size=100,
+    ) -> dict:
         """Read one public register page, preserving legacy storage compatibility."""
         self._workspace(workspace)
         if month is not None:
@@ -504,75 +517,74 @@ class LedgerService:
                 "transactionPage": window, "toReview": to_review,
             }
 
-        with self._lock:
-            selected = account_ids
-            if selected is None and account_id is not None:
-                known = self._store.accounts(workspace)
-                selected = (account_id,) if any(
-                    row["id"] == account_id and row.get("currency", "USD") == currency for row in known
-                ) else None
-            if month is not None:
-                year, number = map(int, month.split("-"))
-                first, last = month + "-01", f"{month}-{monthrange(year, number)[1]:02d}"
-                start_date = max(first, start_date) if start_date is not None else first
-                end_date = min(last, end_date) if end_date is not None else last
-            data = _public(read(
-                workspace, start_date, end_date, currency, selected, search, review, page, page_size,
-            ))
-            try:
-                accounts = data["accounts"]
-                categories = data["categories"]
-                currencies = sorted({"USD", currency, *(
-                    row.get("currency", "USD") for row in accounts + categories
-                )})
-                accounts = [row for row in accounts if row.get("currency", "USD") == currency]
-                categories = [row for row in categories if row.get("currency", "USD") == currency]
-                available = {row["id"] for row in accounts}
-                counts = data["transactionPage"]
-                if not all(type(counts[key]) is int and counts[key] >= 0 for key in (
-                    "total", "count", "toReview", "page", "pages", "start", "end",
-                )) or counts["count"] > counts["total"] or counts["toReview"] > counts["total"]:
+        selected = account_ids
+        if selected is None and account_id is not None:
+            known = self._store.accounts(workspace)
+            selected = (account_id,) if any(
+                row["id"] == account_id and row.get("currency", "USD") == currency for row in known
+            ) else None
+        if month is not None:
+            year, number = map(int, month.split("-"))
+            first, last = month + "-01", f"{month}-{monthrange(year, number)[1]:02d}"
+            start_date = max(first, start_date) if start_date is not None else first
+            end_date = min(last, end_date) if end_date is not None else last
+        data = _public(read(
+            workspace, start_date, end_date, currency, selected, search, review, page, page_size,
+        ))
+        try:
+            accounts = data["accounts"]
+            categories = data["categories"]
+            currencies = sorted({"USD", currency, *(
+                row.get("currency", "USD") for row in accounts + categories
+            )})
+            accounts = [row for row in accounts if row.get("currency", "USD") == currency]
+            categories = [row for row in categories if row.get("currency", "USD") == currency]
+            available = {row["id"] for row in accounts}
+            counts = data["transactionPage"]
+            if not all(type(counts[key]) is int and counts[key] >= 0 for key in (
+                "total", "count", "toReview", "page", "pages", "start", "end",
+            )) or counts["count"] > counts["total"] or counts["toReview"] > counts["total"]:
+                raise ValueError
+            if not query and review == "all" and counts["count"] != counts["total"]:
+                raise ValueError
+            empty_scope = (
+                not available or selected is not None and not available.intersection(selected)
+                or start_date is not None and end_date is not None and start_date > end_date
+            )
+            if empty_scope and counts["total"]:
+                raise ValueError
+            window = metadata(counts["total"], counts["count"], counts["toReview"])
+            if any(counts[key] != value for key, value in window.items()):
+                raise ValueError
+            rows = data["transactions"]
+            expected = window["end"] - window["start"] + 1 if counts["count"] else 0
+            if type(rows) is not list or len(rows) != expected:
+                raise ValueError
+            for row in rows:
+                _identifier(row["id"])
+                validate_date(row["date"])
+                if (
+                    row["accountId"] not in available
+                    or selected is not None and row["accountId"] not in selected
+                    or row.get("currency", currency) != currency or row.get("deleted")
+                    or start_date is not None and row["date"] < start_date
+                    or end_date is not None and row["date"] > end_date
+                    or type(row["merchant"]) is not str or type(row["note"]) is not str
+                    or type(row["pending"]) is not bool or type(row["reviewed"]) is not bool
+                    or not matches(row)
+                ):
                     raise ValueError
-                if not query and review == "all" and counts["count"] != counts["total"]:
-                    raise ValueError
-                empty_scope = (
-                    not available or selected is not None and not available.intersection(selected)
-                    or start_date is not None and end_date is not None and start_date > end_date
-                )
-                if empty_scope and counts["total"]:
-                    raise ValueError
-                window = metadata(counts["total"], counts["count"], counts["toReview"])
-                if any(counts[key] != value for key, value in window.items()):
-                    raise ValueError
-                rows = data["transactions"]
-                expected = window["end"] - window["start"] + 1 if counts["count"] else 0
-                if type(rows) is not list or len(rows) != expected:
-                    raise ValueError
-                for row in rows:
-                    _identifier(row["id"])
-                    validate_date(row["date"])
-                    if (
-                        row["accountId"] not in available
-                        or selected is not None and row["accountId"] not in selected
-                        or row.get("currency", currency) != currency or row.get("deleted")
-                        or start_date is not None and row["date"] < start_date
-                        or end_date is not None and row["date"] > end_date
-                        or type(row["merchant"]) is not str or type(row["note"]) is not str
-                        or type(row["pending"]) is not bool or type(row["reviewed"]) is not bool
-                        or not matches(row)
-                    ):
-                        raise ValueError
-                if len({row["id"] for row in rows}) != len(rows):
-                    raise ValueError
-                rows = sorted(rows, key=lambda row: (row["date"], row["id"]), reverse=True)
-            except (KeyError, TypeError, ValueError):
-                raise StoreError("Storage returned an invalid transaction page.") from None
-            return {
-                "currency": currency, "currencyMinorUnits": currency_minor_units(currency),
-                "currencies": currencies, "accounts": accounts, "categories": categories,
-                "categoryGroups": category_tree(categories), "transactions": rows,
-                "transactionPage": window, "toReview": window["toReview"],
-            }
+            if len({row["id"] for row in rows}) != len(rows):
+                raise ValueError
+            rows = sorted(rows, key=lambda row: (row["date"], row["id"]), reverse=True)
+        except (KeyError, TypeError, ValueError):
+            raise StoreError("Storage returned an invalid transaction page.") from None
+        return {
+            "currency": currency, "currencyMinorUnits": currency_minor_units(currency),
+            "currencies": currencies, "accounts": accounts, "categories": categories,
+            "categoryGroups": category_tree(categories), "transactions": rows,
+            "transactionPage": window, "toReview": window["toReview"],
+        }
 
     def workspace_periods(self, workspace: str, month: str, count: int) -> list[dict]:
         """Read consecutive core projections under the budget's shared command lock.

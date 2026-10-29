@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.37.0 — 2026-10-28
+
+PR: [#132](https://github.com/Fillll/whab/pull/132)
+
+- Make register fields editable on a single click and keep the account column available in every register. Replace page controls with continuous, bounded row loading, guarded retries, snapshot checks, ID de-duplication and Back/Forward scroll restoration. Preserve editing, selection, review and receipt behavior for appended rows.
+
 ## 1.36.1 — 2026-10-28
 
 PR: [#131](https://github.com/Fillll/whab/pull/131)

@@ -61,6 +61,7 @@ def test_legacy_storage_pages_complete_selected_history(options):
         "total": len(scoped), "count": len(matching), "page": page, "pages": pages,
         "start": offset + 1 if matching else 0, "end": min(offset + size, len(matching)),
         "toReview": sum(not row["pending"] and not row["reviewed"] for row in scoped),
+        "revision": service.revision,
     }
     assert result["toReview"] == result["transactionPage"]["toReview"]
     assert "cursor" not in repr(result)
@@ -85,8 +86,8 @@ def test_sqlite_capability_matches_service_legacy_fallback(store, month, options
         accounts=store.accounts, transaction_register=store.transaction_register,
         transaction_register_filtered=store.transaction_register_filtered,
     )
-    assert LedgerService(store).transaction_page("personal", month, "USD", page_size=1, page=99, **options) == (
-        LedgerService(legacy).transaction_page("personal", month, "USD", page_size=1, page=99, **options)
+    assert LedgerService(store, revision="same-view").transaction_page("personal", month, "USD", page_size=1, page=99, **options) == (
+        LedgerService(legacy, revision="same-view").transaction_page("personal", month, "USD", page_size=1, page=99, **options)
     )
 
 
@@ -251,3 +252,17 @@ def test_optional_workspace_periods_batch_is_sanitized_and_boundary_clamped():
     ]
     assert calls == [("personal", "2200-12", 1)]
     assert data == original
+
+
+def test_register_chunks_share_a_revision_until_a_committed_edit(store):
+    service = LedgerService(store)
+    account = service.add_account("personal", {"name": "Fictional wallet", "type": "depository", "balance": 10000})
+    key = service.add_transaction("personal", {"accountId": account, "date": "2026-10-01", "merchant": "Fictional purchase", "amount": 100, "categoryId": None})
+    first = service.transaction_page("personal", "2026-10", "USD", page=1, page_size=1)
+    again = service.transaction_page("personal", "2026-10", "USD", page=2, page_size=1)
+    assert first["transactionPage"]["revision"] == again["transactionPage"]["revision"] == service.revision
+    service.edit_transaction("personal", key, note="A committed edit")
+    current = service.transaction_page("personal", "2026-10", "USD")
+    assert current["transactionPage"]["revision"] != first["transactionPage"]["revision"]
+    assert current["transactionPage"]["revision"] == service.revision
+    assert current["transactions"][0]["note"] == "A committed edit"

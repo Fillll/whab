@@ -1,13 +1,13 @@
 {% set merchant_logos = merchant_logos|default({}) %}
 {% set logos = account_logos|default({}) %}
 {% set selected_ids = selected_account_ids|default([selected_account.id] if selected_account else []) %}
-{% set show_account_column = (selected_ids|length if selected_ids else data.accounts|length) > 1 %}
+{% set show_account_column = true %}
 {% set filter_period = transaction_period|default('all' if transaction_all_dates else 'custom') %}
 {% set period_label = transaction_period_label|default('Custom dates' if transaction_all_dates else month_label(month)) %}
 {% set review_state = transaction_review_filter|default('all') %}
 {% set review_labels = {'all': 'All', 'needs-review': 'Needs review', 'reviewed': 'Reviewed'} %}
 {% set next_review_labels = {'all': 'Needs review', 'needs-review': 'Reviewed', 'reviewed': 'All'} %}
-<section data-transaction-register data-workspace="{{ workspace }}" data-transaction-paged="true" data-transaction-page="{{ register.page }}" data-transaction-requested-page="{{ register.requested_page }}">
+<section data-transaction-register data-workspace="{{ workspace }}" data-transaction-paged="true" data-transaction-page="{{ register.page }}" data-transaction-requested-page="{{ register.requested_page }}" data-stream-next="{{ register.next or '' }}" data-stream-previous="{{ register.previous or '' }}" data-stream-revision="{{ register.revision|default('') }}" data-stream-count="{{ register.count }}">
 <div class="page-title-row">
   <div>
     <h1 id="transaction-title" tabindex="-1">{{ selected_account.name if selected_account else 'Transactions' }}</h1>
@@ -74,11 +74,11 @@
 <template data-transaction-accounts>{% for choice in transaction_accounts %}<option value="{{ choice.id }}">{{ choice.name }}</option>{% endfor %}</template>
 <template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</template>
 <form id="transaction-create-form" data-transaction-create hidden></form>
-<p class="sr-only" id="transaction-grid-help">Arrow keys move between cells. Enter, F2 or double-click edits a field. Tab moves to the next cell. Escape finishes editing. Control+Enter saves a new transaction.</p>
+<p class="transaction-grid-help" id="transaction-grid-help">Click a field to edit · ↑ ↓ move between rows · Tab moves between fields · F2 keeps arrows in the editor</p>
 <div class="table-scroll transactions-scroll" role="region" aria-labelledby="transaction-title" tabindex="0">
   <table aria-describedby="transaction-grid-help" class="transactions-table{% if show_account_column %} transactions-table-multi-account{% endif %}">
     <thead><tr>
-      <th class="transaction-select-cell" scope="col"><span class="sr-only">Multi-select</span><input type="checkbox" data-select-all aria-label="Select all transactions in this view" title="Multi-select"></th>
+      <th class="transaction-select-cell" scope="col"><span class="sr-only">Multi-select</span><input type="checkbox" data-select-all aria-label="Select loaded transactions" title="Multi-select"></th>
       <th scope="col" class="date-cell">Date</th>
       {% if show_account_column %}<th scope="col" class="account-cell">Account</th>{% endif %}
       <th class="transaction-receipt-cell" scope="col"><span class="sr-only">Receipt</span><span title="Receipt">{{ icon('image', 14) }}</span></th>
@@ -130,11 +130,12 @@
     {% endfor %}
     </tbody>
   </table>
+  <div class="transaction-stream-status" data-transaction-stream role="status" aria-live="polite"><span data-stream-status></span><button class="text-link" type="button" data-stream-retry hidden>Retry loading</button></div>
 </div>
 {% if not register.count %}<div class="empty-state"><span>{{ icon('transactions', 28) }}</span><h2>{{ 'No matching transactions' if register.total else 'No transactions here yet' }}</h2><p>{{ 'Try another search or review filter.' if register.total else 'This account has no transactions.' if transaction_all_dates and selected_account else 'No transactions match these filters.' if transaction_all_dates else 'Try another month.' if data.accounts else 'Connect a bank account to import transactions.' }}</p></div>{% endif %}
 <div class="table-footer transaction-pagination">
-  <span id="transaction-count" data-period="{{ transaction_count_period|default(period_label) }}">{{ register.count }} {% if register.count != register.total %}matching {% endif %}{{ 'transaction' if register.count == 1 else 'transactions' }}{% if register.count != register.total %} of {{ register.total }}{% endif %} · {{ transaction_count_period|default(period_label) }}{% if register.pages > 1 %} · Showing {{ register.start }}–{{ register.end }}{% endif %}</span>
-  {% if register.pages > 1 %}<nav aria-label="Transaction pages">{% if register.previous %}<a class="text-link" data-transaction-page href="{{ register.previous }}">Previous</a>{% endif %}<span>Page {{ register.page }} of {{ register.pages }}</span>{% if register.next %}<a class="text-link" data-transaction-page href="{{ register.next }}">Next</a>{% endif %}</nav>{% endif %}
+  <span id="transaction-count" data-period="{{ transaction_count_period|default(period_label) }}">{{ register.count }} {% if register.count != register.total %}matching {% endif %}{{ 'transaction' if register.count == 1 else 'transactions' }}{% if register.count != register.total %} of {{ register.total }}{% endif %} · {{ transaction_count_period|default(period_label) }}</span>
+  <span data-stream-loaded>{{ register.rows|length }} loaded</span>
 </div>
 <dialog class="modal transaction-receipt-dialog" data-transaction-receipt-dialog aria-labelledby="receipt-title">
   <div class="modal-heading"><h2 id="receipt-title">Receipt</h2><button class="icon-button" type="button" data-receipt-close aria-label="Close receipt">{{ icon('close', 16) }}</button></div>
