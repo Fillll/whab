@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.49.0 — 2026-10-28
+
+PR: [#133](https://github.com/Fillll/whab/pull/133)
+
+- Add budget/workspace-scoped sidebar account visibility preferences through a validated per-account patch. Preserve ledger data, other visibility choices and the existing currency preference file format.
+
 ## 2.48.0 — 2026-10-28
 
 PR: [#132](https://github.com/Fillll/whab/pull/132)
