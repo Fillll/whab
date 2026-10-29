@@ -102,6 +102,13 @@ def test_imported_corrections_survive_refresh_and_portable_roundtrip(imported_st
     assert (row["accountId"], row["date"], row["merchant"], row["amount"]) == (moved, "2026-10-03", "My payee", 150)
     original = store.export_budget()["transactions"][-1]["original"]
     assert original["amount"] == 130 and original["accountId"] == "bank"
+    # An override remains explicit even when a provider briefly matches it.
+    store.apply_sync("item", {"added": [], "modified": [{**posted, "amount": 150}], "removed": []}, "three", [account])
+    store.apply_sync("item", {"added": [], "modified": [{**posted, "amount": 160}], "removed": []}, "four", [account])
+    store.edit_transaction_details("personal", "posted", {"merchant": "My payee again"})
+    assert store.transactions("personal")[0]["amount"] == 150
+    original = store.export_budget()["transactions"][-1]["original"]
+    assert original["amount"] == 160
     files = store.export_budget_files()
     restored = type(store)(tmp_path / "restored-budget", month="2026-10")
     try:
@@ -123,3 +130,11 @@ def test_new_row_request_identity_prevents_duplicate_creation(imported_store, tm
         assert len(store.transactions("personal")) == 1
         assert client.post("/api/transactions", json={**payload, "amount": 200}).status_code == 400
         assert store.accounts("personal")[0]["balance"] == 9875
+
+
+def test_detail_corrections_require_an_existing_transaction(imported_store):
+    from whab.plugins import StoreError
+    before = imported_store.export_budget()
+    with pytest.raises(StoreError, match="not found"):
+        imported_store.edit_transaction_details("personal", "missing", {"amount": 100})
+    assert imported_store.export_budget() == before

@@ -730,7 +730,9 @@ class Store(Authority):
         )
 
     def edit_transaction_details(self, workspace, transaction_id, changes):
-        return self._mutate(workspace, lambda state: commands.edit_transaction_details(state, transaction_id, changes))
+        from .transaction_edits import edit_transaction
+
+        return edit_transaction(self, workspace, transaction_id, details=changes)
 
     def edit_transaction(
         self,

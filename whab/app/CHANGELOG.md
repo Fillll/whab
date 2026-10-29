@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.47.0 — 2026-10-28
+
+PR: [#130](https://github.com/Fillll/whab/pull/130)
+
+- Add atomic date, payee, amount and same-currency account corrections through the public transaction command. Preserve explicit imported overrides and provider balances through refresh/posting, adjust manual-entry balances together, and prevent duplicate new-entry retries with a request identity.
+
 ## 2.46.0 — 2026-10-27
 
 PR: [#127](https://github.com/Fillll/whab/pull/127)

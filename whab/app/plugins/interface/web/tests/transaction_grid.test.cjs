@@ -11,6 +11,7 @@ test('register signed amounts preserve currency precision and core spending sign
   assert.equal(parseRegisterAmount('+12.3', 2), -1230);
   assert.equal(parseRegisterAmount('12', 0), -12);
   assert.equal(parseRegisterAmount('-0.001', 3), 1);
+  assert.equal(parseRegisterAmount('-0.00', 2, true), 0);
   for (const amount of ['0', '-0.00', '12.345', '1e3', 'NaN', '1,000', '10000000000.01']) assert.throws(() => parseRegisterAmount(amount, 2));
   assert.throws(() => parseRegisterAmount('1.1', 0));
 });

@@ -20,7 +20,8 @@ def test_suggestion_shares_category_editor_with_short_label_and_accessible_metad
                   "createdAt": "2026-10-27T00:00:00Z", "categoryId": category, "score": .6 if low else .95, "belowCutoff": low}
     monkeypatch.setattr(client.app.state.ledger_service, "category_suggestions", lambda *args: {tx: suggestion})
     page = client.get("/budgets/home/transactions/2026-10/usd").text
-    cell = re.search(r'<td class="transaction-category-cell">(.*?)</td>', page, re.S)[1]
+    row = re.search(r'<tr class="transaction-row" data-transaction-id="' + re.escape(tx) + r'".*?</tr>', page, re.S)[0]
+    cell = re.search(r'<td class="transaction-category-cell">(.*?)</td>', row, re.S)[1]
     assert '<div class="transaction-category-editor"><select' in cell
     assert f'<option value="{category}" selected>Fictional category</option>' in cell
     assert f'<span>{label}</span>' in cell

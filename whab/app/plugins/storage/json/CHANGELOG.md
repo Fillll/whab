@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0 — 2026-10-28
+
+PR: [#130](https://github.com/Fillll/whab/pull/130)
+
+- Persist core-validated transaction detail corrections and their optional original-field annotations through atomic commits, synchronization, portable export and reopening. Require WHAB 2.47 or newer.
+
 ## 1.4.0 — 2026-10-27
 
 PR: [#126](https://github.com/Fillll/whab/pull/126)

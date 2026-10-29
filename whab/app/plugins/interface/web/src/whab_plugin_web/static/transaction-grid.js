@@ -1,10 +1,10 @@
 /* Cell navigation stays separate from native field editing and financial saves. */
-export function parseRegisterAmount(value, digits) {
+export function parseRegisterAmount(value, digits, allowZero = false) {
   const clean = value.trim();
   const match = clean.match(new RegExp(`^([+-]?)(\\d+)(?:\\.(\\d{1,${digits || 1}}))?$`));
   if (!match || !digits && match[3]) throw new Error(`Enter an amount with ${digits} decimal places or fewer.`);
   const minor = BigInt(match[2]) * 10n ** BigInt(digits) + BigInt((match[3] || '').padEnd(digits, '0'));
-  if (!minor || minor > 1_000_000_000_000n) throw new Error('Enter a nonzero amount within the supported range.');
+  if (!minor && !allowZero || minor > 1_000_000_000_000n) throw new Error('Enter a nonzero amount within the supported range.');
   // Register amounts show spending as negative; core uses positive spending.
   return match[1] === '-' ? Number(minor) : -Number(minor);
 }

@@ -330,7 +330,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     const category = row.querySelector('[data-transaction-field="categoryId"]');
     const reviewed = row.querySelector('[data-transaction-reviewed]');
     const detailFields = [...row.querySelectorAll('[data-transaction-detail]')];
-    const detailValue = control => control.dataset.transactionDetail === 'amount' ? parseRegisterAmount(control.value, Number(control.dataset.minorUnits)) : control.value;
+    const detailValue = control => control.dataset.transactionDetail === 'amount' ? parseRegisterAmount(control.value, Number(control.dataset.minorUnits), true) : control.value;
     const committed = { ...Object.fromEntries(detailFields.map(control => [control.dataset.transactionDetail, detailValue(control)])), note: memo.value, categoryId: category.value || null, reviewed: row.dataset.reviewed === 'true'};
     const prepareReview = patch => row.dataset.suggestionId && patch.reviewed === true ?
       {...patch, categoryId: category.value || null, suggestionId: row.dataset.suggestionId} : patch;

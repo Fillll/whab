@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.36.0 — 2026-10-28
+
+PR: [#130](https://github.com/Fillll/whab/pull/130)
+
+- Replace the Add transaction modal with a blank register row and prefill a selected account. Add arrow-key cell navigation, Enter/F2/double-click field editing, Tab movement and Ctrl+Enter saving. Keep fixed row heights, saved/error feedback and navigation guards for unfinished rows.
+
 ## 1.35.2 — 2026-10-28
 
 PR: [#129](https://github.com/Fillll/whab/pull/129)
