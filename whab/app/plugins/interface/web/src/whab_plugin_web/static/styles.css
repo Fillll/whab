@@ -4481,3 +4481,20 @@ main:has(.budget-planner) > .demo-ribbon,
 .month-range-frame.is-dragging .month-range-move {cursor: grabbing;}
 .month-range-move:focus-visible::after {height: 5px; background: var(--ink);}
 @media (prefers-reduced-motion: reduce) {.month-range-frame {transition: none;}}
+
+/* Spreadsheet cells retain the register's fixed row height. */
+.transactions-table td input:not([type='checkbox']):not([type='hidden']),
+.transactions-table td select,
+.transactions-table td textarea {
+  width: 100%; min-width: 0; max-width: 100%; height: 26px; min-height: 26px;
+  margin: 0; padding: 3px 4px; border: 1px solid transparent; border-radius: 3px;
+  font: inherit; color: inherit; background: transparent; box-shadow: none;
+}
+.transactions-table td input[data-transaction-detail='merchant'] {font-weight: 600;}
+.transactions-table .transaction-payee input {flex: 1;}
+.transactions-table td.amount-cell input {text-align: right; font-variant-numeric: tabular-nums;}
+.transactions-table td.grid-current {background: var(--current);}
+.transactions-table td [data-grid-editing='true'] {border-color: var(--focus); background: var(--field);}
+.transactions-table .transaction-draft-row td {background: var(--accent);}
+.transactions-table .transaction-draft-row input::placeholder {color: var(--muted); opacity: 1;}
+.transaction-grid-action {display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; color: var(--brand-red); background: transparent;}

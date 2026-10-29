@@ -1,12 +1,14 @@
 """Atomic annotation edits without reading or rewriting unrelated ledger history."""
 
+import json
+
 from whab.domain import commands
 from whab.plugins import UNSET, StoreError
 
 
 def edit_transaction(
     store, workspace: str, transaction_id: str, category_id=UNSET,
-    reviewed: bool | None = None, note=UNSET,
+    reviewed: bool | None = None, note=UNSET, *, details=None,
 ) -> None:
     with store._authority_write() as write:
         try:
@@ -31,7 +33,7 @@ def edit_transaction(
                 row = store.db.execute(
                     "SELECT id,account_id AS accountId,category_id AS categoryId,reviewed,note,"
                     "is_transfer AS isTransfer,inferred_transfer AS inferredTransfer,"
-                    "category_edited AS categoryEdited,deleted "
+                    "category_edited AS categoryEdited,deleted, date,merchant,amount,source,original_details "
                     "FROM transactions WHERE workspace=? AND id=?", (workspace, transaction_id),
                 ).fetchone()
                 if row is not None:
@@ -40,8 +42,27 @@ def edit_transaction(
                             "reviewed", "isTransfer", "inferredTransfer", "categoryEdited", "deleted",
                         )},
                     }
-            commands.edit_transaction(state, transaction_id, category_id, reviewed, note)
-            transaction = state["transactions"][transaction_id]
+            if details is not None:
+                transaction = state["transactions"].get(transaction_id)
+                if transaction is not None:
+                    original = transaction.pop("original_details")
+                    if original is not None:
+                        transaction["original"] = json.loads(original)
+                balances = {key: row["balance"] for key, row in state["accounts"].items()}
+                commands.edit_transaction_details(state, transaction_id, details)
+                transaction = state["transactions"][transaction_id]
+                store.db.execute(
+                    "UPDATE transactions SET account_id=?,date=?,merchant=?,amount=?,original_details=? WHERE workspace=? AND id=?",
+                    (transaction["accountId"], transaction["date"], transaction["merchant"], transaction["amount"],
+                     json.dumps(transaction["original"]) if "original" in transaction else None, workspace, transaction_id),
+                )
+                for key, account in state["accounts"].items():
+                    if account["balance"] != balances[key]:
+                        store.db.execute("UPDATE accounts SET balance=? WHERE workspace=? AND id=?",
+                                         (account["balance"], workspace, key))
+            else:
+                commands.edit_transaction(state, transaction_id, category_id, reviewed, note)
+                transaction = state["transactions"][transaction_id]
             store.db.execute(
                 "UPDATE transactions SET category_id=?,reviewed=?,note=?,is_transfer=?,category_edited=? "
                 "WHERE workspace=? AND id=?",

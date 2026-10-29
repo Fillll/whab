@@ -119,6 +119,10 @@ def read_files(files, *, with_receipts=False):
                 )) if row[1] == "accounts" else row
                 for row in schema
             ])
+            for schema in (schema, [
+                (*row[:3], row[3].replace(", original_details TEXT", "")) if row[1] == "transactions" else row
+                for row in schema
+            ])
             for omitted in ((), ("future_funding",), ("rollover_modes",), ("future_funding", "rollover_modes"))
             for omitted in (omitted, (*omitted, "transaction_receipts"))
             # These exact indexes are optional optimizations. Every present

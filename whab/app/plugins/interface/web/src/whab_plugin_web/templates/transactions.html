@@ -12,7 +12,7 @@
   <div>
     <h1 id="transaction-title" tabindex="-1">{{ selected_account.name if selected_account else 'Transactions' }}</h1>
   </div>
-  <div class="button-group">{% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}">{{ icon('settings', 16) }}Account settings</button>{% endif %}<a class="button secondary" href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}" download>{{ icon('download', 16) }}Export</a><button class="button primary" data-dialog="transaction-dialog" {% if not transaction_accounts %}disabled title="Add an account in Accounts first" {% endif %}>{{ icon('plus', 16) }}Add transaction</button></div>
+  <div class="button-group">{% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}">{{ icon('settings', 16) }}Account settings</button>{% endif %}<a class="button secondary" href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}" download>{{ icon('download', 16) }}Export</a><button class="button primary" data-add-transaction {% if not transaction_accounts %}disabled title="Add an account in Accounts first" {% endif %}>{{ icon('plus', 16) }}Add transaction</button></div>
 </div>
 <div class="transaction-filters">
   <form method="get" action="{{ request.url.path }}" data-transaction-search-form>
@@ -71,9 +71,12 @@
 </div>
 <div class="transaction-feedback" data-transaction-feedback hidden role="status"><span data-transaction-feedback-text></span><button class="text-link" type="button" data-transaction-retry>Retry save</button></div>
 <span class="sr-only" data-transaction-save-status aria-live="polite"></span>
+<template data-transaction-accounts>{% for choice in transaction_accounts %}<option value="{{ choice.id }}">{{ choice.name }}</option>{% endfor %}</template>
 <template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</template>
+<form id="transaction-create-form" data-transaction-create hidden></form>
+<p class="sr-only" id="transaction-grid-help">Arrow keys move between cells. Enter, F2 or double-click edits a field. Tab moves to the next cell. Escape finishes editing. Control+Enter saves a new transaction.</p>
 <div class="table-scroll transactions-scroll" role="region" aria-labelledby="transaction-title" tabindex="0">
-  <table class="transactions-table{% if show_account_column %} transactions-table-multi-account{% endif %}">
+  <table aria-describedby="transaction-grid-help" class="transactions-table{% if show_account_column %} transactions-table-multi-account{% endif %}">
     <thead><tr>
       <th class="transaction-select-cell" scope="col"><span class="sr-only">Multi-select</span><input type="checkbox" data-select-all aria-label="Select all transactions in this view" title="Multi-select"></th>
       <th scope="col" class="date-cell">Date</th>
@@ -87,19 +90,30 @@
       <th scope="col" class="transaction-review-cell"><abbr title="Reviewed">R</abbr></th>
     </tr></thead>
     <tbody>
+      <tr class="transaction-draft-row" data-new-transaction hidden>
+        <td class="transaction-select-cell"><button class="transaction-grid-action" type="submit" form="transaction-create-form" aria-label="Save new transaction" title="Save transaction (Ctrl+Enter)">{{ icon('check', 15) }}</button></td>
+        <td class="date-cell"><input form="transaction-create-form" type="date" name="date" value="{{ today }}" min="1900-01-01" max="2200-12-31" required aria-label="Date for new transaction">{% if not show_account_column %}<input form="transaction-create-form" type="hidden" name="accountId" value="{{ selected_account.id if selected_account else transaction_accounts[0].id if transaction_accounts else '' }}">{% endif %}</td>
+        {% if show_account_column %}<td class="account-cell"><select form="transaction-create-form" name="accountId" required aria-label="Account for new transaction"><option value="">Choose account</option>{% for account in transaction_accounts %}<option value="{{ account.id }}"{% if selected_account and account.id==selected_account.id or transaction_accounts|length==1 %} selected{% endif %}>{{ account.name }}</option>{% endfor %}</select></td>{% endif %}
+        <td class="transaction-receipt-cell"><button class="transaction-grid-action" type="button" data-cancel-transaction aria-label="Cancel new transaction" title="Cancel new transaction">{{ icon('close', 15) }}</button></td>
+        <td class="transaction-payee-cell"><input form="transaction-create-form" name="merchant" required maxlength="200" aria-label="Payee for new transaction" placeholder="Payee" autocomplete="off"></td>
+        <td class="transaction-category-cell"><select form="transaction-create-form" name="categoryId" data-category-options-lazy aria-label="Category for new transaction"><option value="">Uncategorized</option></select></td>
+        <td class="transaction-memo-cell"><input form="transaction-create-form" name="note" maxlength="1000" aria-label="Memo for new transaction" placeholder="Memo"></td>
+        <td class="amount-cell"><input form="transaction-create-form" name="amount" required inputmode="decimal" data-minor-units="{{ minor_units }}" aria-label="Amount for new transaction: negative for spending, positive for income" placeholder="-0.00"></td>
+        <td class="transaction-currency-cell">{{ currency }}</td><td class="transaction-review-cell"></td>
+      </tr>
     {% for transaction in register.rows %}
       {% set account = accounts_by_id.get(transaction.accountId) %}
       {% set suggestion = (category_suggestions|default({})).get(transaction.id) %}
       {% set selected_category = transaction.categoryId or (suggestion.categoryId if suggestion else none) %}
       <tr class="transaction-row" data-transaction-id="{{ transaction.id }}"{% if suggestion %} data-suggestion-id="{{ suggestion.id }}" data-suggestion-plugin="{{ suggestion.pluginId }}"{% endif %} data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
         <td class="transaction-select-cell"><input type="checkbox" data-select-transaction aria-label="Select {{ transaction.merchant }} on {{ date_label(transaction.date) }}"></td>
-        <td class="date-cell">{{ date_label(transaction.date) }}</td>
-        {% if show_account_column %}<td class="account-cell" title="{{ account.name if account else 'Disconnected account' }}">{{ account.name if account else 'Disconnected account' }}</td>{% endif %}
+        <td class="date-cell">{% if client_context.transactionDetails %}<input type="date" data-transaction-detail="date" value="{{ transaction.date }}" min="1900-01-01" max="2200-12-31" required aria-label="Date for {{ transaction.merchant }}">{% else %}{{ date_label(transaction.date) }}{% endif %}</td>
+        {% if show_account_column %}<td class="account-cell" title="{{ account.name if account else 'Disconnected account' }}">{% if client_context.transactionDetails %}<select data-transaction-detail="accountId" data-account-options-lazy aria-label="Account for {{ transaction.merchant }}"><option value="{{ transaction.accountId }}" selected>{{ account.name if account else 'Disconnected account' }}</option></select>{% else %}{{ account.name if account else 'Disconnected account' }}{% endif %}</td>{% endif %}
         <td class="transaction-receipt-cell"><button class="transaction-receipt-button" type="button" data-transaction-receipt aria-label="Receipt for {{ transaction.merchant }}" title="Receipt" disabled>{{ icon('image', 15) }}</button></td>
         <td class="transaction-payee-cell" title="{{ account.name if account else 'Disconnected account' }}{% if account and not is_on_budget(account) %} · Off-budget · excluded from budget{% endif %}{% if transaction.pending %} · Pending{% endif %}{% if transaction.isTransfer %} · Transfer{% endif %}">
           <div class="transaction-payee">
             {% if merchant_logos.get(transaction.id) %}<span class="merchant-mark" aria-hidden="true"><span>{{ transaction.merchant[:1]|upper }}</span><img class="merchant-logo-image" data-merchant-logo data-logo-src="{{ merchant_logos[transaction.id] }}" alt="" width="18" height="18" decoding="async" hidden></span>{% endif %}
-            <strong>{{ transaction.merchant }}</strong>
+            {% if client_context.transactionDetails %}<input data-transaction-detail="merchant" value="{{ transaction.merchant }}" maxlength="200" required aria-label="Payee for {{ transaction.merchant }}">{% else %}<strong>{{ transaction.merchant }}</strong>{% endif %}
             {% if transaction.pending %}<span class="transaction-status" title="Pending" aria-label="Pending">{{ icon('clock', 13) }}</span>{% endif %}
             {% if transaction.isTransfer %}<span class="transaction-status" title="Transfer" aria-label="Transfer">{{ icon('arrow-right', 13) }}</span>{% endif %}
           </div>
@@ -109,7 +123,7 @@
           {% if selected_category %}<option value="{{ selected_category }}" selected>{{ category_labels.get(selected_category, 'Unknown category') }}</option>{% endif %}
         </select>{% if suggestion %}<span class="ml-suggestion" role="group" aria-label="{{ 'LLM' if suggestion.pluginId == 'llm-categorization' else 'ML' }} suggested category{% if suggestion.get('belowCutoff') %} · {{ (suggestion.score * 100)|round|int }}% · Low score{% endif %}" title="Suggested by {{ suggestion.pluginId }} · Model {{ suggestion.modelId }} · {{ suggestion.createdAt }}{% if suggestion.get('belowCutoff') %} · {{ (suggestion.score * 100)|round|int }}% · Low score{% endif %}. Applied only when reviewed.">{% if suggestion.pluginId == 'llm-categorization' %}{{ icon('sparkles', 13) }}<span>LLM</span>{% else %}{{ icon('forest', 13) }}<span>ML</span>{% endif %}{% if suggestion.get('belowCutoff') %}<span aria-hidden="true">{{ (suggestion.score * 100)|round|int }}%</span>{% endif %}<button type="button" data-dismiss-suggestion aria-label="Dismiss category suggestion for {{ transaction.merchant }}" title="Dismiss suggestion">×</button></span>{% endif %}</div></td>
         <td class="transaction-memo-cell"><textarea rows="1" maxlength="1000" class="transaction-memo" data-transaction-field="note" aria-label="Memo for {{ transaction.merchant }}" placeholder="Memo">{{ transaction.note }}</textarea></td>
-        <td class="amount-cell {% if transaction.amount<0 %}inflow{% endif %}">{{ money(-transaction.amount) }}</td>
+        <td class="amount-cell {% if transaction.amount<0 %}inflow{% endif %}">{% if client_context.transactionDetails %}<input data-transaction-detail="amount" value="{{ money_input(-transaction.amount) }}" data-minor-units="{{ minor_units }}" required inputmode="decimal" aria-label="Amount for {{ transaction.merchant }}: negative for spending, positive for income">{% else %}{{ money(-transaction.amount) }}{% endif %}</td>
         <td class="transaction-currency-cell">{{ account.currency|default(currency) if account else currency }}</td>
         <td class="transaction-review-cell"><button type="button" class="transaction-review-button" data-transaction-reviewed aria-pressed="{{ 'true' if transaction.reviewed else 'false' }}" aria-label="Reviewed: {{ transaction.merchant }}" title="{{ 'Pending transactions cannot be reviewed yet' if transaction.pending else 'Reviewed' if transaction.reviewed else 'Not reviewed' }}"{% if transaction.pending %} disabled{% endif %}>R</button></td>
       </tr>

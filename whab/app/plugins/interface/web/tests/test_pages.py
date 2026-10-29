@@ -56,9 +56,9 @@ def test_default_formats_and_only_children_in_category_choices(client):
     import re
 
     text = client.get("/budgets/demo/transactions/2026-10/usd").text
-    assert re.search(r'class="date-cell">2026-10-\d{2}</td>', text)
-    assert 'Date (YYYY-MM-DD)' in text
-    assert 'name="date" type="text" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"' in text
+    assert re.search(r'data-transaction-detail="date" value="2026-10-\d{2}"', text)
+    assert 'aria-label="Date for new transaction"' in text
+    assert 'type="date" name="date"' in text
     assert 'aria-label="Budget currency"' not in text
     assert '<optgroup label="Everyday">' in text
     category_selects = re.findall(r'<select name="categoryId"[^>]*>(.*?)</select>', text, re.S)
@@ -67,8 +67,8 @@ def test_default_formats_and_only_children_in_category_choices(client):
     assert '"KWD": 3' in text
     assert '"JPY": 0' in text
     assert 'name="currency"' in text
-    assert re.search(r'\$[0-9,]+\.[0-9]{2}', text)
-    assert '-$64.25' in text and '$8,200.00' in text
+    assert 'data-transaction-detail="amount"' in text
+    assert 'value="-64.25"' in text and 'value="8200.00"' in text
     assert '−$' not in text and '+$' not in text
     assert 'Parent category<input name="group"' in text
     assert 'Child category name' in text

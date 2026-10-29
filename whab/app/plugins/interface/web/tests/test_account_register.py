@@ -110,7 +110,7 @@ def test_account_register_skips_envelope_projection_and_reuses_category_choices(
     assert len(register_rows(text)) == 12
     assert text.count('<template data-transaction-categories>') == 1
     assert text.count('<optgroup label="Everyday">') == 1
-    assert text.count('data-category-options-lazy') == 12
+    assert text.count('data-category-options-lazy') == 13
     for row in register_rows(text):
         category = re.search(r'<select name="categoryId"[^>]*>(.*?)</select>', row, re.S)[1]
         assert len(re.findall(r'<option\b', category)) == 2
@@ -168,8 +168,9 @@ def test_account_column_follows_date_only_for_multiple_selected_accounts(client,
         assert len(rows) == (1 if "q=First" in query else 2)
         for row in rows:
             expected = "Daily &lt;wallet&gt; &amp; savings" if "First purchase" in row else "Reserve wallet"
-            assert re.search(r'class="date-cell">2026-10-05</td>\s*<td class="account-cell"', row)
-            assert f'title="{expected}">{expected}</td>' in row
+            assert re.search(r'class="date-cell"><input[^>]*value="2026-10-05"[^>]*></td>\s*<td class="account-cell"', row)
+            assert f'title="{expected}"' in row
+            assert re.search(r'<option[^>]* selected>' + re.escape(expected) + r'</option>', row)
             assert "Daily <wallet>" not in row
     for query in (f"?account={first}", f"?accounts={first}"):
         text = client.get(path + query, headers=headers).text

@@ -80,6 +80,10 @@ class LedgerService:
             return self._revision
 
     @property
+    def supports_transaction_details(self) -> bool:
+        return callable(getattr(self._store, "edit_transaction_details", None))
+
+    @property
     def supports_bulk_review(self) -> bool:
         return callable(getattr(self._store, "review_transactions", None))
 
@@ -135,7 +139,7 @@ class LedgerService:
             "add_transaction": (
                 {"accountId", "date", "merchant", "amount", "categoryId"}, {"note"},
             ),
-            "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed", "note", "suggestionId"}),
+            "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed", "note", "suggestionId", "accountId", "date", "merchant", "amount"}),
             "categorization": ({"action", "pluginId"}, {"parameters", "modelId", "session", "name", "transactionId", "suggestionId"}),
             "review_transactions": ({"transactionIds", "reviewed"}, set()),
             "assign": ({"categoryId", "month", "assigned"}, set()),
@@ -197,14 +201,14 @@ class LedgerService:
                 raise StoreError("Invalid account budget scope.")
             if "subtype" in payload and payload["subtype"] is not None and type(payload["subtype"]) is not str:
                 raise StoreError("Invalid account subtype.")
-        if operation == "add_transaction":
+        if operation == "add_transaction" or operation == "edit_transaction" and "date" in payload:
             validate_date(payload["date"])
             if not "1900-01-01" <= payload["date"] <= "2200-12-31":
                 raise StoreError("Transaction date must be between 1900-01-01 and 2200-12-31.")
-            if not payload["amount"]:
+            if "amount" in payload and not payload["amount"]:
                 raise StoreError("Amount must not be zero.")
         if operation == "edit_transaction":
-            if not payload.keys() & {"categoryId", "reviewed", "note"}:
+            if not payload.keys() & {"categoryId", "reviewed", "note", "accountId", "date", "merchant", "amount"}:
                 raise StoreError("No transaction changes provided.")
             if "reviewed" in payload and type(payload["reviewed"]) is not bool:
                 raise StoreError("Invalid review status.")
@@ -272,12 +276,20 @@ class LedgerService:
                         if payload.get("reviewed") is not True:
                             raise StoreError("Review the transaction to accept a category suggestion.")
                         payload.setdefault("categoryId", suggestion["categoryId"])
-                    data = self._store.edit_transaction(
-                        workspace, payload["transactionId"],
-                        category_id=payload.get("categoryId", UNSET), reviewed=payload.get("reviewed"),
-                        **({"note": payload["note"]} if "note" in payload else {}),
-                        **({"suggestion_id": suggestion_id} if suggestion_id and self.categorization is None else {}),
-                    )
+                    if payload.keys() & {"accountId", "date", "merchant", "amount"}:
+                        details = getattr(self._store, "edit_transaction_details", None)
+                        if not callable(details):
+                            raise StoreError("Update the budget storage plugin to edit transaction details.")
+                        data = details(workspace, payload["transactionId"], {
+                            key: value for key, value in payload.items() if key not in {"transactionId", "suggestionId"}
+                        })
+                    else:
+                        data = self._store.edit_transaction(
+                            workspace, payload["transactionId"],
+                            category_id=payload.get("categoryId", UNSET), reviewed=payload.get("reviewed"),
+                            **({"note": payload["note"]} if "note" in payload else {}),
+                            **({"suggestion_id": suggestion_id} if suggestion_id and self.categorization is None else {}),
+                        )
                     if suggestion is not None:
                         self.categorization.accepted(workspace, payload["transactionId"], suggestion, payload["categoryId"])
                 elif operation == "review_transactions":
@@ -626,10 +638,18 @@ class LedgerService:
     def add_category(self, workspace, category):
         return self._local_command("add_category", workspace, category)
 
-    def add_transaction(self, workspace, transaction, source="manual"):
+    def add_transaction(self, workspace, transaction, source="manual", *, request_id=None):
         if source != "manual":
             raise StoreError("Public commands only create manual transactions.")
-        return self._local_command("add_transaction", workspace, transaction)
+        if request_id is None:
+            return self._local_command("add_transaction", workspace, transaction)
+        self._workspace(workspace)
+        _identifier(request_id)
+        with self._lock:
+            previous = self._receipts.get(request_id)
+            revision = previous[2] if previous is not None else self._revision
+            return self.command("add_transaction", workspace, transaction,
+                                request_id=request_id, expected_revision=revision)["data"]
 
     def category_suggestions(self, workspace, transactions=None):
         self._workspace(workspace)
@@ -641,7 +661,7 @@ class LedgerService:
     def categorize(self, workspace, payload):
         return self._local_command("categorization", workspace, payload)
 
-    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET, suggestion_id=None):
+    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET, suggestion_id=None, details=None):
         payload = {"transactionId": transaction_id}
         if suggestion_id is not None:
             payload["suggestionId"] = suggestion_id
@@ -651,6 +671,10 @@ class LedgerService:
             payload["reviewed"] = reviewed
         if note is not UNSET:
             payload["note"] = note
+        if details is not None:
+            if type(details) is not dict or details.keys() - {"accountId", "date", "merchant", "amount"}:
+                raise StoreError("Invalid transaction detail fields.")
+            payload.update(details)
         return self._local_command("edit_transaction", workspace, payload)
 
     def review_transactions(self, workspace, transaction_ids, reviewed, *, request_id=None):

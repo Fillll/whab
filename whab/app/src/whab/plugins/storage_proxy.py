@@ -29,6 +29,7 @@ _MUTATIONS = {
     "update_account": (("workspace", "account_id", "changes"), {}),
     "add_category": (("workspace", "category"), {}),
     "add_transaction": (("workspace", "transaction"), {"source": "manual"}),
+    "edit_transaction_details": (("workspace", "transaction_id", "changes"), {}),
     "edit_transaction": (("workspace", "transaction_id"), {"category_id": UNSET, "reviewed": None, "note": UNSET}),
     "review_transactions": (("workspace", "transaction_ids", "reviewed"), {}),
     "assign": (("workspace", "category_id", "month", "assigned"), {}),
@@ -72,6 +73,8 @@ def operation_payload(name, args, kwargs):
             payload["source"] = values["source"]
     elif name == "update_account":
         payload = {**values["changes"], "accountId": values["account_id"]}
+    elif name == "edit_transaction_details":
+        payload = {"transactionId": values["transaction_id"], "changes": values["changes"]}
     elif name == "edit_transaction":
         payload = {"transactionId": values["transaction_id"]}
         for source, target in (("category_id", "categoryId"), ("reviewed", "reviewed"), ("note", "note")):

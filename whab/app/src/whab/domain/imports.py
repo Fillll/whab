@@ -137,7 +137,7 @@ def annotated_transaction(record: ImportedTransaction, annotations: dict) -> dic
         if annotations.get("categoryEdited")
         else record["suggestedCategoryId"]
     )
-    return {
+    result = {
         "id": record["id"],
         "accountId": record["accountId"],
         "date": record["date"],
@@ -156,3 +156,9 @@ def annotated_transaction(record: ImportedTransaction, annotations: dict) -> dic
         "categoryEdited": bool(annotations.get("categoryEdited")),
         "deleted": False,
     }
+
+    if "original" in annotations:
+        result["original"] = {key: result[key] for key in annotations["original"]}
+        for key in annotations["original"]:
+            result[key] = annotations[key]
+    return result

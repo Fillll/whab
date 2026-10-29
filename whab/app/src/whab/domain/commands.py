@@ -63,7 +63,8 @@ def update_account(state: dict, account_id: str, changes: dict) -> None:
     if "currency" in changes:
         candidate["currency"] = currency_code(changes["currency"])
         if candidate["currency"] != account.get("currency", "USD") and any(
-            row["accountId"] == account_id for row in state["transactions"].values()
+            row["accountId"] == account_id or row.get("original", {}).get("accountId") == account_id
+            for row in state["transactions"].values()
         ):
             raise StoreError("Currency can only change before an account has transaction history.")
     if "type" in changes and changes["type"] != account["type"]:
@@ -149,6 +150,56 @@ def edit_transaction(
         transaction["reviewed"] = reviewed
     if note is not UNSET:
         transaction["note"] = note
+
+
+
+def edit_transaction_details(state: dict, transaction_id: str, changes: dict) -> None:
+    """Correct register fields atomically, retaining imported originals for refreshes."""
+    if type(changes) is not dict or not changes or changes.keys() - {
+        "accountId", "date", "merchant", "amount", "categoryId", "reviewed", "note",
+    }:
+        raise StoreError("Invalid transaction fields.")
+    transaction = state["transactions"].get(transaction_id)
+    if not transaction or transaction.get("deleted"):
+        raise StoreError("Transaction not found.")
+    candidate = {**transaction, **changes}
+    validate_date(candidate["date"])
+    if not "1900-01-01" <= candidate["date"] <= "2200-12-31":
+        raise StoreError("Invalid transaction date.")
+    candidate["merchant"] = validate_label(candidate["merchant"])
+    amount = cents(candidate["amount"])
+    if not amount:
+        raise StoreError("Amount must not be zero.")
+    old_account = state["accounts"][transaction["accountId"]]
+    account = state["accounts"].get(candidate["accountId"])
+    if account is None:
+        raise StoreError("Account not found.")
+    if account.get("currency", "USD") != old_account.get("currency", "USD"):
+        raise StoreError("Transaction accounts must have the same currency.")
+    # Annotation validation sees the new account/category pair, without exposing
+    # a partly corrected record to the caller when any validation fails.
+    detached = {**state, "transactions": {transaction_id: candidate}}
+    edit_transaction(detached, transaction_id, candidate.get("categoryId"),
+                     changes.get("reviewed"), changes.get("note", UNSET))
+    if "categoryId" not in changes:
+        candidate["categoryEdited"] = transaction["categoryEdited"]
+        candidate["isTransfer"] = transaction["isTransfer"]
+    balances = {}
+    if transaction["source"] in {"manual", "demo"}:
+        balances[old_account["id"]] = old_account["balance"] - (
+            transaction["amount"] if is_liability(old_account) else -transaction["amount"])
+        balances[account["id"]] = cents(balances.get(account["id"], account["balance"]) + (
+            amount if is_liability(account) else -amount))
+        for balance in balances.values():
+            cents(balance)
+    else:
+        candidate["original"] = {
+            **{key: transaction[key] for key in ("accountId", "date", "merchant", "amount") if key in changes},
+            **transaction.get("original", {}),
+        }
+    state["transactions"][transaction_id] = candidate
+    for identifier, balance in balances.items():
+        state["accounts"][identifier]["balance"] = balance
 
 
 def assign(

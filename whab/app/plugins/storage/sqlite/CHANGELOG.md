@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.13.0 — 2026-10-28
+
+PR: [#130](https://github.com/Fillll/whab/pull/130)
+
+- Persist core-validated transaction detail corrections atomically. Add original-field annotations through a nullable column, preserve overrides during synchronization and portable roundtrips, and retain exact older SQLite image schemas. Require WHAB 2.47 or newer.
+
 ## 1.12.1 — 2026-10-25
 
 PR: [#113](https://github.com/Fillll/whab/pull/113)

@@ -126,6 +126,7 @@ function harness(count = 5, options = {}) {
       const pending = deferred(); imageRequests.push({path, details, ...pending}); return pending.promise;
     },
   };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/transaction-grid.js'), 'utf8').replaceAll('export function ', 'function '), context);
   vm.runInNewContext(source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function '), context);
   const register = context.initTransactionRegister({navigate: async (url, details) => {
     navigations.push({url: JSON.parse(JSON.stringify(url)), details: JSON.parse(JSON.stringify(details))});

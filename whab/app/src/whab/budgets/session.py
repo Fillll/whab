@@ -668,7 +668,7 @@ class BudgetSession:
 class TrackedStorage:
     """Checkpoint portable files after committed writes, including bank synchronization."""
 
-    MUTATIONS = frozenset({"add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "apply_sync", "import_workspace", "save_item", "set_item_status", "disconnect_item", "save_receipt", "delete_receipt", "restore_budget", "restore_budget_files", "execute_operation"})
+    MUTATIONS = frozenset({"add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details", "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "apply_sync", "import_workspace", "save_item", "set_item_status", "disconnect_item", "save_receipt", "delete_receipt", "restore_budget", "restore_budget_files", "execute_operation"})
 
     def __init__(self, store, session=None):
         self.store = store

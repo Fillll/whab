@@ -1,5 +1,7 @@
 """Detached portable records without materializing a second domain ledger."""
 
+import json
+
 from whab.domain.portable import ACCOUNT_FIELDS
 from whab.plugins import StoreError
 
@@ -22,13 +24,18 @@ def snapshot(store, workspace):
             (workspace,),
         )]
         transactions = []
+        original_column = "original_details" in {row["name"] for row in store.db.execute("PRAGMA table_info(transactions)")}
         for row in store.db.execute(
             "SELECT id,account_id AS accountId,date,merchant,merchant_logo AS merchantLogo,amount,"
             "category_id AS categoryId,pending,reviewed,source,note,is_transfer AS isTransfer,"
             "inferred_transfer AS inferredTransfer,category_edited AS categoryEdited,deleted "
+            + (",original_details " if original_column else "") +
             "FROM transactions WHERE workspace=? ORDER BY rowid", (workspace,),
         ):
             record = dict(row)
+            original = record.pop("original_details", None)
+            if original is not None:
+                record["original"] = json.loads(original)
             for key in ("pending", "reviewed", "isTransfer", "inferredTransfer", "categoryEdited", "deleted"):
                 record[key] = bool(record[key])
             transactions.append(record)
