@@ -579,18 +579,19 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   listen(removeReceipt, 'click', () => { receiptPromise = saveReceipt('DELETE').finally(() => { receiptPromise = null; }); });
   function loadReceiptMarkers(targetRows) {
     if (!targetRows.length) return;
-     (getContext().receiptIndexScoped === true ?
-    api('/receipts/index', {workspace, transactionIds: targetRows.map(row => row.dataset.transactionId)}, 'POST') :
-    api(`/receipts?workspace=${workspace}`)).then(result => {
-    if (disposed) return;
-    for (const id of result.transactionIds || []) receiptIds.add(id);
-    for (const row of targetRows) {
-      const button = row.querySelector('[data-transaction-receipt]');
-      button.disabled = result.supported !== true;
-      if (result.supported) markReceipt(row, receiptIds.has(row.dataset.transactionId));
-      else button.title = 'Receipts are unavailable with this storage plugin.';
-    }
-  }).catch(() => { if (!disposed) for (const row of targetRows) row.querySelector('[data-transaction-receipt]').title = 'Receipts could not be loaded.'; });
+    const request = getContext().receiptIndexScoped === true ?
+      api('/receipts/index', {workspace, transactionIds: targetRows.map(row => row.dataset.transactionId)}, 'POST') :
+      api(`/receipts?workspace=${workspace}`);
+    request.then(result => {
+      if (disposed) return;
+      for (const id of result.transactionIds || []) receiptIds.add(id);
+      for (const row of targetRows) {
+        const button = row.querySelector('[data-transaction-receipt]');
+        button.disabled = result.supported !== true;
+        if (result.supported) markReceipt(row, receiptIds.has(row.dataset.transactionId));
+        else button.title = 'Receipts are unavailable with this storage plugin.';
+      }
+    }).catch(() => {if (!disposed) for (const row of targetRows) row.querySelector('[data-transaction-receipt]').title = 'Receipts could not be loaded.';});
   }
   loadReceiptMarkers(rows);
   if (createForm && draft) {

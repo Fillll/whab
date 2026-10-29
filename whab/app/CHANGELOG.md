@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.48.0 — 2026-10-28
+
+PR: [#132](https://github.com/Fillll/whab/pull/132)
+
+- Tag bounded transaction reads with the ledger revision captured under the command lock, allowing interfaces to reject stale chunks without changing financial commands or storage schemas.
+
 ## 2.47.0 — 2026-10-28
 
 PR: [#130](https://github.com/Fillll/whab/pull/130)
