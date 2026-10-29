@@ -20,7 +20,7 @@ function harness(present = true) {
   const links = Array.from({length: 13}, (_, index) => target({href: `https://localhost/budgets/demo/budget/2027-${String(index + 1).padStart(2, '0')}/usd`,
     dataset: {month: `2027-${String(index + 1).padStart(2, '0')}`}, getAttribute: () => `Month ${index + 1}`, getBoundingClientRect: () => ({left: index * 40 + (index >= 5 ? 20 : 0) - strip.scrollLeft, width: 36, top: 13, height: 29})}));
   links[4].classList.add('is-selected');
-  const strip = target({scrollLeft: 0, scrollTop: 0, clientWidth: 800, scrollWidth: 800, dataset: {timelineScope: 'fictional/USD'}, scrollTo(value) {scrolls.push(value); this.scrollLeft = value.left;}, closest: () => ({dataset: {monthCount: '3'}}),
+  const strip = target({scrollLeft: 0, scrollTop: 0, clientWidth: 800, scrollWidth: 800, dataset: {timelineScope: 'fictional/USD'}, scrollTo(value) {scrolls.push(value); if (!this.deferScroll) this.scrollLeft = value.left;}, closest: () => ({dataset: {monthCount: '3'}}),
     querySelector: () => frame, querySelectorAll: () => links, getBoundingClientRect: () => ({left: 0, top: 0})});
   const context = {URL, AbortController, window: {matchMedia: () => ({matches: false})}, ResizeObserver: class {constructor(callback) {this.callback = callback; observers.push(this);} observe() {} disconnect() {this.disconnected = true;}}, document: {querySelector: () => present ? strip : null}};
   vm.runInNewContext(source.replaceAll('export function ', 'function '), context);
@@ -94,4 +94,17 @@ test('captured timeline position survives disposal after the old strip loses lay
   const fresh = h.context.initMonthRange({navigate() {}});
   assert.equal(h.strip.scrollLeft, 80);
   fresh.dispose();
+});
+
+test('a smooth edge scroll finishes centering after a fragment replaces an intermediate animation frame', () => {
+  const h = harness(); h.strip.clientWidth = 240; h.strip.scrollWidth = 800;
+  h.strip.scrollLeft = 100; h.strip.deferScroll = true;
+  h.frame.emit('keydown', {target:h.handles.move, key:'ArrowRight'});
+  const destination = h.scrolls.at(-1).left;
+  h.strip.scrollLeft = 130; // Enough gap, but the requested animation has not finished.
+  h.control.capture(); h.strip.isConnected = false; h.strip.scrollLeft = 0; h.control.dispose();
+  h.strip.isConnected = true;
+  h.context.initMonthRange({navigate() {}});
+  assert.equal(h.scrolls.at(-1).left, destination);
+  assert.equal(h.scrolls.at(-1).behavior, 'smooth');
 });

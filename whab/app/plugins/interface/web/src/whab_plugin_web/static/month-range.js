@@ -25,7 +25,7 @@ export function initMonthRange({root = document, navigate}) {
   const links = [...strip.querySelectorAll('a[data-month]')];
   const initial = {start: links.findIndex(link => link.classList.contains('is-selected')),
     count: Number(strip.closest('[data-month-count]').dataset.monthCount)};
-  let selection = initial, drag = null;
+  let selection = initial, drag = null, camera = null;
   const controller = new AbortController();
   const listen = (target, event, callback) => target.addEventListener(event, callback, {signal: controller.signal});
   function bounds(index) {
@@ -33,10 +33,12 @@ export function initMonthRange({root = document, navigate}) {
     return {left: rect.left - parent.left + strip.scrollLeft, width: rect.width, top: rect.top - parent.top + strip.scrollTop, height: rect.height};
   }
   function reveal(value, center = false, smooth = true) {
+    center ||= camera !== null && Math.abs(camera - strip.scrollLeft) > 1;
     const first = bounds(value.start), last = bounds(value.start + value.count - 1);
     const target = timelineScrollTarget(first.left - 6, last.left + last.width + 6,
       strip.scrollLeft, strip.clientWidth, Math.max(0, strip.scrollWidth - strip.clientWidth), center);
-    if (target === strip.scrollLeft) return;
+    if (target === strip.scrollLeft) {camera = null; return;}
+    camera = target;
     if (strip.scrollTo) strip.scrollTo({left: target, behavior: smooth && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'instant'});
     else strip.scrollLeft = target;
   }
@@ -44,7 +46,7 @@ export function initMonthRange({root = document, navigate}) {
     if (strip.isConnected === false) return;
     const index = links.findIndex((_, index) => bounds(index).left + bounds(index).width > strip.scrollLeft);
     if (index >= 0) viewportState = {scope: strip.dataset?.timelineScope, month: links[index].dataset?.month,
-      offset: bounds(index).left - strip.scrollLeft};
+      offset: bounds(index).left - strip.scrollLeft, recenter: camera !== null && Math.abs(camera - strip.scrollLeft) > 1};
   }
   function draw(value = selection, offset = 0, mode = 'move') {
     const first = bounds(value.start), last = bounds(value.start + value.count - 1);
@@ -117,7 +119,7 @@ export function initMonthRange({root = document, navigate}) {
   const anchor = viewportState && viewportState.scope === strip.dataset?.timelineScope && viewportState.month && links.findIndex(link => link.dataset?.month === viewportState.month);
   if (typeof anchor === 'number' && anchor >= 0) {
     strip.scrollLeft = Math.max(0, bounds(anchor).left - viewportState.offset);
-    reveal(initial);
+    reveal(initial, viewportState.recenter);
   } else reveal(initial, true, false);
   return {capture: remember, dispose() {remember(); controller.abort(); observer.disconnect();}};
 }
