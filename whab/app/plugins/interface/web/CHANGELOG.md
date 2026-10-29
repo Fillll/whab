@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.35.2 — 2026-10-28
+
+PR: [#129](https://github.com/Fillll/whab/pull/129)
+
+- Show the year above each month in the budget selector, replacing separate inline year markers. Keep the range frame, yellow highlights and keyboard/drag controls.
+
 ## 1.35.1 — 2026-10-28
 
 PR: [#128](https://github.com/Fillll/whab/pull/128)
