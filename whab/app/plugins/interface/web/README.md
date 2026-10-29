@@ -159,3 +159,6 @@ Bank connection controls appear only in the corresponding installed plugin's set
 
 
 **Add transaction** works with every account in the current currency, including imported and connected accounts. A full individual-register load selects that account in the entry form. Both full pages and retained page-navigation option lists include these accounts. An empty currency view keeps the action disabled with an explanation to add an account first. The core validates and saves the entry with manual provenance and updates the account balance; bank refreshes preserve manual entries, and automatic manual/import matching remains separate.
+
+
+Focus styling uses existing control borders, text underlines and icon weight instead of extra outlines. Month-range grips retain keyboard focus after navigation without adding a second red box; the single red range frame and yellow selected months remain. Account-picker active backgrounds, review/save states and matching-budget-total highlights retain their feedback without outline strokes.
