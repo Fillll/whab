@@ -802,3 +802,7 @@ Provider UI extensions can dispatch `whab:plugin-settings` on the document with 
 ### Optional transaction detail corrections
 
 WHAB 2.47 supports `edit_transaction_details(workspace, transaction_id, changes)` on storage adapters. The changes object may contain `date`, `merchant`, integer-minor-unit `amount`, `accountId`, `categoryId`, `note` and `reviewed`. The host's public `edit_transaction` command accepts these detail fields as an additive extension and keeps the original annotation-only method available for older adapters. Core validates the combined transaction before committing. Currency-changing account moves are rejected. Manual entries adjust account balances; imported overrides preserve provider balances and optional original-field annotations through sync and portable saves. User interfaces expose detail editing when the selected adapter supplies the capability.
+
+### Register snapshot revisions
+
+WHAB 2.48 adds an opaque `revision` to the public `transactionPage` metadata. The service reads the bounded projection and captures this marker under the budget command lock. Chunks from one unchanged ledger share the marker; a committed command or privileged host mutation invalidates it. Interfaces can reject stale chunks without exposing financial drafts or adding storage-specific dependencies. Financial commands and the underlying bounded storage read contract are unchanged.

@@ -22,7 +22,7 @@ def test_add_transaction_enabled_for_imported_accounts_and_fragments(client, sto
         assert 'id="transaction-dialog"' not in text
     selected = client.get(f"/budgets/home/transactions/2026-10/usd?account={second}").text
     selected_form = re.search(r'data-new-transaction(.*?)</tr>', selected, re.S)[1]
-    assert f'name="accountId" value="{second}"' in selected_form
+    assert f'<option value="{second}" selected>Second imported account</option>' in selected_form
     for page in ("transactions", "accounts", "budget", "insights"):
         fragment = client.get(f"/budgets/home/{page}/2026-10/usd", headers={"X-WHAB-Page-Fragment": "1"}).text
         options = re.search(r'<select data-page-account-options>(.*?)</select>', fragment, re.S)[1]

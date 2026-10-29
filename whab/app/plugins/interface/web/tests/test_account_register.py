@@ -127,12 +127,28 @@ def test_large_register_searches_unrendered_transactions_and_preserves_page_filt
     path = f"/budgets/home/transactions/2026-10/usd?account={account}&all_dates=true"
     first = client.get(path).text
     assert len(register_rows(first)) == 100
-    assert "205 transactions · All dates · Showing 1–100" in first
-    assert 'aria-label="Transaction pages"' in first and "Page 1 of 3" in first
+    assert "205 transactions · All dates" in first
+    assert 'aria-label="Transaction pages"' not in first and "Page 1 of 3" not in first
+    assert 'data-stream-next="' in first and 'data-stream-revision="' in first
+    assert "100 loaded" in first
+    # The same scoped address supplies bounded chunks without visible page controls.
+    loaded = list(register_rows(first))
+    revisions = [re.search(r'data-stream-revision="([^"]+)"', first)[1]]
+    next_url = re.search(r'data-stream-next="([^"]*)"', first)[1]
+    while next_url:
+        chunk = client.get(unescape(next_url), headers={"X-WHAB-Transactions-Fragment": "1", "X-WHAB-Transactions-Sidebar": "omit"}).text
+        batch = register_rows(chunk)
+        assert len(batch) <= 100 and 'aria-label="Transaction pages"' not in chunk
+        loaded.extend(batch)
+        revisions.append(re.search(r'data-stream-revision="([^"]+)"', chunk)[1])
+        next_url = re.search(r'data-stream-next="([^"]*)"', chunk)[1]
+    identifiers = [re.search(r'data-transaction-id="([^"]+)"', row)[1] for row in loaded]
+    assert len(identifiers) == len(set(identifiers)) == 205
+    assert len(set(revisions)) == 1
     assert 'data-transaction-paged="true"' in first
     last = client.get(path + "&tx_page=999").text
-    assert len(register_rows(last)) == 5 and "Page 3 of 3" in last
-    assert "Showing 201–205" in last
+    assert len(register_rows(last)) == 5 and "Page 3 of 3" not in last
+    assert "5 loaded" in last
     # A query matches the complete account history, including rows absent from page one.
     offscreen = re.search(r'data-merchant="(Purchase \d+)"', register_rows(last)[0])[1]
     searched = client.get(path + "&q=" + offscreen.replace(" ", "+") + "&tx_page=3").text
@@ -147,12 +163,12 @@ def test_large_register_searches_unrendered_transactions_and_preserves_page_filt
 
 
 @pytest.mark.parametrize("headers", [{}, {"X-WHAB-Transactions-Fragment": "1"}])
-def test_account_column_follows_date_only_for_multiple_selected_accounts(client, store, headers):
+def test_account_column_stays_editable_for_single_and_multiple_selected_accounts(client, store, headers):
     first = store.add_account("personal", {
         "name": "Daily <wallet> & savings", "type": "depository", "balance": 0,
     })
     path = "/budgets/home/transactions/2026-10/usd"
-    assert 'scope="col" class="account-cell"' not in client.get(path, headers=headers).text
+    assert 'scope="col" class="account-cell"' in client.get(path, headers=headers).text
     second = store.add_account("personal", {
         "name": "Reserve wallet", "type": "depository", "balance": 0,
     })
@@ -174,6 +190,6 @@ def test_account_column_follows_date_only_for_multiple_selected_accounts(client,
             assert "Daily <wallet>" not in row
     for query in (f"?account={first}", f"?accounts={first}"):
         text = client.get(path + query, headers=headers).text
-        assert 'scope="col" class="account-cell"' not in text
-        assert '<td class="account-cell"' not in text
+        assert 'scope="col" class="account-cell"' in text
+        assert '<td class="account-cell"' in text
         assert len(register_rows(text)) == 1

@@ -3,6 +3,8 @@ import {api, apiUrl, getContext, notify, pageUrl, updateContext} from './client.
 import {initAccountPicker} from './account-picker.js';
 import {initPeriodPicker} from './period-picker.js';
 import {initTransactionGrid, parseRegisterAmount} from './transaction-grid.js';
+import {initTransactionStream} from './transaction-stream.js';
+import {bindLogos} from './logo-images.js';
 
 export function createTransactionWriter(save, {saved = () => {}, state = () => {}} = {}) {
   let pending = {};
@@ -103,6 +105,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   const root = document.querySelector('[data-transaction-register]');
   if (!root) return {flush: async () => true, dispose() {}};
   const rows = [...root.querySelectorAll('.transaction-row')];
+  let stream = null;
   const workspace = root.dataset.workspace;
   const grid = initTransactionGrid(root.querySelector('.transactions-table'));
   const createForm = root.querySelector('[data-transaction-create]');
@@ -179,6 +182,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     selection();
   }
   async function go(url, focus = 'heading', refresh = false, summary = false) {
+    stream?.cancel();
     const revision = ++filterNavigationRevision;
     filterNavigationPending = true;
     try {
@@ -218,6 +222,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     }, 0);
   }
   function editStarted() {
+    stream?.cancel();
     const interruptedFilters = filterNavigationPending || pendingDestination() || Object.keys(pendingFilters).length;
     clearTimeout(refreshTimer);
     clearTimeout(searchTimer);
@@ -240,7 +245,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     reviewFilter.setAttribute('aria-label', `Review status: ${labels[next]}. Click for ${nextLabels[next]}.`);
     updateContext({reviewFilter: next});
   }
-  listen(document, 'click', () => { if (refreshNeeded) refreshAfterMutation(); });
+  listen(document, 'click', () => { if (refreshNeeded) refreshAfterMutation(); stream?.check(); });
   const accountPicker = initAccountPicker(root, accounts => {
     applyFilters({accounts}, '#account-filter-toggle');
   });
@@ -325,7 +330,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     for (const row of rows) row.querySelector('[data-select-transaction]').checked = false;
     selection();
   });
-  for (const row of rows) {
+  function bindRow(row) {
     const memo = row.querySelector('[data-transaction-field="note"]');
     const category = row.querySelector('[data-transaction-field="categoryId"]');
     const reviewed = row.querySelector('[data-transaction-reviewed]');
@@ -351,6 +356,17 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         if (amountField) amountField.closest('td').classList.toggle('inflow', Number(amountField.value) > 0);
         row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
         onMutation();
+        if (stream) {
+          const context = getContext();
+          const outsideAccount = 'accountId' in patch && context.selectedAccountIds?.length && !context.selectedAccountIds.includes(patch.accountId);
+          const outsideDates = 'date' in patch && (context.startDate && patch.date < context.startDate || context.endDate && patch.date > context.endDate);
+          if (!row.hidden && (outsideAccount || outsideDates)) {
+            row.hidden = true; row.querySelector('[data-select-transaction]').checked = false; selection();
+            const remaining = Math.max(0, Number(root.dataset.streamCount) - 1); root.dataset.streamCount = String(remaining);
+            count.textContent = count.textContent.replace(/^\d+/, String(remaining));
+          }
+          stream.mutation('date' in patch || 'accountId' in patch || Boolean(search.value && ('merchant' in patch || 'note' in patch)) || displayedReview !== 'all' && 'reviewed' in patch);
+        }
         if (!paged) filter();
         else if (!bulkBusy && (refreshNeeded || search.value && 'note' in patch && document.activeElement !== memo || 'reviewed' in patch || detailFields.some(control => control.dataset.transactionDetail in patch))) {
           refreshAfterMutation();
@@ -363,7 +379,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         if (value === 'saving') row.setAttribute('aria-busy', 'true');
         else row.removeAttribute('aria-busy');
         if (value === 'error') error(failure.message || 'The transaction could not be saved.');
-        else if (value === 'saved') live.textContent = 'Transaction saved.';
+        else if (value === 'saved') {live.textContent = 'Transaction saved.'; stream?.check();}
       },
     });
     editors.set(row, writer);
@@ -431,6 +447,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       void writer.push({reviewed: value});
     });
   }
+  for (const row of rows) bindRow(row);
   for (const button of selectionBar.querySelectorAll('[data-bulk-reviewed]')) listen(button, 'click', () => {
     if (bulkBusy) return;
     editStarted();
@@ -513,14 +530,15 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       receiptError.textContent = failure.message; receiptError.hidden = false;
     } finally { if (revision === receiptRequest) receiptStatus.textContent = ''; }
   }
-  for (const row of rows) listen(row.querySelector('[data-transaction-receipt]'), 'click', () => {
+  function bindReceiptRow(row) {listen(row.querySelector('[data-transaction-receipt]'), 'click', () => {
     editStarted();
     receiptRow = row;
     receiptFile.value = '';
     receiptDialog.querySelector('[data-receipt-payee]').textContent = row.dataset.merchant;
     receiptDialog.showModal();
     void loadReceipt(row);
-  });
+  });}
+  for (const row of rows) bindReceiptRow(row);
   listen(receiptDialog.querySelector('[data-receipt-close]'), 'click', () => { if (!receiptBusy) receiptDialog.close(); });
   listen(receiptFile, 'change', editStarted);
   listen(receiptDialog, 'cancel', event => { if (receiptBusy) event.preventDefault(); });
@@ -559,18 +577,22 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     receiptPromise = saveReceipt('PUT', file).finally(() => { receiptPromise = null; });
   });
   listen(removeReceipt, 'click', () => { receiptPromise = saveReceipt('DELETE').finally(() => { receiptPromise = null; }); });
-  if (rows.length) (getContext().receiptIndexScoped === true ?
-    api('/receipts/index', {workspace, transactionIds: rows.map(row => row.dataset.transactionId)}, 'POST') :
+  function loadReceiptMarkers(targetRows) {
+    if (!targetRows.length) return;
+     (getContext().receiptIndexScoped === true ?
+    api('/receipts/index', {workspace, transactionIds: targetRows.map(row => row.dataset.transactionId)}, 'POST') :
     api(`/receipts?workspace=${workspace}`)).then(result => {
     if (disposed) return;
     for (const id of result.transactionIds || []) receiptIds.add(id);
-    for (const row of rows) {
+    for (const row of targetRows) {
       const button = row.querySelector('[data-transaction-receipt]');
       button.disabled = result.supported !== true;
       if (result.supported) markReceipt(row, receiptIds.has(row.dataset.transactionId));
       else button.title = 'Receipts are unavailable with this storage plugin.';
     }
-  }).catch(() => { if (!disposed) for (const row of rows) row.querySelector('[data-transaction-receipt]').title = 'Receipts could not be loaded.'; });
+  }).catch(() => { if (!disposed) for (const row of targetRows) row.querySelector('[data-transaction-receipt]').title = 'Receipts could not be loaded.'; });
+  }
+  loadReceiptMarkers(rows);
   if (createForm && draft) {
     listen(root.querySelector('[data-add-transaction]'), 'click', () => {
       editStarted(); draft.hidden = false; createRequestId ||= crypto.randomUUID();
@@ -622,6 +644,26 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   function beforeUnload(event) {
     if (creating || draft && !draft.hidden || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
   }
+  stream = initTransactionStream({root, context: {...getContext()},
+    ready: () => !disposed && !filterNavigationPending && !pendingDestination() && !searchTimer &&
+      search.value === displayedSearch && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
+      !creating && (!draft || draft.hidden) && !bulkBusy && !receiptBusy && !timers.size &&
+      !rows.some(row => row.hasDraft()) && ![...editors.values()].some(writer => writer.dirty),
+    changed: () => {notify('Transactions changed. Refreshing this view.'); void go(new URL(location.href), 'heading', true);},
+    append(incoming, direction) {
+      const known = new Set(rows.map(row => row.dataset.transactionId));
+      const added = incoming.filter(row => !known.has(row.dataset.transactionId));
+      if (!added.length) return;
+      const body = root.querySelector('.transactions-table tbody'), anchor = body.querySelector('.transaction-row');
+      for (const row of added) {
+        if (direction === 'previous') body.insertBefore(row, anchor);
+        else body.append(row);
+      }
+      if (direction === 'previous') rows.unshift(...added); else rows.push(...added);
+      for (const row of added) {bindRow(row); bindReceiptRow(row);}
+      loadReceiptMarkers(added); bindLogos(); selection();
+    },
+  });
   listen(window, 'beforeunload', beforeUnload);
   if (paged) selection();
   else filter();
@@ -632,6 +674,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       disposed = true;
       clearTimeout(searchTimer);
       clearTimeout(refreshTimer);
+      stream?.dispose();
       grid.dispose();
       accountPicker.dispose();
       periodPicker.dispose();

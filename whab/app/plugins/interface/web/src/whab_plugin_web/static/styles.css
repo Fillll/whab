@@ -1152,7 +1152,7 @@ strong {
   border: 0;
 }
 .transactions-scroll {
-  max-height: max(220px, calc(100dvh - 270px));
+  max-height: max(220px, calc(100dvh - 290px));
   border: 1px solid var(--line);
   border-radius: 4px;
   scrollbar-gutter: stable;
@@ -4498,3 +4498,11 @@ main:has(.budget-planner) > .demo-ribbon,
 .transactions-table .transaction-draft-row td {background: var(--accent);}
 .transactions-table .transaction-draft-row input::placeholder {color: var(--muted); opacity: 1;}
 .transaction-grid-action {display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; color: var(--brand-red); background: transparent;}
+
+.transaction-grid-help {font-size: 10px; color: var(--muted); margin: 0 0 8px;}
+.transaction-stream-status {min-height: 1px; padding: 0 12px; font-size: 11px; color: var(--muted); background: var(--surface);}
+.transaction-stream-status[data-state='loading'], .transaction-stream-status[data-state='error'] {padding-top: 12px; padding-bottom: 12px;}
+.transaction-stream-status button {margin-left: 10px;}
+.transactions-table td input:not([type='hidden']):not([type='checkbox']):hover,
+.transactions-table td select:hover,
+.transactions-table td textarea:hover {border-color: var(--line); background: var(--field);}

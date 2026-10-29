@@ -25,7 +25,7 @@ export function gridDestination(rows, cell, key, shift = false) {
 
 export function initTransactionGrid(table) {
   if (!table) return {focus() {}, dispose() {}};
-  let active = null, editing = null;
+  let active = null, editing = null, nativeArrows = false;
   const controller = new AbortController();
   const listen = (event, callback) => table.addEventListener(event, callback, {capture: true, signal: controller.signal});
   const cells = row => [...row.cells].filter(cell => cell.querySelector('input:not([type="hidden"]),select,textarea,button:not(:disabled)'));
@@ -36,7 +36,6 @@ export function initTransactionGrid(table) {
     const control = editing;
     editing = null;
     control.dispatchEvent(new Event('change', {bubbles: true}));
-    if (control.matches('input:not([type="checkbox"]),textarea')) control.readOnly = true;
     delete control.dataset.gridEditing;
   }
   function focus(cell) {
@@ -46,11 +45,11 @@ export function initTransactionGrid(table) {
     active = cell; cell.tabIndex = 0; cell.classList.add('grid-current');
     cell.focus({preventScroll: true}); cell.scrollIntoView({block: 'nearest', inline: 'nearest'});
   }
-  function edit(cell, replacement) {
+  function edit(cell, replacement, native = true) {
     const control = field(cell);
     if (!control) return;
     if (control.matches('button,input[type="checkbox"]')) {control.click(); return;}
-    editing = control; control.dataset.gridEditing = 'true';
+    editing = control; nativeArrows = native || control.matches('select,input[type="date"]'); control.dataset.gridEditing = 'true';
     control.readOnly = false; control.focus();
     if (replacement !== undefined && !control.matches('select')) {
       control.value = replacement; control.dispatchEvent(new Event('input', {bubbles: true}));
@@ -58,15 +57,13 @@ export function initTransactionGrid(table) {
   }
   for (const row of table.tBodies[0].rows) for (const cell of cells(row)) {
     cell.tabIndex = -1;
-    const control = field(cell);
-    if (control.matches('input:not([type="checkbox"]),textarea')) control.readOnly = true;
   }
   const first = rows().flatMap(cells)[0];
   if (first) first.tabIndex = 0;
   listen('pointerdown', event => {
     const cell = event.target.closest('td');
     if (!cell || !cells(cell.parentElement).includes(cell) || event.target === editing || event.target.closest('button,input[type="checkbox"]')) return;
-    event.preventDefault(); focus(cell);
+    focus(cell); edit(cell, undefined, false);
   });
   listen('dblclick', event => {const cell = event.target.closest('td'); if (cell && field(cell)) {event.preventDefault(); focus(cell); edit(cell);}});
   listen('focusout', event => {
@@ -82,7 +79,14 @@ export function initTransactionGrid(table) {
       return;
     }
     if (event.ctrlKey) return;
-    if (editing && !['Enter', 'Escape', 'Tab'].includes(event.key)) return;
+    if (editing && event.key === 'F2') {event.preventDefault(); nativeArrows = true; return;}
+    if (editing && event.key === 'Enter' && event.shiftKey && editing.matches('textarea')) return;
+    if (editing && !['Enter', 'Escape', 'Tab'].includes(event.key)) {
+      if (nativeArrows || event.shiftKey || !['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)) return;
+      if (['ArrowLeft','ArrowRight'].includes(event.key) && (editing.selectionStart !== editing.selectionEnd ||
+          event.key === 'ArrowLeft' && editing.selectionStart > 0 ||
+          event.key === 'ArrowRight' && editing.selectionEnd < editing.value.length)) return;
+    }
     if (editing && event.key === 'Escape') {event.preventDefault(); event.stopPropagation(); focus(cell); return;}
     if (!editing && ['Enter', 'F2'].includes(event.key)) {event.preventDefault(); event.stopPropagation(); edit(cell); return;}
     const navigation = editing && event.key === 'Enter' ? 'ArrowDown' : event.key;

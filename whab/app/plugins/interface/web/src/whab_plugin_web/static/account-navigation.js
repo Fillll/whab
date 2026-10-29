@@ -184,7 +184,10 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
     pendingCancel = onCancel;
     const revision = ++request;
     if (!summary && !refresh) {
-      scrollPositions.set(displayed.href, {left: window.scrollX || 0, top: window.scrollY || 0});
+      const register = document.querySelector('.transactions-scroll');
+      scrollPositions.set(displayed.href, {left: window.scrollX || 0, top: window.scrollY || 0,
+        ...(register ? {register: {top: register.scrollTop, left: register.scrollLeft,
+          loaded: document.querySelectorAll('.transaction-row').length}} : {})});
       if (scrollPositions.size > 64) scrollPositions.delete(scrollPositions.keys().next().value);
     }
     pendingTarget = target.href;
@@ -280,7 +283,9 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
       }
       if (!refresh && getContext().pageFragments === true && (generic || action === 'none')) {
         const position = action === 'none' ? scrollPositions.get(canonical.href) : null;
-        window.scrollTo?.({...position || {left: 0, top: 0}, behavior: 'instant'});
+        window.scrollTo?.({left: position?.left || 0, top: position?.top || 0, behavior: 'instant'});
+        if (position?.register) fresh.querySelector('[data-transaction-register]')?.dispatchEvent(
+          new CustomEvent('whab:restore-register', {detail: position.register}));
       }
     } catch (failure) {
       if (revision !== request || disposed || failure.name === 'AbortError') return !summary;

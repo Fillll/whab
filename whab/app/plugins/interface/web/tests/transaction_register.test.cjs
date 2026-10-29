@@ -41,7 +41,7 @@ function harness(count = 5, options = {}) {
   const navigations = [];
   const contexts = [], history = [];
   let pickerChoose, pickerDisposed = false, periodChoose, periodDisposed = false;
-  const rowList = Array.from({length: count}, (_, index) => {
+  const makeRow = index => {
     const controls = Object.fromEntries(['[data-select-transaction]', '[data-transaction-field="note"]',
       '[data-transaction-field="categoryId"]', '[data-transaction-reviewed]', '[data-transaction-receipt]']
       .map(selector => [selector, element()]));
@@ -52,7 +52,10 @@ function harness(count = 5, options = {}) {
     return element({dataset: {transactionId: options.transactionIds?.[index] || `transaction-${index}`, merchant: `Payee ${index}`,
       payee: `payee ${index}`, reviewed: 'false', pending: 'false', transfer: 'false'},
     querySelector: selector => controls[selector], controls});
-  });
+  };
+  const rowList = Array.from({length: count}, (_, index) => makeRow(index));
+  const body = {querySelector: () => rowList[0], append(row) {rowList.push(row);}, insertBefore(row, anchor) {rowList.splice(rowList.indexOf(anchor), 0, row);}};
+  let streamCallbacks;
   const bulk = element({dataset: {bulkReviewed: 'true'}}), clear = element(), selectionCount = element();
   const selectionBar = element({querySelector: selector => selector === '[data-clear-selection]' ? clear : selectionCount,
     querySelectorAll: () => [bulk]});
@@ -80,7 +83,7 @@ function harness(count = 5, options = {}) {
     querySelectorAll: selector => selector === '.transaction-row' ? rowList : selector === '[data-transaction-page]' ? [pageLink] : [],
     querySelector: selector => ({...controls, '[data-transaction-selection-bar]': selectionBar,
       '[data-transaction-feedback]': feedback, '[data-transaction-receipt-dialog]': receiptDialog,
-      '[data-transaction-search-form]': searchForm})[selector]});
+      '[data-transaction-search-form]': searchForm, '.transactions-table tbody': body})[selector]});
   const window = element();
   window.history = {state: {}, replaceState: (...args) => history.push(args)};
   let requestId = 0;
@@ -127,12 +130,17 @@ function harness(count = 5, options = {}) {
     },
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/transaction-grid.js'), 'utf8').replaceAll('export function ', 'function '), context);
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/transaction-stream.js'), 'utf8').replaceAll('export function ', 'function '), context);
   vm.runInNewContext(source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function '), context);
+  if (options.stream) {
+    context.bindLogos = () => {};
+    context.initTransactionStream = callbacks => {streamCallbacks = callbacks; return {cancel() {}, mutation() {}, check() {}, dispose() {}};};
+  }
   const register = context.initTransactionRegister({navigate: async (url, details) => {
     navigations.push({url: JSON.parse(JSON.stringify(url)), details: JSON.parse(JSON.stringify(details))});
     return true;
   }, ...options});
-  return {register, requests, receiptRequests, imageRequests, receiptControls, objectUrls, revokedUrls,
+  return {register, requests, receiptRequests, makeRow, stream: streamCallbacks, imageRequests, receiptControls, objectUrls, revokedUrls,
     rows: rowList, bulk, window, feedback, feedbackText, controls, navigations,
     chooseAccount: value => pickerChoose(value), isPickerDisposed: () => pickerDisposed,
     choosePeriod: value => periodChoose(value), isPeriodDisposed: () => periodDisposed, reviewLabel, contexts, history, searchForm, pageLink, document: context.document, receiptDialog};
@@ -792,5 +800,25 @@ test('review changes during sidebar navigation preserve the pending account and 
   assert.equal(state.history.length, 0);
   for (const request of pending) request.resolve(true);
   await tick();
+  state.register.dispose();
+});
+
+test('appended rows retain editing, receipt markers and ID de-duplication', async () => {
+  const state = harness(1, {paged: true, stream: true, receiptIndexScoped: true});
+  const added = state.makeRow(100);
+  state.stream.append([added], 'next');
+  state.stream.append([added], 'next');
+  assert.equal(state.rows.length, 2);
+  assert.equal(state.receiptRequests.length, 2);
+  assert.deepEqual(state.receiptRequests[1].body.transactionIds, ['transaction-100']);
+  added.controls['[data-transaction-field="note"]'].value = 'Memo beyond the first chunk';
+  added.controls['[data-transaction-field="note"]'].emit('input');
+  assert.equal(state.stream.ready(), false);
+  const flushed = state.register.flush();
+  assert.equal(state.requests[0].path, '/transactions/transaction-100');
+  assert.equal(state.requests[0].body.note, 'Memo beyond the first chunk');
+  state.requests[0].resolve({ok: true});
+  assert.equal(await flushed, true);
+  assert.equal(state.stream.ready(), true);
   state.register.dispose();
 });
