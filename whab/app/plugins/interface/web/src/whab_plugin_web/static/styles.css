@@ -1221,7 +1221,7 @@ strong {
   margin: auto;
 }
 .transactions-table th.date-cell {
-  width: 96px;
+  width: 128px;
 }
 .transactions-table-multi-account {
   min-width: 1160px;

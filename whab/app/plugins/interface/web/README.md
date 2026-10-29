@@ -165,6 +165,6 @@ Focus styling uses existing control borders, text underlines and icon weight ins
 
 ### Spreadsheet entry and editing
 
-Add transaction opens a blank row in the register. A single selected account is prefilled; an all-account view offers an account choice. Negative displayed amounts record spending and positive amounts record income. Save commits the row, Cancel discards it, and Ctrl+Enter saves from the keyboard. An unfinished row blocks navigation and remains available after validation or save errors.
+Add transaction opens a blank row in the register. The date column reserves room for the full date and native picker. A single selected account is prefilled; an all-account view offers an account choice. Negative displayed amounts record spending and positive amounts record income. Save commits the row, Cancel discards it, and Ctrl+Enter saves from the keyboard. An unfinished row blocks navigation and remains available after validation or save errors.
 
 Arrow keys move vertically within a column and horizontally between controls. Enter, F2 or double-click edits a field; typing starts a text edit. While editing, native arrows move the caret or choose options; Enter finishes the edit and moves down, Tab moves between cells, and Escape finishes editing. Date, payee, amount and account corrections require WHAB 2.47 and a supporting backend. Category, memo, review and receipt controls keep their existing behavior. Account currency remains derived from its account; moves between currencies are rejected.
