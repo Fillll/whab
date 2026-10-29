@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.35.1 — 2026-10-28
+
+PR: [#128](https://github.com/Fillll/whab/pull/128)
+
+- Remove redundant focus and hover outlines throughout Web, including the extra red rectangle around month-range grips. Keep the single range frame and selected-month colors, with keyboard focus indicated by existing borders, underlines and icon/grip weight.
+
+
 ## 1.35.0 — 2026-10-27
 
 PR: [#127](https://github.com/Fillll/whab/pull/127)
