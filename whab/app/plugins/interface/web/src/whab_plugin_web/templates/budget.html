@@ -15,8 +15,7 @@
     <nav class="month-strip" data-month-range aria-label="Budget month">
       {% if shift_month(month,-1)!=month %}<a class="icon-button" href="{{ url(months=month_count,month=shift_month(month,-1)) }}" aria-label="Previous month">{{ icon('chevron-left', 17) }}</a>{% endif %}
       {% for strip_month in month_strip %}
-        {% if loop.first or strip_month[:4]!=month_strip[loop.index0-1][:4] %}<span class="month-strip-year">{{ strip_month[:4] }}</span>{% endif %}
-        <a data-month="{{ strip_month }}" class="month-link {% if strip_month==month %}is-selected {% elif strip_month in period_months %}in-range {% endif %}" href="{{ url(months=month_count,month=strip_month) }}" aria-label="{{ month_label(strip_month) }}"{% if strip_month==month %} aria-current="date"{% endif %}>{{ month_label(strip_month,true) }}</a>
+        <a data-month="{{ strip_month }}" class="month-link {% if strip_month==month %}is-selected {% elif strip_month in period_months %}in-range {% endif %}" href="{{ url(months=month_count,month=strip_month) }}" aria-label="{{ month_label(strip_month) }}"{% if strip_month==month %} aria-current="date"{% endif %}><small class="month-link-year" aria-hidden="true">{{ strip_month[:4] }}</small><span>{{ month_label(strip_month,true) }}</span></a>
       {% endfor %}
       {% if shift_month(month,1)!=month %}<a class="icon-button" href="{{ url(months=month_count,month=shift_month(month,1)) }}" aria-label="Next month">{{ icon('chevron-right', 17) }}</a>{% endif %}
       <div class="month-range-frame" data-month-frame data-budget-key="month-range-frame" data-budget-local hidden>

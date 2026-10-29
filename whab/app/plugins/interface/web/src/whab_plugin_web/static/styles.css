@@ -3408,21 +3408,24 @@ main:has(.budget-planner) > .demo-ribbon,
   width: 27px;
   height: 29px;
 }
-.month-strip-year,
-.month-year {
-  padding: 0 6px;
-  color: var(--muted);
-  font-size: 10px;
+.month-link-year {
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 400;
+  opacity: 0.8;
 }
 .month-link {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   min-height: 29px;
   padding: 5px 8px;
   border-radius: 4px;
   color: var(--muted);
   font-size: 11px;
+  line-height: 1.2;
   transition: background 0.15s, color 0.15s;
 }
 .month-link:hover {
