@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.36.1 — 2026-10-28
+
+PR: [#131](https://github.com/Fillll/whab/pull/131)
+
+- Widen the editable transaction date column so the full date and native picker fit without changing row height.
+
 ## 1.36.0 — 2026-10-28
 
 PR: [#130](https://github.com/Fillll/whab/pull/130)
