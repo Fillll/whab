@@ -26,7 +26,15 @@
     </nav>
       {% if shift_month(month,1)!=month %}<a class="icon-button" href="{{ url(months=month_count,month=shift_month(month,1)) }}" aria-label="Next month">{{ icon('chevron-right', 17) }}</a>{% endif %}
     </div>
-    <label class="month-jump">Starting month<input type="month" data-navigation="month" aria-label="Starting month" value="{{ month }}" min="1900-01" max="2200-12" required></label>
+    <div class="month-jump" data-month-picker role="group" aria-label="Starting month">
+      <span>Starting month</span>
+      <div class="month-jump-fields">
+        <select data-navigation="month" data-month-number aria-label="Starting month" required>
+          {% for number in range(1,13) %}{% set month_number = '%02d'|format(number) %}<option value="{{ month_number }}"{% if month_number==month[5:7] %} selected{% endif %}>{{ month_label(month[:4]+'-'+month_number).split(' ')[0] }}</option>{% endfor %}
+        </select>
+        <input type="number" data-navigation="month" data-month-year aria-label="Starting year" value="{{ month[:4] }}" min="1900" max="2200" step="1" required>
+      </div>
+    </div>
     <a class="button secondary budget-today" href="{{ url(months=month_count,month='current-month') }}">This month</a>
   </div>
   <div class="budget-workspace{% if selected %} has-inspector{% endif %}" data-budget-key="workspace">

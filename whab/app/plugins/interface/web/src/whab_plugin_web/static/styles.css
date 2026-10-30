@@ -4452,8 +4452,15 @@ main:has(.budget-planner) > .demo-ribbon,
   overflow-y: hidden;
   padding: 13px 10px;
   min-width: 0;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+  touch-action: pan-y;
 }
+.month-strip[data-month-range]::-webkit-scrollbar {display: none;}
+.month-strip[data-month-range] .month-link {cursor: grab; -webkit-user-drag: none;}
+.month-strip[data-month-range].is-panning,
+.month-strip[data-month-range].is-panning .month-link {cursor: grabbing;}
 .month-strip[data-month-range] > * {flex-shrink: 0;}
 .month-range-frame {
   position: absolute;
@@ -4476,8 +4483,8 @@ main:has(.budget-planner) > .demo-ribbon,
 .month-range-handle {top: 0; bottom: 0; width: 12px; cursor: ew-resize; display: grid; place-items: center;}
 .month-range-handle.start {left: -9px;}
 .month-range-handle.end {right: -9px;}
-.month-range-move {height: 12px; left: 10px; right: 10px; bottom: -8px; cursor: grab;}
-.month-range-move::after {content: ''; position: absolute; left: calc(50% - 10px); top: 4px; width: 20px; height: 3px; background: var(--brand-red); border-radius: 3px;}
+.month-range-move {top: 0; left: 4px; right: 4px; bottom: -8px; cursor: grab;}
+.month-range-move::after {content: ''; position: absolute; left: calc(50% - 10px); bottom: 5px; width: 20px; height: 3px; background: var(--brand-red); border-radius: 3px;}
 .month-range-frame.is-dragging .month-range-move {cursor: grabbing;}
 .month-range-move:focus-visible::after {height: 5px; background: var(--ink);}
 @media (prefers-reduced-motion: reduce) {.month-range-frame {transition: none;}}
@@ -4542,5 +4549,9 @@ main:has(.budget-planner) > .demo-ribbon,
 .month-navigation > .icon-button {flex-shrink:0; width:28px; height:36px;}
 .month-navigation .month-strip {flex:1;}
 .month-jump {display:grid; gap:3px; flex-shrink:0; font-size:10px; color:var(--muted);}
-.month-jump input {width:148px; height:32px; border:1px solid var(--line); border-radius:5px; background:var(--surface); color:var(--ink); padding:4px 7px; font:inherit; font-size:11px;}
+.month-jump-fields {display:flex; gap:5px;}
+.month-jump input,
+.month-jump select {height:32px; border:1px solid var(--line); border-radius:5px; background-color:var(--surface); color:var(--ink); padding:4px 7px; font:inherit; font-size:11px;}
+.month-jump select {width:108px; padding-right:26px;}
+.month-jump input {width:72px;}
 @media (max-width:700px) {.budget-toolbar {flex-wrap:wrap;} .month-navigation {flex-basis:100%;} .month-jump {margin-left:auto;}}

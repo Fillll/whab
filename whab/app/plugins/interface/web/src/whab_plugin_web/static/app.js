@@ -613,22 +613,29 @@ function initPageControls(root = document) {
   }});
   for (const input of root.querySelectorAll('[data-navigation]')) {
     if (input.closest('[data-transaction-register]')) continue;
-    if (pageControls.has(input)) continue;
-    pageControls.add(input);
-    const initialValue = input.value;
+    const picker = input.closest('[data-month-picker]');
+    const control = picker || input;
+    if (pageControls.has(control)) continue;
+    pageControls.add(control);
+    const fields = picker ? [...picker.querySelectorAll('input, select')] : [input];
+    const values = () => fields.map(field => field.value);
+    const initialValues = values();
+    const restore = () => fields.forEach((field, index) => {field.value = initialValues[index];});
     let revision = 0;
-    input.addEventListener('change', async () => {
+    control.addEventListener('change', async () => {
       const current = ++revision;
-      if (!input.checkValidity()) {
-        input.reportValidity();
+      const invalid = fields.find(field => !field.checkValidity());
+      if (invalid) {
+        invalid.reportValidity();
         return;
       }
-      const url = pageUrl({[input.dataset.navigation]: input.value});
-      const selectedValue = input.value;
-      const canceled = () => { if (input.isConnected && input.value === selectedValue) input.value = initialValue; };
+      const value = picker ? `${picker.querySelector('[data-month-year]').value}-${picker.querySelector('[data-month-number]').value}` : input.value;
+      const url = pageUrl({[input.dataset.navigation]: value});
+      const selectedValues = values();
+      const canceled = () => { if (control.isConnected && values().every((value, index) => value === selectedValues[index])) restore(); };
       if (await accountNavigation.navigate(url, {onCancel: canceled})) return;
       if (!(await flushEdits())) {
-        input.value = initialValue;
+        canceled();
         notify('Save the transaction edit before continuing.');
         return;
       }

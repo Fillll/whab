@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Month timeline regression</title>
+<style>
+  body {font: 14px system-ui; margin: 24px;}
+  iframe {display: block; border: 1px solid #bbb; margin: 16px 0;}
+  td, th {padding: 6px 14px; text-align: left;}
+</style>
+<h1>Month timeline regression</h1>
+<p>Fictional timelines using the shipped stylesheet and controller. Drag unselected months to pan; drag the center of the red frame to move the range. The edges resize it.</p>
+<table><thead><tr><th>Width / theme / months</th><th>Hidden scrollbar</th><th>Center and edges reachable</th><th>Result</th></tr></thead><tbody></tbody></table>
+<script type="module">
+const stylesheet = new URL('../../src/whab_plugin_web/static/styles.css', location.href);
+const controller = new URL('../../src/whab_plugin_web/static/month-range.js', location.href);
+for (const width of [825, 1280, 390]) for (const theme of ['light', 'dark']) for (const count of [1, 3, 5]) {
+  const frame = document.createElement('iframe');
+  frame.width = width; frame.height = 150;
+  frame.title = `${width}px, ${theme}, ${count} months`;
+  const loaded = new Promise(resolve => frame.onload = resolve);
+  frame.srcdoc = `<!doctype html><html lang="en" data-theme="${theme}"><meta charset="utf-8"><link rel="stylesheet" href="${stylesheet}">
+    <div style="padding:16px" data-month-count="${count}">
+      <nav class="month-strip" data-month-range aria-label="Budget month">
+        ${Array.from({length: 48}, (_, index) => {
+          const date = new Date(2025, index, 1), month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          const label = date.toLocaleDateString('en-US', {month: 'long', year: 'numeric'});
+          return `<a class="month-link ${index === 21 ? 'is-selected' : ''}" data-month="${month}" href="?month=${month}" aria-label="${label}"><small class="month-link-year">${date.getFullYear()}</small><span>${label.slice(0, 3)}</span></a>`;
+        }).join('')}
+        <div class="month-range-frame" data-month-frame hidden>
+          <button class="month-range-handle start" data-range-handle="start" aria-label="Resize start of month range">‹</button>
+          <button class="month-range-move" data-range-handle="move" aria-label="Move selected month range"></button>
+          <button class="month-range-handle end" data-range-handle="end" aria-label="Resize end of month range">›</button>
+        </div>
+      </nav><p role="status">Drag to explore</p>
+    </div>
+    <script type="module">import {initMonthRange} from '${controller}';
+      initMonthRange({navigate(url) {document.querySelector('[role=status]').textContent = 'Selected ' + url.searchParams.get('month') + ', ' + url.searchParams.get('months') + ' months';}});
+    <\/script></html>`;
+  document.body.append(frame); await loaded;
+  const doc = frame.contentDocument, win = frame.contentWindow;
+  await new Promise(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
+  const strip = doc.querySelector('[data-month-range]'), selection = doc.querySelector('[data-month-frame]');
+  const box = selection.getBoundingClientRect();
+  const hidden = win.getComputedStyle(strip).scrollbarWidth === 'none'
+    && win.getComputedStyle(strip, '::-webkit-scrollbar').display === 'none';
+  const hits = [box.left + 1, (box.left + box.right) / 2, box.right - 1].map(x =>
+    doc.elementFromPoint(x, (box.top + box.bottom) / 2)?.closest('[data-range-handle]')?.dataset.rangeHandle);
+  const reachable = hits.join(',') === 'start,move,end';
+  const fits = doc.documentElement.scrollWidth <= width;
+  const row = document.createElement('tr');
+  row.innerHTML = `<td>${width}px / ${theme} / ${count}</td><td>${hidden}</td><td>${hits.join(', ')}</td><td>${hidden && reachable && fits ? 'PASS' : 'FAIL'}</td>`;
+  document.querySelector('tbody').append(row);
+}
+const failures = [...document.querySelectorAll('tbody tr')].filter(row => row.lastElementChild.textContent === 'FAIL').length;
+document.title = failures ? `FAIL: ${failures} timeline cases` : 'PASS: 18 timeline cases';
+document.querySelector('h1').textContent = document.title;
+</script>
+</html>
