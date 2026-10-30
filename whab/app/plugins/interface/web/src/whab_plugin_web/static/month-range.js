@@ -71,13 +71,16 @@ export function initMonthRange({root = document, navigate}) {
   }
   // An ordinary click still opens a month; a horizontal drag pans without navigation.
   listen(strip, 'pointerdown', event => {
+    if (event.button !== 0 || event.isPrimary === false) return;
     suppressClick = false;
-    if (event.button !== 0 || event.isPrimary === false || drag || event.target.closest('[data-month-frame]')) return;
+    pan = null;
+    if (drag || event.target.closest('[data-month-frame]')) return;
     pan = {id: event.pointerId, x: event.clientX, scroll: strip.scrollLeft, moved: false};
   });
   listen(strip, 'dragstart', event => event.preventDefault());
   listen(strip, 'pointermove', event => {
     if (!pan || pan.id !== event.pointerId) return;
+    if (event.buttons === 0) {finishPan(event); return;}
     const distance = event.clientX - pan.x;
     if (!pan.moved && Math.abs(distance) < 4) return;
     if (!pan.moved) {strip.setPointerCapture(event.pointerId); pan.moved = true;}

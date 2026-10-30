@@ -157,6 +157,8 @@ The month strip shows the year above each month, keeping year changes within the
 
 The budget timeline keeps the same visible months while the selection has room. Its scrollbar stays hidden; drag the unselected months with the hand cursor to pan without changing the selection. Ordinary clicks, trackpad scrolling and fixed Previous/Next controls remain available. Near an edge it scrolls the selected range gently into view. Reduced-motion preferences use immediate positioning. **Starting month** has a month dropdown and an explicitly labeled **Starting year** number field, accepting years from 1900 through 2200 without stepping through intervening months. Both retain the selected one-to-five-month width and use the same pending-edit navigation guards.
 
+Serve the plugin folder using the static fixture command under Development checks, then open `/tests/fixtures/month-timeline.html` for a fictional preview with the shipped stylesheet and range controller. Its 18 cases cover light/dark appearances, 390/825/1280px widths and one/three/five-month ranges, checking hidden scrollbars and hit-testing the center and both resize edges. The same timelines support manual pan and selection drags without opening a runtime budget.
+
 Bank connection controls appear only in the corresponding installed plugin's settings page. Visual adapters can support the public `whab:plugin-settings` document event (`detail: {pluginId, open}`) to suspend their settings modal while an external connection overlay is open and restore the provider page afterwards. The `#plugin-settings-<id>` fragment opens that plugin's settings after a completed connection/reload.
 
 

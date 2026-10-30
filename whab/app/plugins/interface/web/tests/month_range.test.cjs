@@ -146,3 +146,16 @@ test('small pointer motion retains month clicks and cancellation releases pannin
   h.strip.emit('pointerup');
   assert.equal(h.strip.emit('click').prevented, undefined, 'the next ordinary click works');
 });
+
+test('a pointer released outside the timeline cannot leave a stale pan behind', () => {
+  const h = harness();
+  h.strip.emit('pointerdown', {target: h.links[1], clientX: 80});
+  h.strip.emit('pointermove', {clientX: 30, buttons: 0});
+  assert.equal(h.strip.scrollLeft, 0);
+  h.strip.emit('pointermove', {clientX: 20, buttons: 1});
+  assert.equal(h.strip.scrollLeft, 0);
+  h.strip.emit('pointerdown', {target: h.links[1], clientX: 80});
+  h.strip.emit('pointerdown', {target: {closest: () => h.frame}, clientX: 100});
+  h.strip.emit('pointermove', {clientX: 50, buttons: 1});
+  assert.equal(h.strip.scrollLeft, 0, 'starting a range drag clears any stale unselected-month press');
+});
