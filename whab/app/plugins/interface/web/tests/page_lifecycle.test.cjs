@@ -215,7 +215,7 @@ test('explicit month and year controls validate and navigate together across pag
   const {picker, monthNumber, year} = state.current;
   state.runtime.initPageControls(state.current.root);
   assert.equal(picker.handlers.size, 1, 'one listener for the pair');
-  year.value = '2034';
+  year.value = '2.034e3'; // Native number fields accept numeric notation; addresses use four-digit years.
   const changing = picker.fire('change');
   assert.equal(state.tickets[0].url.pathname, '/budgets/household/budget/2034-10/usd');
   state.tickets[0].options.onCancel();

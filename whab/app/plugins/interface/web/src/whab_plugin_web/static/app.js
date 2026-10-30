@@ -629,7 +629,7 @@ function initPageControls(root = document) {
         invalid.reportValidity();
         return;
       }
-      const value = picker ? `${picker.querySelector('[data-month-year]').value}-${picker.querySelector('[data-month-number]').value}` : input.value;
+      const value = picker ? `${Number(picker.querySelector('[data-month-year]').value)}-${picker.querySelector('[data-month-number]').value}` : input.value;
       const url = pageUrl({[input.dataset.navigation]: value});
       const selectedValues = values();
       const canceled = () => { if (control.isConnected && values().every((value, index) => value === selectedValues[index])) restore(); };
