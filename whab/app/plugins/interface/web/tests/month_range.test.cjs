@@ -9,7 +9,7 @@ function harness(present = true) {
   function target(properties = {}) {
     const events = new Map();
     return Object.assign({style: {}, addEventListener(name, callback) {events.set(name, callback);},
-      emit(name, properties = {}) {const event = {button: 0, pointerId: 1, preventDefault() {}, ...properties}; events.get(name)?.(event);},
+      emit(name, properties = {}) {const event = {button: 0, pointerId: 1, detail: 1, preventDefault() {this.prevented = true;}, stopPropagation() {this.stopped = true;}, ...properties}; events.get(name)?.(event); return event;},
       setAttribute(name, value) {this[name] = value;},
       classList: {values: new Set(), contains(name) {return this.values.has(name);}, toggle(name, on) {if (on) this.values.add(name); else this.values.delete(name);}, add(name) {this.values.add(name);}, remove(name) {this.values.delete(name);}},
     }, properties);
@@ -18,9 +18,10 @@ function harness(present = true) {
   let capture = false;
   const frame = target({querySelector: () => handles.move, setPointerCapture() {capture = true;}, hasPointerCapture: () => capture, releasePointerCapture() {capture = false;}});
   const links = Array.from({length: 13}, (_, index) => target({href: `https://localhost/budgets/demo/budget/2027-${String(index + 1).padStart(2, '0')}/usd`,
-    dataset: {month: `2027-${String(index + 1).padStart(2, '0')}`}, getAttribute: () => `Month ${index + 1}`, getBoundingClientRect: () => ({left: index * 40 + (index >= 5 ? 20 : 0) - strip.scrollLeft, width: 36, top: 13, height: 29})}));
+    dataset: {month: `2027-${String(index + 1).padStart(2, '0')}`}, closest: () => null, getAttribute: () => `Month ${index + 1}`, getBoundingClientRect: () => ({left: index * 40 + (index >= 5 ? 20 : 0) - strip.scrollLeft, width: 36, top: 13, height: 29})}));
   links[4].classList.add('is-selected');
-  const strip = target({scrollLeft: 0, scrollTop: 0, clientWidth: 800, scrollWidth: 800, dataset: {timelineScope: 'fictional/USD'}, scrollTo(value) {scrolls.push(value); if (!this.deferScroll) this.scrollLeft = value.left;}, closest: () => ({dataset: {monthCount: '3'}}),
+  let panCapture = false;
+  const strip = target({setPointerCapture() {panCapture = true;}, hasPointerCapture: () => panCapture, releasePointerCapture() {panCapture = false;}, scrollLeft: 0, scrollTop: 0, clientWidth: 800, scrollWidth: 800, dataset: {timelineScope: 'fictional/USD'}, scrollTo(value) {scrolls.push(value); if (!this.deferScroll) this.scrollLeft = value.left;}, closest: () => ({dataset: {monthCount: '3'}}),
     querySelector: () => frame, querySelectorAll: () => links, getBoundingClientRect: () => ({left: 0, top: 0})});
   const context = {URL, AbortController, window: {matchMedia: () => ({matches: false})}, ResizeObserver: class {constructor(callback) {this.callback = callback; observers.push(this);} observe() {} disconnect() {this.disconnected = true;}}, document: {querySelector: () => present ? strip : null}};
   vm.runInNewContext(source.replaceAll('export function ', 'function '), context);
@@ -107,4 +108,54 @@ test('a smooth edge scroll finishes centering after a fragment replaces an inter
   h.context.initMonthRange({navigate() {}});
   assert.equal(h.scrolls.at(-1).left, destination);
   assert.equal(h.scrolls.at(-1).behavior, 'smooth');
+});
+
+test('dragging unselected months pans the timeline, preserves selection and suppresses the resulting click', () => {
+  const h = harness(); h.strip.scrollLeft = 120;
+  h.strip.emit('pointerdown', {target: h.links[1], clientX: 80});
+  h.strip.emit('pointermove', {clientX: 30, pointerId: 2});
+  assert.equal(h.strip.scrollLeft, 120, 'another pointer cannot pan');
+  h.strip.emit('pointermove', {clientX: 30});
+  assert.equal(h.strip.scrollLeft, 170);
+  assert.equal(h.strip.classList.contains('is-panning'), true);
+  assert.equal(h.strip.hasPointerCapture(), true);
+  h.strip.emit('pointerup');
+  assert.equal(h.strip.hasPointerCapture(), false);
+  assert.equal(h.strip.classList.contains('is-panning'), false);
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.links[4].classList.contains('is-selected'), true);
+  const click = h.strip.emit('click');
+  assert.equal(click.prevented, true); assert.equal(click.stopped, true);
+  assert.equal(h.strip.emit('click').prevented, undefined);
+});
+
+test('small pointer motion retains month clicks and cancellation releases panning', () => {
+  const h = harness();
+  h.strip.emit('pointerdown', {target: h.links[1], clientX: 80});
+  h.strip.emit('pointermove', {clientX: 82});
+  h.strip.emit('pointerup');
+  assert.equal(h.strip.emit('click').prevented, undefined);
+  assert.equal(h.strip.emit('dragstart').prevented, true);
+  h.strip.emit('pointerdown', {target: h.links[1], clientX: 80});
+  h.strip.emit('pointermove', {clientX: 30});
+  h.strip.emit('pointercancel');
+  assert.equal(h.strip.classList.contains('is-panning'), false);
+  assert.equal(h.strip.hasPointerCapture(), false);
+  assert.equal(h.strip.emit('click', {detail: 0}).prevented, undefined, 'keyboard clicks remain available');
+  h.strip.emit('pointerdown', {target: h.links[2], clientX: 50});
+  h.strip.emit('pointerup');
+  assert.equal(h.strip.emit('click').prevented, undefined, 'the next ordinary click works');
+});
+
+test('a pointer released outside the timeline cannot leave a stale pan behind', () => {
+  const h = harness();
+  h.strip.emit('pointerdown', {target: h.links[1], clientX: 80});
+  h.strip.emit('pointermove', {clientX: 30, buttons: 0});
+  assert.equal(h.strip.scrollLeft, 0);
+  h.strip.emit('pointermove', {clientX: 20, buttons: 1});
+  assert.equal(h.strip.scrollLeft, 0);
+  h.strip.emit('pointerdown', {target: h.links[1], clientX: 80});
+  h.strip.emit('pointerdown', {target: {closest: () => h.frame}, clientX: 100});
+  h.strip.emit('pointermove', {clientX: 50, buttons: 1});
+  assert.equal(h.strip.scrollLeft, 0, 'starting a range drag clears any stale unselected-month press');
 });

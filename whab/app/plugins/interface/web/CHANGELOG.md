@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.38.1 — 2026-10-30
+
+PR: [#134](https://github.com/Fillll/whab/pull/134)
+
+- Give Starting month separate month and year controls so any supported year can be entered directly. Retain range width and pending-edit navigation guards.
+- Keep the timeline scrollbar hidden, pan unselected months with a hand drag, and move the entire red selection by dragging anywhere inside its frame. Preserve edge resizing, ordinary month clicks and keyboard controls.
+
 ## 1.38.0 — 2026-10-28
 
 PR: [#133](https://github.com/Fillll/whab/pull/133)

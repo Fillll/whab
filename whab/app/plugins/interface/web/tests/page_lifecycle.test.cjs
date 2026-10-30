@@ -56,8 +56,11 @@ function page(kind, assigned = '100') {
     'data-month': '2026-10', 'data-currency': 'USD', 'data-workspace': 'personal',
     'data-budget-id': 'fictional', 'data-budget-route': 'household'}, [assignment]);
   const month = input('month', '2026-10', {'data-navigation': 'month'});
-  const root = {querySelectorAll: selector => selector === '[data-navigation]' && kind === 'insights' ? [month] : []};
-  return {kind, planner: kind === 'budget' ? planner : null, amount, assignment, month, root};
+  const monthNumber = input('monthNumber', '10', {'data-navigation': 'month', 'data-month-number': ''});
+  const year = input('year', '2026', {'data-navigation': 'month', 'data-month-year': ''});
+  const picker = dom.node('div', {'data-month-picker': ''}, [monthNumber, year]);
+  const root = {querySelectorAll: selector => selector !== '[data-navigation]' ? [] : kind === 'insights' ? [month] : kind === 'budget' ? [monthNumber, year] : []};
+  return {kind, planner: kind === 'budget' ? planner : null, amount, assignment, month, monthNumber, year, picker, root};
 }
 function harness(initial = 'budget') {
   let current = page(initial), navigationOptions, openDialog = false, logos = 0;
@@ -205,4 +208,30 @@ test('selector cancellation during its save barrier restores only the canceled s
   assert.equal(month.value, '2026-12', 'a late cancellation cannot overwrite a newer selector draft');
   state.tickets[1].resolve(true); state.tickets[2].resolve(true); await Promise.all([first, later]);
   assert.equal(state.locations.length, 0);
+});
+
+test('explicit month and year controls validate and navigate together across page mounts', async () => {
+  const state = harness('accounts'); await state.replace('budget');
+  const {picker, monthNumber, year} = state.current;
+  state.runtime.initPageControls(state.current.root);
+  assert.equal(picker.handlers.size, 1, 'one listener for the pair');
+  year.value = '2.034e3'; // Native number fields accept numeric notation; addresses use four-digit years.
+  const changing = picker.fire('change');
+  assert.equal(state.tickets[0].url.pathname, '/budgets/household/budget/2034-10/usd');
+  state.tickets[0].options.onCancel();
+  assert.equal(year.value, '2026'); assert.equal(monthNumber.value, '10');
+  state.tickets[0].resolve(true); await changing;
+  year.checkValidity = () => false; year.value = '2201';
+  await picker.fire('change');
+  assert.equal(year.reported, true); assert.equal(state.tickets.length, 1);
+  year.checkValidity = () => true;
+  year.value = '1900'; monthNumber.value = '01';
+  const first = picker.fire('change');
+  year.value = '2200'; monthNumber.value = '12';
+  const later = picker.fire('change');
+  state.tickets[1].options.onCancel();
+  assert.equal(year.value, '2200', 'a late cancellation retains newer year and month choices');
+  assert.equal(state.tickets[1].url.pathname, '/budgets/household/budget/1900-01/usd');
+  assert.equal(state.tickets[2].url.pathname, '/budgets/household/budget/2200-12/usd');
+  state.tickets[1].resolve(true); state.tickets[2].resolve(true); await Promise.all([first, later]);
 });

@@ -641,7 +641,10 @@ def test_funding_shortfall_is_not_shown_before_the_budget_start(client, store, m
 
 def test_starting_month_picker_and_fixed_arrows_preserve_range_width(client):
     text = client.get("/budgets/demo/budget/2020-02/usd?months=5").text
-    assert 'type="month" data-navigation="month" aria-label="Starting month" value="2020-02" min="1900-01" max="2200-12" required' in text
+    assert 'data-month-picker role="group" aria-label="Starting month"' in text
+    assert 'data-month-number aria-label="Starting month" required' in text
+    assert '<option value="02" selected>February</option>' in text
+    assert 'data-month-year aria-label="Starting year" value="2020" min="1900" max="2200" step="1" required' in text
     assert 'data-month-count="5"' in text
     assert 'month-navigation' in text
     assert 'budget/2020-01/usd?months=5' in text and 'budget/2020-03/usd?months=5' in text

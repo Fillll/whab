@@ -25,9 +25,9 @@ export function initMonthRange({root = document, navigate}) {
   const links = [...strip.querySelectorAll('a[data-month]')];
   const initial = {start: links.findIndex(link => link.classList.contains('is-selected')),
     count: Number(strip.closest('[data-month-count]').dataset.monthCount)};
-  let selection = initial, drag = null, camera = null;
+  let selection = initial, drag = null, pan = null, suppressClick = false, camera = null;
   const controller = new AbortController();
-  const listen = (target, event, callback) => target.addEventListener(event, callback, {signal: controller.signal});
+  const listen = (target, event, callback, capture = false) => target.addEventListener(event, callback, {signal: controller.signal, capture});
   function bounds(index) {
     const rect = links[index].getBoundingClientRect(), parent = strip.getBoundingClientRect();
     return {left: rect.left - parent.left + strip.scrollLeft, width: rect.width, top: rect.top - parent.top + strip.scrollTop, height: rect.height};
@@ -69,6 +69,42 @@ export function initMonthRange({root = document, navigate}) {
     url.searchParams.set('months', value.count);
     navigate(url, () => {if (selection === value) {selection = initial; draw();}}, mode);
   }
+  // An ordinary click still opens a month; a horizontal drag pans without navigation.
+  listen(strip, 'pointerdown', event => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    suppressClick = false;
+    pan = null;
+    if (drag || event.target.closest('[data-month-frame]')) return;
+    pan = {id: event.pointerId, x: event.clientX, scroll: strip.scrollLeft, moved: false};
+  });
+  listen(strip, 'dragstart', event => event.preventDefault());
+  listen(strip, 'pointermove', event => {
+    if (!pan || pan.id !== event.pointerId) return;
+    if (event.buttons === 0) {finishPan(event); return;}
+    const distance = event.clientX - pan.x;
+    if (!pan.moved && Math.abs(distance) < 4) return;
+    if (!pan.moved) {strip.setPointerCapture(event.pointerId); pan.moved = true;}
+    event.preventDefault();
+    camera = null;
+    strip.classList.add('is-panning');
+    strip.scrollLeft = pan.scroll - distance;
+  });
+  function finishPan(event) {
+    if (!pan || pan.id !== event.pointerId) return;
+    suppressClick = pan.moved;
+    pan = null;
+    strip.classList.remove('is-panning');
+    if (strip.hasPointerCapture(event.pointerId)) strip.releasePointerCapture(event.pointerId);
+    remember();
+  }
+  listen(strip, 'pointerup', finishPan);
+  listen(strip, 'pointercancel', finishPan);
+  listen(strip, 'lostpointercapture', finishPan);
+  listen(strip, 'click', event => {
+    if (!suppressClick || event.detail === 0) return;
+    event.preventDefault(); event.stopPropagation();
+    suppressClick = false;
+  }, true);
   listen(frame, 'pointerdown', event => {
     const handle = event.target.closest('[data-range-handle]');
     if (!handle || event.button !== 0 || drag) return;
