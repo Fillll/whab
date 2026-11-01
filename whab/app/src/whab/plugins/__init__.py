@@ -29,6 +29,7 @@ from .contracts import (
     resolve_plugins,
     state_upgrade_path,
 )
+from .features import FeatureOperations
 from .runtime import PluginError, PluginRegistry, copy_snapshot, load_descriptors, load_plugins
 from .sdk import (
     API_VERSION,
@@ -207,6 +208,7 @@ __all__ = [
     "TransactionRegisterFiltered",
     "SyncChanges",
     "WebhookResult",
+    "FeatureOperations",
     "WorkspaceImport",
     "WorkspaceImporter",
     "copy_snapshot",

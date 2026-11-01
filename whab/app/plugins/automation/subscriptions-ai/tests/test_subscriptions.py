@@ -7,11 +7,11 @@ from datetime import date
 
 import pytest
 from whab_plugin_ai_credentials import api as ai
-from whab_plugin_subscriptions.engine import (
+from whab_plugin_subscriptions.api import fingerprint
+from whab_plugin_subscriptions_ai.engine import (
     DEFAULTS,
     Engine,
     configuration,
-    fingerprint,
     valid_decision,
 )
 

@@ -195,7 +195,7 @@ def test_actual_catalog_has_exact_static_contracts_for_supported_packages(metada
     records = metadata_tool.source_inventory()
     generated = metadata_tool.build_catalog()
     assert {row["id"] for row in records if row["support"] == "maintained"} == {
-        "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", "ai-credentials", "subscriptions",
+        "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", "ai-credentials", "subscriptions", "subscriptions-ai", "cli",
     }
     assert json.loads(json.dumps(generated))["plugins"]
 

@@ -15,6 +15,8 @@ _BUNDLED_METADATA = {
     ("ai-credentials", "whab_plugin_ai_credentials.plugin:plugin"): ("automation", "AI credentials"),
     ("llm-categorization", "whab_plugin_llm_categorization.plugin:plugin"): ("automation", "AI transaction categorization"),
     ("subscriptions", "whab_plugin_subscriptions.plugin:plugin"): ("automation", "Subscriptions"),
+    ("subscriptions-ai", "whab_plugin_subscriptions_ai.plugin:plugin"): ("automation", "AI subscription classification"),
+    ("cli", "whab_plugin_cli.plugin:plugin"): ("interface", "Command line interface"),
     ("random-forest-categorization", "whab_plugin_random_forest_categorization.plugin:plugin"): ("automation", "Random forest categorization"),
     ("bank-logos", "whab_plugin_bank_logos.plugin:plugin"): ("interface", "Bank logos"),
     ("web", "whab_plugin_web.plugin:plugin"): ("interface", "WHAB web"),

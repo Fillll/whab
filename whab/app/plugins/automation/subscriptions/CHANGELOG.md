@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 — 2026-11-01
+
+PR: [#141](https://github.com/Fillll/whab/pull/141)
+
+- Remove required AI dependencies; expose manual labels/reports and deterministic reuse for future matching payments.
+
 ## 1.2.0 — 2026-11-01
 
 PR: [#138](https://github.com/Fillll/whab/pull/138)

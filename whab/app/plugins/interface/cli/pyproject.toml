@@ -1,0 +1,37 @@
+[project]
+name = "whab_plugin_cli"
+version = "1.0.0"
+description = "Machine-usable command line interface for WHAB"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["whab>=2.52,<3"]
+
+[project.scripts]
+whab-cli = "whab_plugin_cli.client:main"
+
+[project.entry-points."whab.plugins"]
+cli = "whab_plugin_cli.plugin:plugin"
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+whab_plugin_cli = ["plugin.json"]
+
+[tool.whab.plugin]
+api-version = 1
+capabilities = [{ name = "interface.api", version = 1, composition = "additive" }]
+requires = []
+conflicts = []
+lifecycle = "restart"
+legacy = false
+authority = "local"
+state-version = 1
+state-upgrades = []
+support = "maintained"

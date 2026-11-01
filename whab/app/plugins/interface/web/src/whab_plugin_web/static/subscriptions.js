@@ -21,7 +21,7 @@ export function initSubscriptions() {
   const stopButton = dialog.querySelector('[data-subscriptions-stop]');
   const badge = document.querySelector('[data-subscriptions-job-badge]');
   const planState = createPlanTableState();
-  let busy = false, filter = 'subscriptions', searchQuery = '', limit = 100, last, job = null, viewGeneration = 0, jobSupported = true, refreshOnIdle = false;
+  let busy = false, filter = null, searchQuery = '', limit = 100, last, job = null, viewGeneration = 0, jobSupported = true, refreshOnIdle = false;
   const call = (action, values = {}) => {
     const context = getContext();
     return api('/plugin-settings/subscriptions', {workspace: context.workspace, currency: context.currency, month: context.month, action, ...values});
@@ -149,8 +149,17 @@ export function initSubscriptions() {
   function render(data) {
     content.replaceChildren();
     const actions = el('div', '', 'subscription-toolbar');
+    const modeField = el('div'); modeField.dataset.subscriptionsMutation = ''; actions.append(modeField);
+    const mode = field(modeField, 'Classification', 'classification-mode', 'select');
+    const supportsManual = typeof data.classificationMode === 'string';
+    if (supportsManual) option(mode, 'manual', 'Manual (no model)');
+    if (data.aiAvailable || !supportsManual) option(mode, 'ai', 'AI assisted');
+    mode.value = supportsManual ? data.classificationMode : 'ai';
+    if (supportsManual) mode.addEventListener('change', () => perform(async () => {await call('set-mode', {mode: mode.value}); await refresh();}));
+    if (filter === null) filter = mode.value === 'manual' ? 'all' : 'subscriptions';
     const start = button(['stopped','failed','interrupted'].includes(job?.status) ? 'Resume unchecked transactions' : 'Classify unchecked transactions', () => classify(), 'button primary'); start.dataset.subscriptionsMutation = ''; start.dataset.subscriptionsStart = '';
-    actions.append(button('Refresh', refresh), start);
+    actions.append(button('Refresh', refresh));
+    if (mode.value === 'ai' && data.config.consent) actions.append(start);
     content.append(actions);
     const summary = el('div', '', 'subscription-summary');
     const active = data.subscriptions.filter(row => row.active);
@@ -171,9 +180,14 @@ export function initSubscriptions() {
       line.append(meter, el('strong', format(row.amount)), el('small', row.change > 0 ? `+${format(row.change)} from prior month` : '')); history.append(line);
     }
     content.append(history);
-    const configuration = el('details', '', 'llm-disclosure'); configuration.open = !data.config.consent;
-    configuration.append(el('summary', 'AI classification settings')); content.append(configuration);
-    void settings(data, configuration).catch(failure => {error.textContent = failure.message; error.hidden = false;});
+    if (mode.value === 'ai') {
+      const configuration = el('details', '', 'llm-disclosure'); configuration.open = !data.config.consent;
+      configuration.append(el('summary', 'AI classification settings')); content.append(configuration);
+      void settings(data, configuration).catch(failure => {error.textContent = failure.message; error.hidden = false;});
+    } else {
+      content.append(el('p', 'Label payments below to build your subscription reports. No model or AI account is required.', 'settings-notice'));
+      if (!data.aiAvailable && data.config.consent) content.append(el('p', 'Your saved AI settings are preserved. Enable AI subscription classification in Settings → Plugins to use them again.', 'settings-notice'));
+    }
     const review = el('section'); review.append(el('h3', 'Review payments'), el('p', 'Saving a label also corrects matching payments: same merchant, amount, billing day and account. Pending payments, transfers and inflows are excluded.', 'settings-notice'));
     content.append(review); reviewRows(data, review); lock(busy);
   }

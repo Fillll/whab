@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.52.0 — 2026-11-01
+
+PR: [#141](https://github.com/Fillll/whab/pull/141)
+
+- Add generic public feature operations with revision/retry validation for model-free external-agent access.
+
 ## 2.51.0 — 2026-11-01
 
 PR: [#139](https://github.com/Fillll/whab/pull/139)

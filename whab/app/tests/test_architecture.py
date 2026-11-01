@@ -17,7 +17,7 @@ PLUGIN_PACKAGES = tuple(
 )
 PLUGIN_NAMES = tuple(path.name for path in PLUGIN_PACKAGES)
 # Reviewed public peer contracts. Private implementation modules remain forbidden.
-PUBLIC_PLUGIN_APIS = {"whab_plugin_ai_credentials": ("api",)}
+PUBLIC_PLUGIN_APIS = {"whab_plugin_ai_credentials": ("api",), "whab_plugin_subscriptions": ("api",)}
 
 
 def public_dependency_import(package, module):

@@ -1,5 +1,5 @@
 {
-  "source_ref": "e9bfe90633bba24c3087fdd932e9d6df4635ac40",
+  "source_ref": "bd5883f3c54b777e4ff380a0387e5d1fe07addbb",
   "plugins": [
     {
       "schema_version": 1,
@@ -10,6 +10,12 @@
     {
       "schema_version": 1,
       "id": "bank-logos",
+      "category": "interface",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "cli",
       "category": "interface",
       "dependencies": []
     },
@@ -118,7 +124,17 @@
       "schema_version": 1,
       "id": "subscriptions",
       "category": "automation",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "subscriptions-ai",
+      "category": "automation",
       "dependencies": [
+        {
+          "id": "subscriptions",
+          "version": ">=1.3.0,<2"
+        },
         {
           "id": "ai-credentials",
           "version": ">=1.0.0,<2"
