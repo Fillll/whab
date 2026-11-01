@@ -127,7 +127,10 @@ def test_host_scopes_non_categorizer_settings_and_persists_review_without_ledger
     assert store.export_budget() == before
     assert request(client, "status", workspace="demo").json()["config"]["consent"] is False
     page = client.get("/budgets/home/insights/2026-10/usd")
-    assert page.status_code == 200 and 'data-dialog="subscriptions-dialog"' in page.text
+    assert page.status_code == 200 and '/subscriptions/2026-10/usd"' in page.text
+    workspace = client.get("/budgets/home/subscriptions/2026-10/usd")
+    assert workspace.status_code == 200 and 'data-subscriptions-mount' in workspace.text
+    assert '<dialog id="subscriptions-dialog"' not in workspace.text
 
 
 def test_credential_adoption_is_bounded_preserves_new_shared_connections_and_demo(client):
