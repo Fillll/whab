@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "plugin_id": "plaid",
+  "summary": "Explicit bank connections and synchronization through scoped provider contracts.",
+  "delegates": [],
+  "operations": [
+    {
+      "name": "BankService.link_token",
+      "kind": "sdk",
+      "summary": "BankService.link_token public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "item_id": {
+            "description": "item_id: str | None. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "item_id": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "BankService.exchange",
+      "kind": "sdk",
+      "summary": "BankService.exchange public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "public_token": {
+            "description": "public_token: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "institution_name": {
+            "description": "institution_name: str | None. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [
+          "public_token"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "public_token": "fictional",
+            "institution_name": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicit provider operation; may contact the selected bank provider and persist validated results. Production connections require deliberate configuration.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "BankService.sync",
+      "kind": "sdk",
+      "summary": "BankService.sync public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "item_id": {
+            "description": "item_id: str | None. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "item_id": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicit provider operation; may contact the selected bank provider and persist validated results. Production connections require deliberate configuration.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "BankService.disconnect",
+      "kind": "sdk",
+      "summary": "BankService.disconnect public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "item_id": {
+            "description": "item_id: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "item_id": "fictional"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "BankService.webhook",
+      "kind": "sdk",
+      "summary": "BankService.webhook public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "raw": {
+            "description": "raw: bytes. Typed SDK value supplied by the host; this is not a CLI argument."
+          },
+          "headers": {
+            "description": "headers: Mapping[str, str]. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [
+          "raw",
+          "headers"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "raw": null,
+            "headers": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "BankService.close",
+      "kind": "sdk",
+      "summary": "BankService.close public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": null
+        }
+      ],
+      "side_effects": "Release owned resources; no financial mutation or provider inference.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    }
+  ]
+}

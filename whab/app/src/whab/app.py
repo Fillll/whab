@@ -517,6 +517,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         leased_banks = LeasedBanks(runtime)
         bank_stores = BankStores(leased_banks, bank_lifecycle.bank_store)
         registry = LeasedPluginRegistry(runtime)
+        service.enabled_plugin_ids = lambda: {plugin.id for plugin in registry.descriptors()}
         plugin_manager = PluginManager(settings, registry, budget_session=budget_session)
         live = LivePluginSelection(runtime, plugin_manager.required, installed_entrypoints,
                                    plugin_manager.persist_live, budget_session, nonlive, worker_home)
@@ -741,6 +742,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             budget_host.register(app, budget_session)
             app.add_middleware(BudgetDispatch, host=budget_host)
         app.add_middleware(RequireHTTPS)
+        service.http_documentation = app.openapi
         startup.release()
         return app
     except BaseException as error:

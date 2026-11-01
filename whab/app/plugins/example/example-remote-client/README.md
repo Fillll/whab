@@ -43,3 +43,7 @@ constructor, then runs the official WHAB CLI. The server uses the ordinary CLI.
 This verifies the public client/services with that transport; it does not claim
 stock CLI support for private-CA configuration. Ambient TLS/proxy settings stay
 disabled, and certificate or hostname failures remain errors.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_example_remote_client/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin example-remote-client`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

@@ -73,6 +73,7 @@ class LedgerService:
         self._lock = lock if lock is not None else RLock()
         self.categorization = None
         self._features = {}
+        self._feature_docs = {}
         self._on_commit = on_commit
 
     def register_feature(self, plugin_id, operations):
@@ -83,10 +84,21 @@ class LedgerService:
         if not valid_plugin_name(plugin_id) or type(operations) is not FeatureOperations:
             raise ValueError("Use a plugin ID and public FeatureOperations record.")
         operations.__post_init__()
+        from whab.plugins.documentation import plugin_document
+
+        document = operations.documentation or plugin_document(plugin_id)
+        if document is not None:
+            declared = {(row["kind"], row["name"]) for row in document["operations"]
+                        if row["kind"] in {"feature-query", "feature-command"}}
+            expected = {("feature-query", name) for name in operations.queries} | {
+                ("feature-command", name) for name in operations.commands}
+            if declared != expected or document["plugin_id"] != plugin_id:
+                raise ValueError("Every feature operation must match its packaged documentation.")
         with self._lock:
             if plugin_id in self._features:
                 raise ValueError("Feature operations are already registered.")
             self._features[plugin_id] = operations
+            self._feature_docs[plugin_id] = deepcopy(document)
 
     @property
     def operation_lock(self):
@@ -120,6 +132,16 @@ class LedgerService:
         if payload["action"] not in actions:
             raise StoreError("Unknown feature operation.")
         callback = feature.command if command else feature.query
+        document = self._feature_docs[payload["pluginId"]]
+        if document is not None:
+            from whab.plugins.documentation import operation
+            from whab.plugins.operation_schema import validate_value
+
+            documented = operation(document, "feature-command" if command else "feature-query", payload["action"])
+            try:
+                validate_value(documented["input"], payload["parameters"])
+            except ValueError:
+                raise StoreError("Feature parameters do not match its documented input fields. Read operation help.") from None
         return callback(workspace, payload["action"], deepcopy(payload["parameters"]))
 
     @property
@@ -165,6 +187,32 @@ class LedgerService:
         with self._lock:
             if parameters is not None and operation != "feature":
                 raise StoreError("Only feature queries accept parameters.")
+            if operation == "describe":
+                remote = getattr(self._store, "describe_operations", None)
+                if callable(remote):
+                    data = remote(workspace)
+                else:
+                    from whab.plugins.documentation import installed_catalog
+
+                    enabled = self.enabled_plugin_ids() if hasattr(self, "enabled_plugin_ids") else set(self._features)
+                    data = installed_catalog(enabled)
+                    for identifier, document in self._feature_docs.items():
+                        if document is not None:
+                            row = next((row for row in data["plugins"] if row["id"] == identifier), None)
+                            if row is None:
+                                data["plugins"].append({"id": identifier, "version": None, "enabled": True,
+                                    "documented": True, "documentation": deepcopy(document)})
+                            else:
+                                row.update(documented=True, documentation=deepcopy(document), enabled=True)
+                    if hasattr(self, "http_documentation"):
+                        data["http"] = {
+                            "description": "OpenAPI for this running authority. Describing local routes does not make them remotely callable.",
+                            "access": "HTTPS everywhere; local Host/origin checks remain on ordinary routes, bearer authorization on enabled remote routes, provider signatures on bank webhooks.",
+                            "openapi": self.http_documentation(),
+                        }
+                # Authored static schemas include secret field *names* but never
+                # credential values. Do not strip those names from documentation.
+                return {"revision": self._revision, "data": data}
             if operation == "features":
                 remote = getattr(self._store, "features", None)
                 data = remote(workspace) if callable(remote) else {
@@ -190,25 +238,14 @@ class LedgerService:
 
     @staticmethod
     def _validate(operation: str, payload: dict) -> dict:
-        fields = {
-            "feature": ({"pluginId", "action", "parameters"}, set()),
-            "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype"}),
-            "update_account": ({"accountId"}, {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}),
-            "add_category": ({"name", "target"}, {"group", "parentId", "currency"}),
-            "add_transaction": (
-                {"accountId", "date", "merchant", "amount", "categoryId"}, {"note"},
-            ),
-            "edit_transaction": ({"transactionId"}, {"categoryId", "reviewed", "note", "suggestionId", "accountId", "date", "merchant", "amount"}),
-            "categorization": ({"action", "pluginId"}, {"parameters", "modelId", "session", "name", "transactionId", "suggestionId"}),
-            "review_transactions": ({"transactionIds", "reviewed"}, set()),
-            "assign": ({"categoryId", "month", "assigned"}, set()),
-            "assign_next_month": ({"month", "currency", "assigned"}, set()),
-            "set_rollover_mode": ({"month", "currency", "mode"}, set()),
-        }
-        if type(operation) is not str or operation not in fields:
+        from whab.plugins.documentation import core_document
+        from whab.plugins.documentation import operation as documented_operation
+        documented = documented_operation(core_document(), "command", operation) if type(operation) is str else None
+        if documented is None:
             raise StoreError("Unknown ledger command.")
-        required, optional = fields[operation]
-        if type(payload) is not dict or not required <= payload.keys() or payload.keys() - required - optional:
+        schema = documented["input"]
+        if (type(payload) is not dict or not set(schema["required"]) <= payload.keys()
+                or payload.keys() - schema["properties"].keys()):
             raise StoreError("Invalid ledger command fields.")
         if operation == "categorization":
             if type(payload["action"]) is not str or payload["action"] not in {"status", "suggest", "preview", "train", "step", "cancel", "select", "delete", "rename", "dismiss"}:

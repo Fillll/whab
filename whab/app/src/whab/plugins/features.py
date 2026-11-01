@@ -19,6 +19,7 @@ class FeatureOperations:
     query: Callable | None = None
     command: Callable | None = None
     adapter: object = None
+    documentation: dict | None = None
 
     def __post_init__(self):
         for names, callback in ((self.queries, self.query), (self.commands, self.command)):
@@ -28,3 +29,7 @@ class FeatureOperations:
                 raise ValueError("Feature operations require bounded unique names and matching callbacks.")
         if not self.queries and not self.commands:
             raise ValueError("A feature must expose at least one operation.")
+        if self.documentation is not None:
+            from .operation_schema import validate_document
+
+            validate_document(self.documentation)

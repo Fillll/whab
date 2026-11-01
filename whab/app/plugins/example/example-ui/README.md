@@ -36,3 +36,7 @@ saved manifest with `whab-plugin replay MANIFEST --wheelhouse /approved/local/wh
 WHAB source commit. Its genuine minimum artifact is 2.36. SDK, package dependency
 resolution and runtime capability selection remain separate. No arbitrary
 community package is downloaded during conformance or catalog inspection.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_example_ui/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin example-ui`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

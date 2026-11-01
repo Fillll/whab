@@ -734,6 +734,8 @@ The [CLI](../app/plugins/interface/cli/README.md) builds `--help` and operation-
 
 The [contribution requirement](../app/CONTRIBUTING.md#required-operation-documentation), repository checker, wheel smoke checks and [developer toolkit](../app/devtools/plugin-devkit/README.md) enforce these rules. A plugin change that adds or changes a public operation must update its resource, README and examples in the same change.
 
+Authenticated online discovery also includes `http.openapi`, the running application's complete OpenAPI contract with HTTP paths, methods, parameter/body schemas and response schemas. Human-readable `describe` lists methods and paths; `describe --json` includes their full definitions. Its `http.access` explains the existing HTTPS, local Host/origin, bearer authorization and signed-webhook boundaries. Documentation never grants route access. Offline documentation covers installed operation resources; it cannot claim the runtime's exact HTTP route selection or enablement.
+
 ## Public feature operations
 
 WHAB 2.52 adds `FeatureOperations`, registered by an enabled restart-scoped local interface factory with `context.service.register_feature(plugin_id, operations)`. Its `queries` and `commands` are bounded tuples of action names; `query(workspace, action, parameters)` and `command(workspace, action, parameters)` are the corresponding callbacks. Queries must be read-only. Commands validate explicit input and publish one coherent feature change. Public results must be JSON data without credentials or provider configuration. Financial rules remain in core; feature-specific rules and saved files remain plugin-owned.

@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "plugin_id": "example-branding",
+  "summary": "Fictional teaching implementation of the public example-branding capability; never a production provider.",
+  "delegates": [],
+  "operations": [
+    {
+      "name": "BankLogos.resolve",
+      "kind": "sdk",
+      "summary": "Resolve a public institution logo key.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Public institution identity or logo key."
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "key": "fictional-bank"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Resolution is local. Fetch may contact a public icon provider and update its cache; no financial data is sent.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "BankLogos.fetch",
+      "kind": "sdk",
+      "summary": "Fetch a bounded public raster logo on an explicit image request.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Public institution identity or logo key."
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "key": "fictional-bank"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Resolution is local. Fetch may contact a public icon provider and update its cache; no financial data is sent.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    }
+  ]
+}

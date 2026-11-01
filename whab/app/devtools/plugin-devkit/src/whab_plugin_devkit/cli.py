@@ -10,6 +10,7 @@ from packaging.version import Version
 
 from .artifacts import installed_artifacts
 from .configurations import _parse, replay_configuration, sample_configurations, validate_manifest
+from .documentation import check_entry_documentation, check_project_documentation
 from .generator import FAMILIES, generate_project
 
 
@@ -26,6 +27,7 @@ def _selected(plugin_id, wheelhouse, *, runtime=False):
         selected.append(matches[0])
         required.append(matches[0].dist.metadata["Name"])
     artifacts = installed_artifacts(wheelhouse, required)
+    check_entry_documentation(selected[0])
     # Only these two explicit registrations execute, after installed bytes match.
     candidate = selected[0].load()
     if runtime and Version(metadata.version("whab")) >= Version("2.32.0"):
@@ -43,6 +45,8 @@ def main(argv=None):
     new.add_argument("--capability", choices=FAMILIES, required=True)
     new.add_argument("--directory", type=Path)
     new.add_argument("--ci-ref", help="Add reusable CI pinned to this published full WHAB source commit.")
+    docs = commands.add_parser("docs", help="Require complete packaged operation documentation and valid examples without running hooks.")
+    docs.add_argument("--directory", type=Path, default=Path("."))
     check = commands.add_parser("check", help="Run distinct constrained resolver/hook configurations.")
     check.add_argument("--plugin", required=True)
     check.add_argument("--combinations", type=int, default=10)
@@ -56,6 +60,10 @@ def main(argv=None):
     replay.add_argument("--wheelhouse", type=Path, required=True)
     arguments = parser.parse_args(argv)
     try:
+        if arguments.command == "docs":
+            document = check_project_documentation(arguments.directory)
+            print(f'Validated operation documentation for {document["plugin_id"]}.')
+            return 0
         if arguments.command == "new":
             project = generate_project(arguments.plugin_id, arguments.capability, arguments.directory or Path(arguments.plugin_id), ci_ref=arguments.ci_ref)
             print(f"Created {project}")

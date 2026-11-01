@@ -202,3 +202,7 @@ The client backend requires a separate host-managed remote adapter.
 ## Transaction detail corrections
 
 The optional `edit_transaction_details(workspace, transaction_id, changes)` capability commits core-validated date, payee, amount, same-currency account and annotation edits atomically. Manual entries adjust balances together; imported corrections retain their provider balances and original edited fields. Provider refreshes preserve those overrides through posting replacements. Optional `original` records survive native reopen, portable export and copies. Existing records without corrections retain their earlier format.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_json/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin json`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

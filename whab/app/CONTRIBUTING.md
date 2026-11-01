@@ -38,15 +38,15 @@ Runtime configuration lives under `WHAB_HOME`, or the launch directory when abse
 
 Read [runtime setup and HTTPS](../docs/usage.md#runtime-setup), [budget-owned storage](../docs/target-architecture.md#installation-and-budget-ownership) and the owning plugin README before changing configuration, storage selection, saved paths or migrations. Setup provisions certificates but never changes OS trust. Storage selection does not migrate data between backends. The standard source installer owns scoped legacy distribution/metadata cleanup; no manual metadata deletion is needed for a standard upgrade.
 
-## Tests and checks
-
-### Required operation documentation
+## Required operation documentation
 
 Every maintained/teaching plugin must package `operations.json` beside `plugin.json` and link it from its README's **Operation documentation** section. New external plugins follow the same contract. Each public query, command, local settings action or SDK surface needs its purpose, input/output JSON Schemas, required fields, types, defaults/choices, fictional examples, side effects, permissions, budget/workspace/currency scope, errors, retries and availability. Plugins that delegate ledger behavior name those shared core contracts instead of copying them. SDK-only and local-only documentation never grants remote access.
 
 Run `.venv/bin/python scripts/check_operations.py`. The quick/required CI gate rejects missing or malformed resources, invalid examples/defaults, external schema references, omitted settings actions, stale toolkit validators and resources excluded from wheels. Core dispatch/command fields and registered feature operations are checked against their documented definitions. Financial validation and compatible normalization remain in the owning core rules.
 
 CLI `--help`, operation-specific help and offline `describe --json` read these installed resources without running plugin hooks or requiring credentials, a checkout or internet access. Authenticated online `describe` reports the authority's definitions and enablement. The toolkit generates initial documentation, `whab-plugin docs --directory PROJECT` checks it, and installed candidate conformance validates documentation before loading the candidate. Legacy third-party distributions remain identifiable as undocumented rather than being silently represented as documented.
+
+## Tests and checks
 
 Use focused local feedback and the authoritative required PR gate. During iteration, run:
 

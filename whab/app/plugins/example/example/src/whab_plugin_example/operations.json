@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "plugin_id": "example",
+  "summary": "Fictional teaching implementation of the public example capability; never a production provider.",
+  "delegates": [],
+  "operations": [
+    {
+      "name": "insights",
+      "kind": "sdk",
+      "summary": "Produce fictional reporting results from an immutable scoped budget snapshot.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "snapshot": {
+            "description": "Host-provided immutable BudgetSnapshot."
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "snapshot": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read-only report/export; no provider requests or financial mutations.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "export",
+      "kind": "sdk",
+      "summary": "Produce fictional reporting results from an immutable scoped budget snapshot.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "snapshot": {
+            "description": "Host-provided immutable BudgetSnapshot."
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "snapshot": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read-only report/export; no provider requests or financial mutations.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    }
+  ]
+}

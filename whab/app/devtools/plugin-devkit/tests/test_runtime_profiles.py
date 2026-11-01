@@ -195,6 +195,7 @@ def test_runtime_cli_verifies_json_and_reviewed_fixture_closure_before_loading(m
                for row in (candidate, reference)]
     monkeypatch.setattr(cli.metadata, "entry_points", lambda **_: entries)
     monkeypatch.setattr(cli.metadata, "version", lambda _: "2.32.0")
+    monkeypatch.setattr(cli, "check_entry_documentation", lambda _: None)
     observed = []
     monkeypatch.setattr(cli, "installed_artifacts", lambda _, required: observed.extend(required) or [])
     assert cli._selected(candidate.id, "unused", runtime=True)[:2] == (candidate, reference)

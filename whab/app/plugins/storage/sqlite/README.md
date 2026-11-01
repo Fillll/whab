@@ -122,3 +122,7 @@ The client backend requires a separate host-managed remote adapter.
 ## Transaction detail corrections
 
 The optional `edit_transaction_details(workspace, transaction_id, changes)` capability delegates date, payee, amount, same-currency account and combined annotation validation to core in one atomic mutation. Manual entries adjust the old and new account balances together. Imported corrections retain provider snapshots and original edited fields in an additive nullable `original_details` column; later syncs preserve explicit overrides, including pending-to-posted replacement. Portable exports and reopening retain those annotations, and earlier SQLite schemas remain readable without running untrusted migrations. This schema addition needs a stopped-host update before candidate read-only readiness can succeed on an older native schema.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_sqlite/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin sqlite`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

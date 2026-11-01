@@ -52,3 +52,7 @@ Run from `whab/app/`:
 Use focused pytest or `--quick` during iteration and the full runner before submitting. Documentation-only edits can use `--docs`. See [plugin contribution rules](../../README.md#test-ownership) and the [budget-isolation verification recipe](../../../../docs/architecture.md#budget-isolation-verification).
 
 After creation, the importer selects the new budget for this browser before opening its Accounts page. Reopening WHAB then returns to that budget; identically named older budgets retain their own models and history.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_ynab/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin ynab`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

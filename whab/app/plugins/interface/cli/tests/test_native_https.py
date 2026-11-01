@@ -40,9 +40,20 @@ def test_native_ca_verified_cli_and_saved_label_reopen(store, tmp_path, monkeypa
         assert main(args + ["query", "accounts"]) == 1
         capsys.readouterr()
         args += ["--ca", str(tmp_path / "tls/ca.crt")]
+        assert main(args + ["describe", "--json"]) == 0
+        documentation = json.loads(capsys.readouterr().out)
+        assert documentation["source"] == "authority"
+        assert "/remote/v1/budgets/{budget_id}/commands" in documentation["http"]["openapi"]["paths"]
+        feature = next(row for row in documentation["plugins"] if row["id"] == "subscriptions")
+        assert feature["enabled"] and feature["documented"]
+        assert token not in json.dumps(documentation) and "Fictional membership" not in json.dumps(documentation)
         report_args = ["feature-query", "subscriptions", "report", "--parameters", '{"month":"2026-10","currency":"USD"}']
         assert main(args + report_args) == 0
         report = json.loads(capsys.readouterr().out)
+        from whab.plugins.operation_schema import validate_value
+
+        report_operation = next(row for row in feature["documentation"]["operations"] if row["kind"] == "feature-query" and row["name"] == "report")
+        validate_value(report_operation["output"], report["data"])
         row = report["data"]["transactions"][0]
         assert main(args + ["feature-command", "subscriptions", "set_label", "--parameters", json.dumps({"transactionId": transaction, "fingerprint": row["fingerprint"], "isSubscription": True, "cadence": "monthly"}), "--request-id", "native-label", "--revision", report["revision"]]) == 0
         capsys.readouterr()

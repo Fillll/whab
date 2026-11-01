@@ -16,3 +16,7 @@ whab-plugin check --plugin example-file-import --combinations 10 --seed 42 --whe
 ```
 
 The configuration check also needs the installed SQLite reference distribution and the exact wheels for all installed runtime dependencies in the approved wheelhouse. Project tests use public SDK contracts; no other concrete plugin is imported. Installed plugins are trusted executable Python. This example is a starting point, with bounded fictional behavior, rather than production provider certification.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_example_file_import/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin example-file-import`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

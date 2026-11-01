@@ -17,3 +17,7 @@ Consumers import only `whab_plugin_ai_credentials.api`. They declare a named `ai
 `POST /api/plugin-settings/ai-credentials` accepts the workspace and status/save-key/models/connect/auth-status/cancel-sign-in/disconnect actions. Status exposes connection IDs and connected flags, never secrets. The bounded `adopt` action accepts valid opaque provider references from the original categorizer, preserving newer shared connections. Web adopts existing references when opening the categorizer settings; old profiles continue working before adoption. New consumer profiles retain the shared connection ID.
 
 Tests use fictional namespaces and mocked provider responses. Run `.venv/bin/python -m pytest plugins/automation/ai-credentials/tests` from `whab/app/`.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_ai_credentials/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin ai-credentials`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

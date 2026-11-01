@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_subscriptions_ai"
-version = "1.0.0"
+version = "1.0.1"
 description = "Optional AI subscription classification for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -19,7 +19,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-whab_plugin_subscriptions_ai = ["plugin.json"]
+whab_plugin_subscriptions_ai = ["plugin.json", "operations.json"]
 
 [tool.whab.plugin]
 api-version = 1

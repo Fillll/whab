@@ -31,10 +31,30 @@ from whab.app import create_app
 from whab.config import Settings
 from whab.plugins import LogoImage, contract_for, load_descriptors, load_plugins
 from whab.plugins.catalog import catalog_snapshot
+from whab.plugins.documentation import installed_catalog
 from whab_plugin_plaid.logos import logo_key
 from fastapi.testclient import TestClient
 
 target = Path(sys.argv[1]).resolve()
+with patch.object(metadata.EntryPoint, "load", side_effect=AssertionError("Documentation must not load hooks")):
+    operation_catalog = installed_catalog()
+assert len(operation_catalog["core"]["operations"]) == 20
+assert {row["id"] for row in operation_catalog["plugins"]} == set(expected) - {"whab"}
+assert all(row["documented"] and row["enabled"] is None for row in operation_catalog["plugins"])
+from whab_plugin_cli.client import main as cli_main
+from contextlib import redirect_stdout
+from io import StringIO
+with redirect_stdout(StringIO()) as output:
+    assert cli_main(["describe", "--json"]) == 0
+assert json.loads(output.getvalue())["core"] == operation_catalog["core"]
+for args in (["--help"], ["command", "edit_transaction", "--help"],
+             ["feature-command", "subscriptions", "set_label", "--help"]):
+    with redirect_stdout(StringIO()) as output:
+        try:
+            cli_main(args)
+        except SystemExit as exit:
+            assert exit.code == 0
+    assert "Examples:" in output.getvalue() or "Installed plugin documentation" in output.getvalue()
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]
 assert not metadata.distribution("whab").entry_points

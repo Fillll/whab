@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_ai_credentials"
-version = "1.0.0"
+version = "1.0.1"
 description = "Shared AI provider credentials and authenticated requests for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -19,7 +19,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-whab_plugin_ai_credentials = ["plugin.json"]
+whab_plugin_ai_credentials = ["plugin.json", "operations.json"]
 
 [tool.whab.plugin]
 api-version = 1

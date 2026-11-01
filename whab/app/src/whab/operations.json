@@ -1,0 +1,1716 @@
+{
+  "schema_version": 1,
+  "plugin_id": "core",
+  "summary": "Public budgeting operations shared by interfaces. Money is integer minor units; revision and request ID are required for mutations. Query results are wrapped in budgetId/revision/data.",
+  "delegates": [],
+  "operations": [
+    {
+      "name": "accounts",
+      "kind": "query",
+      "summary": "List public accounts and their currencies and classifications.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "array",
+        "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+        "items": {
+          "type": "object",
+          "description": "Public accounts record. Additional compatible projection fields may be present.",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Stable record identifier."
+            },
+            "name": {
+              "type": "string",
+              "description": "Display name."
+            },
+            "institution": {
+              "type": "string",
+              "description": "Public institution name."
+            },
+            "type": {
+              "type": "string",
+              "description": "Account classification."
+            },
+            "balance": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Current integer-minor-unit balance; null when unknown."
+            },
+            "currency": {
+              "type": "string",
+              "description": "ISO currency; no conversion."
+            },
+            "source": {
+              "type": "string",
+              "description": "Record origin."
+            },
+            "stale": {
+              "type": "boolean",
+              "description": "Whether the account snapshot is stale."
+            },
+            "balanceUnknown": {
+              "type": "boolean",
+              "description": "Whether a balance is unavailable."
+            },
+            "onBudget": {
+              "type": "boolean",
+              "description": "Whether the account participates in envelopes."
+            },
+            "subtype": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Optional account subtype."
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": []
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "categories",
+      "kind": "query",
+      "summary": "List assignable budget categories and currency/group metadata.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "array",
+        "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+        "items": {
+          "type": "object",
+          "description": "Public categories record. Additional compatible projection fields may be present.",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Stable record identifier."
+            },
+            "name": {
+              "type": "string",
+              "description": "Display name."
+            },
+            "group": {
+              "type": "string",
+              "description": "Parent category group display name."
+            },
+            "parentId": {
+              "type": "string",
+              "description": "Parent group identity; parents are not assignable."
+            },
+            "target": {
+              "type": "integer",
+              "description": "Category target in minor units."
+            },
+            "currency": {
+              "type": "string",
+              "description": "ISO currency; no conversion."
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": []
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "transactions",
+      "kind": "query",
+      "summary": "Read public transactions, optionally restricted to a calendar month.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "month": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional calendar month; null reads full transaction history or the current workspace month.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$",
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "array",
+        "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+        "items": {
+          "type": "object",
+          "description": "Public transactions record. Additional compatible projection fields may be present.",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Stable record identifier."
+            },
+            "accountId": {
+              "type": "string",
+              "description": "Owning account ID."
+            },
+            "date": {
+              "type": "string",
+              "description": "Calendar date YYYY-MM-DD."
+            },
+            "merchant": {
+              "type": "string",
+              "description": "Payee display name."
+            },
+            "merchantLogo": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Optional public logo key."
+            },
+            "amount": {
+              "type": "integer",
+              "description": "Integer minor units; positive outflow, negative inflow."
+            },
+            "currency": {
+              "type": "string",
+              "description": "ISO currency; no conversion."
+            },
+            "categoryId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Assigned child category or null."
+            },
+            "pending": {
+              "type": "boolean",
+              "description": "Pending rows are excluded from cleared spending."
+            },
+            "reviewed": {
+              "type": "boolean",
+              "description": "Explicit transaction review status."
+            },
+            "source": {
+              "type": "string",
+              "description": "Record origin."
+            },
+            "note": {
+              "type": "string",
+              "description": "Saved user note."
+            },
+            "isTransfer": {
+              "type": "boolean",
+              "description": "Explicit transfer exclusion."
+            },
+            "inferredTransfer": {
+              "type": "boolean",
+              "description": "Inferred transfer exclusion."
+            },
+            "categoryEdited": {
+              "type": "boolean",
+              "description": "Whether category annotation was explicitly changed."
+            },
+            "deleted": {
+              "type": "boolean",
+              "description": "Portable tombstone marker."
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "month": "2026-11"
+          },
+          "output": []
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "workspace",
+      "kind": "query",
+      "summary": "Read calculated monthly envelopes, summary, accounts and transactions.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "month": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional calendar month; null reads full transaction history or the current workspace month.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$",
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public result object. Detailed public record contracts belong to the SDK guide.",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+            "items": {
+              "type": "object",
+              "description": "Public accounts record. Additional compatible projection fields may be present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable record identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name."
+                },
+                "institution": {
+                  "type": "string",
+                  "description": "Public institution name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Account classification."
+                },
+                "balance": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Current integer-minor-unit balance; null when unknown."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO currency; no conversion."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Record origin."
+                },
+                "stale": {
+                  "type": "boolean",
+                  "description": "Whether the account snapshot is stale."
+                },
+                "balanceUnknown": {
+                  "type": "boolean",
+                  "description": "Whether a balance is unavailable."
+                },
+                "onBudget": {
+                  "type": "boolean",
+                  "description": "Whether the account participates in envelopes."
+                },
+                "subtype": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional account subtype."
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "categories": {
+            "type": "array",
+            "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+            "items": {
+              "type": "object",
+              "description": "Public categories record. Additional compatible projection fields may be present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable record identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Parent category group display name."
+                },
+                "parentId": {
+                  "type": "string",
+                  "description": "Parent group identity; parents are not assignable."
+                },
+                "target": {
+                  "type": "integer",
+                  "description": "Category target in minor units."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO currency; no conversion."
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "transactions": {
+            "type": "array",
+            "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+            "items": {
+              "type": "object",
+              "description": "Public transactions record. Additional compatible projection fields may be present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable record identifier."
+                },
+                "accountId": {
+                  "type": "string",
+                  "description": "Owning account ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "merchantLogo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional public logo key."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Integer minor units; positive outflow, negative inflow."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO currency; no conversion."
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Assigned child category or null."
+                },
+                "pending": {
+                  "type": "boolean",
+                  "description": "Pending rows are excluded from cleared spending."
+                },
+                "reviewed": {
+                  "type": "boolean",
+                  "description": "Explicit transaction review status."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Record origin."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Saved user note."
+                },
+                "isTransfer": {
+                  "type": "boolean",
+                  "description": "Explicit transfer exclusion."
+                },
+                "inferredTransfer": {
+                  "type": "boolean",
+                  "description": "Inferred transfer exclusion."
+                },
+                "categoryEdited": {
+                  "type": "boolean",
+                  "description": "Whether category annotation was explicitly changed."
+                },
+                "deleted": {
+                  "type": "boolean",
+                  "description": "Portable tombstone marker."
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "month": {
+            "type": "string",
+            "description": "Projected calendar month."
+          },
+          "budget": {
+            "type": "array",
+            "description": "Category envelope rows with assigned, spent and available minor units.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "summary": {
+            "type": "object",
+            "description": "Selected currency monthly funding/income/spending totals."
+          },
+          "summariesByCurrency": {
+            "type": "object",
+            "description": "Independent per-currency totals."
+          },
+          "trend": {
+            "type": "array",
+            "description": "Monthly history projections.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "categoryGroups": {
+            "type": "array",
+            "description": "Two-level category hierarchy.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "currencies": {
+            "type": "array",
+            "description": "Available currency codes.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "month": "2026-11"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "portable",
+      "kind": "query",
+      "summary": "Read a sanitized portable ledger snapshot; excludes provider credentials.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public result object. Detailed public record contracts belong to the SDK guide.",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+            "items": {
+              "type": "object",
+              "description": "Public accounts record. Additional compatible projection fields may be present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable record identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name."
+                },
+                "institution": {
+                  "type": "string",
+                  "description": "Public institution name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Account classification."
+                },
+                "balance": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Current integer-minor-unit balance; null when unknown."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO currency; no conversion."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Record origin."
+                },
+                "stale": {
+                  "type": "boolean",
+                  "description": "Whether the account snapshot is stale."
+                },
+                "balanceUnknown": {
+                  "type": "boolean",
+                  "description": "Whether a balance is unavailable."
+                },
+                "onBudget": {
+                  "type": "boolean",
+                  "description": "Whether the account participates in envelopes."
+                },
+                "subtype": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional account subtype."
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "categories": {
+            "type": "array",
+            "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+            "items": {
+              "type": "object",
+              "description": "Public categories record. Additional compatible projection fields may be present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable record identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Parent category group display name."
+                },
+                "parentId": {
+                  "type": "string",
+                  "description": "Parent group identity; parents are not assignable."
+                },
+                "target": {
+                  "type": "integer",
+                  "description": "Category target in minor units."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO currency; no conversion."
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "transactions": {
+            "type": "array",
+            "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+            "items": {
+              "type": "object",
+              "description": "Public transactions record. Additional compatible projection fields may be present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable record identifier."
+                },
+                "accountId": {
+                  "type": "string",
+                  "description": "Owning account ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "merchantLogo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional public logo key."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Integer minor units; positive outflow, negative inflow."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO currency; no conversion."
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Assigned child category or null."
+                },
+                "pending": {
+                  "type": "boolean",
+                  "description": "Pending rows are excluded from cleared spending."
+                },
+                "reviewed": {
+                  "type": "boolean",
+                  "description": "Explicit transaction review status."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Record origin."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Saved user note."
+                },
+                "isTransfer": {
+                  "type": "boolean",
+                  "description": "Explicit transfer exclusion."
+                },
+                "inferredTransfer": {
+                  "type": "boolean",
+                  "description": "Inferred transfer exclusion."
+                },
+                "categoryEdited": {
+                  "type": "boolean",
+                  "description": "Whether category annotation was explicitly changed."
+                },
+                "deleted": {
+                  "type": "boolean",
+                  "description": "Portable tombstone marker."
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "formatVersion": {
+            "type": "integer",
+            "description": "Portable ledger format version."
+          },
+          "budgetStartMonth": {
+            "type": "string",
+            "description": "First budget month."
+          },
+          "assignments": {
+            "type": "array",
+            "description": "Category/month assignment records.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "futureFunding": {
+            "type": "array",
+            "description": "Source-month next-month funding records.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "rolloverModes": {
+            "type": "array",
+            "description": "Month/currency carryover records.",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "category_suggestions",
+      "kind": "query",
+      "summary": "Read eligible provisional category suggestions; no inference is started.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public result object. Detailed public record contracts belong to the SDK guide."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "features",
+      "kind": "query",
+      "summary": "List enabled feature query/command names.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Object keyed by enabled feature ID; each value has queries and commands name arrays. Use describe for full schemas."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "describe",
+      "kind": "query",
+      "summary": "Describe core operations and installed plugins, including enabled and documented status.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Documentation catalog: schema_version, source, core document, plugins array with id/version/enabled/documented/documentation. Static data only; no credentials or live financial records."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "feature",
+      "kind": "query",
+      "summary": "Read an enabled feature using its documented parameters.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "action": {
+            "type": "string",
+            "description": "Documented feature action name."
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Action-specific parameters; see feature-query/feature-command help."
+          }
+        },
+        "required": [
+          "pluginId",
+          "action",
+          "parameters"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "The feature-specific result."
+      },
+      "examples": [
+        {
+          "input": {
+            "pluginId": "subscriptions",
+            "action": "report",
+            "parameters": {
+              "month": "2026-11",
+              "currency": "USD"
+            }
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "add_account",
+      "kind": "command",
+      "summary": "Create a manual account; on-budget cash/credit participates in envelopes.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Account display name."
+          },
+          "type": {
+            "type": "string",
+            "description": "Account classification.",
+            "enum": [
+              "depository",
+              "credit",
+              "investment",
+              "retirement",
+              "property",
+              "loan",
+              "other"
+            ]
+          },
+          "balance": {
+            "type": "integer",
+            "description": "Integer currency minor units; USD cents. Positive outflows, negative inflows."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$",
+            "default": "USD"
+          },
+          "onBudget": {
+            "type": "boolean",
+            "description": "Explicit true/false choice."
+          },
+          "subtype": {
+            "type": "string",
+            "description": "Subtype supported by the chosen account type."
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "balance"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "name": "Fictional checking",
+            "type": "depository",
+            "balance": 10000
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "update_account",
+      "kind": "command",
+      "summary": "Update account metadata. Currency changes require no transaction history.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "type": {
+            "type": "string",
+            "description": "Account classification.",
+            "enum": [
+              "depository",
+              "credit",
+              "investment",
+              "retirement",
+              "property",
+              "loan",
+              "other"
+            ]
+          },
+          "onBudget": {
+            "type": "boolean",
+            "description": "Explicit true/false choice."
+          },
+          "subtype": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Account subtype or null."
+          },
+          "name": {
+            "type": "string",
+            "description": "New display name."
+          },
+          "bankWebsite": {
+            "type": "string",
+            "description": "Public HTTPS institution origin, or empty string to clear."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          }
+        },
+        "required": [
+          "accountId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "accountId": "fictional-account",
+            "name": "Fictional daily spending"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "add_category",
+      "kind": "command",
+      "summary": "Create an assignable child category in the selected currency.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Child category name."
+          },
+          "target": {
+            "type": "integer",
+            "description": "Integer currency minor units; USD cents. Positive outflows, negative inflows.",
+            "minimum": 0
+          },
+          "group": {
+            "type": "string",
+            "description": "Parent group name."
+          },
+          "parentId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$",
+            "default": "USD"
+          }
+        },
+        "required": [
+          "name",
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "name": "Fictional food",
+            "target": 20000,
+            "currency": "USD"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "add_transaction",
+      "kind": "command",
+      "summary": "Create a manual transaction. Amount must be nonzero and category currency must match the account.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "date": {
+            "type": "string",
+            "description": "Calendar date YYYY-MM-DD.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "merchant": {
+            "type": "string",
+            "description": "Merchant/payee name."
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Integer currency minor units; USD cents. Positive outflows, negative inflows."
+          },
+          "categoryId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Assignable child category ID, or null to clear the category.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "note": {
+            "type": "string",
+            "description": "User note; empty string clears it.",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "accountId",
+          "date",
+          "merchant",
+          "amount",
+          "categoryId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "accountId": "fictional-account",
+            "date": "2026-11-01",
+            "merchant": "Fictional shop",
+            "amount": 125,
+            "categoryId": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "edit_transaction",
+      "kind": "command",
+      "summary": "Edit a transaction category, note, review flag or supported details. At least one editable field is required.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "categoryId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Assignable child category ID, or null to clear the category.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reviewed": {
+            "type": "boolean",
+            "description": "Set review explicitly; assigning a category alone does not review it."
+          },
+          "note": {
+            "type": "string",
+            "description": "User note; empty string clears it.",
+            "maxLength": 1000
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Current suggestion ID; accepting it requires reviewed=true."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "date": {
+            "type": "string",
+            "description": "Calendar date YYYY-MM-DD.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "merchant": {
+            "type": "string",
+            "description": "Corrected payee name."
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Integer currency minor units; USD cents. Positive outflows, negative inflows."
+          }
+        },
+        "required": [
+          "transactionId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionId": "fictional-payment",
+            "categoryId": "fictional-category"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "review_transactions",
+      "kind": "command",
+      "summary": "Set review status for a bounded transaction selection.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "description": "One to 100 distinct current transaction IDs.",
+            "items": {
+              "type": "string",
+              "description": "Stable identifier returned by a read; never a display name.",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true
+          },
+          "reviewed": {
+            "type": "boolean",
+            "description": "Explicit true/false choice."
+          }
+        },
+        "required": [
+          "transactionIds",
+          "reviewed"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-payment"
+            ],
+            "reviewed": true
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "assign",
+      "kind": "command",
+      "summary": "Set an envelope assignment, preserving funding-capacity and currency rules.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "assigned": {
+            "type": "integer",
+            "description": "Integer currency minor units; USD cents. Positive outflows, negative inflows.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "categoryId",
+          "month",
+          "assigned"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "categoryId": "fictional-category",
+            "month": "2026-11",
+            "assigned": 20000
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "assign_next_month",
+      "kind": "command",
+      "summary": "Set funds aside from this source month for the next month.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "assigned": {
+            "type": "integer",
+            "description": "Integer currency minor units; USD cents. Positive outflows, negative inflows.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "month",
+          "currency",
+          "assigned"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "month": "2026-11",
+            "currency": "USD",
+            "assigned": 10000
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "set_rollover_mode",
+      "kind": "command",
+      "summary": "Choose the outgoing month/currency carryover policy.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "mode": {
+            "type": "string",
+            "description": "Carry funds by category or overall balance.",
+            "enum": [
+              "category",
+              "balance"
+            ]
+          }
+        },
+        "required": [
+          "month",
+          "currency",
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "month": "2026-11",
+            "currency": "USD",
+            "mode": "category"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "categorization",
+      "kind": "command",
+      "summary": "Operate the selected categorizer. Training/inference is explicit; predictions do not assign categories.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ]
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "description": "Action-specific result; see the selected plugin operation documentation."
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "status",
+            "pluginId": "random-forest-categorization"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "May train a local model, perform explicitly authorized paid inference, or change suggestions/model selection depending on action; never applies an actual category implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "feature",
+      "kind": "command",
+      "summary": "Apply an enabled feature command. Its input schema is provided by that plugin.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "action": {
+            "type": "string",
+            "description": "Documented feature action name."
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Action-specific parameters; see feature-query/feature-command help."
+          }
+        },
+        "required": [
+          "pluginId",
+          "action",
+          "parameters"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "description": "Action-specific result; see the selected plugin operation documentation."
+      },
+      "examples": [
+        {
+          "input": {
+            "pluginId": "subscriptions",
+            "action": "set_label",
+            "parameters": {
+              "transactionId": "fictional-payment",
+              "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+              "isSubscription": true,
+              "cadence": "monthly"
+            }
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Public ledger API and CLI."
+    }
+  ]
+}

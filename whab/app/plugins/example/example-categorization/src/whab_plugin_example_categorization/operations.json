@@ -1,0 +1,999 @@
+{
+  "schema_version": 1,
+  "plugin_id": "example-categorization",
+  "summary": "Fictional teaching implementation of the public example-categorization capability; never a production provider.",
+  "delegates": [
+    "core.categorization",
+    "core.category_suggestions"
+  ],
+  "operations": [
+    {
+      "name": "categorization.status",
+      "kind": "command",
+      "summary": "Use core categorization with action status for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "status"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "status",
+            "pluginId": "example-categorization"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    },
+    {
+      "name": "categorization.suggest",
+      "kind": "command",
+      "summary": "Use core categorization with action suggest for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "suggest"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "suggest",
+            "pluginId": "example-categorization"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    },
+    {
+      "name": "categorization.preview",
+      "kind": "command",
+      "summary": "Use core categorization with action preview for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "preview"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "preview",
+            "pluginId": "example-categorization"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    },
+    {
+      "name": "categorization.train",
+      "kind": "command",
+      "summary": "Use core categorization with action train for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "train"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation. Defaults and tunable fields are listed in the categorizer README and returned by action=status."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "train",
+            "pluginId": "example-categorization",
+            "parameters": {}
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    },
+    {
+      "name": "categorization.step",
+      "kind": "command",
+      "summary": "Use core categorization with action step for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "step"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "step",
+            "pluginId": "example-categorization",
+            "session": "00000000-0000-0000-0000-000000000000"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    },
+    {
+      "name": "categorization.cancel",
+      "kind": "command",
+      "summary": "Use core categorization with action cancel for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "cancel"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "cancel",
+            "pluginId": "example-categorization",
+            "session": "00000000-0000-0000-0000-000000000000"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    },
+    {
+      "name": "categorization.select",
+      "kind": "command",
+      "summary": "Use core categorization with action select for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "select"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "select",
+            "pluginId": "example-categorization",
+            "modelId": "00000000-0000-0000-0000-000000000000"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    },
+    {
+      "name": "categorization.delete",
+      "kind": "command",
+      "summary": "Use core categorization with action delete for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "delete"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "delete",
+            "pluginId": "example-categorization",
+            "modelId": "00000000-0000-0000-0000-000000000000"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    },
+    {
+      "name": "categorization.rename",
+      "kind": "command",
+      "summary": "Use core categorization with action rename for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "rename"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "rename",
+            "pluginId": "example-categorization",
+            "modelId": "00000000-0000-0000-0000-000000000000"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    },
+    {
+      "name": "categorization.dismiss",
+      "kind": "command",
+      "summary": "Use core categorization with action dismiss for example-categorization.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Engine action. select/delete/rename need modelId; step/cancel need session; dismiss needs transactionId and suggestionId.",
+            "enum": [
+              "status",
+              "suggest",
+              "preview",
+              "train",
+              "step",
+              "cancel",
+              "select",
+              "delete",
+              "rename",
+              "dismiss"
+            ],
+            "const": "dismiss"
+          },
+          "pluginId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200,
+            "const": "example-categorization"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Plugin-owned training/profile parameters; see the selected categorizer documentation."
+          },
+          "modelId": {
+            "type": "string",
+            "description": "Saved model UUID."
+          },
+          "session": {
+            "type": "string",
+            "description": "Opaque live training session ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name, at most 100 characters.",
+            "maxLength": 100
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suggestionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "action",
+          "pluginId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "dismiss",
+            "pluginId": "example-categorization",
+            "transactionId": "fictional-payment",
+            "suggestionId": "fictional-suggestion"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Uses the explicit categorization action; model inference/training is optional and never assigns an actual category automatically.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Delegated core categorization command; not a feature-command. Use command categorization --parameters with the documented action."
+    }
+  ]
+}

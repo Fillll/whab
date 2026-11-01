@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0 — 2026-11-01
+
+PR: [#142](https://github.com/Fillll/whab/pull/142)
+
+- Generate and validate required packaged operation contracts, including installed candidate checks before loading hooks and an offline project documentation command.
+
 ## 0.10.1 — 2026-10-25
 
 PR: [#113](https://github.com/Fillll/whab/pull/113)

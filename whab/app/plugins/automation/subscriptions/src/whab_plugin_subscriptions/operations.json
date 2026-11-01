@@ -1,0 +1,3320 @@
+{
+  "schema_version": 1,
+  "plugin_id": "subscriptions",
+  "summary": "Manual subscription labels, deterministic matching and cost reports; no AI credentials required.",
+  "delegates": [],
+  "operations": [
+    {
+      "name": "report",
+      "kind": "feature-query",
+      "summary": "Read subscription labels, payment fingerprints, plans and currency-specific cost reports.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          }
+        },
+        "required": [
+          "month",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Report with transactions, subscriptions, estimatedMonthly/estimatedAnnual, actualMonth, unclassified, needsReview, months, byCategory, byMerchant, asOfDate and chargesSince. Provider configuration is excluded.",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "description": "Payments with id/date/merchant/amount/account/category/status/cadence/source/fingerprint.",
+            "items": {
+              "type": "object",
+              "description": "Public payment classification and observed fingerprint.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint"
+              ]
+            }
+          },
+          "subscriptions": {
+            "type": "array",
+            "description": "Plans with latest charge/frequency, monthly and annual equivalents, occurrence counts and active status.",
+            "items": {
+              "type": "object",
+              "description": "Subscription plan with latest same-date charges combined.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                },
+                "monthly": {
+                  "type": "integer",
+                  "description": "Rounded monthly equivalent in minor units; zero for unknown cadence."
+                },
+                "annual": {
+                  "type": "integer",
+                  "description": "Annual equivalent computed directly from charges."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Latest charge falls within the cadence-specific recency window."
+                },
+                "occurrences": {
+                  "type": "integer",
+                  "description": "All observed charge count."
+                },
+                "occurrencesLast12Months": {
+                  "type": "integer",
+                  "description": "Charge count after the rolling cutoff."
+                },
+                "charges": {
+                  "type": "array",
+                  "description": "Underlying individually classified payments.",
+                  "items": {
+                    "type": "object",
+                    "description": "Public payment classification and observed fingerprint.",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Stable transaction ID."
+                      },
+                      "date": {
+                        "type": "string",
+                        "description": "Calendar date YYYY-MM-DD."
+                      },
+                      "merchant": {
+                        "type": "string",
+                        "description": "Payee display name."
+                      },
+                      "amount": {
+                        "type": "integer",
+                        "description": "Expense in selected-currency minor units."
+                      },
+                      "category": {
+                        "type": "string",
+                        "description": "Category display path or Uncategorized."
+                      },
+                      "account": {
+                        "type": "string",
+                        "description": "Account display name; identity is carried by transaction ID."
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Classification state.",
+                        "enum": [
+                          "excluded",
+                          "unclassified",
+                          "needs-review",
+                          "subscription",
+                          "not-subscription"
+                        ]
+                      },
+                      "cadence": {
+                        "type": "string",
+                        "description": "Observed billing interval.",
+                        "enum": [
+                          "monthly",
+                          "annual",
+                          "quarterly",
+                          "weekly",
+                          "unknown"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "description": "Classification origin; empty when unclassified.",
+                        "enum": [
+                          "",
+                          "rules",
+                          "manual",
+                          "ai",
+                          "cache"
+                        ]
+                      },
+                      "fingerprint": {
+                        "type": "string",
+                        "description": "Current payment fingerprint required for a manual label."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "date",
+                      "merchant",
+                      "amount",
+                      "category",
+                      "account",
+                      "status",
+                      "cadence",
+                      "source",
+                      "fingerprint"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint",
+                "monthly",
+                "annual",
+                "active",
+                "occurrences",
+                "occurrencesLast12Months",
+                "charges"
+              ]
+            }
+          },
+          "estimatedMonthly": {
+            "type": "integer",
+            "description": "Estimated monthly minor units for recent known-cadence plans."
+          },
+          "estimatedAnnual": {
+            "type": "integer",
+            "description": "Annual equivalent computed directly from actual charge amounts."
+          },
+          "actualMonth": {
+            "type": "integer",
+            "description": "Actual classified charges in the selected month."
+          },
+          "unclassified": {
+            "type": "integer",
+            "description": "Eligible unchecked payment count."
+          },
+          "needsReview": {
+            "type": "integer",
+            "description": "Uncertain classification count."
+          },
+          "months": {
+            "type": "array",
+            "description": "Actual monthly classified charges.",
+            "items": {
+              "type": "object",
+              "description": "Actual monthly charges and change from the previous month.",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "description": "Calendar month YYYY-MM."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Classified charges in minor units."
+                },
+                "change": {
+                  "type": "integer",
+                  "description": "Difference from the previous month in minor units."
+                }
+              },
+              "required": [
+                "month",
+                "amount",
+                "change"
+              ]
+            }
+          },
+          "byCategory": {
+            "type": "array",
+            "description": "Monthly cost grouped by category.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "byMerchant": {
+            "type": "array",
+            "description": "Monthly cost grouped by payee.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "asOfDate": {
+            "type": "string",
+            "description": "Earlier of today and the selected month end."
+          },
+          "chargesSince": {
+            "type": "string",
+            "description": "Inclusive lower bound for the rolling twelve-month count."
+          }
+        },
+        "required": [
+          "transactions",
+          "subscriptions",
+          "estimatedMonthly",
+          "estimatedAnnual",
+          "actualMonth",
+          "unclassified",
+          "needsReview",
+          "months",
+          "byCategory",
+          "byMerchant",
+          "asOfDate",
+          "chargesSince"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "month": "2026-11",
+            "currency": "USD"
+          },
+          "output": {
+            "transactions": [],
+            "subscriptions": [],
+            "estimatedMonthly": 0,
+            "estimatedAnnual": 0,
+            "actualMonth": 0,
+            "unclassified": 0,
+            "needsReview": 0,
+            "months": [],
+            "byCategory": [],
+            "byMerchant": [],
+            "asOfDate": "2026-11-01",
+            "chargesSince": "2025-11-02"
+          }
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Enabled feature public API and CLI."
+    },
+    {
+      "name": "set_label",
+      "kind": "feature-command",
+      "summary": "Explicitly label matching payments in the same account as subscription or non-subscription.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Current payment fingerprint returned by report.",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "isSubscription": {
+            "type": "boolean",
+            "description": "True for a subscription; false otherwise."
+          },
+          "cadence": {
+            "type": "string",
+            "description": "Billing interval; use unknown when timing is unknown.",
+            "enum": [
+              "monthly",
+              "annual",
+              "quarterly",
+              "weekly",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "transactionId",
+          "fingerprint",
+          "isSubscription",
+          "cadence"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Saved label receipt.",
+        "properties": {
+          "saved": {
+            "type": "boolean",
+            "description": "True when saved."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Effect scope.",
+            "const": "matching-payments-in-account"
+          }
+        },
+        "required": [
+          "saved",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionId": "fictional-payment",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "isSubscription": true,
+            "cadence": "monthly"
+          },
+          "output": {
+            "saved": true,
+            "scope": "matching-payments-in-account"
+          }
+        }
+      ],
+      "side_effects": "Saves the label for matching merchant/amount/currency/account/billing-day payments, including future matching imports. Does not change categories, review flags, balances or bank records.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "Enabled feature public API and CLI."
+    },
+    {
+      "name": "status",
+      "kind": "local",
+      "summary": "Local subscription status action. AI actions require an explicitly enabled companion and data permission.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "action": {
+            "type": "string",
+            "description": "Local subscription settings action.",
+            "const": "status"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional explicit AI provider/model/effort/consent configuration; requires the AI companion."
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Current payment fingerprint."
+          },
+          "decision": {
+            "type": "object",
+            "description": "Legacy manual label: isSubscription, cadence and score. Public set_label needs no score."
+          },
+          "operationId": {
+            "type": "string",
+            "description": "UUID for an explicitly started background scan."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Observed job UUID used to stop that exact scan."
+          },
+          "mode": {
+            "type": "string",
+            "description": "Manual uses no model.",
+            "enum": [
+              "manual",
+              "ai"
+            ],
+            "default": "manual"
+          }
+        },
+        "required": [
+          "workspace",
+          "month",
+          "currency",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Local subscription report, configuration references, classification mode and job status; no credential values.",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "description": "Payments with id/date/merchant/amount/account/category/status/cadence/source/fingerprint.",
+            "items": {
+              "type": "object",
+              "description": "Public payment classification and observed fingerprint.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint"
+              ]
+            }
+          },
+          "subscriptions": {
+            "type": "array",
+            "description": "Plans with latest charge/frequency, monthly and annual equivalents, occurrence counts and active status.",
+            "items": {
+              "type": "object",
+              "description": "Subscription plan with latest same-date charges combined.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                },
+                "monthly": {
+                  "type": "integer",
+                  "description": "Rounded monthly equivalent in minor units; zero for unknown cadence."
+                },
+                "annual": {
+                  "type": "integer",
+                  "description": "Annual equivalent computed directly from charges."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Latest charge falls within the cadence-specific recency window."
+                },
+                "occurrences": {
+                  "type": "integer",
+                  "description": "All observed charge count."
+                },
+                "occurrencesLast12Months": {
+                  "type": "integer",
+                  "description": "Charge count after the rolling cutoff."
+                },
+                "charges": {
+                  "type": "array",
+                  "description": "Underlying individually classified payments.",
+                  "items": {
+                    "type": "object",
+                    "description": "Public payment classification and observed fingerprint.",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Stable transaction ID."
+                      },
+                      "date": {
+                        "type": "string",
+                        "description": "Calendar date YYYY-MM-DD."
+                      },
+                      "merchant": {
+                        "type": "string",
+                        "description": "Payee display name."
+                      },
+                      "amount": {
+                        "type": "integer",
+                        "description": "Expense in selected-currency minor units."
+                      },
+                      "category": {
+                        "type": "string",
+                        "description": "Category display path or Uncategorized."
+                      },
+                      "account": {
+                        "type": "string",
+                        "description": "Account display name; identity is carried by transaction ID."
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Classification state.",
+                        "enum": [
+                          "excluded",
+                          "unclassified",
+                          "needs-review",
+                          "subscription",
+                          "not-subscription"
+                        ]
+                      },
+                      "cadence": {
+                        "type": "string",
+                        "description": "Observed billing interval.",
+                        "enum": [
+                          "monthly",
+                          "annual",
+                          "quarterly",
+                          "weekly",
+                          "unknown"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "description": "Classification origin; empty when unclassified.",
+                        "enum": [
+                          "",
+                          "rules",
+                          "manual",
+                          "ai",
+                          "cache"
+                        ]
+                      },
+                      "fingerprint": {
+                        "type": "string",
+                        "description": "Current payment fingerprint required for a manual label."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "date",
+                      "merchant",
+                      "amount",
+                      "category",
+                      "account",
+                      "status",
+                      "cadence",
+                      "source",
+                      "fingerprint"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint",
+                "monthly",
+                "annual",
+                "active",
+                "occurrences",
+                "occurrencesLast12Months",
+                "charges"
+              ]
+            }
+          },
+          "estimatedMonthly": {
+            "type": "integer",
+            "description": "Estimated monthly minor units for recent known-cadence plans."
+          },
+          "estimatedAnnual": {
+            "type": "integer",
+            "description": "Annual equivalent computed directly from actual charge amounts."
+          },
+          "actualMonth": {
+            "type": "integer",
+            "description": "Actual classified charges in the selected month."
+          },
+          "unclassified": {
+            "type": "integer",
+            "description": "Eligible unchecked payment count."
+          },
+          "needsReview": {
+            "type": "integer",
+            "description": "Uncertain classification count."
+          },
+          "months": {
+            "type": "array",
+            "description": "Actual monthly classified charges.",
+            "items": {
+              "type": "object",
+              "description": "Actual monthly charges and change from the previous month.",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "description": "Calendar month YYYY-MM."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Classified charges in minor units."
+                },
+                "change": {
+                  "type": "integer",
+                  "description": "Difference from the previous month in minor units."
+                }
+              },
+              "required": [
+                "month",
+                "amount",
+                "change"
+              ]
+            }
+          },
+          "byCategory": {
+            "type": "array",
+            "description": "Monthly cost grouped by category.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "byMerchant": {
+            "type": "array",
+            "description": "Monthly cost grouped by payee.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "asOfDate": {
+            "type": "string",
+            "description": "Earlier of today and the selected month end."
+          },
+          "chargesSince": {
+            "type": "string",
+            "description": "Inclusive lower bound for the rolling twelve-month count."
+          },
+          "config": {
+            "type": "object",
+            "description": "Provider/model/effort/connection reference and explicit consent; no API key or token."
+          },
+          "classificationMode": {
+            "type": "string",
+            "description": "Selected classification mode.",
+            "enum": [
+              "manual",
+              "ai"
+            ]
+          },
+          "aiAvailable": {
+            "type": "boolean",
+            "description": "Whether the optional classifier companion is enabled."
+          },
+          "job": {
+            "type": "object",
+            "description": "Current background scan status; idle when the companion is disabled."
+          }
+        },
+        "required": [
+          "transactions",
+          "subscriptions",
+          "estimatedMonthly",
+          "estimatedAnnual",
+          "actualMonth",
+          "unclassified",
+          "needsReview",
+          "months",
+          "byCategory",
+          "byMerchant",
+          "asOfDate",
+          "chargesSince"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "month": "2026-11",
+            "currency": "USD",
+            "action": "status"
+          },
+          "output": {
+            "transactions": [],
+            "subscriptions": [],
+            "estimatedMonthly": 0,
+            "estimatedAnnual": 0,
+            "actualMonth": 0,
+            "unclassified": 0,
+            "needsReview": 0,
+            "months": [],
+            "byCategory": [],
+            "byMerchant": [],
+            "asOfDate": "2026-11-01",
+            "chargesSince": "2025-11-02",
+            "config": {},
+            "classificationMode": "manual",
+            "aiAvailable": false,
+            "job": {
+              "status": "idle"
+            }
+          }
+        }
+      ],
+      "side_effects": "Read-only report; no inference or saved-data mutation.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/subscriptions (AI actions supplied by subscriptions-ai)"
+    },
+    {
+      "name": "configure",
+      "kind": "local",
+      "summary": "Local subscription configure action. AI actions require an explicitly enabled companion and data permission.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "action": {
+            "type": "string",
+            "description": "Local subscription settings action.",
+            "const": "configure"
+          },
+          "config": {
+            "type": "object",
+            "description": "Explicit selected provider/model settings and transaction-data consent. Credentials remain in AI credentials.",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "description": "Provider connection.",
+                "enum": [
+                  "chatgpt",
+                  "openai",
+                  "anthropic",
+                  "openrouter"
+                ]
+              },
+              "connectionId": {
+                "type": "string",
+                "description": "Opaque saved connection UUID, not a credential."
+              },
+              "model": {
+                "type": "string",
+                "description": "Exact text model ID.",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "effort": {
+                "type": "string",
+                "description": "Provider-supported effort, or default."
+              },
+              "consent": {
+                "type": "boolean",
+                "description": "Explicit permission to send the documented transaction data.",
+                "const": true
+              }
+            },
+            "required": [
+              "provider",
+              "connectionId",
+              "model",
+              "effort",
+              "consent"
+            ],
+            "additionalProperties": false
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Current payment fingerprint."
+          },
+          "decision": {
+            "type": "object",
+            "description": "Legacy manual label: isSubscription, cadence and score. Public set_label needs no score."
+          },
+          "operationId": {
+            "type": "string",
+            "description": "UUID for an explicitly started background scan."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Observed job UUID used to stop that exact scan."
+          },
+          "mode": {
+            "type": "string",
+            "description": "Manual uses no model.",
+            "enum": [
+              "manual",
+              "ai"
+            ],
+            "default": "manual"
+          }
+        },
+        "required": [
+          "workspace",
+          "month",
+          "currency",
+          "action",
+          "config"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Local subscription report, configuration references, classification mode and job status; no credential values.",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "description": "Payments with id/date/merchant/amount/account/category/status/cadence/source/fingerprint.",
+            "items": {
+              "type": "object",
+              "description": "Public payment classification and observed fingerprint.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint"
+              ]
+            }
+          },
+          "subscriptions": {
+            "type": "array",
+            "description": "Plans with latest charge/frequency, monthly and annual equivalents, occurrence counts and active status.",
+            "items": {
+              "type": "object",
+              "description": "Subscription plan with latest same-date charges combined.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                },
+                "monthly": {
+                  "type": "integer",
+                  "description": "Rounded monthly equivalent in minor units; zero for unknown cadence."
+                },
+                "annual": {
+                  "type": "integer",
+                  "description": "Annual equivalent computed directly from charges."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Latest charge falls within the cadence-specific recency window."
+                },
+                "occurrences": {
+                  "type": "integer",
+                  "description": "All observed charge count."
+                },
+                "occurrencesLast12Months": {
+                  "type": "integer",
+                  "description": "Charge count after the rolling cutoff."
+                },
+                "charges": {
+                  "type": "array",
+                  "description": "Underlying individually classified payments.",
+                  "items": {
+                    "type": "object",
+                    "description": "Public payment classification and observed fingerprint.",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Stable transaction ID."
+                      },
+                      "date": {
+                        "type": "string",
+                        "description": "Calendar date YYYY-MM-DD."
+                      },
+                      "merchant": {
+                        "type": "string",
+                        "description": "Payee display name."
+                      },
+                      "amount": {
+                        "type": "integer",
+                        "description": "Expense in selected-currency minor units."
+                      },
+                      "category": {
+                        "type": "string",
+                        "description": "Category display path or Uncategorized."
+                      },
+                      "account": {
+                        "type": "string",
+                        "description": "Account display name; identity is carried by transaction ID."
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Classification state.",
+                        "enum": [
+                          "excluded",
+                          "unclassified",
+                          "needs-review",
+                          "subscription",
+                          "not-subscription"
+                        ]
+                      },
+                      "cadence": {
+                        "type": "string",
+                        "description": "Observed billing interval.",
+                        "enum": [
+                          "monthly",
+                          "annual",
+                          "quarterly",
+                          "weekly",
+                          "unknown"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "description": "Classification origin; empty when unclassified.",
+                        "enum": [
+                          "",
+                          "rules",
+                          "manual",
+                          "ai",
+                          "cache"
+                        ]
+                      },
+                      "fingerprint": {
+                        "type": "string",
+                        "description": "Current payment fingerprint required for a manual label."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "date",
+                      "merchant",
+                      "amount",
+                      "category",
+                      "account",
+                      "status",
+                      "cadence",
+                      "source",
+                      "fingerprint"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint",
+                "monthly",
+                "annual",
+                "active",
+                "occurrences",
+                "occurrencesLast12Months",
+                "charges"
+              ]
+            }
+          },
+          "estimatedMonthly": {
+            "type": "integer",
+            "description": "Estimated monthly minor units for recent known-cadence plans."
+          },
+          "estimatedAnnual": {
+            "type": "integer",
+            "description": "Annual equivalent computed directly from actual charge amounts."
+          },
+          "actualMonth": {
+            "type": "integer",
+            "description": "Actual classified charges in the selected month."
+          },
+          "unclassified": {
+            "type": "integer",
+            "description": "Eligible unchecked payment count."
+          },
+          "needsReview": {
+            "type": "integer",
+            "description": "Uncertain classification count."
+          },
+          "months": {
+            "type": "array",
+            "description": "Actual monthly classified charges.",
+            "items": {
+              "type": "object",
+              "description": "Actual monthly charges and change from the previous month.",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "description": "Calendar month YYYY-MM."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Classified charges in minor units."
+                },
+                "change": {
+                  "type": "integer",
+                  "description": "Difference from the previous month in minor units."
+                }
+              },
+              "required": [
+                "month",
+                "amount",
+                "change"
+              ]
+            }
+          },
+          "byCategory": {
+            "type": "array",
+            "description": "Monthly cost grouped by category.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "byMerchant": {
+            "type": "array",
+            "description": "Monthly cost grouped by payee.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "asOfDate": {
+            "type": "string",
+            "description": "Earlier of today and the selected month end."
+          },
+          "chargesSince": {
+            "type": "string",
+            "description": "Inclusive lower bound for the rolling twelve-month count."
+          },
+          "config": {
+            "type": "object",
+            "description": "Provider/model/effort/connection reference and explicit consent; no API key or token."
+          },
+          "classificationMode": {
+            "type": "string",
+            "description": "Selected classification mode.",
+            "enum": [
+              "manual",
+              "ai"
+            ]
+          },
+          "aiAvailable": {
+            "type": "boolean",
+            "description": "Whether the optional classifier companion is enabled."
+          },
+          "job": {
+            "type": "object",
+            "description": "Current background scan status; idle when the companion is disabled."
+          }
+        },
+        "required": [
+          "transactions",
+          "subscriptions",
+          "estimatedMonthly",
+          "estimatedAnnual",
+          "actualMonth",
+          "unclassified",
+          "needsReview",
+          "months",
+          "byCategory",
+          "byMerchant",
+          "asOfDate",
+          "chargesSince"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "month": "2026-11",
+            "currency": "USD",
+            "action": "configure",
+            "config": {
+              "provider": "openai",
+              "connectionId": "00000000-0000-0000-0000-000000000000",
+              "model": "fictional-model",
+              "effort": "default",
+              "consent": true
+            }
+          },
+          "output": {
+            "transactions": [],
+            "subscriptions": [],
+            "estimatedMonthly": 0,
+            "estimatedAnnual": 0,
+            "actualMonth": 0,
+            "unclassified": 0,
+            "needsReview": 0,
+            "months": [],
+            "byCategory": [],
+            "byMerchant": [],
+            "asOfDate": "2026-11-01",
+            "chargesSince": "2025-11-02",
+            "config": {},
+            "classificationMode": "manual",
+            "aiAvailable": false,
+            "job": {
+              "status": "idle"
+            }
+          }
+        }
+      ],
+      "side_effects": "Validate and save explicitly consented classifier configuration; selects AI mode. Requires the companion.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/subscriptions (AI actions supplied by subscriptions-ai)"
+    },
+    {
+      "name": "classify",
+      "kind": "local",
+      "summary": "Local subscription classify action. AI actions require an explicitly enabled companion and data permission.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "action": {
+            "type": "string",
+            "description": "Local subscription settings action.",
+            "const": "classify"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional explicit AI provider/model/effort/consent configuration; requires the AI companion."
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Current payment fingerprint."
+          },
+          "decision": {
+            "type": "object",
+            "description": "Legacy manual label: isSubscription, cadence and score. Public set_label needs no score."
+          },
+          "operationId": {
+            "type": "string",
+            "description": "UUID for an explicitly started background scan."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Observed job UUID used to stop that exact scan."
+          },
+          "mode": {
+            "type": "string",
+            "description": "Manual uses no model.",
+            "enum": [
+              "manual",
+              "ai"
+            ],
+            "default": "manual"
+          }
+        },
+        "required": [
+          "workspace",
+          "month",
+          "currency",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "One explicit classification batch progress.",
+        "properties": {
+          "remaining": {
+            "type": "integer",
+            "description": "Count of remaining payments."
+          },
+          "classified": {
+            "type": "integer",
+            "description": "Count of classified payments."
+          },
+          "reused": {
+            "type": "integer",
+            "description": "Count of reused payments."
+          }
+        },
+        "required": [
+          "remaining",
+          "classified",
+          "reused"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "month": "2026-11",
+            "currency": "USD",
+            "action": "classify"
+          },
+          "output": {
+            "remaining": 0,
+            "classified": 0,
+            "reused": 0
+          }
+        }
+      ],
+      "side_effects": "Explicitly send eligible payment data to the selected model and save one classification batch. Requires AI mode and the companion.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/subscriptions (AI actions supplied by subscriptions-ai)"
+    },
+    {
+      "name": "override",
+      "kind": "local",
+      "summary": "Local subscription override action. AI actions require an explicitly enabled companion and data permission.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "action": {
+            "type": "string",
+            "description": "Local subscription settings action.",
+            "const": "override"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional explicit AI provider/model/effort/consent configuration; requires the AI companion."
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Current payment fingerprint."
+          },
+          "decision": {
+            "type": "object",
+            "description": "Legacy manual label: isSubscription, cadence and score. Public set_label needs no score."
+          },
+          "operationId": {
+            "type": "string",
+            "description": "UUID for an explicitly started background scan."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Observed job UUID used to stop that exact scan."
+          },
+          "mode": {
+            "type": "string",
+            "description": "Manual uses no model.",
+            "enum": [
+              "manual",
+              "ai"
+            ],
+            "default": "manual"
+          }
+        },
+        "required": [
+          "workspace",
+          "month",
+          "currency",
+          "action",
+          "transactionId",
+          "fingerprint",
+          "decision"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Local subscription report, configuration references, classification mode and job status; no credential values.",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "description": "Payments with id/date/merchant/amount/account/category/status/cadence/source/fingerprint.",
+            "items": {
+              "type": "object",
+              "description": "Public payment classification and observed fingerprint.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint"
+              ]
+            }
+          },
+          "subscriptions": {
+            "type": "array",
+            "description": "Plans with latest charge/frequency, monthly and annual equivalents, occurrence counts and active status.",
+            "items": {
+              "type": "object",
+              "description": "Subscription plan with latest same-date charges combined.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                },
+                "monthly": {
+                  "type": "integer",
+                  "description": "Rounded monthly equivalent in minor units; zero for unknown cadence."
+                },
+                "annual": {
+                  "type": "integer",
+                  "description": "Annual equivalent computed directly from charges."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Latest charge falls within the cadence-specific recency window."
+                },
+                "occurrences": {
+                  "type": "integer",
+                  "description": "All observed charge count."
+                },
+                "occurrencesLast12Months": {
+                  "type": "integer",
+                  "description": "Charge count after the rolling cutoff."
+                },
+                "charges": {
+                  "type": "array",
+                  "description": "Underlying individually classified payments.",
+                  "items": {
+                    "type": "object",
+                    "description": "Public payment classification and observed fingerprint.",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Stable transaction ID."
+                      },
+                      "date": {
+                        "type": "string",
+                        "description": "Calendar date YYYY-MM-DD."
+                      },
+                      "merchant": {
+                        "type": "string",
+                        "description": "Payee display name."
+                      },
+                      "amount": {
+                        "type": "integer",
+                        "description": "Expense in selected-currency minor units."
+                      },
+                      "category": {
+                        "type": "string",
+                        "description": "Category display path or Uncategorized."
+                      },
+                      "account": {
+                        "type": "string",
+                        "description": "Account display name; identity is carried by transaction ID."
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Classification state.",
+                        "enum": [
+                          "excluded",
+                          "unclassified",
+                          "needs-review",
+                          "subscription",
+                          "not-subscription"
+                        ]
+                      },
+                      "cadence": {
+                        "type": "string",
+                        "description": "Observed billing interval.",
+                        "enum": [
+                          "monthly",
+                          "annual",
+                          "quarterly",
+                          "weekly",
+                          "unknown"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "description": "Classification origin; empty when unclassified.",
+                        "enum": [
+                          "",
+                          "rules",
+                          "manual",
+                          "ai",
+                          "cache"
+                        ]
+                      },
+                      "fingerprint": {
+                        "type": "string",
+                        "description": "Current payment fingerprint required for a manual label."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "date",
+                      "merchant",
+                      "amount",
+                      "category",
+                      "account",
+                      "status",
+                      "cadence",
+                      "source",
+                      "fingerprint"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint",
+                "monthly",
+                "annual",
+                "active",
+                "occurrences",
+                "occurrencesLast12Months",
+                "charges"
+              ]
+            }
+          },
+          "estimatedMonthly": {
+            "type": "integer",
+            "description": "Estimated monthly minor units for recent known-cadence plans."
+          },
+          "estimatedAnnual": {
+            "type": "integer",
+            "description": "Annual equivalent computed directly from actual charge amounts."
+          },
+          "actualMonth": {
+            "type": "integer",
+            "description": "Actual classified charges in the selected month."
+          },
+          "unclassified": {
+            "type": "integer",
+            "description": "Eligible unchecked payment count."
+          },
+          "needsReview": {
+            "type": "integer",
+            "description": "Uncertain classification count."
+          },
+          "months": {
+            "type": "array",
+            "description": "Actual monthly classified charges.",
+            "items": {
+              "type": "object",
+              "description": "Actual monthly charges and change from the previous month.",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "description": "Calendar month YYYY-MM."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Classified charges in minor units."
+                },
+                "change": {
+                  "type": "integer",
+                  "description": "Difference from the previous month in minor units."
+                }
+              },
+              "required": [
+                "month",
+                "amount",
+                "change"
+              ]
+            }
+          },
+          "byCategory": {
+            "type": "array",
+            "description": "Monthly cost grouped by category.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "byMerchant": {
+            "type": "array",
+            "description": "Monthly cost grouped by payee.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "asOfDate": {
+            "type": "string",
+            "description": "Earlier of today and the selected month end."
+          },
+          "chargesSince": {
+            "type": "string",
+            "description": "Inclusive lower bound for the rolling twelve-month count."
+          },
+          "config": {
+            "type": "object",
+            "description": "Provider/model/effort/connection reference and explicit consent; no API key or token."
+          },
+          "classificationMode": {
+            "type": "string",
+            "description": "Selected classification mode.",
+            "enum": [
+              "manual",
+              "ai"
+            ]
+          },
+          "aiAvailable": {
+            "type": "boolean",
+            "description": "Whether the optional classifier companion is enabled."
+          },
+          "job": {
+            "type": "object",
+            "description": "Current background scan status; idle when the companion is disabled."
+          }
+        },
+        "required": [
+          "transactions",
+          "subscriptions",
+          "estimatedMonthly",
+          "estimatedAnnual",
+          "actualMonth",
+          "unclassified",
+          "needsReview",
+          "months",
+          "byCategory",
+          "byMerchant",
+          "asOfDate",
+          "chargesSince"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "month": "2026-11",
+            "currency": "USD",
+            "action": "override",
+            "transactionId": "fictional-payment",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "decision": {
+              "isSubscription": true,
+              "cadence": "monthly",
+              "score": 1
+            }
+          },
+          "output": {
+            "transactions": [],
+            "subscriptions": [],
+            "estimatedMonthly": 0,
+            "estimatedAnnual": 0,
+            "actualMonth": 0,
+            "unclassified": 0,
+            "needsReview": 0,
+            "months": [],
+            "byCategory": [],
+            "byMerchant": [],
+            "asOfDate": "2026-11-01",
+            "chargesSince": "2025-11-02",
+            "config": {},
+            "classificationMode": "manual",
+            "aiAvailable": false,
+            "job": {
+              "status": "idle"
+            }
+          }
+        }
+      ],
+      "side_effects": "Save an explicit manual label for matching payments in the same account; no inference.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/subscriptions (AI actions supplied by subscriptions-ai)"
+    },
+    {
+      "name": "start",
+      "kind": "local",
+      "summary": "Local subscription start action. AI actions require an explicitly enabled companion and data permission.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "action": {
+            "type": "string",
+            "description": "Local subscription settings action.",
+            "const": "start"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional explicit AI provider/model/effort/consent configuration; requires the AI companion."
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Current payment fingerprint."
+          },
+          "decision": {
+            "type": "object",
+            "description": "Legacy manual label: isSubscription, cadence and score. Public set_label needs no score."
+          },
+          "operationId": {
+            "type": "string",
+            "description": "UUID for an explicitly started background scan."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Observed job UUID used to stop that exact scan."
+          },
+          "mode": {
+            "type": "string",
+            "description": "Manual uses no model.",
+            "enum": [
+              "manual",
+              "ai"
+            ],
+            "default": "manual"
+          }
+        },
+        "required": [
+          "workspace",
+          "month",
+          "currency",
+          "action",
+          "operationId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Background scan status; a disabled companion returns status idle only.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Job UUID, or empty when idle."
+          },
+          "status": {
+            "type": "string",
+            "description": "Background scan state.",
+            "enum": [
+              "idle",
+              "preparing",
+              "running",
+              "stopping",
+              "completed",
+              "stopped",
+              "failed",
+              "interrupted"
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "description": "Count of total payments."
+          },
+          "processed": {
+            "type": "integer",
+            "description": "Count of processed payments."
+          },
+          "classified": {
+            "type": "integer",
+            "description": "Count of classified payments."
+          },
+          "reused": {
+            "type": "integer",
+            "description": "Count of reused payments."
+          },
+          "skipped": {
+            "type": "integer",
+            "description": "Count of skipped payments."
+          },
+          "error": {
+            "type": "string",
+            "description": "Sanitized error text, or empty."
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "UTC start timestamp, or empty."
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "UTC completion timestamp, or empty."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "month": "2026-11",
+            "currency": "USD",
+            "action": "start",
+            "operationId": "00000000-0000-0000-0000-000000000000"
+          },
+          "output": {
+            "status": "idle"
+          }
+        }
+      ],
+      "side_effects": "Start one explicitly identified background model scan; paid inference may occur. Requires the companion and explicit configuration or saved AI mode.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/subscriptions (AI actions supplied by subscriptions-ai)"
+    },
+    {
+      "name": "job",
+      "kind": "local",
+      "summary": "Local subscription job action. AI actions require an explicitly enabled companion and data permission.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "action": {
+            "type": "string",
+            "description": "Local subscription settings action.",
+            "const": "job"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional explicit AI provider/model/effort/consent configuration; requires the AI companion."
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Current payment fingerprint."
+          },
+          "decision": {
+            "type": "object",
+            "description": "Legacy manual label: isSubscription, cadence and score. Public set_label needs no score."
+          },
+          "operationId": {
+            "type": "string",
+            "description": "UUID for an explicitly started background scan."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Observed job UUID used to stop that exact scan."
+          },
+          "mode": {
+            "type": "string",
+            "description": "Manual uses no model.",
+            "enum": [
+              "manual",
+              "ai"
+            ],
+            "default": "manual"
+          }
+        },
+        "required": [
+          "workspace",
+          "month",
+          "currency",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Background scan status; a disabled companion returns status idle only.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Job UUID, or empty when idle."
+          },
+          "status": {
+            "type": "string",
+            "description": "Background scan state.",
+            "enum": [
+              "idle",
+              "preparing",
+              "running",
+              "stopping",
+              "completed",
+              "stopped",
+              "failed",
+              "interrupted"
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "description": "Count of total payments."
+          },
+          "processed": {
+            "type": "integer",
+            "description": "Count of processed payments."
+          },
+          "classified": {
+            "type": "integer",
+            "description": "Count of classified payments."
+          },
+          "reused": {
+            "type": "integer",
+            "description": "Count of reused payments."
+          },
+          "skipped": {
+            "type": "integer",
+            "description": "Count of skipped payments."
+          },
+          "error": {
+            "type": "string",
+            "description": "Sanitized error text, or empty."
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "UTC start timestamp, or empty."
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "UTC completion timestamp, or empty."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "month": "2026-11",
+            "currency": "USD",
+            "action": "job"
+          },
+          "output": {
+            "status": "idle"
+          }
+        }
+      ],
+      "side_effects": "Read current job state; does not start a scan or inference.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/subscriptions (AI actions supplied by subscriptions-ai)"
+    },
+    {
+      "name": "stop",
+      "kind": "local",
+      "summary": "Local subscription stop action. AI actions require an explicitly enabled companion and data permission.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "action": {
+            "type": "string",
+            "description": "Local subscription settings action.",
+            "const": "stop"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional explicit AI provider/model/effort/consent configuration; requires the AI companion."
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Current payment fingerprint."
+          },
+          "decision": {
+            "type": "object",
+            "description": "Legacy manual label: isSubscription, cadence and score. Public set_label needs no score."
+          },
+          "operationId": {
+            "type": "string",
+            "description": "UUID for an explicitly started background scan."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Observed job UUID used to stop that exact scan."
+          },
+          "mode": {
+            "type": "string",
+            "description": "Manual uses no model.",
+            "enum": [
+              "manual",
+              "ai"
+            ],
+            "default": "manual"
+          }
+        },
+        "required": [
+          "workspace",
+          "month",
+          "currency",
+          "action",
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Background scan status; a disabled companion returns status idle only.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Job UUID, or empty when idle."
+          },
+          "status": {
+            "type": "string",
+            "description": "Background scan state.",
+            "enum": [
+              "idle",
+              "preparing",
+              "running",
+              "stopping",
+              "completed",
+              "stopped",
+              "failed",
+              "interrupted"
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "description": "Count of total payments."
+          },
+          "processed": {
+            "type": "integer",
+            "description": "Count of processed payments."
+          },
+          "classified": {
+            "type": "integer",
+            "description": "Count of classified payments."
+          },
+          "reused": {
+            "type": "integer",
+            "description": "Count of reused payments."
+          },
+          "skipped": {
+            "type": "integer",
+            "description": "Count of skipped payments."
+          },
+          "error": {
+            "type": "string",
+            "description": "Sanitized error text, or empty."
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "UTC start timestamp, or empty."
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "UTC completion timestamp, or empty."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "month": "2026-11",
+            "currency": "USD",
+            "action": "stop",
+            "jobId": "00000000-0000-0000-0000-000000000000"
+          },
+          "output": {
+            "status": "idle"
+          }
+        }
+      ],
+      "side_effects": "Request that the identified scan stop after its current batch; an in-flight provider request may finish.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/subscriptions (AI actions supplied by subscriptions-ai)"
+    },
+    {
+      "name": "set-mode",
+      "kind": "local",
+      "summary": "Local subscription set-mode action. AI actions require an explicitly enabled companion and data permission.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "month": {
+            "type": "string",
+            "description": "Calendar month YYYY-MM, between 1900-01 and 2200-12.",
+            "pattern": "^(19|20|21)\\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code; no currency conversion is performed.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "action": {
+            "type": "string",
+            "description": "Local subscription settings action.",
+            "const": "set-mode"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional explicit AI provider/model/effort/consent configuration; requires the AI companion."
+          },
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Current payment fingerprint."
+          },
+          "decision": {
+            "type": "object",
+            "description": "Legacy manual label: isSubscription, cadence and score. Public set_label needs no score."
+          },
+          "operationId": {
+            "type": "string",
+            "description": "UUID for an explicitly started background scan."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "Observed job UUID used to stop that exact scan."
+          },
+          "mode": {
+            "type": "string",
+            "description": "Manual uses no model.",
+            "enum": [
+              "manual",
+              "ai"
+            ],
+            "default": "manual"
+          }
+        },
+        "required": [
+          "workspace",
+          "month",
+          "currency",
+          "action",
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Local subscription report, configuration references, classification mode and job status; no credential values.",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "description": "Payments with id/date/merchant/amount/account/category/status/cadence/source/fingerprint.",
+            "items": {
+              "type": "object",
+              "description": "Public payment classification and observed fingerprint.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint"
+              ]
+            }
+          },
+          "subscriptions": {
+            "type": "array",
+            "description": "Plans with latest charge/frequency, monthly and annual equivalents, occurrence counts and active status.",
+            "items": {
+              "type": "object",
+              "description": "Subscription plan with latest same-date charges combined.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable transaction ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Expense in selected-currency minor units."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category display path or Uncategorized."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Account display name; identity is carried by transaction ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Classification state.",
+                  "enum": [
+                    "excluded",
+                    "unclassified",
+                    "needs-review",
+                    "subscription",
+                    "not-subscription"
+                  ]
+                },
+                "cadence": {
+                  "type": "string",
+                  "description": "Observed billing interval.",
+                  "enum": [
+                    "monthly",
+                    "annual",
+                    "quarterly",
+                    "weekly",
+                    "unknown"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification origin; empty when unclassified.",
+                  "enum": [
+                    "",
+                    "rules",
+                    "manual",
+                    "ai",
+                    "cache"
+                  ]
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "Current payment fingerprint required for a manual label."
+                },
+                "monthly": {
+                  "type": "integer",
+                  "description": "Rounded monthly equivalent in minor units; zero for unknown cadence."
+                },
+                "annual": {
+                  "type": "integer",
+                  "description": "Annual equivalent computed directly from charges."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Latest charge falls within the cadence-specific recency window."
+                },
+                "occurrences": {
+                  "type": "integer",
+                  "description": "All observed charge count."
+                },
+                "occurrencesLast12Months": {
+                  "type": "integer",
+                  "description": "Charge count after the rolling cutoff."
+                },
+                "charges": {
+                  "type": "array",
+                  "description": "Underlying individually classified payments.",
+                  "items": {
+                    "type": "object",
+                    "description": "Public payment classification and observed fingerprint.",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Stable transaction ID."
+                      },
+                      "date": {
+                        "type": "string",
+                        "description": "Calendar date YYYY-MM-DD."
+                      },
+                      "merchant": {
+                        "type": "string",
+                        "description": "Payee display name."
+                      },
+                      "amount": {
+                        "type": "integer",
+                        "description": "Expense in selected-currency minor units."
+                      },
+                      "category": {
+                        "type": "string",
+                        "description": "Category display path or Uncategorized."
+                      },
+                      "account": {
+                        "type": "string",
+                        "description": "Account display name; identity is carried by transaction ID."
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Classification state.",
+                        "enum": [
+                          "excluded",
+                          "unclassified",
+                          "needs-review",
+                          "subscription",
+                          "not-subscription"
+                        ]
+                      },
+                      "cadence": {
+                        "type": "string",
+                        "description": "Observed billing interval.",
+                        "enum": [
+                          "monthly",
+                          "annual",
+                          "quarterly",
+                          "weekly",
+                          "unknown"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "description": "Classification origin; empty when unclassified.",
+                        "enum": [
+                          "",
+                          "rules",
+                          "manual",
+                          "ai",
+                          "cache"
+                        ]
+                      },
+                      "fingerprint": {
+                        "type": "string",
+                        "description": "Current payment fingerprint required for a manual label."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "date",
+                      "merchant",
+                      "amount",
+                      "category",
+                      "account",
+                      "status",
+                      "cadence",
+                      "source",
+                      "fingerprint"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "merchant",
+                "amount",
+                "category",
+                "account",
+                "status",
+                "cadence",
+                "source",
+                "fingerprint",
+                "monthly",
+                "annual",
+                "active",
+                "occurrences",
+                "occurrencesLast12Months",
+                "charges"
+              ]
+            }
+          },
+          "estimatedMonthly": {
+            "type": "integer",
+            "description": "Estimated monthly minor units for recent known-cadence plans."
+          },
+          "estimatedAnnual": {
+            "type": "integer",
+            "description": "Annual equivalent computed directly from actual charge amounts."
+          },
+          "actualMonth": {
+            "type": "integer",
+            "description": "Actual classified charges in the selected month."
+          },
+          "unclassified": {
+            "type": "integer",
+            "description": "Eligible unchecked payment count."
+          },
+          "needsReview": {
+            "type": "integer",
+            "description": "Uncertain classification count."
+          },
+          "months": {
+            "type": "array",
+            "description": "Actual monthly classified charges.",
+            "items": {
+              "type": "object",
+              "description": "Actual monthly charges and change from the previous month.",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "description": "Calendar month YYYY-MM."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Classified charges in minor units."
+                },
+                "change": {
+                  "type": "integer",
+                  "description": "Difference from the previous month in minor units."
+                }
+              },
+              "required": [
+                "month",
+                "amount",
+                "change"
+              ]
+            }
+          },
+          "byCategory": {
+            "type": "array",
+            "description": "Monthly cost grouped by category.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "byMerchant": {
+            "type": "array",
+            "description": "Monthly cost grouped by payee.",
+            "items": {
+              "type": "object",
+              "description": "Monthly equivalent grouped by display name.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Category path or payee display name."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Monthly equivalent in minor units."
+                }
+              },
+              "required": [
+                "name",
+                "amount"
+              ]
+            }
+          },
+          "asOfDate": {
+            "type": "string",
+            "description": "Earlier of today and the selected month end."
+          },
+          "chargesSince": {
+            "type": "string",
+            "description": "Inclusive lower bound for the rolling twelve-month count."
+          },
+          "config": {
+            "type": "object",
+            "description": "Provider/model/effort/connection reference and explicit consent; no API key or token."
+          },
+          "classificationMode": {
+            "type": "string",
+            "description": "Selected classification mode.",
+            "enum": [
+              "manual",
+              "ai"
+            ]
+          },
+          "aiAvailable": {
+            "type": "boolean",
+            "description": "Whether the optional classifier companion is enabled."
+          },
+          "job": {
+            "type": "object",
+            "description": "Current background scan status; idle when the companion is disabled."
+          }
+        },
+        "required": [
+          "transactions",
+          "subscriptions",
+          "estimatedMonthly",
+          "estimatedAnnual",
+          "actualMonth",
+          "unclassified",
+          "needsReview",
+          "months",
+          "byCategory",
+          "byMerchant",
+          "asOfDate",
+          "chargesSince"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "month": "2026-11",
+            "currency": "USD",
+            "action": "set-mode",
+            "mode": "manual"
+          },
+          "output": {
+            "transactions": [],
+            "subscriptions": [],
+            "estimatedMonthly": 0,
+            "estimatedAnnual": 0,
+            "actualMonth": 0,
+            "unclassified": 0,
+            "needsReview": 0,
+            "months": [],
+            "byCategory": [],
+            "byMerchant": [],
+            "asOfDate": "2026-11-01",
+            "chargesSince": "2025-11-02",
+            "config": {},
+            "classificationMode": "manual",
+            "aiAvailable": false,
+            "job": {
+              "status": "idle"
+            }
+          }
+        }
+      ],
+      "side_effects": "Save manual or AI mode. Manual needs no model or credential; AI requires the companion.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/subscriptions (AI actions supplied by subscriptions-ai)"
+    }
+  ]
+}

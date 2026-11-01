@@ -259,6 +259,9 @@ class RemoteStore:
     def features(self, workspace):
         return self._query("features", workspace)
 
+    def describe_operations(self, workspace):
+        return self._query("describe", workspace)
+
     def feature_query(self, workspace, payload):
         return self._query("feature", workspace, parameters=payload)
 

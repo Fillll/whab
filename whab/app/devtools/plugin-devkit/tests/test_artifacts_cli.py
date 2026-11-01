@@ -199,8 +199,9 @@ def test_selection_verifies_wheel_evidence_before_loading_any_descriptor(monkeyp
         entry.load = lambda load=load: (calls.append("load"), load())[1]
     monkeypatch.setattr(cli.metadata, "entry_points", lambda **_: entries)
     monkeypatch.setattr(cli, "installed_artifacts", lambda *_: calls.append("verify") or [])
+    monkeypatch.setattr(cli, "check_entry_documentation", lambda *_: calls.append("docs"))
     assert cli._selected("candidate", "fictional-wheels")[:2] == (candidate, reference)
-    assert calls == ["verify", "load", "load"]
+    assert calls == ["verify", "docs", "load", "load"]
     monkeypatch.setattr(cli.metadata, "entry_points", lambda **_: ())
     with pytest.raises(ValueError, match="exactly one"):
         cli._selected("candidate", "fictional-wheels")

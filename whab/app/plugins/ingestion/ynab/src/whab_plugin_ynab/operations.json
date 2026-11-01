@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "plugin_id": "ynab",
+  "summary": "Explicit local YNAB archive import, preview and atomic migration.",
+  "delegates": [],
+  "operations": [
+    {
+      "name": "FileImport.parse",
+      "kind": "sdk",
+      "summary": "Parse supplied file bytes into a validated import preview; no automatic migration.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "data": {
+            "type": "string",
+            "description": "Supplied archive/file bytes, represented as base64."
+          },
+          "filename": {
+            "type": "string",
+            "description": "User-selected filename."
+          }
+        },
+        "required": [
+          "data",
+          "filename"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "data": "",
+            "filename": "fictional.zip"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Parsing creates a preview. Applying a migration is a separate guarded host action.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    }
+  ]
+}
