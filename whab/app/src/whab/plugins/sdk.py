@@ -498,7 +498,7 @@ class UserInterface:
 
     def __post_init__(self) -> None:
         if (type(self.workspace_pages) not in (tuple, list) or len(self.workspace_pages) > 16
-                or any((type(name) is not str or re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*", name) is None) or name in {"budget", "transactions", "insights", "accounts"} for name in self.workspace_pages)
+                or any((type(name) is not str or len(name) > 200 or re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*", name) is None) or name in {"budget", "transactions", "insights", "accounts", "api", "static", "ui", "banks", "imports"} for name in self.workspace_pages)
                 or len(set(self.workspace_pages)) != len(self.workspace_pages)):
             raise ValueError("Choose unique safe additional workspace page names.")
         object.__setattr__(self, "workspace_pages", tuple(self.workspace_pages))

@@ -136,8 +136,8 @@ def _visual_adapter(node):
             return False
         pages = _literal(fields["workspace_pages"]) if "workspace_pages" in fields else ()
         if (type(pages) not in (tuple, list) or len(pages) > 16
-                or any(type(name) is not str or re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*", name) is None
-                       or name in {"budget", "transactions", "insights", "accounts"} for name in pages)
+                or any(type(name) is not str or len(name) > 200 or re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*", name) is None
+                       or name in {"budget", "transactions", "insights", "accounts", "api", "static", "ui", "banks", "imports"} for name in pages)
                 or len(set(pages)) != len(pages)):
             return False
         protocol = _literal(fields["view_protocol"]) if "view_protocol" in fields else 0

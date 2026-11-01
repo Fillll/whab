@@ -105,6 +105,6 @@ def test_additional_workspace_pages_survive_worker_flags_and_validate_names():
     flags = adapter_info(selected)
     assert flags["workspace_pages"] == ("reports",)
     assert validate_adapter_info({**flags, "workspace_pages": ["reports"]})["workspace_pages"] == ["reports"]
-    for value in (("../private",), ("budget",), ("repeat", "repeat"), ("under_score",), "reports", (1,), ("x",) * 17):
+    for value in (("../private",), ("budget",), ("repeat", "repeat"), ("under_score",), ("static",), ("a" * 201,), "reports", (1,), ("x",) * 17):
         with pytest.raises(ValueError):
             replace(selected, workspace_pages=value)
