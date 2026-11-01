@@ -55,7 +55,8 @@ def test_extension_insights_render_and_escape_content(store, tmp_path, client_fo
 def test_default_formats_and_only_children_in_category_choices(client):
     import re
 
-    text = client.get("/budgets/demo/transactions/2026-10/usd").text
+    # Formatting covers the pending sample dated today as well as seeded history.
+    text = client.get("/budgets/demo/transactions/2026-10/usd?all_dates=true").text
     assert re.search(r'data-transaction-detail="date" value="2026-10-\d{2}"', text)
     assert 'aria-label="Date for new transaction"' in text
     assert 'type="date" name="date"' in text

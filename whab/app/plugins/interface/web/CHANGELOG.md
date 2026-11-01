@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.41.0 — 2026-11-01
+
+PR: [#138](https://github.com/Fillll/whab/pull/138)
+
+- Replace subscription-plan rows with the standard compact spreadsheet grid: plan, category, account, actual charge/frequency, monthly and annual equivalents, total charges, last-12-month charges and latest charge date.
+- Sort every column in either direction and combine text, numeric range, frequency and date filters. Retain sorting/filtering and table scroll on report refresh; support keyboard controls, compact horizontal scrolling and unavailable older-report fields.
+
 ## 1.40.0 — 2026-10-31
 
 PR: [#137](https://github.com/Fillll/whab/pull/137)

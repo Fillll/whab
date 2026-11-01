@@ -54,6 +54,7 @@ def fragment_client(tmp_path, store):
 @pytest.mark.parametrize("key,workspace", [("demo", "demo"), ("home", "personal")])
 def test_generic_fragment_is_explicit_and_keeps_authoritative_context(fragment_client, page, key, workspace, monkeypatch):
     monkeypatch.setattr("whab.web.routes.pages.current_month", lambda: "2026-10")
+    monkeypatch.setattr("whab.web.transaction_filters.current_month", lambda: "2026-10")
     path = f"/budgets/{key}/{page}/current-month/eur"
     full = fragment_client.get(path)
     result = fragment_client.get(path, headers=FRAGMENT)

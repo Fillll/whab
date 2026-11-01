@@ -496,4 +496,4 @@ whab_plugin_sqlite = "1.12.0"
 whab_plugin_json = "1.3.0"
 
 [marketplace]
-source_ref = "d42b3009d083b0c237cb5b2bb6ccf36a449daa6e"
+source_ref = "5988d4f48379af08e27d8bb6570bca2d11c37a26"

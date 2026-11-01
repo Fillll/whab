@@ -2,6 +2,7 @@
 import {api, getContext} from './client.js';
 import {credentials, element as el, field, option} from './ai-credentials-settings.js';
 import {classificationRunning, createSubscriptionJobs, renderSubscriptionProgress} from './subscription-jobs.js';
+import {createPlanTableState, renderSubscriptionPlans} from './subscription-plans.js';
 
 export function money(value, currency) {
   const digits = new Intl.NumberFormat('en', {style: 'currency', currency}).resolvedOptions().maximumFractionDigits;
@@ -17,6 +18,7 @@ export function initSubscriptions() {
   const progress = dialog.querySelector('[data-subscriptions-progress]');
   const stopButton = dialog.querySelector('[data-subscriptions-stop]');
   const badge = document.querySelector('[data-subscriptions-job-badge]');
+  const planState = createPlanTableState();
   let busy = false, filter = 'subscriptions', searchQuery = '', limit = 100, last, job = null, viewGeneration = 0, jobSupported = true, refreshOnIdle = false;
   const call = (action, values = {}) => {
     const context = getContext();
@@ -150,18 +152,12 @@ export function initSubscriptions() {
     content.append(actions);
     const summary = el('div', '', 'subscription-summary');
     const active = data.subscriptions.filter(row => row.active);
-    for (const [label, value] of [['Estimated monthly', format(data.estimatedMonthly)], ['Annualized estimate', format(data.estimatedMonthly * 12)], ['Charged this month', format(data.actualMonth)], ['Active plans', String(active.length)]]) {
+    for (const [label, value] of [['Estimated monthly', format(data.estimatedMonthly)], ['Annualized estimate', data.estimatedAnnual == null ? '—' : format(data.estimatedAnnual)], ['Charged this month', format(data.actualMonth)], ['Active plans', String(active.length)]]) {
       const block = el('div'); block.append(el('small', label), el('strong', value)); summary.append(block);
     }
     content.append(summary, el('p', `${data.unclassified} unchecked · ${data.needsReview} uncertain. Monthly estimates include active plans with a known billing interval. No recent charge means a plan may have ended; it does not confirm cancellation.`, 'settings-notice'));
     const plans = el('section', '', 'subscription-plans'); plans.append(el('h3', 'Your plans'));
-    for (const row of data.subscriptions) {
-      const line = el('div', '', 'subscription-plan');
-      line.append(el('strong', row.merchant), el('span', `${row.category} · ${row.account}`),
-        el('span', `${format(row.amount)} · ${row.cadence}`), el('strong', row.cadence === 'unknown' ? 'Interval needs review' : `${format(row.monthly)} / month`),
-        el('small', `${row.active ? 'Recent' : 'No recent charge'} · Last ${row.date} · ${row.occurrences} charges`)); plans.append(line);
-    }
-    if (!data.subscriptions.length) plans.append(el('p', 'Classify your transactions to find subscriptions, or label a payment below.', 'settings-notice'));
+    renderSubscriptionPlans(plans, data, planState, {format, digits:new Intl.NumberFormat('en', {style:'currency',currency:getContext().currency}).resolvedOptions().maximumFractionDigits});
     content.append(plans);
     const breakdowns = el('div', '', 'subscription-breakdowns');
     breakdown(breakdowns, 'Monthly cost by category', data.byCategory); breakdown(breakdowns, 'Largest merchants', data.byMerchant); content.append(breakdowns);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 — 2026-11-01
+
+PR: [#138](https://github.com/Fillll/whab/pull/138)
+
+- Report total and rolling-12-month classified charges per plan, the reference/window dates and direct annual equivalents. Calculate annual estimates from actual charges to avoid monthly rounding drift; preserve account/currency isolation and historical-view cutoffs.
+
 ## 1.1.0 — 2026-10-31
 
 PR: [#137](https://github.com/Fillll/whab/pull/137)

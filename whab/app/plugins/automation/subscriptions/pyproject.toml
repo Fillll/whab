@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_subscriptions"
-version = "1.1.0"
+version = "1.2.0"
 description = "AI-assisted subscription detection and spend review for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"

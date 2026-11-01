@@ -1,0 +1,30 @@
+<!doctype html><html lang="en" data-theme="light"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fictional subscription table preview</title><link rel="stylesheet" href="../../src/whab_plugin_web/static/styles.css">
+<style>body{display:block;padding:24px}main{display:block}dialog{margin:auto}.preview-actions{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}</style>
+<main><h1>Fictional subscription table preview</h1><p>Offline fictional report with the shipped plan table and stylesheet. No budget or provider connection.</p><button id="open" class="button primary">Open subscription table</button></main>
+<dialog class="modal subscriptions-window" aria-labelledby="preview-heading">
+ <div class="subscription-header"><div class="modal-heading"><div><p class="eyebrow">RECURRING SPENDING</p><h2 id="preview-heading">Subscriptions</h2></div><button id="close" class="icon-button" aria-label="Close subscriptions">×</button></div></div>
+ <div class="preview-actions"><button id="theme" class="button secondary">Switch appearance</button><button id="refresh" class="button secondary">Refresh fictional report</button></div>
+ <section id="plans" class="subscription-plans"></section>
+</dialog>
+<script type="module">
+import {createPlanTableState,renderSubscriptionPlans} from '../../src/whab_plugin_web/static/subscription-plans.js';
+const data={asOfDate:'2026-11-01',chargesSince:'2025-11-02',subscriptions:[
+ {id:'mobile',merchant:'Fictional Mobile',category:'Connectivity / Mobile',account:'Fictional Card',amount:32300,cadence:'annual',monthly:2692,annual:32300,occurrences:3,occurrencesLast12Months:1,date:'2026-10-15',active:true},
+ {id:'music',merchant:'Fictional Music',category:'Entertainment / Music',account:'Fictional Checking',amount:1700,cadence:'monthly',monthly:1700,annual:20400,occurrences:24,occurrencesLast12Months:12,date:'2026-10-28',active:true},
+ {id:'weekly',merchant:'Fictional Weekly',category:'Entertainment / Reading',account:'Fictional Card',amount:101,cadence:'weekly',monthly:438,annual:5252,occurrences:22,occurrencesLast12Months:22,date:'2026-10-30',active:true},
+ {id:'quarterly',merchant:'Fictional Quarterly',category:'Software / Design',account:'Fictional Checking',amount:3000,cadence:'quarterly',monthly:1000,annual:12000,occurrences:8,occurrencesLast12Months:4,date:'2026-09-01',active:true},
+ {id:'unknown',merchant:'Fictional Hosting',category:'Software / Servers',account:'Fictional Card',amount:500,cadence:'unknown',monthly:0,annual:0,occurrences:1,occurrencesLast12Months:1,date:'2026-10-12',active:true},
+ {id:'old',merchant:'Fictional Former Plan',category:'Entertainment / Media',account:'Fictional Checking',amount:1200,cadence:'monthly',monthly:1200,annual:14400,occurrences:8,occurrencesLast12Months:0,date:'2024-01-30',active:false},
+ {id:'second-music',merchant:'Fictional Music',category:'Work / Music',account:'Fictional Business',amount:2500,cadence:'monthly',monthly:2500,annual:30000,occurrences:14,occurrencesLast12Months:12,date:'2026-10-28',active:true},
+ {id:'long',merchant:'Fictional international service with a deliberately long plan name',category:'Fictional long category group / Long category name',account:'Fictional account with a deliberately long name',amount:10000,cadence:'annual',monthly:833,annual:10000,occurrences:2,occurrencesLast12Months:1,date:'2026-09-30',active:true},
+ {id:'text',merchant:'<Fictional plan> & text',category:'Uncategorized',account:'Fictional Card',amount:999,cadence:'monthly',monthly:999,annual:11988,occurrences:2,occurrencesLast12Months:2,date:'2026-10-01',active:true}
+]};
+const state=createPlanTableState(),parent=document.querySelector('#plans'),dialog=document.querySelector('dialog');
+const format=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value/100);
+function render(){parent.replaceChildren();const heading=document.createElement('h3');heading.textContent='Your plans';parent.append(heading);renderSubscriptionPlans(parent,data,state,{format,digits:2});}
+document.querySelector('#theme').onclick=()=>document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';
+document.querySelector('#refresh').onclick=render;
+document.querySelector('#close').onclick=()=>dialog.close();document.querySelector('#open').onclick=()=>{render();dialog.showModal();};
+render();dialog.showModal();
+</script></html>
