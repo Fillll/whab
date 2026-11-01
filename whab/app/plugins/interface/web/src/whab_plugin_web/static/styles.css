@@ -4559,7 +4559,8 @@ main:has(.budget-planner) > .demo-ribbon,
 /* Subscription review follows the existing workspace typography and surfaces. */
 .subscriptions-nav { width: 100%; border: 0; background: transparent; cursor: pointer; font: inherit; text-align: left; }
 .subscriptions-window { width: min(1160px, calc(100vw - 40px)); max-width: none; max-height: calc(100dvh - 40px); overflow-y: auto; }
-.subscriptions-window .modal-heading { position: sticky; top: -1px; z-index: 2; background: var(--page); padding: 12px 0; }
+.subscription-header { position: sticky; top: -26px; z-index: 3; background: var(--surface); padding-top: 12px; }
+.subscriptions-window .modal-heading { background: var(--surface); padding: 12px 0; margin-bottom: 12px; }
 .subscriptions-window h3 { font-size: 15px; margin: 26px 0 18px; }
 .subscription-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 14px; margin: 18px 0; }
 .subscription-toolbar label { display: grid; gap: 6px; font-size: 12px; }
@@ -4594,3 +4595,14 @@ main:has(.budget-planner) > .demo-ribbon,
 
 .subscriptions-window .llm-profile-form label:has(input[type="checkbox"]) { flex-direction: row; align-items: flex-start; line-height: 1.6; }
 .subscriptions-window .llm-profile-form input[type="checkbox"] { order: -1; flex: 0 0 auto; width: 16px; margin-top: 2px; }
+
+.subscription-progress { padding: 12px 0; border-block: 1px solid var(--line); margin-bottom: 12px; }
+.subscription-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.subscription-progress progress { display: block; width: 100%; height: 12px; accent-color: var(--red, #b8443d); }
+.subscription-progress p { margin: 8px 0 0; font-size: 12px; line-height: 1.5; }
+.subscription-job-badge { margin-left: auto; font-size: 10px; color: var(--text-secondary); }
+@media (max-width: 760px) {
+ .subscription-header { top: -18px; }
+ .subscription-progress-heading { flex-wrap: wrap; }
+ .subscription-progress-heading .button { padding: 7px 10px; }
+}

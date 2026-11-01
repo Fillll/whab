@@ -337,7 +337,15 @@
 
 {% if plugins|selectattr('id','equalto','subscriptions')|list %}
 <dialog id="subscriptions-dialog" class="modal subscriptions-window" aria-labelledby="subscriptions-heading">
+  <div class="subscription-header">
   <div class="modal-heading"><div><p class="eyebrow">RECURRING SPENDING</p><h2 id="subscriptions-heading">Subscriptions</h2></div><button type="button" class="icon-button" aria-label="Close subscriptions" data-close-dialog>{{ icon('close',20) }}</button></div>
+  <section class="subscription-progress" data-subscriptions-progress hidden aria-label="Classification progress">
+    <div class="subscription-progress-heading"><strong data-subscriptions-job-label></strong><button class="button secondary" type="button" data-subscriptions-stop>Stop classification</button></div>
+    <progress max="1" aria-label="Subscription classification progress"></progress>
+    <p role="status" aria-live="polite" data-subscriptions-job-count></p>
+    <p class="settings-notice" data-subscriptions-job-help></p>
+  </section>
+  </div>
   <p class="settings-notice">One view of ongoing plans, memberships and their cost. Estimates use saved labels; check uncertain payments and correct any mistakes.</p>
   <p role="status" aria-live="polite" data-subscriptions-status>Loading subscriptions…</p>
   <p role="alert" class="field-error" data-subscriptions-error hidden></p>

@@ -1,57 +1,59 @@
 """Local, budget-scoped subscription operations using sanitized public ledger reads."""
 
-from dataclasses import replace
-from threading import RLock
+from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.concurrency import run_in_threadpool
 
 from whab.plugins import StoreError
 
 from .engine import Engine
+from .jobs import Jobs
 
 
 class Request(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     workspace: Literal["personal", "demo"]
-    action: Literal["status", "configure", "classify", "override"]
+    action: Literal["status", "configure", "classify", "override", "start", "job", "stop"]
     currency: str = Field(pattern=r"^[A-Z]{3}$")
     month: str = Field(pattern=r"^(19|20|21)\d{2}-(0[1-9]|1[0-2])$|^2200-(0[1-9]|1[0-2])$")
     config: dict = Field(default_factory=dict)
     transactionId: str = Field(default="", max_length=200)
     fingerprint: str = Field(default="", max_length=64)
     decision: dict = Field(default_factory=dict)
+    operationId: str = Field(default="", max_length=36)
+    jobId: str = Field(default="", max_length=36)
 
 
 def router(context):
-    routes, lock = APIRouter(), RLock()
+    jobs = Jobs(context)
+
+    @asynccontextmanager
+    async def lifespan(app):
+        try:
+            yield
+        finally:
+            await run_in_threadpool(jobs.close)
+
+    routes = APIRouter(lifespan=lifespan)
 
     @routes.post("/api/plugin-settings/subscriptions")
     def subscriptions(body: Request):
-        if context.budget is None:
-            raise StoreError("Open subscriptions on the local budget host.")
-        base = context.budget
-        budget = (
-            replace(
-                base,
-                read_file=lambda name: base.read_file("demo/" + name),
-                write_file=lambda name, raw: base.write_file("demo/" + name, raw),
-            )
-            if body.workspace == "demo"
-            else base
-        )
-        with lock:
-            engine = Engine(budget)
+        if body.action == "job":
+            return jobs.status(body.workspace)
+        if body.action == "start":
+            return jobs.start(body.workspace, body.operationId, body.config)
+        if body.action == "stop":
+            return jobs.stop(body.workspace, body.jobId)
+        with jobs.lock:
+            engine = Engine(jobs.budget(body.workspace))
             # Public portable snapshots are coherent and omit provider credentials.
-            snapshot = context.service.query("portable", body.workspace)
+            snapshot, rows = jobs.snapshot(body.workspace)
             data = snapshot["data"]
-            accounts = {r["id"]: r for r in data["accounts"]}
-            rows = [
-                {**r, "currency": accounts[r["accountId"]]["currency"]}
-                for r in data["transactions"]
-                if not r.get("deleted")
-            ]
+            if body.action != "status":
+                jobs.require_idle(body.workspace)
             if body.action == "configure":
                 engine.configure(body.config)
             elif body.action == "override":
@@ -67,8 +69,11 @@ def router(context):
                     )
                 engine.write()
                 return progress
-            return engine.report(
-                rows, data["accounts"], data["categories"], body.month, body.currency
-            )
+            return {
+                **engine.report(
+                    rows, data["accounts"], data["categories"], body.month, body.currency
+                ),
+                "job": jobs.status(body.workspace),
+            }
 
     return routes
