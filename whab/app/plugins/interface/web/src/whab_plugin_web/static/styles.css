@@ -4604,8 +4604,8 @@ main:has(.budget-planner) > .demo-ribbon,
  .subscriptions-nav { padding-inline: 8px; }
 }
 
-.subscriptions-window .llm-profile-form label:has(input[type="checkbox"]) { flex-direction: row; align-items: flex-start; line-height: 1.6; }
-.subscriptions-window .llm-profile-form input[type="checkbox"] { order: -1; flex: 0 0 auto; width: 16px; margin-top: 2px; }
+:is(.subscriptions-window, .subscriptions-workspace) .llm-profile-form label:has(input[type="checkbox"]) { flex-direction: row; align-items: flex-start; line-height: 1.6; }
+:is(.subscriptions-window, .subscriptions-workspace) .llm-profile-form input[type="checkbox"] { order: -1; flex: 0 0 auto; width: 16px; margin-top: 2px; }
 
 .subscription-progress { padding: 12px 0; border-block: 1px solid var(--line); margin-bottom: 12px; }
 .subscription-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
