@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.50.1 — 2026-10-31
+
+PR: [#136](https://github.com/Fillll/whab/pull/136)
+
+- Show safe plugin startup explanations and the recovery link when a saved budget cannot activate, including missing named dependencies. Keep failed budgets isolated, escape browser text and return uncached 409 responses through cookie and canonical routing.
+
 ## 2.50.0 — 2026-10-31
 
 PR: [#135](https://github.com/Fillll/whab/pull/135)
