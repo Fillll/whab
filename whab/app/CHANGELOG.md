@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.51.0 — 2026-11-01
+
+PR: [#139](https://github.com/Fillll/whab/pull/139)
+
+- Add explicitly declared interface-owned workspace pages to canonical routing, scoped fragments and immutable/native visual resources. Preserve default page choices and existing empty-declaration resource generations; reject undeclared pages.
+
 ## 2.50.1 — 2026-10-31
 
 PR: [#136](https://github.com/Fillll/whab/pull/136)

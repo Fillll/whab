@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.42.0 — 2026-11-01
+
+PR: [#139](https://github.com/Fillll/whab/pull/139)
+
+- Integrate Subscriptions into the main workspace with the shared navigation font, active state and a distinct recurring-payment icon. Replace the dialog with a canonical page while retaining plans, filters, manual labels and background-job observation across in-place navigation.
+
 ## 1.41.0 — 2026-11-01
 
 PR: [#138](https://github.com/Fillll/whab/pull/138)
