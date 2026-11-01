@@ -144,7 +144,9 @@ from whab import __version__
 mode = MODE
 if mode.startswith(('child-close:', 'child-timeout:')):
     import subprocess
-    child_program = 'import os,pathlib,signal,sys,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); time.sleep(60)'
+    # Existence is the parent's readiness barrier: publish the complete PID with
+    # rename, rather than exposing the empty file created by write_text first.
+    child_program = 'import os,pathlib,signal,sys,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); marker=pathlib.Path(sys.argv[1]); pending=marker.with_suffix(".pending"); pending.write_text(str(os.getpid())); pending.replace(marker); time.sleep(60)'
     subprocess.Popen([sys.executable, '-I', '-c', child_program, mode.split(':',1)[1]], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 def send(metadata, payload=b''):
     sys.stdout.buffer.write(Frame(metadata, payload).encode())
