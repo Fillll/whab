@@ -3,6 +3,7 @@
 import json
 from copy import deepcopy
 from dataclasses import replace
+from datetime import date
 
 import pytest
 from whab_plugin_ai_credentials import api as ai
@@ -305,3 +306,57 @@ def test_category_groups_disambiguate_identical_child_names(context, row):
                            [{"id": "media", "name": "Software", "group": "Work"},
                             {"id": "personal", "name": "Software", "group": "Personal"}], "2026-10", "USD")
     assert {r["name"] for r in report["byCategory"]} == {"Work / Software", "Personal / Software"}
+
+
+def test_annual_equivalents_use_actual_charge_without_monthly_rounding_drift(context, row):
+    engine = Engine(context)
+    annual = {**row, "id": "annual", "merchant": "Fictional annual plan", "amount": 32300}
+    weekly = {**row, "id": "weekly", "merchant": "Fictional weekly plan", "amount": 101}
+    unknown = {**row, "id": "unknown", "merchant": "Fictional unknown interval"}
+    for item, cadence in [(annual, "annual"), (weekly, "weekly"), (unknown, "unknown")]:
+        engine.put(item, {**YES, "cadence": cadence}, "manual")
+    report = engine.report([annual, weekly, unknown], [{"id": "account", "name": "Account"}], [], "2026-10", "USD")
+    plans = {r["id"]: r for r in report["subscriptions"]}
+    assert (plans["annual"]["monthly"], plans["annual"]["annual"]) == (2692, 32300)
+    assert (plans["weekly"]["monthly"], plans["weekly"]["annual"]) == (438, 5252)
+    assert plans["unknown"]["annual"] == 0
+    assert report["estimatedAnnual"] == 37552
+
+
+@pytest.mark.parametrize("reference,dates,since,historical_total,historical_latest", [
+    ("2026-10-29", ["2024-10-29", "2025-10-29", "2025-10-30", "2026-10-29", "2026-10-30"], "2025-10-30", 3, "2025-10-30"),
+    ("2024-02-29", ["2022-02-28", "2023-02-28", "2023-03-28", "2024-02-29", "2024-03-28"], "2023-03-01", 2, "2023-02-28"),
+])
+def test_plan_charge_counts_have_rolling_calendar_year_boundaries_and_exclude_future(
+    context, row, monkeypatch, reference, dates, since, historical_total, historical_latest
+):
+    class Today(date):
+        @classmethod
+        def today(cls):
+            return cls.fromisoformat(reference)
+
+    monkeypatch.setattr("whab_plugin_subscriptions.engine.date", Today)
+    engine = Engine(context)
+    rows = [{**row, "id": str(i), "date": day} for i, day in enumerate(dates)]
+    for item in rows:
+        engine.put(item, YES, "manual")
+    # Other account/currency and uncertain/excluded payments cannot inflate this plan.
+    extras = [
+        {**rows[-2], "id": "other-account", "accountId": "other"},
+        {**rows[-2], "id": "other-currency", "currency": "EUR"},
+        {**rows[-2], "id": "pending", "pending": True},
+        {**rows[-2], "id": "uncertain"},
+        {**rows[-2], "id": "inflow", "amount": -1200},
+    ]
+    for item in extras:
+        engine.put(item, {**YES, "score": 0.5} if item["id"] == "uncertain" else YES, "manual")
+    accounts = [{"id": "account", "name": "Main"}, {"id": "other", "name": "Other"}]
+    report = engine.report([*rows, *extras], accounts, [], reference[:7], "USD")
+    plan = next(r for r in report["subscriptions"] if r["account"] == "Main")
+    assert plan["occurrences"] == 4
+    assert plan["occurrencesLast12Months"] == 2
+    assert plan["date"] == reference
+    assert report["asOfDate"] == reference and report["chargesSince"] == since
+    historical = engine.report([*rows, *extras], accounts, [], dates[1][:7], "USD")
+    assert historical["subscriptions"][0]["occurrences"] == historical_total
+    assert historical["subscriptions"][0]["date"] == historical_latest

@@ -4558,17 +4558,29 @@ main:has(.budget-planner) > .demo-ribbon,
 
 /* Subscription review follows the existing workspace typography and surfaces. */
 .subscriptions-nav { width: 100%; border: 0; background: transparent; cursor: pointer; font: inherit; text-align: left; }
-.subscriptions-window { width: min(1160px, calc(100vw - 40px)); max-width: none; max-height: calc(100dvh - 40px); overflow-y: auto; }
+.subscriptions-window { width: min(1600px, calc(100vw - 40px)); max-width: none; max-height: calc(100dvh - 40px); overflow-y: auto; }
 .subscription-header { position: sticky; top: -26px; z-index: 3; background: var(--surface); padding-top: 12px; }
 .subscriptions-window .modal-heading { background: var(--surface); padding: 12px 0; margin-bottom: 12px; }
 .subscriptions-window h3 { font-size: 15px; margin: 26px 0 18px; }
 .subscription-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 14px; margin: 18px 0; }
 .subscription-toolbar label { display: grid; gap: 6px; font-size: 12px; }
 .subscription-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 24px 0; border-block: 1px solid var(--line); }
-.subscription-summary small, .subscription-table small, .subscription-plan small { display: block; color: var(--text-secondary); font-size: 11px; margin-top: 6px; }
+.subscription-summary small, .subscription-table small { display: block; color: var(--text-secondary); font-size: 11px; margin-top: 6px; }
 .subscription-summary strong { display: block; font-size: 26px; font-variant-numeric: tabular-nums; margin-top: 10px; }
-.subscription-plan { display: grid; grid-template-columns: 1.2fr 1.4fr 1fr 1fr; align-items: center; gap: 10px; padding: 15px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
-.subscription-plan small { grid-column: 1 / -1; margin: 0; }
+.subscription-plan-filters, .subscription-plan-filter-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+.subscription-plan-filters { margin-bottom: 12px; }
+.subscription-plan-filters label { display: grid; gap: 5px; font-size: 11px; }
+.subscription-plan-filters input, .subscription-plan-filters select { width: 170px; max-width: 100%; }
+.subscription-plans-scroll { max-height: min(55vh, 560px); border: 1px solid var(--line); }
+.subscription-plans-table { min-width: 1240px; }
+.subscription-plans-table th, .subscription-plans-table td { overflow: hidden; text-overflow: ellipsis; }
+.subscription-plans-table .subscription-plan-number { text-align: right; font-variant-numeric: tabular-nums; }
+.subscription-plan-sort, .subscription-plan-filter { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.subscription-plan-sort { max-width: calc(100% - 18px); white-space: normal; text-align: inherit; vertical-align: middle; line-height: 1.1; }
+.subscription-plan-filter { margin-left: 6px; padding: 3px; }
+.subscription-plan-sort:hover, .subscription-plan-sort:focus-visible { text-decoration: underline; }
+.subscription-plan-filter:hover, .subscription-plan-filter:focus-visible, .subscription-plan-filter.is-active { color: var(--focus); background: var(--accent); }
+.subscription-plan-inactive { color: var(--text-secondary); }
 .subscription-breakdowns { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
 .subscription-bar-row { margin: 14px 0; }
 .subscription-bar-row > div { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
@@ -4587,7 +4599,6 @@ main:has(.budget-planner) > .demo-ribbon,
  .subscription-summary { grid-template-columns: 1fr 1fr; }
  .subscription-summary strong { font-size: 21px; }
  .subscription-breakdowns { grid-template-columns: 1fr; gap: 0; }
- .subscription-plan { grid-template-columns: 1fr 1fr; }
  .subscription-month { grid-template-columns: 65px 1fr 85px; }
  .subscription-month small { grid-column: 2 / -1; }
  .subscriptions-nav { padding-inline: 8px; }

@@ -5,7 +5,7 @@ import hashlib
 import json
 import math
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 from whab_plugin_ai_credentials import api as ai
 
@@ -271,6 +271,8 @@ class Engine:
                 month + f"-{calendar.monthrange(int(month[:4]), int(month[5:]))[1]}"
             ),
         )
+        previous_year = reference.year - 1
+        cutoff = date(previous_year, reference.month, min(reference.day, calendar.monthrange(previous_year, reference.month)[1]))
         for row in sorted(rows, key=lambda r: (r["date"], r["id"]), reverse=True):
             if row["currency"] != currency:
                 continue
@@ -305,6 +307,7 @@ class Engine:
                 series[(pattern({**row, "amount": 0}), decision["cadence"])].append(visible[-1])
                 monthly[row["date"][:7]] += row["amount"]
         subscriptions, by_category, by_merchant = [], defaultdict(int), defaultdict(int)
+        annual_total = 0
         for (_, cadence), charges in series.items():
             latest = charges[0]
             gap = (reference - date.fromisoformat(latest["date"])).days
@@ -326,18 +329,22 @@ class Engine:
             amount = sum(r["amount"] for r in latest_charges)
             estimates = [(r, (r["amount"] * numerator + denominator // 2) // denominator) for r in latest_charges]
             estimate = sum(value for _, value in estimates)
+            annual = sum((r["amount"] * numerator * 12 + denominator // 2) // denominator for r in latest_charges)
             subscriptions.append(
                 {
                     **latest,
                     "amount": amount,
                     "cadence": cadence,
                     "monthly": estimate,
+                    "annual": annual,
                     "active": active,
                     "occurrences": len(charges),
+                    "occurrencesLast12Months": sum(r["date"] > cutoff.isoformat() for r in charges),
                     "charges": charges,
                 }
             )
             if active:
+                annual_total += annual
                 for charge, value in estimates:
                     by_category[charge["category"]] += value
                 by_merchant[latest["merchant"]] += estimate
@@ -365,6 +372,9 @@ class Engine:
             "byMerchant": ranked(by_merchant),
             "months": months,
             "estimatedMonthly": sum(by_category.values()),
+            "estimatedAnnual": annual_total,
+            "asOfDate": reference.isoformat(),
+            "chargesSince": (cutoff + timedelta(days=1)).isoformat(),
             "actualMonth": monthly.get(month, 0),
             "unclassified": sum(r["status"] == "unclassified" for r in visible),
             "needsReview": sum(r["status"] == "needs-review" for r in visible),
