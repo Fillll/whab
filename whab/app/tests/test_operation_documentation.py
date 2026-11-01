@@ -13,8 +13,18 @@ from whab.app import create_app
 from whab.config import Settings
 from whab.plugins import FeatureOperations, PluginRegistry, StoreError
 from whab.plugins import documentation as docs
-from whab.plugins.operation_schema import validate_document
+from whab.plugins.operation_schema import validate_document, validate_value
 from whab.services.ledger import LedgerService
+
+
+def test_schema_reference_validation_never_attempts_network_lookup(monkeypatch):
+    def no_lookup(*args, **kwargs):
+        pytest.fail("Operation schemas must validate without network access.")
+
+    monkeypatch.setattr("urllib.request.urlopen", no_lookup)
+    validate_value({"$defs": {"count": {"type": "integer"}}, "$ref": "#/$defs/count"}, 1)
+    with pytest.raises(ValueError):
+        validate_value({"$ref": "#/extension", "extension": {"$ref": "https://example.invalid/no-network"}}, {})
 
 
 def test_all_installed_plugins_have_complete_nonexecuting_documents(monkeypatch):

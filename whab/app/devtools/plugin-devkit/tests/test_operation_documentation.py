@@ -91,6 +91,20 @@ def test_schema_walk_checks_subschemas_and_leaves_literal_values_alone():
         schema.validate_document(value)
 
 
+def test_local_references_work_and_hidden_remote_references_never_fetch(monkeypatch):
+    def no_lookup(*args, **kwargs):
+        pytest.fail("Documentation validation must not attempt network access.")
+
+    monkeypatch.setattr("urllib.request.urlopen", no_lookup)
+    schema.validate_value({"$defs": {"count": {"type": "integer"}}, "$ref": "#/$defs/count"}, 1)
+    with pytest.raises(ValueError):
+        schema.validate_value({"$ref": "#/extension", "extension": {"$ref": "https://example.invalid/no-network"}}, {})
+    value = document()
+    value["operations"][0]["input"]["definitions"] = {"hidden": {"$ref": "https://example.invalid/no-network"}}
+    with pytest.raises(ValueError):
+        schema.validate_document(value)
+
+
 @pytest.mark.parametrize(
     "case",
     [

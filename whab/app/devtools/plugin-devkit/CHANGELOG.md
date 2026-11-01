@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1 — 2026-11-01
+
+PR: [#143](https://github.com/Fillll/whab/pull/143)
+
+- Disable schema retrieval during operation documentation conformance while retaining valid local references.
+
 ## 0.11.0 — 2026-11-01
 
 PR: [#142](https://github.com/Fillll/whab/pull/142)

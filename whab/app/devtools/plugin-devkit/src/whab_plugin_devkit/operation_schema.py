@@ -7,6 +7,7 @@ toolkit for its genuine older-host conformance environments by check_operations.
 import json
 
 from jsonschema import Draft202012Validator, SchemaError, ValidationError
+from referencing import Registry
 from referencing.exceptions import Unresolvable
 
 KINDS = ("query", "command", "feature-query", "feature-command", "local", "sdk")
@@ -24,7 +25,7 @@ def _schemas(value):
         for key, item in value.items():
             if key in {"$ref", "$dynamicRef"} and (type(item) is not str or not item.startswith("#")):
                 raise ValueError("Operation schemas must use local references only.")
-            if key in {"properties", "patternProperties", "$defs", "dependentSchemas"}:
+            if key in {"properties", "patternProperties", "$defs", "definitions", "dependentSchemas"}:
                 for child in item.values():
                     _schemas(child)
             elif key in {"allOf", "anyOf", "oneOf", "prefixItems"}:
@@ -38,7 +39,8 @@ def validate_value(schema, value):
     """Validate finite JSON without resolving network schemas or showing values."""
     try:
         json.dumps(value, allow_nan=False)
-        Draft202012Validator(schema).validate(value)
+        # Reject retrieval even for references reached through extension schemas.
+        Draft202012Validator(schema, registry=Registry()).validate(value)
     except (ValueError, TypeError, ValidationError, Unresolvable):
         raise ValueError("Operation data does not match its documented schema.") from None
 
