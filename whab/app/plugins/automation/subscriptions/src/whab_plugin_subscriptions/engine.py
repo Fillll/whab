@@ -262,7 +262,7 @@ class Engine:
         }
 
     def report(self, rows, accounts, categories, month, currency):
-        names = {r["id"]: r["name"] for r in categories}
+        names = {r["id"]: f"{r['group']} / {r['name']}" if r.get("group") else r["name"] for r in categories}
         account_names = {r["id"]: r["name"] for r in accounts}
         visible, series, monthly = [], defaultdict(list), defaultdict(int)
         reference = min(

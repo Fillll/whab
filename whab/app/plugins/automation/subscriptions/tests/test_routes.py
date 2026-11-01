@@ -227,3 +227,27 @@ def test_missing_local_budget_fails_safely():
     app.include_router(router(InterfaceContext(SimpleNamespace(), {}, "sandbox", "fictional")))
     with TestClient(app, base_url="https://127.0.0.1", raise_server_exceptions=False) as client:
         assert request(client, "status").status_code == 500
+
+
+def test_portable_labels_and_shared_references_survive_reopen_and_keep_other_budgets_separate(tmp_path, store, row):
+    from whab_plugin_subscriptions.engine import Engine
+
+    from whab.budgets.container import decode_container
+    from whab.budgets.session import BudgetSession
+
+    path = tmp_path / "fictional.whab"
+    session = BudgetSession.create(tmp_path / "first", "sandbox", "Fictional", ("ai-credentials", "subscriptions"), path=path)
+    session.bind(store)
+    engine = Engine(session.context("subscriptions"))
+    engine.put(row, {"isSubscription": True, "cadence": "monthly", "score": 1}, "manual")
+    engine.write()
+    session.context("ai-credentials").write_file("connections.json", b'{"openai":"00000000-0000-0000-0000-000000000000"}')
+    exported = decode_container(session.bundle())
+    assert "plugins/subscriptions/subscriptions.json" in exported.files
+    assert "plugins/ai-credentials/connections.json" in exported.files
+    reopened = BudgetSession.open(tmp_path / "reopened", "sandbox", path)
+    assert Engine(reopened.context("subscriptions")).label(row)["source"] == "manual"
+    assert reopened.context("ai-credentials").read_file("connections.json") == exported.files["plugins/ai-credentials/connections.json"]
+    other = BudgetSession.create(tmp_path / "second", "sandbox", "Other", ("ai-credentials", "subscriptions"))
+    assert Engine(other.context("subscriptions")).label(row) is None
+    assert other.context("ai-credentials").read_file("connections.json") is None

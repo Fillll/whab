@@ -293,3 +293,15 @@ def test_same_day_plans_preserve_category_breakdown_and_count_all_charges(contex
     assert report["estimatedMonthly"] == 1800
     assert report["subscriptions"][0]["amount"] == 1800
     assert report["byCategory"] == [{"name": "Media", "amount": 1200}, {"name": "Work", "amount": 600}]
+
+
+def test_category_groups_disambiguate_identical_child_names(context, row):
+    engine = Engine(context)
+    first = {**row, "merchant": "Work plan"}
+    second = {**row, "id": "other", "merchant": "Personal plan", "categoryId": "personal"}
+    for item in (first, second):
+        engine.put(item, YES, "manual")
+    report = engine.report([first, second], [{"id": "account", "name": "Account"}],
+                           [{"id": "media", "name": "Software", "group": "Work"},
+                            {"id": "personal", "name": "Software", "group": "Personal"}], "2026-10", "USD")
+    assert {r["name"] for r in report["byCategory"]} == {"Work / Software", "Personal / Software"}
