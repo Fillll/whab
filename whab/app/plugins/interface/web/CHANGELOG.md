@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.40.0 — 2026-10-31
+
+PR: [#137](https://github.com/Fillll/whab/pull/137)
+
+- Show a sticky subscription-classification progress bar with checked/total and reused counts, an explicit Stop control and a Running navigation badge. Closing the view or browser tab leaves classification running while WHAB stays open; reopening reconnects to saved progress.
+
 ## 1.39.0 — 2026-10-31
 
 PR: [#135](https://github.com/Fillll/whab/pull/135)
