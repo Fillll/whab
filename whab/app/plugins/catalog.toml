@@ -3,7 +3,7 @@
 [publisher]
 maintainer = "Fillll"
 repository = "https://github.com/Fillll/whab"
-documentation_ref = "f9751d6c9bb39c89a885d11fa5ef12d24fbfdca9"
+documentation_ref = "bd5883f3c54b777e4ff380a0387e5d1fe07addbb"
 security = "https://github.com/Fillll/whab/security/advisories/new"
 security_policy = "https://github.com/Fillll/whab/blob/d9a0c4dc300097c4cfb8f022b3534c1c63ad334c/SECURITY.md"
 security_verified_date = "2026-10-23"
@@ -496,4 +496,4 @@ whab_plugin_sqlite = "1.12.0"
 whab_plugin_json = "1.3.0"
 
 [marketplace]
-source_ref = "f9751d6c9bb39c89a885d11fa5ef12d24fbfdca9"
+source_ref = "bd5883f3c54b777e4ff380a0387e5d1fe07addbb"
