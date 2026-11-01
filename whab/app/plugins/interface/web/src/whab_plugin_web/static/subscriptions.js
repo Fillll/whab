@@ -1,6 +1,7 @@
 /* Independent subscription workspace; labels never change budget categories. */
 import {api, getContext} from './client.js';
 import {credentials, element as el, field, option} from './ai-credentials-settings.js';
+import {classificationRunning, createSubscriptionJobs, renderSubscriptionProgress} from './subscription-jobs.js';
 
 export function money(value, currency) {
   const digits = new Intl.NumberFormat('en', {style: 'currency', currency}).resolvedOptions().maximumFractionDigits;
@@ -13,33 +14,58 @@ export function initSubscriptions() {
   const content = dialog.querySelector('[data-subscriptions-content]');
   const status = dialog.querySelector('[data-subscriptions-status]');
   const error = dialog.querySelector('[data-subscriptions-error]');
-  let busy = false, stop = false, filter = 'subscriptions', limit = 100, last;
+  const progress = dialog.querySelector('[data-subscriptions-progress]');
+  const stopButton = dialog.querySelector('[data-subscriptions-stop]');
+  const badge = document.querySelector('[data-subscriptions-job-badge]');
+  let busy = false, filter = 'subscriptions', searchQuery = '', limit = 100, last, job = null, viewGeneration = 0, jobSupported = true, refreshOnIdle = false;
   const call = (action, values = {}) => {
     const context = getContext();
     return api('/plugin-settings/subscriptions', {workspace: context.workspace, currency: context.currency, month: context.month, action, ...values});
   };
+  const scope = () => `${getContext().apiPrefix}|${getContext().workspace}`;
+  const jobs = createSubscriptionJobs({call, scope,
+    onChange(value) {
+      job = value; renderSubscriptionProgress(progress, job); lock(busy);
+      if (error.dataset.subscriptionProgressError) {error.hidden = true; delete error.dataset.subscriptionProgressError;}
+      if (badge) badge.hidden = !classificationRunning(job);
+    },
+    onComplete() {if (dialog.open) void perform(refresh);},
+    onError(failure) {if (dialog.open) {error.dataset.subscriptionProgressError = 'true'; error.textContent = `Progress could not be refreshed. Classification may still be running. ${failure.message}`; error.hidden = false;}}
+  });
+  stopButton.addEventListener('click', () => {void perform(() => jobs.stop());});
   const format = value => money(value, getContext().currency);
   async function perform(work) {
     if (busy) return;
     busy = true; error.hidden = true; lock(true);
     try { await work(); }
     catch (failure) { error.textContent = failure.message; error.hidden = false; status.textContent = 'Your saved labels are preserved. You can retry.'; }
-    finally { busy = false; lock(false); }
+    finally { busy = false; lock(false); if (refreshOnIdle && dialog.open) {refreshOnIdle = false; void perform(refresh);} }
   }
-  function lock(value) { for (const node of content.querySelectorAll('button,input,select')) node.disabled = value; }
+  function lock(value) {
+    for (const node of content.querySelectorAll('button,input,select')) node.disabled = value ||
+      classificationRunning(job) && Boolean(node.closest('[data-subscriptions-mutation]')) ||
+      !jobSupported && Boolean(node.closest('[data-subscriptions-start]'));
+    stopButton.hidden = !classificationRunning(job);
+    stopButton.disabled = value || job?.status === 'stopping';
+  }
   function button(label, handler, cls = 'button secondary') {
     const node = el('button', label, cls); node.type = 'button';
     node.addEventListener('click', () => perform(handler)); return node;
   }
-  async function refresh() { last = await call('status'); if (dialog.open) { render(last); if (status.textContent === 'Loading subscriptions…') status.textContent = ''; } }
-  async function classify() {
-    stop = false; let total = 0, reused = 0, progress;
-    do {
-      status.textContent = `Checking subscriptions… ${total} classified, ${reused} reused. Close to stop after this batch.`;
-      progress = await call('classify'); total += progress.classified; reused += progress.reused;
-    } while (progress.remaining && !stop && dialog.open);
-    status.textContent = `${total} transactions classified; ${reused} reused saved decisions.${stop ? ' Stopped after the completed batch.' : ''}`;
-    await refresh();
+  async function refresh() {
+    const token = viewGeneration, owner = scope();
+    const data = await call('status');
+    if (!dialog.open || token !== viewGeneration || owner !== scope()) return;
+    refreshOnIdle = false; last = data; jobSupported = Boolean(data.job);
+    if (data.job) jobs.accept(data.job);
+    else {error.textContent = 'Update the Subscriptions plugin to 1.1.0 or newer for background classification.'; error.hidden = false;}
+    const scroll = dialog.scrollTop; render(last); dialog.scrollTop = scroll;
+    if (status.textContent === 'Loading subscriptions…') status.textContent = '';
+  }
+  async function classify(config) {
+    dialog.scrollTop = 0;
+    await jobs.start(config);
+    if (dialog.open) await refresh();
   }
   function breakdown(parent, title, values) {
     const section = el('section', '', 'subscription-breakdown'); section.append(el('h3', title));
@@ -59,7 +85,7 @@ export function initSubscriptions() {
     for (const [value, label] of [['subscriptions', 'Subscription charges'], ['needs-review', `Needs review (${data.needsReview})`], ['unclassified', `Not checked (${data.unclassified})`], ['all', 'All transactions']]) option(select, value, label);
     select.value = filter;
     select.addEventListener('change', () => { filter = select.value; limit = 100; render(data); });
-    const search = field(toolbar, 'Merchant or category', 'search', 'search');
+    const search = field(toolbar, 'Merchant or category', 'search', 'search'); search.value = searchQuery;
     const results = el('div'); parent.append(results);
     function populate() {
       results.replaceChildren();
@@ -72,7 +98,7 @@ export function initSubscriptions() {
         const tr = el('tr'); const merchant = el('td'); merchant.append(el('strong', row.merchant), el('small', row.date));
         const category = el('td'); category.append(el('span', row.category), el('small', row.account));
         const label = el('td', row.status.replaceAll('-', ' ')); label.append(el('small', `${row.cadence} · ${row.source || 'unchecked'}`));
-        const actions = el('td');
+        const actions = el('td'); actions.dataset.subscriptionsMutation = '';
         if (row.status !== 'excluded') {
           const choice = field(actions, 'Subscription label', `label-${row.id}`, 'select');
           option(choice, '', 'Choose…'); option(choice, 'no', 'Not a subscription');
@@ -90,13 +116,14 @@ export function initSubscriptions() {
       const wrapper = el('div', '', 'subscription-table-scroll'); wrapper.append(table); results.append(wrapper);
       if (!rows.length) results.append(el('p', 'No payments match this view.', 'settings-notice'));
       if (rows.length > limit) results.append(button(`Show more (${rows.length - limit} remaining)`, async () => {limit += 100; populate();}));
+      lock(busy);
     }
-    search.addEventListener('input', populate); populate();
+    search.addEventListener('input', () => {searchQuery = search.value; populate();}); populate();
   }
   async function settings(data, parent) {
     const connection = await credentials('status');
     if (!dialog.open || last !== data) return;
-    const form = el('form', '', 'llm-profile-form');
+    const form = el('form', '', 'llm-profile-form'); form.dataset.subscriptionsMutation = ''; form.dataset.subscriptionsStart = '';
     const provider = field(form, 'Provider', 'provider', 'select');
     for (const row of connection.providers) option(provider, row.id, `${row.name}${row.connected ? ' · Connected' : ' · Connect in AI credentials'}`);
     provider.value = data.config.provider;
@@ -112,14 +139,14 @@ export function initSubscriptions() {
     form.addEventListener('submit', event => {event.preventDefault(); void perform(async () => {
       const chosen = connection.providers.find(row => row.id === provider.value);
       if (!chosen.connected) throw new Error('Connect this provider in Settings → AI credentials first.');
-      await call('configure', {config: {provider: provider.value, connectionId: chosen.connectionId, model: model.value.trim(), effort: effort.value, consent: consent.checked}});
-      await classify();
+      await classify({provider: provider.value, connectionId: chosen.connectionId, model: model.value.trim(), effort: effort.value, consent: consent.checked});
     });}); parent.append(form); lock(busy);
   }
   function render(data) {
     content.replaceChildren();
     const actions = el('div', '', 'subscription-toolbar');
-    actions.append(button('Refresh', refresh), button('Classify unchecked transactions', classify, 'button primary'));
+    const start = button(['stopped','failed','interrupted'].includes(job?.status) ? 'Resume unchecked transactions' : 'Classify unchecked transactions', () => classify(), 'button primary'); start.dataset.subscriptionsMutation = ''; start.dataset.subscriptionsStart = '';
+    actions.append(button('Refresh', refresh), start);
     content.append(actions);
     const summary = el('div', '', 'subscription-summary');
     const active = data.subscriptions.filter(row => row.active);
@@ -152,8 +179,11 @@ export function initSubscriptions() {
     const review = el('section'); review.append(el('h3', 'Review payments'), el('p', 'Saving a label also corrects matching payments: same merchant, amount, billing day and account. Pending payments, transfers and inflows are excluded.', 'settings-notice'));
     content.append(review); reviewRows(data, review); lock(busy);
   }
-  dialog.addEventListener('close', () => {stop = true;});
+  dialog.addEventListener('close', () => {++viewGeneration; refreshOnIdle = false;});
+  window.addEventListener('pagehide', () => jobs.dispose(), {once:true});
+  document.addEventListener('whab:page-ready', () => {if (!busy) void jobs.refresh();});
+  void jobs.refresh();
   // Native dialog.open changes do not emit an open event.
-  const observer = new MutationObserver(() => {if (dialog.open && !busy) { status.textContent = 'Loading subscriptions…'; dialog.scrollTop = 0; void perform(async () => { await refresh(); dialog.scrollTop = 0; }); }});
+  const observer = new MutationObserver(() => {if (!dialog.open) return; if (busy) {refreshOnIdle = true; return;} status.textContent = 'Loading subscriptions…'; dialog.scrollTop = 0; void perform(async () => { await refresh(); dialog.scrollTop = 0; });});
   observer.observe(dialog, {attributes: true, attributeFilter: ['open']});
 }

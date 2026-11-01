@@ -229,25 +229,126 @@ def test_missing_local_budget_fails_safely():
         assert request(client, "status").status_code == 500
 
 
-def test_portable_labels_and_shared_references_survive_reopen_and_keep_other_budgets_separate(tmp_path, store, row):
+def test_portable_labels_and_shared_references_survive_reopen_and_keep_other_budgets_separate(
+    tmp_path, store, row
+):
     from whab_plugin_subscriptions.engine import Engine
 
     from whab.budgets.container import decode_container
     from whab.budgets.session import BudgetSession
 
     path = tmp_path / "fictional.whab"
-    session = BudgetSession.create(tmp_path / "first", "sandbox", "Fictional", ("ai-credentials", "subscriptions"), path=path)
+    session = BudgetSession.create(
+        tmp_path / "first", "sandbox", "Fictional", ("ai-credentials", "subscriptions"), path=path
+    )
     session.bind(store)
     engine = Engine(session.context("subscriptions"))
     engine.put(row, {"isSubscription": True, "cadence": "monthly", "score": 1}, "manual")
     engine.write()
-    session.context("ai-credentials").write_file("connections.json", b'{"openai":"00000000-0000-0000-0000-000000000000"}')
+    session.context("ai-credentials").write_file(
+        "connections.json", b'{"openai":"00000000-0000-0000-0000-000000000000"}'
+    )
     exported = decode_container(session.bundle())
     assert "plugins/subscriptions/subscriptions.json" in exported.files
     assert "plugins/ai-credentials/connections.json" in exported.files
     reopened = BudgetSession.open(tmp_path / "reopened", "sandbox", path)
     assert Engine(reopened.context("subscriptions")).label(row)["source"] == "manual"
-    assert reopened.context("ai-credentials").read_file("connections.json") == exported.files["plugins/ai-credentials/connections.json"]
-    other = BudgetSession.create(tmp_path / "second", "sandbox", "Other", ("ai-credentials", "subscriptions"))
+    assert (
+        reopened.context("ai-credentials").read_file("connections.json")
+        == exported.files["plugins/ai-credentials/connections.json"]
+    )
+    other = BudgetSession.create(
+        tmp_path / "second", "sandbox", "Other", ("ai-credentials", "subscriptions")
+    )
     assert Engine(other.context("subscriptions")).label(row) is None
     assert other.context("ai-credentials").read_file("connections.json") is None
+
+
+def test_background_start_poll_stop_and_resume_are_request_independent(client, store, monkeypatch):
+    from threading import Event
+    from time import monotonic
+    from uuid import uuid4
+
+    account = store.add_account(
+        "personal", {"name": "Fictional", "type": "depository", "balance": 0}
+    )
+    for index in range(22):
+        store.add_transaction(
+            "personal",
+            {
+                "accountId": account,
+                "date": "2026-10-15",
+                "merchant": f"Fictional plan {index}",
+                "amount": 100,
+                "categoryId": None,
+            },
+        )
+    client.post(
+        CREDENTIALS, json={"workspace": "personal", "action": "save-key", "api_key": "fictional"}
+    )
+    providers = client.post(CREDENTIALS, json={"workspace": "personal", "action": "status"}).json()[
+        "providers"
+    ]
+    reference = next(r["connectionId"] for r in providers if r["id"] == "openai")
+    config = {
+        "provider": "openai",
+        "connectionId": reference,
+        "model": "fictional",
+        "effort": "default",
+        "consent": True,
+    }
+    entered, release = Event(), Event()
+    calls = []
+
+    def response(vault, provider, model, payload, *args, **kwargs):
+        calls.append(len(payload["transactions"]))
+        entered.set()
+        assert release.wait(5)
+        return json.dumps(
+            {
+                "classifications": [
+                    {
+                        "transactionId": r["transactionId"],
+                        "isSubscription": True,
+                        "cadence": "monthly",
+                        "score": 0.95,
+                    }
+                    for r in payload["transactions"]
+                ]
+            }
+        )
+
+    monkeypatch.setattr(ai, "complete", response)
+    operation = str(uuid4())
+    try:
+        assert (
+            request(client, "start", operationId=operation, config=config).json()["id"] == operation
+        )
+        assert entered.wait(3)
+        assert request(client, "job").json()["total"] == 22
+        assert request(client, "status").json()["job"]["status"] == "running"
+        assert request(client, "start", operationId=str(uuid4())).json()["id"] == operation
+        for action in ("configure", "classify", "override"):
+            denied = request(client, action)
+            assert (
+                denied.status_code == 400 and "running in the background" in denied.json()["error"]
+            )
+        assert request(client, "stop", jobId=str(uuid4())).status_code == 400
+        assert request(client, "stop", jobId=operation).json()["status"] == "stopping"
+        release.set()
+
+        def done():
+            deadline = monotonic() + 5
+            while True:
+                value = request(client, "job").json()
+                if value["status"] not in {"preparing", "running", "stopping"}:
+                    return value
+                assert monotonic() < deadline
+
+        assert done()["status"] == "stopped"
+        assert request(client, "start", operationId=str(uuid4())).status_code == 200
+        result = done()
+        assert result["status"] == "completed" and result["total"] == 2
+        assert calls == [20, 2]
+    finally:
+        release.set()
