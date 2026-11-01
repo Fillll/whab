@@ -151,10 +151,11 @@ export function initSubscriptions() {
     const actions = el('div', '', 'subscription-toolbar');
     const modeField = el('div'); modeField.dataset.subscriptionsMutation = ''; actions.append(modeField);
     const mode = field(modeField, 'Classification', 'classification-mode', 'select');
-    option(mode, 'manual', 'Manual (no model)');
-    if (data.aiAvailable) option(mode, 'ai', 'AI assisted');
-    mode.value = data.classificationMode || 'manual';
-    mode.addEventListener('change', () => perform(async () => {await call('set-mode', {mode: mode.value}); await refresh();}));
+    const supportsManual = typeof data.classificationMode === 'string';
+    if (supportsManual) option(mode, 'manual', 'Manual (no model)');
+    if (data.aiAvailable || !supportsManual) option(mode, 'ai', 'AI assisted');
+    mode.value = supportsManual ? data.classificationMode : 'ai';
+    if (supportsManual) mode.addEventListener('change', () => perform(async () => {await call('set-mode', {mode: mode.value}); await refresh();}));
     if (filter === null) filter = mode.value === 'manual' ? 'all' : 'subscriptions';
     const start = button(['stopped','failed','interrupted'].includes(job?.status) ? 'Resume unchecked transactions' : 'Classify unchecked transactions', () => classify(), 'button primary'); start.dataset.subscriptionsMutation = ''; start.dataset.subscriptionsStart = '';
     actions.append(button('Refresh', refresh));

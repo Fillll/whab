@@ -1,6 +1,6 @@
 # AI credentials
 
-Shared provider connections for [AI transaction categorization](../llm-categorization/README.md) and [Subscriptions](../subscriptions/README.md). Installed with the supported plugin set, disabled by default. Enable it with either consumer in Settings → Plugins → Installed, then restart when requested.
+Shared provider connections for [AI transaction categorization](../llm-categorization/README.md) and [AI subscription classification](../subscriptions-ai/README.md). Installed with the supported plugin set, disabled by default. Enable it with either consumer in Settings → Plugins → Installed, then restart when requested. Manual [Subscriptions](../subscriptions/README.md) and ordinary transaction category edits need no AI credentials.
 
 Open **AI credentials → Settings** to connect OpenAI subscription (Continue with ChatGPT), OpenAI API key, Anthropic API key, or OpenRouter API key. A provider connection is shared by the enabled AI features in this budget. Each consumer chooses its own model, effort and data permission. No inference occurs when connecting. Disconnecting a shared provider affects every consumer using that connection.
 
