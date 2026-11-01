@@ -13,8 +13,31 @@ These are the durable choices behind the current implementation. Change their do
 | The budget host is the authority for remote operations | Clients use public commands and queries with revisions and bounded retry receipts; bank credentials and categorization execution remain at the authority. See the [remote contract](plugins.md#remote-interface-and-client). |
 | Render pages in Python and keep browser JavaScript small | The selected UI owns presentation and interaction while core owns financial decisions. No Node build or React runtime is required; Node is used for browser-module tests. See [web acceptance checks](../app/plugins/interface/web/README.md#ui-acceptance-criteria). |
 | Require HTTPS and explicit certificate trust | Transport encryption applies to every route; local access, bearer authorization and webhook signatures retain their separate checks. See [the web boundary](#web-boundary) and [local HTTPS](usage.md#local-https). |
+| Keep AI optional and expose tools for external agents | People and external agents must be able to perform supported budgeting work without a WHAB-managed model or AI account. Built-in inference is an optional assistant to explicit, validated operations. See [optional AI and external agents](#optional-ai-and-external-agents). |
 
 The [categorization plan](automatic-categorization-plan.md) is a historical delivery record. Current behavior belongs in the owning plugin README and public SDK guide; proposed experiments there are not additional runtime requirements.
+
+## Optional AI and external agents
+
+Accepted on November 1, 2026. WHAB is intended to work almost fully without AI and to serve as a budgeting tool for a larger external AI agent. That agent brings its own reasoning and provider access. It should not need a second model, AI account or credential connection inside WHAB to inspect financial data or apply a decision it has already made.
+
+For each feature that can operate on explicit user or agent decisions, provide a path that uses no model and no AI credentials. Local machine learning is optional too: avoiding a cloud provider must not require training a Random Forest. Keep built-in AI available as an opt-in convenience for people who want it.
+
+- **Subscriptions:** manual subscription/non-subscription labels and billing intervals must be sufficient for saved plans and cost reports. A person or external agent can supply those decisions without selecting a model, granting inference consent or enabling AI credentials. AI classification is optional; the absence or disabling of its provider must not block manual labels or reports.
+- **Transaction categories:** people and agents assign existing budget categories through the ordinary validated transaction-edit operations. Neither LLM categorization nor Random Forest is required. Suggestion generation and acceptance remain separate from explicit category assignment and transaction review.
+- **Agent access:** expose relevant reads and explicit mutations through documented, machine-usable interfaces. CLI tools and API adapters should call the same public services and plugin contracts as other interfaces. An agent must not need browser automation, direct database edits or changes to private plugin files to perform a supported operation. Credentials for ordinary access and authorization remain separate from AI-provider credentials.
+- **Dependencies and data:** a feature's deterministic operations must not require an AI package, active provider or network inference. Put provider-specific behavior behind an optional, explicitly selected integration with declared public dependencies. Do not work around plugin dependency validation with undeclared imports. Disabling inference preserves saved user decisions and reports; paid requests require an explicit AI action or an explicitly enabled automation policy.
+- **Correctness and ownership:** external agent decisions use the same budget/workspace targeting, currency checks, stale-data checks, authorization and retry guarantees as equivalent user actions. Model output is input to validation, never a substitute for financial rules. Core owns financial invariants, the host/SDK owns shared access contracts, and concrete plugins own replaceable inference and feature-specific labels/reports.
+
+This is an architectural direction, not a claim that every agent interface is already implemented. At acceptance:
+
+| Area | Current implementation and remaining work |
+| --- | --- |
+| Transaction categories | Manual assignment works with both categorizers disabled. The public ledger `edit_transaction` command accepts `categoryId`; the [remote interface](plugins.md#remote-interface-and-client) exposes validated ledger operations. The launch CLI does not yet provide transaction-edit subcommands. |
+| Subscriptions | [Subscriptions](../app/plugins/automation/subscriptions/README.md) already supports manual labels and reports through its local settings transport, but its package, manifest and capability requirements still mandate AI credentials. Remove that coupling, make the no-model choice clear, and document the agent-facing label operations before claiming this decision is fully implemented. Subscription labels are not currently operations in the remote ledger protocol. |
+| Built-in AI | [AI credentials](../app/plugins/automation/ai-credentials/README.md), [LLM categorization](../app/plugins/automation/llm-categorization/README.md) and [Random Forest](../app/plugins/automation/random-forest-categorization/README.md) remain optional integrations. Existing saved selections and model/label data must survive changes to their dependency structure. |
+
+New features and material changes to existing features should be reviewed against this decision. Where a useful no-model operation is still missing, record that limitation in the owning contract rather than presenting AI as a necessary part of budgeting.
 
 ## Choosing the owner of a change
 
