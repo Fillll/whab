@@ -82,7 +82,7 @@ def fragment(client, path, **headers):
     return response, markup
 
 
-@pytest.mark.parametrize("page", ["budget", "transactions", "insights", "accounts"])
+@pytest.mark.parametrize("page", ["budget", "transactions", "insights", "accounts", "subscriptions"])
 @pytest.mark.parametrize("key,workspace", [("demo", "demo"), ("home", "personal")])
 def test_every_view_fragment_matches_full_page_context_and_runtime_assets(client, page, key, workspace, monkeypatch):
     monkeypatch.setattr("whab.web.routes.pages.current_month", lambda: "2026-10")

@@ -10,8 +10,10 @@ export function money(value, currency) {
 }
 
 export function initSubscriptions() {
-  const dialog = document.getElementById('subscriptions-dialog');
+  const dialog = document.getElementById('subscriptions-workspace');
   if (!dialog) return;
+  const cache = document.getElementById('subscriptions-workspace-cache');
+  const active = () => getContext().page === 'subscriptions' && dialog.parentElement?.hasAttribute('data-subscriptions-mount');
   const content = dialog.querySelector('[data-subscriptions-content]');
   const status = dialog.querySelector('[data-subscriptions-status]');
   const error = dialog.querySelector('[data-subscriptions-error]');
@@ -31,8 +33,8 @@ export function initSubscriptions() {
       if (error.dataset.subscriptionProgressError) {error.hidden = true; delete error.dataset.subscriptionProgressError;}
       if (badge) badge.hidden = !classificationRunning(job);
     },
-    onComplete() {if (dialog.open) void perform(refresh);},
-    onError(failure) {if (dialog.open) {error.dataset.subscriptionProgressError = 'true'; error.textContent = `Progress could not be refreshed. Classification may still be running. ${failure.message}`; error.hidden = false;}}
+    onComplete() {if (active()) void perform(refresh);},
+    onError(failure) {if (active()) {error.dataset.subscriptionProgressError = 'true'; error.textContent = `Progress could not be refreshed. Classification may still be running. ${failure.message}`; error.hidden = false;}}
   });
   stopButton.addEventListener('click', () => {void perform(() => jobs.stop());});
   const format = value => money(value, getContext().currency);
@@ -41,7 +43,7 @@ export function initSubscriptions() {
     busy = true; error.hidden = true; lock(true);
     try { await work(); }
     catch (failure) { error.textContent = failure.message; error.hidden = false; status.textContent = 'Your saved labels are preserved. You can retry.'; }
-    finally { busy = false; lock(false); if (refreshOnIdle && dialog.open) {refreshOnIdle = false; void perform(refresh);} }
+    finally { busy = false; lock(false); if (refreshOnIdle && active()) {refreshOnIdle = false; void perform(refresh);} }
   }
   function lock(value) {
     for (const node of content.querySelectorAll('button,input,select')) node.disabled = value ||
@@ -57,7 +59,7 @@ export function initSubscriptions() {
   async function refresh() {
     const token = viewGeneration, owner = scope();
     const data = await call('status');
-    if (!dialog.open || token !== viewGeneration || owner !== scope()) return;
+    if (!active() || token !== viewGeneration || owner !== scope()) return;
     refreshOnIdle = false; last = data; jobSupported = Boolean(data.job);
     if (data.job) jobs.accept(data.job);
     else {error.textContent = 'Update the Subscriptions plugin to 1.1.0 or newer for background classification.'; error.hidden = false;}
@@ -67,7 +69,7 @@ export function initSubscriptions() {
   async function classify(config) {
     dialog.scrollTop = 0;
     await jobs.start(config);
-    if (dialog.open) await refresh();
+    if (active()) await refresh();
   }
   function breakdown(parent, title, values) {
     const section = el('section', '', 'subscription-breakdown'); section.append(el('h3', title));
@@ -124,7 +126,7 @@ export function initSubscriptions() {
   }
   async function settings(data, parent) {
     const connection = await credentials('status');
-    if (!dialog.open || last !== data) return;
+    if (!active() || last !== data) return;
     const form = el('form', '', 'llm-profile-form'); form.dataset.subscriptionsMutation = ''; form.dataset.subscriptionsStart = '';
     const provider = field(form, 'Provider', 'provider', 'select');
     for (const row of connection.providers) option(provider, row.id, `${row.name}${row.connected ? ' · Connected' : ' · Connect in AI credentials'}`);
@@ -175,11 +177,16 @@ export function initSubscriptions() {
     const review = el('section'); review.append(el('h3', 'Review payments'), el('p', 'Saving a label also corrects matching payments: same merchant, amount, billing day and account. Pending payments, transfers and inflows are excluded.', 'settings-notice'));
     content.append(review); reviewRows(data, review); lock(busy);
   }
-  dialog.addEventListener('close', () => {++viewGeneration; refreshOnIdle = false;});
+  function detach() {++viewGeneration; refreshOnIdle = false; cache.append(dialog);}
+  function mount() {
+    const target = document.querySelector('[data-subscriptions-mount]');
+    if (!target) return;
+    target.replaceChildren(dialog);
+    if (busy) {refreshOnIdle = true; return;}
+    status.textContent = 'Loading subscriptions…'; void perform(refresh);
+  }
   window.addEventListener('pagehide', () => jobs.dispose(), {once:true});
-  document.addEventListener('whab:page-ready', () => {if (!busy) void jobs.refresh();});
-  void jobs.refresh();
-  // Native dialog.open changes do not emit an open event.
-  const observer = new MutationObserver(() => {if (!dialog.open) return; if (busy) {refreshOnIdle = true; return;} status.textContent = 'Loading subscriptions…'; dialog.scrollTop = 0; void perform(async () => { await refresh(); dialog.scrollTop = 0; });});
-  observer.observe(dialog, {attributes: true, attributeFilter: ['open']});
+  document.addEventListener('whab:page-ready', () => {mount(); if (!busy) void jobs.refresh();});
+  void jobs.refresh(); mount();
+  return {detach};
 }

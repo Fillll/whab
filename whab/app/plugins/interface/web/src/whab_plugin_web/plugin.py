@@ -19,6 +19,7 @@ plugin = Plugin(
         lightweight_accounts=True,
         transaction_page_size=100,
         view_protocol=1,
+        workspace_pages=("subscriptions",),
     ),
     contract=PluginContract(lifecycle="live"),
 )

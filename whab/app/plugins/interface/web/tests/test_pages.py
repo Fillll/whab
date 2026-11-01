@@ -224,3 +224,25 @@ def test_receipt_picker_offers_only_jpeg_png_and_pdf_in_that_order(client):
     assert 'Receipt file<input' in text
     assert 'data-receipt-pdf target="_blank" rel="noopener noreferrer" hidden>Open PDF receipt</a>' in text
     assert 'image/webp' not in text and 'JPEG, PNG or WebP' not in text
+
+
+def test_subscriptions_is_a_workspace_link_and_page_not_a_dialog(store, tmp_path, client_for):
+    from whab_plugin_ai_credentials.plugin import plugin as credentials
+    from whab_plugin_subscriptions.plugin import plugin as subscriptions
+
+    with client_for(store, tmp_path, credentials, subscriptions) as client:
+        response = client.get("/budgets/home/subscriptions/2026-10/usd")
+        assert response.status_code == 200
+        assert 'href="/budgets/my-budget/subscriptions/2026-10/usd" aria-label="Subscriptions" title="Subscriptions" aria-current="page"' in response.text
+        assert 'data-subscriptions-mount' in response.text
+        assert '<dialog id="subscriptions-dialog"' not in response.text
+        partial = client.get("/budgets/home/subscriptions/2026-10/usd", headers={"X-WHAB-Page-Fragment": "1"})
+        assert partial.status_code == 200 and 'data-page-fragment' in partial.text
+        assert 'data-subscriptions-mount' in partial.text
+        assert 'subscriptions-workspace-cache' not in partial.text
+
+
+def test_subscriptions_disabled_page_explains_how_to_enable(client):
+    response = client.get("/budgets/home/subscriptions/2026-10/usd")
+    assert response.status_code == 200
+    assert 'Enable the Subscriptions plugin' in response.text

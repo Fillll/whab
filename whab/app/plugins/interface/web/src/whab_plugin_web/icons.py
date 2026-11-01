@@ -3,6 +3,7 @@
 from markupsafe import Markup
 
 PATHS = {
+    "subscriptions": '<path d="M20 7v5h-5M4 17v-5h5M5 8a8 8 0 0 1 14-2M19 16a8 8 0 0 1-14 2"/><path d="M10 10h4v4h-4z"/>',
     "forest": '<path d="m8 3-5 7h3l-4 6h5v5h2v-5h5l-4-6h3zM16 4l5 7h-3l4 6h-7M17 17v4"/>',
     "budget": '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
     "transactions": '<path d="M18 6 6 18M6 7v11h11"/>',

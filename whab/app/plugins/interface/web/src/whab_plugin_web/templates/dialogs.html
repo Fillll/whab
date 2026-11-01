@@ -336,9 +336,9 @@
 </dialog>
 
 {% if plugins|selectattr('id','equalto','subscriptions')|list %}
-<dialog id="subscriptions-dialog" class="modal subscriptions-window" aria-labelledby="subscriptions-heading">
+<div id="subscriptions-workspace-cache" hidden><section id="subscriptions-workspace" class="subscriptions-workspace" aria-labelledby="subscriptions-heading">
   <div class="subscription-header">
-  <div class="modal-heading"><div><p class="eyebrow">RECURRING SPENDING</p><h2 id="subscriptions-heading">Subscriptions</h2></div><button type="button" class="icon-button" aria-label="Close subscriptions" data-close-dialog>{{ icon('close',20) }}</button></div>
+  <div class="page-title-row"><div><div class="eyebrow">RECURRING SPENDING</div><h1 id="subscriptions-heading">Subscriptions</h1></div></div>
   <section class="subscription-progress" data-subscriptions-progress hidden aria-label="Classification progress">
     <div class="subscription-progress-heading"><strong data-subscriptions-job-label></strong><button class="button secondary" type="button" data-subscriptions-stop>Stop classification</button></div>
     <progress max="1" aria-label="Subscription classification progress"></progress>
@@ -350,5 +350,5 @@
   <p role="status" aria-live="polite" data-subscriptions-status>Loading subscriptions…</p>
   <p role="alert" class="field-error" data-subscriptions-error hidden></p>
   <div data-subscriptions-content></div>
-</dialog>
+</section></div>
 {% endif %}

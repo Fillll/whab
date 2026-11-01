@@ -118,7 +118,7 @@ class LeasedVisualUI:
             return lease.service("visual").generation
 
     def __getattr__(self, name):
-        if name not in {"budget_months", "lightweight_transactions", "lightweight_accounts", "transaction_page_size", "build_context"}:
+        if name not in {"budget_months", "lightweight_transactions", "lightweight_accounts", "transaction_page_size", "workspace_pages", "build_context"}:
             raise AttributeError(name)
         if name == "build_context":
             def build(*args, **kwargs):

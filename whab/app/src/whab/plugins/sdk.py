@@ -494,8 +494,14 @@ class UserInterface:
     resources: PluginResources | None = field(default=None, repr=False)
     render: Callable[[dict], bytes] | None = field(default=None, repr=False)
     view_protocol: int = 0
+    workspace_pages: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if (type(self.workspace_pages) not in (tuple, list) or len(self.workspace_pages) > 16
+                or any((type(name) is not str or len(name) > 200 or re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*", name) is None) or name in {"budget", "transactions", "insights", "accounts", "api", "static", "ui", "banks", "imports"} for name in self.workspace_pages)
+                or len(set(self.workspace_pages)) != len(self.workspace_pages)):
+            raise ValueError("Choose unique safe additional workspace page names.")
+        object.__setattr__(self, "workspace_pages", tuple(self.workspace_pages))
         if self.resources is None:
             if not isinstance(self.templates, Path) or not isinstance(self.static, Path):
                 raise ValueError("User interface resources must be pathlib.Path directories.")

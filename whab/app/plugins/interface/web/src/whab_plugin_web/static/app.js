@@ -29,6 +29,7 @@ bindLogos();
 let currentRegister = null;
 let currentAccounts = null;
 let monthRange = null;
+let subscriptionsWorkspace = null;
 async function flushEdits() {
   if (!(await budgetEdits.flush())) return false;
   if (currentRegister && !(await currentRegister.flush())) return false;
@@ -46,7 +47,7 @@ const accountNavigation = initAccountNavigation({
   flush: () => navigationReady() ? flushEdits() : false,
   beforeReplace() {
     const ready = navigationReady() && !currentRegister?.dirty && !currentAccounts?.dirty && budgetEdits.dispose();
-    if (ready) monthRange?.capture?.();
+    if (ready) {monthRange?.capture?.(); subscriptionsWorkspace?.detach();}
     return ready;
   },
   onReplace({content}) {
@@ -730,4 +731,4 @@ const uiViews = createUIViews({
 void uiViews?.start();
 window.addEventListener('pagehide', () => uiViews?.stop());
 
-initSubscriptions();
+subscriptionsWorkspace = initSubscriptions();

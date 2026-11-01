@@ -74,7 +74,7 @@ export function renderSubscriptionProgress(panel, job) {
   text(count, job.status === 'preparing' ? 'Preparing the unchecked transaction list…' :
     `${progress} · ${job.reused.toLocaleString()} reused${job.skipped ? ` · ${job.skipped.toLocaleString()} changed or removed (skipped)` : ''}`);
   text(help, job.error || (classificationRunning(job) ?
-    'You can close this view or browser tab. Classification continues while WHAB is running; completed batches are saved.' :
+    'You can leave this page or close the browser tab. Classification continues while WHAB is running; completed batches are saved.' :
     job.status === 'completed' ? 'Results are saved. New imports can be checked in the next scan.' :
     'Completed batches are saved. Classify unchecked transactions again to finish.'));
 }

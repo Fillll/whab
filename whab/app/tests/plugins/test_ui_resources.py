@@ -110,3 +110,12 @@ def test_private_temporary_cleanup_failure_cannot_override_durable_store_or_auth
     with pytest.raises(PluginError) as raised:
         failing.store(bundle)
     assert str(tmp_path) not in str(raised.value) and "private filesystem" not in str(raised.value)
+
+
+def test_declared_pages_are_bound_to_generation_and_round_trip_without_changing_legacy_flags():
+    legacy = capture_visual("fictional", interface(), "a" * 64)
+    current = capture_visual("fictional", replace(interface(), workspace_pages=("reports",)), "a" * 64)
+    assert "workspace_pages" not in legacy.flags
+    assert current.generation != legacy.generation
+    assert VisualBundle.decode(current.encoded()).flags["workspace_pages"] == ("reports",)
+    assert VisualBundle.decode(legacy.encoded()).encoded() == legacy.encoded()
