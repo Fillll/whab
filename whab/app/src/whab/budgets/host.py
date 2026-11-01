@@ -7,6 +7,7 @@ import copy
 import json
 import shutil
 from dataclasses import replace
+from html import escape
 from pathlib import Path
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit
@@ -19,6 +20,7 @@ from starlette.concurrency import run_in_threadpool
 
 from whab.domain.errors import StoreError
 from whab.domain.money import currency_code
+from whab.plugins import PluginError
 from whab.web.navigation import PAGES, budget_key, page_url, valid_route_key
 from whab.web.schemas import valid_month
 
@@ -574,13 +576,13 @@ class BudgetDispatch:
         )
 
     @staticmethod
-    async def _unavailable(scope, receive, send):
-        message = "This budget is unavailable. Select or reopen its file before continuing."
+    async def _unavailable(scope, receive, send, reason=None):
+        message = reason or "This budget is unavailable. Select or reopen its file before continuing."
         response = (
             JSONResponse({"error": message}, status_code=409)
             if scope["path"].startswith("/api/") or "/api/" in scope["path"]
             else HTMLResponse(
-                f'<h1>Budget unavailable</h1><p>{message}</p>'
+                f'<h1>Budget unavailable</h1><p>{escape(message)}</p>'
                 '<a href="/budget-recovery">Return to the startup budget</a>', status_code=409,
             )
         )
@@ -632,6 +634,9 @@ class BudgetDispatch:
             else:
                 try:
                     await self.host.activate(identifier)
+                except PluginError as error:
+                    await self._unavailable(scope, receive, send, str(error))
+                    return
                 except (StoreError, HTTPException):
                     await self._unavailable(scope, receive, send)
                     return
@@ -714,6 +719,9 @@ class BudgetDispatch:
                     return
                 try:
                     await self.host.activate(budget_id)
+                except PluginError as error:
+                    await self._unavailable(scope, receive, send, str(error))
+                    return
                 except (StoreError, HTTPException):
                     await self._unavailable(scope, receive, send)
                     return
