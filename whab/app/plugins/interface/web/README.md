@@ -176,3 +176,9 @@ Click a field to edit it immediately. Up/Down move within a text column; Left/Ri
 ### Continuous register loading
 
 The scroll container loads the next batch near its bottom and retains every mounted row, field draft, selection and keyboard position. Newly loaded rows have the same editing, suggestions, review and receipt controls. A failed load offers Retry without discarding existing rows. Account/date/search/review changes cancel old requests; late responses cannot append to the new view. Saved local edits update the loader's revision, and ordering/membership edits restart its scan with ID de-duplication. An unrelated ledger revision refreshes the view instead of combining snapshots. Earlier `tx_page` bookmarks also load preceding batches when scrolled to the top. Back/Forward reloads the necessary batches before restoring the table’s scroll position, without caching financial HTML. The footer reports the total and loaded rows; Export includes the complete selection.
+
+## Subscriptions and shared AI connections
+
+When the Subscriptions plugin is enabled, the main sidebar adds **Subscriptions**. Its review dialog shows per-currency monthly estimates, actual charge history, ranked categories/merchants and editable subscription labels. Data and report arithmetic belong to the [Subscriptions plugin](../../automation/subscriptions/README.md). The dialog retains the shell and accessible native close/Escape controls. Review lists render at most 100 rows at once with Show more.
+
+The [AI credentials plugin](../../automation/ai-credentials/README.md) has a separate Settings page. Category settings link to it within the existing settings window; category and subscription profiles share opaque provider connections, with independent models and data permission. Existing category connection references are adopted locally when opening those settings. New requests never include credentials in ledger commands.

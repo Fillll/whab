@@ -1,5 +1,11 @@
 # LLM categorization plugin changelog
 
+## 1.2.0 — 2026-10-31
+
+PR: [#135](https://github.com/Fillll/whab/pull/135)
+
+- Rename the display to AI transaction categorization and depend on the shared AI credentials plugin. Preserve profiles, legacy settings compatibility and existing provider references.
+
 ## 1.1.0 — 2026-10-26
 
 PR: [#119](https://github.com/Fillll/whab/pull/119)

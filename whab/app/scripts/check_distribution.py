@@ -29,7 +29,7 @@ expected = json.loads(sys.argv[2])
 import whab
 from whab.app import create_app
 from whab.config import Settings
-from whab.plugins import LogoImage, contract_for, load_plugins
+from whab.plugins import LogoImage, contract_for, load_descriptors, load_plugins
 from whab.plugins.catalog import catalog_snapshot
 from whab_plugin_plaid.logos import logo_key
 from fastapi.testclient import TestClient
@@ -58,7 +58,7 @@ for identifier, record in expected.items():
     module = importlib.import_module(record["module"])
     assert Path(module.__file__).resolve().is_relative_to(target), identifier
 for row in catalog_snapshot()["plugins"]:
-    descriptor = load_plugins((row["id"],)).descriptors()[0]
+    descriptor = load_descriptors((row["id"],))[0]
     contract = contract_for(descriptor)
     assert row["display_name"] == descriptor.display_name
     assert row["api_version"] == descriptor.api_version
@@ -72,6 +72,9 @@ for row in catalog_snapshot()["plugins"]:
     assert row["state_version"] == contract.state_version
     assert row["state_upgrades"] == [list(edge) for edge in contract.state_upgrades]
     assert row["legacy"] == (descriptor.contract is None)
+# Shared credential dependencies compose with both independent consumers.
+ai_registry = load_plugins(("ai-credentials", "llm-categorization", "subscriptions"))
+assert {p.id for p in ai_registry.describe()} == {"ai-credentials", "llm-categorization", "subscriptions"}
 assert {"server", "client"} <= {entry.name for entry in metadata.entry_points(group="whab.plugins")}
 assert load_plugins(("server",)).interface_plugins()[0].id == "server"
 assert load_plugins(("client",)).storage_plugin("client").id == "client"
@@ -304,7 +307,7 @@ def main():
                 "module": entrypoint.split(":", 1)[0].split(".", 1)[0],
             }
         teaching = {"example", "example-api", "example-ui", "example-bank", "example-remote-client", "example-storage", "example-branding", "example-file-import", "example-categorization"}
-        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", *teaching}
+        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", "ai-credentials", "subscriptions", *teaching}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {
             f'{record["distribution"]}>={record["version"]},<2'

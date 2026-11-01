@@ -119,7 +119,9 @@ def test_json_https_save_export_fresh_restore_restart_and_demo_storage(tmp_path)
         assert any(row["note"] == "Saved after fresh restoration" for row in view["transactions"])
     with _https(demo_home, demo) as client:
         assert _request(client, "GET", "/api/budget").json()["storage"] == "json"
-        view = _request(client, "GET", "/api/workspace", params={"workspace": "personal", "month": month}).json()
+        # Demo dates follow the runtime's local calendar, which can differ
+        # from the UTC month used by manual entries above near a month boundary.
+        view = _request(client, "GET", "/api/workspace", params={"workspace": "personal"}).json()
         assert any(row["source"] == "demo" for row in view["transactions"])
     for runtime in (home, fresh_home, demo_home):
         assert list(runtime.rglob("*.json"))

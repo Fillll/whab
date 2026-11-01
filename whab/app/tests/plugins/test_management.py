@@ -78,6 +78,9 @@ def test_discovery_lists_inactive_plugins_without_importing_or_exposing_settings
 
 def test_disabled_bundled_plugins_keep_canonical_names_without_importing(tmp_path, monkeypatch):
     registrations = (
+        ("ai-credentials", "whab_plugin_ai_credentials.plugin:plugin", "AI credentials", "automation"),
+        ("llm-categorization", "whab_plugin_llm_categorization.plugin:plugin", "AI transaction categorization", "automation"),
+        ("subscriptions", "whab_plugin_subscriptions.plugin:plugin", "Subscriptions", "automation"),
         ("bank-logos", "whab_plugin_bank_logos.plugin:plugin", "Bank logos", "interface"),
         ("web", "whab_plugin_web.plugin:plugin", "WHAB web", "interface"),
         ("plaid", "whab_plugin_plaid.plugin:plugin", "Plaid", "ingestion"),

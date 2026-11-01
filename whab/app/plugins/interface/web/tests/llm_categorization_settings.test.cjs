@@ -38,6 +38,7 @@ async function fixture({readOnly = false, fail = '', saved = false, legacy = fal
   globalThis.__llmSettings = {api, getContext: () => ({workspace: 'personal'}), isSettingsPageOpen: value => value.open};
   globalThis.document = {createElement: tag => new Element(tag)};
   const source = readFileSync(resolve(__dirname, '../src/whab_plugin_web/static/llm-categorization-settings.js'), 'utf8')
+    .replace(/import .* from '.\/ai-credentials-settings.js';/, 'const credentials = (action, values = {}) => globalThis.__llmSettings.api("/plugin-settings/ai-credentials", {workspace: "personal", action, ...values});')
     .replace(/import .* from '.\/client.js';/, 'const {api, getContext} = globalThis.__llmSettings;')
     .replace(/import .* from '.\/settings-navigation.js';/, 'const {isSettingsPageOpen} = globalThis.__llmSettings;');
   const module = await import(`data:text/javascript;base64,${Buffer.from(source + `\n// ${Math.random()}`).toString('base64')}`);
@@ -53,10 +54,8 @@ test('new profile saves the visible prompt and effort, activates it and keeps ke
   assert.equal(ui.field('automatic').checked, false);
   assert.equal(ui.field('consent').checked, false);
   assert.equal(ui.field('prompt').value, 'Suggested prompt.');
-  ui.field('api_key').value = 'fictional-secret';
-  ui.button('Save API key').emit('click'); await settle();
-  assert.equal(ui.field('api_key').value, '');
-  assert.match(ui.requests.find(row => row.action === 'save-key').path, /plugin-settings/);
+  assert.equal(ui.field('api_key'), undefined);
+  assert.equal(ui.button('Manage AI credentials').dataset.dialog, 'plugin-options-ai-credentials');
   ui.field('model').value = 'test-model'; ui.field('consent').checked = true;
   ui.field('prompt').value = 'Custom prompt.'; ui.field('prompt').emit('input');
   ui.field('effort').value = 'high';
@@ -105,14 +104,8 @@ test('provider change clears model and consent, sign-in controls and models rema
   assert.equal(ui.field('model').value, '');
   assert.equal(ui.field('consent').checked, false);
   assert.equal(ui.field('api_key'), undefined);
-  ui.button('Continue with ChatGPT').emit('click'); await settle();
-  assert(ui.content.querySelectorAll('a').some(link => link.href.startsWith('https://auth.openai.com/')));
-  ui.button('Check sign-in').emit('click'); await settle();
-  assert.match(ui.status.textContent, /ChatGPT connected/);
-  ui.button('Disconnect provider').emit('click'); await settle();
-  assert.equal(ui.status.textContent, 'Disconnected.');
-  ui.dialog.emit('close'); await settle();
-  assert.equal(ui.requests.at(-1).action, 'cancel-sign-in');
+  assert(ui.button('Manage AI credentials'));
+
 });
 
 test('new profile and deletion controls are separate from the editor', async () => {
@@ -131,7 +124,7 @@ test('validation stops sending, failures are visible, sessions cancel, and read-
   const invalid = await fixture();
   invalid.content.children.find(node => node.tag === 'form').valid = false;
   invalid.button('Suggest for uncategorized').emit('click'); await settle();
-  assert.equal(invalid.requests.length, 2);
+  assert.equal(invalid.requests.length, 3);
   const failed = await fixture({fail:'step'});
   failed.content.children.find(node => node.tag === 'form').emit('submit'); await settle();
   assert.equal(failed.error.textContent, 'Fictional provider failure');
@@ -139,13 +132,13 @@ test('validation stops sending, failures are visible, sessions cancel, and read-
   assert(failed.requests.some(row => row.action === 'cancel'));
   const locked = await fixture({readOnly:true});
   assert(locked.controls().every(node => node.disabled));
-  locked.button('Save API key').emit('click'); await settle();
-  assert.equal(locked.requests.length, 2);
+  locked.button('Load available models').emit('click'); await settle();
+  assert.equal(locked.requests.length, 3);
 });
 
 test('independent Web upgrade explains when the installed LLM plugin needs updating', async () => {
   const ui = await fixture({legacy:true});
   assert.match(ui.content.children[0].textContent, /Update the LLM categorization plugin to 1.1.0/);
   assert.equal(ui.controls().length, 0);
-  assert.equal(ui.requests.length, 2);
+  assert.equal(ui.requests.length, 3);
 });

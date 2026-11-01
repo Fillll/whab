@@ -38,6 +38,9 @@
       {% endif %}
       </a>
     {% endfor %}
+  {% if plugins|selectattr('id','equalto','subscriptions')|list %}
+  <button class="nav-item subscriptions-nav" type="button" aria-label="Subscriptions" title="Subscriptions" data-dialog="subscriptions-dialog">{{ icon('insights',19) }}<span>Subscriptions</span></button>
+  {% endif %}
   </nav>
   <div class="sidebar-accounts">
     {% include "sidebar-accounts.html" %}

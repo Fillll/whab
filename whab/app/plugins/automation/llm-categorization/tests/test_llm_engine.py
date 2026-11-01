@@ -4,9 +4,9 @@ import json
 from copy import deepcopy
 
 import pytest
-from whab_plugin_llm_categorization import providers
+from whab_plugin_ai_credentials import api as providers
+from whab_plugin_ai_credentials.api import Vault, document, identifier
 from whab_plugin_llm_categorization.engine import Engine, settings, text, transaction
-from whab_plugin_llm_categorization.private import Vault, document, identifier
 
 from whab.plugins import StoreError
 
@@ -24,7 +24,7 @@ def save_profile(engine, config, rows=()):
 
 
 def test_profile_lifecycle_and_no_data_sent_on_save(engine, config, row, monkeypatch):
-    monkeypatch.setattr(providers, "complete", lambda *args: pytest.fail("Saving must not call inference"))
+    monkeypatch.setattr(providers, "complete", lambda *args, **kwargs: pytest.fail("Saving must not call inference"))
     rows = [{**row, "reviewed": True, "categoryId": "food"}, row,
             {**row, "reviewed": True, "categoryId": "food", "pending": True},
             {**row, "reviewed": True, "categoryId": "food", "isTransfer": True},
@@ -57,8 +57,8 @@ def test_manual_and_automatic_predictions_minimize_data_and_preserve_inputs(engi
     assert engine.predict([row]) == []
     assert engine.preview([]) == []
     sent = []
-    def respond(vault, provider, model, payload, prompt, effort):
-        assert prompt == providers.DEFAULT_PROMPT and effort == "default"
+    def respond(vault, provider, model, payload, prompt, effort, **kwargs):
+        assert prompt == __import__("whab_plugin_llm_categorization.engine", fromlist=["DEFAULT_PROMPT"]).DEFAULT_PROMPT and effort == "default"
         sent.append(deepcopy(payload))
         return json.dumps({"suggestions": [{"transactionId": item["transactionId"], "categoryId": "food", "score": .95}
                                            for item in payload["transactions"]]})
@@ -90,7 +90,7 @@ def test_manual_and_automatic_predictions_minimize_data_and_preserve_inputs(engi
 ])
 def test_invalid_response_never_produces_partial_suggestions(engine, config, row, monkeypatch, output):
     save_profile(engine, config)
-    monkeypatch.setattr(providers, "complete", lambda *args: output if type(output) is str else json.dumps(output))
+    monkeypatch.setattr(providers, "complete", lambda *args, **kwargs: output if type(output) is str else json.dumps(output))
     with pytest.raises(StoreError, match="invalid category suggestions"):
         engine.preview([row])
 
@@ -98,10 +98,10 @@ def test_invalid_response_never_produces_partial_suggestions(engine, config, row
 def test_duplicate_rows_and_low_scores_are_not_applied(engine, config, row, monkeypatch):
     save_profile(engine, config)
     for result in ([], [{"transactionId": "0", "categoryId": "food", "score": .79}]):
-        monkeypatch.setattr(providers, "complete", lambda *args: json.dumps({"suggestions": result}))
+        monkeypatch.setattr(providers, "complete", lambda *args, **kwargs: json.dumps({"suggestions": result}))
         assert engine.preview([row]) == []
     duplicate = [{"transactionId": "0", "categoryId": "food", "score": .9}] * 2
-    monkeypatch.setattr(providers, "complete", lambda *args: json.dumps({"suggestions": duplicate}))
+    monkeypatch.setattr(providers, "complete", lambda *args, **kwargs: json.dumps({"suggestions": duplicate}))
     with pytest.raises(StoreError):
         engine.preview([row, {**row, "id": "second"}])
 
@@ -193,7 +193,7 @@ def test_imported_profiles_cannot_smuggle_extra_data_into_requests(engine, confi
     save_profile(engine, config, [{**row, "reviewed": True, "categoryId": "food"}])
     raw = engine.context.read_file("profiles.json")
     saved = json.loads(raw)
-    monkeypatch.setattr(providers, "complete", lambda *args: pytest.fail("Invalid imported profile must not send data"))
+    monkeypatch.setattr(providers, "complete", lambda *args, **kwargs: pytest.fail("Invalid imported profile must not send data"))
     saved["models"][0]["examples"][0]["note"] = "private data outside consent"
     engine.context.write_file("profiles.json", json.dumps(saved).encode())
     with pytest.raises(StoreError, match="profiles are invalid"):
@@ -254,3 +254,14 @@ def test_revision_at_profile_limit_and_invalid_name_preserves_original(engine, c
     replacement = engine.save(result.value.value, "Revision at limit")
     assert len(engine.index()["models"]) == 20
     assert engine.index()["active"] == replacement["id"]
+
+def test_category_portable_validation_keeps_legacy_error_behavior():
+    from whab_plugin_llm_categorization.state import document, identifier
+
+    assert identifier("00000000-0000-0000-0000-000000000000")
+    assert identifier(None) is False
+    assert identifier("invalid") is False
+    for raw in (b"x" * (1024 * 1024 + 1), b"[]", b"invalid", None):
+        with pytest.raises(StoreError):
+            document(raw)
+    assert document(json.dumps({"profiles": []}).encode()) == {"profiles": []}

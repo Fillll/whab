@@ -4555,3 +4555,42 @@ main:has(.budget-planner) > .demo-ribbon,
 .month-jump select {width:108px; padding-right:26px;}
 .month-jump input {width:72px;}
 @media (max-width:700px) {.budget-toolbar {flex-wrap:wrap;} .month-navigation {flex-basis:100%;} .month-jump {margin-left:auto;}}
+
+/* Subscription review follows the existing workspace typography and surfaces. */
+.subscriptions-nav { width: 100%; border: 0; background: transparent; cursor: pointer; font: inherit; text-align: left; }
+.subscriptions-window { width: min(1160px, calc(100vw - 40px)); max-width: none; max-height: calc(100dvh - 40px); overflow-y: auto; }
+.subscriptions-window .modal-heading { position: sticky; top: -1px; z-index: 2; background: var(--page); padding: 12px 0; }
+.subscriptions-window h3 { font-size: 15px; margin: 26px 0 18px; }
+.subscription-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 14px; margin: 18px 0; }
+.subscription-toolbar label { display: grid; gap: 6px; font-size: 12px; }
+.subscription-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 24px 0; border-block: 1px solid var(--line); }
+.subscription-summary small, .subscription-table small, .subscription-plan small { display: block; color: var(--text-secondary); font-size: 11px; margin-top: 6px; }
+.subscription-summary strong { display: block; font-size: 26px; font-variant-numeric: tabular-nums; margin-top: 10px; }
+.subscription-plan { display: grid; grid-template-columns: 1.2fr 1.4fr 1fr 1fr; align-items: center; gap: 10px; padding: 15px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.subscription-plan small { grid-column: 1 / -1; margin: 0; }
+.subscription-breakdowns { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+.subscription-bar-row { margin: 14px 0; }
+.subscription-bar-row > div { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.subscription-breakdown meter, .subscription-month meter { width: 100%; height: 10px; accent-color: var(--yellow, #e4bd45); }
+.subscription-month { display: grid; grid-template-columns: 65px 1fr 100px 190px; gap: 12px; align-items: center; margin: 12px 0; font-size: 12px; }
+.subscription-month strong { text-align: right; font-variant-numeric: tabular-nums; }
+.subscription-month small { color: var(--text-secondary); }
+.subscription-table-scroll { overflow-x: auto; }
+.subscription-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.subscription-table th, .subscription-table td { padding: 14px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.subscription-table td:nth-child(3) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.subscription-table label { display: grid; gap: 5px; font-size: 10px; }
+.subscription-table select { max-width: 180px; margin-bottom: 8px; }
+@media (max-width: 760px) {
+ .subscriptions-window { width: calc(100vw - 20px); padding: 18px; }
+ .subscription-summary { grid-template-columns: 1fr 1fr; }
+ .subscription-summary strong { font-size: 21px; }
+ .subscription-breakdowns { grid-template-columns: 1fr; gap: 0; }
+ .subscription-plan { grid-template-columns: 1fr 1fr; }
+ .subscription-month { grid-template-columns: 65px 1fr 85px; }
+ .subscription-month small { grid-column: 2 / -1; }
+ .subscriptions-nav { padding-inline: 8px; }
+}
+
+.subscriptions-window .llm-profile-form label:has(input[type="checkbox"]) { flex-direction: row; align-items: flex-start; line-height: 1.6; }
+.subscriptions-window .llm-profile-form input[type="checkbox"] { order: -1; flex: 0 0 auto; width: 16px; margin-top: 2px; }

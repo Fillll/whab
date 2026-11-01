@@ -1,6 +1,12 @@
 {
-  "source_ref": "063f7d37b5dee43b00e71bd77cc127d80fe3e09c",
+  "source_ref": "462e202904311bac76b9659f9c06e3532774b266",
   "plugins": [
+    {
+      "schema_version": 1,
+      "id": "ai-credentials",
+      "category": "automation",
+      "dependencies": []
+    },
     {
       "schema_version": 1,
       "id": "bank-logos",
@@ -77,7 +83,12 @@
       "schema_version": 1,
       "id": "llm-categorization",
       "category": "automation",
-      "dependencies": []
+      "dependencies": [
+        {
+          "id": "ai-credentials",
+          "version": ">=1.0.0,<2"
+        }
+      ]
     },
     {
       "schema_version": 1,
@@ -102,6 +113,17 @@
       "id": "sqlite",
       "category": "storage",
       "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "subscriptions",
+      "category": "automation",
+      "dependencies": [
+        {
+          "id": "ai-credentials",
+          "version": ">=1.0.0,<2"
+        }
+      ]
     },
     {
       "schema_version": 1,

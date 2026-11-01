@@ -36,7 +36,7 @@ def document(raw):
 class Vault:
     def __init__(self, context):
         self.context = context
-        self.root = Path(os.environ.get("LLM_CATEGORIZATION_CREDENTIALS_DIR",
+        self.root = Path(os.environ.get("AI_CREDENTIALS_DIR") or os.environ.get("LLM_CATEGORIZATION_CREDENTIALS_DIR",
                                         str(Path.home() / ".config/whab/llm-categorization"))).expanduser()
 
     def references(self):
@@ -54,7 +54,10 @@ class Vault:
     def read(self, provider):
         key = self.references().get(provider)
         path = self.path(key) if key else None
-        return document(path.read_bytes()) if path and path.exists() else {}
+        value = document(path.read_bytes()) if path and path.exists() else {}
+        if value.pop("_provider", provider) != provider:
+            raise StoreError("This AI connection belongs to another provider. Choose the matching connection.")
+        return value
 
     def write(self, provider, value):
         if provider not in PROVIDERS:
@@ -69,7 +72,7 @@ class Vault:
                 temporary = Path(handle.name)
                 try:
                     os.chmod(temporary, 0o600)
-                    handle.write(json.dumps(value, allow_nan=False).encode())
+                    handle.write(json.dumps({**value, "_provider": provider}, allow_nan=False).encode())
                     handle.flush()
                     os.fsync(handle.fileno())
                     os.replace(temporary, path)

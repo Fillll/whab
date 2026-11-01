@@ -1,6 +1,8 @@
 """Keep core independent and each contributor plugin behind public contracts."""
 
 import ast
+import json
+import tomllib
 from importlib.util import resolve_name
 from pathlib import Path
 
@@ -14,6 +16,20 @@ PLUGIN_PACKAGES = tuple(
     if (path / "__init__.py").is_file()
 )
 PLUGIN_NAMES = tuple(path.name for path in PLUGIN_PACKAGES)
+# Reviewed public peer contracts. Private implementation modules remain forbidden.
+PUBLIC_PLUGIN_APIS = {"whab_plugin_ai_credentials": ("api",)}
+
+
+def public_dependency_import(package, module):
+    manifest = json.loads((package / "plugin.json").read_text())
+    dependencies = {row["id"] for row in manifest["dependencies"]}
+    requirements = tomllib.loads((package.parents[1] / "pyproject.toml").read_text())["project"]["dependencies"]
+    for peer, modules in PUBLIC_PLUGIN_APIS.items():
+        plugin_id = peer.removeprefix("whab_plugin_").replace("_", "-")
+        if plugin_id in dependencies and any(value.startswith(peer + ">=") for value in requirements):
+            if module == peer or any(module == f"{peer}.{name}" or module.startswith(f"{peer}.{name}.") for name in modules):
+                return True
+    return False
 
 
 def imported_modules(path):
@@ -68,7 +84,7 @@ def test_core_modules_do_not_import_higher_layers_or_specific_providers(owner, f
 
 
 @pytest.mark.parametrize("package", PLUGIN_PACKAGES, ids=lambda path: path.name)
-def test_plugins_use_public_host_contracts_and_do_not_import_each_other(package):
+def test_plugins_use_public_host_and_declared_public_peer_contracts(package):
     allowed = ("whab.domain", "whab.plugins", "whab.__version__")
     other_plugins = tuple(name for name in PLUGIN_NAMES if name != package.name)
     violations = [
@@ -79,9 +95,19 @@ def test_plugins_use_public_host_contracts_and_do_not_import_each_other(package)
             module.startswith("whab.")
             and not any(module == prefix or module.startswith(prefix + ".") for prefix in allowed)
         )
-        or any(module == name or module.startswith(name + ".") for name in other_plugins)
+        or (any(module == name or module.startswith(name + ".") for name in other_plugins)
+            and not public_dependency_import(package, module))
     ]
     assert not violations, "\n".join(violations)
+
+
+def test_peer_contract_exception_never_permits_private_modules_or_undeclared_dependencies():
+    category = next(path for path in PLUGIN_PACKAGES if path.name == "whab_plugin_llm_categorization")
+    web = next(path for path in PLUGIN_PACKAGES if path.name == "whab_plugin_web")
+    assert public_dependency_import(category, "whab_plugin_ai_credentials.api")
+    assert not public_dependency_import(category, "whab_plugin_ai_credentials.private")
+    assert not public_dependency_import(category, "whab_plugin_ai_credentials.providers")
+    assert not public_dependency_import(web, "whab_plugin_ai_credentials.api")
 
 
 @pytest.mark.parametrize("module", ["store", "schema", "seeding"])
