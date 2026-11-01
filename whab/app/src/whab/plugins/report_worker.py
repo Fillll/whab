@@ -132,7 +132,7 @@ def supports_live_report(plugin):
 
 def serve(plugin_id, source, target):
     """Worker loop; diagnostics and plugin exception details never enter frames."""
-    registry = load_plugins((plugin_id,)).bind_branding()
+    registry = load_plugins((plugin_id,), _worker=True).bind_branding()
     descriptor = registry.descriptors()[0]
     if descriptor.bind is not None or not any((descriptor.insights, descriptor.export, descriptor.bank_logos, descriptor.merchant_logos, descriptor.file_import, descriptor.categorization, type(descriptor.bank) is BankAdapter, descriptor.interface and descriptor.interface.adapter, descriptor.ui, supports_remote_client(descriptor))):
         raise WireError()
@@ -575,7 +575,8 @@ class ReportWorker:
     def render_ui(self, arguments):
         from .ui_render import read_arguments
 
-        return self._typed("ui.render", read_arguments(arguments), lambda frame: read_html(frame.metadata["data"], frame.payload))
+        return self._typed("ui.render", read_arguments(arguments, workspace_pages=self.info["adapters"]["ui"].get("workspace_pages", ())),
+                           lambda frame: read_html(frame.metadata["data"], frame.payload))
 
     def interface(self):
         from .interface_adapter import interface_record, read_interface_record

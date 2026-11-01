@@ -71,6 +71,7 @@ class RuntimeResource:
 
     plugin_id: str
     close: Callable = field(repr=False)
+    plugin_process: bool = False
 
     def __post_init__(self):
         if not valid_plugin_name(self.plugin_id) or not callable(self.close):
@@ -88,6 +89,11 @@ class RuntimeCandidate:
             type(resource) is not RuntimeResource for resource in self.resources
         ) or len({id(resource) for resource in self.resources}) != len(self.resources):
             raise RuntimeTransitionError("invalid_runtime")
+        plugins = self.services.get("plugins")
+        owned = getattr(plugins, "process_resources", ())
+        resources = tuple(resource for resource in self.resources
+                          if not resource.plugin_process or resource in owned)
+        object.__setattr__(self, "resources", resources + tuple(resource for resource in owned if resource not in resources))
 
 
 @dataclass(frozen=True)
@@ -197,6 +203,9 @@ class BudgetRuntime:
         candidate = RuntimeCandidate(services, resources)
         self.budget_id = budget_id
         self._active = RuntimeGeneration(1, candidate.services, candidate.resources)
+        plugins = candidate.services.get("plugins")
+        if callable(getattr(plugins, "bind_process_runtime", None)):
+            plugins.bind_process_runtime(self)
         self._condition = Condition()
         self._waiters = set()
         self._leases = {}
@@ -557,6 +566,9 @@ class BudgetRuntime:
                 candidate = await _invoke(prepare, preparation)
                 if type(candidate) is not RuntimeCandidate:
                     raise RuntimeTransitionError("invalid_runtime")
+                plugins = candidate.services.get("plugins")
+                if callable(getattr(plugins, "bind_process_runtime", None)):
+                    plugins.bind_process_runtime(self)
                 for resource in candidate.resources:
                     preparation.own(resource)
                 candidate = RuntimeCandidate(candidate.services, tuple(preparation._resources))

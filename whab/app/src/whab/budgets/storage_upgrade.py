@@ -363,6 +363,8 @@ def replace_saved_storage_worker(home, plugin_id, approvals, context, *, expecte
 
 def storage_worker_descriptor(home, budget_id, environment, template, *, worker_owner=None, storage_owner=None):
     """Startup descriptor lookup BEFORE any legacy native factory may run."""
+    if template._process is not None:
+        template._process.home = Path(home)
     path = Path(home) / "plugin-workers" / "storage" / template.id / "storage-upgrade.json"
     if not path.exists() and not path.is_symlink():
         return template

@@ -2,5 +2,6 @@
   "schema_version": 1,
   "id": "ai-credentials",
   "category": "automation",
-  "dependencies": []
+  "dependencies": [],
+  "process_config": ["AI_CREDENTIALS_DIR", "LLM_CATEGORIZATION_CREDENTIALS_DIR"]
 }

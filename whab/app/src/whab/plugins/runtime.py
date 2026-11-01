@@ -455,6 +455,7 @@ class PluginRegistry:
 def load_descriptors(
     enabled: tuple[str, ...],
     entrypoints: Sequence[metadata.EntryPoint] | None = None,
+    *, _worker=False,
 ) -> tuple[Plugin, ...]:
     """Validate named descriptors without resolving an incomplete capability selection.
 
@@ -506,8 +507,18 @@ def load_descriptors(
     plugins = []
     for name, entry in selected:
         try:
-            descriptor = entry.load()
+            if not _worker and isinstance(entry, metadata.EntryPoint) and entry.dist is not None:
+                from .process_worker import PluginProcess
+
+                descriptor = PluginProcess(name).descriptor
+            else:
+                # Explicit injected descriptors are test doubles. Real installed
+                # entry points execute exclusively inside their owned worker.
+                descriptor = entry.load()
         except Exception:
+            for loaded in plugins:
+                if loaded._process is not None:
+                    loaded._process.close()
             raise PluginError(
                 f"Plugin '{name}' could not be loaded. Check its installation or disable it.",
                 code="load_failed",
@@ -547,9 +558,10 @@ def load_descriptors(
 def load_plugins(
     enabled: tuple[str, ...],
     entrypoints: Sequence[metadata.EntryPoint] | None = None,
+    *, _worker=False,
 ) -> PluginRegistry:
     """Load and resolve one complete selection before hooks or factories execute."""
-    descriptors = load_descriptors(enabled, entrypoints)
+    descriptors = load_descriptors(enabled, entrypoints, _worker=_worker)
     if entrypoints is not None:
         from .manifests import validate_dependencies
 

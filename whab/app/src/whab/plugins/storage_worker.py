@@ -112,7 +112,7 @@ def _writer_owner(context, plugin_id):
 
 
 def serve(plugin_id, source, target):
-    registry = load_plugins((plugin_id,))
+    registry = load_plugins((plugin_id,), _worker=True)
     descriptor = registry.storage_plugin(plugin_id)
     if descriptor.id != plugin_id or not supports_storage_worker(descriptor):
         raise WireError()

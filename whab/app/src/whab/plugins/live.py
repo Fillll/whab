@@ -103,6 +103,15 @@ class RegistryGeneration:
     def describe(self):
         return self.registry.describe()
 
+    @property
+    def process_resources(self):
+        return tuple(plugin._process.resource for plugin in self.descriptors() if plugin._process is not None)
+
+    def bind_process_runtime(self, runtime):
+        for plugin in self.descriptors():
+            if plugin._process is not None:
+                plugin._process.runtime = runtime
+
     def descriptors(self):
         return self.registry.descriptors()
 

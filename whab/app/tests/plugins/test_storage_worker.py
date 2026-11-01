@@ -327,7 +327,7 @@ def test_preworker_acknowledged_baseline_cannot_regress_during_read_fault_recove
     from whab.plugins.storage import open_storage
 
     context = StorageContext(tmp_path, "sandbox", {})
-    descriptor = load_plugins((kind,)).storage_plugin(kind)
+    descriptor = load_plugins((kind,), _worker=True).storage_plugin(kind)
     native = open_storage(descriptor, context)
     native.close()
     path = tmp_path / "data" / ("whab-sandbox." + ("sqlite" if kind == "sqlite" else "json"))

@@ -47,6 +47,9 @@ def native_code_identity(plugin):
     Same-version editable changes to the context builder's package change this
     cache identity too. This is resource coherence, not artifact approval.
     """
+    if plugin._process is not None:
+        return plugin._process.code_identity
+
     import inspect
 
     digest = hashlib.sha256(("native-ui-v1\n" + __version__ + "\n" + plugin.id).encode("utf-8"))
@@ -152,7 +155,8 @@ class VisualTemplates:
                 inputs, routing = values.pop("_ui_inputs"), values.pop("_ui_routing")
                 values.pop("url", None)
                 values.pop("request", None)
-                return HTMLResponse(visual.ui.render(render_arguments(inputs, values, routing, request, extensions)))
+                return HTMLResponse(visual.ui.render(render_arguments(inputs, values, routing, request, extensions,
+                                                                     workspace_pages=visual.ui.workspace_pages)))
             templates = Jinja2Templates(directory=".")
             templates.env.loader = ChoiceLoader([
                 DictLoader({path.removeprefix("templates/"): raw.decode("utf-8")

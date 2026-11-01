@@ -84,7 +84,8 @@ def dispatch(ui, operation, arguments, payload):
         return resource_bundle(ui.resources)
     if operation != "ui.render":
         raise WireError()
-    return html_result(render_page(ui, read_arguments(arguments)))
+    arguments = read_arguments(arguments, workspace_pages=ui.workspace_pages)
+    return html_result(ui.render(arguments) if ui.render is not None else render_page(ui, arguments))
 
 
 def readiness_arguments(page):
