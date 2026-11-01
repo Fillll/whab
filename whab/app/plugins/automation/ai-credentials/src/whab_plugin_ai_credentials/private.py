@@ -36,7 +36,7 @@ def document(raw):
 class Vault:
     def __init__(self, context):
         self.context = context
-        self.root = Path(os.environ.get("LLM_CATEGORIZATION_CREDENTIALS_DIR",
+        self.root = Path(os.environ.get("AI_CREDENTIALS_DIR") or os.environ.get("LLM_CATEGORIZATION_CREDENTIALS_DIR",
                                         str(Path.home() / ".config/whab/llm-categorization"))).expanduser()
 
     def references(self):

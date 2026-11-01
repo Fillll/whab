@@ -1,0 +1,25 @@
+# Subscriptions
+
+An optional Automation plugin that labels transactions as subscription or not, independently of budget categories and transaction review. Enable **AI credentials** and **Subscriptions**, restart when requested, then choose **Subscriptions** in the main sidebar. It can run alongside either budget categorizer. Requires WHAB 2.50+, Python 3.14+, and `whab_plugin_ai_credentials>=1.0.0,<2`.
+
+The view shows recent plans, estimated monthly/annual costs, the largest categories and merchants, twelve months of actual classified charges and month-to-month increases. Select the currency and month in the main workspace before opening it. Currencies are never combined. Actual charges include historical subscriptions; estimates include only plans with a recent charge. A missing recent charge is not confirmation of cancellation.
+
+Connect a provider under **Settings → Plugins → AI credentials**. In the subscription view, open **AI classification settings**, select a provider, model and effort, review the data permission and choose **Save and classify unchecked transactions**. Classification visits the full history, including already reviewed and categorized records, in requests of at most 20 payment patterns. Progress saves after every successful batch. Closing stops after the current batch, which may still finish. New imports remain unchecked until **Classify unchecked transactions** is chosen again. No paid inference runs on ordinary page reads or bank imports.
+
+## Classification and caching
+
+Pending payments, transfers and nonpositive amounts receive an excluded label; every other transaction is eligible. The classifier distinguishes ongoing subscriptions and memberships from ordinary shopping, rent, utilities, loans and income. Recurrence alone does not prove a subscription. AI scores below 0.8 remain **Needs review** and are excluded from costs. Unknown billing intervals are shown without an invented monthly equivalent.
+
+Labels persist in the budget's `subscriptions.json` namespace, with separate demo files. A fingerprint invalidates a label after merchant, amount, date, currency or account changes. Category/note edits do not cause another AI call. Matching merchant (case/whitespace normalized), amount, currency, account and billing day reuse positive or negative saved decisions. Dates 28–31 share a month-end anchor. The same match is classified together in the first request; recurrence dates are supplied as evidence. Changing provider/model/effort/connection invalidates AI caches; manual corrections survive. Unknown/low-score results stay visible for review rather than being repeatedly charged to AI.
+
+Under **Review payments**, select subscription charges, uncertain payments, unchecked payments or all transactions, and search by merchant/category. Choose a label and billing interval, then **Save label**. This explicitly corrects every matching payment in the account. Manual labels outrank AI results and apply to future matching payments. Stale transactions must be refreshed before a correction. No categories, review flags, account balances or bank records change.
+
+Monthly estimates use integer minor units, rounding half up: monthly charge, annual / 12, quarterly / 3, weekly × 52 / 12. Duplicate charges on the latest billing date are counted together. A monthly/unknown plan is recent within 62 days, annual within 400, quarterly within 110 and weekly within 16, relative to the selected month end or today, whichever is earlier. These are estimates, not forecasts or cancellation detection. Historical payments are never removed from actual-cost charts.
+
+## Data and ownership
+
+AI receives bounded payee names, amounts, currencies, billing days, occurrence counts and up to 24 observed months, with request-local transaction numbers. Account IDs, full transaction dates, notes, categories, balances, receipts and bank credentials are excluded. Model responses are strictly validated before a batch is saved. Concurrent ledger edits reject the batch; successful earlier batches survive a later error. The plugin uses sanitized coherent portable ledger snapshots and its own namespaced files through public SDK contracts. AI requests go through the credentials plugin's documented public API; no private cross-plugin imports or state access.
+
+The plugin owns classification, caching, corrections and report arithmetic. Web owns the sidebar button, review dialog and display. The host only supplies local settings namespaces. This local transport keeps existing HTTPS/Host/origin guards; it introduces no remote protocol operation or new financial fields. Disabling the plugin retains its saved state.
+
+Run `.venv/bin/python -m pytest plugins/automation/subscriptions/tests` from `whab/app/`. Tests use fictional records and mocked providers.

@@ -8,6 +8,8 @@ import {initTransactionRegister} from './transaction-register.js';
 import {hydrateCurrencyChoices, initAccountSettings, initSettingsCurrencyChoices} from './account-settings.js';
 import {initAccountList} from './account-list.js';
 import {bindLogos} from './logo-images.js';
+import {initAiCredentials} from './ai-credentials-settings.js';
+import {initSubscriptions} from './subscriptions.js';
 import {initCategorizationSettings} from './categorization-settings.js';
 import {initStorageCopies} from './storage-copies.js';
 import {createUIViews} from './ui-lifecycle.js';
@@ -532,6 +534,18 @@ function renderPluginSettings(dialog, settings) {
   const readOnly = dialog.dataset.pluginReadOnly === 'true';
   const content = dialog.querySelector('[data-plugin-settings]');
   content.replaceChildren();
+  if (dialog.dataset.pluginId === 'ai-credentials') {
+    void initAiCredentials(dialog, content).catch(failure => {
+      const error = dialog.querySelector('[data-plugin-settings-error]'); error.textContent = failure.message; error.hidden = false;
+    });
+    return;
+  }
+  if (dialog.dataset.pluginId === 'subscriptions') {
+    const opener = settingsText('button', 'Open subscriptions', 'button secondary');
+    opener.type = 'button';
+    opener.addEventListener('click', () => { document.getElementById('settings-dialog').close(); document.getElementById('subscriptions-dialog').showModal(); });
+    content.append(opener); return;
+  }
   if (settings.categorization) {
     void initCategorizationSettings(dialog, content).catch(failure => {
       const error = dialog.querySelector('[data-plugin-settings-error]');
@@ -715,3 +729,5 @@ const uiViews = createUIViews({
 });
 void uiViews?.start();
 window.addEventListener('pagehide', () => uiViews?.stop());
+
+initSubscriptions();

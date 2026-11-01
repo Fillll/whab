@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "subscriptions",
+  "category": "automation",
+  "dependencies": [
+    {
+      "id": "ai-credentials",
+      "version": ">=1.0.0,<2"
+    }
+  ]
+}

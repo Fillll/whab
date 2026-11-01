@@ -1,3 +1,4 @@
+import {credentials} from './ai-credentials-settings.js';
 import {api, getContext} from './client.js';
 import {isSettingsPageOpen} from './settings-navigation.js';
 
@@ -41,7 +42,10 @@ export async function initLlmSettings(dialog, content) {
   }
   dialog.addEventListener('close', () => { void local('cancel-sign-in').catch(() => {}); }, {once: true});
   async function render(selectedId) {
-    const [connection, saved] = await Promise.all([local('status'), call('status')]);
+    const [legacy, saved] = await Promise.all([local('status'), call('status')]);
+    const references = Object.fromEntries(legacy.providers.filter(row => row.connected && row.connectionId).map(row => [row.id, row.connectionId]));
+    if (Object.keys(references).length) await credentials('adopt', {connections: references});
+    const connection = {...legacy, ...await credentials('status'), categories: legacy.categories, promptRules: legacy.promptRules};
     if (!isSettingsPageOpen(dialog)) return;
     if (!connection.efforts || !connection.promptRules || !saved.defaults?.prompt) {
       content.replaceChildren(text('p', 'Update the LLM categorization plugin to 1.1.0 or newer to configure prompts and effort.', 'settings-notice'));
@@ -68,7 +72,7 @@ export async function initLlmSettings(dialog, content) {
     const effort = field(grid, 'Effort level', 'effort', '', 'select');
     const modelActions = document.createElement('div'); modelActions.className = 'llm-inline-actions'; form.append(modelActions);
     modelActions.append(button('Load available models', async () => {
-      const result = await local('models', {provider: provider.value}); choices.replaceChildren();
+      const result = await credentials('models', {provider: provider.value}); choices.replaceChildren();
       for (const row of result.models) option(choices, row.id, row.name);
       status.textContent = `${result.models.length} models loaded. Choose one or enter its model ID.`;
     }));
@@ -91,35 +95,14 @@ export async function initLlmSettings(dialog, content) {
     advanced.append(text('p', 'Examples are taken from your most recent reviewed transactions when you save. Model scores are self-reported, not calibrated probabilities.', 'settings-notice'));
     const automatic = field(advanced, 'Suggest automatically after bank imports', 'automatic', config.automatic === true, 'checkbox');
     const privacy = disclosure(form, 'Provider connection and data sent');
-    privacy.append(text('p', 'Requests send payee names, amounts, currencies, category names and your selected reviewed examples to this provider. Subscription sign-in uses OpenAI’s cloud; API calls may incur charges. Account IDs, dates, notes, receipts and balances are excluded. Credentials stay on this machine.', 'settings-notice'));
-    const credentials = document.createElement('div'); credentials.className = 'llm-provider-credentials'; privacy.append(credentials);
+    privacy.append(text('p', 'Requests send payees, amounts, currencies, budget categories and selected reviewed examples. API usage may incur charges. Credentials are managed by AI credentials and stay on this machine.', 'settings-notice'));
+    const manage = text('button', 'Manage AI credentials', 'button secondary'); manage.type = 'button';
+    manage.dataset.dialog = 'plugin-options-ai-credentials'; privacy.append(manage);
     function connectionFields() {
-      credentials.replaceChildren(); effort.replaceChildren();
-      for (const value of connection.efforts[provider.value]) option(effort, value, value === 'default' ? 'Provider default' : value[0].toUpperCase() + value.slice(1));
+      effort.replaceChildren();
+      for (const value of connection.efforts[provider.value]) option(effort, value, value === 'default' ? 'Provider default' : value);
       effort.value = connection.efforts[provider.value].includes(config.effort) ? config.effort : 'default';
-      if (provider.value === 'chatgpt') {
-        credentials.append(button('Continue with ChatGPT', async () => {
-          const result = await local('connect', {provider: 'chatgpt'});
-          const link = text('a', 'Open ChatGPT sign-in', 'button secondary');
-          link.href = result.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; credentials.append(link);
-          status.textContent = 'Complete sign-in on this computer, then choose Check sign-in.';
-        }), button('Check sign-in', async () => {
-          const result = await local('auth-status', {provider: 'chatgpt'});
-          if (result.error) throw new Error(result.error);
-          status.textContent = result.status === 'connected' ? 'ChatGPT connected. Load models to see your account’s choices.' : 'Sign-in is still pending. Complete it in the sign-in tab.';
-        }));
-        const usage = text('a', 'Manage ChatGPT usage limits'); usage.href = 'https://chatgpt.com/settings/usage';
-        usage.target = '_blank'; usage.rel = 'noopener noreferrer'; credentials.append(usage);
-      } else {
-        const key = field(credentials, 'API key', 'api_key', '', 'password'); key.autocomplete = 'new-password'; key.maxLength = 4096;
-        credentials.append(button('Save API key', async () => {
-          const value = key.value; key.value = '';
-          await local('save-key', {provider: provider.value, api_key: value}); status.textContent = 'API key saved. Load models or enter a model ID.';
-        }));
-      }
-      credentials.append(button('Disconnect provider', async () => {
-        const result = await local('disconnect', {provider: provider.value}); status.textContent = result.message;
-      })); lock(busy);
+      lock(busy);
     }
     provider.addEventListener('change', () => { model.value = ''; consent.checked = false; choices.replaceChildren(); connectionFields(); });
     const consent = field(form, 'Allow this profile to send the described transaction data to this provider', 'consent', config.consent === true, 'checkbox');
@@ -128,7 +111,7 @@ export async function initLlmSettings(dialog, content) {
     async function saveProfile(replace = true) {
       const parameters = {provider: provider.value, model: model.value.trim(), prompt: prompt.value, effort: effort.value,
         threshold: Number(threshold.value), examples: Number(examples.value), automatic: automatic.checked,
-        consent: consent.checked, categories: connection.categories};
+        consent: consent.checked, connectionId: connection.providers.find(row => row.id === provider.value)?.connectionId || (config.provider === provider.value ? config.connectionId : '') || '', categories: connection.categories};
       if (current && replace) parameters.replaceProfile = current.id;
       let result = await call('train', {name: name.value, parameters}); const session = result.session;
       try { while (!result.complete) result = await call('step', {session}); }

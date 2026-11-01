@@ -334,3 +334,13 @@
   <button class="button primary full-width" data-settings-back>Back to settings</button>
 </article>
 </dialog>
+
+{% if plugins|selectattr('id','equalto','subscriptions')|list %}
+<dialog id="subscriptions-dialog" class="subscriptions-window" aria-labelledby="subscriptions-heading">
+  <div class="modal-heading"><div><p class="eyebrow">RECURRING SPENDING</p><h2 id="subscriptions-heading">Subscriptions</h2></div><button type="button" class="icon-button" aria-label="Close subscriptions" data-close-dialog>{{ icon('close',20) }}</button></div>
+  <p class="settings-notice">One view of ongoing plans, memberships and their cost. Estimates use saved labels; check uncertain payments and correct any mistakes.</p>
+  <p role="status" aria-live="polite" data-subscriptions-status>Loading subscriptions…</p>
+  <p role="alert" class="field-error" data-subscriptions-error hidden></p>
+  <div data-subscriptions-content></div>
+</dialog>
+{% endif %}

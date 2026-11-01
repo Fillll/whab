@@ -2,5 +2,10 @@
   "schema_version": 1,
   "id": "llm-categorization",
   "category": "automation",
-  "dependencies": []
+  "dependencies": [
+    {
+      "id": "ai-credentials",
+      "version": ">=1.0.0,<2"
+    }
+  ]
 }

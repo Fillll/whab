@@ -4,7 +4,7 @@ import json
 
 import httpx
 import pytest
-from whab_plugin_llm_categorization import providers
+from whab_plugin_ai_credentials import providers
 
 from whab.plugins import StoreError
 
@@ -29,11 +29,11 @@ def wire(monkeypatch):
 
 @pytest.mark.parametrize("provider", ["openai", "anthropic", "openrouter", "chatgpt"])
 def test_model_catalog_uses_correct_auth_and_account_model_ids(context, wire, provider, monkeypatch):
-    from whab_plugin_llm_categorization.private import Vault
+    from whab_plugin_ai_credentials.private import Vault
     vault = Vault(context)
     vault.write(provider, {"api_key": "fictional-key"})
     if provider == "chatgpt":
-        monkeypatch.setattr("whab_plugin_llm_categorization.oauth.access_token", lambda _: "fictional-oauth")
+        monkeypatch.setattr("whab_plugin_ai_credentials.oauth.access_token", lambda _: "fictional-oauth")
     catalog = {"models": [{"slug": "account-model", "display_name": "Account model", "visibility": "list"},
                           {"slug": "hidden", "visibility": "hide"}]} if provider == "chatgpt" else {
                               "data": [{"id": "model-id", "name": "Text model"}, {"id": "plain"}]}
@@ -53,7 +53,7 @@ def test_model_catalog_uses_correct_auth_and_account_model_ids(context, wire, pr
 @pytest.mark.parametrize("provider", ["openai", "anthropic", "openrouter", "chatgpt"])
 def test_completion_wire_formats_and_no_tools_or_storage(engine, wire, provider, monkeypatch):
     engine.vault.write(provider, {"api_key": "fictional-key"})
-    monkeypatch.setattr("whab_plugin_llm_categorization.oauth.access_token", lambda _: "fictional-oauth")
+    monkeypatch.setattr("whab_plugin_ai_credentials.oauth.access_token", lambda _: "fictional-oauth")
     output = '{"suggestions":[]}'
     response = {"status": "completed", "output": [{"type": "reasoning"}, {"type": "message", "content": [
         {"type": "refusal"}, {"type": "output_text", "text": output}]}]}
@@ -133,7 +133,7 @@ def sse(*events):
 @pytest.mark.parametrize("mode", ["deltas", "done", "both", "multiple_parts"])
 def test_subscription_text_survives_empty_terminal_output(engine, wire, monkeypatch, mode):
     """The public subscription route can omit final output after streaming it."""
-    monkeypatch.setattr("whab_plugin_llm_categorization.oauth.access_token", lambda _: "fictional-oauth")
+    monkeypatch.setattr("whab_plugin_ai_credentials.oauth.access_token", lambda _: "fictional-oauth")
     first, second = '{"suggestions":', '[]}'
     events = []
     if mode in {"deltas", "both"}:
@@ -178,7 +178,7 @@ def test_malformed_stream_text_is_rejected_without_private_error_details(wire, e
 @pytest.mark.parametrize("effort", ["default", "medium"])
 def test_visible_prompt_and_effort_are_sent_on_the_provider_wire(engine, wire, monkeypatch, provider, effort):
     engine.vault.write(provider, {"api_key": "fictional-key"})
-    monkeypatch.setattr("whab_plugin_llm_categorization.oauth.access_token", lambda _: "fictional-oauth")
+    monkeypatch.setattr("whab_plugin_ai_credentials.oauth.access_token", lambda _: "fictional-oauth")
     response = {"status": "completed", "output": []}
     if provider == "chatgpt":
         response = sse({"type": "response.completed", "response": response})
@@ -188,9 +188,9 @@ def test_visible_prompt_and_effort_are_sent_on_the_provider_wire(engine, wire, m
         response = {"choices": [{"finish_reason": "stop", "message": {"content": ""}}]}
     sent = wire(response)
     guidance = "Choose the closest category.\nAbstain when uncertain."
-    providers.complete(engine.vault, provider, "test-model", {"transactions": []}, guidance, effort)
+    providers.complete(engine.vault, provider, "test-model", {"transactions": []}, guidance, effort, instructions="Fictional fixed response rules")
     payload = json.loads(sent[0].content)
-    expected = guidance + "\n\n" + providers.INSTRUCTIONS
+    expected = guidance + "\n\n" + "Fictional fixed response rules"
     assert expected == (payload["instructions"] if provider in {"chatgpt", "openai"} else payload["system"] if provider == "anthropic" else payload["messages"][0]["content"])
     if provider == "openrouter":
         assert payload["provider"]["require_parameters"] is True

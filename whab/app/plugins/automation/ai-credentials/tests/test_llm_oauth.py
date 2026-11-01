@@ -9,8 +9,8 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
-from whab_plugin_llm_categorization import oauth
-from whab_plugin_llm_categorization.private import Vault
+from whab_plugin_ai_credentials import oauth
+from whab_plugin_ai_credentials.private import Vault
 
 from whab.plugins import StoreError
 

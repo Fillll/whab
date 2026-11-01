@@ -7,9 +7,12 @@ from types import SimpleNamespace
 import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
-from whab_plugin_llm_categorization import oauth, providers, routes
+from whab_plugin_ai_credentials import api as providers
+from whab_plugin_ai_credentials import oauth
+from whab_plugin_ai_credentials.api import Vault
+from whab_plugin_ai_credentials.plugin import plugin as credentials_plugin
+from whab_plugin_llm_categorization import routes
 from whab_plugin_llm_categorization.plugin import plugin
-from whab_plugin_llm_categorization.private import Vault
 from whab_plugin_server.plugin import plugin as server_plugin
 from whab_plugin_web.plugin import plugin as web_plugin
 
@@ -24,7 +27,7 @@ PATH = "/api/plugin-settings/llm-categorization"
 def client(store, context, tmp_path, monkeypatch):
     monkeypatch.setenv("SERVER_TOKEN", "fictional-server-token-" * 3)
     configuration = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", ())
-    app = create_app(store=store, settings=configuration, plugins=PluginRegistry((web_plugin, plugin, server_plugin)))
+    app = create_app(store=store, settings=configuration, plugins=PluginRegistry((web_plugin, credentials_plugin, plugin, server_plugin)))
     with TestClient(app, base_url="https://127.0.0.1:5173") as value:
         yield value
 
@@ -109,7 +112,7 @@ def test_actual_profile_suggestions_review_and_reopen(client, store, monkeypatch
     state = category(client, "status").json()
     assert state["active"] == profile and len(state["models"]) == 1
     assert revised["parameters"]["effort"] == "medium"
-    def respond(vault, provider, model, data, prompt, effort):
+    def respond(vault, provider, model, data, prompt, effort, **kwargs):
         assert prompt == "Use the purchase purpose." and effort == "medium"
         return json.dumps({"suggestions": [{"transactionId": "0", "categoryId": one, "score": .95}]})
     monkeypatch.setattr(providers, "complete", respond)

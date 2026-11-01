@@ -1,7 +1,48 @@
 {
   "format_version": 1,
-  "host_version": "2.49.0",
+  "host_version": "2.50.0",
   "plugins": [
+    {
+      "api_version": 1,
+      "authority": "local",
+      "capabilities": [
+        {
+          "composition": "additive",
+          "name": "ai.credentials",
+          "version": 1
+        },
+        {
+          "composition": "additive",
+          "name": "interface.api",
+          "version": 1
+        }
+      ],
+      "conflicts": [],
+      "display_name": "AI credentials",
+      "distribution": "whab_plugin_ai_credentials",
+      "documentation": "https://github.com/Fillll/whab/blob/60cdb140b54206aa3807ed0875daa462712ae21f/whab/app/plugins/automation/ai-credentials/README.md",
+      "entry_point": {
+        "group": "whab.plugins",
+        "name": "ai-credentials",
+        "value": "whab_plugin_ai_credentials.plugin:plugin"
+      },
+      "id": "ai-credentials",
+      "legacy": false,
+      "lifecycle": "restart",
+      "live_support": "restart-required",
+      "maintainer": "Fillll",
+      "repository": "https://github.com/Fillll/whab",
+      "requires": [],
+      "requires_host": "whab>=2.50,<3",
+      "requires_python": ">=3.14",
+      "security": "https://github.com/Fillll/whab/security/advisories/new",
+      "source": "whab/app/plugins/automation/ai-credentials",
+      "state_upgrades": [],
+      "state_version": 1,
+      "support": "maintained",
+      "verifications": [],
+      "version": "1.0.0"
+    },
     {
       "api_version": 1,
       "authority": "local",
@@ -570,7 +611,7 @@
         }
       ],
       "conflicts": [],
-      "display_name": "LLM categorization",
+      "display_name": "AI transaction categorization",
       "distribution": "whab_plugin_llm_categorization",
       "documentation": "https://github.com/Fillll/whab/blob/60cdb140b54206aa3807ed0875daa462712ae21f/whab/app/plugins/automation/llm-categorization/README.md",
       "entry_point": {
@@ -584,8 +625,13 @@
       "live_support": "restart-required",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
-      "requires": [],
-      "requires_host": "whab>=2.43,<3",
+      "requires": [
+        {
+          "min_version": 1,
+          "name": "ai.credentials"
+        }
+      ],
+      "requires_host": "whab>=2.50,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/automation/llm-categorization",
@@ -593,7 +639,7 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [],
-      "version": "1.1.0"
+      "version": "1.2.0"
     },
     {
       "api_version": 1,
@@ -809,6 +855,47 @@
       "authority": "local",
       "capabilities": [
         {
+          "composition": "additive",
+          "name": "interface.api",
+          "version": 1
+        }
+      ],
+      "conflicts": [],
+      "display_name": "Subscriptions",
+      "distribution": "whab_plugin_subscriptions",
+      "documentation": "https://github.com/Fillll/whab/blob/60cdb140b54206aa3807ed0875daa462712ae21f/whab/app/plugins/automation/subscriptions/README.md",
+      "entry_point": {
+        "group": "whab.plugins",
+        "name": "subscriptions",
+        "value": "whab_plugin_subscriptions.plugin:plugin"
+      },
+      "id": "subscriptions",
+      "legacy": false,
+      "lifecycle": "restart",
+      "live_support": "restart-required",
+      "maintainer": "Fillll",
+      "repository": "https://github.com/Fillll/whab",
+      "requires": [
+        {
+          "min_version": 1,
+          "name": "ai.credentials"
+        }
+      ],
+      "requires_host": "whab>=2.50,<3",
+      "requires_python": ">=3.14",
+      "security": "https://github.com/Fillll/whab/security/advisories/new",
+      "source": "whab/app/plugins/automation/subscriptions",
+      "state_upgrades": [],
+      "state_version": 1,
+      "support": "maintained",
+      "verifications": [],
+      "version": "1.0.0"
+    },
+    {
+      "api_version": 1,
+      "authority": "local",
+      "capabilities": [
+        {
           "composition": "singleton",
           "name": "interface.ui",
           "version": 1
@@ -838,7 +925,7 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [],
-      "version": "1.38.1"
+      "version": "1.39.0"
     },
     {
       "api_version": 1,

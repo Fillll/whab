@@ -48,7 +48,9 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | `interface/server/` | `server` | `whab_plugin_server` | HTTPS bearer-authorized public ledger API interface |
 | `storage/client/` | `client` | `whab_plugin_client` | Remote storage and portable connection payload |
 | `automation/random-forest-categorization/` | `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Reviewed-history models and provisional category suggestions |
-| `automation/llm-categorization/` | `llm-categorization` | `whab_plugin_llm_categorization` | Provider-backed category suggestions and local credential settings |
+| `automation/ai-credentials/` | `ai-credentials` | `whab_plugin_ai_credentials` | Shared machine-local provider connections and authenticated requests |
+| `automation/subscriptions/` | `subscriptions` | `whab_plugin_subscriptions` | Subscription labels, repeated-payment cache and cost reports |
+| `automation/llm-categorization/` | `llm-categorization` | `whab_plugin_llm_categorization` | Category prompts, profiles and suggestions using AI credentials |
 | `example/example/` | `example` | `whab_plugin_example` | Separately installed developer teaching report/export |
 | `example/example-branding/` | `example-branding` | `whab_plugin_example_branding` | Offline fictional institution branding |
 | `example/example-file-import/` | `example-file-import` | `whab_plugin_example_file_import` | Bounded fictional account parser |
@@ -99,7 +101,9 @@ This is the canonical supported-set inventory. Keep it aligned with the host's `
 | `server` | `whab_plugin_server` | Disabled |
 | `client` | `whab_plugin_client` | Not selected; choose as storage for a remote connection |
 | `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Disabled |
-| `llm-categorization` | `whab_plugin_llm_categorization` | Disabled |
+| `llm-categorization` | `whab_plugin_llm_categorization` | Disabled; requires AI credentials |
+| `ai-credentials` | `whab_plugin_ai_credentials` | Disabled |
+| `subscriptions` | `whab_plugin_subscriptions` | Disabled; requires AI credentials |
 
 ## Teaching examples
 
