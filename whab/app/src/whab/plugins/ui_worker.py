@@ -30,11 +30,16 @@ def supports_live_visual(plugin):
 
 
 def adapter_info(ui):
-    return {name: getattr(ui, name) for name in sorted(_FLAGS)} if ui is not None else None
+    if ui is None:
+        return None
+    result = {name: getattr(ui, name) for name in sorted(_FLAGS)}
+    if ui.workspace_pages:
+        result["workspace_pages"] = ui.workspace_pages
+    return result
 
 
 def validate_adapter_info(value):
-    if type(value) is not dict or value.keys() != _FLAGS:
+    if type(value) is not dict or value.keys() not in (_FLAGS, _FLAGS | {"workspace_pages"}):
         raise WireError()
     # Keep SDK projection limits authoritative, without touching any directory.
     from pathlib import Path

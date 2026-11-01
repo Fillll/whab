@@ -41,11 +41,14 @@ def _pairs(values):
 
 
 def _flags(value):
-    if type(value) is not dict or value.keys() != set(_FLAGS):
+    if type(value) is not dict or value.keys() not in (set(_FLAGS), set(_FLAGS) | {"workspace_pages"}):
         raise ValueError()
     # Public SDK validation defines projection bounds and strict boolean types.
     UserInterface(Path("templates"), Path("static"), lambda *args, **kw: {}, **value)
-    return MappingProxyType(dict(value))
+    result = dict(value)
+    if "workspace_pages" in result:
+        result["workspace_pages"] = tuple(result["workspace_pages"])
+    return MappingProxyType(result)
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +112,10 @@ def capture_visual(plugin_id, ui, code_identity):
         if type(ui) is not UserInterface:
             raise ValueError()
         resources = ui.resources if ui.resources is not None else capture_resource_paths(ui.templates, ui.static)
-        return VisualBundle(plugin_id, code_identity, resources, {name: getattr(ui, name) for name in _FLAGS})
+        flags = {name: getattr(ui, name) for name in _FLAGS}
+        if ui.workspace_pages:
+            flags["workspace_pages"] = ui.workspace_pages
+        return VisualBundle(plugin_id, code_identity, resources, flags)
     except Exception:
         raise _invalid(plugin_id) from None
 

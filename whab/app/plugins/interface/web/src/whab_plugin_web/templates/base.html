@@ -39,7 +39,7 @@
       </a>
     {% endfor %}
   {% if plugins|selectattr('id','equalto','subscriptions')|list %}
-  <button class="nav-item subscriptions-nav" type="button" aria-label="Subscriptions" title="Subscriptions" data-dialog="subscriptions-dialog">{{ icon('insights',19) }}<span>Subscriptions</span><span class="subscription-job-badge" data-subscriptions-job-badge hidden>Running</span></button>
+  <a class="nav-item {% if page=='subscriptions' %}active{% endif %}" href="{{ url('subscriptions') }}" aria-label="Subscriptions" title="Subscriptions"{% if page=='subscriptions' %} aria-current="page"{% endif %}>{{ icon('subscriptions',19) }}<span>Subscriptions</span><span class="subscription-job-badge" data-subscriptions-job-badge hidden>Running</span></a>
   {% endif %}
   </nav>
   <div class="sidebar-accounts">

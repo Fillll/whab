@@ -4561,7 +4561,7 @@ main:has(.budget-planner) > .demo-ribbon,
 .subscriptions-window { width: min(1600px, calc(100vw - 40px)); max-width: none; max-height: calc(100dvh - 40px); overflow-y: auto; }
 .subscription-header { position: sticky; top: -26px; z-index: 3; background: var(--surface); padding-top: 12px; }
 .subscriptions-window .modal-heading { background: var(--surface); padding: 12px 0; margin-bottom: 12px; }
-.subscriptions-window h3 { font-size: 15px; margin: 26px 0 18px; }
+.subscriptions-workspace h3 { font-size: 15px; margin: 26px 0 18px; }
 .subscription-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 14px; margin: 18px 0; }
 .subscription-toolbar label { display: grid; gap: 6px; font-size: 12px; }
 .subscription-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 24px 0; border-block: 1px solid var(--line); }
@@ -4617,3 +4617,8 @@ main:has(.budget-planner) > .demo-ribbon,
  .subscription-progress-heading { flex-wrap: wrap; }
  .subscription-progress-heading .button { padding: 7px 10px; }
 }
+
+/* Workspace pages share the shell typography and scrolling. */
+.subscriptions-workspace { min-width: 0; }
+.subscriptions-workspace .subscription-header { position: sticky; top: 0; padding-top: 0; background: var(--page); z-index: 3; }
+.subscriptions-workspace .subscription-plans-scroll { max-height: min(60vh, 660px); }

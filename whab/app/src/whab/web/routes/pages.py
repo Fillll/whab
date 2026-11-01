@@ -12,7 +12,7 @@ from whab.domain.dates import current_month
 from whab.plugins import PluginError
 from whab.plugins.sdk import valid_merchant_logo_key
 from whab.services.ledger import LedgerService
-from whab.web.navigation import budget_key, page_url
+from whab.web.navigation import PAGES, budget_key, page_url
 from whab.web.plugin_snapshot import build_snapshot
 from whab.web.schemas import valid_month
 from whab.web.transaction_filters import transaction_period
@@ -69,7 +69,7 @@ def create_router(
     def index(
         request: Request,
         key: str,
-        page: Literal["budget", "transactions", "insights", "accounts"],
+        page: str,
         month_token: str,
         currency: str,
         category: str | None = None,
@@ -83,6 +83,8 @@ def create_router(
     ):
         if not getattr(ui, "available", True):
             raise HTTPException(404, "A visual interface is unavailable.")
+        if page not in PAGES and page not in ui.workspace_pages:
+            raise HTTPException(404, "Workspace page not found.")
         if any(name in request.query_params for name in ("page", "workspace", "month", "currency")):
             raise HTTPException(400, "Routing values belong in the address path.")
         workspace = request.scope.get("whab.workspace", "demo" if key == "demo" else "personal")

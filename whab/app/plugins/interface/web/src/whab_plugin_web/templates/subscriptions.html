@@ -1,0 +1,3 @@
+{% if plugins|selectattr('id','equalto','subscriptions')|list %}
+<div data-subscriptions-mount><h1>Subscriptions</h1><p role="status">Loading subscriptions…</p><noscript>Enable JavaScript to review subscription classifications.</noscript></div>
+{% else %}<div class="page-title-row"><div><h1>Subscriptions</h1><p>Enable the Subscriptions plugin in Settings → Plugins to review your subscriptions.</p></div></div>{% endif %}

@@ -96,7 +96,7 @@ test('progress is based on saved transaction counts, handles preparation, skips 
   renderSubscriptionProgress(panel,state({processed:50,classified:35,reused:10,skipped:5}));
   assert.equal(nodes.get('progress').max,100);assert.equal(nodes.get('progress').value,50);
   assert.match(nodes.get('[data-subscriptions-job-count]').textContent,/50 of 100.*10 reused.*5 changed/);
-  assert.match(nodes.get('[data-subscriptions-job-help]').textContent,/close this view or browser tab/);
+  assert.match(nodes.get('[data-subscriptions-job-help]').textContent,/leave this page or close the browser tab/);
   renderSubscriptionProgress(panel,state({status:'completed',total:0,processed:0}));assert.equal(nodes.get('progress').value,1);
   renderSubscriptionProgress(panel,state({status:'interrupted'}));assert.match(nodes.get('[data-subscriptions-job-help]').textContent,/Completed batches are saved/);
   renderSubscriptionProgress(panel,state({status:'failed',error:'Fictional provider limit'}));assert.equal(nodes.get('[data-subscriptions-job-help]').textContent,'Fictional provider limit');

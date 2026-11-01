@@ -21,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from whab.domain.errors import StoreError
 from whab.domain.money import currency_code
 from whab.plugins import PluginError
-from whab.web.navigation import PAGES, budget_key, page_url, valid_route_key
+from whab.web.navigation import budget_key, page_url, valid_route_key
 from whab.web.schemas import valid_month
 
 from .aliases import RouteAliases
@@ -606,7 +606,7 @@ class BudgetDispatch:
                     raise ValueError
             else:
                 account_route = len(parts) == 7 and valid_route_key(parts[3]) and parts[4] == "transactions"
-                if not account_route and (len(parts) != 6 or parts[3] not in PAGES):
+                if not account_route and (len(parts) != 6 or not valid_route_key(parts[3])):
                     raise ValueError
                 month, currency = parts[-2:]
                 if currency != currency.lower():

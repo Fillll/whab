@@ -14,7 +14,7 @@ export function getContext() {
 }
 
 export function parsePageRoute(url) {
-  const match = url.pathname.match(/^\/budgets\/([^/]+)\/(?:([^/]+)\/)?(budget|transactions|insights|accounts)\/(current-month|\d{4}-\d{2})\/([a-z]{3})$/);
+  const match = url.pathname.match(/^\/budgets\/([^/]+)\/(?:([^/]+)\/)?(budget|transactions|insights|accounts|subscriptions)\/(current-month|\d{4}-\d{2})\/([a-z]{3})$/);
   if (!match || match[2] && match[3] !== 'transactions') return null;
   return {budget: match[1], accountSlug: match[2] || null, page: match[3], month: match[4], currency: match[5]};
 }

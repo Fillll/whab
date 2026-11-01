@@ -66,7 +66,7 @@ function harness({page = 'budget', href = address(page), initial = {}, flush = a
   const accountList = element();
   const accountUpdates = [];
   accountList.replaceChildren = value => accountUpdates.push(value);
-  const navigationLinks = ['budget', 'transactions', 'insights', 'accounts'].map(name => link(address(name)));
+  const navigationLinks = ['budget', 'transactions', 'insights', 'accounts', 'subscriptions'].map(name => link(address(name)));
   navigationLinks[0].setAttribute('aria-current', 'page');
   const account = link(`${address('transactions')}?account=first`, ['sidebar-account']);
   account.dataset.accountId = 'first';
@@ -198,8 +198,8 @@ function harness({page = 'budget', href = address(page), initial = {}, flush = a
     navigationLinks, accountUpdates, original, content: () => content, respond, click, pop};
 }
 
-for (const sourcePage of ['budget', 'transactions', 'insights', 'accounts']) {
-  for (const targetPage of ['budget', 'transactions', 'insights', 'accounts']) {
+for (const sourcePage of ['budget', 'transactions', 'insights', 'accounts', 'subscriptions']) {
+  for (const targetPage of ['budget', 'transactions', 'insights', 'accounts', 'subscriptions']) {
     test(`${sourcePage} to ${targetPage} changes only page content and retains the current shell`, async () => {
       const state = harness({page: sourcePage});
       const target = address(targetPage, '2026-11');

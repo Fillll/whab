@@ -45,7 +45,7 @@ def fragment_client(tmp_path, store):
         }}
 
     settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="alternate")
-    registry = PluginRegistry((Plugin("alternate", "Alternate", ui=UserInterface(templates, static, build)),))
+    registry = PluginRegistry((Plugin("alternate", "Alternate", ui=UserInterface(templates, static, build, workspace_pages=("reports",))),))
     with TestClient(create_app(store=store, settings=settings, plugins=registry), base_url=BASE) as client:
         yield client
 
@@ -173,3 +173,13 @@ def test_fragment_context_and_data_exclude_private_bank_state(fragment_client, s
     data = json.loads(re.search(r'<script id="transport-data">(.*?)</script>', result.text, re.S)[1])
     assert not {"items", "token", "cursor", "encryptionKey"}.intersection(data)
     assert store.db.serialize() == before
+
+
+def test_visual_declared_workspace_pages_keep_scoped_fragment_transport(fragment_client):
+    path = "/budgets/home/reports/2026-10/usd"
+    full = fragment_client.get(path)
+    partial = fragment_client.get(path, headers=FRAGMENT)
+    assert context(full) == context(partial)
+    assert context(partial)["page"] == "reports"
+    assert context(partial)["canonicalUrl"] == "/budgets/my-budget/reports/2026-10/usd"
+    assert fragment_client.get("/budgets/home/undeclared/2026-10/usd").status_code == 404
