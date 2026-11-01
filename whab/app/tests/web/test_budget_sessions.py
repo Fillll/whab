@@ -599,3 +599,55 @@ def test_corrupt_recent_index_fails_before_opening_storage(tmp_path, raw):
     with pytest.raises(StoreError, match="recent budget list is unreadable"):
         create_app(settings=settings(tmp_path))
     assert not (tmp_path / "data").exists()
+
+
+@pytest.mark.parametrize("scoped", [False, True])
+def test_saved_budget_with_new_missing_dependency_has_actionable_recovery_and_reopens_after_repair(tmp_path, store, scoped):
+    session = BudgetSession.create(tmp_path, "sandbox", "Fictional legacy AI budget", ("llm-categorization",), path=tmp_path / "fictional.whab")
+    store.add_account("personal", {"name": "Fictional retained wallet", "type": "depository", "balance": 10000})
+    session.bind(store)
+    session.context("llm-categorization").write_file("retained.bin", b"fictional legacy plugin state")
+    configuration = settings(tmp_path)
+    host = BudgetHost(configuration)
+    host._remember(session)
+    with TestClient(create_app(settings=configuration, budget_host=host), base_url=BASE) as client:
+        client.cookies.set("whab-budget", session.id)
+        prefix = f"/budgets/{session.id}" if scoped else ""
+        api_path = prefix + "/api/workspace?workspace=personal"
+        page = prefix + "/budget/current-month/usd" if scoped else "/"
+        for path in (api_path, page):
+            response = client.get(path)
+            assert response.status_code == 409
+            assert "ai-credentials" in response.text and "compatible dependency" in response.text
+            assert "Fictional retained wallet" not in response.text
+            assert response.headers["cache-control"] == "no-store"
+        assert session.id not in host.applications
+        assert "/budget-recovery" in client.get(page).text
+        # A deliberate metadata repair keeps the complete ledger and plugin files.
+        repaired = BudgetSession.open(tmp_path, "sandbox", session.path)
+        repaired.save_selection((*repaired.selection, "ai-credentials"))
+        response = client.get(api_path)
+        assert response.status_code == 200
+        assert response.json()["accounts"][0]["name"] == "Fictional retained wallet"
+        active = host.applications[session.id][1]
+        assert active.context("llm-categorization").read_file("retained.bin") == b"fictional legacy plugin state"
+
+
+@pytest.mark.parametrize("scoped", [False, True])
+def test_authored_plugin_startup_errors_are_escaped_in_recovery_html(tmp_path, monkeypatch, scoped):
+    from uuid import uuid4
+
+    configuration = settings(tmp_path)
+    host = BudgetHost(configuration)
+    identifier = str(uuid4())
+    host.recent[identifier] = {"id": identifier, "name": "Fictional", "path": str(tmp_path / "fictional.whab")}
+    async def fail(*args, **kwargs):
+        raise PluginError('Enable the <fictional> plugin & retry.', code="plugin_dependency")
+    monkeypatch.setattr(host, "activate", fail)
+    with TestClient(create_app(settings=configuration, budget_host=host), base_url=BASE) as client:
+        client.cookies.set("whab-budget", identifier)
+        path = f"/budgets/{identifier}/budget/current-month/usd" if scoped else "/"
+        response = client.get(path)
+        assert response.status_code == 409
+        assert "&lt;fictional&gt;" in response.text and "&amp;" in response.text
+        assert "<fictional>" not in response.text
