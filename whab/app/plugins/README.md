@@ -49,6 +49,8 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | `storage/client/` | `client` | `whab_plugin_client` | Remote storage and portable connection payload |
 | `automation/random-forest-categorization/` | `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Reviewed-history models and provisional category suggestions |
 | `automation/ai-credentials/` | `ai-credentials` | `whab_plugin_ai_credentials` | Shared machine-local provider connections and authenticated requests |
+| `interface/cli/` | `cli` | `whab_plugin_cli` | Noninteractive JSON terminal interface over public HTTPS operations |
+| `automation/subscriptions-ai/` | `subscriptions-ai` | `whab_plugin_subscriptions_ai` | Optional model-based subscription classification |
 | `automation/subscriptions/` | `subscriptions` | `whab_plugin_subscriptions` | Subscription labels, repeated-payment cache and cost reports |
 | `automation/llm-categorization/` | `llm-categorization` | `whab_plugin_llm_categorization` | Category prompts, profiles and suggestions using AI credentials |
 | `example/example/` | `example` | `whab_plugin_example` | Separately installed developer teaching report/export |
@@ -103,7 +105,9 @@ This is the canonical supported-set inventory. Keep it aligned with the host's `
 | `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Disabled |
 | `llm-categorization` | `whab_plugin_llm_categorization` | Disabled; requires AI credentials |
 | `ai-credentials` | `whab_plugin_ai_credentials` | Disabled |
-| `subscriptions` | `whab_plugin_subscriptions` | Disabled; requires AI credentials |
+| `subscriptions` | `whab_plugin_subscriptions` | Disabled; manual operation needs no AI |
+| `subscriptions-ai` | `whab_plugin_subscriptions_ai` | Disabled; requires Subscriptions and AI credentials |
+| `cli` | `whab_plugin_cli` | Installed terminal command; no AI required |
 
 ## Teaching examples
 

@@ -1,0 +1,21 @@
+<!doctype html><html lang="en" data-theme="light"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manual subscriptions fictional preview</title><link rel="stylesheet" href="../../src/whab_plugin_web/static/styles.css">
+<style>body{display:block;padding:24px}main{display:block;max-width:1280px;margin:auto}.subscriptions-window{position:static;width:100%;max-width:none;max-height:none;margin:0}</style>
+<script id="whab-context" type="application/json">{"workspace":"personal","currency":"USD","month":"2026-11","page":"subscriptions","apiPrefix":"/fictional"}</script>
+<div id="toast" hidden><span></span></div><div id="subscriptions-workspace-cache" hidden></div>
+<main><h1>Subscriptions</h1><p>Fictional manual workflow. No model or provider connection.</p><div data-subscriptions-mount><section id="subscriptions-workspace" class="subscriptions-window">
+<p data-subscriptions-status></p><p data-subscriptions-error hidden></p><div data-subscriptions-progress hidden></div><button data-subscriptions-stop hidden>Stop classification</button><div data-subscriptions-content></div>
+</section></div></main>
+<script type="module">
+const config={provider:'openai',connectionId:'',model:'',effort:'default',consent:false};
+const transaction={id:'fictional-one',date:'2026-11-01',merchant:'Fictional Music',amount:1700,category:'Entertainment / Music',account:'Fictional Checking',status:'unclassified',cadence:'unknown',source:'',fingerprint:'fictional-fingerprint'};
+const report={config,aiAvailable:false,classificationMode:'manual',job:{status:'idle'},subscriptions:[],transactions:[transaction],estimatedMonthly:0,estimatedAnnual:0,actualMonth:0,unclassified:1,needsReview:0,months:[],byCategory:[],byMerchant:[],asOfDate:'2026-11-01',chargesSince:'2025-11-02'};
+window.previewRequests=[];
+window.fetch=async(url,options)=>{
+ const body=JSON.parse(options.body);window.previewRequests.push({url,action:body.action});
+ if(String(url).includes('ai-credentials')) throw new Error('Provider access is forbidden in manual mode');
+ if(body.action==='override'){Object.assign(transaction,{status:body.decision.isSubscription?'subscription':'not-subscription',cadence:body.decision.cadence,source:'manual'});report.estimatedMonthly=body.decision.isSubscription?1700:0;report.estimatedAnnual=report.estimatedMonthly*12;report.unclassified=0;report.subscriptions=body.decision.isSubscription?[{...transaction,monthly:1700,annual:20400,occurrences:1,occurrencesLast12Months:1,active:true}]:[];report.byCategory=body.decision.isSubscription?[{name:transaction.category,amount:1700}]:[];report.byMerchant=body.decision.isSubscription?[{name:transaction.merchant,amount:1700}]:[];}
+ return {ok:true,json:async()=>body.action==='job'?{status:'idle'}:structuredClone(report)};
+};
+const {initSubscriptions}=await import('../../src/whab_plugin_web/static/subscriptions.js');initSubscriptions();
+</script></html>

@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "host_version": "2.51.0",
+  "host_version": "2.52.0",
   "plugins": [
     {
       "api_version": 1,
@@ -78,6 +78,42 @@
       "support": "maintained",
       "verifications": [],
       "version": "1.4.1"
+    },
+    {
+      "api_version": 1,
+      "authority": "local",
+      "capabilities": [
+        {
+          "composition": "additive",
+          "name": "interface.api",
+          "version": 1
+        }
+      ],
+      "conflicts": [],
+      "display_name": "Command line interface",
+      "distribution": "whab_plugin_cli",
+      "documentation": "https://github.com/Fillll/whab/blob/60cdb140b54206aa3807ed0875daa462712ae21f/whab/app/plugins/interface/cli/README.md",
+      "entry_point": {
+        "group": "whab.plugins",
+        "name": "cli",
+        "value": "whab_plugin_cli.plugin:plugin"
+      },
+      "id": "cli",
+      "legacy": false,
+      "lifecycle": "restart",
+      "live_support": "restart-required",
+      "maintainer": "Fillll",
+      "repository": "https://github.com/Fillll/whab",
+      "requires": [],
+      "requires_host": "whab>=2.52,<3",
+      "requires_python": ">=3.14",
+      "security": "https://github.com/Fillll/whab/security/advisories/new",
+      "source": "whab/app/plugins/interface/cli",
+      "state_upgrades": [],
+      "state_version": 1,
+      "support": "maintained",
+      "verifications": [],
+      "version": "1.0.0"
     },
     {
       "api_version": 1,
@@ -858,6 +894,11 @@
           "composition": "additive",
           "name": "interface.api",
           "version": 1
+        },
+        {
+          "composition": "additive",
+          "name": "subscriptions.labels",
+          "version": 1
         }
       ],
       "conflicts": [],
@@ -875,13 +916,8 @@
       "live_support": "restart-required",
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
-      "requires": [
-        {
-          "min_version": 1,
-          "name": "ai.credentials"
-        }
-      ],
-      "requires_host": "whab>=2.50,<3",
+      "requires": [],
+      "requires_host": "whab>=2.52,<3",
       "requires_python": ">=3.14",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/automation/subscriptions",
@@ -889,7 +925,52 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [],
-      "version": "1.2.0"
+      "version": "1.3.0"
+    },
+    {
+      "api_version": 1,
+      "authority": "local",
+      "capabilities": [
+        {
+          "composition": "additive",
+          "name": "interface.api",
+          "version": 1
+        }
+      ],
+      "conflicts": [],
+      "display_name": "AI subscription classification",
+      "distribution": "whab_plugin_subscriptions_ai",
+      "documentation": "https://github.com/Fillll/whab/blob/60cdb140b54206aa3807ed0875daa462712ae21f/whab/app/plugins/automation/subscriptions-ai/README.md",
+      "entry_point": {
+        "group": "whab.plugins",
+        "name": "subscriptions-ai",
+        "value": "whab_plugin_subscriptions_ai.plugin:plugin"
+      },
+      "id": "subscriptions-ai",
+      "legacy": false,
+      "lifecycle": "restart",
+      "live_support": "restart-required",
+      "maintainer": "Fillll",
+      "repository": "https://github.com/Fillll/whab",
+      "requires": [
+        {
+          "min_version": 1,
+          "name": "subscriptions.labels"
+        },
+        {
+          "min_version": 1,
+          "name": "ai.credentials"
+        }
+      ],
+      "requires_host": "whab>=2.52,<3",
+      "requires_python": ">=3.14",
+      "security": "https://github.com/Fillll/whab/security/advisories/new",
+      "source": "whab/app/plugins/automation/subscriptions-ai",
+      "state_upgrades": [],
+      "state_version": 1,
+      "support": "maintained",
+      "verifications": [],
+      "version": "1.0.0"
     },
     {
       "api_version": 1,
@@ -925,7 +1006,7 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [],
-      "version": "1.42.0"
+      "version": "1.43.0"
     },
     {
       "api_version": 1,

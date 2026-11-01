@@ -10,6 +10,7 @@ from whab_plugin_ai_credentials import api as ai
 from whab_plugin_ai_credentials.plugin import plugin as credentials_plugin
 from whab_plugin_subscriptions.plugin import plugin
 from whab_plugin_subscriptions.routes import router
+from whab_plugin_subscriptions_ai.plugin import plugin as ai_plugin
 from whab_plugin_web.plugin import plugin as web_plugin
 
 from whab.app import create_app
@@ -27,7 +28,7 @@ def client(store, tmp_path, monkeypatch):
     app = create_app(
         store=store,
         settings=settings,
-        plugins=PluginRegistry((web_plugin, credentials_plugin, plugin)),
+        plugins=PluginRegistry((web_plugin, credentials_plugin, plugin, ai_plugin)),
     )
     with TestClient(app, base_url="https://127.0.0.1:5173") as value:
         yield value
@@ -44,6 +45,13 @@ def request(client, action, **values):
             **values,
         },
     )
+
+
+def test_manual_mode_does_not_start_an_inference_scan(client):
+    from uuid import uuid4
+
+    result = request(client, "start", operationId=str(uuid4()))
+    assert result.status_code == 400 and "manually" in result.json()["error"]
 
 
 def test_host_scopes_non_categorizer_settings_and_persists_review_without_ledger_edits(
@@ -227,7 +235,7 @@ def test_routes_keep_tls_origin_host_and_strict_body_validation(client):
 
 def test_missing_local_budget_fails_safely():
     app = FastAPI()
-    app.include_router(router(InterfaceContext(SimpleNamespace(), {}, "sandbox", "fictional")))
+    app.include_router(router(InterfaceContext(__import__("whab.services.ledger", fromlist=["LedgerService"]).LedgerService(SimpleNamespace()), {}, "sandbox", "fictional")))
     with TestClient(app, base_url="https://127.0.0.1", raise_server_exceptions=False) as client:
         assert request(client, "status").status_code == 500
 

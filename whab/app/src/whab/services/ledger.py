@@ -72,7 +72,55 @@ class LedgerService:
         self._receipts = OrderedDict()
         self._lock = lock if lock is not None else RLock()
         self.categorization = None
+        self._features = {}
         self._on_commit = on_commit
+
+    def register_feature(self, plugin_id, operations):
+        """Register public feature operations during a local interface's startup."""
+        from whab.plugins.features import FeatureOperations
+        from whab.plugins.sdk import valid_plugin_name
+
+        if not valid_plugin_name(plugin_id) or type(operations) is not FeatureOperations:
+            raise ValueError("Use a plugin ID and public FeatureOperations record.")
+        operations.__post_init__()
+        with self._lock:
+            if plugin_id in self._features:
+                raise ValueError("Feature operations are already registered.")
+            self._features[plugin_id] = operations
+
+    @property
+    def operation_lock(self):
+        """Shared reentrant authority lock for cooperating local feature adapters."""
+        return self._lock
+
+    def feature_adapter(self, plugin_id):
+        """In-process public collaboration API; never exposed by remote transport."""
+        with self._lock:
+            if plugin_id not in self._features:
+                raise StoreError("Enable the required feature on this budget first.")
+            return self._features[plugin_id].adapter
+
+    def _feature(self, workspace, payload, *, command=False):
+        if (type(payload) is not dict or set(payload) != {"pluginId", "action", "parameters"}
+                or any(type(payload[key]) is not str for key in ("pluginId", "action"))
+                or type(payload["parameters"]) is not dict):
+            raise StoreError("Invalid feature operation fields.")
+        try:
+            if len(dumps(payload, allow_nan=False).encode()) > 1024 * 1024:
+                raise ValueError()
+        except (TypeError, ValueError):
+            raise StoreError("Feature parameters must be bounded JSON data.") from None
+        feature = self._features.get(payload["pluginId"])
+        if feature is None:
+            remote = getattr(self._store, "feature_command" if command else "feature_query", None)
+            if callable(remote):
+                return remote(workspace, payload)
+            raise StoreError("Enable the requested feature on this budget first.")
+        actions = feature.commands if command else feature.queries
+        if payload["action"] not in actions:
+            raise StoreError("Unknown feature operation.")
+        callback = feature.command if command else feature.query
+        return callback(workspace, payload["action"], deepcopy(payload["parameters"]))
 
     @property
     def revision(self) -> str:
@@ -110,12 +158,22 @@ class LedgerService:
         if type(workspace) is not str or workspace not in {"demo", "personal"}:
             raise StoreError("Invalid workspace.")
 
-    def query(self, operation: str, workspace: str, month: str | None = None) -> dict:
+    def query(self, operation: str, workspace: str, month: str | None = None, *, parameters=None) -> dict:
         self._workspace(workspace)
         if month is not None:
             _month(month)
         with self._lock:
-            if operation == "category_suggestions":
+            if parameters is not None and operation != "feature":
+                raise StoreError("Only feature queries accept parameters.")
+            if operation == "features":
+                remote = getattr(self._store, "features", None)
+                data = remote(workspace) if callable(remote) else {
+                    identifier: {"queries": list(feature.queries), "commands": list(feature.commands)}
+                    for identifier, feature in self._features.items()
+                }
+            elif operation == "feature":
+                data = self._feature(workspace, parameters)
+            elif operation == "category_suggestions":
                 data = self.category_suggestions(workspace)
             elif operation == "portable":
                 exporter = getattr(self._store, "export_budget", None)
@@ -133,6 +191,7 @@ class LedgerService:
     @staticmethod
     def _validate(operation: str, payload: dict) -> dict:
         fields = {
+            "feature": ({"pluginId", "action", "parameters"}, set()),
             "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype"}),
             "update_account": ({"accountId"}, {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}),
             "add_category": ({"name", "target"}, {"group", "parentId", "currency"}),
@@ -239,7 +298,7 @@ class LedgerService:
                     raise RequestConflict("Request ID already belongs to another command.")
                 return deepcopy(response)
             durable_replay = getattr(self._store, "durable_command_replay", None)
-            if operation != "categorization" and callable(durable_replay):
+            if operation not in {"categorization", "feature"} and callable(durable_replay):
                 replayed = durable_replay(request_id, fingerprint)
                 if replayed is not None:
                     return deepcopy(replayed)
@@ -248,9 +307,11 @@ class LedgerService:
             response_revision = str(uuid4())
             durable_scope = getattr(self._store, "durable_command_scope", None)
             scope = (durable_scope(request_id, fingerprint, response_revision)
-                     if operation != "categorization" and callable(durable_scope) else nullcontext())
+                     if operation not in {"categorization", "feature"} and callable(durable_scope) else nullcontext())
             with scope:
-                if operation == "categorization":
+                if operation == "feature":
+                    data = _public(self._feature(workspace, payload, command=True))
+                elif operation == "categorization":
                     if self.categorization is not None:
                         data = self.categorization.action(workspace, payload)
                     else:

@@ -137,13 +137,15 @@ class RemoteStore:
         self._revision = body["revision"]
         return body["data"]
 
-    def _query(self, operation, workspace, month=None):
+    def _query(self, operation, workspace, month=None, *, parameters=None):
         params = {"workspace": workspace}
         if month is not None:
             params["month"] = month
         with self._admit(), self._lock:
             try:
-                response = self._client.get(self._path + "/queries/" + operation, params=params)
+                response = (self._client.post(self._path + "/queries", json={
+                    "operation": operation, "workspace": workspace, "parameters": parameters,
+                }) if parameters is not None else self._client.get(self._path + "/queries/" + operation, params=params))
             except httpx.HTTPError:
                 raise StoreError("Remote budget connection failed.") from None
             return self._response(response)
@@ -253,6 +255,15 @@ class RemoteStore:
 
     def categories(self, workspace):
         return self._query("categories", workspace)
+
+    def features(self, workspace):
+        return self._query("features", workspace)
+
+    def feature_query(self, workspace, payload):
+        return self._query("feature", workspace, parameters=payload)
+
+    def feature_command(self, workspace, payload):
+        return self._command("feature", workspace, payload)
 
     def transactions(self, workspace, month=None):
         return self._query("transactions", workspace, month)

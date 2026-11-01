@@ -8,9 +8,11 @@ from threading import Event, RLock, Thread
 from time import monotonic
 from uuid import UUID
 
+from whab_plugin_subscriptions.api import digest, excluded, fingerprint
+
 from whab.plugins import StoreError
 
-from .engine import Engine, configuration, digest, excluded, fingerprint
+from .engine import Engine, configuration
 
 ACTIVE = {"preparing", "running", "stopping"}
 STATUSES = ACTIVE | {"idle", "completed", "stopped", "failed", "interrupted"}
@@ -46,9 +48,11 @@ def idle():
 
 
 class Jobs:
+    engine_factory = staticmethod(Engine)
+
     def __init__(self, context):
         self.context = context
-        self.lock = RLock()
+        self.lock = getattr(getattr(context, "service", None), "operation_lock", None) or RLock()
         self.states, self.threads, self.stops = {}, {}, {}
         self.closing = self.closed = False
 

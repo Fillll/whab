@@ -9,9 +9,9 @@ from uuid import uuid4
 
 import pytest
 from whab_plugin_ai_credentials import api as ai
-from whab_plugin_subscriptions import jobs as module
-from whab_plugin_subscriptions.engine import Engine
-from whab_plugin_subscriptions.jobs import FILE, Jobs, idle
+from whab_plugin_subscriptions_ai import jobs as module
+from whab_plugin_subscriptions_ai.engine import Engine
+from whab_plugin_subscriptions_ai.jobs import FILE, Jobs, idle
 
 from whab.plugins import StoreError
 

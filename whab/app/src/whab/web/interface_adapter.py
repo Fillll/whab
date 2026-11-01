@@ -23,6 +23,14 @@ class RemoteCommand(BaseModel):
     expected_revision: Annotated[StrictStr, Field(min_length=1, max_length=200)]
 
 
+class RemoteQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    operation: StrictStr
+    workspace: Literal["demo", "personal"]
+    month: str | None = None
+    parameters: dict | None = None
+
+
 class BoundRemoteInterface:
     """Prepared host-only adapter. Tokens and service handles never cross IPC."""
 
@@ -58,14 +66,15 @@ class BoundRemoteInterface:
         if identifier != self.context.budget_id:
             raise HTTPException(404, "Budget not found.")
 
-    def query(self, identifier, operation, workspace, month):
+    def query(self, identifier, operation, workspace, month, parameters=None):
         from whab.domain.errors import StoreError
 
         self.check_budget(identifier)
         if not self.adapter.queries:
             raise HTTPException(405, "Remote queries are disabled by this interface.")
         try:
-            result = self.context.service.query(operation, workspace, month)
+            result = (self.context.service.query(operation, workspace, month, parameters=parameters)
+                      if parameters is not None else self.context.service.query(operation, workspace, month))
         except StoreError as error:
             raise HTTPException(400, str(error)) from None
         except Exception:
@@ -151,5 +160,9 @@ def create_remote_router(resolve, legacy=lambda: False):
     @router.post("/budgets/{budget_id}/commands")
     def command(budget_id: str, body: RemoteCommand, selected: BoundRemoteInterface = Depends(binding)):
         return selected.command(budget_id, body)
+
+    @router.post("/budgets/{budget_id}/queries")
+    def feature_query(budget_id: str, body: RemoteQuery, selected: BoundRemoteInterface = Depends(binding)):
+        return selected.query(budget_id, body.operation, body.workspace, body.month, body.parameters)
 
     return router

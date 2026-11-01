@@ -15,6 +15,12 @@
     },
     {
       "schema_version": 1,
+      "id": "cli",
+      "category": "interface",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
       "id": "client",
       "category": "storage",
       "dependencies": []
@@ -118,7 +124,17 @@
       "schema_version": 1,
       "id": "subscriptions",
       "category": "automation",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
+      "id": "subscriptions-ai",
+      "category": "automation",
       "dependencies": [
+        {
+          "id": "subscriptions",
+          "version": ">=1.3.0,<2"
+        },
         {
           "id": "ai-credentials",
           "version": ">=1.0.0,<2"

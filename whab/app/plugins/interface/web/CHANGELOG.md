@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.43.0 — 2026-11-01
+
+PR: [#141](https://github.com/Fillll/whab/pull/141)
+
+- Make manual subscription labeling available without model configuration or provider requests.
+
 ## 1.42.0 — 2026-11-01
 
 PR: [#139](https://github.com/Fillll/whab/pull/139)
