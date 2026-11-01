@@ -322,11 +322,14 @@ class Engine:
                 "weekly": (52, 12),
                 "unknown": (0, 1),
             }[cadence]
-            amount = sum(r["amount"] for r in charges if r["date"] == latest["date"])
-            estimate = (amount * numerator + denominator // 2) // denominator
+            latest_charges = [r for r in charges if r["date"] == latest["date"]]
+            amount = sum(r["amount"] for r in latest_charges)
+            estimates = [(r, (r["amount"] * numerator + denominator // 2) // denominator) for r in latest_charges]
+            estimate = sum(value for _, value in estimates)
             subscriptions.append(
                 {
                     **latest,
+                    "amount": amount,
                     "cadence": cadence,
                     "monthly": estimate,
                     "active": active,
@@ -335,7 +338,8 @@ class Engine:
                 }
             )
             if active:
-                by_category[latest["category"]] += estimate
+                for charge, value in estimates:
+                    by_category[charge["category"]] += value
                 by_merchant[latest["merchant"]] += estimate
         def ranked(values):
             return [{"name": k, "amount": v} for k, v in sorted(values.items(), key=lambda r: (-r[1], r[0]))]

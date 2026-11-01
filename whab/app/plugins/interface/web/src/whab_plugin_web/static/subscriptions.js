@@ -154,6 +154,6 @@ export function initSubscriptions() {
   }
   dialog.addEventListener('close', () => {stop = true;});
   // Native dialog.open changes do not emit an open event.
-  const observer = new MutationObserver(() => {if (dialog.open && !busy) void perform(refresh);});
+  const observer = new MutationObserver(() => {if (dialog.open && !busy) { status.textContent = 'Loading subscriptions…'; dialog.scrollTop = 0; void perform(async () => { await refresh(); dialog.scrollTop = 0; }); }});
   observer.observe(dialog, {attributes: true, attributeFilter: ['open']});
 }

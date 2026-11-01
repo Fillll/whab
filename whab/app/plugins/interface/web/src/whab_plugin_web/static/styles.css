@@ -4591,3 +4591,6 @@ main:has(.budget-planner) > .demo-ribbon,
  .subscription-month small { grid-column: 2 / -1; }
  .subscriptions-nav { padding-inline: 8px; }
 }
+
+.subscriptions-window .llm-profile-form label:has(input[type="checkbox"]) { flex-direction: row; align-items: flex-start; line-height: 1.6; }
+.subscriptions-window .llm-profile-form input[type="checkbox"] { order: -1; flex: 0 0 auto; width: 16px; margin-top: 2px; }

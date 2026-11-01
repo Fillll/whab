@@ -265,3 +265,31 @@ def test_report_actual_spikes_monthly_equivalents_currency_history_and_unknown_i
         write_file=lambda n, r: files.__setitem__(n, r),
     )
     assert Engine(other).label(row) is None
+
+
+def test_price_increases_use_latest_charge_and_past_views_do_not_use_future_charges(context, row):
+    engine = Engine(context)
+    old = {**row, "id": "old-price", "date": "2026-09-15", "amount": 1000}
+    new = {**row, "id": "new-price", "date": "2026-10-15", "amount": 1500}
+    for item in (old, new):
+        engine.put(item, YES, "manual")
+    accounts = [{"id": "account", "name": "Account"}]
+    current = engine.report([old, new], accounts, [], "2026-10", "USD")
+    previous = engine.report([old, new], accounts, [], "2026-09", "USD")
+    assert len(current["subscriptions"]) == 1
+    assert current["estimatedMonthly"] == 1500
+    assert current["months"][-1]["change"] == 500
+    assert previous["estimatedMonthly"] == 1000
+    assert previous["actualMonth"] == 1000
+
+
+def test_same_day_plans_preserve_category_breakdown_and_count_all_charges(context, row):
+    engine = Engine(context)
+    second = {**row, "id": "two", "amount": 600, "categoryId": "work"}
+    for item in (row, second):
+        engine.put(item, YES, "manual")
+    report = engine.report([row, second], [{"id": "account", "name": "Account"}],
+                           [{"id": "media", "name": "Media"}, {"id": "work", "name": "Work"}], "2026-10", "USD")
+    assert report["estimatedMonthly"] == 1800
+    assert report["subscriptions"][0]["amount"] == 1800
+    assert report["byCategory"] == [{"name": "Media", "amount": 1200}, {"name": "Work", "amount": 600}]
