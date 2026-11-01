@@ -39,6 +39,7 @@ def validate_value(schema, value):
     """Validate finite JSON without resolving network schemas or showing values."""
     try:
         json.dumps(value, allow_nan=False)
+        # Reject retrieval even for references reached through extension schemas.
         Draft202012Validator(schema, registry=Registry()).validate(value)
     except (ValueError, TypeError, ValidationError, Unresolvable):
         raise ValueError("Operation data does not match its documented schema.") from None

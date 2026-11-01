@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.53.1 — 2026-11-01
+
+PR: [#143](https://github.com/Fillll/whab/pull/143)
+
+- Keep operation documentation validation offline even when local schema references reach extension schemas containing remote references.
+
 ## 2.53.0 — 2026-11-01
 
 PR: [#142](https://github.com/Fillll/whab/pull/142)
