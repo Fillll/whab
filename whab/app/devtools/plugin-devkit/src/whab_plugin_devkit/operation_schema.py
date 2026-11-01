@@ -16,13 +16,22 @@ FIELDS = {"name", "kind", "summary", "input", "output", "examples", "side_effect
 
 def _schemas(value):
     if isinstance(value, dict):
+        for field in value.get("properties", {}).values():
+            if type(field) is not dict or not field.get("description"):
+                raise ValueError("Operation fields require descriptions.")
+            if "default" in field:
+                validate_value(field, field["default"])
         for key, item in value.items():
             if key in {"$ref", "$dynamicRef"} and (type(item) is not str or not item.startswith("#")):
                 raise ValueError("Operation schemas must use local references only.")
-            _schemas(item)
-    elif isinstance(value, list):
-        for item in value:
-            _schemas(item)
+            if key in {"properties", "patternProperties", "$defs", "dependentSchemas"}:
+                for child in item.values():
+                    _schemas(child)
+            elif key in {"allOf", "anyOf", "oneOf", "prefixItems"}:
+                for child in item:
+                    _schemas(child)
+            elif key in {"items", "contains", "additionalProperties", "unevaluatedProperties", "unevaluatedItems", "propertyNames", "not", "if", "then", "else", "contentSchema"}:
+                _schemas(item)
 
 
 def validate_value(schema, value):
@@ -66,16 +75,11 @@ def validate_document(document, plugin_id=None):
             schema = operation[name]
             if type(schema) is not dict or not schema.get("description"):
                 raise ValueError("Operation schemas require a description.")
-            _schemas(schema)
             try:
                 Draft202012Validator.check_schema(schema)
             except SchemaError:
                 raise ValueError("Invalid operation JSON Schema.") from None
-            for field in schema.get("properties", {}).values():
-                if type(field) is not dict or not field.get("description"):
-                    raise ValueError("Operation fields require descriptions.")
-                if "default" in field:
-                    validate_value(field, field["default"])
+            _schemas(schema)
         for example in operation["examples"]:
             if type(example) is not dict or set(example) != {"input", "output"}:
                 raise ValueError("Examples require input and output.")

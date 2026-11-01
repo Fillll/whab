@@ -67,6 +67,30 @@ def test_complete_contract_defaults_examples_and_finite_json():
         schema.validate_value({"$ref": "#/$defs/absent"}, {})
 
 
+@pytest.mark.parametrize("invalid_default", [False, True])
+def test_nested_fields_require_descriptions_and_valid_defaults(invalid_default):
+    value = document()
+    nested = {"type": "integer", "default": "invalid"} if invalid_default else {"type": "integer"}
+    if invalid_default:
+        nested["description"] = "Nested integer."
+    value["operations"][0]["input"]["properties"]["nested"] = {
+        "type": "object", "description": "Nested controls.", "properties": {"count": nested}
+    }
+    with pytest.raises(ValueError):
+        schema.validate_document(value)
+
+
+def test_schema_walk_checks_subschemas_and_leaves_literal_values_alone():
+    value = document()
+    row = value["operations"][0]
+    row["input"]["properties"]["properties"] = {"description": "A literal JSON object.", "const": {"$ref": "https://example.invalid/data", "properties": None}}
+    row["input"]["allOf"] = [True, {"additionalProperties": True}]
+    assert schema.validate_document(value)
+    row["input"]["allOf"].append({"$ref": "https://example.invalid/no-network"})
+    with pytest.raises(ValueError):
+        schema.validate_document(value)
+
+
 @pytest.mark.parametrize(
     "case",
     [
