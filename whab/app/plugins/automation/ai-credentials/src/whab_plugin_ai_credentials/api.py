@@ -11,6 +11,7 @@ from whab.plugins import StoreError
 
 from . import providers
 from .private import PROVIDERS, Vault, identifier
+from .private import document as document
 
 EFFORTS = providers.EFFORTS
 

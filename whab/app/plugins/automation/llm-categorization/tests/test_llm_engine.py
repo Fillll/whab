@@ -254,3 +254,14 @@ def test_revision_at_profile_limit_and_invalid_name_preserves_original(engine, c
     replacement = engine.save(result.value.value, "Revision at limit")
     assert len(engine.index()["models"]) == 20
     assert engine.index()["active"] == replacement["id"]
+
+def test_category_portable_validation_keeps_legacy_error_behavior():
+    from whab_plugin_llm_categorization.state import document, identifier
+
+    assert identifier("00000000-0000-0000-0000-000000000000")
+    assert identifier(None) is False
+    assert identifier("invalid") is False
+    for raw in (b"x" * (1024 * 1024 + 1), b"[]", b"invalid", None):
+        with pytest.raises(StoreError):
+            document(raw)
+    assert document(json.dumps({"profiles": []}).encode()) == {"profiles": []}

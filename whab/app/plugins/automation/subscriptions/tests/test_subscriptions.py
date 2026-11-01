@@ -61,7 +61,7 @@ def test_positive_and_negative_caches_reopen_and_invalidate_material_edits(
     ):
         assert reopened.label({**row, key: value}) is None
     assert reopened.label({**row, "categoryId": "different", "note": "changed"})
-    reopened.override([*rows, new], row["id"], fingerprint(row), NO)
+    reopened.override([*rows, new, {**row, "id": "pending", "pending": True}, {**row, "id": "different", "merchant": "Other"}], row["id"], fingerprint(row), NO)
     assert all(reopened.label(r)["decision"] == NO for r in [*rows, new])
     fourth = {**row, "id": "four", "date": "2026-12-15"}
     assert reopened.classify([*rows, new, fourth])["reused"] == 1

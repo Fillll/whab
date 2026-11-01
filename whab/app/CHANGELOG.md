@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.50.0 — 2026-10-31
+
+PR: [#135](https://github.com/Fillll/whab/pull/135)
+
+- Supply budget-isolated namespaces to all local plugin settings transports on local authorities, including plugins without categorization.
+
 ## 2.49.0 — 2026-10-28
 
 PR: [#133](https://github.com/Fillll/whab/pull/133)

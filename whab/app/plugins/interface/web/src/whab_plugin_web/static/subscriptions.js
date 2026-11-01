@@ -31,7 +31,7 @@ export function initSubscriptions() {
     const node = el('button', label, cls); node.type = 'button';
     node.addEventListener('click', () => perform(handler)); return node;
   }
-  async function refresh() { last = await call('status'); if (dialog.open) render(last); }
+  async function refresh() { last = await call('status'); if (dialog.open) { render(last); if (status.textContent === 'Loading subscriptions…') status.textContent = ''; } }
   async function classify() {
     stop = false; let total = 0, reused = 0, progress;
     do {

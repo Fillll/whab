@@ -265,6 +265,12 @@ class Engine:
         names = {r["id"]: r["name"] for r in categories}
         account_names = {r["id"]: r["name"] for r in accounts}
         visible, series, monthly = [], defaultdict(list), defaultdict(int)
+        reference = min(
+            date.today(),
+            date.fromisoformat(
+                month + f"-{calendar.monthrange(int(month[:4]), int(month[5:]))[1]}"
+            ),
+        )
         for row in sorted(rows, key=lambda r: (r["date"], r["id"]), reverse=True):
             if row["currency"] != currency:
                 continue
@@ -295,16 +301,10 @@ class Engine:
                     "fingerprint": fingerprint(row),
                 }
             )
-            if state == "subscription":
-                series[(pattern(row), decision["cadence"])].append(visible[-1])
+            if state == "subscription" and row["date"] <= reference.isoformat():
+                series[(pattern({**row, "amount": 0}), decision["cadence"])].append(visible[-1])
                 monthly[row["date"][:7]] += row["amount"]
         subscriptions, by_category, by_merchant = [], defaultdict(int), defaultdict(int)
-        reference = min(
-            date.today(),
-            date.fromisoformat(
-                month + f"-{calendar.monthrange(int(month[:4]), int(month[5:]))[1]}"
-            ),
-        )
         for (_, cadence), charges in series.items():
             latest = charges[0]
             gap = (reference - date.fromisoformat(latest["date"])).days

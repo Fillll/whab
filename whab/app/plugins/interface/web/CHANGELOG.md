@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.39.0 — 2026-10-31
+
+PR: [#135](https://github.com/Fillll/whab/pull/135)
+
+- Add the Subscriptions sidebar button and review view, plus centralized AI credentials settings shared by both AI consumers.
+
 ## 1.38.1 — 2026-10-30
 
 PR: [#134](https://github.com/Fillll/whab/pull/134)
