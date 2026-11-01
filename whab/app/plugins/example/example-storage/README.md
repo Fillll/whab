@@ -62,3 +62,7 @@ preserves and refuses that incomplete file; it never resets or silently adopts i
 The host owns TLS/authentication, budget identity, financial validation, request
 revision/retry, encryption keys, admission and authority. Worker code remains
 trusted code; the process boundary is containment, not a security sandbox.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_example_storage/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin example-storage`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

@@ -38,12 +38,30 @@ def generate_project(plugin_id, capability, destination, *, ci_ref=None):
     category = {"reporting": "insight", "branding": "interface", "file-import": "ingestion", "categorization": "automation",
                 "api": "interface", "ui": "interface", "bank": "ingestion", "remote-client": "storage", "storage": "storage"}[capability]
     (source / "plugin.json").write_text(json.dumps({"schema_version": 1, "id": plugin_id, "category": category, "dependencies": []}, indent=2) + "\n")
+    from .operation_schema import validate_document
+
+    documentation = {"schema_version": 1, "plugin_id": plugin_id,
+        "summary": "Generated " + capability + " plugin. Document each public operation before adding callable behavior.",
+        "delegates": ["core"] if capability in {"storage", "remote-client", "api", "ui"} else [],
+        "operations": [{"kind": "sdk", "name": capability,
+            "summary": "Host-invoked " + capability + " capability; see the generated README and typed SDK contract.",
+            "input": {"type": "object", "description": "Host-supplied typed capability inputs.", "properties": {}, "additionalProperties": True},
+            "output": {"description": "Typed SDK capability result; not a remote JSON invocation."},
+            "examples": [{"input": {}, "output": None}],
+            "side_effects": "Only the capability's declared scoped effects; no implicit inference or financial changes.",
+            "permissions": "Host-scoped SDK access. Public remote operations require separate explicit registration.",
+            "scope": "Addressed budget and workspace; currencies remain separate.",
+            "errors": ["Invalid input or unavailable capability is rejected with a safe authored error."],
+            "retry": "Follow the owning SDK lifecycle; remote mutations retain original request IDs and revisions.",
+            "availability": "SDK callback only; not directly callable through the CLI."}]}
+    validate_document(documentation, plugin_id)
+    (source / "operations.json").write_text(json.dumps(documentation, indent=2) + "\n")
     tests = destination / "tests"
     tests.mkdir()
     template = files("whab_plugin_devkit").joinpath("templates")
     replacements = {"__PLUGIN_ID__": plugin_id, "__MODULE__": module,
                     "__HOST_MINIMUM__": {"api": "2.34", "ui": "2.36", "bank": "2.38", "remote-client": "2.40", "storage": "2.41"}.get(capability, "2.22"),
-                    "__KIT_MINIMUM__": {"api": "0.6", "ui": "0.7", "bank": "0.8", "remote-client": "0.9", "storage": "0.10"}.get(capability, "0.2"),
+                    "__KIT_MINIMUM__": "0.11",
                     "__REFERENCE_TEST_REQUIREMENT__": template.joinpath("remote-client_test_dependencies.txt" if capability == "remote-client" else "api_test_dependencies.txt").read_text().strip() if capability in {"api", "ui", "bank", "remote-client"} else "",
                     "__TOKEN_SETTING__": plugin_id.replace("-", "_").upper() + "_TOKEN",
                     "__URL_SETTING__": plugin_id.replace("-", "_").upper() + "_URL",
@@ -57,6 +75,10 @@ def generate_project(plugin_id, capability, destination, *, ci_ref=None):
         for old, new in replacements.items():
             value = value.replace(old, new)
         path.write_text(value)
+    operation_test = tests / "test_plugin.py"
+    operation_test.write_text(operation_test.read_text() + "\n\ndef test_packaged_operation_documentation():\n    import json\n    from importlib.resources import files\n    from whab_plugin_devkit.operation_schema import validate_document\n    document = json.loads(files(" + repr(module) + ").joinpath('operations.json').read_bytes())\n    assert validate_document(document, " + repr(plugin_id) + ")['plugin_id'] == " + repr(plugin_id) + "\n")
+    readme = destination / "README.md"
+    readme.write_text(readme.read_text() + "\n## Operation documentation\n\nThe packaged [operations.json](src/" + module + "/operations.json) is a required part of this plugin. Keep it complete for every exposed operation; input/output schemas, examples, side effects, scope, permissions, errors and retry rules are checked without executing hooks. Use whab-cli describe --plugin " + plugin_id + " --json to inspect it offline. SDK descriptions do not authorize remote calls.\n")
     (destination / "LICENSE").write_text(template.joinpath("LICENSE.txt").read_text())
     if capability == "storage":
         for resource, path in (("storage_backend.py.txt", source / "backend.py"),

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.53.0 — 2026-11-01
+
+PR: [#142](https://github.com/Fillll/whab/pull/142)
+
+- Require complete packaged operation contracts, derive command fields and feature validation from documented schemas, and expose read-only authority discovery without loading inactive plugin hooks.
+
 ## 2.52.0 — 2026-11-01
 
 PR: [#141](https://github.com/Fillll/whab/pull/141)

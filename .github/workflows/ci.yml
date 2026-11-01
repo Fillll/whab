@@ -41,8 +41,8 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: "22"
-      - name: Install lint tool only
-        run: python -m pip install --disable-pip-version-check ruff==0.17.0
+      - name: Install lint and operation-schema tools
+        run: python -m pip install --disable-pip-version-check ruff==0.17.0 jsonschema==4.26.0
       - name: Lint, provenance, docs and browser tests once
         working-directory: whab/app
         run: |

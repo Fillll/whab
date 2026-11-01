@@ -1,0 +1,745 @@
+{
+  "schema_version": 1,
+  "plugin_id": "ai-credentials",
+  "summary": "Shared machine-local provider connections; credentials are never public ledger commands.",
+  "delegates": [],
+  "operations": [
+    {
+      "name": "status",
+      "kind": "local",
+      "summary": "Local provider connection action status. Saving credentials never performs inference.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Credential settings action.",
+            "const": "status"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Provider connection.",
+            "enum": [
+              "chatgpt",
+              "openai",
+              "anthropic",
+              "openrouter"
+            ],
+            "default": "openai"
+          },
+          "connections": {
+            "type": "object",
+            "description": "Opaque provider connection UUID references; no secret values.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Secret input, used only for save-key. Documentation examples intentionally leave it blank.",
+            "maxLength": 4096,
+            "writeOnly": true,
+            "default": ""
+          }
+        },
+        "required": [
+          "workspace",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Action-specific local response. No API key, OAuth token or saved credential is returned.",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "description": "Provider id/name/connectionId/connected flags; no secret values.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "promptRules": {
+            "type": "string",
+            "description": "Visible categorization prompt guidance."
+          },
+          "efforts": {
+            "type": "object",
+            "description": "Supported reasoning effort choices."
+          },
+          "categories": {
+            "type": "array",
+            "description": "Current assignable id/name/currency category summaries.",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": []
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "action": "status"
+          },
+          "output": {
+            "providers": [],
+            "promptRules": "",
+            "efforts": {},
+            "categories": []
+          }
+        }
+      ],
+      "side_effects": "Local settings action; read actions inspect state, while explicit mutations change only the documented namespace.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/ai-credentials"
+    },
+    {
+      "name": "save-key",
+      "kind": "local",
+      "summary": "Local provider connection action save-key. Saving credentials never performs inference.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Credential settings action.",
+            "const": "save-key"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Provider connection.",
+            "enum": [
+              "chatgpt",
+              "openai",
+              "anthropic",
+              "openrouter"
+            ],
+            "default": "openai"
+          },
+          "connections": {
+            "type": "object",
+            "description": "Opaque provider connection UUID references; no secret values.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Secret input, used only for save-key. Documentation examples intentionally leave it blank.",
+            "maxLength": 4096,
+            "writeOnly": true,
+            "default": ""
+          }
+        },
+        "required": [
+          "workspace",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Action-specific local response. No API key, OAuth token or saved credential is returned.",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the local action succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Optional local confirmation or revocation status."
+          }
+        },
+        "required": []
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "action": "save-key",
+            "api_key": ""
+          },
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "Explicitly saves a supplied secret in owner-only machine files. The example intentionally leaves it blank; supply your own value locally. No inference.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/ai-credentials"
+    },
+    {
+      "name": "models",
+      "kind": "local",
+      "summary": "Local provider connection action models. Saving credentials never performs inference.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Credential settings action.",
+            "const": "models"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Provider connection.",
+            "enum": [
+              "chatgpt",
+              "openai",
+              "anthropic",
+              "openrouter"
+            ],
+            "default": "openai"
+          },
+          "connections": {
+            "type": "object",
+            "description": "Opaque provider connection UUID references; no secret values.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Secret input, used only for save-key. Documentation examples intentionally leave it blank.",
+            "maxLength": 4096,
+            "writeOnly": true,
+            "default": ""
+          }
+        },
+        "required": [
+          "workspace",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Action-specific local response. No API key, OAuth token or saved credential is returned.",
+        "properties": {
+          "models": {
+            "type": "array",
+            "description": "Provider model IDs and visible names.",
+            "items": {}
+          }
+        },
+        "required": []
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "action": "models"
+          },
+          "output": {
+            "models": []
+          }
+        }
+      ],
+      "side_effects": "Contacts the selected provider to load the available model catalog using its saved connection. No inference or financial mutation.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/ai-credentials"
+    },
+    {
+      "name": "connect",
+      "kind": "local",
+      "summary": "Local provider connection action connect. Saving credentials never performs inference.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Credential settings action.",
+            "const": "connect"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Provider connection.",
+            "enum": [
+              "chatgpt",
+              "openai",
+              "anthropic",
+              "openrouter"
+            ],
+            "default": "openai"
+          },
+          "connections": {
+            "type": "object",
+            "description": "Opaque provider connection UUID references; no secret values.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Secret input, used only for save-key. Documentation examples intentionally leave it blank.",
+            "maxLength": 4096,
+            "writeOnly": true,
+            "default": ""
+          }
+        },
+        "required": [
+          "workspace",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Action-specific local response. No API key, OAuth token or saved credential is returned.",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Provider authorization URL; open locally to finish sign-in."
+          }
+        },
+        "required": []
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "action": "connect"
+          },
+          "output": {
+            "url": "https://example.org/fictional-authorization"
+          }
+        }
+      ],
+      "side_effects": "Explicitly starts the native ChatGPT OAuth sign-in flow and a bounded loopback callback. No inference or financial mutation.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/ai-credentials"
+    },
+    {
+      "name": "auth-status",
+      "kind": "local",
+      "summary": "Local provider connection action auth-status. Saving credentials never performs inference.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Credential settings action.",
+            "const": "auth-status"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Provider connection.",
+            "enum": [
+              "chatgpt",
+              "openai",
+              "anthropic",
+              "openrouter"
+            ],
+            "default": "openai"
+          },
+          "connections": {
+            "type": "object",
+            "description": "Opaque provider connection UUID references; no secret values.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Secret input, used only for save-key. Documentation examples intentionally leave it blank.",
+            "maxLength": 4096,
+            "writeOnly": true,
+            "default": ""
+          }
+        },
+        "required": [
+          "workspace",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Action-specific local response. No API key, OAuth token or saved credential is returned.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Sign-in status; idle when no attempt exists."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sanitized authorization error or null."
+          }
+        },
+        "required": []
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "action": "auth-status"
+          },
+          "output": {
+            "status": "idle"
+          }
+        }
+      ],
+      "side_effects": "Local settings action; read actions inspect state, while explicit mutations change only the documented namespace.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/ai-credentials"
+    },
+    {
+      "name": "disconnect",
+      "kind": "local",
+      "summary": "Local provider connection action disconnect. Saving credentials never performs inference.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Credential settings action.",
+            "const": "disconnect"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Provider connection.",
+            "enum": [
+              "chatgpt",
+              "openai",
+              "anthropic",
+              "openrouter"
+            ],
+            "default": "openai"
+          },
+          "connections": {
+            "type": "object",
+            "description": "Opaque provider connection UUID references; no secret values.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Secret input, used only for save-key. Documentation examples intentionally leave it blank.",
+            "maxLength": 4096,
+            "writeOnly": true,
+            "default": ""
+          }
+        },
+        "required": [
+          "workspace",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Action-specific local response. No API key, OAuth token or saved credential is returned.",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the local action succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Optional local confirmation or revocation status."
+          }
+        },
+        "required": []
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "action": "disconnect"
+          },
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "Local settings action; read actions inspect state, while explicit mutations change only the documented namespace.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/ai-credentials"
+    },
+    {
+      "name": "cancel-sign-in",
+      "kind": "local",
+      "summary": "Local provider connection action cancel-sign-in. Saving credentials never performs inference.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Credential settings action.",
+            "const": "cancel-sign-in"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Provider connection.",
+            "enum": [
+              "chatgpt",
+              "openai",
+              "anthropic",
+              "openrouter"
+            ],
+            "default": "openai"
+          },
+          "connections": {
+            "type": "object",
+            "description": "Opaque provider connection UUID references; no secret values.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Secret input, used only for save-key. Documentation examples intentionally leave it blank.",
+            "maxLength": 4096,
+            "writeOnly": true,
+            "default": ""
+          }
+        },
+        "required": [
+          "workspace",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Action-specific local response. No API key, OAuth token or saved credential is returned.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Canceled or current sign-in status."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sanitized authorization error or null."
+          }
+        },
+        "required": []
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "action": "cancel-sign-in"
+          },
+          "output": {
+            "status": "idle"
+          }
+        }
+      ],
+      "side_effects": "Local settings action; read actions inspect state, while explicit mutations change only the documented namespace.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/ai-credentials"
+    },
+    {
+      "name": "adopt",
+      "kind": "local",
+      "summary": "Local provider connection action adopt. Saving credentials never performs inference.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Addressed workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Credential settings action.",
+            "const": "adopt"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Provider connection.",
+            "enum": [
+              "chatgpt",
+              "openai",
+              "anthropic",
+              "openrouter"
+            ],
+            "default": "openai"
+          },
+          "connections": {
+            "type": "object",
+            "description": "Opaque provider connection UUID references; no secret values.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4
+          },
+          "api_key": {
+            "type": "string",
+            "description": "Secret input, used only for save-key. Documentation examples intentionally leave it blank.",
+            "maxLength": 4096,
+            "writeOnly": true,
+            "default": ""
+          }
+        },
+        "required": [
+          "workspace",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Action-specific local response. No API key, OAuth token or saved credential is returned.",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the local action succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Optional local confirmation or revocation status."
+          }
+        },
+        "required": []
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "demo",
+            "action": "adopt"
+          },
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "Local settings action; read actions inspect state, while explicit mutations change only the documented namespace.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "POST /api/plugin-settings/ai-credentials"
+    }
+  ]
+}

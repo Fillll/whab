@@ -87,3 +87,7 @@ From the application directory, use `.venv/bin/python -m pytest plugins/ingestio
 ### Connection settings
 
 Open **Settings → Plugins → Plaid → Settings** to connect, manage, reconnect, sync or disconnect banks. Accounts lists financial accounts without connection setup controls. Disconnect confirmation stays inside the same settings page, and imported records remain in the budget. OAuth continuation keeps its existing addressed Accounts return path and original budget/environment checks, then returns to Plaid settings. The provider emits the public `whab:plugin-settings` document event while opening/exiting Link so a visual adapter can suspend its native settings modal without stacking dialogs. Completed operations reopen `#plugin-settings-plaid`.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_plaid/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin plaid`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

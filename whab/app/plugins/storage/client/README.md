@@ -110,3 +110,7 @@ Category suggestions and model settings are forwarded through public ledger oper
 ## Development checks
 
 From `whab/app/`, use `.venv/bin/python -m pytest plugins/storage/client/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. Documentation-only edits can use `--docs`. Follow the [two-budget isolation recipe](../../../../docs/architecture.md#budget-isolation-verification) for changes to remote targets, contexts, retry state or plugin files. See [plugin contribution rules](../../README.md#test-ownership) for the complete check contract.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_client/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin client`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

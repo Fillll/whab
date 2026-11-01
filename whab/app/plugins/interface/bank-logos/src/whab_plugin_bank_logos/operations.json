@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "plugin_id": "bank-logos",
+  "summary": "Optional public institution logos and a local cache; no private bank records are transmitted.",
+  "delegates": [],
+  "operations": [
+    {
+      "name": "BankLogos.resolve",
+      "kind": "sdk",
+      "summary": "Resolve a public institution logo key.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Public institution identity or logo key."
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "key": "fictional-bank"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Resolution is local. Fetch may contact a public icon provider and update its cache; no financial data is sent.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "BankLogos.fetch",
+      "kind": "sdk",
+      "summary": "Fetch a bounded public raster logo on an explicit image request.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Public institution identity or logo key."
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "key": "fictional-bank"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Resolution is local. Fetch may contact a public icon provider and update its cache; no financial data is sent.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "flush-cache",
+      "kind": "local",
+      "summary": "Delete downloaded public logos and reset failed lookups; saved bank websites remain unchanged.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Explicit local action.",
+            "const": "flush-cache"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Action-specific local response; secrets are never returned."
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "flush-cache"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "Local settings action; read actions inspect state, while explicit mutations change only the documented namespace.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
+      "availability": "/api/plugins/bank-logos/settings/actions/flush-cache"
+    }
+  ]
+}

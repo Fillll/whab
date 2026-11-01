@@ -1,0 +1,850 @@
+{
+  "schema_version": 1,
+  "plugin_id": "json",
+  "summary": "Local JSON ledger backend with atomic persisted state and compatible financial operations.",
+  "delegates": [
+    "core"
+  ],
+  "operations": [
+    {
+      "name": "StorageBackend.close",
+      "kind": "sdk",
+      "summary": "StorageBackend.close public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": null
+        }
+      ],
+      "side_effects": "Release owned resources; no financial mutation or provider inference.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.accounts",
+      "kind": "sdk",
+      "summary": "StorageBackend.accounts public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "fictional"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.categories",
+      "kind": "sdk",
+      "summary": "StorageBackend.categories public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "fictional"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.transactions",
+      "kind": "sdk",
+      "summary": "StorageBackend.transactions public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "month": {
+            "description": "month: str | None. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "fictional",
+            "month": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.workspace",
+      "kind": "sdk",
+      "summary": "StorageBackend.workspace public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "month": {
+            "description": "month: str | None. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "fictional",
+            "month": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.add_account",
+      "kind": "sdk",
+      "summary": "StorageBackend.add_account public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "account": {
+            "description": "account: dict. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [
+          "workspace",
+          "account"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "fictional",
+            "account": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.add_category",
+      "kind": "sdk",
+      "summary": "StorageBackend.add_category public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "category": {
+            "description": "category: dict. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [
+          "workspace",
+          "category"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "fictional",
+            "category": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.add_transaction",
+      "kind": "sdk",
+      "summary": "StorageBackend.add_transaction public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "transaction": {
+            "description": "transaction: dict. Typed SDK value supplied by the host; this is not a CLI argument."
+          },
+          "source": {
+            "description": "source: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace",
+          "transaction"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "fictional",
+            "transaction": null,
+            "source": "fictional"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.edit_transaction",
+      "kind": "sdk",
+      "summary": "StorageBackend.edit_transaction public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "transaction_id": {
+            "description": "transaction_id: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "category_id": {
+            "description": "category_id: object. Typed SDK value supplied by the host; this is not a CLI argument."
+          },
+          "reviewed": {
+            "description": "reviewed: bool | None. Typed SDK value supplied by the host; this is not a CLI argument."
+          },
+          "note": {
+            "description": "note: object. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [
+          "workspace",
+          "transaction_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "fictional",
+            "transaction_id": "fictional",
+            "category_id": null,
+            "reviewed": null,
+            "note": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.assign",
+      "kind": "sdk",
+      "summary": "StorageBackend.assign public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "category_id": {
+            "description": "category_id: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "month": {
+            "description": "month: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "assigned": {
+            "description": "assigned: int. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "workspace",
+          "category_id",
+          "month",
+          "assigned"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "fictional",
+            "category_id": "fictional",
+            "month": "fictional",
+            "assigned": 0
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.items",
+      "kind": "sdk",
+      "summary": "StorageBackend.items public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": null
+        }
+      ],
+      "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.get_item",
+      "kind": "sdk",
+      "summary": "StorageBackend.get_item public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "item_id": {
+            "description": "item_id: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "item_id": "fictional"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.save_item",
+      "kind": "sdk",
+      "summary": "StorageBackend.save_item public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "item_id": {
+            "description": "item_id: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "encrypted_token": {
+            "description": "encrypted_token: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "institution_name": {
+            "description": "institution_name: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "encrypted_token",
+          "institution_name"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "item_id": "fictional",
+            "encrypted_token": "fictional",
+            "institution_name": "fictional"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.set_item_status",
+      "kind": "sdk",
+      "summary": "StorageBackend.set_item_status public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "item_id": {
+            "description": "item_id: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "status": {
+            "description": "status: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "error": {
+            "description": "error: str | None. Typed SDK value supplied by the host; this is not a CLI argument."
+          }
+        },
+        "required": [
+          "item_id",
+          "status",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "item_id": "fictional",
+            "status": "fictional",
+            "error": null
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.disconnect_item",
+      "kind": "sdk",
+      "summary": "StorageBackend.disconnect_item public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "item_id": {
+            "description": "item_id: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "item_id": "fictional"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.apply_sync",
+      "kind": "sdk",
+      "summary": "StorageBackend.apply_sync public SDK callback.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "item_id": {
+            "description": "item_id: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "changes": {
+            "description": "changes: SyncChanges. Typed SDK value supplied by the host; this is not a CLI argument."
+          },
+          "cursor": {
+            "description": "cursor: str | None. Typed SDK value supplied by the host; this is not a CLI argument."
+          },
+          "accounts": {
+            "description": "accounts: list[ImportedAccount] | None. Typed SDK value supplied by the host; this is not a CLI argument."
+          },
+          "historical_complete": {
+            "description": "historical_complete: bool. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "item_id",
+          "changes",
+          "cursor"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "item_id": "fictional",
+            "changes": null,
+            "cursor": null,
+            "accounts": null,
+            "historical_complete": false
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    }
+  ]
+}

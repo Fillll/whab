@@ -22,7 +22,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-__MODULE__ = ["plugin.json"]
+__MODULE__ = ["plugin.json", "operations.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

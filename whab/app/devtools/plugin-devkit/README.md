@@ -538,3 +538,11 @@ own-file formats require explicit versioned readers; opaque provider records sta
 host-encrypted and outside portable payloads. An incomplete initial native file or
 unknown native schema is preserved and refused rather than reset. No test uses an
 external provider connection, real budget, household key or OS trust change.
+
+## Required operation documentation
+
+Every generated/new plugin packages operations.json beside plugin.json. Edit this contract whenever public operations change. It declares operation kind/availability, purpose, complete input/output schemas, defaults/choices, fictional examples, effects, permissions, budget/workspace/currency scope, errors and retry behavior. SDK callbacks and local-only settings remain explicitly labeled; documentation does not make them remotely callable.
+
+Run `whab-plugin docs --directory /absolute/project` to validate the project without loading hooks. The installed candidate check also requires valid packaged documentation before loading its descriptor. Missing metadata, malformed schemas, remote schema references, invalid examples and omitted package resources fail the check. Blank credential examples are structural templates only and are never executed.
+
+`whab-cli --help`, `whab-cli command edit_transaction --help`, and `whab-cli feature-command subscriptions set_label --help` use installed metadata. `whab-cli describe --json` returns full offline schemas without a checkout, URL or credentials. The standalone toolkit validator is generated from the host's canonical validator so genuine older-host conformance does not import new host internals.

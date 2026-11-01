@@ -63,3 +63,7 @@ Python code with the current user's operating-system access.
 ## Development checks
 
 From `whab/app/`, use `.venv/bin/python -m pytest plugins/interface/server/tests` or `.venv/bin/python scripts/check.py --quick` during iteration, then `.venv/bin/python scripts/check.py` before submitting. Documentation-only edits can use `--docs`. Changes to budget targeting, authorization or command identity also need the [two-budget isolation checks](../../../../docs/architecture.md#budget-isolation-verification). See [plugin contribution rules](../../README.md#test-ownership) for the complete check contract.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_server/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin server`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

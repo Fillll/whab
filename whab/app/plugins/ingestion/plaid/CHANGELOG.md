@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.4.1 — 2026-11-01
+
+PR: [#142](https://github.com/Fillll/whab/pull/142)
+
+- Package required public operation schemas, examples, access/effect/scope/error/retry documentation for offline CLI discovery.
+
 ## 1.4.0 — 2026-10-27
 
 PR: [#124](https://github.com/Fillll/whab/pull/124)

@@ -9,22 +9,32 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
+from whab.plugins.documentation import core_document, installed_catalog
 
-def parser():
-    root = argparse.ArgumentParser(description="Read and change an explicitly addressed WHAB budget.")
-    root.add_argument("--url", required=True, help="HTTPS server origin")
-    root.add_argument("--budget", required=True, help="Stable budget ID")
-    root.add_argument("--token-env", default="WHAB_CLI_TOKEN", help="Environment variable containing the server access token")
+from .help import contextual_help, describe, overview, render_catalog
+
+
+def parser(argv=()):
+    catalog = installed_catalog()
+    root = argparse.ArgumentParser(description="Read and change an explicitly addressed WHAB budget.",
+        epilog=overview(catalog), formatter_class=argparse.RawDescriptionHelpFormatter)
+    root.add_argument("--url", help="HTTPS server origin; omit for offline documentation")
+    root.add_argument("--budget", help="Stable budget ID; required for online operations")
+    root.add_argument("--token-env", default="WHAB_CLI_TOKEN", help="Environment variable containing the server access token (default: WHAB_CLI_TOKEN)")
     root.add_argument("--ca", help="Explicit CA certificate file; otherwise use system trust")
-    root.add_argument("--workspace", choices=("personal", "demo"), default="personal")
+    root.add_argument("--workspace", choices=("personal", "demo"), default="personal", help="Addressed workspace (default: personal)")
     commands = root.add_subparsers(dest="kind", required=True)
-    query = commands.add_parser("query", help="Read a public ledger projection")
-    query.add_argument("operation", choices=("accounts", "categories", "transactions", "workspace", "features"))
+    topic = contextual_help(argv, catalog)
+    def group(name, text):
+        return commands.add_parser(name, help=text, epilog=topic, formatter_class=argparse.RawDescriptionHelpFormatter)
+    query = group("query", "Read a public ledger projection")
+    query.add_argument("operation", choices=tuple(row["name"] for row in core_document()["operations"] if row["kind"] == "query"))
     query.add_argument("--month")
-    command = commands.add_parser("command", help="Apply an explicit public ledger command")
-    command.add_argument("operation")
+    query.add_argument("--parameters", help="JSON parameters for a generic feature query")
+    command = group("command", "Apply an explicit public ledger command")
+    command.add_argument("operation", choices=tuple(row["name"] for row in core_document()["operations"] if row["kind"] == "command"))
     for name in ("feature-query", "feature-command"):
-        feature = commands.add_parser(name, help="Call an operation listed by query features")
+        feature = group(name, "Call an operation listed by query features")
         feature.add_argument("plugin")
         feature.add_argument("action")
     for command_parser in (command, commands.choices["feature-query"], commands.choices["feature-command"]):
@@ -32,11 +42,19 @@ def parser():
     for command_parser in (command, commands.choices["feature-command"]):
         command_parser.add_argument("--revision", required=True, help="Revision returned by the read used to make this decision")
         command_parser.add_argument("--request-id", required=True, help="Unique intent ID; retain it unchanged for an exact retry")
+    docs = group("describe", "Read full operation documentation without executing operations")
+    docs.add_argument("--json", action="store_true", help="Output machine-readable schemas and examples")
+    docs.add_argument("--offline", action="store_true", help="Use installed package documentation even when a URL is supplied")
+    docs.add_argument("--plugin", help="Filter to core or an installed plugin ID")
+    docs.add_argument("--kind", dest="filter_kind", choices=("query", "command", "feature-query", "feature-command", "local", "sdk"))
+    docs.add_argument("--operation", help="Filter by exact operation name")
     return root
 
 
 def request(args):
     """Build a detached intent before opening a network connection."""
+    if not args.url or not args.budget:
+        raise ValueError("Online operations require --url and --budget. Use --help or describe offline.")
     origin = urlsplit(args.url)
     if (origin.scheme != "https" or not origin.hostname or origin.username is not None
             or origin.password is not None or origin.path not in ("", "/")
@@ -49,12 +67,16 @@ def request(args):
     if not args.budget or len(args.budget) > 200 or any(ord(c) < 32 for c in args.budget):
         raise ValueError("Choose a valid budget ID.")
     path = "/remote/v1/budgets/" + quote(args.budget, safe="")
-    if args.kind == "query":
+    if args.kind == "describe":
+        return token, "GET", path + "/queries/describe", {"params": {"workspace": args.workspace}}
+    if args.kind == "query" and args.operation != "feature":
         params = {"workspace": args.workspace}
         if args.month is not None:
             params["month"] = args.month
         return token, "GET", path + "/queries/" + args.operation, {"params": params}
     raw = sys.stdin.read(1024 * 1024 + 1) if args.parameters == "-" else args.parameters
+    if raw is None:
+        raise ValueError("This operation requires JSON parameters.")
     if len(raw.encode()) > 1024 * 1024:
         raise ValueError("Parameters exceed 1 MiB.")
     values = json.loads(raw)
@@ -62,7 +84,7 @@ def request(args):
         raise ValueError("Parameters must be a JSON object.")
     json.dumps(values, allow_nan=False)
     payload = {"pluginId": args.plugin, "action": args.action, "parameters": values} if args.kind.startswith("feature-") else values
-    if args.kind == "feature-query":
+    if args.kind == "feature-query" or args.kind == "query":
         return token, "POST", path + "/queries", {"json": {
             "operation": "feature", "workspace": args.workspace, "parameters": payload,
         }}
@@ -74,8 +96,13 @@ def request(args):
 
 
 def main(argv=None):
-    args = parser().parse_args(argv)
+    argv = sys.argv[1:] if argv is None else argv
     try:
+        args = parser(argv).parse_args(argv)
+        if args.kind == "describe" and (not args.url or args.offline):
+            data = describe(installed_catalog(), plugin=args.plugin, kind=args.filter_kind, name=args.operation)
+            print(json.dumps(data, allow_nan=False) if args.json else render_catalog(data))
+            return 0
         token, method, path, kwargs = request(args)
         with httpx.Client(base_url=args.url.rstrip("/"),
                           headers={"Authorization": "Bearer " + token},
@@ -94,7 +121,11 @@ def main(argv=None):
                         or type(result.get("revision")) is not str or not result["revision"]
                         or "data" not in result):
                     raise ValueError("WHAB returned an invalid response or another budget.")
-        print(json.dumps(result, allow_nan=False))
+        if args.kind == "describe":
+            result = describe(result["data"], plugin=args.plugin, kind=args.filter_kind, name=args.operation)
+            print(json.dumps(result, allow_nan=False) if args.json else render_catalog(result))
+        else:
+            print(json.dumps(result, allow_nan=False))
         return 0
     except (ValueError, OSError, httpx.HTTPError):
         # Do not echo transport exceptions, request payloads or credentials.

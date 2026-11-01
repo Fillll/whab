@@ -39,3 +39,7 @@ host floors; the toolkit itself still supports 2.22. Build/runtime/test dependen
 resolution uses a controlled wheelhouse and is separate from capability selection.
 Missing reviewed wheels fail the check. Caller-authorized project code executes
 without inherited workflow secrets or an OS sandbox.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_example_api/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin example-api`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

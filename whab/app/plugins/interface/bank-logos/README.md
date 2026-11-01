@@ -22,3 +22,7 @@ legacy direct helper functions remain available to provider tests.
 Resolution stays local. Icon Horse is the fixed artwork provider at `https://icon.horse`; each image request uses only `https://icon.horse/icon/<public-hostname>`. The plugin sends a curated bank hostname or the public bank hostname explicitly entered in account settings. It never fetches the entered bank URL directly or sends account names, balances, transactions or bank credentials. Fetches use bounded bytes, short timeouts, no redirects and no environment proxies. Provider tests must mock HTTP requests.
 
 From the application directory, use `.venv/bin/python -m pytest plugins/interface/bank-logos/tests` or `.venv/bin/python scripts/check.py --quick` during iteration. Run `.venv/bin/python scripts/check.py` before submitting; use `--docs` for documentation-only edits. See [plugin contribution rules](../../README.md#test-ownership) for the complete check contract.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_bank_logos/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin bank-logos`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

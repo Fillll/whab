@@ -21,3 +21,7 @@ Version 1.4.0 declares **`whab>=2.24,<3`**, SDK `api_version=1`, and an explicit
 Insights use `AccountSnapshot.on_budget` to count only activity in on-budget accounts; off-budget activity remains in the transaction export. Insights use core's fixed money format for the snapshot's selected currency: `$1,234.56` for USD, `EUR 1,234.56` for EUR, `JPY 1,234` for JPY, and the corresponding ISO minor-unit precision for other supported currencies. The host supplies one currency per snapshot, so reports never combine or convert currencies.
 
 The CSV export retains its existing `amount_cents` integer column for compatibility and appends `currency`. Despite the legacy column name, each amount is in that currency's minor units: `1234,JPY` means JPY 1,234, while `1234,USD` means $12.34. Dates retain core's `YYYY-MM-DD` format. There are no exchange rates or locale-dependent formatting settings.
+
+## Operation documentation
+
+The packaged [operations.json](src/whab_plugin_example/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin example`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

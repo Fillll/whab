@@ -1,5 +1,11 @@
 # Remote budget server plugin changelog
 
+## 1.1.2 — 2026-11-01
+
+PR: [#142](https://github.com/Fillll/whab/pull/142)
+
+- Package required public operation schemas, examples, access/effect/scope/error/retry documentation for offline CLI discovery.
+
 ## 1.1.1 — 2026-10-25
 
 PR: [#113](https://github.com/Fillll/whab/pull/113)

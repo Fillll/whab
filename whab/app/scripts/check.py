@@ -35,7 +35,7 @@ def preflight(*, docs_only: bool, quick: bool, env: dict[str, str] | None = None
         raise ValueError("Git is required to discover source documentation and changelogs.")
     if docs_only:
         return None
-    modules = ("ruff",) if quick else ("ruff", "pytest", "pytest_cov", "coverage", "pip")
+    modules = ("ruff", "jsonschema") if quick else ("ruff", "jsonschema", "pytest", "pytest_cov", "coverage", "pip")
     missing = [name for name in modules if importlib.util.find_spec(name) is None]
     if missing:
         raise ValueError(
@@ -66,6 +66,7 @@ def commands(*, docs_only: bool, quick: bool, node: str | None, evidence_dir: Pa
     checks = [
         ("Python lint", [sys.executable, "-m", "ruff", "check", "src", "scripts", "tests", "plugins", "devtools", "conftest.py"]),
         ("Changelog provenance", [sys.executable, "scripts/check_changelog_prs.py"]),
+        ("Operation documentation", [sys.executable, "scripts/check_operations.py"]),
         *checks,
         ("Browser JavaScript", [node, "--test", *tests]),
     ]
