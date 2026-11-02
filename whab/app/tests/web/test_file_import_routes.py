@@ -257,25 +257,27 @@ def test_new_import_operation_retry_survives_restart_and_rejects_changed_export(
 
 
 def test_new_import_failure_does_not_publish_empty_budget_and_same_operation_can_retry(store, tmp_path, monkeypatch):
-    from whab_plugin_sqlite import Store
+    from whab.plugins.storage_proxy import StorageWorkerProxy
 
     configuration = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", ui="")
     host = BudgetHost(configuration)
-    original = Store.import_workspace
+    original = StorageWorkerProxy._mutate
     headers = new_headers()
 
-    def fail(*args):
-        raise StoreError("Synthetic import failure")
+    def fail(backend, name, args, kwargs):
+        if name == "import_workspace":
+            raise StoreError("Synthetic import failure")
+        return original(backend, name, args, kwargs)
 
     with client_for(store, tmp_path, budget_host=host) as client:
-        monkeypatch.setattr(Store, "import_workspace", fail)
+        monkeypatch.setattr(StorageWorkerProxy, "_mutate", fail)
         failed = client.post(BASE + "new/commit", content=RAW, headers=headers)
         assert failed.status_code == 400
         assert set(host.applications) == {"default"} and host.contexts == []
         assert set(host._exports) == {"default"}
         assert len(client.get("/api/budgets").json()["budgets"]) == 1
         assert not (tmp_path / "budgets" / headers["x-import-operation"] / "sandbox").exists()
-        monkeypatch.setattr(Store, "import_workspace", original)
+        monkeypatch.setattr(StorageWorkerProxy, "_mutate", original)
         success = client.post(BASE + "new/commit", content=RAW, headers=headers)
         assert success.status_code == 200 and not success.json()["alreadyImported"]
 

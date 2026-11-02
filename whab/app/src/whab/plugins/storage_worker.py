@@ -112,7 +112,7 @@ def _writer_owner(context, plugin_id):
 
 
 def serve(plugin_id, source, target):
-    registry = load_plugins((plugin_id,))
+    registry = load_plugins((plugin_id,), _worker=True)
     descriptor = registry.storage_plugin(plugin_id)
     if descriptor.id != plugin_id or not supports_storage_worker(descriptor):
         raise WireError()
@@ -162,7 +162,8 @@ def serve(plugin_id, source, target):
                     if context.expected_instance_id is not None and backend.commit_evidence().instance_id != context.expected_instance_id:
                         raise StoreError("The native instance does not match its explicit host selection.")
                     result = {"evidence": backend.commit_evidence(),
-                              "methods": tuple(name for name in METHODS if callable(getattr(backend, name, None)))}
+                              "methods": tuple(name for name in METHODS if callable(getattr(backend, name, None))
+                                               or name == "prepare_existing" and callable(getattr(backend, "prepare_budget_files", None)))}
                 elif method == "close":
                     if request["args"] or request["kwargs"]:
                         raise WireError()
@@ -182,10 +183,18 @@ def serve(plugin_id, source, target):
                     arguments = bind_call(method, request["args"], request["kwargs"])
                     if mutating:
                         before = backend.commit_evidence()
-                    implementation = getattr(backend, method, None)
-                    if not callable(implementation):
-                        raise StoreError("Unsupported storage method.")
-                    result = implementation(**arguments)
+                    if method == "prepare_existing":
+                        if not context.read_only:
+                            raise WireError()
+                        before = backend.commit_evidence()
+                        result = backend.prepare_budget_files(**arguments, existing=True)
+                        if backend.commit_evidence() != before:
+                            raise WireError()
+                    else:
+                        implementation = getattr(backend, method, None)
+                        if not callable(implementation):
+                            raise StoreError("Unsupported storage method.")
+                        result = implementation(**arguments)
                     if owner is not None:
                         owner.snapshot()
                 send({"id": identifier, "kind": "result", "data": result})

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0 — 2026-11-01
+
+PR: [#144](https://github.com/Fillll/whab/pull/144)
+
+- Explicitly declare current and legacy machine-local credential directory configuration for independent plugin processes and consumers of the public connection API. Preserve existing files and opaque references.
+
 ## 1.0.1 — 2026-11-01
 
 PR: [#142](https://github.com/Fillll/whab/pull/142)

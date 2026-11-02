@@ -103,6 +103,15 @@ class RegistryGeneration:
     def describe(self):
         return self.registry.describe()
 
+    @property
+    def process_resources(self):
+        return tuple(plugin._process.resource for plugin in self.descriptors() if plugin._process is not None)
+
+    def bind_process_runtime(self, runtime):
+        for plugin in self.descriptors():
+            if plugin._process is not None:
+                plugin._process.runtime = runtime
+
     def descriptors(self):
         return self.registry.descriptors()
 
@@ -240,6 +249,13 @@ class LivePluginSelection:
         with self._lock:
             operations = [dict(ticket) for ticket in self._tickets.values()]
         workers = []
+        processes = []
+        for plugin in self.runtime._active.services["plugins"].descriptors():
+            process = plugin._process
+            if process is not None:
+                processes.append({"plugin": plugin.id, "pid": process._process.pid if process._process else None,
+                                  "health": "ready" if process.healthy else "failed",
+                                  "distribution": process.info["distribution"], "version": process.info["version"]})
         # Status must remain available while admission is gated. The immutable
         # active generation is safe to inspect here; no hook is invoked.
         for identifier, binding in self.runtime._active.services["plugins"].workers.items():
@@ -264,7 +280,8 @@ class LivePluginSelection:
                 "code_upgrade_families": sorted(code_families) if self.home is not None else [],
                 "host_only_families": [],
                 "code_upgrades": self.home is not None, "runtime": self.runtime.status(),
-                "workers": sorted(workers, key=lambda item: item["plugin"]), "operations": operations}
+                "workers": sorted(workers, key=lambda item: item["plugin"]), "operations": operations,
+                "processes": sorted(processes, key=lambda item: item["plugin"])}
 
     def _candidate(self, selection, active, *, bind=False):
         selection = validate_selection(selection)

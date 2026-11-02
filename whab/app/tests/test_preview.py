@@ -1,7 +1,6 @@
 """The fictional preview ignores private configuration and cleans up owned state."""
 
 import socket
-import sqlite3
 import ssl
 from importlib import util
 from pathlib import Path
@@ -88,8 +87,7 @@ def test_smoke_ignores_private_configuration_and_reopens_saved_fictional_data(tm
     assert "CA certificate (manual browser trust only):" in output
     assert all(not path.exists() for path in runtimes)
     assert {path.name: path.read_text() for path in private.iterdir()} == files
-    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
-        applications[0].state.store.db.execute("SELECT 1")
+    assert not applications[0].state.store.worker.healthy
 
 
 def test_startup_failure_closes_store_and_removes_temporary_runtime(monkeypatch, runtimes):
@@ -109,8 +107,7 @@ def test_startup_failure_closes_store_and_removes_temporary_runtime(monkeypatch,
     with pytest.raises(RuntimeError, match="Fictional startup failure"):
         preview.main(["--check", "--port", "0"])
     assert len(runtimes) == 1 and not runtimes[0].exists()
-    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
-        stores[0].db.execute("SELECT 1")
+    assert not stores[0].worker.healthy
 
 
 def test_failed_smoke_request_stops_listener_and_removes_runtime(monkeypatch, runtimes):
@@ -133,8 +130,7 @@ def test_failed_smoke_request_stops_listener_and_removes_runtime(monkeypatch, ru
     assert len(runtimes) == 1 and not runtimes[0].exists()
     with pytest.raises(OSError), socket.create_connection(("127.0.0.1", ports[0]), timeout=1):
         pytest.fail("The failed smoke check left its server listening")
-    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
-        applications[0].state.store.db.execute("SELECT 1")
+    assert not applications[0].state.store.worker.healthy
 
 
 def test_ctrl_c_cleans_up_and_server_configuration_stays_local_https(monkeypatch, runtimes, capsys):
@@ -154,8 +150,7 @@ def test_ctrl_c_cleans_up_and_server_configuration_stays_local_https(monkeypatch
     preview.main(["--port", "0"])
     assert len(runtimes) == 1 and not runtimes[0].exists()
     assert "Temporary preview runtime removed." in capsys.readouterr().out
-    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
-        stores[0].db.execute("SELECT 1")
+    assert not stores[0].worker.healthy
 
 
 def test_occupied_port_is_rejected_before_creating_a_runtime(monkeypatch, runtimes, capsys):

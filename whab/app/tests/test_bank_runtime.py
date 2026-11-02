@@ -8,7 +8,7 @@ import pytest
 
 from whab.budgets.runtime import BudgetRuntime, RuntimeCandidate
 from whab.budgets.session import TrackedStorage
-from whab.plugins import BudgetContext, StorageContext, load_plugins
+from whab.plugins import BudgetContext, PluginError, StorageContext, load_plugins
 from whab.plugins.bank_adapter import ProviderWebhook
 from whab.plugins.effect_store import EffectError
 from whab.plugins.storage import close_storage, open_storage
@@ -368,8 +368,11 @@ def test_cursor_changed_during_provider_read_rejects_atomic_batch_without_late_s
                                expected_cursor=None)
         return response
     monkeypatch.setattr(setup.provider, 'call', concurrent)
-    with pytest.raises(ValueError, match='changed'):
+    # Native worker errors deliberately omit backend exception text. The
+    # rejection code proves the competing cursor was retained without a write.
+    with pytest.raises(PluginError) as rejected:
         run(setup.coordinator.sync('fictional-item'))
+    assert rejected.value.code == 'storage_worker_rejected'
     item = setup.store.get_item('fictional-item')
     assert item['cursor'] == 'other-committed-cursor' and item['status'] == 'connected'
     assert setup.tracked.transactions('personal') == []

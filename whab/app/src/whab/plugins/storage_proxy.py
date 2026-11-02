@@ -18,6 +18,7 @@ from .storage_transfer import (
     canonical_storage_json,
     check_storage_operation,
     evidence_record,
+    operation_limit,
     read_evidence,
     read_storage_json,
 )
@@ -103,7 +104,7 @@ def operation_payload(name, args, kwargs):
                 "institution_name": "institutionName", "provider_id": "providerId", "historical_complete": "historicalComplete",
                 "expected_cursor": "expectedCursor"}
         payload = {keys.get(key, key): _plain(value) for key, value in values.items() if value is not UNSET}
-    return workspace, canonical_storage_json(payload)
+    return workspace, canonical_storage_json(payload, limit=operation_limit(name))
 
 
 class StorageWorkerProxy:
@@ -249,8 +250,29 @@ class StorageWorkerProxy:
         return self.uncertain
 
     def worker_environment(self):
-        prepared = self.prepared_environment
-        return {"identifier": prepared.identifier, "distribution": prepared.distribution, "version": prepared.version}
+        prepared = getattr(self, "prepared_environment", None)
+        return {"identifier": prepared.identifier, "distribution": prepared.distribution, "version": prepared.version} if prepared is not None else None
+
+    def prepare_budget_files(self, workspace, files, *, existing=False):
+        if type(existing) is not bool:
+            raise StoreError("Budget preparation requires a boolean cache flag.")
+        if existing and "prepare_existing" in self.worker.methods:
+            with self.lock:
+                self._check_write()
+                before = self._call("commit_evidence")
+                reader = self._replacement()
+                try:
+                    reader.open(replace(self.context, read_only=True, expected_instance_id=before.instance_id))
+                    reader.call("prepare_existing", workspace, files)
+                    if reader.call("commit_evidence") == before:
+                        return None
+                except PluginError:
+                    # A readonly backend may need a real first restore. It has
+                    # changed no native data; the durable command below owns it.
+                    pass
+                finally:
+                    reader.close()
+        return self._mutate("prepare_budget_files", (workspace, files), {"existing": existing})
 
     def durable_command_replay(self, request_id, fingerprint):
         with self.lock:

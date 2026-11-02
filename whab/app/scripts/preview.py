@@ -21,19 +21,43 @@ from time import monotonic
 
 import httpx
 import uvicorn
-from whab_plugin_sqlite import Store
-from whab_plugin_sqlite.plugin import plugin as sqlite_plugin
-from whab_plugin_web.plugin import plugin as web_plugin
 
 from whab.app import create_app
 from whab.config import Settings
 from whab.domain.accounts import normalize_account
 from whab.domain.dates import current_month, shift_month
-from whab.plugins import PluginRegistry
+from whab.plugins import PluginRegistry, StorageContext, load_plugins
+from whab.plugins.storage import open_storage
 from whab.tls import prepare_local_tls
 
 EDIT_TRANSACTION = "preview-groceries-0"
 EDIT_NOTE = "Verified fictional preview edit"
+
+
+class Store:
+    """The preview uses the same isolated storage adapter as an installed host."""
+
+    def __init__(self, database, *, month):
+        self.database_path = str(database)
+        self.plugin = load_plugins(("sqlite",)).storage_plugin("sqlite")
+        try:
+            self.backend = open_storage(self.plugin, StorageContext(database.parent.parent, "sandbox", {}))
+        except BaseException:
+            self.plugin._process.close()
+            raise
+
+    @property
+    def worker(self):
+        return self.backend.worker
+
+    def __getattr__(self, name):
+        return getattr(self.backend, name)
+
+    def close(self):
+        try:
+            self.backend.close()
+        finally:
+            self.plugin._process.close()
 
 
 def seed_fictional_budget(store, month):
@@ -144,7 +168,8 @@ def serve_preview(listener, *, check=False):
         with closing(Store(database, month=month)) as store:
             seed_fictional_budget(store, month)
             application = create_app(
-                store=store, settings=settings, plugins=PluginRegistry((sqlite_plugin, web_plugin)),
+                store=store, settings=settings,
+                plugins=PluginRegistry((store.plugin, *load_plugins(("web",)).descriptors())),
             )
             print("Fictional preview only; temporary data is deleted on exit.", flush=True)
             print(f"Runtime: {home}", flush=True)

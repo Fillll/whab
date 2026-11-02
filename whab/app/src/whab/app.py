@@ -40,6 +40,12 @@ from whab.plugins.live import (
     RegistryGeneration,
 )
 from whab.plugins.management import PluginManager, installed_entrypoints
+from whab.plugins.process_worker import (
+    interface_documentation,
+    managed_plugin_startup,
+    retry_process_cleanup,
+    set_process_scope,
+)
 from whab.plugins.remote_client_adapter import (
     configuration,
     connection_settings,
@@ -100,7 +106,7 @@ def retry_startup_cleanup(home, budget_id, environment):
     with _STARTUP_PENDING_LOCK:
         # Another already-starting constructor may have registered a failure
         # during this pass. Never approve a new startup while any owner remains.
-        return not _STARTUP_PENDING.get(key)
+        return not _STARTUP_PENDING.get(key) and retry_process_cleanup(home, budget_id, environment)
 
 
 class _StartupResources:
@@ -242,6 +248,7 @@ def storage_config(settings, session, plugin):
     return resolved
 
 
+@managed_plugin_startup
 def create_app(store=None, settings=None, plugins=None, bank_services=None, *, budget_session=None, budget_host=None, _child=False):
     settings = settings or Settings.load()
     if plugins is not None:
@@ -261,6 +268,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         budget_session.missing_plugins = [name for name in budget_session.selection if name not in installed]
         settings = replace(settings, storage=budget_session.manifest["storage"], plugins=tuple(name for name in budget_session.selection if name in installed))
     worker_home = budget_session.storage_home if budget_session else settings.home
+    set_process_scope(worker_home, budget_session.id if budget_session else "default", settings.plaid_env)
     if not retry_startup_cleanup(worker_home, budget_session.id if budget_session else "default", settings.plaid_env):
         raise PluginError("This budget's previous startup resources are still closing. Preserve its files and retry after cleanup finishes.",
                           code="startup_cleanup_pending")
@@ -742,7 +750,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             budget_host.register(app, budget_session)
             app.add_middleware(BudgetDispatch, host=budget_host)
         app.add_middleware(RequireHTTPS)
-        service.http_documentation = app.openapi
+        service.http_documentation = lambda: interface_documentation(app, plugins.descriptors())
         startup.release()
         return app
     except BaseException as error:

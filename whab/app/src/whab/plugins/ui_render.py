@@ -62,7 +62,7 @@ def public_value(value):
     return _public(value, [1000000, MAX_METADATA_BYTES])
 
 
-def render_arguments(inputs, context, routing, request, templates=None):
+def render_arguments(inputs, context, routing, request, templates=None, *, workspace_pages=()):
     """Encode public page projections and selected request fields, never cookies."""
     if type(inputs) is not dict or inputs.keys() != _INPUT or type(routing) is not dict or routing.keys() != _ROUTING:
         raise WireError()
@@ -75,11 +75,11 @@ def render_arguments(inputs, context, routing, request, templates=None):
     # Reuse the negotiated frame's strict scalar/depth/size validation before
     # the parent allocates or writes a worker message.
     value = public_value(value)
-    read_arguments(value)
+    read_arguments(value, workspace_pages=workspace_pages)
     return value
 
 
-def read_arguments(value):
+def read_arguments(value, *, workspace_pages=()):
     value = public_value(value)
     if type(value) is not dict or value.keys() != {"input", "context", "routing", "request", "templates"}:
         raise WireError()
@@ -89,7 +89,7 @@ def read_arguments(value):
             or type(request) is not dict or request.keys() != {"path", "query", "headers"}):
         raise WireError()
     if (type(inputs["data"]) is not dict or type(inputs["status"]) is not dict or type(inputs["items"]) is not list
-            or inputs["workspace"] not in {"demo", "personal"} or inputs["page"] not in {"budget", "transactions", "insights", "accounts"}
+            or inputs["workspace"] not in {"demo", "personal"} or inputs["page"] not in {"budget", "transactions", "insights", "accounts", *workspace_pages}
             or any(type(inputs[name]) is not str for name in ("workspace", "page", "month"))
             or inputs["selected"] is not None and type(inputs["selected"]) is not str):
         raise WireError()
@@ -107,7 +107,7 @@ def read_arguments(value):
         raise WireError()
     templates = value["templates"]
     if (type(templates) is not dict or len(templates) > 256
-            or any(type(name) is not str or not name.startswith(("plugins/", "imports/"))
+            or any(type(name) is not str or not name.startswith(("plugins/", "imports/", "banks/"))
                    or any(part in {"", ".", ".."} for part in name.split("/")) or "\\" in name
                    or type(content) is not str for name, content in templates.items())
             or sum(len(content.encode("utf-8")) for content in templates.values()) > 4 * 1024 * 1024):
@@ -121,7 +121,7 @@ def render_page(ui, arguments):
     from jinja2 import ChoiceLoader, DictLoader
     from starlette.templating import Jinja2Templates
 
-    value = read_arguments(arguments)
+    value = read_arguments(arguments, workspace_pages=ui.workspace_pages)
     inputs, routing, request = value["input"], value["routing"], value["request"]
     context = ui.build_context(inputs["data"], inputs["status"], inputs["items"],
                                **{name: inputs[name] for name in ("workspace", "page", "month", "selected")})

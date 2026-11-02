@@ -1,5 +1,9 @@
 # Approved optional-worker upgrades
 
+All installed plugins already execute in [owned child processes](plugin-processes.md)
+from WHAB 2.54. This document describes the specialized adapters and explicit
+immutable-environment approvals used for compatible live code upgrades.
+
 WHAB 2.25 introduced explicitly live stateless reporting/export upgrades. The
 current adapter also replaces branding, file-parser, declarative API interface,
 explicitly scoped categorization and typed bank-provider code without restarting its listener.

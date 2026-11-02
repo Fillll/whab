@@ -974,6 +974,8 @@ class Plugin:
     # A zero-authority factory creates independent optional artwork cache/hooks.
     # It receives no configuration, budget namespace, backend or credentials.
     branding_factory: Callable[[], Plugin] | None = None
+    # Host-private lifetime owner. Plugin implementations never supply this.
+    _process: object = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if (type(self.storage_payload_paths) is not tuple or len(self.storage_payload_paths) > 32

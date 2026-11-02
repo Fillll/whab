@@ -155,7 +155,7 @@ def test_all_new_worker_operations_use_typed_arguments_and_only_public_data(tmp_
 
 def test_child_loop_sends_resources_and_import_data_as_binary_without_raw_objects(monkeypatch):
     plugin = Plugin("parser", "Parser", file_import=FileImport(lambda _: imported(), resources=resources()), contract=PluginContract(lifecycle="live"))
-    monkeypatch.setattr(report_worker, "load_plugins", lambda _: PluginRegistry((plugin,)))
+    monkeypatch.setattr(report_worker, "load_plugins", lambda _, **kwargs: PluginRegistry((plugin,)))
     monkeypatch.setattr(report_worker.metadata, "entry_points", lambda **_: (
         SimpleNamespace(name="parser", dist=SimpleNamespace(metadata={"Name": "fictional-parser"}, version="1.0.0")),
     ))

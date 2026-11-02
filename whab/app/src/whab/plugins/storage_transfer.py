@@ -28,6 +28,7 @@ from whab.receipts import receipt_media_type
 
 MAX_LOCAL_TRANSFER_BYTES = 128 * 1024 * 1024
 MAX_OPERATION_BYTES = 32 * 1024 * 1024
+MAX_BULK_OPERATION_BYTES = 72 * 1024 * 1024
 MAX_OPERATION_RECEIPTS = 4096
 STORAGE_ROLES = frozenset({"primary", "staged", "copy", "fenced", "retired"})
 STORAGE_OPERATIONS = frozenset({
@@ -36,6 +37,7 @@ STORAGE_OPERATIONS = frozenset({
     "set_item_status", "disconnect_item", "apply_sync", "import_workspace", "restore_budget",
     "save_receipt", "delete_receipt", "restore_budget_files", "prepare_budget_files",
 })
+_BULK_OPERATIONS = frozenset({"restore_budget", "restore_budget_files", "prepare_budget_files", "import_workspace"})
 _OPERATION_FIELDS = {
     "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype"}),
     "update_account": ({"accountId"}, {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}),
@@ -62,6 +64,12 @@ _OPERATION_FIELDS = {
 
 def _invalid():
     raise StoreError("Invalid or unsupported local storage transfer records.")
+
+
+def operation_limit(name):
+    # A supported 50 MiB portable payload can require almost 67 MiB after
+    # base64 encoding. Ordinary individual commands retain their 32 MiB bound.
+    return MAX_BULK_OPERATION_BYTES if name in _BULK_OPERATIONS else MAX_OPERATION_BYTES
 
 
 def storage_identifier(value, *, limit=200):
@@ -226,7 +234,8 @@ class StorageOperation:
             _invalid()
         if type(self.name) is not str or self.name not in STORAGE_OPERATIONS:
             raise StoreError("Unsupported durable storage operation.")
-        value = read_storage_json(self.payload)
+        limit = operation_limit(self.name)
+        value = read_storage_json(self.payload, limit=limit)
         if type(value) is not dict:
             _invalid()
         required, optional = _OPERATION_FIELDS[self.name]
@@ -234,7 +243,7 @@ class StorageOperation:
             raise StoreError("Invalid durable storage operation fields.")
         if self.name in {"save_item", "set_item_status", "disconnect_item", "apply_sync"} and self.workspace != "personal":
             raise StoreError("Provider operations require the personal workspace.")
-        object.__setattr__(self, "payload", canonical_storage_json(value))
+        object.__setattr__(self, "payload", canonical_storage_json(value, limit=limit))
 
     @property
     def fingerprint(self):
@@ -242,8 +251,8 @@ class StorageOperation:
             "name": self.name, "workspace": self.workspace,
             "authority_epoch": self.authority_epoch,
             "expected_generation": self.expected_generation,
-            "payload": read_storage_json(self.payload),
-        })).hexdigest()
+            "payload": read_storage_json(self.payload, limit=operation_limit(self.name)),
+        }, limit=operation_limit(self.name) + 1024)).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -361,7 +370,7 @@ def dispatch_storage_operation(backend, operation):
     if type(operation) is not StorageOperation:
         _invalid()
     name, workspace = operation.name, operation.workspace
-    payload = read_storage_json(operation.payload)
+    payload = read_storage_json(operation.payload, limit=operation_limit(operation.name))
     if name in {"add_account", "add_category"}:
         return getattr(backend, name)(workspace, payload)
     if name == "add_transaction":

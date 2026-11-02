@@ -232,6 +232,16 @@ def test_addressed_budget_and_legacy_plaid_alias_keep_continuations_isolated(tmp
         return services[identifier]
 
     monkeypatch.setattr(module, "plugin", replace(module.plugin, bank=factory))
+    # Parent-local fake services are injected explicitly; installed production
+    # entry points execute in children and cannot see parent monkeypatches.
+    from importlib import metadata
+    from types import SimpleNamespace
+
+    entries = tuple(metadata.entry_points(group="whab.plugins"))
+    injected = tuple(SimpleNamespace(name=entry.name, group=entry.group, value=entry.value,
+                                    dist=entry.dist, load=lambda: module.plugin)
+                     if entry.name == "plaid" else entry for entry in entries)
+    monkeypatch.setattr(metadata, "entry_points", lambda **kwargs: injected)
     settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", ("plaid",), ui="")
     with TestClient(create_app(settings=settings), base_url="https://127.0.0.1:5173") as client:
         created = client.post("/budgets/home/api/budget/new", json={"name": "Fictional second budget"})

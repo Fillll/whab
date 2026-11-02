@@ -363,6 +363,10 @@ def replace_saved_storage_worker(home, plugin_id, approvals, context, *, expecte
 
 def storage_worker_descriptor(home, budget_id, environment, template, *, worker_owner=None, storage_owner=None):
     """Startup descriptor lookup BEFORE any legacy native factory may run."""
+    if template._process is not None:
+        template._process.home = Path(home)
+        template._process.worker_owner = worker_owner
+        template._process.storage_owner = storage_owner
     path = Path(home) / "plugin-workers" / "storage" / template.id / "storage-upgrade.json"
     if not path.exists() and not path.is_symlink():
         return template
@@ -509,6 +513,12 @@ class StorageUpgrade:
         self.journal = _journal(home, runtime.budget_id, context.environment, self.plugin_id)
         backend = tracked.store
         prepared = getattr(backend, "prepared_environment", None)
+        if isinstance(backend, StorageWorkerProxy):
+            self.own_worker(backend.worker)
+            self.own_proxy(backend)
+            backend._on_unknown = runtime.fence_storage
+            if backend.uncertain:
+                runtime.fence_storage(self.plugin_id)
         if prepared is not None:
             self.own_worker(backend.worker)
             self.own_proxy(backend)
@@ -558,7 +568,7 @@ class StorageUpgrade:
         with self._status_lock:
             backend = self.tracked.store
             return {"supported": self.supported(), "plugin": self.plugin_id,
-                    "mode": "worker" if self.binding is not None else "host",
+                    "mode": "worker" if self.binding is not None or callable(getattr(backend, "worker_health", None)) else "host",
                     "uncertain": bool(getattr(backend, "uncertain", False)),
                     "active": self.journal.snapshot()["active"], "runtime": self.runtime.status()}
 
@@ -714,10 +724,17 @@ class StorageUpgrade:
             def reconcile():
                 with self.tracked.lock:
                     record = self.journal.snapshot()
-                    if record["active"] is None or record["native"] is None or record["pending"] is not None:
+                    if record["pending"] is not None:
                         raise storage_error(self.plugin_id)
-                    recover(minimum=read_evidence(record["native"]))
-                    _native_matches(self.tracked.commit_evidence(), read_evidence(record["native"]))
+                    if record["active"] is None:
+                        if record["native"] is not None:
+                            raise storage_error(self.plugin_id)
+                        recover()
+                    else:
+                        if record["native"] is None:
+                            raise storage_error(self.plugin_id)
+                        recover(minimum=read_evidence(record["native"]))
+                        _native_matches(self.tracked.commit_evidence(), read_evidence(record["native"]))
                     if self.tracked.session is not None:
                         self.tracked.session.bind(self.tracked.store)
                     if self.tracked.on_mutation is not None:
@@ -755,8 +772,9 @@ class StorageUpgrade:
         resources = tuple(resource for resource in active.resources
                           if previous is None or resource is not previous.resource)
         environment = getattr(prepared, "worker_environment", None)
-        if callable(environment):
-            binding = StorageBinding(_prepared(self.home, target.id, environment()), prepared)
+        reference = environment() if callable(environment) else None
+        if reference is not None:
+            binding = StorageBinding(_prepared(self.home, target.id, reference), prepared)
             prepared._storage_worker_binding = binding
             workers[target.id] = binding
             resources += (binding.resource,)

@@ -42,7 +42,7 @@ The enabled plugin registers feature `subscriptions` with query `report` and com
 
 A label command applies to matching merchant/amount/currency/account/billing-day patterns and returns scope `matching-payments-in-account`. Use the current fingerprint and the report's enclosing revision. The host requires `request_id` and `expected_revision`, rejects stale edits and returns the original response for an exact retained retry. Reads do not write files, call providers or start jobs. Transaction category/review/balance fields are unaffected.
 
-`whab_plugin_subscriptions.api` is the public in-process v1 contract for the optional companion: `LabelStore`, pattern/fingerprint/decision helpers, and `install_ai(service, factory)`. Installation deliberately supplies the base plugin's namespace to the selected companion so old settings, labels and progress stay in place. The companion must declare both package and named-plugin dependencies. The collaboration adapter is never serialized to remote clients.
+`whab_plugin_subscriptions.api` is the public local v1 contract for the optional companion: `LabelStore`, pattern/fingerprint/decision helpers, and `install_ai(service, factory)`. From WHAB 2.54, this collaboration uses scoped plugin IPC and the implementation objects stay in their owning processes. Installation deliberately supplies the base plugin's namespace to the selected companion so old settings, labels and progress stay in place. The companion must declare both package and named-plugin dependencies. The collaboration adapter is never exposed to remote clients.
 
 ## Operation documentation
 

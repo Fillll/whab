@@ -575,7 +575,7 @@ def test_worker_loop_accepts_only_report_operations_and_sanitizes_hook_errors(mo
         raise RuntimeError("synthetic-private-hook-detail")
 
     registry = PluginRegistry((Plugin("fixture", "Fixture", insights=failing),))
-    monkeypatch.setattr(report_worker, "load_plugins", lambda _: registry)
+    monkeypatch.setattr(report_worker, "load_plugins", lambda _, **kwargs: registry)
     monkeypatch.setattr(report_worker.metadata, "entry_points", lambda **_: (
         SimpleNamespace(name="fixture", dist=SimpleNamespace(metadata={"Name": "fixture-package"}, version="1.0.0")),
     ))
