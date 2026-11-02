@@ -13,6 +13,7 @@ from functools import partial, wraps
 from pathlib import Path
 from threading import RLock
 
+from .https_transport import broker, command, deliver
 from .process_environment import process_environment
 from .process_rpc import Peer
 from .wire import WireError
@@ -125,15 +126,16 @@ class PluginProcess:
         self.plugin_id, self.timeout = plugin_id, timeout
         self.scope = _STARTUP.get()["scope"] if _STARTUP.get() is not None else None
         self.dependencies = ()
-        self._process = self._retiring = self.peer = None
+        self._process = self._retiring = self.peer = self.channel = None
         self._resource = None
         self.openapi = None
         try:
             entry, = (entry for entry in metadata.entry_points(group="whab.plugins") if entry.name == plugin_id)
             distribution = getattr(entry, "dist", None)
+            self.channel = broker().session(plugin_id, "process_worker")
             self._process = subprocess.Popen(
-                [str(python), "-I", "-B", "-m", "whab.plugins.process_worker", plugin_id],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                command(python, "process_worker", plugin_id),
+                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 env=plugin_environment(plugin_id), bufsize=0, start_new_session=True,
             )
             acquired = _STARTUP.get()
@@ -141,12 +143,13 @@ class PluginProcess:
                 acquired["processes"].append(self)
             for owners in _DISCOVERY.get():
                 owners.append(self)
-            self.peer = Peer(self._process.stdout, self._process.stdin, timeout=timeout)
+            deliver(self.channel, self._process)
+            self.peer = Peer(self.channel, self.channel, timeout=timeout)
             self.peer.codec.owner = weakref.ref(self)
             from .process_capabilities import prepare_record
 
             self.peer.codec.prepare_record = partial(prepare_record, owner=weakref.ref(self))
-            self._finalizer = weakref.finalize(self, _dispose, self._process, self.peer)
+            self._finalizer = weakref.finalize(self, _dispose, self._process, self.peer, self.channel)
             result = self.peer.call("root", "describe")
             if (type(result) is not dict or set(result) != {"plugin", "pid", "code", "host", "sdk", "distribution", "version"}
                     or type(result["pid"]) is not int or result["pid"] != self._process.pid
@@ -307,6 +310,8 @@ class PluginProcess:
 
         process = self._process or self._retiring
         self._process, self._retiring = None, None
+        if self.channel is not None:
+            self.channel.close()
         if process is None:
             return
         if getattr(self, "_finalizer", None) is not None:
@@ -322,7 +327,8 @@ class PluginProcess:
                     self._retiring = process
             for stream in (process.stdin, process.stdout):
                 try:
-                    stream.close()
+                    if stream is not None:
+                        stream.close()
                 except OSError:
                     self._retiring = process
             with _PENDING_LOCK:
@@ -332,17 +338,19 @@ class PluginProcess:
                     _PENDING.pop(id(self), None)
 
 
-def _dispose(process, peer):
+def _dispose(process, peer, channel):
     from .report_worker import _stop_process_group
 
     try:
+        channel.close()
         _stop_process_group(process)
     except (OSError, subprocess.TimeoutExpired):
         pass
     finally:
         peer.close()
         for stream in (process.stdin, process.stdout):
-            stream.close()
+            if stream is not None:
+                stream.close()
 
 
 def interface_documentation(app, plugins):
@@ -499,15 +507,9 @@ class Worker:
             await lifespan.__aexit__(None, None, None)
 
 
-def main():
-    # Reserve the original stdout pipe before any plugin import. Plugin prints,
-    # native writes and diagnostics cannot corrupt protocol frames or leak data.
-    target = os.fdopen(os.dup(sys.stdout.fileno()), "wb", buffering=0)
-    null = os.open(os.devnull, os.O_WRONLY)
-    os.dup2(null, sys.stdout.fileno())
-    os.close(null)
-    worker = Worker(sys.argv[1])
-    peer = Peer(sys.stdin.buffer, target, root=worker)
+def serve(plugin_id, source, target):
+    worker = Worker(plugin_id)
+    peer = Peer(source, target, root=worker)
     try:
         peer._closed.wait()
     finally:
@@ -516,6 +518,8 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        from .https_transport import run_worker
+
+        run_worker("process_worker", sys.argv[1])
     except Exception:
         sys.exit(1)

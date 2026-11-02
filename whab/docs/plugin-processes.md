@@ -14,11 +14,70 @@ The CLI remains an independently launched HTTPS client.
 
 ## Local transport and public capabilities
 
-Installed workers use their host's Python environment and private stdin/stdout
-pipes. No network listener is required for plugin IPC. Approved immutable code
+From WHAB 2.55, all installed discovery/settings, native storage, reporting,
+provider, categorization and visual worker traffic uses authenticated HTTPS.
+Workers use their host's Python environment. Approved immutable code
 upgrades retain their selected versioned environments and existing protocol/host
 compatibility fences; separate processes alone do not create separate dependency
 environments or make every lifecycle live-replaceable.
+
+The core owns one private HTTPS broker per host process, shared across budgets
+and worker families. It binds only `127.0.0.1` on an OS-assigned port. This listener
+starts before discovery, independently of the browser/CLI listener: application
+construction, headless tools and native recovery cannot depend on the public
+server already being ready. It never proxies application routes or discovers a
+remote destination. Existing browser HTTPS, Host/origin guards, bearer-authorized
+remote APIs and provider webhooks keep their existing access boundaries.
+
+### Authentication and bootstrap
+
+The broker generates its own temporary local CA and server certificate in a
+private temporary directory. Children receive only the public CA, never signing
+or server keys, and verify both the certificate chain and loopback hostname.
+Runtime/browser TLS material is preserved and OS certificate trust is unchanged.
+Temporary broker material is removed when its host exits normally.
+
+Every launched worker receives a different random 256-bit bearer credential.
+The broker indexes its hash against exactly that plugin instance and its two
+message streams. No request can select another plugin, budget or connection.
+Existing SDK capability handles, budget admission and namespace/dependency checks
+remain responsible for which operations that session can perform. Workers cannot
+grant themselves authority by supplying a plugin or budget ID in an HTTP body.
+
+One bounded startup message passes the endpoint, public CA, protocol/family/plugin
+identity and credential over the child's private stdin. That pipe closes before
+discovery or any plugin operation begins. Credentials never enter process
+arguments, inherited environment variables, URLs, public status, portable files
+or diagnostics. Stdout/stderr are discarded. All subsequent worker traffic uses
+HTTPS; there is no stdio fallback after a transport failure. Closing a session
+revokes its credential and wakes waiting readers/writers. Dead children are
+rejected, and restarted instances receive fresh credentials.
+
+### Message delivery
+
+The private version-1 transport has three fixed authenticated operations:
+`GET /v1/receive` obtains the next bounded binary chunk, `POST /v1/ack` confirms
+its cumulative stream offset, and `POST /v1/send` returns a worker message. Empty
+receives use HTTP 204; this idle poll does no plugin or financial work. Strict
+loopback Host checks apply even with a credential. Browser Origin/Cookie headers,
+ambiguous authorization/framing, chunked requests, upgrades and redirects are
+unsupported. Requests and private failure details are never logged.
+
+Chunks are at most 256 KiB; each stream buffers at most 4 MiB. Complete frame
+envelopes are bounded to the existing 64 MiB metadata plus 256 MiB binary storage
+maximum. Up to 256 worker sessions and 512 concurrent TLS connections are admitted
+per broker. Its accept loop never waits for a peer's TLS handshake. The same
+stdlib bootstrap runs approved older report SDKs without importing current SDK
+implementations into their environments; their existing compatibility fences
+still apply.
+
+The parent finishes dispatch only after the complete request has reached the
+child's HTTPS client. That delivery acknowledgment is never a financial commit
+receipt. There is no automatic HTTP reconnect, replay or mutation retry after a
+missing acknowledgment. Existing native intents, receipts, uncertainty fencing
+and explicit recovery decide the financial outcome.
+
+### Public capabilities
 
 The version-1 `WHPR` protocol bounds metadata to 32 MiB, binary data to 256 MiB,
 nesting to 40 levels, value nodes to two million and concurrent calls to 128.
@@ -73,11 +132,12 @@ follow the budget generation and close after their dependent services. Shutdown,
 retirement and failed startup stop/reap only owned process groups. Failed cleanup
 remains observable. `/api/plugins/runtime` includes installed `processes` with
 plugin ID, PID and health, alongside the existing approved `workers` list.
+Both lists identify the HTTPS transport without disclosing its endpoint or token.
 Dedicated native/provider/session workers may coexist with a plugin's discovery
 and settings worker; each retains its own cleanup and recovery owner.
 
-Stdout is reserved before importing plugin code, so plugin prints and native
-stdout writes cannot corrupt protocol frames or expose diagnostics. Hook errors
+Stdout is discarded before importing plugin code, so plugin prints and native
+stdout writes cannot enter HTTPS messages or expose diagnostics. Hook errors
 use fixed messages; public authored domain rejections retain their safe messages.
 Processes provide failure containment and remain trusted executable code with
 the user's filesystem/network access. They are not an OS security sandbox.

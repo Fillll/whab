@@ -254,12 +254,14 @@ class LivePluginSelection:
             process = plugin._process
             if process is not None:
                 processes.append({"plugin": plugin.id, "pid": process._process.pid if process._process else None,
+                                  "transport": "https",
                                   "health": "ready" if process.healthy else "failed",
                                   "distribution": process.info["distribution"], "version": process.info["version"]})
         # Status must remain available while admission is gated. The immutable
         # active generation is safe to inspect here; no hook is invoked.
         for identifier, binding in self.runtime._active.services["plugins"].workers.items():
             workers.append({"plugin": identifier, "version": binding.environment.version,
+                            "transport": "https",
                             "distribution": binding.environment.distribution,
                             "environment": binding.environment.identifier,
                             "health": "ready" if binding.worker.healthy else "failed"})

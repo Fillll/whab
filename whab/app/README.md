@@ -22,7 +22,7 @@ Keep each existing runtime home, its data and keys together across upgrades. Res
 
 The `whab` wheel contains the host/core and public SDK. The [supported plugin inventory](plugins/README.md#supported-plugins) defines the independently packaged plugin set, versions' ownership and default selections. `pip install 'whab[bundled]'` selects that set when compatible distributions are available in the chosen package index or wheelhouse. The source installer installs local packages together without requiring unpublished releases from an index; `--example` also installs the teaching plugin.
 
-Installing a plugin does not enable it. Settings selects installed optional plugins for the active budget; portable containers keep their own selections and data. Installed plugin code runs in [host-managed child processes](../docs/plugin-processes.md), including discovery, settings and rendering. Plugins remain trusted code with the current user's OS access. See [plugin management](../docs/usage.md#settings-and-plugin-manager), [folder ownership](plugins/README.md) and the [public SDK](../docs/plugins.md).
+Installing a plugin does not enable it. Settings selects installed optional plugins for the active budget; portable containers keep their own selections and data. Installed plugin code runs in [host-managed child processes](../docs/plugin-processes.md), including discovery, settings and rendering, and communicates with the core over authenticated loopback HTTPS. Plugins remain trusted code with the current user's OS access. See [plugin management](../docs/usage.md#settings-and-plugin-manager), [folder ownership](plugins/README.md) and the [public SDK](../docs/plugins.md).
 
 | Setting | Default | Purpose |
 | --- | --- | --- |

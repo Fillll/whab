@@ -3,6 +3,9 @@
 All installed plugins already execute in [owned child processes](plugin-processes.md)
 from WHAB 2.54. This document describes the specialized adapters and explicit
 immutable-environment approvals used for compatible live code upgrades.
+From WHAB 2.55, all these worker families use the shared authenticated
+[HTTPS transport](plugin-processes.md#authentication-and-bootstrap). Their typed
+messages, exact-host fences and financial continuation semantics are preserved.
 
 WHAB 2.25 introduced explicitly live stateless reporting/export upgrades. The
 current adapter also replaces branding, file-parser, declarative API interface,

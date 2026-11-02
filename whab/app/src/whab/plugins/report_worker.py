@@ -7,7 +7,6 @@ The caller chooses a Python interpreter from its approved versioned environment.
 """
 
 import os
-import selectors
 import signal
 import subprocess
 import sys
@@ -24,6 +23,7 @@ from .bank_adapter import BankAdapter, ProviderFailure
 from .categorization_worker import CategorizationDispatcher
 from .contracts import contract_for
 from .effect_store import decode, encode
+from .https_transport import broker, command, deliver
 from .process_environment import process_environment
 from .provider_worker import MAX_PROVIDER_BYTES, ProviderDispatcher, read_provider_result
 from .remote_client_adapter import supports_remote_client
@@ -286,14 +286,17 @@ class ReportWorker:
         self._lock = Lock()
         self._process = None
         self._retiring = None
+        self.channel = None
         if on_create is not None:
             on_create(self)
         try:
+            self.channel = broker().session(plugin_id, "report_worker")
             self._process = subprocess.Popen(
-                [str(python), "-I", "-B", "-m", "whab.plugins.report_worker", plugin_id],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                command(python, "report_worker", plugin_id),
+                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 env=process_environment(), bufsize=0, start_new_session=True,
             )
+            deliver(self.channel, self._process)
             hello = self._read(timeout)
             if hello.payload or set(hello.metadata) != {"kind", "worker", "sdk", "plugin", "distribution", "version", "host", "live", "capabilities", "insights", "export", "adapters", "contract"}:
                 raise WireError()
@@ -349,48 +352,31 @@ class ReportWorker:
 
     def _write(self, raw, timeout):
         deadline = monotonic() + timeout
-        descriptor = self._process.stdin.fileno()
-        os.set_blocking(descriptor, False)
-        with selectors.DefaultSelector() as selector:
-            selector.register(descriptor, selectors.EVENT_WRITE)
-            sent = 0
-            while sent < len(raw):
-                remaining = deadline - monotonic()
-                if remaining <= 0 or not selector.select(remaining):
-                    raise TimeoutError()
-                try:
-                    sent += os.write(descriptor, raw[sent:sent + 64 * 1024])
-                except BlockingIOError:
-                    continue
+        self.channel.send_frame(raw, timeout)
         return max(0, deadline - monotonic())
 
     def _read(self, timeout, max_payload=0):
         deadline = monotonic() + timeout
-        descriptor = self._process.stdout.fileno()
-        with selectors.DefaultSelector() as selector:
-            selector.register(descriptor, selectors.EVENT_READ)
+        def read(size):
+            result = bytearray()
+            while len(result) < size:
+                part = self.channel.read(min(size - len(result), 64 * 1024), max(0, deadline - monotonic()))
+                if not part:
+                    raise EOFError()
+                result.extend(part)
+            return bytes(result)
 
-            def read(size):
-                result = bytearray()
-                while len(result) < size:
-                    remaining = deadline - monotonic()
-                    if remaining <= 0 or not selector.select(remaining):
-                        raise TimeoutError()
-                    part = os.read(descriptor, min(size - len(result), 64 * 1024))
-                    if not part:
-                        raise EOFError()
-                    result.extend(part)
-                return bytes(result)
-
-            header = read(HEADER.size)
-            metadata_size, payload_size = frame_lengths(header)
-            if payload_size > max_payload:
-                raise WireError()
-            return Frame.decode(header + read(metadata_size + payload_size))
+        header = read(HEADER.size)
+        metadata_size, payload_size = frame_lengths(header)
+        if payload_size > max_payload:
+            raise WireError()
+        return Frame.decode(header + read(metadata_size + payload_size))
 
     def _stop(self):
         process = self._process or self._retiring
         self._process, self._retiring = None, None
+        if self.channel is not None:
+            self.channel.close()
         if process is None:
             return
         try:
@@ -402,7 +388,8 @@ class ReportWorker:
         finally:
             for stream in (process.stdin, process.stdout):
                 try:
-                    stream.close()
+                    if stream is not None:
+                        stream.close()
                 except OSError:
                     pass
 
@@ -626,6 +613,8 @@ if __name__ == "__main__":
     try:
         if len(sys.argv) != 2 or not valid_plugin_name(sys.argv[1]):
             raise WireError()
-        serve(sys.argv[1], sys.stdin.buffer, sys.stdout.buffer)
+        from .https_transport import run_worker
+
+        run_worker("report_worker", sys.argv[1])
     except Exception:
         sys.exit(1)

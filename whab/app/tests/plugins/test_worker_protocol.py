@@ -140,6 +140,12 @@ import os
 import sys
 from whab.plugins.wire import Frame, HEADER, PROTOCOL_VERSION, frame_lengths
 from whab import __version__
+from whab.plugins.https_transport import bootstrap_client
+source = target = bootstrap_client('report_worker', 'fixture')
+
+def wait_for_close():
+    while source.read(65536):
+        pass
 
 mode = MODE
 if mode.startswith(('child-close:', 'child-timeout:')):
@@ -149,13 +155,13 @@ if mode.startswith(('child-close:', 'child-timeout:')):
     child_program = 'import os,pathlib,signal,sys,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); marker=pathlib.Path(sys.argv[1]); pending=marker.with_suffix(".pending"); pending.write_text(str(os.getpid())); pending.replace(marker); time.sleep(60)'
     subprocess.Popen([sys.executable, '-I', '-c', child_program, mode.split(':',1)[1]], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 def send(metadata, payload=b''):
-    sys.stdout.buffer.write(Frame(metadata, payload).encode())
-    sys.stdout.buffer.flush()
+    target.write(Frame(metadata, payload).encode())
+    target.flush()
 if mode == 'startup-crash':
     sys.stderr.write('synthetic-private-diagnostic')
     raise SystemExit(7)
 if mode == 'startup-timeout':
-    sys.stdin.buffer.read()
+    wait_for_close()
     raise SystemExit(0)
 hello = {'kind':'ready','worker':PROTOCOL_VERSION,'sdk':1,'plugin':'fixture','distribution':'fixture-package','version':'1.0.0','host':__version__,'live':True,'capabilities':[{'name':'reporting.insights','version':1},{'name':'reporting.export','version':1}],'insights':True,'export':True,
          'adapters':{'bank_logos':None,'merchant_logos':False,'file_import':None,'settings':None,'interface':None,'ui':None,'categorization':False,'remote_client':None,'bank':None},
@@ -167,21 +173,21 @@ if mode == 'no-read':
     import signal
     signal.pause()
 while True:
-    header = sys.stdin.buffer.read(HEADER.size)
+    header = source.read(HEADER.size)
     if not header:
         break
     metadata_size, payload_size = frame_lengths(header)
-    request = Frame.decode(header + sys.stdin.buffer.read(metadata_size + payload_size)).metadata
+    request = Frame.decode(header + source.read(metadata_size + payload_size)).metadata
     identifier = request['id']
     if mode == 'oversized-logo':
         from whab.plugins.wire import PROTOCOL_VERSION
-        sys.stdout.buffer.write(HEADER.pack(b'WHAB',PROTOCOL_VERSION,2,128*1024+1)+b'{}')
-        sys.stdout.buffer.flush()
-        sys.stdin.buffer.read()
+        target.write(HEADER.pack(b'WHAB',PROTOCOL_VERSION,2,128*1024+1)+b'{}')
+        target.flush()
+        wait_for_close()
         break
     if request['operation'] == 'shutdown':
         if mode == 'shutdown-timeout':
-            sys.stdin.buffer.read()
+            wait_for_close()
             break
         if mode == 'shutdown-result':
             send({'id':identifier,'kind':'result','data':[]})
@@ -191,11 +197,11 @@ while True:
     if mode == 'crash':
         os._exit(7)
     if mode == 'timeout' or mode.startswith('child-timeout:'):
-        sys.stdin.buffer.read()
+        wait_for_close()
         break
     if mode == 'bad-frame':
-        sys.stdout.buffer.write(b'INVALID-FRAME!')
-        sys.stdout.buffer.flush()
+        target.write(b'INVALID-FRAME!')
+        target.flush()
         break
     if mode == 'hook-error':
         sys.stderr.write('synthetic-private-diagnostic')
@@ -224,32 +230,18 @@ while True:
 
 
 @pytest.fixture
-def fixture_process(monkeypatch, tmp_path):
+def fixture_process(monkeypatch):
     original = subprocess.Popen
     processes = []
     observed = []
 
-    def select(mode, *, ready=False):
+    def select(mode):
         program = _FIXTURE_WORKER.replace("mode = MODE", "mode = " + repr(mode))
-        marker = tmp_path / f"ready-{len(processes)}"
-        if ready:
-            # Malformed-response tests measure the operation/validation boundary.
-            # Wait for this fixture's real hello, keeping interpreter/coverage
-            # startup outside that measurement. Startup-deadline tests below
-            # deliberately do not use this setup barrier.
-            program = program.replace("send(hello)",
-                                      "send(hello)\nfrom pathlib import Path\nPath(" + repr(str(marker)) + ").write_text('ready')")
 
         def spawn(command, **kwargs):
             observed.append((command, kwargs))
             process = original([sys.executable, "-I", "-c", program], **kwargs)
             processes.append(process)
-            if ready:
-                deadline = time.monotonic() + 30
-                while not marker.exists():
-                    if process.poll() is not None or time.monotonic() >= deadline:
-                        raise AssertionError("The malformed-response fixture did not send its ready handshake.")
-                    time.sleep(0.01)
             return process
 
         monkeypatch.setattr(report_worker.subprocess, "Popen", spawn)
@@ -261,13 +253,14 @@ def fixture_process(monkeypatch, tmp_path):
             process.kill()
             process.wait(timeout=2)
         for stream in (process.stdin, process.stdout):
-            stream.close()
+            if stream is not None:
+                stream.close()
 
 
 def assert_retired(worker, process):
     assert worker._process is None
     assert process.poll() is not None
-    assert process.stdin.closed and process.stdout.closed
+    assert process.stdin.closed and (process.stdout is None or process.stdout.closed)
 
 
 def test_real_example_worker_roundtrip_matches_public_results_and_closes(worker_snapshot, capfd):
@@ -277,6 +270,7 @@ def test_real_example_worker_roundtrip_matches_public_results_and_closes(worker_
     worker = ReportWorker("example", timeout=5, expected_distribution=distribution.metadata["Name"], expected_version=distribution.version)
     process = worker._process
     try:
+        assert worker.channel.family == "report_worker" and process.stdin.closed and process.stdout is None
         assert worker.info["insights"] and worker.info["export"]
         assert worker.insights(worker_snapshot) == descriptor.insights(worker_snapshot)
         assert worker.export(worker_snapshot) == descriptor.export(worker_snapshot)
@@ -306,7 +300,7 @@ def test_startup_rejects_crashes_timeouts_and_incompatible_hello_and_cleans_proc
         ReportWorker("fixture", timeout=0.1 if mode == "startup-timeout" else 5)
     assert raised.value.code == "worker_startup_failed" and raised.value.plugin_id == "fixture"
     process, = processes
-    assert process.poll() is not None and process.stdin.closed and process.stdout.closed
+    assert process.poll() is not None and process.stdin.closed and process.stdout is None
 
 
 @pytest.mark.parametrize("expected", [{"expected_version": "2.0.0"}, {"expected_distribution": "different-package"}])
@@ -316,7 +310,7 @@ def test_exact_approved_package_identity_is_required_before_use(expected, fixtur
         ReportWorker("fixture", timeout=5, **expected)
     assert raised.value.code == "worker_startup_failed"
     process, = processes
-    assert process.poll() is not None and process.stdin.closed and process.stdout.closed
+    assert process.poll() is not None and process.stdin.closed and process.stdout is None
 
 
 def test_legacy_worker_is_readable_but_does_not_claim_live_upgrade_support(fixture_process, worker_snapshot):
@@ -349,7 +343,7 @@ def test_live_report_support_requires_explicit_stateless_report_contract_without
 
 @pytest.mark.parametrize("mode", ["crash", "bad-frame", "wrong-id", "unknown-field", "payload", "insights-type", "insights-fields"])
 def test_failed_or_malformed_worker_reports_are_attributed_and_retired(mode, fixture_process, worker_snapshot):
-    processes, _ = fixture_process(mode, ready=True)
+    processes, _ = fixture_process(mode)
     worker = ReportWorker("fixture", timeout=5)
     with pytest.raises(PluginError) as raised:
         worker.insights(worker_snapshot)
@@ -389,7 +383,7 @@ def test_logo_response_size_is_rejected_from_header_before_waiting_for_binary_bo
     assert_retired(worker, processes[0])
 
 
-def test_unread_large_request_has_a_bounded_write_timeout_and_closes_pipes(fixture_process, worker_snapshot):
+def test_unread_large_request_has_a_bounded_write_timeout_and_revokes_https(fixture_process, worker_snapshot):
     processes, observed = fixture_process("no-read")
     worker = ReportWorker("fixture", timeout=5)
     worker.timeout = 0.05
@@ -494,7 +488,7 @@ def test_cancellation_preserves_identity_and_retires_owned_worker(during_startup
         assert worker._process is None
     assert raised.value is cancellation
     process, = processes
-    assert process.poll() is not None and process.stdin.closed and process.stdout.closed
+    assert process.poll() is not None and process.stdin.closed and process.stdout is None
     assert observed[0][1]["start_new_session"] is True
 
 

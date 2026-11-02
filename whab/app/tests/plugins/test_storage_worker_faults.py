@@ -20,10 +20,12 @@ def fake_channel(monkeypatch, *, malformed):
     packet = HEADER.pack(b"WHST", 1, MAX_METADATA + 1, 0)
     source = (
         "import sys,base64\n"
-        f"sys.stdout.buffer.write(base64.b64decode({base64.b64encode(hello)!r}));sys.stdout.buffer.flush()\n"
-        "sys.stdin.buffer.read(14)\n"
-        + (f"sys.stdout.buffer.write({packet!r});sys.stdout.buffer.flush()\n" if malformed else "")
-        + "sys.stdin.buffer.read()\n"
+        "from whab.plugins.https_transport import bootstrap_client\n"
+        "channel=bootstrap_client('storage_worker','json')\n"
+        f"channel.write(base64.b64decode({base64.b64encode(hello)!r}));channel.flush()\n"
+        "channel.read(14)\n"
+        + (f"channel.write({packet!r});channel.flush()\n" if malformed else "")
+        + "while channel.read(65536):pass\n"
     )
     popen = subprocess.Popen
     monkeypatch.setattr(storage_worker.subprocess, "Popen", lambda _args, **kwargs: popen([sys.executable, "-I", "-u", "-c", source], **kwargs))
@@ -144,7 +146,7 @@ os._exit(0)
         database.close()
         database = None
         # Readiness retries do no financial work. The old child commits, sees
-        # the closed parent pipe, and releases its native owner in finally.
+        # the unavailable HTTPS broker, and releases its native owner in finally.
         for _ in range(10):
             try:
                 replacement = StorageWorkerProxy(StorageWorker("sqlite"), StorageContext(tmp_path, "sandbox", {}), tmp_path / "intents")
@@ -186,7 +188,9 @@ def factory(context):
  assert dict(context.config)=={'EXPLICIT_STORAGE_SETTING':'scoped'}
  return original.storage(context)
 storage_worker.load_plugins=lambda _, **kwargs:PluginRegistry((replace(original,storage=factory),))
-storage_worker.serve('json',sys.stdin.buffer,sys.stdout.buffer)
+from whab.plugins.https_transport import bootstrap_client
+channel=bootstrap_client('storage_worker','json')
+storage_worker.serve('json',channel,channel)
 '''
     for key in ('FICTIONAL_PROVIDER_TOKEN', 'FICTIONAL_SERVICE_SECRET', 'FICTIONAL_API_KEY', 'FICTIONAL_AUTHORIZATION',
                 'fictional_password', 'JSON_CUSTOM_VALUE', 'ODD_PASSWORD_ALIAS'):

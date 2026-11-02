@@ -43,6 +43,8 @@ def test_backend_is_owned_by_child_and_reopens_same_authority(proxy):
     assert proxy.accounts("personal")[0]["id"] == account
     assert not hasattr(proxy, "db") and not hasattr(proxy, "state")
     assert proxy.worker._process.pid != __import__("os").getpid()
+    assert proxy.worker.channel.family == "storage_worker"
+    assert proxy.worker._process.stdin.closed and proxy.worker._process.stdout is None
     assert proxy.commit_evidence().authority_epoch == evidence.authority_epoch
     assert proxy.recover() == {"outcome": "unchanged"}
     assert proxy.accounts("personal")[0]["balance"] == 12345

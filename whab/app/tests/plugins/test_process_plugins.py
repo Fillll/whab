@@ -50,6 +50,8 @@ plugins = load_descriptors(tuple(sorted(entry.name for entry in entries)))
 try:
     pids = [plugin._process._process.pid for plugin in plugins]
     assert all(plugin._process.healthy for plugin in plugins)
+    assert all(plugin._process._process.stdin.closed and plugin._process._process.stdout is None for plugin in plugins)
+    assert all(plugin._process.channel.family == "process_worker" and plugin._process.channel._secret is None for plugin in plugins)
     assert len(set(pids)) == len(plugins)
     assert os.getpid() not in pids
     assert not any(name.startswith("whab_plugin_") for name in sys.modules)
