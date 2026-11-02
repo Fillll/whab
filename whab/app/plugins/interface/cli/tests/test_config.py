@@ -11,7 +11,7 @@ from whab_plugin_cli.config import CONFIG_LIMIT, connection_defaults
 
 @pytest.mark.parametrize("newline", ["\n", "\r\n"])
 def test_config_help_accepts_continuations_quotes_comments_and_relative_ca(tmp_path, monkeypatch, capsys, newline):
-    config = tmp_path / "default-budget.config"
+    config = tmp_path / "default.budget"
     config.write_bytes(newline.join([
         "# Connection defaults, not a script",
         "--url https://localhost:5173 \\",
@@ -90,7 +90,7 @@ def test_missing_config_and_empty_defaults(tmp_path, capsys):
 
 
 def test_pasted_config_accepts_a_final_backslash_without_a_final_newline(tmp_path):
-    config = tmp_path / "default-budget.config"
+    config = tmp_path / "default.budget"
     config.write_text("--url https://localhost:5173 \\\n--budget default \\\n--ca /fictional/tls/ca.crt \\")
     assert connection_defaults([str(config), "--help"]) == (["--help"], {
         "url": "https://localhost:5173", "budget": "default", "ca": "/fictional/tls/ca.crt"})
