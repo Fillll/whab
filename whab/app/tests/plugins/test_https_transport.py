@@ -236,3 +236,42 @@ def test_thread_admission_failure_closes_the_socket_and_releases_capacity(transp
         assert connection.fileno() == -1
     assert transport.server._slots._value == capacity
     assert not transport.server._connections
+
+
+def test_exit_after_ack_flush_preserves_the_buffered_final_reply(transport, monkeypatch):
+    import threading
+    import time
+
+    from whab.plugins.https_transport import _Handler
+
+    channel, credential = session(transport)
+    client = Client(credential)
+    flushed, publish = threading.Event(), threading.Event()
+    reply = _Handler._reply
+
+    def delayed_counter(handler, code, *args, **kwargs):
+        result = reply(handler, code, *args, **kwargs)
+        if handler.path == '/v1/ack' and code == 204:
+            channel.incoming.put(b'fictional-final-reply')
+            channel.process = SimpleNamespace(poll=lambda: 0)
+            flushed.set()
+            assert publish.wait(5)
+        return result
+
+    monkeypatch.setattr(_Handler, '_reply', delayed_counter)
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            dispatch = executor.submit(channel.send_frame, b'fictional-request', 5)
+            try:
+                assert read_exact(client, len(b'fictional-request')) == b'fictional-request'
+                assert flushed.wait(1)
+                # Force the parent to observe the exited child before the
+                # delivery handler can publish its completed acknowledgment.
+                time.sleep(0.15)
+                assert not dispatch.done()
+            finally:
+                publish.set()
+            dispatch.result(timeout=2)
+        assert channel.read(100, timeout=1) == b'fictional-final-reply'
+    finally:
+        client.close()

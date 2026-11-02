@@ -142,9 +142,10 @@ class Session:
                     if remaining <= 0:
                         raise TimeoutError()
                     self._delivery.wait(min(0.1, remaining))
-                if self.process is not None and self.process.poll() is not None:
-                    self.close()
-                    raise EOFError()
+                # A child can exit after receiving the acknowledgment response
+                # while its HTTP handler is still publishing this counter. Its
+                # final reply may already be buffered. Only delivery/closure or
+                # the deadline decides this write; readers observe process exit.
         finally:
             self._write_lock.release()
 
