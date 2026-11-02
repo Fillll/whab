@@ -9,6 +9,7 @@ These are the durable choices behind the current implementation. Change their do
 | Decision | Reason and contract |
 | --- | --- |
 | Financial rules remain in the domain core | Replacing a UI, provider or backend must preserve money, currency and budgeting rules. See [financial invariants](#financial-invariants). |
+| Installed plugin implementations execute in owned child processes | Discovery, rendering, settings and feature hooks use [scoped process messages](plugin-processes.md); the host retains financial validation, access checks and recovery. |
 | Install code per environment; own saved state per budget | A plugin package can serve several budgets without sharing their models, settings, sessions or files. See [budget isolation](#budget-isolation-verification). |
 | The budget host is the authority for remote operations | Clients use public commands and queries with revisions and bounded retry receipts; bank credentials and categorization execution remain at the authority. See the [remote contract](plugins.md#remote-interface-and-client). |
 | Render pages in Python and keep browser JavaScript small | The selected UI owns presentation and interaction while core owns financial decisions. No Node build or React runtime is required; Node is used for browser-module tests. See [web acceptance checks](../app/plugins/interface/web/README.md#ui-acceptance-criteria). |

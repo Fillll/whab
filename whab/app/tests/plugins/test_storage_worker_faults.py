@@ -181,11 +181,11 @@ from whab.plugins import storage_worker
 for key in ('FICTIONAL_PROVIDER_TOKEN','FICTIONAL_SERVICE_SECRET','FICTIONAL_API_KEY','FICTIONAL_AUTHORIZATION','fictional_password','JSON_CUSTOM_VALUE','ODD_PASSWORD_ALIAS','FICTIONAL_SAFE_VALUE'):
  assert key not in os.environ
 assert os.environ['LANG']=='C'
-original=storage_worker.load_plugins(('json',)).storage_plugin('json')
+original=storage_worker.load_plugins(('json',), _worker=True).storage_plugin('json')
 def factory(context):
  assert dict(context.config)=={'EXPLICIT_STORAGE_SETTING':'scoped'}
  return original.storage(context)
-storage_worker.load_plugins=lambda _:PluginRegistry((replace(original,storage=factory),))
+storage_worker.load_plugins=lambda _, **kwargs:PluginRegistry((replace(original,storage=factory),))
 storage_worker.serve('json',sys.stdin.buffer,sys.stdout.buffer)
 '''
     for key in ('FICTIONAL_PROVIDER_TOKEN', 'FICTIONAL_SERVICE_SECRET', 'FICTIONAL_API_KEY', 'FICTIONAL_AUTHORIZATION',

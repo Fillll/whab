@@ -1,6 +1,5 @@
 """Budget activation isolates ledgers and restores portable feature setups."""
 
-import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from zipfile import ZipFile
@@ -300,8 +299,9 @@ def test_shutdown_closes_all_owned_budget_backends(tmp_path):
         assert all(store.accounts("personal") == [] for store in stores)
     assert host.contexts == []
     for store in stores:
-        with pytest.raises(sqlite3.ProgrammingError, match="closed"):
-            store.db.execute("SELECT 1")
+        assert not store.worker.healthy and not store.worker.cleanup_pending
+        with pytest.raises(PluginError):
+            store.accounts("personal")
 
 
 def test_failed_interface_startup_closes_backend_without_activating_budget(tmp_path, monkeypatch):
@@ -330,8 +330,9 @@ def test_failed_interface_startup_closes_backend_without_activating_budget(tmp_p
         assert client.get("/api/budget").json()["id"] == "default"
         assert len(host.applications) == 1 and host.contexts == []
         assert len(opened) == 1
-        with pytest.raises(sqlite3.ProgrammingError, match="closed"):
-            opened[0].db.execute("SELECT 1")
+        assert not opened[0].worker.healthy and not opened[0].worker.cleanup_pending
+        with pytest.raises(PluginError):
+            opened[0].accounts("personal")
 
 
 def test_recent_budget_is_listed_and_lazily_reopened_after_restart(tmp_path):

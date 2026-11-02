@@ -452,7 +452,7 @@ class PluginRegistry:
             ) from None
 
 
-def load_descriptors(
+def _load_descriptors(
     enabled: tuple[str, ...],
     entrypoints: Sequence[metadata.EntryPoint] | None = None,
     *, _worker=False,
@@ -555,7 +555,26 @@ def load_descriptors(
     return tuple(plugins)
 
 
-def load_plugins(
+def load_descriptors(enabled, entrypoints=None, *, _worker=False):
+    """Discover actual installed code in owned children; injected doubles stay local."""
+    if _worker:
+        return _load_descriptors(enabled, entrypoints, _worker=True)
+    from .process_worker import discovery_scope
+
+    with discovery_scope():
+        return _load_descriptors(enabled, entrypoints)
+
+
+def load_plugins(enabled, entrypoints=None, *, _worker=False):
+    if _worker:
+        return _resolve_plugins(enabled, entrypoints, _worker=True)
+    from .process_worker import discovery_scope
+
+    with discovery_scope():
+        return _resolve_plugins(enabled, entrypoints)
+
+
+def _resolve_plugins(
     enabled: tuple[str, ...],
     entrypoints: Sequence[metadata.EntryPoint] | None = None,
     *, _worker=False,

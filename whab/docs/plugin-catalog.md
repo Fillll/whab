@@ -9,7 +9,7 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 
 | Plugin | Distribution version | Host requirement | Lifecycle | Support |
 | --- | --- | --- | --- | --- |
-| [ai-credentials](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/automation/ai-credentials/README.md) | `whab_plugin_ai_credentials 1.0.1` | `whab>=2.50,<3` | restart-required | maintained |
+| [ai-credentials](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/automation/ai-credentials/README.md) | `whab_plugin_ai_credentials 1.1.0` | `whab>=2.54,<3` | restart-required | maintained |
 | [bank-logos](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.2` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
 | [cli](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/interface/cli/README.md) | `whab_plugin_cli 1.1.0` | `whab>=2.53,<3` | restart-required | maintained |
 | [client](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.6.2` | `whab>=2.39,<3` | declarative-remote-client-worker | maintained |

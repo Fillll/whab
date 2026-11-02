@@ -451,7 +451,7 @@ from whab.plugins.wire import HEADER, Frame, frame_lengths
 from dataclasses import asdict
 
 plugin_id = sys.argv[1]
-registry = load_plugins((plugin_id,))
+registry = load_plugins((plugin_id,), _worker=True)
 plugin = registry.descriptors()[0]
 entry, = (entry for entry in metadata.entry_points(group='whab.plugins') if entry.name == plugin_id)
 def send(value):

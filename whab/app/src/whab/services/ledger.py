@@ -106,7 +106,7 @@ class LedgerService:
         return self._lock
 
     def feature_adapter(self, plugin_id):
-        """In-process public collaboration API; never exposed by remote transport."""
+        """Local collaboration through scoped plugin IPC; never a remote API."""
         with self._lock:
             if plugin_id not in self._features:
                 raise StoreError("Enable the required feature on this budget first.")

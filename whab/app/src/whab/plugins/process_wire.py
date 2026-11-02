@@ -12,6 +12,8 @@ from dataclasses import fields, is_dataclass
 from pathlib import Path
 from types import MappingProxyType
 
+from whab.domain.transactions import UNSET
+
 from .wire import WireError
 
 VERSION = 1
@@ -55,6 +57,8 @@ class Codec:
             nodes += 1
             if depth > 40 or nodes > 2_000_000:
                 raise WireError()
+            if item is UNSET:
+                return ["unset"]
             if item is None or type(item) in {str, int, bool, float}:
                 if type(item) is float and not math.isfinite(item):
                     raise WireError()
@@ -101,6 +105,8 @@ class Codec:
             if depth > 40 or nodes > 2_000_000 or type(item) is not list or not item:
                 raise WireError()
             kind = item[0]
+            if kind == "unset" and len(item) == 1:
+                return UNSET
             if kind == "value" and len(item) == 2:
                 value = item[1]
                 if value is None or type(value) in {str, int, bool} or type(value) is float and math.isfinite(value):

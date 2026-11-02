@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.54.0 — 2026-11-01
+
+PR: [#144](https://github.com/Fillll/whab/pull/144)
+
+- Discover and execute every installed plugin in host-managed child processes, including settings routes, UI rendering, binders, feature collaboration and background work. Keep financial validation and access guards in the host and retain native storage receipt recovery.
+- Add bounded versioned SDK capability messages, scoped callback admission, explicit process configuration declarations, process health status and deterministic startup/shutdown ownership. Preserve local interface operation documentation and custom workspace pages across the process boundary.
+
 ## 2.53.1 — 2026-11-01
 
 PR: [#143](https://github.com/Fillll/whab/pull/143)

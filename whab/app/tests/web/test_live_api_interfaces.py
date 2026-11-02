@@ -171,6 +171,7 @@ def test_portable_settings_cannot_supply_a_machine_bearer_credential(tmp_path, m
 
 
 def test_api_handover_preserves_categorization_and_failed_startup_closes_its_resources(tmp_path, store, monkeypatch):
+    from whab.plugins.process_worker import PluginProcess
     from whab.services.categorization import CategorizationService
 
     category = load_plugins(("random-forest-categorization",)).descriptors()[0]
@@ -197,6 +198,7 @@ def test_api_handover_preserves_categorization_and_failed_startup_closes_its_res
 
     asyncio.run(run())
     previous = len(closed)
+    category = PluginProcess("random-forest-categorization").descriptor
     # An unconfigured credential fails after categorization was prepared.
     descriptor = api("broken")
     settings = Settings(tmp_path / "failed", 5173, "sandbox", "", "", "", False, "", "", (category.id, descriptor.id), ui="")

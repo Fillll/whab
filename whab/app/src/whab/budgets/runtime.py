@@ -93,7 +93,7 @@ class RuntimeCandidate:
         owned = getattr(plugins, "process_resources", ())
         resources = tuple(resource for resource in self.resources
                           if not resource.plugin_process or resource in owned)
-        object.__setattr__(self, "resources", resources + tuple(resource for resource in owned if resource not in resources))
+        object.__setattr__(self, "resources", tuple(owned) + tuple(resource for resource in resources if resource not in owned))
 
 
 @dataclass(frozen=True)
@@ -203,9 +203,6 @@ class BudgetRuntime:
         candidate = RuntimeCandidate(services, resources)
         self.budget_id = budget_id
         self._active = RuntimeGeneration(1, candidate.services, candidate.resources)
-        plugins = candidate.services.get("plugins")
-        if callable(getattr(plugins, "bind_process_runtime", None)):
-            plugins.bind_process_runtime(self)
         self._condition = Condition()
         self._waiters = set()
         self._leases = {}
@@ -222,6 +219,9 @@ class BudgetRuntime:
         self._sequence = 0
         self._uncertain = None
         self._service_fault = None
+        plugins = candidate.services.get("plugins")
+        if callable(getattr(plugins, "bind_process_runtime", None)):
+            plugins.bind_process_runtime(self)
 
     def handle(self, name):
         if type(name) is not str or not name.isidentifier() or name.startswith("_"):

@@ -13,13 +13,15 @@ import queue
 import selectors
 import threading
 import weakref
-from contextvars import ContextVar
+from contextvars import Context, ContextVar
 from time import monotonic
 from uuid import uuid4
 
 from whab.domain.errors import StoreError
 
 from .process_wire import HEADER, Codec, lengths
+from .storage_proxy import _MUTATIONS
+from .storage_worker_codec import CONTROL_WRITES, METHODS
 from .wire import WireError
 
 _REQUEST = ContextVar("whab_plugin_process_request", default=None)
@@ -35,7 +37,17 @@ _KINDS = {
     "bank": ({"link_token", "exchange", "sync", "disconnect", "webhook", "close"}, {"config"}, set()),
     "lock": ({"enter", "exit"}, set(), set()),
     "iterator": ({"next", "close"}, set(), set()),
+    "storage": (set(METHODS) | set(_MUTATIONS) | {"close"}, set(), set()),
+    "bankstore": ({"items", "get_item", "save_item", "set_item_status", "disconnect_item", "item_identity", "apply_sync"}, set(), set()),
+    "opaque": (set(), set(), set()),
 }
+
+
+class OpaqueModel:
+    """Keep a completed legacy engine model exclusively in its child."""
+
+    def __init__(self, value):
+        self.value = value
 
 
 class ProcessUnavailable(StoreError):
@@ -46,6 +58,8 @@ class ProcessUnavailable(StoreError):
 class Capability:
     def __init__(self, peer, identifier, kind, methods, attributes, setters, asynchronous):
         object.__setattr__(self, "_peer", peer)
+        owner = getattr(peer.codec, "owner", None)
+        object.__setattr__(self, "_owner", owner() if owner is not None else None)
         object.__setattr__(self, "_identifier", identifier)
         object.__setattr__(self, "_kind", kind)
         object.__setattr__(self, "_methods", frozenset(methods))
@@ -96,6 +110,45 @@ class AsyncCapability(Capability):
         return await asyncio.to_thread(super().__call__, *args, **kwargs)
 
 
+class StorageCapability(Capability):
+    """Legacy public storage methods, fenced after an uncertain write response."""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        object.__setattr__(self, "_fenced", False)
+        object.__setattr__(self, "_lock", threading.RLock())
+
+    @property
+    def uncertain(self):
+        return self._fenced
+
+    @property
+    def lock(self):
+        return self._lock
+
+    def __getattr__(self, name):
+        callback = super().__getattr__(name)
+        if name not in set(_MUTATIONS) | CONTROL_WRITES | {"execute_operation"}:
+            return callback
+
+        def mutate(*args, **kwargs):
+            from .runtime import PluginError
+
+            if self._fenced:
+                raise PluginError("The storage write outcome is unknown. Reopen and reconcile this budget before retrying.",
+                                  code="storage_write_unknown")
+            try:
+                return callback(*args, **kwargs)
+            except (StoreError, WireError):
+                object.__setattr__(self, "_fenced", True)
+                if self._owner is not None:
+                    self._owner.storage_fault(self._owner.plugin_id)
+                raise PluginError("The storage write outcome is unknown. Reopen and reconcile this budget before retrying.",
+                                  code="storage_write_unknown") from None
+
+        return mutate
+
+
 class Peer:
     def __init__(self, source, target, *, timeout=60, root=None):
         self.source, self.target, self.timeout = source, target, timeout
@@ -104,16 +157,19 @@ class Peer:
         self._write_lock, self._state_lock = threading.Lock(), threading.RLock()
         self._pending, self._exports, self._identities, self._dispatchers = {}, {}, {}, {}
         self._remote = weakref.WeakValueDictionary()
+        self._threads = []
         self._closed = threading.Event()
         self._local = threading.local()
         self._loop = None
-        self._reader = threading.Thread(target=self._read, daemon=True, name="whab-plugin-pipe")
+        self._reader = threading.Thread(target=self._read, daemon=True, name="whab-plugin-pipe", context=Context())
         self._reader.start()
 
     def export(self, value):
         if isinstance(value, Capability) and value._peer is self:
             return {"back": value._identifier}
-        if isinstance(value, Capability):
+        if type(value) is OpaqueModel:
+            kind = "opaque"
+        elif isinstance(value, Capability):
             kind = value._kind
         elif callable(value):
             kind = "call"
@@ -131,6 +187,10 @@ class Peer:
             kind = "provider"
         elif callable(getattr(value, "link_token", None)):
             kind = "bank"
+        elif callable(getattr(value, "accounts", None)) and callable(getattr(value, "categories", None)):
+            kind = "storage"
+        elif callable(getattr(value, "items", None)) and callable(getattr(value, "apply_sync", None)):
+            kind = "bankstore"
         elif hasattr(value, "__next__"):
             kind = "iterator"
         elif hasattr(value, "__enter__") and hasattr(value, "__exit__"):
@@ -163,7 +223,7 @@ class Peer:
                 entry = self._exports.get(value["back"])
                 if entry is None:
                     raise WireError()
-                return entry[0]
+                return entry[0].value if entry[1] == "opaque" else entry[0]
         if set(value) != {"id", "kind", "methods", "attributes", "setters", "async"}:
             raise WireError()
         identifier, kind = value["id"], value["kind"]
@@ -176,7 +236,7 @@ class Peer:
         if (set(value["methods"]) - methods or set(value["attributes"]) - attributes
                 or set(value["setters"]) - setters or set(value["async"]) - set(value["methods"])):
             raise WireError()
-        cls = AsyncCapability if "call" in value["async"] else Capability
+        cls = StorageCapability if kind == "storage" else (AsyncCapability if "call" in value["async"] else Capability)
         with self._state_lock:
             previous = self._remote.get(identifier)
             if previous is not None:
@@ -191,13 +251,16 @@ class Peer:
             return result
 
     def _send(self, value):
+        deadline = monotonic() + self.timeout
         raw = self.codec.encode(value)
-        with self._write_lock:
+        if not self._write_lock.acquire(timeout=max(0, deadline - monotonic())):
+            self.fail()
+            raise ProcessUnavailable()
+        try:
             if self._closed.is_set():
                 raise ProcessUnavailable()
             descriptor = self.target.fileno()
             os.set_blocking(descriptor, False)
-            deadline = monotonic() + self.timeout
             with selectors.DefaultSelector() as selector:
                 selector.register(descriptor, selectors.EVENT_WRITE)
                 offset = 0
@@ -210,6 +273,8 @@ class Peer:
                         offset += os.write(descriptor, raw[offset:offset + 65536])
                     except BlockingIOError:
                         continue
+        finally:
+            self._write_lock.release()
 
     def release_remote(self, identifier, leases):
         try:
@@ -273,13 +338,15 @@ class Peer:
                         raise WireError()
                     pending = queue.Queue(maxsize=128)
                     self._dispatchers[key] = pending
-                    threading.Thread(target=self._dispatch_loop, args=(pending,), daemon=True,
-                                     name="whab-plugin-sdk").start()
+                    thread = threading.Thread(target=self._dispatch_loop, args=(pending,), daemon=True,
+                                              name="whab-plugin-sdk", context=Context())
+                    self._threads.append(thread)
+                    thread.start()
         pending.put_nowait(value)
 
     def _dispatch_loop(self, pending):
         try:
-            while (value := pending.get()) is not None:
+            while not self._closed.is_set() and (value := pending.get()) is not None:
                 self._dispatch(value)
         finally:
             self._unwind(0)
@@ -299,7 +366,7 @@ class Peer:
         with self._state_lock:
             if self._loop is None:
                 self._loop = asyncio.new_event_loop()
-                threading.Thread(target=self._loop.run_forever, daemon=True, name="whab-plugin-async").start()
+                threading.Thread(target=self._loop.run_forever, daemon=True, name="whab-plugin-async", context=Context()).start()
         return asyncio.run_coroutine_threadsafe(value, self._loop).result(self.timeout)
 
     def _dispatch(self, value):
@@ -346,7 +413,8 @@ class Peer:
                     result = getattr(target, operation)(*args, **kwargs)
             self._send({"kind": "result", "id": value["id"], "value": self._await(result)})
         except StopIteration as error:
-            self._send({"kind": "error", "id": value["id"], "value": {"code": "iterator_end", "data": error.value}})
+            model = OpaqueModel(error.value) if value["operation"] == "next" and error.value is not None else error.value
+            self._send({"kind": "error", "id": value["id"], "value": {"code": "iterator_end", "data": model}})
         except StoreError as error:
             self._send({"kind": "error", "id": value["id"], "value": {"code": "rejected", "data": str(error)[:2000]}})
         except Exception:
@@ -371,6 +439,8 @@ class Peer:
                         "thread": str(threading.get_ident()), "target": target, "operation": operation,
                         "args": tuple(args), "kwargs": dict(kwargs or {})})
             while True:
+                if self._closed.is_set():
+                    raise ProcessUnavailable()
                 try:
                     value = pending.get(timeout=max(0, deadline - monotonic()))
                 except queue.Empty:
@@ -415,3 +485,11 @@ class Peer:
             self._identities.clear()
         if self._loop is not None:
             self._loop.call_soon_threadsafe(self._loop.stop)
+        deadline = monotonic() + 1
+        for thread in self._threads:
+            if thread is not threading.current_thread():
+                thread.join(max(0, deadline - monotonic()))
+
+    @property
+    def cleanup_pending(self):
+        return any(thread.is_alive() for thread in self._threads)

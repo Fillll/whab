@@ -6,13 +6,75 @@ import os
 import subprocess
 import sys
 import weakref
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import replace
-from functools import partial
+from functools import partial, wraps
 from pathlib import Path
+from threading import RLock
 
 from .process_environment import process_environment
 from .process_rpc import Peer
 from .wire import WireError
+
+_STARTUP = ContextVar("whab_plugin_process_startup", default=None)
+_DISCOVERY = ContextVar("whab_plugin_process_discovery", default=())
+_PENDING = {}
+_PENDING_LOCK = RLock()
+
+
+@contextmanager
+def discovery_scope():
+    owners = []
+    token = _DISCOVERY.set((*_DISCOVERY.get(), owners))
+    try:
+        yield
+    except BaseException:
+        for owner in reversed(owners):
+            owner.close()
+        raise
+    finally:
+        _DISCOVERY.reset(token)
+
+
+def set_process_scope(home, budget_id, environment):
+    startup = _STARTUP.get()
+    if startup is not None:
+        startup["scope"] = str(Path(home).resolve()), budget_id, environment
+
+
+def retry_process_cleanup(home, budget_id, environment):
+    key = str(Path(home).resolve()), budget_id, environment
+    with _PENDING_LOCK:
+        owners = [owner for owner in _PENDING.values() if owner.scope == key]
+    for owner in owners:
+        owner.close()
+    with _PENDING_LOCK:
+        return not any(owner.scope == key for owner in _PENDING.values())
+
+
+def managed_plugin_startup(function):
+    """Own every discovery child before application startup can fail."""
+    @wraps(function)
+    def run(*args, **kwargs):
+        acquired = []
+        token = _STARTUP.set({"processes": acquired, "scope": None})
+        try:
+            app = function(*args, **kwargs)
+            active = app.state.budget_runtime._active.services["plugins"].descriptors()
+            retained = {id(plugin._process) for plugin in active if plugin._process is not None}
+            for process in acquired:
+                if id(process) not in retained:
+                    process.close()
+            return app
+        except BaseException:
+            for process in reversed(acquired):
+                process.close()
+            raise
+        finally:
+            _STARTUP.reset(token)
+
+    return run
 
 
 def plugin_environment(plugin_id):
@@ -52,20 +114,33 @@ def plugin_environment(plugin_id):
 
 class PluginProcess:
     def __init__(self, plugin_id, *, python=sys.executable, timeout=60):
-        from .sdk import valid_plugin_name
+        from importlib import metadata
 
-        if not valid_plugin_name(plugin_id):
-            raise ValueError("Choose a valid plugin identity.")
+        from whab import __version__
+
+        from .sdk import API_VERSION, valid_plugin_name
+
+        if not valid_plugin_name(plugin_id) or type(timeout) not in {int, float} or not 0 < timeout <= 60:
+            raise ValueError("Choose a valid plugin identity and a timeout within 60 seconds.")
         self.plugin_id, self.timeout = plugin_id, timeout
+        self.scope = _STARTUP.get()["scope"] if _STARTUP.get() is not None else None
         self.dependencies = ()
         self._process = self._retiring = self.peer = None
         self._resource = None
+        self.openapi = None
         try:
+            entry, = (entry for entry in metadata.entry_points(group="whab.plugins") if entry.name == plugin_id)
+            distribution = getattr(entry, "dist", None)
             self._process = subprocess.Popen(
                 [str(python), "-I", "-B", "-m", "whab.plugins.process_worker", plugin_id],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 env=plugin_environment(plugin_id), bufsize=0, start_new_session=True,
             )
+            acquired = _STARTUP.get()
+            if acquired is not None:
+                acquired["processes"].append(self)
+            for owners in _DISCOVERY.get():
+                owners.append(self)
             self.peer = Peer(self._process.stdout, self._process.stdin, timeout=timeout)
             self.peer.codec.owner = weakref.ref(self)
             from .process_capabilities import prepare_record
@@ -73,17 +148,22 @@ class PluginProcess:
             self.peer.codec.prepare_record = partial(prepare_record, owner=weakref.ref(self))
             self._finalizer = weakref.finalize(self, _dispose, self._process, self.peer)
             result = self.peer.call("root", "describe")
-            if type(result) is not dict or set(result) != {"plugin", "pid", "code"} or result["pid"] != self._process.pid:
+            if (type(result) is not dict or set(result) != {"plugin", "pid", "code", "host", "sdk", "distribution", "version"}
+                    or type(result["pid"]) is not int or result["pid"] != self._process.pid
+                    or result["host"] != __version__ or type(result["sdk"]) is not int or result["sdk"] != API_VERSION
+                    or type(result["code"]) is not str or len(result["code"]) != 64
+                    or any(character not in "0123456789abcdef" for character in result["code"])
+                    or any(type(result[name]) is not str or not 1 <= len(result[name]) <= 200 for name in ("distribution", "version"))
+                    or distribution is not None and (result["distribution"] != distribution.metadata["Name"]
+                                                     or result["version"] != distribution.version)):
                 raise WireError()
+            self.info = {key: result[key] for key in ("host", "sdk", "distribution", "version")}
             self.code_identity = result["code"]
             self._descriptor = self.adapt(result["plugin"])
             if self._descriptor.id != plugin_id:
                 raise WireError()
-            from importlib import metadata
-
             from .manifests import installed_manifest
 
-            entry, = (entry for entry in metadata.entry_points(group="whab.plugins") if entry.name == plugin_id)
             manifest = installed_manifest(entry)
             self.dependencies = tuple(row["id"] for row in manifest["dependencies"]) if manifest else ()
         except BaseException:
@@ -126,6 +206,7 @@ class PluginProcess:
 
     def adapt(self, plugin):
         from .sdk import Interface, Plugin, RemoteLedgerClient
+        from .storage_worker import supports_storage_worker
         from .ui_worker import proxy_context
 
         if type(plugin) is not Plugin or plugin.id != self.plugin_id:
@@ -133,11 +214,11 @@ class PluginProcess:
         updates = {"_process": self}
         if plugin.interface is not None and plugin.interface.factory is not None:
             factory = plugin.interface.factory
-            updates["interface"] = Interface(factory=lambda context: self.interface(context, factory),
+            updates["interface"] = Interface(factory=lambda context: self.interface(context, factory, plugin.interface.local_settings),
                                              local_settings=plugin.interface.local_settings)
         if plugin.ui is not None:
             updates["ui"] = replace(plugin.ui, build_context=proxy_context)
-        if plugin.storage is not None and type(plugin.storage) is not RemoteLedgerClient:
+        if plugin.storage is not None and type(plugin.storage) is not RemoteLedgerClient and supports_storage_worker(plugin):
             updates["storage"] = self.storage
         if plugin.bind is not None:
             original = plugin.bind
@@ -153,15 +234,30 @@ class PluginProcess:
 
         # Keep the native financial receipts/fencing protocol authoritative.
         root = getattr(self, "home", context.home) / "plugin-workers" / "storage-intents"
-        return StorageWorkerProxy(StorageWorker(self.plugin_id), context, root)
+        worker_owner = getattr(self, "worker_owner", None)
+        worker = StorageWorker(self.plugin_id, **({"on_create": worker_owner} if worker_owner else {}))
+        return StorageWorkerProxy(worker, context, root, on_unknown=self.storage_fault,
+                                  on_create=getattr(self, "storage_owner", None))
 
-    def interface(self, context, factory):
+    def storage_fault(self, plugin_id):
+        runtime = getattr(self, "runtime", None)
+        if runtime is not None:
+            registry = runtime._active.services["plugins"]
+            active = next((plugin for plugin in registry.descriptors() if plugin.id == plugin_id), None)
+            if active is not None and active._process is self:
+                runtime.fence_storage(plugin_id)
+
+    def interface(self, context, factory, local_settings):
         from contextlib import asynccontextmanager
 
         from fastapi import APIRouter, Request, Response
         from starlette.concurrency import run_in_threadpool
 
-        descriptions = self.peer.call("root", "interface.open", (context, factory))
+        prepared = self.peer.call("root", "interface.open", (context, factory))
+        if type(prepared) is not dict or set(prepared) != {"routes", "schema"} or type(prepared["schema"]) is not dict:
+            raise WireError()
+        descriptions = prepared["routes"]
+        self.openapi = prepared["schema"]
         if type(descriptions) is not list or len(descriptions) > 256:
             raise WireError()
 
@@ -179,11 +275,12 @@ class PluginProcess:
             raw = await request.body()
             if len(raw) > 1024 * 1024:
                 return Response(status_code=413)
+            headers = {b"content-type", b"accept"} | ({b"authorization"} if not local_settings else set())
             result = await run_in_threadpool(self.peer.call, "root", "interface.http", ({
                 "method": request.method, "path": request.url.path,
                 "query": request.scope.get("query_string", b""),
                 "headers": tuple((key, value) for key, value in request.scope["headers"]
-                                 if key.lower() in {b"content-type", b"accept"}),
+                                 if key.lower() in headers),
                 "body": raw,
             },))
             if (type(result) is not dict or set(result) != {"status", "headers", "body"}
@@ -221,8 +318,18 @@ class PluginProcess:
         finally:
             if self.peer is not None:
                 self.peer.close()
+                if self.peer.cleanup_pending:
+                    self._retiring = process
             for stream in (process.stdin, process.stdout):
-                stream.close()
+                try:
+                    stream.close()
+                except OSError:
+                    self._retiring = process
+            with _PENDING_LOCK:
+                if self._retiring is not None:
+                    _PENDING[id(self)] = self
+                else:
+                    _PENDING.pop(id(self), None)
 
 
 def _dispose(process, peer):
@@ -236,6 +343,38 @@ def _dispose(process, peer):
         peer.close()
         for stream in (process.stdin, process.stdout):
             stream.close()
+
+
+def interface_documentation(app, plugins):
+    """Merge data-only child OpenAPI with collision-free component names."""
+    from copy import deepcopy
+
+    document = deepcopy(app.openapi())
+    for plugin in plugins:
+        owner = plugin._process
+        if owner is None or owner.openapi is None:
+            continue
+        child = deepcopy(owner.openapi)
+        schemas = child.get("components", {}).get("schemas", {})
+        names = {name: plugin.id.replace("-", "_") + "_" + name for name in schemas}
+
+        def references(value):
+            if type(value) is dict:
+                for key, item in value.items():
+                    if key == "$ref" and type(item) is str and item.startswith("#/components/schemas/"):
+                        name = item.removeprefix("#/components/schemas/")
+                        value[key] = "#/components/schemas/" + names.get(name, name)
+                    else:
+                        references(item)
+            elif type(value) is list:
+                for item in value:
+                    references(item)
+
+        references(child)
+        document["paths"].update(child.get("paths", {}))
+        document.setdefault("components", {}).setdefault("schemas", {}).update(
+            {names[name]: schema for name, schema in schemas.items()})
+    return document
 
 
 def normalize(plugin):
@@ -275,16 +414,29 @@ class Worker:
             digest = hashlib.sha256()
             from importlib import metadata, util
 
+            from whab import __version__
+            from whab.web.visual_interface import _source_paths
+
             entries = [entry for entry in metadata.entry_points(group="whab.plugins") if entry.name == self.plugin_id]
             entry = entries[0]
-            digest.update((entry.value + "\n" + entry.dist.version).encode())
+            digest.update((__version__ + "\n" + entry.value + "\n" + entry.dist.version).encode())
             spec = util.find_spec(entry.value.split(":")[0].split(".")[0])
+            total = 0
             for location in spec.submodule_search_locations or ():
-                for path in sorted(Path(location).rglob("*.py")):
-                    if not path.is_symlink() and path.stat().st_size <= 2 * 1024 * 1024:
-                        digest.update(path.relative_to(location).as_posix().encode())
-                        digest.update(path.read_bytes())
-            return {"plugin": normalize(self.plugin), "pid": os.getpid(), "code": digest.hexdigest()}
+                for path in _source_paths(Path(location)):
+                    raw = path.read_bytes() if path.stat().st_size <= 2 * 1024 * 1024 else None
+                    if raw is None:
+                        raise WireError()
+                    total += len(raw)
+                    if total > 10 * 1024 * 1024:
+                        raise WireError()
+                    digest.update(path.relative_to(location).as_posix().encode())
+                    digest.update(raw)
+            from .sdk import API_VERSION
+
+            return {"plugin": normalize(self.plugin), "pid": os.getpid(), "code": digest.hexdigest(),
+                    "host": __version__, "sdk": API_VERSION, "distribution": entry.dist.metadata["Name"],
+                    "version": entry.dist.version}
         if operation == "interface.open" and len(args) == 2 and self.app is None:
             return self.open_interface(*args)
         if operation == "interface.http" and len(args) == 1 and self.app is not None:
@@ -310,8 +462,8 @@ class Worker:
         self.app.include_router(router)
         self.lifespan = self.app.router.lifespan_context(self.app)
         await self.lifespan.__aenter__()
-        return [{"path": route.path, "methods": tuple(sorted(route.methods)), "name": route.name}
-                for route in router.routes]
+        return {"routes": [{"path": route.path, "methods": tuple(sorted(route.methods)), "name": route.name}
+                           for route in router.routes], "schema": self.app.openapi()}
 
     async def http(self, value):
         if (type(value) is not dict or set(value) != {"method", "path", "query", "headers", "body"}

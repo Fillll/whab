@@ -619,8 +619,11 @@ def test_durable_code_baseline_blocks_recovery_even_when_reopened_proxy_baseline
             target.close()
             acknowledged = path.read_bytes()
             path.write_bytes(pristine)
+            # Default workers already retain a stricter intent floor. Use a
+            # separate fictional proxy journal to isolate the code baseline
+            # protection under test without deleting the acknowledged evidence.
             target.backend = StorageWorkerProxy(storage_upgrade._worker(prepared, on_create=controller.own_worker),
-                controller.context, tmp_path / "plugin-workers/storage-intents", on_create=controller.own_proxy)
+                controller.context, tmp_path / "fictional-reopened-intents", on_create=controller.own_proxy)
             assert target.backend._before.generation < expected.generation
             target.backend._fenced = True
             app.state.budget_runtime.fence_storage(kind)

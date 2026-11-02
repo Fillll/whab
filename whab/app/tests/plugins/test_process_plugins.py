@@ -130,6 +130,116 @@ def test_large_binary_calls_handle_partial_pipe_writes():
         assert host.call("root", "echo", (raw,)) == raw
 
 
+def test_legacy_storage_unknown_write_is_fenced_without_repeating_it():
+    from whab.plugins import PluginError
+
+    class Backend:
+        writes = 0
+
+        def accounts(self, workspace):
+            return self.writes
+
+        def categories(self, workspace):
+            return []
+
+        def add_account(self, workspace, account):
+            self.writes += 1
+            raise RuntimeError("FICTIONAL_LOST_REPLY_AFTER_SAVE")
+
+    with peers(lambda _: Backend()) as (host, _):
+        backend = host.call("root", "storage")
+        for _ in range(2):
+            with pytest.raises(PluginError) as error:
+                backend.add_account("personal", {"name": "Fictional"})
+            assert error.value.code == "storage_write_unknown"
+        assert backend.uncertain
+        assert backend.accounts("personal") == 1
+
+
+def test_plugin_environment_preserves_only_declared_configuration_and_password_exclusion(monkeypatch, tmp_path):
+    from whab.plugins.process_worker import plugin_environment
+
+    monkeypatch.setenv("AI_CREDENTIALS_DIR", str(tmp_path / "fictional-credentials"))
+    monkeypatch.setenv("UNDECLARED_PRIVATE_SETTING", "FICTIONAL_PRIVATE_VALUE")
+    assert "AI_CREDENTIALS_DIR" in plugin_environment("subscriptions-ai")
+    assert "AI_CREDENTIALS_DIR" not in plugin_environment("web")
+    assert "UNDECLARED_PRIVATE_SETTING" not in plugin_environment("subscriptions-ai")
+    monkeypatch.setenv("WHAB_BUDGET_PASSWORD_ENV", "AI_CREDENTIALS_DIR")
+    assert "AI_CREDENTIALS_DIR" not in plugin_environment("subscriptions-ai")
+
+
+def test_failed_application_startup_reaps_all_discovery_children():
+    result = fresh_python('''
+import json, os, subprocess
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from whab.app import create_app
+from whab.config import Settings
+from whab.plugins import PluginError
+original = subprocess.Popen
+children = []
+def capture(*args, **kwargs):
+    process = original(*args, **kwargs)
+    children.append(process)
+    return process
+subprocess.Popen = capture
+with TemporaryDirectory(prefix="whab-process-startup-fault-") as temporary:
+    try:
+        create_app(settings=Settings(Path(temporary),5173,"sandbox","","","",False,"","",("web",),ui=""))
+    except PluginError:
+        pass
+    else:
+        raise AssertionError("Conflicting visual selection must fail")
+    assert children and all(process.poll() is not None for process in children)
+    print(json.dumps({"reaped":True}))
+''')
+    assert result == {"reaped": True}
+
+
+@pytest.mark.parametrize("storage", ["sqlite", "json"])
+def test_default_native_worker_recovers_lost_write_reply_without_code_upgrade_or_replay(storage):
+    result = fresh_python('''
+import asyncio, json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from whab.app import create_app
+from whab.config import Settings
+from whab.plugins import PluginError
+from whab.plugins.storage_worker import storage_error
+async def scenario(home):
+    app = create_app(settings=Settings(home,5173,"sandbox","","","",False,"","",(),storage=STORAGE,ui=""))
+    async with app.router.lifespan_context(app):
+        service = app.state.ledger_service
+        worker = app.state.store.worker
+        original = worker.call
+        revision = service.revision
+        payload = {"name":"Fictional acknowledged account","type":"depository","balance":123}
+        def lost_reply(method, *args, **kwargs):
+            result = original(method, *args, **kwargs)
+            if method == "execute_operation":
+                worker._unknown = True
+                raise storage_error(worker.plugin_id, "storage_write_unknown")
+            return result
+        worker.call = lost_reply
+        try:
+            service.command("add_account","personal",payload,request_id="same-fictional-intent",expected_revision=revision)
+        except PluginError:
+            pass
+        else:
+            raise AssertionError("The lost acknowledgment must fence the budget")
+        assert app.state.budget_runtime.status()["health"] == "recovery_required"
+        assert app.state.storage_upgrade.journal.snapshot()["active"] is None
+        await app.state.storage_upgrade.recover()
+        assert app.state.budget_runtime.status()["health"] == "ready"
+        service.command("add_account","personal",payload,request_id="same-fictional-intent",expected_revision=revision)
+        assert len(service.query("accounts","personal")["data"]) == 1
+    print(json.dumps({"recovered":True}))
+with TemporaryDirectory(prefix="whab-default-receipt-") as temporary:
+    asyncio.run(scenario(Path(temporary)))
+'''.replace("STORAGE", repr(storage)))
+    assert result == {"recovered": True}
+
+
 def test_public_records_and_capability_identity_round_trip():
     from whab.plugins import BudgetContext, Insight
 
@@ -144,6 +254,34 @@ def test_public_records_and_capability_identity_round_trip():
         assert first is second
         assert insights == (Insight("Result", "ok"),)
         assert states == [{"updated": True}]
+
+
+def test_legacy_training_models_remain_opaque_and_save_in_the_owning_child():
+    model = object()
+
+    class Engine:
+        defaults = {}
+
+        def predict(self, rows):
+            return []
+
+        def train(self, rows, parameters):
+            yield {"progress": 50}
+            return model
+
+        def save(self, selected, name):
+            assert selected is model
+            return name
+
+    with peers(lambda _: Engine()) as (host, _):
+        engine = host.call("root", "engine")
+        training = engine.train([], {})
+        assert next(training) == {"progress": 50}
+        with pytest.raises(StopIteration) as completed:
+            next(training)
+        with pytest.raises(AttributeError):
+            completed.value.value.private_model_state
+        assert engine.save(completed.value.value, "Fictional model") == "Fictional model"
 
 
 @pytest.mark.parametrize("raw", [
