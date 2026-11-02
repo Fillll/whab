@@ -275,3 +275,60 @@ def test_exit_after_ack_flush_preserves_the_buffered_final_reply(transport, monk
         assert channel.read(100, timeout=1) == b'fictional-final-reply'
     finally:
         client.close()
+
+
+def test_next_worker_frame_can_arrive_before_previous_http_handler_returns(transport, monkeypatch):
+    import threading
+
+    from whab.plugins.https_transport import _Handler
+
+    channel, credential = session(transport)
+    client = Client(credential)
+    flushed, retire = threading.Event(), threading.Event()
+    reply = _Handler._reply
+
+    def delayed_retirement(handler, code, *args, **kwargs):
+        result = reply(handler, code, *args, **kwargs)
+        if handler.path == "/v1/send" and code == 204 and not flushed.is_set():
+            flushed.set()
+            assert retire.wait(5)
+        return result
+
+    monkeypatch.setattr(_Handler, "_reply", delayed_retirement)
+    try:
+        client.send_frame(b"fictional-first-reply", 3)
+        assert flushed.wait(1)
+        # The client has received success and may immediately send its next
+        # frame on a new connection, before the previous handler returns.
+        client.send_frame(b"fictional-next-reply", 3)
+        assert read_exact(channel, len(b"fictional-first-replyfictional-next-reply")) == b"fictional-first-replyfictional-next-reply"
+        assert not client.closed and not channel.closed
+    finally:
+        retire.set()
+        client.close()
+
+
+def test_overlapping_incomplete_worker_frames_are_rejected_without_interleaving(transport):
+    channel, credential = session(transport)
+    client = Client(credential)
+    connection = http.client.HTTPSConnection("127.0.0.1", transport.server.server_port,
+                                           context=client.context, timeout=3)
+    try:
+        connection.putrequest("POST", "/v1/send")
+        connection.putheader("Authorization", "Bearer " + credential["token"])
+        connection.putheader("Content-Type", "application/octet-stream")
+        connection.putheader("Content-Length", str(CHUNK + 1))
+        connection.endheaders()
+        connection.send(b"x" * CHUNK)
+        assert channel.read(CHUNK, timeout=2) == b"x" * CHUNK
+        with pytest.raises(OSError, match="channel is unavailable"):
+            client.send_frame(b"fictional-overlapping-frame", 3)
+        connection.send(b"y")
+        response = connection.getresponse()
+        assert response.status == 204
+        assert response.read() == b""
+        assert channel.read(1, timeout=2) == b"y"
+        assert not channel.closed
+    finally:
+        connection.close()
+        client.close()

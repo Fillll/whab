@@ -77,6 +77,10 @@ receipt. There is no automatic HTTP reconnect, replay or mutation retry after a
 missing acknowledgment. Existing native intents, receipts, uncertainty fencing
 and explicit recovery decide the financial outcome.
 
+Worker replies enter the incoming stream completely before HTTP success is sent.
+The next reply can start as soon as that success reaches the worker, even while
+the previous HTTP handler is returning. Overlapping incomplete frames are rejected.
+
 ### Public capabilities
 
 The version-1 `WHPR` protocol bounds metadata to 32 MiB, binary data to 256 MiB,
