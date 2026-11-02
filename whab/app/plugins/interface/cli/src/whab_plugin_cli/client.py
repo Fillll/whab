@@ -11,18 +11,22 @@ import httpx
 
 from whab.plugins.documentation import core_document, installed_catalog
 
+from .config import ConfigError, connection_defaults
 from .help import contextual_help, describe, overview, render_catalog
 
 
-def parser(argv=()):
+def parser(argv=(), *, defaults=None):
     catalog = installed_catalog()
     root = argparse.ArgumentParser(description="Read and change an explicitly addressed WHAB budget.",
-        epilog=overview(catalog), formatter_class=argparse.RawDescriptionHelpFormatter)
+        usage="%(prog)s [CONFIG] [OPTIONS] {query,command,feature-query,feature-command,describe} ...",
+        epilog="Optional CONFIG contains connection options, one or more per line. Quotes, # comments and backslash continuations are supported. Command-line options override the file. Relative CA paths use the config directory.\nExample: whab-cli default-budget.config --help\n\n" + overview(catalog),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     root.add_argument("--url", help="HTTPS server origin; omit for offline documentation")
     root.add_argument("--budget", help="Stable budget ID; required for online operations")
-    root.add_argument("--token-env", default="WHAB_CLI_TOKEN", help="Environment variable containing the server access token (default: WHAB_CLI_TOKEN)")
+    root.add_argument("--token-env", default="WHAB_CLI_TOKEN", help="Environment variable containing the server access token (default: %(default)s)")
     root.add_argument("--ca", help="Explicit CA certificate file; otherwise use system trust")
-    root.add_argument("--workspace", choices=("personal", "demo"), default="personal", help="Addressed workspace (default: personal)")
+    root.add_argument("--workspace", choices=("personal", "demo"), default="personal", help="Addressed workspace (default: %(default)s)")
+    root.set_defaults(**(defaults or {}))
     commands = root.add_subparsers(dest="kind", required=True)
     topic = contextual_help(argv, catalog)
     def group(name, text):
@@ -98,7 +102,8 @@ def request(args):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     try:
-        args = parser(argv).parse_args(argv)
+        argv, defaults = connection_defaults(argv)
+        args = parser(argv, defaults=defaults).parse_args(argv)
         if args.kind == "describe" and (not args.url or args.offline):
             data = describe(installed_catalog(), plugin=args.plugin, kind=args.filter_kind, name=args.operation)
             print(json.dumps(data, allow_nan=False) if args.json else render_catalog(data))
@@ -127,6 +132,9 @@ def main(argv=None):
         else:
             print(json.dumps(result, allow_nan=False))
         return 0
+    except ConfigError as error:
+        print(json.dumps({"error": str(error)}), file=sys.stderr)
+        return 1
     except (ValueError, OSError, httpx.HTTPError):
         # Do not echo transport exceptions, request payloads or credentials.
         print(json.dumps({"error": "WHAB request failed. Verify the connection, inputs and current budget. For an uncertain write, retain its original request ID, revision and parameters; do not submit a new intent."}), file=sys.stderr)

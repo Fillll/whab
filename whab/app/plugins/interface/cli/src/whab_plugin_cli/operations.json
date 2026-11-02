@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "cli",
-  "summary": "Noninteractive JSON command line interface over authenticated public operations.",
+  "summary": "Noninteractive JSON CLI over authenticated public operations, with optional connection flags loaded through whab-cli CONFIG ...",
   "delegates": [
     "core"
   ],
