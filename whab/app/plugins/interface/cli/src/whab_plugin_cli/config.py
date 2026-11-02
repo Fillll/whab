@@ -26,7 +26,7 @@ def connection_defaults(argv):
     except (OSError, UnicodeError, RuntimeError):
         raise ConfigError("Cannot read CLI config. Supply a readable UTF-8 connection-options file.") from None
     try:
-        tokens = iter(shlex.split(text.replace("\\\r\n", "").replace("\\\n", ""), comments=True))
+        tokens = iter(shlex.split((text + "\n").replace("\\\r\n", "").replace("\\\n", ""), comments=True))
     except ValueError:
         raise ConfigError("Invalid quoting in CLI config.") from None
     defaults = {}

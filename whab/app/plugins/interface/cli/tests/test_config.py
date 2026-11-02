@@ -89,6 +89,13 @@ def test_missing_config_and_empty_defaults(tmp_path, capsys):
     assert connection_defaults([str(config), "--help"]) == (["--help"], {})
 
 
+def test_pasted_config_accepts_a_final_backslash_without_a_final_newline(tmp_path):
+    config = tmp_path / "default-budget.config"
+    config.write_text("--url https://localhost:5173 \\\n--budget default \\\n--ca /fictional/tls/ca.crt \\")
+    assert connection_defaults([str(config), "--help"]) == (["--help"], {
+        "url": "https://localhost:5173", "budget": "default", "ca": "/fictional/tls/ca.crt"})
+
+
 def test_ca_paths_expand_home_and_explicit_cli_ca_overrides_config(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     config = tmp_path / "paths.config"
