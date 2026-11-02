@@ -297,7 +297,12 @@ class Peer:
                 header = self._read_exact(HEADER.size)
                 metadata, body = lengths(header)
                 value = self.codec.decode(header + self._read_exact(metadata + body))
-                self._receive(value)
+                try:
+                    self._receive(value)
+                finally:
+                    # A descriptor/callback can retain its process owner. Do
+                    # not keep the last frame alive while waiting on an idle pipe.
+                    del value
         except (Exception, BaseExceptionGroup):
             self.fail()
 
@@ -347,7 +352,10 @@ class Peer:
     def _dispatch_loop(self, pending):
         try:
             while not self._closed.is_set() and (value := pending.get()) is not None:
-                self._dispatch(value)
+                try:
+                    self._dispatch(value)
+                finally:
+                    del value
         finally:
             self._unwind(0)
 

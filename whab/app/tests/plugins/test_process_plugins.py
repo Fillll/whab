@@ -63,6 +63,22 @@ finally:
             "random-forest-categorization"} <= set(result["plugins"])
 
 
+def test_discarding_an_unused_descriptor_reaps_its_idle_discovery_process():
+    result = fresh_python('''
+import gc, json, weakref
+from whab.plugins.runtime import load_descriptors
+descriptor, = load_descriptors(("example-api",))
+owner = weakref.ref(descriptor._process)
+child = descriptor._process._process
+del descriptor
+gc.collect()
+child.wait(timeout=5)
+assert owner() is None
+print(json.dumps({"reaped":True}))
+''')
+    assert result == {"reaped": True}
+
+
 def test_reentrant_callbacks_execute_on_waiting_thread_and_keep_lock_ownership():
     seen = []
     lock = RLock()
@@ -324,6 +340,19 @@ with TemporaryDirectory(prefix="whab-process-contract-") as temporary:
         account = service.command("add_account", "personal", {"name":"Fictional account","type":"depository","balance":10000},
                                   request_id="fictional-account", expected_revision=service.revision)
         assert account["data"]
+        identifier = service.query("accounts", "personal")["data"][0]["id"]
+        service.command("add_transaction", "personal", {"accountId":identifier,"date":"2026-11-01",
+                        "merchant":"Fictional membership","amount":1200,"categoryId":None},
+                        request_id="fictional-payment", expected_revision=service.revision)
+        feature = {"pluginId":"subscriptions","action":"report","parameters":{"month":"2026-11","currency":"USD"}}
+        report = service.query("feature", "personal", parameters=feature)
+        row = report["data"]["transactions"][0]
+        label = {"pluginId":"subscriptions","action":"set_label","parameters":{
+            "transactionId":row["id"],"fingerprint":row["fingerprint"],"isSubscription":True,"cadence":"monthly"}}
+        saved = service.command("feature", "personal", label, request_id="fictional-label", expected_revision=report["revision"])
+        assert saved["data"]["saved"]
+        assert service.command("feature", "personal", label, request_id="fictional-label", expected_revision=report["revision"]) == saved
+        assert service.query("feature", "personal", parameters=feature)["data"]["transactions"][0]["source"] == "manual"
         assert client.get("/api/plugin-settings/cli").status_code == 200
         response = client.post("/api/plugin-settings/subscriptions", json={
             "workspace":"personal","action":"status","month":"2026-11","currency":"USD"})
@@ -337,6 +366,7 @@ with TemporaryDirectory(prefix="whab-process-contract-") as temporary:
     reopened = create_app(settings=settings)
     with TestClient(reopened, base_url="https://localhost:5173"):
         assert any(row["name"] == "Fictional account" for row in reopened.state.ledger_service.query("accounts", "personal")["data"])
+        assert reopened.state.ledger_service.query("feature", "personal", parameters=feature)["data"]["transactions"][0]["source"] == "manual"
     print(json.dumps({"storage":STORAGE,"saved":True}))
 '''.replace("STORAGE", repr(storage)))
     assert result == {"storage": storage, "saved": True}

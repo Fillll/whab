@@ -1,7 +1,7 @@
 """Build and exercise installed wheels outside the checkout, using fictional data only.
 
-Run with the development environment's Python. A temporary target installation
-uses its dependencies but cannot resolve WHAB modules from the source checkout.
+Run with the development environment's Python. Temporary virtual environments
+install the wheels and dependencies without access to the source checkout.
 """
 
 import ast
@@ -20,11 +20,13 @@ SMOKE = """
 from pathlib import Path
 import importlib.metadata as metadata
 import importlib
+import base64
+import hashlib
 import json
 import sys
+import time
 from dataclasses import asdict, replace
 from unittest.mock import patch
-sys.path.insert(0, sys.argv[1])
 expected = json.loads(sys.argv[2])
 import whab
 from whab.app import create_app
@@ -179,23 +181,33 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     }).status_code == 200
     saved_accounts = client.get('/api/workspace?workspace=personal').json()['accounts']
     image = LogoImage(bytes.fromhex('89504e470d0a1a0a') + b'fictional', 'image/png')
-    provider = importlib.import_module('whab_plugin_bank_logos.plugin')
-    with patch.object(provider, 'fetch_logo', return_value=image) as fetch:
-        preview = client.post('/api/plugins/bank-logo-preview', json={'website': 'bank.example.org'}).json()
-        assert preview['available'] and preview['website'] == 'https://bank.example.org'
-        logo_url = preview['logoUrl']
-        assert client.get(logo_url).content == image.data and fetch.call_count == 1
-        cache = settings.home / 'cache' / 'plugins' / 'bank-logos'
-        assert tuple(cache.glob('domain-*.json'))
-        flushed = client.post('/api/plugins/bank-logos/settings/actions/flush-cache', json={})
-        assert flushed.status_code == 200
-        assert any(row['title'] == 'Cached logos' and row['value'] == '0' for row in flushed.json()['settings']['insights'])
-        assert not tuple(cache.glob('domain-*.json'))
-        assert client.get('/api/workspace?workspace=personal').json()['accounts'] == saved_accounts
-        # The saved public hostname survives flushing, so the same image URL can fetch again.
-        assert client.get(logo_url).content == image.data and fetch.call_count == 2
-        assert client.get(logo_url).content == image.data and fetch.call_count == 2
-        assert tuple(cache.glob('domain-*.json'))
+    cache = settings.home / 'cache' / 'plugins' / 'bank-logos'
+    # A saved fictional public image crosses the real process boundary. A
+    # parent monkeypatch cannot change an independently running plugin.
+    def save_logo():
+        cache.mkdir(parents=True, exist_ok=True)
+        key = 'domain-' + hashlib.sha256(b'bank.example.org').hexdigest()[:32]
+        (cache / (key + '.json')).write_text(json.dumps({
+            'saved_at': time.time(), 'media_type': image.media_type,
+            'data': base64.b64encode(image.data).decode('ascii'),
+        }))
+    save_logo()
+    preview = client.post('/api/plugins/bank-logo-preview', json={'website': 'bank.example.org'}).json()
+    assert preview['available'] and preview['website'] == 'https://bank.example.org'
+    logo_url = preview['logoUrl']
+    assert client.get(logo_url).content == image.data
+    assert tuple(cache.glob('domain-*.json'))
+    flushed = client.post('/api/plugins/bank-logos/settings/actions/flush-cache', json={})
+    assert flushed.status_code == 200
+    assert any(row['title'] == 'Cached logos' and row['value'] == '0' for row in flushed.json()['settings']['insights'])
+    assert not tuple(cache.glob('domain-*.json'))
+    assert client.get('/api/workspace?workspace=personal').json()['accounts'] == saved_accounts
+    # The public hostname survives flushing. Refill its fictional disk cache
+    # and verify the unchanged URL can load it across the process boundary.
+    save_logo()
+    assert client.get(logo_url).content == image.data
+    assert client.get(logo_url).content == image.data
+    assert tuple(cache.glob('domain-*.json'))
     assert client.get("/api/plugins/web/settings").json() == {"insights": [], "actions": []}
     assert client.post("/api/plaid/link-token", json={}).status_code == 400
     export = client.get("/api/plugins/example/export?workspace=demo")
@@ -242,7 +254,6 @@ import importlib.metadata as metadata
 import json
 import sys
 from pathlib import Path
-sys.path.insert(0, sys.argv[1])
 expected = json.loads(sys.argv[2])
 import whab
 from whab.plugins.management import package_details
@@ -253,12 +264,16 @@ assert distribution.version == expected["plugin_version"]
 entry, = distribution.entry_points
 assert entry.group == "whab.plugins"
 assert package_details(entry) == (expected["distribution"], expected["plugin_version"])
+from whab.plugins import load_descriptors
+descriptor, = load_descriptors((entry.name,))
+assert descriptor._process.info["version"] == expected["plugin_version"]
+descriptor._process.close()
 print("A plugin-only version update leaves the host version unchanged and reaches the plugin manager.")
 """
 
 
-def run(*args, cwd, env):
-    subprocess.run([sys.executable, *args], cwd=cwd, env=env, check=True)
+def run(*args, cwd, env, python=None):
+    subprocess.run([str(python or sys.executable), *args], cwd=cwd, env=env, check=True)
 
 
 def project_metadata(source):
@@ -276,10 +291,15 @@ def application_version(source):
 
 
 def install_wheels(packages, target, *, cwd, env):
+    # Child processes use sys.executable, so exercise a real installation rather
+    # than a target directory added only to the parent's sys.path.
+    run("-m", "venv", str(target), cwd=cwd, env=env)
+    python = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     run(
-        "-m", "pip", "install", "--disable-pip-version-check", "--no-deps",
-        "--target", str(target), *(str(package) for package in packages), cwd=cwd, env=env,
+        "-m", "pip", "install", "--disable-pip-version-check",
+        *(str(package) for package in packages), cwd=cwd, env=env, python=python,
     )
+    return python
 
 
 def main():
@@ -287,7 +307,8 @@ def main():
         key: value
         for key, value in os.environ.items()
         if not key.startswith(("WHAB_", "PLAID_", "SERVER_", "CLIENT_"))
-        and key not in {"TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID", "PORT", "PYTHONPATH"}
+        and key not in {"TOKEN_ENCRYPTION_KEY", "ALLOW_LIVE_PLAID", "PORT", "PYTHONPATH",
+                        "AI_CREDENTIALS_DIR", "LLM_CATEGORIZATION_CREDENTIALS_DIR"}
     }
     env.update(
         PLAID_ENV="sandbox", ALLOW_LIVE_PLAID="false", WHAB_PLUGINS="plaid,example,bank-logos,ynab", PORT="5173"
@@ -347,16 +368,15 @@ def main():
         )
         packages = sorted(wheels.glob("*.whl"))
         assert len(packages) == len(projects), "Expected one host wheel and one wheel per plugin"
-        install_wheels(packages, installed, cwd=base, env=env)
-        run("-I", "-c", SMOKE, str(installed), json.dumps(expected), cwd=home, env=env)
+        installed_python = install_wheels(packages, installed, cwd=base, env=env)
+        run("-I", "-c", SMOKE, str(installed), json.dumps(expected), cwd=home, env=env, python=installed_python)
         run(
             "-I",
             "-c",
-            "import runpy,sys; sys.path.insert(0,sys.argv.pop(1)); runpy.run_module('whab',run_name='__main__')",
-            str(installed),
+            "import runpy; runpy.run_module('whab',run_name='__main__')",
             "--version",
             cwd=home,
-            env=env,
+            env=env, python=installed_python,
         )
         # Rebuild only one copied plugin: its independent distribution metadata
         # must reach discovery without changing the host or another plugin.
@@ -376,13 +396,13 @@ def main():
         host_wheel, = (package for package in packages if package.name.startswith("whab-"))
         probe_wheel, = probe_wheels.glob("*.whl")
         probe_target = base / "independent-version"
-        install_wheels((host_wheel, probe_wheel), probe_target, cwd=base, env=env)
+        probe_python = install_wheels((host_wheel, probe_wheel), probe_target, cwd=base, env=env)
         run(
             "-I", "-c", INDEPENDENT_VERSION, str(probe_target), json.dumps({
                 "host_version": expected["whab"]["version"],
                 "distribution": expected["bank-logos"]["distribution"],
                 "plugin_version": probe_version,
-            }), cwd=home, env=env,
+            }), cwd=home, env=env, python=probe_python,
         )
 
 
