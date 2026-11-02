@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 — 2026-11-01
+
+PR: [#148](https://github.com/Fillll/whab/pull/148)
+
+- Read JSON connection files with `url`, `budget`, `ca`, `workspace` and `token_env` fields, retaining command-line overrides, relative CA paths and offline help. Document JSON in help and examples, reject unknown/duplicate keys and invalid values, and preserve compatibility with existing flag files. Keep access tokens in environment variables.
+
 ## 1.2.0 — 2026-11-01
 
 PR: [#147](https://github.com/Fillll/whab/pull/147)

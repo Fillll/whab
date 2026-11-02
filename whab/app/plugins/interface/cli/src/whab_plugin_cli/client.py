@@ -19,7 +19,7 @@ def parser(argv=(), *, defaults=None):
     catalog = installed_catalog()
     root = argparse.ArgumentParser(description="Read and change an explicitly addressed WHAB budget.",
         usage="%(prog)s [CONFIG] [OPTIONS] {query,command,feature-query,feature-command,describe} ...",
-        epilog="Optional CONFIG contains connection options, one or more per line. Quotes, # comments and backslash continuations are supported. Command-line options override the file. Relative CA paths use the config directory.\nExample: whab-cli default.budget --help\n\n" + overview(catalog),
+        epilog='Optional CONFIG is a JSON object with url, budget, ca, workspace and token_env fields. Command-line options override the file. Relative CA paths use the config directory.\nExample file: {"url": "https://localhost:5173", "budget": "default", "ca": "tls/ca.crt"}\nUsage: whab-cli default.budget --help\n\n' + overview(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     root.add_argument("--url", help="HTTPS server origin; omit for offline documentation")
     root.add_argument("--budget", help="Stable budget ID; required for online operations")
