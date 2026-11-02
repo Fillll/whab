@@ -235,7 +235,7 @@ class PluginProcess:
         # Keep the native financial receipts/fencing protocol authoritative.
         root = getattr(self, "home", context.home) / "plugin-workers" / "storage-intents"
         worker_owner = getattr(self, "worker_owner", None)
-        worker = StorageWorker(self.plugin_id, **({"on_create": worker_owner} if worker_owner else {}))
+        worker = StorageWorker(self.plugin_id, timeout=60, **({"on_create": worker_owner} if worker_owner else {}))
         return StorageWorkerProxy(worker, context, root, on_unknown=self.storage_fault,
                                   on_create=getattr(self, "storage_owner", None))
 

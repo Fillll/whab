@@ -63,6 +63,10 @@ Reopening an already restored native budget first validates its saved payload in
 an exact-code readonly worker. A successful validation changes no native generation
 or receipts, preserving separate financial and plugin-namespace watermarks. A
 payload needing an actual restore still uses the durable native command path.
+Bulk restore/import operations allow 72 MiB of canonical payload so a supported
+50 MiB portable container still fits after base64 encoding; ordinary individual
+commands retain their 32 MiB bound. Native frame and transfer limits remain
+independently enforced.
 
 Every discovery child is owned before startup can fail. Active process resources
 follow the budget generation and close after their dependent services. Shutdown,

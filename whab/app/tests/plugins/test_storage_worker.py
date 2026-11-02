@@ -17,6 +17,18 @@ from whab.plugins.wire import WireError
 from whab.services.ledger import LedgerService
 
 
+def test_bulk_restore_payload_exceeding_individual_command_limit_survives_wire_round_trip():
+    from whab.plugins.storage_transfer import MAX_OPERATION_BYTES, operation_limit
+
+    value = {"files": {"budget.sqlite": "A" * (MAX_OPERATION_BYTES + 4)}, "existing": False}
+    payload = canonical_storage_json(value, limit=operation_limit("prepare_budget_files"))
+    operation = StorageOperation("fictional-large-restore", str(uuid4()), 0, "personal", "prepare_budget_files", payload)
+    restored = decode(encode(operation))
+    assert restored.payload == payload and restored.fingerprint == operation.fingerprint
+    with pytest.raises(StoreError):
+        canonical_storage_json(value)
+
+
 @pytest.fixture(params=("sqlite", "json"))
 def proxy(request, tmp_path):
     context = StorageContext(tmp_path, "sandbox", {})
