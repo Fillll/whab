@@ -4,6 +4,28 @@ The `cli` Interface plugin installs `whab-cli`, a noninteractive JSON terminal i
 
 Supply an HTTPS origin, stable budget ID, and access token through an environment variable. Use `--ca` for an explicitly selected CA certificate; certificate verification is always enabled. The default token variable is `WHAB_CLI_TOKEN`; `--token-env` selects another. This is ordinary server access, separate from AI credentials.
 
+Save repeated connection options in a UTF-8 file named, for example, `default.budget`:
+
+```sh
+--url https://localhost:5173 \
+--budget default \
+--ca /absolute/path/ca.crt
+```
+
+Pass that file before options and the command:
+
+```sh
+whab-cli default.budget --help
+whab-cli default.budget command edit_transaction --help
+whab-cli default.budget describe --offline --json
+whab-cli default.budget query transactions
+whab-cli default.budget --budget ANOTHER_BUDGET query accounts
+```
+
+The optional file accepts only `--url`, `--budget`, `--ca`, `--workspace` and `--token-env`, with the same values as their command-line options. Quotes, `#` comments, `--option=value` and backslash continuations are supported; backslashes are optional when options are on separate lines. Explicit command-line options override file defaults. Relative CA paths use the config file's directory; `~` expands to the user's home for the config and CA paths. Files are limited to 64 KiB and are read as data: shell commands and environment substitutions are never executed. Keep the file with private runtime configuration, outside Git. Store tokens in the named environment variable. Configured help and offline discovery need no server or token.
+
+The equivalent explicit connection options remain supported:
+
 ```sh
 whab-cli --url https://localhost:5173 --budget BUDGET_ID --ca /absolute/path/ca.crt query transactions
 whab-cli --url https://localhost:5173 --budget BUDGET_ID --ca /absolute/path/ca.crt query categories

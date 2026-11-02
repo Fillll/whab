@@ -39,7 +39,9 @@ def test_native_ca_verified_cli_and_saved_label_reopen(store, tmp_path, monkeypa
         args = ["--url", f"https://localhost:{port}", "--budget", "default"]
         assert main(args + ["query", "accounts"]) == 1
         capsys.readouterr()
-        args += ["--ca", str(tmp_path / "tls/ca.crt")]
+        connection_file = tmp_path / "default.budget"
+        connection_file.write_text(f"--url https://localhost:{port} \\\n--budget default \\\n--ca tls/ca.crt\n")
+        args = [str(connection_file)]
         assert main(args + ["describe", "--json"]) == 0
         documentation = json.loads(capsys.readouterr().out)
         assert documentation["source"] == "authority"
