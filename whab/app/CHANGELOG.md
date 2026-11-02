@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.55.1 — 2026-11-01
+
+PR: [#146](https://github.com/Fillll/whab/pull/146)
+
+- Preserve a worker's buffered final response when it exits while its HTTPS delivery acknowledgment is still being published. Keep successful shutdown/preparation replies available without replaying an operation or changing native financial receipt recovery.
+
 ## 2.55.0 — 2026-11-01
 
 PR: [#145](https://github.com/Fillll/whab/pull/145)
