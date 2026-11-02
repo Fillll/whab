@@ -142,9 +142,10 @@ class Session:
                     if remaining <= 0:
                         raise TimeoutError()
                     self._delivery.wait(min(0.1, remaining))
-                if self.process is not None and self.process.poll() is not None:
-                    self.close()
-                    raise EOFError()
+                # A child can exit after receiving the acknowledgment response
+                # while its HTTP handler is still publishing this counter. Its
+                # final reply may already be buffered. Only delivery/closure or
+                # the deadline decides this write; readers observe process exit.
         finally:
             self._write_lock.release()
 
@@ -263,18 +264,22 @@ class _Handler(BaseHTTPRequestHandler):
             self._reply(409, close=True)
             return
         try:
-            deadline = monotonic() + 60
-            while size:
-                data = self.rfile.read(min(size, CHUNK))
-                if not data:
-                    raise EOFError()
-                session.incoming.put(data, max(0, deadline - monotonic()))
-                size -= len(data)
+            try:
+                deadline = monotonic() + 60
+                while size:
+                    data = self.rfile.read(min(size, CHUNK))
+                    if not data:
+                        raise EOFError()
+                    session.incoming.put(data, max(0, deadline - monotonic()))
+                    size -= len(data)
+            finally:
+                # All bytes are ordered in the incoming stream before success
+                # is visible. The next frame may arrive on another connection
+                # as soon as the client receives that acknowledgment.
+                session._send_lock.release()
             self._reply(204, close=True)
         except (OSError, EOFError):
             session.close()
-        finally:
-            session._send_lock.release()
 
 
 class _Server(ThreadingHTTPServer):
