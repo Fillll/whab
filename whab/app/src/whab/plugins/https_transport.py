@@ -304,8 +304,15 @@ class _Server(ThreadingHTTPServer):
             return
         with self._connections_lock:
             self._connections.add(request)
-        threading.Thread(target=self.process_request_thread, args=(request, address), daemon=True,
-                         name="whab-plugin-https-request", context=Context()).start()
+        try:
+            threading.Thread(target=self.process_request_thread, args=(request, address), daemon=True,
+                             name="whab-plugin-https-request", context=Context()).start()
+        except BaseException:
+            with self._connections_lock:
+                self._connections.discard(request)
+            self._slots.release()
+            request.close()
+            raise
 
     def process_request_thread(self, request, address):
         try:

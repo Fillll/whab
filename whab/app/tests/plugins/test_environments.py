@@ -754,7 +754,7 @@ def test_offline_installation_and_readiness_do_not_inherit_custom_plugin_configu
             stage = "install"
         elif environments._VERIFY in command:
             stage = "verify"
-        elif "whab.plugins.report_worker" in command:
+        elif "report_worker" in command:
             stage = "probe"
         else:
             stage = "setup"

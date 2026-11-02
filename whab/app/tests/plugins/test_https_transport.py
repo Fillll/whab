@@ -213,3 +213,26 @@ def test_real_worker_bootstrap_secret_is_absent_from_arguments_environment_and_s
     finally:
         worker.close()
     assert request(worker.channel.broker, observed["credential"]) == (401, b"")
+
+
+def test_a_stalled_tls_handshake_does_not_block_authenticated_workers(transport):
+    _, credential = session(transport)
+    with socket.create_connection(("127.0.0.1", transport.server.server_port), timeout=3):
+        assert request(transport, credential) == (204, b"")
+
+
+def test_thread_admission_failure_closes_the_socket_and_releases_capacity(transport, monkeypatch):
+    import threading
+
+    capacity = transport.server._slots._value
+
+    def exhausted(_):
+        raise RuntimeError("fictional thread capacity exhausted")
+
+    monkeypatch.setattr(threading.Thread, "start", exhausted)
+    with socket.socket() as connection:
+        with pytest.raises(RuntimeError):
+            transport.server.process_request(connection, ("127.0.0.1", 1))
+        assert connection.fileno() == -1
+    assert transport.server._slots._value == capacity
+    assert not transport.server._connections

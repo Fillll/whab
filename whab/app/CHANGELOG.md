@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.55.0 — 2026-11-01
+
+PR: [#145](https://github.com/Fillll/whab/pull/145)
+
+- Move every installed plugin worker family to authenticated loopback HTTPS, including discovery, settings, native storage, reporting, providers, categorization and visual rendering. Bootstrap per-instance bearer credentials and verified temporary TLS trust privately, then close the startup pipe and revoke credentials on retirement.
+- Preserve bounded typed messages, scoped reentrant callbacks, native intent/receipt recovery and owned process cleanup. Confirm transport delivery separately from native financial commit, with no automatic request replay after an uncertain outcome.
+
 ## 2.54.0 — 2026-11-01
 
 PR: [#144](https://github.com/Fillll/whab/pull/144)
