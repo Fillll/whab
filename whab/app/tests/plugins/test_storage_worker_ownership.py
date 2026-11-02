@@ -16,7 +16,9 @@ from whab.plugins.storage_worker_codec import encode
 def malformed_child(monkeypatch):
     popen = subprocess.Popen
     packet = encode({"kind": "invalid-ready"})
-    source = f"import sys;sys.stdout.buffer.write({packet!r});sys.stdout.buffer.flush();sys.stdin.buffer.read()"
+    source = ("from whab.plugins.https_transport import bootstrap_client;"
+              "channel=bootstrap_client('storage_worker','json');"
+              f"channel.write({packet!r});channel.flush();\nwhile channel.read(65536):pass")
     monkeypatch.setattr(storage_worker.subprocess, "Popen", lambda _args, **kwargs: popen(
         [sys.executable, "-I", "-B", "-c", source], **kwargs))
     monkeypatch.setattr(report_worker, "_stop_process_group", lambda _process: (_ for _ in ()).throw(OSError("fictional private reap")))

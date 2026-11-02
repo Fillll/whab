@@ -450,37 +450,43 @@ from whab.plugins import AccountSnapshot, BudgetSnapshot, CategorySnapshot, Tran
 from whab.plugins.wire import HEADER, Frame, frame_lengths
 from dataclasses import asdict
 
-plugin_id = sys.argv[1]
-registry = load_plugins((plugin_id,), _worker=True)
-plugin = registry.descriptors()[0]
-entry, = (entry for entry in metadata.entry_points(group='whab.plugins') if entry.name == plugin_id)
-def send(value):
-    sys.stdout.buffer.write(Frame(value).encode())
-    sys.stdout.buffer.flush()
-send({'kind':'ready','worker':1,'sdk':1,'plugin':plugin_id,'distribution':entry.dist.metadata['Name'],
-      'version':entry.dist.version,'host':__version__,'live':True,
-      'capabilities':[{'name':'reporting.export','version':1},{'name':'reporting.insights','version':1}],
-      'insights':True,'export':True})
-while True:
-    header = sys.stdin.buffer.read(HEADER.size)
-    if not header:
-        break
-    meta, payload = frame_lengths(header)
-    request = Frame.decode(header + sys.stdin.buffer.read(meta + payload)).metadata
-    identifier = request['id']
-    if request['operation'] == 'shutdown':
-        send({'id':identifier,'kind':'closed'})
-        break
-    value = request['snapshot']
-    snapshot = BudgetSnapshot(value['workspace'],value['month'],tuple(AccountSnapshot(**row) for row in value['accounts']),
-                              tuple(CategorySnapshot(**row) for row in value['categories']),
-                              tuple(TransactionSnapshot(**row) for row in value['transactions']),currency=value['currency'])
-    if request['operation'] == 'insights':
-        output = [asdict(row) for row in registry.insights(snapshot)[0].insights]
-    else:
-        table = registry.export(plugin_id,snapshot)
-        output = {'columns':list(table.columns),'rows':[list(row) for row in table.rows]}
-    send({'id':identifier,'kind':'result','data':output})
+def serve(plugin_id, source, target):
+    registry = load_plugins((plugin_id,), _worker=True)
+    plugin = registry.descriptors()[0]
+    entry, = (entry for entry in metadata.entry_points(group='whab.plugins') if entry.name == plugin_id)
+    def send(value):
+        target.write(Frame(value).encode())
+        target.flush()
+    def read(size):
+        result = bytearray()
+        while len(result) < size:
+            part = source.read(size-len(result))
+            if not part:
+                raise EOFError()
+            result.extend(part)
+        return bytes(result)
+    send({'kind':'ready','worker':1,'sdk':1,'plugin':plugin_id,'distribution':entry.dist.metadata['Name'],
+          'version':entry.dist.version,'host':__version__,'live':True,
+          'capabilities':[{'name':'reporting.export','version':1},{'name':'reporting.insights','version':1}],
+          'insights':True,'export':True})
+    while True:
+        header = read(HEADER.size)
+        meta, payload = frame_lengths(header)
+        request = Frame.decode(header + read(meta + payload)).metadata
+        identifier = request['id']
+        if request['operation'] == 'shutdown':
+            send({'id':identifier,'kind':'closed'})
+            break
+        value = request['snapshot']
+        snapshot = BudgetSnapshot(value['workspace'],value['month'],tuple(AccountSnapshot(**row) for row in value['accounts']),
+                                  tuple(CategorySnapshot(**row) for row in value['categories']),
+                                  tuple(TransactionSnapshot(**row) for row in value['transactions']),currency=value['currency'])
+        if request['operation'] == 'insights':
+            output = [asdict(row) for row in registry.insights(snapshot)[0].insights]
+        else:
+            table = registry.export(plugin_id,snapshot)
+            output = {'columns':list(table.columns),'rows':[list(row) for row in table.rows]}
+        send({'id':identifier,'kind':'result','data':output})
 '''
 
 
@@ -541,12 +547,16 @@ def test_synthetic_saved_protocol1_environment_is_fenced_then_explicitly_reprepa
         def __init__(self, plugin_id, *, python, timeout, expected_distribution, expected_version, on_create=None):
             self.plugin_id, self.timeout, self._lock, self._retiring = plugin_id, timeout, Lock(), None
             self._process = None
+            from whab.plugins.https_transport import broker, command, deliver
+
+            self.channel = broker().session(plugin_id, "report_worker")
             if on_create is not None:
                 on_create(self)
-            self._process = subprocess.Popen([str(python), "-I", "-B", "-m", "whab.plugins.report_worker", plugin_id],
-                                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            self._process = subprocess.Popen(command(python, "report_worker", plugin_id),
+                                             stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                              env=environments._environment(), start_new_session=True, bufsize=0)
             try:
+                deliver(self.channel, self._process)
                 self.info = self._read(timeout).metadata
                 assert self.info["worker"] == 1 and self.info["distribution"] == expected_distribution and self.info["version"] == expected_version
                 # New preparation uses this explicit shim only for constructing

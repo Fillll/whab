@@ -4,6 +4,8 @@ From WHAB 2.54, installed compatible native storage uses this worker and durable
 receipt adapter by default, before any approved code replacement. Its intent
 journal remains in the host's stable budget scope across native/code handovers.
 See [independent plugin processes](plugin-processes.md).
+From WHAB 2.55, native worker frames travel over authenticated HTTPS. A transport
+delivery acknowledgment never substitutes for the native operation receipt.
 
 WHAB 2.37, SQLite 1.12 and JSON 1.3 provide the explicit version-1 `storage.worker` contract, alongside
 `storage.authority` and `storage.commands`. Their compatible code can run in a

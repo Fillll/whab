@@ -259,6 +259,9 @@ class Peer:
         try:
             if self._closed.is_set():
                 raise ProcessUnavailable()
+            if callable(getattr(self.target, "send_frame", None)):
+                self.target.send_frame(raw, timeout=max(0, deadline - monotonic()))
+                return
             descriptor = self.target.fileno()
             os.set_blocking(descriptor, False)
             with selectors.DefaultSelector() as selector:
@@ -485,6 +488,8 @@ class Peer:
                     pending.put_nowait(None)
                 except queue.Full:
                     pass
+        if callable(getattr(self.source, "send_frame", None)):
+            self.source.close()
 
     def close(self):
         self.fail()

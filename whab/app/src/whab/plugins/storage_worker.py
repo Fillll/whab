@@ -6,8 +6,6 @@ An absent response is never interpreted as rollback or automatically repeated.
 Installed plugin code remains trusted code, not a security sandbox.
 """
 
-import os
-import selectors
 import subprocess
 import sys
 from dataclasses import replace
@@ -21,6 +19,7 @@ from whab import __version__
 from whab.domain.errors import StoreError
 
 from .contracts import Capability, contract_for
+from .https_transport import broker, command, deliver
 from .process_environment import process_environment
 from .report_worker import ReportWorker, _blocking_read
 from .runtime import PluginError, load_plugins
@@ -233,17 +232,20 @@ class StorageWorker:
         self.plugin_id, self.timeout, self.python = plugin_id, timeout, python
         self._lock = RLock()
         self._process = self._retiring = None
+        self.channel = None
         self._unknown = False
         self._received = bytearray()
         self._starting = True
         if on_create is not None:
             on_create(self)
         try:
+            self.channel = broker().session(plugin_id, "storage_worker")
             self._process = subprocess.Popen(
-                [str(python), "-I", "-B", "-m", "whab.plugins.storage_worker", plugin_id],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                command(python, "storage_worker", plugin_id),
+                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 env=process_environment(), bufsize=0, start_new_session=True,
             )
+            deliver(self.channel, self._process)
             hello = self._read(timeout)
             if type(hello) is not dict or hello.keys() != {
                 "kind", "storage_protocol", "sdk", "host", "plugin", "distribution", "version", "contract", "capabilities", "payload_paths",
@@ -284,27 +286,21 @@ class StorageWorker:
 
     def _read(self, timeout):
         deadline = monotonic() + timeout
-        descriptor = self._process.stdout.fileno()
-        with selectors.DefaultSelector() as selector:
-            selector.register(descriptor, selectors.EVENT_READ)
 
-            def receive(size):
-                while len(self._received) < size:
-                    remaining = deadline - monotonic()
-                    if remaining <= 0 or not selector.select(remaining):
-                        raise TimeoutError()
-                    part = os.read(descriptor, min(size - len(self._received), 64 * 1024))
-                    if not part:
-                        raise EOFError()
-                    self._received.extend(part)
+        def receive(size):
+            while len(self._received) < size:
+                part = self.channel.read(min(size - len(self._received), 64 * 1024), max(0, deadline - monotonic()))
+                if not part:
+                    raise EOFError()
+                self._received.extend(part)
 
-            receive(HEADER.size)
-            metadata_size, body_size = lengths(bytes(self._received[:HEADER.size]))
-            size = HEADER.size + metadata_size + body_size
-            receive(size)
-            raw = bytes(self._received[:size])
-            del self._received[:size]
-            return decode(raw)
+        receive(HEADER.size)
+        metadata_size, body_size = lengths(bytes(self._received[:HEADER.size]))
+        size = HEADER.size + metadata_size + body_size
+        receive(size)
+        raw = bytes(self._received[:size])
+        del self._received[:size]
+        return decode(raw)
 
     @property
     def uncertain(self):
@@ -401,6 +397,8 @@ class StorageWorker:
 
 if __name__ == "__main__":
     try:
-        serve(sys.argv[1], sys.stdin.buffer, sys.stdout.buffer)
+        from .https_transport import run_worker
+
+        run_worker("storage_worker", sys.argv[1])
     except Exception:
         raise SystemExit(1) from None
