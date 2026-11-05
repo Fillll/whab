@@ -44,6 +44,11 @@ retain their owners; pure rendering/import/report/artwork hooks and installed
 bank provider clients release their child after each operation. Existing budget
 selections and encrypted connections remain intact.
 
+`plugins status` and successful plugin changes return `host_url`, including the
+chosen temporary port, so enabling Web also tells you where to open it. Browser
+access still requires explicitly trusting that runtime's CA; CLI trust does not
+change OS/browser trust.
+
 Plaid declares a 3,600-second incremental sync interval. `jobs enable` installs a
 private macOS LaunchAgent that runs due jobs hourly, including without Web UI.
 The running host also checks due work; saved due times prevent duplicate runs and

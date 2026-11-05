@@ -68,6 +68,11 @@ def create_router(app):
         if request.scope.get("whab.workspace") == "demo":
             raise HTTPException(403, "Local management requires your own budget.")
 
+    def plugin_projection():
+        owner = current_owner()
+        return {**app.state.plugin_manager.projection(),
+                "host_url": f"https://localhost:{owner.settings.port}"}
+
     @router.post("/leases")
     def acquire(body: LeaseBody):
         try:
@@ -101,7 +106,7 @@ def create_router(app):
 
     @router.get("/plugins")
     async def plugins():
-        return await run_in_threadpool(app.state.plugin_manager.projection)
+        return await run_in_threadpool(plugin_projection)
 
     @router.post("/plugins")
     async def selection(request: Request, body: SelectionBody):
@@ -130,7 +135,7 @@ def create_router(app):
             selected = set(manager.projection()["configured"])
             selected.add(body.plugin) if body.action == "enable" else selected.discard(body.plugin)
             await manager.live.activate(tuple(sorted(selected)))
-        return await run_in_threadpool(manager.projection)
+        return await run_in_threadpool(plugin_projection)
 
     @router.post("/sync")
     async def sync(request: Request, body: SyncBody):

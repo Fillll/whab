@@ -41,6 +41,7 @@ def test_two_cli_clients_share_verified_host_and_it_exits_without_web(tmp_path, 
         with local_connection(home) as session:
             response = session.post("/budgets/default/api/local/v1/plugins", json={"action": "enable", "plugin": "web"})
             assert response.status_code == 200
+            assert response.json()["host_url"] == str(session.base_url).replace("127.0.0.1", "localhost").rstrip("/")
         sleep(3.5)
         assert read_endpoint(directory)["pid"] == first[0]
         with local_connection(home) as session:
