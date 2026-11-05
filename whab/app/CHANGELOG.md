@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.56.1 — 2026-11-04
+
+PR: [#150](https://github.com/Fillll/whab/pull/150)
+
+- Align periodic bank checks with the next local calendar boundary so an initial sync between hourly OS ticks cannot skip the following hour. Apply the corrected effective due time to existing job records without changing transaction/cursor persistence.
+
 ## 2.56.0 — 2026-11-04
 
 PR: [#149](https://github.com/Fillll/whab/pull/149)
