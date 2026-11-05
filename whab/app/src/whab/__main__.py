@@ -92,7 +92,7 @@ def main():
     if not args.reload and not args.recover_plugins:
         from whab.hosting import run_host
         try:
-            run_host(settings, transient=args.transient, persistent=args.serve)
+            run_host(settings, transient=args.transient, persistent=args.serve or not args.transient)
         except (OSError, ValueError):
             parser.error("WHAB could not acquire its runtime or HTTPS listener. Reuse the running host or inspect its status.")
         return

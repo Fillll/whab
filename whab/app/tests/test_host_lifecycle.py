@@ -68,6 +68,22 @@ def test_process_lock_excludes_a_second_owner(tmp_path):
         pass
 
 
+@pytest.mark.parametrize("arguments,persistent", [([], True), (["--transient"], False), (["--transient", "--serve"], True)])
+def test_explicit_server_launch_stays_running_and_cli_launch_is_temporary(tmp_path, monkeypatch, arguments, persistent):
+    from whab import __main__ as main
+    from whab.config import Settings
+
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
+    monkeypatch.setattr(main.Settings, "load", lambda: settings)
+    monkeypatch.setattr(main, "validate_tls", lambda *_: None)
+    monkeypatch.setattr("whab.initialization.initialize_home", lambda _: None)
+    calls = []
+    monkeypatch.setattr("whab.hosting.run_host", lambda _, **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(sys, "argv", ["whab", *arguments])
+    main.main()
+    assert calls == [{"transient": "--transient" in arguments, "persistent": persistent}]
+
+
 def test_initialization_preserves_configuration_keys_and_tls(tmp_path):
     initialize_home(tmp_path)
     paths = [tmp_path / ".env", *list((tmp_path / "tls").iterdir())]

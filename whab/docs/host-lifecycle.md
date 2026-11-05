@@ -10,8 +10,7 @@ shared job runner; it does not implement banking or access budget files directly
 
 New runtime homes select SQLite and no visual or bank plugins. Existing runtime
 homes retain their saved selections and legacy defaults. Enabling a visual
-interface keeps the host running independently of open browser tabs. Explicit API
-service operation also keeps it running. Otherwise CLI requests and scheduled jobs
+interface keeps the host running independently of open browser tabs. Explicit `python -m whab` service operation also keeps it running. Otherwise CLI requests and scheduled jobs
 acquire temporary host leases; the host exits after its clients and work finish.
 
 A private runtime-home rendezvous file publishes the local endpoint, verified CA

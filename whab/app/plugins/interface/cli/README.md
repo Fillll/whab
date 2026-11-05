@@ -38,7 +38,7 @@ The CLI acquires a private authenticated HTTPS lease on the existing host or
 starts a temporary one. Startup is serialized per runtime home/environment;
 commands retain their original revision/request ID and are never replayed after
 transport failure. The host exits shortly after the last lease ends, unless an
-enabled visual/API interface or explicit `python -m whab --serve` needs it.
+enabled visual/API interface or an explicit server launch (`python -m whab`, optionally `--serve`) needs it.
 Closing browser tabs does not disable Web. Stateful engines and active operations
 retain their owners; pure rendering/import/report/artwork hooks and installed
 bank provider clients release their child after each operation. Existing budget
