@@ -3,6 +3,7 @@
 import asyncio
 import json
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -74,3 +75,30 @@ def test_bank_schedule_policy_is_bounded():
         with pytest.raises(ValueError):
             BankAdapter(lambda _: None, interval)
     assert BankAdapter(lambda _: None).sync_interval_seconds is None
+
+
+@pytest.mark.parametrize("legacy_record", [False, True])
+def test_os_hourly_tick_runs_at_next_calendar_boundary(tmp_path, legacy_record):
+    async def run():
+        start = datetime(2026, 11, 4, 10, 17).astimezone().timestamp()
+        boundary = (datetime.fromtimestamp(start).astimezone().replace(minute=0, second=0, microsecond=0)
+                    + timedelta(hours=1)).timestamp()
+        now, calls = [start], []
+        async def sync():
+            calls.append(now[0])
+            return {"added": 0, "modified": 0, "removed": 0}
+        jobs = BankJobs(tmp_path, "sandbox", runtime(), {"fictional": SimpleNamespace(sync=sync)}, clock=lambda: now[0])
+        if legacy_record:
+            jobs.records["fictional"] = {"last_attempt": start, "last_success": start,
+                                         "next_due": start + 3600, "error": None}
+        else:
+            await jobs.run_due()
+        assert jobs.status()["jobs"][0]["next_due"] == boundary
+        now[0] = boundary
+        assert (await jobs.run_due())["fictional"]["ok"]
+        assert calls[-1] == boundary
+        assert (await jobs.run_due())["fictional"]["skipped"]
+        now[0] = boundary + 3600
+        assert (await jobs.run_due())["fictional"]["ok"]
+        assert calls[-1] == boundary + 3600
+    asyncio.run(run())

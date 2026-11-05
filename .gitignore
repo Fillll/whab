@@ -9,6 +9,11 @@ data/
 /budgets/
 /whab/budgets/
 /whab/app/budgets/
+# Private host rendezvous credentials and scheduled-job state.
+/whab/run/
+/whab/jobs/
+/whab/app/run/
+/whab/app/jobs/
 # Private local HTTPS certificates, CA keys and server keys.
 /tls/
 /whab/tls/

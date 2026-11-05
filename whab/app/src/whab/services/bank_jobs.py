@@ -3,6 +3,7 @@
 import asyncio
 import json
 import math
+from datetime import datetime
 from pathlib import Path
 from time import time
 
@@ -38,8 +39,21 @@ class BankJobs:
 
     def status(self):
         return {"jobs": [{"plugin": plugin, "interval_seconds": interval,
-                          **self.records.get(plugin, {"last_attempt": 0, "last_success": 0, "next_due": 0, "error": None})}
+                          **self.record(plugin, interval)}
                          for plugin, interval in self.policies().items()]}
+
+    @staticmethod
+    def next_boundary(at, interval):
+        # launchd's hourly calendar tick and the in-host timer share the same
+        # local clock phase, including zones with fractional-hour UTC offsets.
+        offset = datetime.fromtimestamp(at).astimezone().utcoffset().total_seconds()
+        return ((at + offset) // interval + 1) * interval - offset
+
+    def record(self, plugin, interval):
+        record = self.records.get(plugin, {"last_attempt": 0, "last_success": 0, "next_due": 0, "error": None})
+        # Existing 2.56.0 records used attempt+interval. Bring their effective due
+        # time forward without changing their last attempt/success or native data.
+        return {**record, "next_due": min(record["next_due"], self.next_boundary(record["last_attempt"], interval))}
 
     async def run(self, plugin, *, due=False):
         async with self.lock:
@@ -49,12 +63,12 @@ class BankJobs:
                     raise BankError("The selected bank plugin is not enabled.")
                 interval = self.policies().get(plugin, 3600)
                 now = self.clock()
-                record = self.records.get(plugin, {"last_attempt": 0, "last_success": 0, "next_due": 0, "error": None})
+                record = self.record(plugin, interval)
                 if due and now < record["next_due"]:
                     return {"ok": True, "skipped": True}
                 # Publish the attempt before external work. A crash cannot create
                 # an immediate retry storm or change native uncertainty fencing.
-                record = {**record, "last_attempt": now, "next_due": now + interval}
+                record = {**record, "last_attempt": now, "next_due": self.next_boundary(now, interval)}
                 self.records[plugin] = record
                 atomic_write(self.path, json.dumps(self.records, allow_nan=False).encode())
                 try:
