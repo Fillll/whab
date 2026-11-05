@@ -123,11 +123,11 @@
           "output": {}
         }
       ],
-      "side_effects": "Enable/disable publishes a budget selection through existing live transition and browser drain contracts; list/status only reads metadata.",
+      "side_effects": "Enable/disable applies supported live transitions and browser drains. Restart-required preflight saves a validated startup selection and returns restart_required: true; running plugins remain active until restart. List/status only reads metadata.",
       "permissions": "Authenticated device-local CLI profile with home and explicit sandbox/production environment. Personal workspace only; not available through remote profiles.",
       "scope": "Selected runtime home, permanent budget identity and environment. Credentials remain machine-local.",
       "errors": [
-        "Unavailable plugin or unsupported live transition is rejected.",
+        "Unavailable plugins, invalid selections, busy work and failed live transitions are rejected. Restart-required plugin selection is saved for the next startup.",
         "Startup, TLS, authorization, storage or recovery failures return sanitized errors."
       ],
       "retry": "Never automatically replay failed commands. Inspect status and native recovery before explicitly retrying an uncertain operation.",

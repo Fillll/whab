@@ -43,3 +43,46 @@ def test_local_authentication_and_revision_checks_cannot_be_bypassed(store, tmp_
         client.headers.pop("Origin")
         assert client.post(prefix + "/commands", json={**payload, "unexpected": True}).status_code == 400
         assert len(store.accounts("personal")) == 1
+
+
+def test_local_plugin_restart_selection_is_saved_without_live_activation(store, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, Mock
+
+    from whab.plugins import PluginError, runtime
+
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
+    app = create_app(store=store, settings=settings, plugins=PluginRegistry(()))
+    owner = hosting.HostOwner(settings)
+    owner.app = app
+    monkeypatch.setattr(hosting, "_OWNER", owner)
+    monkeypatch.setattr(runtime, "load_descriptors", lambda *args: (SimpleNamespace(ui=None, _process=None),))
+    manager = app.state.plugin_manager
+    rows = [{"id": "fictional", "installed": True}]
+    monkeypatch.setattr(manager, "projection", lambda: {"plugins": rows, "configured": ["fictional", "retained"]})
+    preflight = Mock(side_effect=PluginError("Restart needed.", code="restart_required"))
+    save = Mock()
+    live = SimpleNamespace(activate=AsyncMock())
+    monkeypatch.setattr(manager, "preflight_live", preflight)
+    monkeypatch.setattr(manager, "save", save)
+    monkeypatch.setattr(manager, "live", live)
+    with TestClient(app, base_url="https://localhost:5173") as client:
+        client.headers["Authorization"] = "Bearer " + owner.token
+        path = "/budgets/default/api/local/v1/plugins"
+        body = {"action": "disable", "plugin": "fictional"}
+        assert client.post(path, json=body).status_code == 200
+        save.assert_called_once_with(("retained",))
+        live.activate.assert_not_awaited()
+        # Busy/invalid selections must fail without saving a startup fallback.
+        save.reset_mock()
+        preflight.side_effect = PluginError("Busy.", code="transition_busy")
+        assert client.post(path, json=body).status_code == 400
+        save.assert_not_called()
+        # A failure after activation starts must never trigger a second write.
+        preflight.side_effect = None
+        live.activate.side_effect = PluginError("Restart needed.", code="restart_required")
+        assert client.post(path, json=body).status_code == 400
+        save.assert_not_called()
+        live.activate.side_effect = None
+        assert client.post(path, json=body).status_code == 200
+        live.activate.assert_awaited_with(("retained",))
