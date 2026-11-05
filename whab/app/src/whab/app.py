@@ -579,6 +579,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 on_create=lambda owner: startup.own(owner, owner.close_sync))
             live.storage = storage_upgrade
         replicas = StorageReplicas(storage_runtime)
+        from whab.services.bank_jobs import BankJobs
+        bank_jobs = BankJobs(worker_home, settings.plaid_env, runtime, leased_banks)
 
         @asynccontextmanager
         async def lifespan(_app):
@@ -595,8 +597,12 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 if not _child:
                     await budget_host.remember_current()
                 await replicas.start()
+                from whab.hosting import current_owner
+                if current_owner() is not None:
+                    await bank_jobs.start()
                 yield
             finally:
+                await bank_jobs.close()
                 # Close every service even if another plugin's cleanup raises.
                 try:
                     try:
@@ -695,6 +701,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         app.state.store = store.store
         app.state.tracked_store = store
         app.state.banks = leased_banks
+        app.state.bank_jobs = bank_jobs
         app.state.bank_stores = bank_stores
         app.state.bank_lifecycle = bank_lifecycle
         app.state.plugins = registry
@@ -718,6 +725,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         app.state.visual_controller = visual_controller
         visual_controller.on_change = lambda identifier: setattr(app.state, "ui_plugin", identifier)
         app.state.ledger_service = service
+        app.state.host = budget_host
         app.state.budget_session = budget_session
         storage_contract = contract_for(selected_storage) if selected_storage else None
         storage_file_exports = bool(storage_contract and storage_contract.authority == "local"
@@ -749,6 +757,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         if not _child:
             budget_host.register(app, budget_session)
             app.add_middleware(BudgetDispatch, host=budget_host)
+        from whab.web.routes.local import LocalAccess
+        from whab.web.routes.local import create_router as local_router
+        app.include_router(local_router(app))
+        app.add_middleware(LocalAccess)
         app.add_middleware(RequireHTTPS)
         service.http_documentation = lambda: interface_documentation(app, plugins.descriptors())
         startup.release()

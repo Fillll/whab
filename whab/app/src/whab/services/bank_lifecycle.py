@@ -19,7 +19,7 @@ from whab.plugins.runtime import PluginError
 from whab.plugins.sdk import valid_plugin_name
 from whab.storage.bank import BankStore
 
-from .bank_runtime import BankCoordinator
+from .bank_runtime import BankCoordinator, OnDemandBankProvider
 
 
 def live_bank(plugin):
@@ -128,10 +128,22 @@ class BankLifecycle:
             entry, = entries
             if len(self._workers) >= 100:
                 raise EffectError('effect_unavailable')
-            worker = ReportWorker(plugin.id, expected_distribution=entry.dist.metadata['Name'], expected_version=entry.dist.version,
-                                  on_create=self._workers.add)
-            self._workers.add(worker)
-            factory = WorkerBankFactory(worker, owns_worker=True)
+            distribution, version = entry.dist.metadata['Name'], entry.dist.version
+
+            def acquire():
+                worker = ReportWorker(plugin.id, expected_distribution=distribution, expected_version=version,
+                                      on_create=self._workers.add)
+                self._workers.add(worker)
+                return WorkerBankFactory(worker, owns_worker=True)(context)
+
+            def release(provider):
+                try:
+                    provider.close()
+                finally:
+                    if not provider.worker.cleanup_pending:
+                        self._workers.discard(provider.worker)
+
+            return OnDemandBankProvider(acquire, release), f'{distribution}/{version}'
         return factory(context), factory.code_identity
 
     def create(self, plugin, generation, injected=None):

@@ -61,6 +61,8 @@ labelled development when the checkout is dirty and is not represented as CI tes
 The launcher rejects unsupported old layouts instead of silently installing an
 incompatible release. Changing the runtime or update channel requires stopping WHAB.
 
+First-time setup through this browser launcher explicitly selects the Web interface. CLI-created runtimes start headlessly; existing runtime selections are preserved. Supported hosts share their authenticated local coordinator with CLI and scheduled jobs.
+
 Closing the window leaves the launcher in the menu bar. **Quit launcher** leaves
 the budget server running; use **Stop** in settings to shut down the budget. Optional **Open
 launcher at login** uses macOS Login Items. After your initial explicit runtime

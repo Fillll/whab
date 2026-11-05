@@ -54,8 +54,13 @@ class ManagedApplication:
 
 
 def create_application(settings):
-    from whab import __version__
     from whab.app import create_app
+
+    return wrap_application(create_app(settings=settings), settings)
+
+
+def wrap_application(application, settings):
+    from whab import __version__
 
     try:
         instance = str(UUID(os.environ.get("WHAB_INSTANCE_ID", "")))
@@ -65,7 +70,7 @@ def create_application(settings):
     if re.fullmatch(r"(?:[0-9a-f]{40}|development-[0-9a-f]{24})", build) is None:
         build = "development"
     return ManagedApplication(
-        create_app(settings=settings), port=settings.port,
+        application, port=settings.port,
         version=__version__, build=build, instance=instance,
     )
 
@@ -87,6 +92,14 @@ def main():
     if str(UUID(args.instance)) != str(UUID(os.environ.get("WHAB_INSTANCE_ID", ""))):
         parser.error("The managed instance identity does not match.")
     import uvicorn
+
+    try:
+        from whab.hosting import run_host
+    except ImportError:
+        pass  # Historical installed hosts retain their original launch protocol.
+    else:
+        run_host(settings, wrapper=lambda application: wrap_application(application, settings))
+        return
 
     uvicorn.run(
         lambda: create_application(settings), factory=True,

@@ -98,10 +98,14 @@ class BankAdapter:
     """Explicit typed provider factory, usable only through the host coordinator."""
 
     factory: Callable[[BankProviderContext], BankProvider] = field(repr=False)
+    sync_interval_seconds: int | None = None
 
     def __post_init__(self):
         if not callable(self.factory):
             raise ValueError('Bank provider factory must be callable.')
+        if self.sync_interval_seconds is not None and (type(self.sync_interval_seconds) is not int
+                or not 60 <= self.sync_interval_seconds <= 31 * 86400):
+            raise ValueError('Choose a bank sync interval between one minute and 31 days.')
 
     def __call__(self, _context):
         raise ValueError('This bank provider requires the host continuation adapter.')

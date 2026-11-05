@@ -510,7 +510,12 @@ def _load_descriptors(
             if not _worker and isinstance(entry, metadata.EntryPoint) and entry.dist is not None:
                 from .process_worker import PluginProcess
 
-                descriptor = PluginProcess(name).descriptor
+                process = PluginProcess(name)
+                descriptor = process.descriptor
+                from whab.hosting import current_owner
+                if current_owner() is not None:
+                    from .on_demand import release_stateless
+                    descriptor = release_stateless(process, descriptor)
             else:
                 # Explicit injected descriptors are test doubles. Real installed
                 # entry points execute exclusively inside their owned worker.

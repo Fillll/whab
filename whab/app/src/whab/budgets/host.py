@@ -36,7 +36,7 @@ _CONTROL_PATHS = frozenset({"/api/plugins/runtime", "/api/plugins/runtime/cleanu
 
 
 def runtime_control(path):
-    return path in _CONTROL_PATHS or path.startswith("/api/ui/views/")
+    return path in _CONTROL_PATHS or path.startswith(("/api/ui/views/", "/api/local/v1/"))
 
 
 def request_password(request):

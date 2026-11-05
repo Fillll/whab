@@ -36,6 +36,8 @@ def launch(monkeypatch, tmp_path):
         calls.append((target, options, Settings.load()))
 
     monkeypatch.setattr(cli.uvicorn, "run", no_listener)
+    monkeypatch.setattr("whab.hosting.run_host", lambda settings, **options: no_listener(
+        "whab.app:create_app", factory=True, host="127.0.0.1", port=settings.port, reload=False))
     # These cases test budget argument behavior; real TLS validation has its own tests.
     monkeypatch.setattr(cli, "validate_tls", lambda *_: None)
 

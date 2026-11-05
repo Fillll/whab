@@ -31,7 +31,7 @@ assets = Path(__file__).parent
 plugin = Plugin(
     id="plaid",
     display_name="Plaid",
-    bank=BankAdapter(create_provider),
+    bank=BankAdapter(create_provider, sync_interval_seconds=3600),
     bank_ui=BankUI(templates=assets / "templates", static=assets / "static"),
     merchant_logos=MerchantLogos(fetch=fetch),
     contract=PluginContract(provides=(Capability("ingestion.bank"), Capability("lifecycle.background")), authority="local", lifecycle="live"),

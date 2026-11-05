@@ -311,7 +311,7 @@ def main():
                         "AI_CREDENTIALS_DIR", "LLM_CATEGORIZATION_CREDENTIALS_DIR"}
     }
     env.update(
-        PLAID_ENV="sandbox", ALLOW_LIVE_PLAID="false", WHAB_PLUGINS="plaid,example,bank-logos,ynab", PORT="5173"
+        PLAID_ENV="sandbox", ALLOW_LIVE_PLAID="false", WHAB_UI="web", WHAB_PLUGINS="plaid,example,bank-logos,ynab", PORT="5173"
     )
     with tempfile.TemporaryDirectory(prefix="whab-distribution-") as temporary:
         base = Path(temporary)
