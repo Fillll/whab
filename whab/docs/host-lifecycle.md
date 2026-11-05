@@ -32,6 +32,11 @@ schedule can start a temporary host without a visual interface. A running host
 also executes due work. Provider webhooks require a reachable persistent receiver
 and are optional alongside polling.
 
+Periodic attempts use the next local calendar boundary, matching the OS hourly
+tick. An initial/manual sync at 10:17 is followed by the 11:00 check, then 12:00;
+it cannot postpone the 11:00 tick until 12:00. Older relative due records are
+projected forward to that boundary without changing native financial state.
+
 CLI help and packaged operation documentation describe local profiles, plugin
 management, synchronization and scheduling. Runtime configuration, credentials,
 job state and platform task files remain outside Git.
