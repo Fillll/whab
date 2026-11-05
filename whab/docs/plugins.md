@@ -53,7 +53,7 @@ CI requires 100% Python statement and branch coverage for each plugin's entire s
 
 **Installed Python plugins run in host-managed child processes from WHAB 2.54 and remain trusted executable code.** See [independent plugin processes](plugin-processes.md) for transport, lifecycle, scoped callbacks and configuration declarations. Reporting hooks receive snapshots; budget binders receive their own portable namespace. Legacy bank factories receive scoped persistence/configuration and an encryption key, while typed provider adapters retain host-owned keys and native persistence. Storage implementations own their native data; visual implementations render from captured resources in their child. Python retains the current user's filesystem/network access. Process separation contains failures and does not provide an OS security sandbox.
 
-Installation alone does not select an additional package. For the original workspace and initial CLI budget creation, `WHAB_STORAGE` selects required storage (`sqlite` by default). An opened portable budget takes storage and optional selections from its manifest; Settings creates new SQLite budgets. The host also loads the installation's selected `WHAB_UI` descriptor (`web` by default). For the original local workspace, optional names are saved in the runtime home’s `plugins.json`. Without a saved selection, `WHAB_PLUGINS` supplies optional names (`plaid` when absent); `WHAB_PLUGINS=` disables optional banks/reports/branding while retaining storage and selected UI. `WHAB_UI=` is headless: APIs/storage remain without the root page or core visual assets. Restart after changing settings. Names are lowercase slugs of at most 64 characters.
+Installation alone does not select an additional package. For the original workspace and initial CLI budget creation, `WHAB_STORAGE` selects required storage (`sqlite` by default). An opened portable budget takes storage and optional selections from its manifest; Settings creates new SQLite budgets. The host also loads the installation's selected `WHAB_UI` descriptor (empty for fresh homes; existing homes retain their selection/legacy `web` default). For the original local workspace, optional names are saved in the runtime home’s `plugins.json`. Without a saved selection, `WHAB_PLUGINS` supplies optional names (empty for fresh homes; existing data homes retain the historical `plaid` default); `WHAB_PLUGINS=` disables optional banks/reports/branding while retaining storage and selected UI. `WHAB_UI=` is headless: APIs/storage remain without the root page or core visual assets. Restart after changing settings. Names are lowercase slugs of at most 64 characters.
 
 Use `WHAB_STORAGE` for the original workspace/new CLI budget and `WHAB_UI` for the installation's visual interface; an opened portable budget's storage remains manifest-owned. One primary backend is required; at most one server-rendered visual interface may be selected, alongside trusted transport interfaces. Missing required storage/UI, incompatible capabilities and multiple enabled storage/UI descriptors fail with actionable errors. Missing portable optional packages are reported without blocking opening and their saved data is preserved. The host deduplicates a selected name also present in the optional list; repeated optional names remain invalid. A standalone `load_plugins(())` loads nothing, but app composition adds required storage and selected UI before discovery.
 
@@ -137,7 +137,7 @@ The teaching example is deliberately hidden from ordinary Settings, including Pl
 .venv/bin/python scripts/install.py --dev --example
 whab_example_home="$(mktemp -d)"
 WHAB_HOME="$whab_example_home" .venv/bin/python scripts/setup.py
-WHAB_HOME="$whab_example_home" WHAB_PLUGINS=example .venv/bin/python -m whab
+WHAB_HOME="$whab_example_home" WHAB_UI=web WHAB_PLUGINS=example .venv/bin/python -m whab
 ```
 
 Trust the generated example home's CA explicitly using the [local HTTPS instructions](usage.md#local-https), then open https://127.0.0.1:5173 and choose **Insights** for fictional demo data. This fresh home has no saved `plugins.json` or portable manifest, so `WHAB_PLUGINS=example` is the effective selection; it does not reuse household data or bank credentials. Use another local port when a server is already running.
@@ -834,3 +834,30 @@ WHAB 2.47 supports `edit_transaction_details(workspace, transaction_id, changes)
 WHAB 2.48 adds an opaque `revision` to the public `transactionPage` metadata. The service reads the bounded projection and captures this marker under the budget command lock. Chunks from one unchanged ledger share the marker; a committed command or privileged host mutation invalidates it. Interfaces can reject stale chunks without exposing financial drafts or adding storage-specific dependencies. Financial commands and the underlying bounded storage read contract are unchanged.
 
 The maintained [AI credentials](../app/plugins/automation/ai-credentials/README.md) plugin publishes an explicitly documented connection API consumed by AI transaction categorization and [Subscriptions](../app/plugins/automation/subscriptions/README.md), with matching named manifest and distribution dependencies. Subscription labels remain separate from the financial ledger and budget categories.
+
+
+## Local CLI lifecycle and scheduled banks
+
+WHAB 2.56 exposes `whab.plugins.local.local_connection(home, environment="sandbox",
+*, ca=None)` as the context-managed local transport adapter. It yields an
+HTTPS client with a temporary host lease, verified runtime CA and ephemeral
+credential. Local profiles identify a runtime home and permanent budget ID;
+remote profiles continue to require the optional API interface plugin. The
+private `/api/local/v1` management/query/command routes are authenticated before
+budget activation and retain local Host/origin policy. They never bypass budget
+admission, native writer authority, revision checks or financial receipts.
+See the [CLI guide](../app/plugins/interface/cli/README.md).
+
+`BankAdapter(factory, sync_interval_seconds=None)` may declare a periodic sync
+interval from 60 seconds to 31 days. Existing descriptors default to no scheduled
+work. Plaid declares 3,600 seconds. The host invokes its ordinary coordinator sync,
+serializes attempts, saves bounded private status and coalesces missed intervals.
+Installed pure providers acquire pinned workers for individual operations;
+approved shared workers and engines with live state retain their scoped lifecycle.
+The host owns credentials, continuation journals, atomic ingestion and uncertainty
+recovery. Provider plugins continue to own transport and normalization.
+
+`whab.plugins.scheduling.configure_schedule(home, environment, enabled=True)`
+registers the device's hourly job entry point (macOS LaunchAgent currently),
+without embedding credentials or financial records. Other platforms may schedule
+`python -m whab --home DIRECTORY --environment sandbox --run-jobs` themselves.

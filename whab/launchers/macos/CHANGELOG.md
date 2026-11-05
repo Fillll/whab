@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.2.0 — 2026-11-04
+
+PR: [#149](https://github.com/Fillll/whab/pull/149)
+
+- Start supported WHAB builds through the shared local host coordinator while preserving managed readiness and historical-host compatibility. A newly configured browser launcher explicitly selects Web; CLI setup stays headless and existing selections remain unchanged.
+
 ## 1.1.3 — 2026-10-23
 
 PR: [#98](https://github.com/Fillll/whab/pull/98)

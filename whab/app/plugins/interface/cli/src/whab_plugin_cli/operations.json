@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "cli",
-  "summary": "Noninteractive JSON CLI over authenticated public operations, with optional JSON connection defaults loaded through whab-cli CONFIG ...",
+  "summary": "JSON CLI with local home/environment profiles, temporary authenticated HTTPS host leases, plugin management, bank synchronization, OS scheduling and optional remote HTTPS profiles.",
   "delegates": [
     "core"
   ],
@@ -82,6 +82,142 @@
       ],
       "retry": "Inspect local state after an uncertain mutation. Paid inference is never automatically retried.",
       "availability": "GET /api/plugin-settings/cli"
+    },
+    {
+      "name": "plugins",
+      "kind": "local",
+      "summary": "List/status or enable/disable installed plugins through the authenticated local host.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "list",
+              "status",
+              "enable",
+              "disable"
+            ],
+            "description": "Explicit CLI action."
+          },
+          "plugin": {
+            "type": "string",
+            "description": "Installed plugin ID; required for enable/disable."
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit local CLI arguments. The connection profile supplies home, budget and environment."
+      },
+      "output": {
+        "type": "object",
+        "description": "JSON host/plugin/job projection or operation result."
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "list"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "Enable/disable publishes a budget selection through existing live transition and browser drain contracts; list/status only reads metadata.",
+      "permissions": "Authenticated device-local CLI profile with home and explicit sandbox/production environment. Personal workspace only; not available through remote profiles.",
+      "scope": "Selected runtime home, permanent budget identity and environment. Credentials remain machine-local.",
+      "errors": [
+        "Unavailable plugin or unsupported live transition is rejected.",
+        "Startup, TLS, authorization, storage or recovery failures return sanitized errors."
+      ],
+      "retry": "Never automatically replay failed commands. Inspect status and native recovery before explicitly retrying an uncertain operation.",
+      "availability": "Local CLI command with an explicit home profile; not remotely callable. See whab-cli COMMAND --help."
+    },
+    {
+      "name": "sync",
+      "kind": "local",
+      "summary": "Synchronize existing bank connections immediately through the local host.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "plugin": {
+            "type": "string",
+            "description": "Enabled bank plugin ID, for example plaid."
+          }
+        },
+        "required": [
+          "plugin"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit local CLI arguments. The connection profile supplies home, budget and environment."
+      },
+      "output": {
+        "type": "object",
+        "description": "JSON host/plugin/job projection or operation result."
+      },
+      "examples": [
+        {
+          "input": {
+            "plugin": "plaid"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "Calls the existing provider coordinator and atomically saves transaction changes/cursors. Does not create a connection or force institution refresh.",
+      "permissions": "Authenticated device-local CLI profile with home and explicit sandbox/production environment. Personal workspace only; not available through remote profiles.",
+      "scope": "Selected runtime home, permanent budget identity and environment. Credentials remain machine-local.",
+      "errors": [
+        "Unavailable plugin or unsupported live transition is rejected.",
+        "Startup, TLS, authorization, storage or recovery failures return sanitized errors."
+      ],
+      "retry": "Never automatically replay failed commands. Inspect status and native recovery before explicitly retrying an uncertain operation.",
+      "availability": "Local CLI command with an explicit home profile; not remotely callable. See whab-cli COMMAND --help."
+    },
+    {
+      "name": "jobs",
+      "kind": "local",
+      "summary": "Inspect due-job status, run due jobs, or register/remove hourly OS wakeups.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "run",
+              "enable",
+              "disable"
+            ],
+            "description": "Explicit CLI action."
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit local CLI arguments. The connection profile supplies home, budget and environment."
+      },
+      "output": {
+        "type": "object",
+        "description": "JSON host/plugin/job projection or operation result."
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "status"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "status reads private sanitized job status; run executes only due work; enable/disable changes a private macOS LaunchAgent. A running host retains enabled provider intervals.",
+      "permissions": "Authenticated device-local CLI profile with home and explicit sandbox/production environment. Personal workspace only; not available through remote profiles.",
+      "scope": "Selected runtime home, permanent budget identity and environment. Credentials remain machine-local.",
+      "errors": [
+        "Unavailable plugin or unsupported live transition is rejected.",
+        "Startup, TLS, authorization, storage or recovery failures return sanitized errors."
+      ],
+      "retry": "Never automatically replay failed commands. Inspect status and native recovery before explicitly retrying an uncertain operation.",
+      "availability": "Local CLI command with an explicit home profile; not remotely callable. See whab-cli COMMAND --help."
     }
   ]
 }

@@ -1,6 +1,73 @@
 # Command line interface
 
-The `cli` Interface plugin installs `whab-cli`, a noninteractive JSON terminal interface for people and external agents. It needs no Web interface or AI plugins. Run it against a budget explicitly enabled with the [server interface](../server/README.md). The terminal executable is available after installing this package; enabling its optional server-side registration adds package information only. The existing `python -m whab` bootstrap is unchanged.
+## Local operation
+
+A fresh runtime needs only the host, CLI and storage packages. No AI account, Web
+UI, remote API plugin or manually configured bearer token is required. Use a JSON
+`default.budget` profile:
+
+```json
+{
+  "home": "/absolute/path/to/private/runtime",
+  "budget": "default",
+  "environment": "sandbox"
+}
+```
+
+```sh
+whab-cli default.budget query accounts
+whab-cli default.budget plugins list
+whab-cli default.budget plugins enable web
+whab-cli default.budget plugins disable web
+whab-cli default.budget plugins enable plaid
+whab-cli default.budget sync plaid
+whab-cli default.budget jobs status
+whab-cli default.budget jobs enable
+whab-cli default.budget jobs run
+whab-cli default.budget jobs disable
+```
+
+Relative `home` and `ca` paths resolve against the profile directory. Choose
+`home` for local operation or `url` for a remote connection. `--home DIRECTORY`
+and `--environment sandbox|production` provide the same explicit configuration.
+For a saved portable budget, use its permanent UUID from the runtime catalog as
+`budget`. Production requires an explicit environment and existing authorized
+provider configuration; plugin enablement never creates a bank connection.
+
+The CLI acquires a private authenticated HTTPS lease on the existing host or
+starts a temporary one. Startup is serialized per runtime home/environment;
+commands retain their original revision/request ID and are never replayed after
+transport failure. The host exits shortly after the last lease ends, unless an
+enabled visual/API interface or an explicit server launch (`python -m whab`, optionally `--serve`) needs it.
+Closing browser tabs does not disable Web. Stateful engines and active operations
+retain their owners; pure rendering/import/report/artwork hooks and installed
+bank provider clients release their child after each operation. Existing budget
+selections and encrypted connections remain intact.
+
+`plugins status` and successful plugin changes return `host_url`, including the
+chosen temporary port, so enabling Web also tells you where to open it. Browser
+access still requires explicitly trusting that runtime's CA; CLI trust does not
+change OS/browser trust.
+
+Plaid declares a 3,600-second incremental sync interval. `jobs enable` installs a
+private macOS LaunchAgent that runs due jobs hourly, including without Web UI.
+The running host also checks due work; saved due times prevent duplicate runs and
+coalesce missed intervals after sleep. `jobs run` runs only due jobs; `sync plaid`
+is an explicit immediate sync. Job status records the last attempt/success and a
+sanitized failure code. `jobs disable` removes OS wakeups; a running host still
+honors enabled providers' intervals. Other operating systems can schedule
+`python -m whab --home DIRECTORY --environment sandbox --run-jobs` with their OS
+scheduler; automatic registration currently supports macOS. No public webhook
+receiver is needed for polling.
+
+Local management is personal-workspace only. Commands return JSON and errors are
+sanitized. Plugin changes use existing live transitions, including browser edit
+draining for visual changes; unsupported live changes report their limitation.
+Neither the CLI nor the scheduler reads or writes a database directly.
+
+## Remote operation
+
+The `cli` Interface plugin installs `whab-cli`, a noninteractive JSON terminal interface for people and external agents. It needs no Web interface or AI plugins. Run it against a budget explicitly enabled with the [server interface](../server/README.md). The terminal executable is available after installing this package; enabling its optional server-side registration adds package information only. `python -m whab --serve` explicitly starts a persistent headless service.
 
 Supply an HTTPS origin, stable budget ID, and access token through an environment variable. Use `--ca` for an explicitly selected CA certificate; certificate verification is always enabled. The default token variable is `WHAB_CLI_TOKEN`; `--token-env` selects another. This is ordinary server access, separate from AI credentials.
 
@@ -24,7 +91,7 @@ whab-cli default.budget query transactions
 whab-cli default.budget --budget ANOTHER_BUDGET query accounts
 ```
 
-The optional file accepts only `url`, `budget`, `ca`, `workspace` and `token_env`, all nonempty strings with the same values as their command-line options. For example, `"workspace": "demo"` selects the demo workspace and `"token_env": "MY_WHAB_TOKEN"` selects the environment variable containing the access token. Unknown or duplicate keys, invalid JSON and incorrect value types are rejected before a request. Explicit command-line options override file defaults. Relative CA paths use the config file's directory; `~` expands to the user's home for the config and CA paths. Files are limited to 64 KiB and are read as data: shell commands and environment substitutions are never executed. Keep the file with private runtime configuration, outside Git. Store tokens in the named environment variable. Configured help and offline discovery need no server or token.
+A remote profile accepts `url`, `budget`, `ca`, `workspace` and `token_env`; a local profile also supports `home` and `environment`. Values are all nonempty strings with the same values as their command-line options. For example, `"workspace": "demo"` selects the demo workspace and `"token_env": "MY_WHAB_TOKEN"` selects the environment variable containing the access token. Unknown or duplicate keys, invalid JSON and incorrect value types are rejected before a request. Explicit command-line options override file defaults. Relative CA paths use the config file's directory; `~` expands to the user's home for the config and CA paths. Files are limited to 64 KiB and are read as data: shell commands and environment substitutions are never executed. Keep the file with private runtime configuration, outside Git. Store tokens in the named environment variable. Configured help and offline discovery need no server or token.
 
 Existing flag-based connection files remain readable for compatibility. New files and help examples use JSON; the `.budget` filename extension is unchanged.
 
@@ -50,7 +117,7 @@ Subscription labels apply to matching payments in the same account; see [Subscri
 
 The CLI makes one request, never retries a write or refreshes its revision automatically, rejects redirects/proxies and validates response budget identity. Success prints JSON to stdout and exits 0; failure prints a sanitized JSON error to stderr and exits 1. After an uncertain write, retain the original target, parameters, revision and request ID. Inspect the budget and retry only that exact intent; a restart or stale revision requires reconciliation rather than a new write. Request receipts have the host's documented lifetime; the CLI does not claim durable receipt storage.
 
-Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.53+ are required.
+Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.56+ are required.
 
 ## Operation documentation
 

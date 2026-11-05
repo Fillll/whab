@@ -131,7 +131,7 @@ def test_cli_uses_native_tls_and_never_trusts_forwarded_scheme(tmp_path, monkeyp
     cert, key = prepare_local_tls(tmp_path)
     configuration = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", tls_cert_file=cert, tls_key_file=key)
     monkeypatch.setattr(cli.Settings, "load", lambda: configuration)
-    monkeypatch.setattr(sys, "argv", ["whab"])
+    monkeypatch.setattr(sys, "argv", ["whab", "--reload"])
     calls = []
     monkeypatch.setattr(cli.uvicorn, "run", lambda *args, **kwargs: calls.append(kwargs))
     cli.main()

@@ -349,11 +349,11 @@ class IsolatedManagerTest(unittest.TestCase):
         def generate_default(arguments, **_kwargs):
             if str(arguments[-1]).endswith("scripts/setup.py"):
                 path = self.home / ".env"
-                path.write_text("PORT=5173\nTOKEN_ENCRYPTION_KEY=new-test-key\n")
+                path.write_text("PORT=5173\nWHAB_UI=\nWHAB_PLUGINS=\nTOKEN_ENCRYPTION_KEY=new-test-key\n")
                 path.chmod(0o600)
         with patch.object(self.manager, "run", side_effect=generate_default):
             self.manager.setup(self.installation(), self.home, 6412)
-        self.assertEqual((self.home / ".env").read_text(), "PORT=6412\nTOKEN_ENCRYPTION_KEY=new-test-key\n")
+        self.assertEqual((self.home / ".env").read_text(), "PORT=6412\nWHAB_UI=web\nWHAB_PLUGINS=\nTOKEN_ENCRYPTION_KEY=new-test-key\n")
 
     def test_child_environment_does_not_inherit_banking_or_storage_overrides(self):
         with patch.dict(os.environ, {"PLAID_SECRET": "hidden", "WHAB_BUDGET": "/external/private.whab", "TOKEN_ENCRYPTION_KEY": "hidden"}):

@@ -10,6 +10,7 @@ import base64
 from collections.abc import Mapping
 from copy import deepcopy
 from functools import partial
+from threading import RLock
 from uuid import uuid4
 
 from whab.domain.validation import validate_label
@@ -89,6 +90,38 @@ class WorkerBankProvider:
             self.worker.close()
         elif self.worker.healthy:
             self.worker.provider('close', {})
+
+
+class OnDemandBankProvider:
+    """Pure provider clients live for one operation; native continuations stay here.
+
+    A readiness probe captures validated configuration, then releases its child.
+    An operation acquires a fresh, exactly pinned child and never replays a failed
+    call. Durable exchange/import uncertainty remains the coordinator's concern.
+    """
+
+    def __init__(self, factory, release):
+        self.factory, self.release = factory, release
+        self.lock, self.closed = RLock(), False
+        provider = factory()
+        try:
+            self.config = deepcopy(dict(provider.config))
+        finally:
+            self.release(provider)
+
+    def call(self, command, **values):
+        with self.lock:
+            if self.closed:
+                raise EffectError('effect_unavailable')
+            provider = self.factory()
+            try:
+                return provider.call(command, **values)
+            finally:
+                self.release(provider)
+
+    def close(self):
+        with self.lock:
+            self.closed = True
 
 
 class BankCoordinator:

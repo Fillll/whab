@@ -5,9 +5,9 @@ import shlex
 from pathlib import Path
 
 CONFIG_LIMIT = 64 * 1024
-COMMANDS = frozenset({"query", "command", "feature-query", "feature-command", "describe"})
+COMMANDS = frozenset({"query", "command", "feature-query", "feature-command", "describe", "plugins", "sync", "jobs"})
 OPTIONS = {"--url": "url", "--budget": "budget", "--ca": "ca",
-           "--workspace": "workspace", "--token-env": "token_env"}
+           "--workspace": "workspace", "--token-env": "token_env", "--home": "home", "--environment": "environment"}
 
 
 class ConfigError(ValueError):
@@ -31,7 +31,7 @@ def _json_defaults(text):
     if type(defaults) is not dict:
         raise ConfigError("CLI JSON config must be an object.")
     if not defaults.keys() <= set(OPTIONS.values()):
-        raise ConfigError("CLI JSON config accepts only url, budget, ca, workspace and token_env.")
+        raise ConfigError("CLI JSON config accepts only url, budget, ca, workspace, token_env, home and environment.")
     if any(type(value) is not str or not value for value in defaults.values()):
         raise ConfigError("CLI JSON config values must be nonempty strings.")
     return defaults
@@ -71,10 +71,16 @@ def connection_defaults(argv):
     defaults = _legacy_defaults(text) if not stripped or stripped.startswith(("-", "#")) else _json_defaults(text)
     if "workspace" in defaults and defaults["workspace"] not in {"personal", "demo"}:
         raise ConfigError("CLI config workspace must be personal or demo.")
-    if "ca" in defaults:
+    if "environment" in defaults and defaults["environment"] not in {"sandbox", "production"}:
+        raise ConfigError("CLI config environment must be sandbox or production.")
+    if "home" in defaults and "url" in defaults:
+        raise ConfigError("Choose either a local home or a remote URL in CLI config.")
+    for field in ("ca", "home"):
+        if field not in defaults:
+            continue
         try:
-            ca = Path(defaults["ca"]).expanduser()
+            ca = Path(defaults[field]).expanduser()
         except RuntimeError:
             raise ConfigError("Cannot resolve the CLI config CA path.") from None
-        defaults["ca"] = str(ca if ca.is_absolute() else path.parent / ca)
+        defaults[field] = str(ca if ca.is_absolute() else path.parent / ca)
     return argv[1:], defaults

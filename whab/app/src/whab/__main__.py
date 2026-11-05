@@ -15,6 +15,11 @@ from .tls import validate_tls
 def main():
     parser = argparse.ArgumentParser(description="Run WHAB on this computer.")
     parser.add_argument("--version", action="version", version=f"WHAB {__version__}")
+    parser.add_argument("--home", help="Private runtime home (also WHAB_HOME)")
+    parser.add_argument("--environment", choices=("sandbox", "production"), help="Explicit runtime environment")
+    parser.add_argument("--transient", action="store_true", help="Choose a private port and exit when CLI work finishes unless an enabled interface needs a service")
+    parser.add_argument("--serve", action="store_true", help="Keep the headless HTTPS service running explicitly")
+    parser.add_argument("--run-jobs", action="store_true", help="Run due jobs through the active or temporary local host, then exit")
     parser.add_argument("--port", type=int, help="Local HTTPS port (default: PORT or 5173)")
     parser.add_argument("--budget", help="Open a portable .whab budget file")
     parser.add_argument("--budget-password-env", metavar="VARIABLE", help="Read the budget password from this environment variable")
@@ -25,6 +30,17 @@ def main():
         "--reload", action="store_true", help="Reload Python files during development"
     )
     args = parser.parse_args()
+    if args.home:
+        os.environ["WHAB_HOME"] = args.home
+    if args.environment:
+        os.environ["WHAB_ENV"] = args.environment
+    if args.run_jobs:
+        from whab.scheduling import run_due_jobs
+        run_due_jobs(args.home or os.environ.get("WHAB_HOME", os.getcwd()), args.environment or os.environ.get("WHAB_ENV", "sandbox"))
+        return
+    if args.transient:
+        from whab.initialization import initialize_home
+        initialize_home(os.environ.get("WHAB_HOME", os.getcwd()))
     if args.recover_plugins and (args.create is not None or args.copy or args.reload):
         parser.error("Use --recover-plugins separately from --create, --copy and --reload.")
     if (args.create is not None or args.copy) and not args.budget:
@@ -73,6 +89,13 @@ def main():
         validate_tls(settings.tls_cert_file, settings.tls_key_file)
     except ValueError as error:
         parser.error(str(error))
+    if not args.reload and not args.recover_plugins:
+        from whab.hosting import run_host
+        try:
+            run_host(settings, transient=args.transient, persistent=args.serve or not args.transient)
+        except (OSError, ValueError):
+            parser.error("WHAB could not acquire its runtime or HTTPS listener. Reuse the running host or inspect its status.")
+        return
     uvicorn.run(
         "whab.plugins.recovery:create_app" if args.recover_plugins else "whab.app:create_app",
         factory=True,

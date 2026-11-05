@@ -293,7 +293,9 @@ def test_remote_factory_dynamic_invalid_or_mixed_shapes_cannot_claim_live(metada
         metadata_tool.descriptor_metadata(path, "plugin", root)
 
 
-@pytest.mark.parametrize("factory", ["BankAdapter(provider)", "BankAdapter(factory=provider)"])
+@pytest.mark.parametrize("factory", ["BankAdapter(provider)", "BankAdapter(factory=provider)",
+                                     "BankAdapter(provider, sync_interval_seconds=3600)",
+                                     "BankAdapter(provider, 3600)"])
 def test_static_typed_bank_marker_and_private_top_level_code_are_never_executed(metadata_tool, static_repository, factory):
     root, _, module = static_repository
     path = module / '__init__.py'

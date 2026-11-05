@@ -38,6 +38,9 @@ class Settings:
     def load(cls, *, read_plugin_selection=True):
         home = Path(os.environ.get("WHAB_HOME", ROOT)).expanduser().resolve()
         load_dotenv(home / ".env", override=False)
+        # Existing data predates CLI-first setup. Keep its historical defaults;
+        # fresh homes get explicit empty settings during initialization.
+        existing = (home / "data").exists() or (home / "budgets").exists()
         environment = os.getenv("WHAB_ENV", os.getenv("PLAID_ENV", "sandbox"))
         if environment not in {"sandbox", "production"}:
             raise ValueError("WHAB_ENV (or legacy PLAID_ENV) must be sandbox or production.")
@@ -46,7 +49,7 @@ class Settings:
             raise ValueError("PORT must be between 1024 and 65535.")
         optional = tuple(
             name.strip()
-            for name in os.getenv("WHAB_PLUGINS", "plaid").split(",")
+            for name in os.getenv("WHAB_PLUGINS", "plaid" if existing else "").split(",")
             if name.strip()
         )
         # A portable budget has its own manifest; an unrelated legacy selection
@@ -72,7 +75,7 @@ class Settings:
             redirect_uri=os.getenv("PLAID_REDIRECT_URI", ""),
             plugins=optional,
             storage=os.getenv("WHAB_STORAGE", "sqlite").strip(),
-            ui=os.getenv("WHAB_UI", "web").strip(),
+            ui=os.getenv("WHAB_UI", "web" if existing else "").strip(),
             budget_path=Path(os.environ["WHAB_BUDGET"]).expanduser().resolve() if os.getenv("WHAB_BUDGET") else None,
             copy_paths=tuple(Path(path) for path in os.getenv("WHAB_BUDGET_COPIES", "").split(os.pathsep) if path),
             budget_password=os.environ[password_variable] if password_variable else None,

@@ -91,3 +91,17 @@ Open **Settings → Plugins → Plaid → Settings** to connect, manage, reconne
 ## Operation documentation
 
 The packaged [operations.json](src/whab_plugin_plaid/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin plaid`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.
+
+
+## Hourly checks without a visual interface
+
+Plaid 1.5 declares `BankAdapter.sync_interval_seconds=3600`. WHAB 2.56's shared
+job runner calls the existing incremental synchronization operation, preserving
+provider ownership, annotations and atomic transaction/cursor saves. It records
+last attempt/success and sanitized failures and coalesces missed intervals.
+
+Use a local CLI profile to run `whab-cli default.budget sync plaid`, inspect
+`jobs status`, and register macOS wakeups with `jobs enable`. Web UI is optional.
+A running host checks due jobs too; a stopped host can be started by the OS job.
+No new bank connection or forced `/transactions/refresh` is created by scheduling.
+Institution freshness remains provider-dependent. See [Plaid transaction updates](https://plaid.com/docs/transactions/#transactions-updates).

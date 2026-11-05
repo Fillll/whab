@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.56.0 — 2026-11-04
+
+PR: [#149](https://github.com/Fillll/whab/pull/149)
+
+- Coordinate one authenticated local HTTPS host per runtime home/environment, reuse it for CLI and scheduled work, and retire temporary hosts after client leases finish. Keep enabled visual/API interfaces persistent and retain native writer fences and uncertain-write recovery.
+- Start fresh runtimes with storage and CLI access; retain existing runtime selections. Add authenticated local plugin management and provider-declared hourly bank jobs with durable status, catch-up and macOS scheduling.
+- Release installed bank provider workers after each operation while retaining host-owned continuation journals.
+
 ## 2.55.1 — 2026-11-01
 
 PR: [#146](https://github.com/Fillll/whab/pull/146)

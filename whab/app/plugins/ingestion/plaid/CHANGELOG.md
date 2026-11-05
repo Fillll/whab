@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.5.0 — 2026-11-04
+
+PR: [#149](https://github.com/Fillll/whab/pull/149)
+
+- Declare an hourly synchronization interval through the public bank adapter. Use the host job runner and existing incremental sync/atomic cursor contract without forcing bank refreshes.
+
 ## 1.4.1 — 2026-11-01
 
 PR: [#142](https://github.com/Fillll/whab/pull/142)

@@ -92,7 +92,10 @@ def adapter_info(plugin):
             "ui": ui_info(plugin.ui),
             "categorization": plugin.categorization is not None,
             "remote_client": client_record(plugin.storage) if type(plugin.storage) is RemoteLedgerClient else None,
-            "bank": {"ui": plugin.bank_ui is not None} if type(plugin.bank) is BankAdapter else None}
+            "bank": ({"ui": plugin.bank_ui is not None,
+                      **({"sync_interval_seconds": plugin.bank.sync_interval_seconds}
+                         if plugin.bank.sync_interval_seconds is not None else {})}
+                     if type(plugin.bank) is BankAdapter else None)}
 
 
 def contract_info(plugin):
@@ -134,8 +137,14 @@ def validate_adapter_info(value):
     if type(value["merchant_logos"]) is not bool or type(value["categorization"]) is not bool:
         raise WireError()
     provider = value['bank']
-    if provider is not None and (type(provider) is not dict or provider.keys() != {'ui'} or type(provider['ui']) is not bool):
-        raise WireError()
+    if provider is not None:
+        if (type(provider) is not dict or not {'ui'} <= provider.keys() <= {'ui', 'sync_interval_seconds'}
+                or type(provider['ui']) is not bool):
+            raise WireError()
+        try:
+            BankAdapter(lambda _: None, provider.get('sync_interval_seconds'))
+        except ValueError:
+            raise WireError() from None
     bank = value["bank_logos"]
     if bank is not None:
         if type(bank) is not dict or set(bank) != {"domain", "cache", "provider_name", "provider_url"} or type(bank["domain"]) is not bool or type(bank["cache"]) is not bool:

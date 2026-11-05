@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0 — 2026-11-04
+
+PR: [#149](https://github.com/Fillll/whab/pull/149)
+
+- Add local JSON profiles with home/environment, automatic authenticated host acquisition, plugin management, bank sync and scheduled-job commands. Preserve remote profiles, offline discovery and explicit financial intent validation.
+
 ## 1.3.0 — 2026-11-01
 
 PR: [#148](https://github.com/Fillll/whab/pull/148)

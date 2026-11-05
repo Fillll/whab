@@ -795,6 +795,9 @@ class Manager:
             # created configuration may be aligned with the chosen launch port.
             path = home / ".env"
             text = path.read_text()
+            # Opening the native browser launcher is an explicit request for Web.
+            # CLI setup remains headless; existing runtime choices are preserved.
+            text = re.sub(r"^WHAB_UI=$", "WHAB_UI=web", text, flags=re.MULTILINE)
             text, count = re.subn(r"^PORT=.*$", f"PORT={port}", text, flags=re.MULTILINE)
             if not count:
                 text += f"\nPORT={port}\n"

@@ -6,6 +6,12 @@ A Python budgeting app with monthly envelopes and rollover, transaction review, 
 
 ## Run locally
 
+For CLI-only operation, install the host, CLI and storage packages, then run
+`whab-cli --home /absolute/path/to/private/runtime query accounts`. A fresh home
+is initialized privately and its temporary HTTPS host exits after the command.
+Use `plugins enable web` with the same home to request a persistent browser
+interface. See [local CLI profiles and scheduled bank jobs](plugins/interface/cli/README.md#local-operation).
+
 Use the [macOS launcher](../launchers/macos/README.md) for native installation and process controls. Source development requires **Python 3.14 or newer**. [Existing checkouts must preserve their runtime home](../README.md#existing-development-checkouts) before running setup from the new location. Run application commands from `whab/app/`:
 
 ```sh
@@ -30,8 +36,8 @@ Installing a plugin does not enable it. Settings selects installed optional plug
 | `WHAB_BUDGET` | Unset | Portable `.whab` file to open; also available as `--budget` |
 | `WHAB_ENV` | `sandbox` | Sandbox or production data; `PLAID_ENV` is the legacy fallback |
 | `WHAB_STORAGE` | `sqlite` | Primary storage for the original workspace and CLI budget creation; existing portable budgets use their manifest |
-| `WHAB_UI` | `web` | Visual interface; an empty value runs APIs headlessly |
-| `WHAB_PLUGINS` | `plaid` | Original workspace's optional extensions when no saved `plugins.json` exists; portable budgets use their manifest |
+| `WHAB_UI` | Empty for a fresh home | Optional visual interface; existing homes retain their selection/legacy `web` default |
+| `WHAB_PLUGINS` | Empty for a fresh home | Optional extensions; existing homes retain saved selections/legacy defaults and portable budgets use their manifest |
 | `WHAB_TLS_CERT_FILE` / `WHAB_TLS_KEY_FILE` | `tls/server.crt` / `tls/server.key` | HTTPS certificate and key; override both together, with absolute paths or paths relative to the runtime home |
 
 <a id="limits-and-data-safety"></a>
