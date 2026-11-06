@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from whab.hosting import current_owner
-from whab.plugins import InterfaceContext
+from whab.plugins import InterfaceContext, PluginError
 from whab.plugins.interface_adapter import RemoteLedgerInterface
 from whab.web.interface_adapter import BoundRemoteInterface, RemoteCommand, RemoteQuery
 
@@ -134,7 +134,17 @@ def create_router(app):
         else:
             selected = set(manager.projection()["configured"])
             selected.add(body.plugin) if body.action == "enable" else selected.discard(body.plugin)
-            await manager.live.activate(tuple(sorted(selected)))
+            selection = tuple(sorted(selected))
+            try:
+                await run_in_threadpool(manager.preflight_live, selection)
+            except PluginError as error:
+                if error.code != "restart_required":
+                    raise
+                # Persist only a validated startup selection. Never fall back
+                # after activation, where a transition may have committed.
+                await run_in_threadpool(manager.save, selection)
+            else:
+                await manager.live.activate(selection)
         return await run_in_threadpool(plugin_projection)
 
     @router.post("/sync")

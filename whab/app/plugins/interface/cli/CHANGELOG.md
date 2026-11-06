@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1 — 2026-11-04
+
+PR: [#151](https://github.com/Fillll/whab/pull/151)
+
+- Document restart-required plugin enable/disable results: the host saves the requested selection and reports `restart_required`, while supported changes continue to apply live.
+
 ## 1.4.0 — 2026-11-04
 
 PR: [#149](https://github.com/Fillll/whab/pull/149)

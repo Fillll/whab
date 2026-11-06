@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.56.2 — 2026-11-04
+
+PR: [#151](https://github.com/Fillll/whab/pull/151)
+
+- Save validated CLI plugin selections for the next startup when preflight requires a restart, returning restart status instead of failing live activation. Preserve busy/invalid rejections and never fall back after activation starts.
+
 ## 2.56.1 — 2026-11-04
 
 PR: [#150](https://github.com/Fillll/whab/pull/150)

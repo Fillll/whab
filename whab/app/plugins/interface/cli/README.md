@@ -60,6 +60,12 @@ honors enabled providers' intervals. Other operating systems can schedule
 scheduler; automatic registration currently supports macOS. No public webhook
 receiver is needed for polling.
 
+Plugin enable/disable applies supported changes live. If preflight reports that a
+plugin requires restart, the host validates and saves the requested selection
+without replacing the running plugins; the response has `restart_required: true`.
+Restart WHAB to apply it. Busy, invalid and failed live transitions remain errors
+and never trigger a fallback write.
+
 Local management is personal-workspace only. Commands return JSON and errors are
 sanitized. Plugin changes use existing live transitions, including browser edit
 draining for visual changes; unsupported live changes report their limitation.
