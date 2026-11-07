@@ -43,9 +43,13 @@ YNAB's exported Activity and Available values are validated but are not stored a
 
 The parser never extracts archive members. It bounds compressed and expanded sizes, member counts and row counts; rejects unsafe paths, symlinks, encrypted members, malformed tables, ambiguous table duplicates and unsupported monetary formats. Errors do not include private record contents.
 
-Text decoding failures report the encoding and byte offset without showing table
-contents. Re-export from YNAB as UTF-8 or BOM-marked UTF-16 when decoding fails;
-the importer does not guess a legacy encoding or discard invalid characters.
+Some YNAB exports encode a Unicode character as two UTF-8 surrogate code units
+(CESU-8). The parser losslessly normalizes complete pairs, preserving the same
+text and deterministic IDs as a standard UTF-8 export. Lone surrogates and other
+invalid bytes remain rejected. It never guesses a legacy encoding or drops or
+replaces characters. Text decoding failures report the decoder and byte
+offset without showing table contents; re-export as UTF-8 or BOM-marked UTF-16
+when decoding still fails.
 Malformed CSV/TSV and unsupported ZIP compression have separate authored errors.
 
 Run from `whab/app/`:

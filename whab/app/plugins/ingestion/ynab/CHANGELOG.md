@@ -4,7 +4,8 @@
 
 PR: [#156](https://github.com/Fillll/whab/pull/156)
 
-- Give encoding failures a decoder/byte-offset diagnostic and re-export guidance without exposing table contents. Distinguish malformed CSV/TSV and unsupported ZIP compression errors while preserving accepted encodings, validation and archive limits.
+- Losslessly normalize complete UTF-8 surrogate pairs emitted by some YNAB exports, preserving text and the same deterministic transaction IDs as standard UTF-8. Continue to reject lone surrogates and invalid bytes without guessing a legacy encoding or dropping characters.
+- Give encoding failures a decoder/byte-offset diagnostic and re-export guidance without exposing table contents. Distinguish malformed CSV/TSV and unsupported ZIP compression errors while preserving validation and archive limits.
 
 ## 1.4.3 — 2026-11-06
 
