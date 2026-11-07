@@ -60,10 +60,10 @@
     {% if item.error %} · {{ item.error }}
     {% endif %}
   </p>
-  </div>
   {% for link in item.accountLinks %}
   <p>{% if link.mask %}Account ending {{ link.mask }} → {% endif %}<strong>{{ link.name }}</strong> · {{ 'Transactions since ' ~ link.since if link.since else 'All available history' }}</p>
   {% endfor %}
+  </div>
   <div class="connection-actions">
     <button class="text-link" data-plaid-setup="{{ item.id }}">Sync setup</button>
     <button class="text-link" data-plaid-connect="{{ item.id }}">{{ 'Reconnect' if item.status=='reconnect' else 'Manage' }}</button><button class="disconnect-button"

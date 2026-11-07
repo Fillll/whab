@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.6.1 — 2026-11-07
+
+PR: [#162](https://github.com/Fillll/whab/pull/162)
+
+- Stack linked-account summaries within the bank-details column so connections with several accounts keep readable destinations and accessible Sync setup and management controls.
+
 ## 1.6.0 — 2026-11-07
 
 PR: [#160](https://github.com/Fillll/whab/pull/160)
