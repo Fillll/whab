@@ -2,6 +2,8 @@
 
 Use the [contribution guide](../app/CONTRIBUTING.md) for installation, task ownership, checks and PR policy. This guide covers reproducible previews, verification of running changes and troubleshooting. All application commands below run from `whab/app/`.
 
+All product exploration must be possible through the CLI, starting with `whab --help`.
+
 ## Isolated preview
 
 Install the development environment using the contribution guide, then run:
