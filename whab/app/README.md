@@ -4,6 +4,15 @@
 
 A Python budgeting app with monthly envelopes and rollover, transaction review, spending analytics and manual accounts. Independently packaged plugins supply interfaces, storage, imports, reports and automation. See the [product overview](../../README.md), [architecture](../docs/architecture.md) and [changelog](CHANGELOG.md). The host version comes from [`src/whab/__init__.py`](src/whab/__init__.py); installed plugin versions come from their distribution metadata.
 
+## Command line
+
+The CLI plugin installs `whab`. Start with `whab --help`, then
+`whab budget create --help`. Name-addressed commands create budgets, manage
+plugins and read reports through the existing local host. CLI commands default
+to production; choose `--environment sandbox` explicitly for tests. See the
+[CLI guide](plugins/interface/cli/README.md#simple-console) for default profiles
+and examples. The detailed `whab-cli` interface remains available.
+
 ## Run locally
 
 For CLI-only operation, install the host, CLI and storage packages, then run

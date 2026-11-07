@@ -86,3 +86,68 @@ def test_local_plugin_restart_selection_is_saved_without_live_activation(store, 
         live.activate.side_effect = None
         assert client.post(path, json=body).status_code == 200
         live.activate.assert_awaited_with(("retained",))
+
+
+def test_local_budget_creation_is_authenticated_empty_and_preserves_paths(store, tmp_path, monkeypatch):
+    from tests.budgets.helpers import decode_budget
+
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
+    app = create_app(store=store, settings=settings, plugins=PluginRegistry(()))
+    owner = hosting.HostOwner(settings)
+    owner.app = app
+    monkeypatch.setattr(hosting, "_OWNER", owner)
+    path = tmp_path / "chosen" / "fictional.whab"
+    with TestClient(app, base_url="https://localhost:5173") as client:
+        url = "/api/local/v1/budgets"
+        body = {"name": "Fictional CLI budget", "path": str(path)}
+        assert client.post(url, json=body).status_code == 401
+        assert not path.exists()
+        client.headers["Authorization"] = "Bearer " + owner.token
+        created = client.post(url, json=body)
+        assert created.status_code == 200, created.text
+        result = created.json()
+        assert result["path"] == str(path) and result["storage"] == "sqlite"
+        assert result["id"] in {row["id"] for row in client.get(url).json()["budgets"]}
+        manifest, ledger = decode_budget(path.read_bytes())
+        assert manifest["name"] == body["name"]
+        assert ledger["accounts"] == ledger["transactions"] == ledger["assignments"] == []
+        selection = client.get(f'/budgets/{result["id"]}/api/local/v1/plugins').json()
+        assert selection["configured"] == []
+        original = path.read_bytes()
+        assert client.post(url, json=body).status_code == 400
+        assert client.post(url, json={"name": result["id"]}).status_code == 400
+        assert client.post(url, json={**body, "name": "Another name"}).status_code == 400
+        assert path.read_bytes() == original
+        assert client.post(url, json={"name": "default"}).status_code == 400
+        assert client.post(url, json={"name": " ", "path": str(tmp_path / "blank.whab")}).status_code == 400
+        assert client.post(url, json={"name": "Other", "path": "relative.whab"}).status_code == 400
+        assert client.post(url, json={"name": "Other", "path": str(tmp_path / "wrong.txt")}).status_code == 400
+        managed = client.post(url, json={"name": "Managed"})
+        assert managed.status_code == 200
+        assert managed.json()["path"].startswith(str(tmp_path / "budgets"))
+        assert client.post("/budgets/demo/api/local/v1/budgets", json={"name": "Demo write"}).status_code == 403
+        assert client.get("/budgets/demo/api/local/v1/budgets").status_code == 403
+        # Creation leaves the original address and authority unchanged.
+        assert app.state.host.default_id == "default"
+
+
+def test_local_summary_uses_core_currency_projection_and_budget_lease(store, tmp_path, monkeypatch):
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
+    app = create_app(store=store, settings=settings, plugins=PluginRegistry(()))
+    owner = hosting.HostOwner(settings)
+    owner.app = app
+    monkeypatch.setattr(hosting, "_OWNER", owner)
+    store.add_account("personal", {"name": "USD account", "type": "depository", "balance": 1000, "currency": "USD"})
+    store.add_account("personal", {"name": "EUR account", "type": "depository", "balance": 3000, "currency": "EUR"})
+    with TestClient(app, base_url="https://localhost:5173") as client:
+        client.headers["Authorization"] = "Bearer " + owner.token
+        response = client.get("/budgets/default/api/local/v1/summary", params={"month": "2026-11", "currency": "EUR"})
+        assert response.status_code == 200, response.text
+        value = response.json()
+        assert value["budgetId"] == "default" and value["revision"]
+        assert value["data"]["currency"] == "EUR" and value["data"]["month"] == "2026-11"
+        expected = store.workspace("personal", "2026-11")["summariesByCurrency"]["EUR"]
+        assert value["data"]["summary"] == expected
+        assert client.get("/budgets/default/api/local/v1/summary", params={"currency": "bad"}).status_code == 400
+        assert client.get("/budgets/default/api/local/v1/summary", params={"month": "not-a-month"}).status_code == 400
+        assert client.get("/budgets/demo/api/local/v1/summary").status_code == 403

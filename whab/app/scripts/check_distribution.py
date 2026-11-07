@@ -57,6 +57,18 @@ for args in (["--help"], ["command", "edit_transaction", "--help"],
         except SystemExit as exit:
             assert exit.code == 0
     assert "Examples:" in output.getvalue() or "Installed plugin documentation" in output.getvalue()
+from whab_plugin_cli.console import main as console_main
+for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
+             ["plugin", "--help"], ["fictional", "plugin", "--help"],
+             ["fictional", "insights", "summary", "--help"],
+             ["fictional", "trnx", "non-reviewed", "--help"]):
+    with redirect_stdout(StringIO()) as output:
+        try:
+            console_main(args)
+        except SystemExit as exit:
+            assert exit.code == 0
+    assert "usage:" in output.getvalue()
+assert any(entry.name == "whab" for entry in metadata.distribution("whab_plugin_cli").entry_points)
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]
 assert not metadata.distribution("whab").entry_points
@@ -351,7 +363,7 @@ def main():
         assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", "ai-credentials", "subscriptions", "subscriptions-ai", "cli", *teaching}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {
-            f'{record["distribution"]}>={record["version"]},<2'
+            f'{record["distribution"]}>={record["version"]},<{int(record["version"].split(".")[0]) + 1}'
             for identifier, record in expected.items() if identifier not in {"whab", *teaching}
         }
         run(

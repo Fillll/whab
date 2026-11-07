@@ -26,7 +26,7 @@ def parser(argv=(), *, defaults=None):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     root.add_argument("--url", help="HTTPS server origin; omit for offline documentation")
     root.add_argument("--home", help="Local runtime home; reuse its host or start a temporary host")
-    root.add_argument("--environment", choices=("sandbox", "production"), default="sandbox", help="Local runtime environment (default: %(default)s)")
+    root.add_argument("--environment", choices=("sandbox", "production"), default="production", help="Local runtime environment (default: %(default)s)")
     root.add_argument("--budget", help="Stable budget ID; required for online operations")
     root.add_argument("--token-env", default="WHAB_CLI_TOKEN", help="Environment variable containing the server access token (default: %(default)s)")
     root.add_argument("--ca", help="Explicit CA certificate file; otherwise use system trust")

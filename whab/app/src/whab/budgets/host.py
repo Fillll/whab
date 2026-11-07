@@ -201,6 +201,28 @@ class BudgetHost:
         async with self._open_lock:
             return await self._open(raw=raw, name=name, as_copy=as_copy, password=password)
 
+    async def create_empty(self, name, path=None):
+        """Create a separate empty local authority without inheriting features."""
+        manifest = new_manifest(name, storage="sqlite")
+        name = manifest["name"]
+        async with self._open_lock:
+            if name.casefold() in {"default", "demo", "budget", "plugin", "api", "budget_name"}:
+                raise StoreError("Choose a budget name other than a reserved command or workspace name.")
+            if any(name.casefold() in {row["name"].casefold(), row["id"].casefold()}
+                   for row in self.list(self.default_id)["budgets"]):
+                raise StoreError("That budget name is already registered. Choose another name or use its existing ID.")
+            if path is not None:
+                path = Path(path).expanduser()
+                if not path.is_absolute() or path.suffix.lower() != ".whab":
+                    raise StoreError("Choose an absolute .whab file location.")
+                if path.exists():
+                    raise StoreError("Choose an unused budget file location.")
+            session = BudgetSession.create(self.settings.home, self.settings.plaid_env, name, storage="sqlite", path=path)
+            # BudgetSession's first save also refuses a file created after the
+            # existence check; creation never grants overwrite authority.
+            await self._start(session)
+            return {"id": session.id, "name": session.name, "path": str(session.path), "storage": "sqlite"}
+
     async def activate(self, budget_id, password=None):
         async with self._open_lock:
             if budget_id in self.applications:

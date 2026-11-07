@@ -53,6 +53,12 @@ class SyncBody(BaseModel):
     due: bool = False
 
 
+class CreateBudgetBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    name: str = Field(min_length=1, max_length=100)
+    path: str | None = Field(default=None, min_length=1, max_length=4096)
+
+
 def create_router(app):
     router = APIRouter(prefix=PREFIX)
 
@@ -72,6 +78,29 @@ def create_router(app):
         owner = current_owner()
         return {**app.state.plugin_manager.projection(),
                 "host_url": f"https://localhost:{owner.settings.port}"}
+
+    @router.get("/budgets")
+    def budgets(request: Request):
+        personal(request)
+        return app.state.host.list(app.state.host.default_id)
+
+    @router.post("/budgets")
+    async def create_budget(request: Request, body: CreateBudgetBody):
+        personal(request)
+        return await app.state.host.create_empty(body.name, body.path)
+
+    @router.get("/summary")
+    async def summary(request: Request, month: str | None = None, currency: str = "USD"):
+        from whab.domain.budget import select_currency
+
+        personal(request)
+        async with app.state.budget_runtime.request():
+            selected = binding()
+            result = await run_in_threadpool(selected.query, selected.context.budget_id, "workspace", "personal", month)
+            view = select_currency(result["data"], currency)
+            return {"budgetId": result["budgetId"], "revision": result["revision"],
+                    "data": {"month": view["month"], "currency": view["currency"],
+                             "currencyMinorUnits": view["currencyMinorUnits"], "summary": view["summary"]}}
 
     @router.post("/leases")
     def acquire(body: LeaseBody):
