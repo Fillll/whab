@@ -108,7 +108,7 @@ test('multiple accounts use repeated stable IDs and a single account keeps its r
 
 test('relative date presets replace legacy all dates and custom bounds while retaining account and review scope', () => {
   const navigate = navigation('https://localhost:5173/budgets/home/transactions/2026-10/usd?account=first&all_dates=true&period=custom&start_date=2026-09-10&end_date=2026-10-10&review=needs-review');
-  for (const period of ['current-month', 'previous-month']) {
+  for (const period of ['current-month', 'previous-month', 'current-year', 'previous-year']) {
     const preset = navigate({period, month: 'current-month'});
     assert.equal(preset.pathname, '/budgets/home/transactions/current-month/usd');
     assert.equal(preset.searchParams.get('period'), period);

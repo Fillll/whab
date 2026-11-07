@@ -23,11 +23,15 @@ def transaction_period(month, month_token, selection, start, end, all_dates):
     legacy_month = selection is None and not all_dates and not start and not end
     if selection is None:
         selection = "all" if all_dates else "custom" if start or end or month_token != "current-month" else "current-month"
-    if selection not in {"current-month", "previous-month", "custom", "all"}:
+    if selection not in {"current-month", "previous-month", "current-year", "previous-year", "custom", "all"}:
         raise ValueError("Invalid transaction period.")
-    if selection in {"current-month", "previous-month"}:
-        month = current_month() if selection == "current-month" else shift_month(current_month(), -1)
-    if selection in {"current-month", "previous-month"} or legacy_month:
+    if selection in {"current-year", "previous-year"}:
+        year = int(current_month()[:4]) - (selection == "previous-year")
+        month = f"{year:04d}-01"
+        start, end = f"{year:04d}-01-01", f"{year:04d}-12-31"
+    elif selection in {"current-month", "previous-month"} or legacy_month:
+        if selection in {"current-month", "previous-month"}:
+            month = current_month() if selection == "current-month" else shift_month(current_month(), -1)
         year, number = map(int, month.split("-"))
         start, end = month + "-01", f"{month}-{monthrange(year, number)[1]:02d}"
     elif selection == "all":
@@ -42,7 +46,9 @@ def transaction_period(month, month_token, selection, start, end, all_dates):
         year, number = map(int, start[:7].split("-"))
         if start.endswith("-01") and int(end[-2:]) == monthrange(year, number)[1]:
             query_month = start[:7]
-    if query_month:
+    if selection in {"current-year", "previous-year"}:
+        label = start[:4]
+    elif query_month:
         label = f"{month_name[int(query_month[-2:])]} {query_month[:4]}"
     elif start and end:
         label = f"{start} – {end}"
