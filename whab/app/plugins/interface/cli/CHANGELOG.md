@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0 — 2026-11-07
+
+PR: [#164](https://github.com/Fillll/whab/pull/164)
+
+- Add bank investments through both whab and whab-cli, with explicit connection, optional provider-account filter and inclusive activity dates. Document financial units, basis coverage, current-snapshot semantics and unavailable acquisition/realized history.
+
 ## 2.2.1 — 2026-11-07
 
 PR: [#163](https://github.com/Fillll/whab/pull/163)

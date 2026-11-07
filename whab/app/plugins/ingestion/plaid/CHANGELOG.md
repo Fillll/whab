@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.7.0 — 2026-11-07
+
+PR: [#164](https://github.com/Fillll/whab/pull/164)
+
+- Read holdings and paginated investment activity from already-active, consented Items. Add an in-place Investments view with account/history filters, current position values, basis, unrealized money/percentage returns and activity; keep unsupported dates and realized returns unavailable.
+
 ## 1.6.1 — 2026-11-07
 
 PR: [#162](https://github.com/Fillll/whab/pull/162)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.60.0 — 2026-11-07
+
+PR: [#164](https://github.com/Fillll/whab/pull/164)
+
+- Add optional read-only investment provider reports with validated position/activity DTOs, exact unrealized returns, defensible addition-date provenance and separately covered currency totals. Expose the shared report through guarded local bank operations without changing ledger imports or cursors.
+
 ## 2.59.1 — 2026-11-07
 
 PR: [#163](https://github.com/Fillll/whab/pull/163)
