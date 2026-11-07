@@ -15,6 +15,7 @@ from whab.plugins.documentation import installed_catalog
 from whab.plugins.local import local_connection
 
 from . import client
+from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import selection_error
 from .help import describe, overview
@@ -56,6 +57,7 @@ def parser(options):
         epilog="Example: whab empty-budget plugin enable ynab-zip-importer\nChanges apply live where supported; otherwise restart_required is returned. CLI is an installed management tool, not a budget toggle. Required storage cannot be disabled. Web is optional and can be disabled.")
     plugins.add_argument("action", choices=("list", "status", "enable", "disable"))
     plugins.add_argument("plugin", nargs="?", help="Identifier from whab plugin list; required for enable/disable")
+    add_bank_parser(commands)
     imports = commands.add_parser("import", help="Preview or commit a ZIP import into this empty budget",
         epilog="Enable an importer first: whab BUDGET plugin enable ynab-zip-importer\nThen: whab BUDGET import ynab-zip-importer preview --help",
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -103,7 +105,7 @@ def configuration(args):
     return str(Path(home).expanduser().resolve()), environment, args.ca or defaults.get("ca")
 
 
-def exchange(connection, method, path, *, import_errors=False, plugin_errors=False, **kwargs):
+def exchange(connection, method, path, *, import_errors=False, plugin_errors=False, bank_errors=False, **kwargs):
     with connection.stream(method, path, **kwargs) as response:
         raw = bytearray()
         for chunk in response.iter_bytes():
@@ -111,6 +113,10 @@ def exchange(connection, method, path, *, import_errors=False, plugin_errors=Fal
             if len(raw) > 16 * 1024 * 1024:
                 raise CommandError("WHAB response exceeds 16 MiB.")
         if response.status_code != 200:
+            if bank_errors and response.status_code in {400, 409}:
+                message = bank_error(raw)
+                if message:
+                    raise CommandError(message)
             if plugin_errors and response.status_code in {400, 409}:
                 message = selection_error(raw)
                 if message:
@@ -186,6 +192,9 @@ def execute(args, home, environment, ca):
                 json={"name": args.name, "path": create_path(args.name, args.path)})
         identifier = resolve_budget(connection, args.target)
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
+        if args.command == "bank":
+            method, path, kwargs = bank_request(args, identifier)
+            return exchange(connection, method, path, bank_errors=True, **kwargs)
         if args.command == "import":
             return execute_import(connection, identifier, args, raw, fingerprint)
         if args.command == "plugin":

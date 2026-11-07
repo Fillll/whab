@@ -83,6 +83,7 @@ class BankLifecycle:
         self._workers = set()
         self.background_scope = None
         self.allow_banks = allow_banks
+        self.automatic_sync = lambda _owner: True
         self._closed = False
         try:
             self.cipher = BankCipher(settings.encryption_key)
@@ -161,7 +162,9 @@ class BankLifecycle:
                     service = BankCoordinator(provider, self.tracked, self.bank_store(plugin.id),
                         budget_id=self.budget_id, environment=self.settings.plaid_env, provider_id=plugin.id,
                         generation=generation, journal=self._journal(plugin.id), cipher=self.cipher,
-                        code_identity=identity, background_scope=self.background_scope)
+                        code_identity=identity, background_scope=self.background_scope,
+                        requires_account_setup=plugin.bank.requires_account_setup,
+                        automatic_sync=lambda: self.automatic_sync(plugin.id))
             else:
                 service = plugin.bank(BankContext(self.bank_store(plugin.id), self.settings.bank_configuration(plugin.id),
                     self.settings.plaid_env, self.settings.encryption_key,

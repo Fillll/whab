@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 from uuid import UUID
 
+from whab.domain.bank_setup import validate_sync_settings
 from whab.domain.errors import StoreError
 from whab.domain.imports import bank_identifier
 from whab.domain.ledger_state import initial_state, portable_snapshot, restore_snapshot
@@ -168,7 +169,9 @@ def _read_ledger(value, workspace, *, portable=False, complete_associations=Fals
     if workspace == "demo" and (value["items"] or (value["associations"] and not complete_associations)):
         _invalid()
     for record in _records(value["items"], 1000):
-        _exact(record, _ITEM_FIELDS)
+        _exact(record, _ITEM_FIELDS | ({"syncSettings"} if "syncSettings" in record else set()))
+        if "syncSettings" in record:
+            validate_sync_settings(record["syncSettings"])
         _text(record["id"], limit=4096)
         identifier = bank_identifier(record["id"], limit=4096)
         if identifier in state["items"]:

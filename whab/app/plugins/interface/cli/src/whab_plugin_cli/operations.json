@@ -1024,6 +1024,313 @@
       ],
       "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
       "availability": "whab BUDGET import PLUGIN commit FILE --currency USD --fingerprint SHA256_FROM_PREVIEW; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints."
+    },
+    {
+      "name": "bank.connections",
+      "kind": "local",
+      "summary": "List connected institutions and their WHAB account destinations.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Safe connection/account setup projection, synchronization counters, update-policy status or background registration result. Bank access tokens, encrypted credentials and cursors are excluded.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "Read-only local saved connection metadata.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "errors": [
+        "Invalid account, date, currency or duplicate destination is rejected atomically.",
+        "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
+        "A linked destination cannot be reassigned after an explicit account setup; existing overlapping history is not automatically matched."
+      ],
+      "retry": "Read status after an uncertain save. Do not recreate a bank connection or blindly replay a financial write. Replaying provider transactions uses stable transaction IDs.",
+      "availability": "WHAB 2.59+ with a typed bank adapter; Plaid 1.6+ and CLI 2.2+ supply these controls. Manual budgeting requires no bank provider."
+    },
+    {
+      "name": "bank.preview",
+      "kind": "local",
+      "summary": "Review provider accounts and possible WHAB destinations before importing.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "Identifier from the addressed connection or budget."
+          }
+        },
+        "required": [
+          "itemId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Safe connection/account setup projection, synchronization counters, update-policy status or background registration result. Bank access tokens, encrypted credentials and cursors are excluded.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "itemId": "fictional-item"
+          },
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "Fetches provider data for review without importing transactions or advancing the saved cursor.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "errors": [
+        "Invalid account, date, currency or duplicate destination is rejected atomically.",
+        "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
+        "A linked destination cannot be reassigned after an explicit account setup; existing overlapping history is not automatically matched."
+      ],
+      "retry": "Read status after an uncertain save. Do not recreate a bank connection or blindly replay a financial write. Replaying provider transactions uses stable transaction IDs.",
+      "availability": "WHAB 2.59+ with a typed bank adapter; Plaid 1.6+ and CLI 2.2+ supply these controls. Manual budgeting requires no bank provider."
+    },
+    {
+      "name": "bank.configure",
+      "kind": "local",
+      "summary": "Save explicit account destinations and inclusive history cutoffs.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "Identifier from the addressed connection or budget."
+          },
+          "accounts": {
+            "type": "array",
+            "description": "Explicit account links and history choices. Select at least one; skipped accounts are omitted.",
+            "items": {
+              "type": "object",
+              "description": "One explicitly selected bank account and its destination. Omitted accounts do not import.",
+              "properties": {
+                "bankAccountId": {
+                  "type": "string",
+                  "description": "Identifier from the addressed connection or budget."
+                },
+                "accountId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Existing same-currency WHAB account ID, or null to create a new account."
+                },
+                "since": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "ISO YYYY-MM-DD start date, inclusive; explicit null imports all available history."
+                }
+              },
+              "required": [
+                "bankAccountId",
+                "accountId",
+                "since"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "itemId",
+          "accounts"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Safe connection/account setup projection, synchronization counters, update-policy status or background registration result. Bank access tokens, encrypted credentials and cursors are excluded.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "itemId": "fictional-item",
+            "accounts": [
+              {
+                "bankAccountId": "fictional-bank-account",
+                "accountId": "fictional-whab-account",
+                "since": "2026-10-01"
+              }
+            ]
+          },
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "Atomically saves links, joins an existing auto-created account when selected, retains transaction IDs/annotations and resets the cursor for idempotent replay. Does not delete old history or start synchronization.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "errors": [
+        "Invalid account, date, currency or duplicate destination is rejected atomically.",
+        "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
+        "A linked destination cannot be reassigned after an explicit account setup; existing overlapping history is not automatically matched."
+      ],
+      "retry": "Read status after an uncertain save. Do not recreate a bank connection or blindly replay a financial write. Replaying provider transactions uses stable transaction IDs.",
+      "availability": "WHAB 2.59+ with a typed bank adapter; Plaid 1.6+ and CLI 2.2+ supply these controls. Manual budgeting requires no bank provider."
+    },
+    {
+      "name": "bank.sync",
+      "kind": "local",
+      "summary": "Check the selected connection, or configured connections, immediately.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {
+          "itemId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Connection ID, or null for all configured connections."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Safe connection/account setup projection, synchronization counters, update-policy status or background registration result. Bank access tokens, encrypted credentials and cursors are excluded.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "itemId": "fictional-item"
+          },
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "Imports configured accounts using saved cutoffs and advances their cursors atomically. No new external bank connection is created.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "errors": [
+        "Invalid account, date, currency or duplicate destination is rejected atomically.",
+        "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
+        "A linked destination cannot be reassigned after an explicit account setup; existing overlapping history is not automatically matched."
+      ],
+      "retry": "Read status after an uncertain save. Do not recreate a bank connection or blindly replay a financial write. Replaying provider transactions uses stable transaction IDs.",
+      "availability": "WHAB 2.59+ with a typed bank adapter; Plaid 1.6+ and CLI 2.2+ supply these controls. Manual budgeting requires no bank provider."
+    },
+    {
+      "name": "bank.schedule",
+      "kind": "local",
+      "summary": "Read or save manual, hourly, three-hourly or six-hourly checks.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {
+          "interval_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Omit for a read. Explicit null means manual only, including no webhook-triggered imports.",
+            "enum": [
+              null,
+              3600,
+              10800,
+              21600
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Safe connection/account setup projection, synchronization counters, update-policy status or background registration result. Bank access tokens, encrypted credentials and cursors are excluded.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "interval_seconds": 10800
+          },
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "With an interval, saves this provider\u2019s budget-local update policy. Does not fetch transactions or register an OS job.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "errors": [
+        "Invalid account, date, currency or duplicate destination is rejected atomically.",
+        "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
+        "A linked destination cannot be reassigned after an explicit account setup; existing overlapping history is not automatically matched."
+      ],
+      "retry": "Read status after an uncertain save. Do not recreate a bank connection or blindly replay a financial write. Replaying provider transactions uses stable transaction IDs.",
+      "availability": "WHAB 2.59+ with a typed bank adapter; Plaid 1.6+ and CLI 2.2+ supply these controls. Manual budgeting requires no bank provider."
+    },
+    {
+      "name": "bank.background",
+      "kind": "local",
+      "summary": "Enable or disable device-owned macOS background wakeups.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Register hourly launchd wakeups when true; unregister them when false. Saved per-budget cadence controls due work."
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Safe connection/account setup projection, synchronization counters, update-policy status or background registration result. Bank access tokens, encrypted credentials and cursors are excluded.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "enabled": true
+          },
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "Registers or removes the existing WHAB launchd task. It can start WHAB to check due jobs in saved budgets. Other platforms use cron with python -m whab --run-jobs.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "errors": [
+        "Invalid account, date, currency or duplicate destination is rejected atomically.",
+        "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
+        "A linked destination cannot be reassigned after an explicit account setup; existing overlapping history is not automatically matched."
+      ],
+      "retry": "Read status after an uncertain save. Do not recreate a bank connection or blindly replay a financial write. Replaying provider transactions uses stable transaction IDs.",
+      "availability": "WHAB 2.59+ with a typed bank adapter; Plaid 1.6+ and CLI 2.2+ supply these controls. Manual budgeting requires no bank provider."
     }
   ]
 }

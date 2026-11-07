@@ -17,7 +17,7 @@ from whab.plugins.storage_transfer import (
     storage_identifier,
 )
 
-_COMMANDS = frozenset({'save_item', 'set_item_status', 'disconnect_item', 'apply_sync'})
+_COMMANDS = frozenset({'save_item', 'set_item_status', 'disconnect_item', 'configure_bank_sync', 'apply_sync'})
 
 
 @dataclass(frozen=True, slots=True)

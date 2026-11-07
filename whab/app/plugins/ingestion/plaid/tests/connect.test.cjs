@@ -64,7 +64,7 @@ function harness({initialPanel = false, sdk = true, href = 'https://localhost:51
     },
   };
   vm.runInNewContext(source, context);
-  return {document, location, requests, notices, redirects, scripts, links, values,
+  return {context, document, location, requests, notices, redirects, scripts, links, values,
     get current() {return current;}, get reloads() {return reloads;},
     replace() {current = panel(); location.href = 'https://localhost:5173/budgets/fictional/accounts/2026-10/usd'; document.dispatchEvent(new Event('whab:page-ready')); return current;},
     ready() {document.dispatchEvent(new Event('whab:page-ready'));},
@@ -434,4 +434,72 @@ test('Finish saving retains its intent on unknown replies and never exchanges a 
   assert.equal(state.values.has('whab-link-context'), true);
   assert.equal(state.requests.filter(request => request.url.endsWith('/exchange')).length, 1);
   assert.equal(state.canNavigate(), true);
+});
+
+test('new setup flow returns to account review without starting an eager import', async () => {
+  const state = harness(); state.replace();
+  state.current.provider.dataset.syncSetup = 'true';
+  const connecting = state.current.buttons['[data-plaid-connect]'][1].emit('click');
+  state.requests[0].reply({link_token: 'fictional-token'}); await connecting;
+  const completing = state.links[0].options.onSuccess('fictional-public-token', {});
+  await tick();
+  assert.equal(state.requests[1].url, '/budgets/fictional/api/plaid/items');
+  state.requests[1].reply({items: []}); await completing;
+  assert.equal(state.requests.some(request => request.url.endsWith('/sync')), false);
+  assert.equal(state.redirects[0].endsWith('#plugin-settings-plaid'), true);
+});
+
+class SetupNode extends Target {
+  constructor(tag = 'div') {super(); this.tag = tag; this.dataset = {}; this.children = []; this.value = ''; this.hidden = false;}
+  append(...children) {for (const child of children) {this.children.push(child); child.parent = this;}}
+  setAttribute(name, value) {this[name] = value;}
+  replaceChildren(...children) {this.children = []; this.append(...children);}
+  scrollIntoView() {}
+  focus() {this.focused = true;}
+  querySelectorAll(selector) {
+    const key = selector.slice(6, -1).replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+    const result = [];
+    for (const child of this.children) {if (Object.hasOwn(child.dataset, key)) result.push(child); result.push(...child.querySelectorAll(selector));}
+    return result;
+  }
+  querySelector(selector) {return this.querySelectorAll(selector)[0] || null;}
+  closest() {return this.parent;}
+}
+
+test('account setup requires explicit history choices and serializes destination/date before sync', async () => {
+  const state = harness(); state.replace();
+  state.document.createElement = tag => new SetupNode(tag);
+  const form = new SetupNode(), choices = new SetupNode(), error = new SetupNode(), save = new SetupNode();
+  choices.dataset.plaidAccountChoices = ''; error.dataset.plaidSetupError = ''; form.append(choices, error, save);
+  save.dataset.plaidSetupSave = '';
+  state.current.buttons['[data-plaid-setup-save]'] = [save];
+  state.ready();
+  state.context.renderSyncSetup(form, {itemId: 'fictional-item', accounts: [{id: 'remote', name: 'Fictional bank', currency: 'USD', mask: '1234', link: null}], destinations: [{id: 'local', name: 'My existing account', currency: 'USD', latestDate: '2026-10-31'}]});
+  const destination = form.querySelector('[data-destination]'), history = form.querySelector('[data-history]'), since = form.querySelector('[data-since]');
+  assert.equal(history.value, ''); assert.equal(since.value, '');
+  destination.value = 'local'; await destination.emit('change');
+  assert.equal(since.value, '');  // Never infer a start date from existing history.
+  await save.emit('click'); assert.equal(error.hidden, false); assert.equal(state.requests.length, 0);
+  history.value = 'date'; await history.emit('change');
+  assert.equal(since.disabled, false);
+  await save.emit('click'); assert.equal(state.requests.length, 0);
+  since.value = '2026-11-01';
+  const saving = save.emit('click');
+  assert.equal(state.requests[0].options.method, 'PUT');
+  assert.deepEqual(JSON.parse(state.requests[0].options.body), {itemId: 'fictional-item', accounts: [{bankAccountId: 'remote', accountId: 'local', since: '2026-11-01'}]});
+  state.requests[0].reply({configured: true}); await tick();
+  assert.equal(state.requests[1].url.endsWith('/sync'), true);
+  state.requests[1].reply({ok: true}); await saving;
+  assert.equal(state.reloads, 1);
+});
+
+test('reopened setup keeps previously excluded accounts out of the import selection', () => {
+  const state = harness(); state.replace();
+  state.document.createElement = tag => new SetupNode(tag);
+  const form = new SetupNode(), choices = new SetupNode(), error = new SetupNode();
+  choices.dataset.plaidAccountChoices = ''; error.dataset.plaidSetupError = ''; form.append(choices, error);
+  state.context.renderSyncSetup(form, {itemId: 'fictional-item', configured: true, accounts: [{id: 'excluded', name: 'Excluded savings', currency: 'USD', link: null}], destinations: []});
+  assert.equal(form.querySelector('[data-destination]').value, 'skip');
+  assert.equal(form.querySelector('[data-history]').disabled, true);
+  assert.equal(form.querySelector('[data-since]').disabled, true);
 });

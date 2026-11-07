@@ -40,7 +40,10 @@ from fastapi.testclient import TestClient
 target = Path(sys.argv[1]).resolve()
 with patch.object(metadata.EntryPoint, "load", side_effect=AssertionError("Documentation must not load hooks")):
     operation_catalog = installed_catalog()
-assert len(operation_catalog["core"]["operations"]) == 20
+assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 20
+assert {row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] == "local"} == {
+    "bank.connections", "bank.preview", "bank.configure", "bank.sync", "bank.schedule", "bank.background",
+}
 assert {row["id"] for row in operation_catalog["plugins"]} == set(expected) - {"whab"}
 assert all(row["documented"] and row["enabled"] is None for row in operation_catalog["plugins"])
 from whab_plugin_cli.client import main as cli_main

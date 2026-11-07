@@ -393,3 +393,53 @@ def test_disconnect_lost_native_reply_reconciles_before_already_disconnected_sho
     run(setup.coordinator.disconnect('fictional-item'))
     setup.coordinator.prepare_close()
     assert [call[0] for call in setup.provider.calls].count('remove_token') == 1
+
+
+def test_new_account_setup_blocks_import_until_user_selects_destinations(setup):
+    value = setup
+    value.coordinator.requires_account_setup = True
+    flow = begin(value)
+    complete(value, flow)
+    with pytest.raises(Exception, match='destination accounts'):
+        run(value.coordinator.sync('fictional-item'))
+    assert value.store.get_item('fictional-item')['cursor'] is None
+    # Reviewing provider accounts must never advance the native cursor.
+    original = value.provider.call
+    remote = {'id': 'bank-account', 'name': 'Fictional checking', 'mask': '1234', 'institution': 'Fictional bank',
+              'type': 'depository', 'balance': 100, 'currency': 'USD', 'source': 'fictional-bank', 'itemId': 'fictional-item'}
+    def call(command, **values):
+        result = original(command, **values)
+        if command == 'read_sync':
+            result['accounts'] = [remote]
+        return result
+    value.provider.call = call
+    preview = run(value.coordinator.sync_preview('fictional-item'))
+    assert preview['accounts'][0]['name'] == 'Fictional checking'
+    assert not preview['configured'] and value.store.get_item('fictional-item')['cursor'] is None
+    assert run(value.coordinator.configure_sync('fictional-item', [{'bankAccountId': 'bank-account', 'accountId': None, 'since': '2026-10-01'}]))['configured']
+    assert run(value.coordinator.sync('fictional-item')) == {'added': 0, 'modified': 0, 'removed': 0}
+    assert value.store.get_item('fictional-item')['cursor'] == 'fictional-next-cursor'
+    value.coordinator.automatic_sync = lambda: False
+    value.coordinator.queue_sync('fictional-item')
+    assert not value.coordinator._queued
+
+
+def test_bulk_sync_metadata_wait_does_not_block_the_event_loop(setup):
+    flow = begin(setup)
+    complete(setup, flow)
+    entered, release = threading.Event(), threading.Event()
+    original = setup.store.items
+    def blocked_items():
+        entered.set()
+        assert release.wait(5)
+        return original()
+    setup.store.items = blocked_items
+    async def scenario():
+        task = asyncio.create_task(setup.coordinator.sync())
+        try:
+            assert await asyncio.to_thread(entered.wait, 3)
+            assert not task.done()
+        finally:
+            release.set()
+        assert await task == {'added': 0, 'modified': 0, 'removed': 0}
+    run(scenario())

@@ -9,7 +9,14 @@ from whab.domain.errors import StoreError
 from whab.plugins import BankError, WebhookResult
 from whab.plugins.effect_store import EffectError
 from whab.plugins.sdk import valid_plugin_name
-from whab.web.bank_schemas import ExchangeBody, FlowId, LinkBody
+from whab.web.bank_schemas import (
+    BackgroundBody,
+    ExchangeBody,
+    FlowId,
+    LinkBody,
+    ScheduleBody,
+    SyncSetupBody,
+)
 
 _CONTINUATIONS = ("begin_link", "continuation_status", "cancel_link", "complete_link")
 _STAGES = {
@@ -42,7 +49,7 @@ def _status(result, *, flow_id=None, begin=False, kind=None):
     return dict(result)
 
 
-def create_router(plugin_id, banks, store, prefix=None):
+def create_router(plugin_id, banks, store, prefix=None, *, jobs=None, settings=None):
     router = APIRouter(prefix=prefix or (f"/api/banks/{plugin_id}" if plugin_id else "/api/banks/{provider_id}"))
 
     def owner(request):
@@ -86,6 +93,42 @@ def create_router(plugin_id, banks, store, prefix=None):
         service(request)
         scoped = store[owner(request)] if plugin_id is None else store
         return {"items": scoped.items()}
+
+    @router.post("/sync-preview")
+    async def preview_sync(body: LinkBody, request: Request):
+        if body.itemId is None:
+            raise BankError("Choose a bank connection to review.")
+        return await invoke(request, "sync_preview", body.itemId)
+
+    @router.put("/sync-settings")
+    async def configure_sync(body: SyncSetupBody, request: Request):
+        return await invoke(request, "configure_sync", body.itemId, [row.model_dump() for row in body.accounts])
+
+    @router.get("/schedule")
+    def schedule(request: Request):
+        service(request)
+        if jobs is None:
+            raise HTTPException(503, "Bank scheduling is unavailable")
+        from whab.scheduling import schedule_status
+        return {"jobs": [row for row in jobs.status()["jobs"] if row["plugin"] == owner(request)],
+                "background": schedule_status(settings.home, settings.plaid_env) if settings is not None else {"enabled": False}}
+
+    @router.put("/schedule")
+    async def set_schedule(body: ScheduleBody, request: Request):
+        service(request)
+        if jobs is None:
+            raise HTTPException(503, "Bank scheduling is unavailable")
+        return await jobs.configure(owner(request), body.interval_seconds)
+
+    @router.post("/schedule/background")
+    async def background_schedule(body: BackgroundBody, request: Request):
+        service(request)
+        if settings is None:
+            raise HTTPException(503, "Background scheduling is unavailable")
+        from starlette.concurrency import run_in_threadpool
+
+        from whab.scheduling import configure_schedule
+        return await run_in_threadpool(configure_schedule, settings.home, settings.plaid_env, enabled=body.enabled)
 
     @router.post("/link-token")
     async def link(body: LinkBody, request: Request):

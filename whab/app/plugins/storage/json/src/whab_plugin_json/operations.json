@@ -845,6 +845,100 @@
       ],
       "retry": "Read again as needed; reads never authorize a later write using an old revision.",
       "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "StorageBackend.configure_bank_sync",
+      "kind": "sdk",
+      "summary": "Atomically validate and save bank account destinations and history cutoffs.",
+      "input": {
+        "type": "object",
+        "description": "Host-owned durable configure_bank_sync command payload; optional backend capability.",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "Identifier from the addressed connection or budget."
+          },
+          "accounts": {
+            "type": "array",
+            "description": "Normalized provider-owned account records from an explicit review.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "selection": {
+            "type": "object",
+            "description": "Provider-scoped source account IDs mapped to accountId/since records.",
+            "additionalProperties": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "itemId",
+          "accounts",
+          "selection"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Committed selection result.",
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "Selection committed."
+          },
+          "retiredAccounts": {
+            "type": "array",
+            "description": "Auto-created source accounts joined into existing destinations.",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "configured",
+          "retiredAccounts"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "itemId": "fictional-item",
+            "accounts": [
+              {
+                "id": "fictional-bank-account",
+                "name": "Fictional checking",
+                "institution": "Fictional bank",
+                "type": "depository",
+                "currency": "USD",
+                "balance": 10000,
+                "source": "plaid",
+                "itemId": "fictional-item"
+              }
+            ],
+            "selection": {
+              "fictional-bank-account": {
+                "accountId": "fictional-bank-account",
+                "since": "2026-10-01"
+              }
+            }
+          },
+          "output": {
+            "configured": true,
+            "retiredAccounts": []
+          }
+        }
+      ],
+      "side_effects": "Native atomic mutation and receipt. Preserves annotations, transaction IDs and receipts when joining an auto-created bank account. Resets the sync cursor, without fetching provider data.",
+      "permissions": "Privileged host/provider command only; not a public remote ledger mutation.",
+      "scope": "One personal budget, provider connection and compatible currency.",
+      "errors": [
+        "Unknown item, conflicting destination, currency mismatch or invalid date rolls back the entire mutation."
+      ],
+      "retry": "Use the original durable operation ID, authority epoch and generation for exact receipt reconciliation; never fabricate commit evidence.",
+      "availability": "Optional native storage operation in WHAB 2.59+. Older backends report unsupported setup."
     }
   ]
 }

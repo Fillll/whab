@@ -34,7 +34,7 @@ STORAGE_ROLES = frozenset({"primary", "staged", "copy", "fenced", "retired"})
 STORAGE_OPERATIONS = frozenset({
     "add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details",
     "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "save_item",
-    "set_item_status", "disconnect_item", "apply_sync", "import_workspace", "restore_budget",
+    "set_item_status", "disconnect_item", "configure_bank_sync", "apply_sync", "import_workspace", "restore_budget",
     "save_receipt", "delete_receipt", "restore_budget_files", "prepare_budget_files",
 })
 _BULK_OPERATIONS = frozenset({"restore_budget", "restore_budget_files", "prepare_budget_files", "import_workspace"})
@@ -52,6 +52,7 @@ _OPERATION_FIELDS = {
     "save_item": ({"itemId", "encryptedToken", "institutionName"}, {"providerId"}),
     "set_item_status": ({"itemId", "status", "error"}, set()),
     "disconnect_item": ({"itemId"}, set()),
+    "configure_bank_sync": ({"itemId", "accounts", "selection"}, set()),
     "apply_sync": ({"itemId", "changes", "cursor"}, {"accounts", "historicalComplete", "expectedCursor"}),
     "import_workspace": ({"pluginId", "fingerprint", "data"}, set()),
     "restore_budget": ({"snapshot"}, set()),
@@ -241,7 +242,7 @@ class StorageOperation:
         required, optional = _OPERATION_FIELDS[self.name]
         if not required <= value.keys() or not value.keys() <= required | optional:
             raise StoreError("Invalid durable storage operation fields.")
-        if self.name in {"save_item", "set_item_status", "disconnect_item", "apply_sync"} and self.workspace != "personal":
+        if self.name in {"save_item", "set_item_status", "disconnect_item", "configure_bank_sync", "apply_sync"} and self.workspace != "personal":
             raise StoreError("Provider operations require the personal workspace.")
         object.__setattr__(self, "payload", canonical_storage_json(value, limit=limit))
 
@@ -401,6 +402,11 @@ def dispatch_storage_operation(backend, operation):
         return backend.set_item_status(payload["itemId"], payload["status"], payload["error"])
     if name == "disconnect_item":
         return backend.disconnect_item(payload["itemId"])
+    if name == "configure_bank_sync":
+        configure = getattr(backend, "configure_bank_sync", None)
+        if not callable(configure):
+            raise StoreError("This storage plugin does not support bank account setup. Upgrade it first.")
+        return configure(payload["itemId"], payload["accounts"], payload["selection"])
     if name == "apply_sync":
         fields = {"accounts": "accounts", "historicalComplete": "historical_complete", "expectedCursor": "expected_cursor"}
         return backend.apply_sync(payload["itemId"], payload["changes"], payload["cursor"],
@@ -522,7 +528,11 @@ def decode_local_state(financial, protected):
         if workspace == "demo" and private["items"]:
             _invalid()
         for item in _records(private["items"], 1000):
-            _exact(item, {"id", "token", "institutionName", "status", "lastSynced", "error", "cursor", "provider"})
+            _exact(item, {"id", "token", "institutionName", "status", "lastSynced", "error", "cursor", "provider"}
+                   | ({"syncSettings"} if "syncSettings" in item else set()))
+            if "syncSettings" in item:
+                from whab.domain.bank_setup import validate_sync_settings
+                validate_sync_settings(item["syncSettings"])
             identifier = bank_identifier(item["id"], limit=4096)
             if identifier in state["items"]:
                 _invalid()

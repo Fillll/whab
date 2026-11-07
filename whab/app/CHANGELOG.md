@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.59.0 — 2026-11-07
+
+PR: [#160](https://github.com/Fillll/whab/pull/160)
+
+- Add explicit bank-account destinations and inclusive transaction cutoffs through shared Web/CLI setup operations, plus manual and configurable 1/3/6-hour sync policies and background scheduling controls. Preserve existing histories, annotations, protected transfers and provider cursor recovery.
+
 ## 2.58.1 — 2026-11-07
 
 PR: [#159](https://github.com/Fillll/whab/pull/159)

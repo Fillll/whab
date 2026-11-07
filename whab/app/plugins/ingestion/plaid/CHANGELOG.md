@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.6.0 — 2026-11-07
+
+PR: [#160](https://github.com/Fillll/whab/pull/160)
+
+- Defer new connections until account destinations and transaction history are explicitly chosen. Show saved WHAB destinations and expose manual, hourly, 3-hour and 6-hour updates with background controls in Plaid settings.
+
 ## 1.5.0 — 2026-11-04
 
 PR: [#149](https://github.com/Fillll/whab/pull/149)

@@ -4,6 +4,7 @@ The caller owns persistence and applies the returned state and checkpoint in one
 commit. Receipt identities live beside ledger state and move with posting matches.
 """
 
+from .bank_setup import select_sync
 from .categories import ensure_child_category
 from .errors import StoreError
 from .imports import (
@@ -28,6 +29,7 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
     if cursor is not None:
         bank_identifier(cursor, limit=4096)
     provider = item.get("provider", "plaid")
+    changes, accounts = select_sync(state, item_id, changes, accounts)
 
     def owned_transaction(transaction):
         account = state["accounts"].get(transaction.get("original", {}).get("accountId", transaction["accountId"]))

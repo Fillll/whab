@@ -210,7 +210,9 @@ async function connect(itemId, resumeToken) {
             if (!context.legacy && status(result, context).stage !== 'complete') throw new Error(pendingMessage);
           }
           clearSession();
-          await api('/plaid/sync', itemId ? {itemId} : {});
+          if (document.querySelector('[data-bank-provider="plaid"]')?.dataset.syncSetup !== 'true') {
+            await api('/plaid/sync', itemId ? {itemId} : {});
+          }
           await refreshConnection();
         } catch (failure) {
           if (submitted) {
@@ -253,6 +255,53 @@ async function connect(itemId, resumeToken) {
     notify(failure.message);
   }
 }
+function setupElement(tag, text) {
+  const element = document.createElement(tag);
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+function renderSyncSetup(form, preview) {
+  form.dataset.itemId = preview.itemId;
+  const choices = form.querySelector('[data-plaid-account-choices]');
+  choices.replaceChildren();
+  for (const account of preview.accounts) {
+    const row = setupElement('fieldset');
+    row.dataset.bankAccountId = account.id;
+    row.append(setupElement('legend', `${account.name}${account.mask ? ` · ending ${account.mask}` : ''} · ${account.currency}`));
+    const destination = setupElement('select');
+    destination.setAttribute('aria-label', `WHAB destination for ${account.name}`);
+    destination.dataset.destination = '';
+    for (const [value, text] of [['choose', 'Choose a WHAB destination'], ['skip', 'Do not import'], ['', 'Create a new WHAB account'],
+        ...preview.destinations.filter(candidate => candidate.currency === account.currency && candidate.available !== false).map(candidate => [candidate.id, candidate.name])]) {
+      const option = setupElement('option', text); option.value = value; destination.append(option);
+    }
+    destination.value = account.link?.accountId || (preview.configured ? 'skip' : 'choose');
+    const history = setupElement('select'); history.dataset.history = '';
+    history.setAttribute('aria-label', `Transaction history for ${account.name}`);
+    for (const [value, text] of [['', 'Choose transaction history'], ['date', 'Choose a start date'], ['all', 'All available history']]) {
+      const option = setupElement('option', text); option.value = value; history.append(option);
+    }
+    history.value = account.link ? (account.link.since ? 'date' : 'all') : '';
+    const label = setupElement('label', 'Import transactions since');
+    const since = setupElement('input'); since.type = 'date'; since.dataset.since = '';
+    since.setAttribute('aria-label', `Import start date for ${account.name}`);
+    since.value = account.link?.since || '';
+    label.append(since);
+    destination.addEventListener('change', () => {
+      history.disabled = destination.value === 'skip';
+      since.disabled = history.disabled || history.value !== 'date';
+    });
+    history.addEventListener('change', () => {since.disabled = history.value !== 'date';});
+    history.disabled = destination.value === 'skip';
+    since.disabled = history.disabled || history.value !== 'date';
+    row.append(destination, history, label); choices.append(row);
+  }
+  form.querySelector('[data-plaid-setup-error]').hidden = true;
+  form.hidden = false;
+  form.scrollIntoView({block: 'nearest'});
+  form.querySelector('[data-destination]')?.focus();
+}
+
 let disconnectId;
 const bound = new WeakSet();
 function bindButtons(selector, callback) {
@@ -263,6 +312,69 @@ function bindButtons(selector, callback) {
   }
 }
 function bind() {
+  bindButtons('[data-plaid-setup]', async button => {
+    if (button.disabled || linking || activeRequests) return;
+    button.disabled = true; activeRequests += 1;
+    try {
+      const preview = await api('/plaid/sync-preview', {itemId: button.dataset.plaidSetup});
+      renderSyncSetup(document.querySelector('[data-plaid-sync-form]'), preview);
+    } catch (failure) {notify(failure.message);}
+    finally {button.disabled = false; activeRequests -= 1;}
+  });
+  bindButtons('[data-plaid-setup-cancel]', button => {button.closest('[data-plaid-sync-form]').hidden = true;});
+  bindButtons('[data-plaid-setup-save]', async button => {
+    if (button.disabled) return;
+    const form = button.closest('[data-plaid-sync-form]');
+    button.disabled = true; activeRequests += 1;
+    const error = form.querySelector('[data-plaid-setup-error]'); error.hidden = true;
+    try {
+      const rows = [...form.querySelectorAll('[data-bank-account-id]')].filter(row => row.querySelector('[data-destination]').value !== 'skip');
+      if (rows.some(row => row.querySelector('[data-destination]').value === 'choose')) {
+        throw new Error('Choose a WHAB destination for each bank account.');
+      }
+      if (rows.some(row => !row.querySelector('[data-history]').value || (row.querySelector('[data-history]').value === 'date' && !row.querySelector('[data-since]').value))) {
+        throw new Error('Choose a start date or All available history for each bank account.');
+      }
+      const accounts = rows.map(row => ({
+        bankAccountId: row.dataset.bankAccountId, accountId: row.querySelector('[data-destination]').value || null,
+        since: row.querySelector('[data-history]').value === 'all' ? null : row.querySelector('[data-since]').value,
+      }));
+      await api('/plaid/sync-settings', {itemId: form.dataset.itemId, accounts}, 'PUT');
+      await api('/plaid/sync', {itemId: form.dataset.itemId});
+      reloadSettings();
+    } catch (failure) {error.textContent = failure.message; error.hidden = false;}
+    finally {button.disabled = false; activeRequests -= 1;}
+  });
+  for (const panel of document.querySelectorAll('[data-plaid-schedule]')) {
+    if (bound.has(panel)) continue;
+    bound.add(panel);
+    api('/plaid/schedule').then(result => {
+      const job = result.jobs[0];
+      if (!job) return;
+      panel.querySelector('[data-plaid-cadence]').value = job.interval_seconds === null ? 'manual' : String(job.interval_seconds);
+      const cadence = job.interval_seconds === null ? 'Automatic updates are off.' :
+        `Next check: ${job.next_due ? new Date(job.next_due * 1000).toLocaleString() : 'When due'}.`;
+      panel.querySelector('[data-plaid-schedule-status]').textContent = `${cadence} Background checks: ${result.background?.enabled ? 'enabled' : 'off'}.`;
+    }).catch(failure => {panel.querySelector('[data-plaid-schedule-status]').textContent = failure.message;});
+  }
+  bindButtons('[data-plaid-schedule-save]', async button => {
+    const panel = button.closest('[data-plaid-schedule]');
+    button.disabled = true;
+    try {
+      const value = panel.querySelector('[data-plaid-cadence]').value;
+      await api('/plaid/schedule', {interval_seconds: value === 'manual' ? null : Number(value)}, 'PUT');
+      panel.querySelector('[data-plaid-schedule-status]').textContent = 'Update frequency saved.';
+    } catch (failure) {panel.querySelector('[data-plaid-schedule-status]').textContent = failure.message;}
+    finally {button.disabled = false;}
+  });
+  bindButtons('[data-plaid-background]', async button => {
+    const panel = button.closest('[data-plaid-schedule]'); button.disabled = true;
+    try {
+      await api('/plaid/schedule/background', {enabled: button.dataset.plaidBackground === 'true'});
+      panel.querySelector('[data-plaid-schedule-status]').textContent = button.dataset.plaidBackground === 'true' ? 'Background checks enabled.' : 'Background checks disabled.';
+    } catch (failure) {panel.querySelector('[data-plaid-schedule-status]').textContent = failure.message;}
+    finally {button.disabled = false;}
+  });
   bindButtons('[data-plaid-close-dialog]', button => document.getElementById('plaid-disconnect-dialog').hidden = true);
   bindButtons('[data-plaid-connect]', button => connect(button.dataset.plaidConnect || undefined));
   bindButtons('[data-plaid-check-link]', async () => {

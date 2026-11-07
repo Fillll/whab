@@ -102,3 +102,52 @@ def test_os_hourly_tick_runs_at_next_calendar_boundary(tmp_path, legacy_record):
         assert (await jobs.run_due())["fictional"]["ok"]
         assert calls[-1] == boundary + 3600
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('hours', [1, 3, 6])
+def test_custom_cadence_survives_reopen_and_manual_mode_still_allows_explicit_sync(tmp_path, hours):
+    async def run():
+        now, calls = [10000], []
+        async def sync():
+            calls.append(now[0])
+            return {'added': 0, 'modified': 0, 'removed': 0}
+        banks = {'fictional': SimpleNamespace(sync=sync)}
+        jobs = BankJobs(tmp_path, 'sandbox', runtime(), banks, clock=lambda: now[0])
+        await jobs.configure('fictional', hours * 3600)
+        assert jobs.automatic('fictional')
+        assert jobs.status()['jobs'][0]['next_due'] == 0
+        await jobs.run_due()
+        due = jobs.status()['jobs'][0]['next_due']
+        assert due == jobs.next_boundary(now[0], hours * 3600)
+        reopened = BankJobs(tmp_path, 'sandbox', runtime(), banks, clock=lambda: now[0])
+        assert reopened.status()['jobs'][0]['interval_seconds'] == hours * 3600
+        now[0] = due - 1
+        assert (await reopened.run_due())['fictional']['skipped']
+        now[0] = due
+        assert (await reopened.run_due())['fictional']['ok']
+        await reopened.configure('fictional', None)
+        assert not reopened.automatic('fictional')
+        count = len(calls)
+        now[0] += 86400
+        assert (await reopened.run_due())['fictional']['skipped'] and len(calls) == count
+        assert (await reopened.run('fictional'))['ok'] and len(calls) == count + 1
+        assert BankJobs(tmp_path, 'sandbox', runtime(), banks).status()['jobs'][0]['interval_seconds'] is None
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('value', [False, 3600.0, 7200, 0, -1, 'manual'])
+def test_invalid_update_frequency_cannot_change_saved_policy(tmp_path, value):
+    async def run():
+        jobs = BankJobs(tmp_path, 'sandbox', runtime(), {})
+        with pytest.raises(BankError):
+            await jobs.configure('fictional', value)
+        assert not jobs.policy_path.exists()
+    asyncio.run(run())
+
+
+def test_providers_without_periodic_policy_keep_their_existing_webhook_behavior(tmp_path):
+    selected = runtime()
+    plugin = Plugin("fictional", "Fictional bank", bank=BankAdapter(lambda _: None))
+    selected._active = SimpleNamespace(services={"plugins": SimpleNamespace(bank_plugins=lambda: (plugin,))})
+    jobs = BankJobs(tmp_path, 'sandbox', selected, {})
+    assert jobs.policies() == {} and jobs.automatic('fictional')

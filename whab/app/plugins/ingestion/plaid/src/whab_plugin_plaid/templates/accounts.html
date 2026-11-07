@@ -1,4 +1,4 @@
-<section class="bank-provider" data-bank-provider="plaid" data-bank-environment="{{ status.environment }}">
+<section class="bank-provider" data-bank-provider="plaid" data-bank-environment="{{ status.environment }}" data-sync-setup="{{ 'true' if status.requiresAccountSetup else 'false' }}">
   <div class="section-title">
     <h2>Plaid connections</h2>
     <button class="button primary" data-plaid-connect {% if not status.configured %}disabled{% endif %}>{{ icon('link', 16) if icon is defined else '' }}Connect account</button>
@@ -56,11 +56,16 @@
        datetime="{{ item.lastSynced }}">{{ item.lastSynced }}</time>
     {% else %}Initial import pending
     {% endif %}
+    {% if not item.setupConfigured %}<br>Review account destinations and transaction start dates in Sync setup.{% endif %}
     {% if item.error %} · {{ item.error }}
     {% endif %}
   </p>
   </div>
+  {% for link in item.accountLinks %}
+  <p>{% if link.mask %}Account ending {{ link.mask }} → {% endif %}<strong>{{ link.name }}</strong> · {{ 'Transactions since ' ~ link.since if link.since else 'All available history' }}</p>
+  {% endfor %}
   <div class="connection-actions">
+    <button class="text-link" data-plaid-setup="{{ item.id }}">Sync setup</button>
     <button class="text-link" data-plaid-connect="{{ item.id }}">{{ 'Reconnect' if item.status=='reconnect' else 'Manage' }}</button><button class="disconnect-button"
         data-plaid-disconnect="{{ item.id }}"
         data-institution="{{ item.institutionName }}">Disconnect</button>
@@ -69,6 +74,30 @@
 {% endfor %}
 </section>
 {% endif %}
+<section data-plaid-sync-form hidden aria-label="Bank account sync setup">
+  <h3>Choose where to sync</h3>
+  <p>Link each bank account to an existing WHAB account, create a new account, or leave it out. The start date includes that day. Existing history and annotations are retained; overlapping imported history is not automatically matched.</p>
+  <div data-plaid-account-choices></div>
+  <p class="field-error" data-plaid-setup-error hidden></p>
+  <button class="button primary" data-plaid-setup-save>Save and sync now</button>
+  <button class="text-link" data-plaid-setup-cancel>Cancel</button>
+</section>
+<section data-plaid-schedule>
+  <h3>Regular updates</h3>
+  <label>Check for new transactions
+    <select data-plaid-cadence aria-label="Plaid update frequency">
+      <option value="manual">Manual only</option>
+      <option value="3600">Every hour</option>
+      <option value="10800">Every 3 hours</option>
+      <option value="21600">Every 6 hours</option>
+    </select>
+  </label>
+  <button class="button secondary" data-plaid-schedule-save>Save update frequency</button>
+  <p data-plaid-schedule-status aria-live="polite"></p>
+  <p>Automatic checks run while WHAB is open. On macOS, enable background checks to run the saved schedule when WHAB is closed. Manual only also stops webhook-triggered imports; use Sync now whenever you want to check.</p>
+  <button class="text-link" data-plaid-background="true">Enable background checks</button>
+  <button class="text-link" data-plaid-background="false">Disable background checks</button>
+</section>
 <section class="plaid-disconnect-confirm" hidden role="region" aria-label="Confirm bank disconnection"
         id="plaid-disconnect-dialog"><div class="modal-heading"><div><h2>Disconnect this bank?</h2><p>Imported transactions will stay in your budget.</p></div><button class="icon-button" data-plaid-close-dialog aria-label="Close dialog">{{ icon('close', 20) if icon is defined else '' }}</button></div>
   <p class="modal-description">This stops bank importing and revokes this connection. A new connection will use another Trial slot.</p>

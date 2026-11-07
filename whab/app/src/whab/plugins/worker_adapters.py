@@ -93,6 +93,7 @@ def adapter_info(plugin):
             "categorization": plugin.categorization is not None,
             "remote_client": client_record(plugin.storage) if type(plugin.storage) is RemoteLedgerClient else None,
             "bank": ({"ui": plugin.bank_ui is not None,
+                      **({"requires_account_setup": True} if plugin.bank.requires_account_setup else {}),
                       **({"sync_interval_seconds": plugin.bank.sync_interval_seconds}
                          if plugin.bank.sync_interval_seconds is not None else {})}
                      if type(plugin.bank) is BankAdapter else None)}
@@ -138,11 +139,11 @@ def validate_adapter_info(value):
         raise WireError()
     provider = value['bank']
     if provider is not None:
-        if (type(provider) is not dict or not {'ui'} <= provider.keys() <= {'ui', 'sync_interval_seconds'}
+        if (type(provider) is not dict or not {'ui'} <= provider.keys() <= {'ui', 'sync_interval_seconds', 'requires_account_setup'}
                 or type(provider['ui']) is not bool):
             raise WireError()
         try:
-            BankAdapter(lambda _: None, provider.get('sync_interval_seconds'))
+            BankAdapter(lambda _: None, provider.get('sync_interval_seconds'), provider.get('requires_account_setup', False))
         except ValueError:
             raise WireError() from None
     bank = value["bank_logos"]

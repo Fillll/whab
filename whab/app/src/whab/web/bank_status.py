@@ -18,4 +18,5 @@ def public_bank_status(bank, environment):
         if type(missing) in {list, tuple}
         else [],
         "enabled": bank is not None,
+        **({"requiresAccountSetup": True} if config.get("requiresAccountSetup") is True else {}),
     }

@@ -105,3 +105,30 @@ Use a local CLI profile to run `whab-cli default.budget sync plaid`, inspect
 A running host checks due jobs too; a stopped host can be started by the OS job.
 No new bank connection or forced `/transactions/refresh` is created by scheduling.
 Institution freshness remains provider-dependent. See [Plaid transaction updates](https://plaid.com/docs/transactions/#transactions-updates).
+
+
+## Account destinations and transaction history
+
+Plaid 1.6 requires WHAB 2.59+. After connecting a new institution, open **Sync setup** in Plaid settings before the first import. Reviewing accounts fetches provider data without importing transactions or advancing the saved cursor. For each account, select an existing WHAB account in the same currency, create a new account, or choose **Do not import**. Choose a start date explicitly (inclusive), or explicitly select **All available history**. No date is selected automatically. **Save and sync now** saves the selection and imports only the selected accounts.
+
+Connected-bank rows show the destination account, last four digits when available, and saved history choice. Existing connections can also use Sync setup. Linking an auto-created bank account to an existing account joins its existing transaction references while preserving transaction IDs, notes, reviews, categories and receipts. Old history is retained, including rows before the new cutoff; overlapping YNAB/manual history is not automatically matched. Once an explicit destination is saved, changing it to a different account is refused. Moving a cutoff earlier resets the cursor and replays stable provider transaction IDs without duplicating those bank records. Provider availability still bounds the history returned.
+
+## Manual and regular updates
+
+**Regular updates** offers Manual only, every hour, every 3 hours and every 6 hours, per budget/provider. Save the frequency explicitly. Manual only suppresses periodic and webhook-triggered imports; **Sync now** remains available. Scheduled checks honor the same account links and dates as manual checks. Existing connections retain their previous hourly policy until changed. New connections wait for account setup before importing.
+
+Checks run while the host is running. On macOS, **Enable background checks** registers the existing hourly launchd wakeup; each budget’s saved cadence decides which checks are due. **Disable background checks** unregisters those device/environment wakeups. On other platforms, schedule `python -m whab --home /absolute/runtime --environment production --run-jobs` with cron; hourly wakeups support the saved 1/3/6-hour policies and coalesce missed checks.
+
+Both console entry points use the same host controls:
+
+```sh
+whab Household bank connections plaid
+whab Household bank preview plaid --item CONNECTION_ID
+whab Household bank configure plaid --item CONNECTION_ID --accounts '[{"bankAccountId":"BANK_ACCOUNT_ID","accountId":"WHAB_ACCOUNT_ID","since":"2026-11-01"}]'
+whab Household bank sync plaid --item CONNECTION_ID
+whab Household bank schedule plaid --every-hours 3
+whab Household bank schedule plaid --manual
+whab Household bank background plaid --enable
+```
+
+Use JSON `null` for a new destination account or an explicitly chosen all-history cutoff. Omit bank accounts you do not want to import. The advanced form is `whab-cli default.budget bank ...`; read `bank --help` or `describe --plugin plaid --operation bank.configure` offline. These are local host controls, not remote ledger commands; connecting a bank still requires its interactive consent flow.

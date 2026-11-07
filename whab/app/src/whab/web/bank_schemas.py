@@ -19,3 +19,22 @@ class ExchangeBody(Body):
     publicToken: Annotated[str, Field(min_length=1, max_length=500)] | None = None
     institutionId: Id | None = None
     institutionName: Label | None = None
+
+
+class AccountSelection(Body):
+    bankAccountId: Id
+    accountId: Id | None
+    since: Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")] | None
+
+
+class SyncSetupBody(Body):
+    itemId: Id
+    accounts: list[AccountSelection] = Field(min_length=1, max_length=500)
+
+
+class ScheduleBody(Body):
+    interval_seconds: int | None
+
+
+class BackgroundBody(Body):
+    enabled: bool

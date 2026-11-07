@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from whab.domain import commands
 from whab.domain.accounts import normalize_account
+from whab.domain.bank_setup import configure_sync
 from whab.domain.bank_sync import merge_sync
 from whab.domain.budget import calculate_workspace, calculate_workspace_periods
 from whab.domain.categories import create_category, public_categories
@@ -322,6 +323,7 @@ class Store(Authority):
                 "id": item_id, "token": encrypted_token, "institutionName": validate_label(institution_name),
                 "status": "connected", "lastSynced": previous.get("lastSynced"), "error": None,
                 "cursor": previous.get("cursor"), "provider": provider_id,
+                **({"syncSettings": previous["syncSettings"]} if "syncSettings" in previous else {}),
             }
 
         return self._mutate("personal", operation)
@@ -344,6 +346,12 @@ class Store(Authority):
                 if account.get("itemId") == item_id:
                     account["stale"] = True
 
+        return self._mutate("personal", operation)
+
+    def configure_bank_sync(self, item_id, accounts, selection):
+        def operation(state):
+            result = configure_sync(state, item_id, accounts, selection)
+            return result
         return self._mutate("personal", operation)
 
     def apply_sync(self, item_id, changes, cursor, accounts=None, historical_complete=True, *, expected_cursor=UNSET):

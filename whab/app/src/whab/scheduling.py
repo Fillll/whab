@@ -39,6 +39,23 @@ def configure_schedule(home, environment, *, enabled):
     return record
 
 
+def schedule_status(home, environment):
+    from whab.hosting import runtime_directory
+
+    path = runtime_directory(home, environment) / "schedule.json"
+    try:
+        if path.stat().st_size > 4096:
+            raise ValueError
+        record = json.loads(path.read_bytes())
+        if type(record) is not dict or type(record.get("enabled")) is not bool:
+            raise ValueError
+        return {"enabled": record["enabled"]}
+    except FileNotFoundError:
+        return {"enabled": False}
+    except (OSError, ValueError, TypeError):
+        raise OSError("Saved background schedule status is invalid. Inspect it before changing the OS job.") from None
+
+
 def run_due_jobs(home, environment):
     from whab.hosting import local_connection
 

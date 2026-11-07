@@ -12,6 +12,7 @@ import httpx
 
 from whab.plugins.documentation import core_document, installed_catalog
 
+from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import PluginSelectionError, selection_error
 from .help import contextual_help, describe, overview, render_catalog
@@ -22,7 +23,7 @@ def parser(argv=(), *, defaults=None):
     catalog = installed_catalog()
     check_identifiers(catalog)
     root = argparse.ArgumentParser(description="Read and change an explicitly addressed WHAB budget.",
-        usage="%(prog)s [CONFIG] [OPTIONS] {query,command,feature-query,feature-command,describe,plugins,sync,jobs} ...",
+        usage="%(prog)s [CONFIG] [OPTIONS] {query,command,feature-query,feature-command,describe,plugins,sync,jobs,bank} ...",
         epilog='Optional CONFIG is a JSON object. Local fields: home, budget, environment, ca, workspace. Remote fields: url, budget, ca, workspace, token_env. Choose home or url. Command-line options override the file. Relative home/CA paths use the config directory.\nLocal example: {"home": "runtime", "budget": "default", "environment": "sandbox"}\nRemote example: {"url": "https://localhost:5173", "budget": "default", "ca": "tls/ca.crt"}\nUsage: whab-cli default.budget --help\n\n' + overview(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     root.add_argument("--url", help="HTTPS server origin; omit for offline documentation")
@@ -34,6 +35,7 @@ def parser(argv=(), *, defaults=None):
     root.add_argument("--workspace", choices=("personal", "demo"), default="personal", help="Addressed workspace (default: %(default)s)")
     root.set_defaults(**(defaults or {}))
     commands = root.add_subparsers(dest="kind", required=True)
+    add_bank_parser(commands)
     manage = commands.add_parser("plugins", help="Manage installed plugins on the local host")
     manage.add_argument("action", choices=("list", "status", "enable", "disable"))
     manage.add_argument("plugin", nargs="?", help="Installed plugin ID for enable/disable")
@@ -115,7 +117,7 @@ def request(args, token=None):
 def _local(args):
     from whab.plugins.local import local_connection
 
-    if args.url or args.workspace != "personal" and args.kind in {"plugins", "sync", "jobs"}:
+    if args.url or args.workspace != "personal" and args.kind in {"plugins", "sync", "jobs", "bank"}:
         raise ValueError("Choose a local home and personal workspace for local management.")
     if args.kind == "jobs" and args.action in {"enable", "disable"}:
         from whab.plugins.scheduling import configure_schedule
@@ -123,7 +125,9 @@ def _local(args):
     with local_connection(args.home, args.environment, ca=args.ca) as client:
         prefix = "/budgets/" + quote(args.budget or "default", safe="") + "/api/local/v1"
         kwargs = {}
-        if args.kind == "plugins":
+        if args.kind == "bank":
+            method, path, kwargs = bank_request(args, args.budget or "default")
+        elif args.kind == "plugins":
             if args.action in {"list", "status"}:
                 method, path = "GET", prefix + "/plugins"
             else:
@@ -148,13 +152,17 @@ def _local(args):
                 if len(raw) > 16 * 1024 * 1024:
                     raise ValueError("Local response exceeds 16 MiB.")
             if response.status_code != 200:
+                if args.kind == "bank" and response.status_code in {400, 409}:
+                    message = bank_error(raw)
+                    if message:
+                        raise ConfigError(message)
                 if args.kind == "plugins" and response.status_code in {400, 409}:
                     message = selection_error(raw)
                     if message:
                         raise PluginSelectionError(message)
                 raise ValueError("Local operation failed. Inspect the budget before retrying.")
             result = json.loads(raw)
-        if args.kind not in {"plugins", "sync", "jobs"} and (
+        if args.kind not in {"plugins", "sync", "jobs", "bank"} and (
                 type(result) is not dict or result.get("budgetId") != (args.budget or "default")
                 or type(result.get("revision")) is not str or not result["revision"] or "data" not in result):
             raise ValueError("Local host returned another budget or an invalid response.")
@@ -173,7 +181,7 @@ def main(argv=None):
         if args.home:
             print(json.dumps(_local(args), allow_nan=False))
             return 0
-        if args.kind in {"plugins", "sync", "jobs"}:
+        if args.kind in {"plugins", "sync", "jobs", "bank"}:
             raise ValueError("Local management requires --home or a local JSON profile.")
         token, method, path, kwargs = request(args)
         with httpx.Client(base_url=args.url.rstrip("/"),

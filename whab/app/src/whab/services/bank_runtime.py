@@ -134,13 +134,17 @@ class BankCoordinator:
 
     def __init__(self, provider, tracked, bank_store, *, budget_id, environment, provider_id,
                  generation, home=None, encryption_key=None, journal=None, cipher=None,
-                 code_identity='installed', background_scope=None, clock=None):
+                 code_identity='installed', background_scope=None, clock=None,
+                 requires_account_setup=False, automatic_sync=lambda: True):
         self.provider, self.tracked, self.bank_store = provider, tracked, bank_store
         self.scope = ContinuationScope(budget_id, environment, provider_id, generation)
         self.code_identity = code_identity
         if type(code_identity) is not str or not 1 <= len(code_identity) <= 200:
             raise EffectError('invalid_effect')
         self.config = deepcopy(dict(provider.config))
+        self.requires_account_setup, self.automatic_sync = requires_account_setup, automatic_sync
+        if requires_account_setup:
+            self.config["requiresAccountSetup"] = True
         self.cipher = cipher or BankCipher(encryption_key)
         self.broker = BankNativeBroker(tracked, bank_store, budget_id, environment, provider_id)
         self.journal = journal or BankContinuations(home, budget_id, environment, provider_id,
@@ -343,6 +347,8 @@ class BankCoordinator:
     def _sync(self, item_id):
         self._ready()
         item = self._item(item_id)
+        if self.requires_account_setup and item.get('syncSettings') is None and item.get('lastSynced') is None:
+            raise BankError('Choose destination accounts and an import start date in Sync setup first.')
         try:
             response = self.provider.call('read_sync', item_id=item_id, access_token=self._access(item_id),
                 cursor=item['cursor'], institution_name=item['institutionName'])
@@ -360,9 +366,56 @@ class BankCoordinator:
         async with self._serial:
             if item_id is not None:
                 return await _blocking(self._sync, item_id)
-            results = [await _blocking(self._sync, item['id']) for item in self.bank_store.items()
-                       if self.bank_store.get_item(item['id'])['token'] is not None]
+            items = await _blocking(self.bank_store.items)
+            results = [await _blocking(self._sync, item['id']) for item in items
+                       if not (self.requires_account_setup and not item.get('setupConfigured')
+                               and item.get('lastSynced') is None)]
             return {name: sum(result[name] for result in results) for name in ('added', 'modified', 'removed')}
+
+    def _sync_preview(self, item_id):
+        self._ready()
+        item = self._item(item_id)
+        response = self.provider.call('read_sync', item_id=item_id, access_token=self._access(item_id),
+            cursor=item['cursor'], institution_name=item['institutionName'])
+        accounts = self.tracked.accounts('personal')
+        latest = {}
+        for transaction in self.tracked.transactions('personal'):
+            if not transaction.get('deleted'):
+                key = transaction['accountId']
+                latest[key] = max(latest.get(key, ''), transaction['date'])
+        saved = item.get('syncSettings')
+        return response['accounts'], {
+            'itemId': item_id, 'institution': item['institutionName'], 'configured': saved is not None,
+            'accounts': [{key: account[key] for key in ('id', 'name', 'mask', 'currency') if key in account}
+                | {'link': (saved or {}).get(self.bank_store._record_identity('account', item_id, account['id']))}
+                for account in response['accounts']],
+            'destinations': [{key: account[key] for key in ('id', 'name', 'currency', 'itemId') if key in account}
+                | {'latestDate': latest.get(account['id']), 'available': account.get('itemId') in (None, self.bank_store.item_identity(item_id))} for account in accounts],
+        }
+
+    async def sync_preview(self, item_id):
+        async with self._serial:
+            return (await _blocking(self._sync_preview, item_id))[1]
+
+    def _configure_sync(self, item_id, selection):
+        accounts, _ = self._sync_preview(item_id)
+        payload = self.bank_store.prepare_sync(item_id, {'added': [], 'modified': [], 'removed': []}, None, accounts)
+        scoped = {}
+        if type(selection) is not list or len(selection) > 500:
+            raise BankError('Choose the bank accounts to import.')
+        for row in selection:
+            if type(row) is not dict or row.keys() != {'bankAccountId', 'accountId', 'since'}:
+                raise BankError('Invalid bank account selection.')
+            source = self.bank_store._record_identity('account', item_id, row['bankAccountId'])
+            if source in scoped:
+                raise BankError('Select each bank account once.')
+            scoped[source] = {'accountId': row['accountId'] or source, 'since': row['since']}
+        payload = {'itemId': payload['itemId'], 'accounts': payload['accounts'], 'selection': scoped}
+        return read_storage_json(self._command(item_id, 'configure_bank_sync', payload).result)
+
+    async def configure_sync(self, item_id, selection):
+        async with self._serial:
+            return await _blocking(self._configure_sync, item_id, selection)
 
     def _disconnect(self, item_id):
         selected = None
@@ -403,6 +456,8 @@ class BankCoordinator:
             return WebhookResult(result.ok, result.status_code)
 
     def queue_sync(self, item_id):
+        if not self.automatic_sync():
+            return
         if item_id in self._queued:
             self._queued[item_id]['again'] = True
             return
@@ -473,7 +528,7 @@ class LeasedBanks(Mapping):
 
 class _BankHandle:
     _METHODS = frozenset({'begin_link', 'complete_link', 'continuation_status', 'cancel_link',
-                          'link_token', 'exchange', 'sync', 'disconnect', 'webhook', 'close'})
+                          'link_token', 'exchange', 'sync', 'sync_preview', 'configure_sync', 'disconnect', 'webhook', 'close'})
 
     def __init__(self, runtime, owner):
         self.runtime, self.owner = runtime, owner
