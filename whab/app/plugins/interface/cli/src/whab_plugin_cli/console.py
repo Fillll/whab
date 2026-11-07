@@ -15,7 +15,7 @@ from whab.plugins.local import local_connection
 from . import client
 from .config import ConfigError, connection_defaults
 from .help import describe, overview
-from .identifiers import host_id, plugin_identifiers
+from .identifiers import check_identifiers, host_id, plugin_identifiers
 
 PREFIX = "/api/local/v1"
 ROOT_COMMANDS = {"budget", "plugin", "api", "BUDGET"}
@@ -26,6 +26,8 @@ class CommandError(ValueError):
 
 
 def parser(options):
+    catalog = installed_catalog()
+    check_identifiers(catalog)
     root = argparse.ArgumentParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
         epilog="Examples:\n  whab budget create empty-budget --path ~/budgets\n  whab empty-budget plugin enable ynab-zip-importer\n  whab empty-budget insights summary\n  whab empty-budget trnx non-reviewed\n\nEvery command supports --help. Names containing spaces can be quoted.\nUse whab budget list to discover names and permanent IDs.",
@@ -40,7 +42,7 @@ def parser(options):
     create.add_argument("name", help="Unique budget name (1–100 characters)")
     create.add_argument("--path", help="Directory or .whab file; expands ~ even when quoted. Default: runtime-managed location")
     plugin = groups.add_parser("plugin", help="Discover installed plugins; enable them under a budget name",
-        epilog="Enable for a budget: whab BUDGET plugin enable PLUGIN\n\n" + overview(installed_catalog()),
+        epilog="Enable for a budget: whab BUDGET plugin enable PLUGIN\n\n" + overview(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     plugin.add_argument("action", choices=("list",), nargs="?", default="list", help="List installed plugin documentation offline")
     scoped = groups.add_parser("BUDGET", help="Address a saved budget by its name or permanent ID",

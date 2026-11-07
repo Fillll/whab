@@ -169,3 +169,10 @@ def test_oversized_response_is_not_replayed():
         with pytest.raises(console.CommandError, match="16 MiB"):
             console.exchange(connection, "GET", "/budgets")
     assert len(calls) == 1
+
+
+def test_reserved_importer_collision_cannot_target_another_plugin(transport, monkeypatch, capsys):
+    monkeypatch.setattr(console, "installed_catalog", lambda: {"plugins": [{"id": "ynab-zip-importer"}]})
+    assert console.main(["Empty Budget", "plugin", "enable", "ynab-zip-importer"]) == 1
+    assert not transport[0] and not transport[1]
+    assert "error" in capsys.readouterr().err
