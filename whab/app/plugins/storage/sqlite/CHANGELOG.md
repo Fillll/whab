@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.14.1 — 2026-11-07
+
+PR: [#161](https://github.com/Fillll/whab/pull/161)
+
+- Accept exact portable schemas predating native bank sync settings and omit that native-only column from new credential-free exports. Preserve existing live data and validation of historical table/index combinations.
+
 ## 1.14.0 — 2026-11-07
 
 PR: [#160](https://github.com/Fillll/whab/pull/160)
