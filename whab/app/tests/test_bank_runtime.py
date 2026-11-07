@@ -403,8 +403,6 @@ def test_new_account_setup_blocks_import_until_user_selects_destinations(setup):
     with pytest.raises(Exception, match='destination accounts'):
         run(value.coordinator.sync('fictional-item'))
     assert value.store.get_item('fictional-item')['cursor'] is None
-    value.coordinator.queue_sync('fictional-item')
-    assert not value.coordinator._queued
     # Reviewing provider accounts must never advance the native cursor.
     original = value.provider.call
     remote = {'id': 'bank-account', 'name': 'Fictional checking', 'mask': '1234', 'institution': 'Fictional bank',

@@ -39,6 +39,7 @@ def bank_app(tmp_path):
     coordinator = BankCoordinator(provider, app.state.tracked_store, app.state.bank_stores['plaid'] if 'plaid' in app.state.bank_stores else app.state.bank_lifecycle.bank_store('plaid'),
         budget_id=app.state.ledger_service.budget_id, environment='sandbox', provider_id='plaid', generation=1,
         home=tmp_path / 'flows', encryption_key='11' * 32, requires_account_setup=True,
+        background_scope=app.state.budget_runtime.background,
         automatic_sync=lambda: app.state.bank_jobs.automatic('plaid'))
     injected['plaid'] = coordinator
     try:
@@ -54,6 +55,7 @@ def test_web_connection_waits_for_explicit_history_and_preserves_destination_aft
     response = client.post('/api/plaid/exchange', json={'flowId': flow['flow_id'], 'publicToken': 'fictional-public-token', 'institutionName': 'Fictional bank'})
     assert response.status_code == 200
     assert bank_app.store.transactions('personal') == []
+    assert 'read_sync' not in bank_app.provider.calls
     assert client.post('/api/plaid/sync', json={'itemId': 'item'}).status_code == 400
     preview = client.post('/api/plaid/sync-preview', json={'itemId': 'item'}).json()
     assert preview['accounts'][0]['id'] == 'account'

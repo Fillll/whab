@@ -456,9 +456,7 @@ class BankCoordinator:
             return WebhookResult(result.ok, result.status_code)
 
     def queue_sync(self, item_id):
-        item = self.bank_store.get_item(item_id)
-        if not self.automatic_sync() or (self.requires_account_setup and item is not None
-                and item.get('syncSettings') is None and item.get('lastSynced') is None):
+        if not self.automatic_sync():
             return
         if item_id in self._queued:
             self._queued[item_id]['again'] = True
