@@ -45,6 +45,9 @@ def export_files(store, workspace):
         # installation and must not travel as a second ledger inside its payload.
         for table in ("meta", *_ROW_LIMITS):
             clean.db.execute(f"DELETE FROM {table} WHERE workspace <> 'personal'")
+        # Strip native-only metadata after populating the trusted fresh ledger.
+        # New portable images retain the schema used before bank sync setup.
+        clean.db.execute("ALTER TABLE items DROP COLUMN sync_settings")
         clean.db.execute("VACUUM")
         clean.db.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
         raw = clean.db.serialize()
@@ -113,6 +116,12 @@ def read_files(files, *, with_receipts=False):
         compatible_schemas = [
             [row for row in schema if row[2] not in omitted and row[1] not in omitted_indexes]
             for schema in (expected_schema, legacy_schema)
+            # Bank setup metadata is native-only; older credential-free images
+            # retain their exact earlier items schema, including an empty table.
+            for schema in (schema, [
+                (*row[:3], row[3].replace(", sync_settings TEXT", "")) if row[1] == "items" else row
+                for row in schema
+            ])
             for schema in (schema, [
                 (*row[:3], row[3].replace(
                     ", bank_website TEXT, name_overridden INTEGER NOT NULL DEFAULT 0", ""

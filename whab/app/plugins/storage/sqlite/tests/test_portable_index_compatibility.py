@@ -26,6 +26,7 @@ def portable_payload(store):
     connection = sqlite3.connect(":memory:")
     try:
         connection.deserialize(payload["budget.sqlite"])
+        connection.execute("ALTER TABLE items ADD COLUMN sync_settings TEXT")
         for name in INDEXES:
             sql = store.db.execute("SELECT sql FROM sqlite_schema WHERE name=?", (name,)).fetchone()[0]
             connection.execute(sql)
@@ -47,12 +48,14 @@ def alter(payload, statements):
         connection.close()
 
 
+@pytest.mark.parametrize("missing_bank_settings", [False, True])
 @pytest.mark.parametrize("missing_indexes", MISSING_INDEXES)
 @pytest.mark.parametrize("missing_tables", [(), ("future_funding", "rollover_modes", "transaction_receipts")])
 def test_exact_historical_and_partial_index_schemas_restore_without_migrating_input(
-    store, portable_payload, missing_indexes, missing_tables,
+    store, portable_payload, missing_indexes, missing_tables, missing_bank_settings,
 ):
     files = alter(portable_payload, [
+        *(["ALTER TABLE items DROP COLUMN sync_settings"] if missing_bank_settings else []),
         *(f"DROP INDEX {name}" for name in missing_indexes),
         *(f"DROP TABLE {name}" for name in missing_tables),
     ])
@@ -93,3 +96,15 @@ def test_omitting_additive_indexes_does_not_allow_other_schema_changes(portable_
         files = alter(portable_payload, [*(f"DROP INDEX {index}" for index in INDEXES), change])
         with pytest.raises(StoreError, match="unsupported database schema"):
             read_files(files)
+
+
+def test_new_portable_exports_keep_bank_setup_metadata_native_only(store):
+    files = store.export_budget_files()
+    connection = sqlite3.connect(':memory:')
+    try:
+        connection.deserialize(files['budget.sqlite'])
+        assert 'sync_settings' not in {row[1] for row in connection.execute('PRAGMA table_info(items)')}
+        assert connection.execute('SELECT COUNT(*) FROM items').fetchone()[0] == 0
+        assert read_files(files) == store.export_budget()
+    finally:
+        connection.close()
