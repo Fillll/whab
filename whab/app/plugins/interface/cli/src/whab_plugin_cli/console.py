@@ -102,15 +102,24 @@ def configuration(args):
     return str(Path(home).expanduser().resolve()), environment, args.ca or defaults.get("ca")
 
 
-def exchange(connection, method, path, **kwargs):
+def exchange(connection, method, path, *, import_errors=False, **kwargs):
     with connection.stream(method, path, **kwargs) as response:
-        if response.status_code != 200:
-            raise CommandError(f"WHAB returned HTTP {response.status_code}. Inspect whab budget list and plugin status before retrying; no operation was automatically replayed.")
         raw = bytearray()
         for chunk in response.iter_bytes():
             raw.extend(chunk)
             if len(raw) > 16 * 1024 * 1024:
                 raise CommandError("WHAB response exceeds 16 MiB.")
+        if response.status_code != 200:
+            detail = None
+            if import_errors and response.status_code in {400, 409, 413}:
+                try:
+                    body = json.loads(raw)
+                    detail = body.get("detail", body.get("error")) if isinstance(body, dict) else None
+                except ValueError:
+                    pass
+            if isinstance(detail, str) and 0 < len(detail) <= 1000:
+                raise CommandError(f"WHAB import returned HTTP {response.status_code}: {detail}")
+            raise CommandError(f"WHAB returned HTTP {response.status_code}. Inspect whab budget list and plugin status before retrying; no operation was automatically replayed.")
         return json.loads(raw)
 
 
@@ -149,7 +158,7 @@ def import_file(args):
 def execute_import(connection, identifier, args, raw, fingerprint):
     path = "/budgets/" + quote(identifier, safe="") + "/api/plugins/" + quote(host_id(args.plugin), safe="") + "/import/"
     headers = {"Content-Type": "application/zip", "X-Import-Currency": args.currency}
-    preview = exchange(connection, "POST", path + "preview", content=raw, headers=headers)
+    preview = exchange(connection, "POST", path + "preview", content=raw, headers=headers, import_errors=True)
     if (not isinstance(preview, dict) or preview.get("fingerprint") != fingerprint or preview.get("currency") != args.currency
             or not isinstance(preview.get("parserIdentity"), str) or not re.fullmatch(r"[!-~]{1,256}", preview["parserIdentity"])):
         raise CommandError("WHAB returned an invalid import preview; nothing was committed.")
@@ -158,7 +167,7 @@ def execute_import(connection, identifier, args, raw, fingerprint):
     if preview.get("canImport") is not True:
         raise CommandError("This budget cannot import the file. Run preview to inspect the reason; nothing was committed.")
     result = exchange(connection, "POST", path + "commit", content=raw,
-        headers={**headers, "X-Import-Fingerprint": fingerprint, "X-Import-Parser": preview["parserIdentity"]})
+        headers={**headers, "X-Import-Fingerprint": fingerprint, "X-Import-Parser": preview["parserIdentity"]}, import_errors=True)
     return {**result, "budgetId": identifier, "fingerprint": fingerprint}
 
 

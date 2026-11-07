@@ -175,6 +175,10 @@ A different subsequent archive is refused. See the [YNAB migration limits](../..
 imported accounts need classification and exported balances remain unverified
 estimates.
 
+Import validation failures retain the host's bounded authored explanation for
+HTTP 400, 409 and 413. Invalid JSON, unexpected response shapes, server crashes
+and transport errors remain sanitized. No failed request is automatically replayed.
+
 ## Remote operation
 
 The `cli` Interface plugin installs `whab-cli`, a noninteractive JSON terminal interface for people and external agents. It needs no Web interface or AI plugins. Run it against a budget explicitly enabled with the [server interface](../server/README.md). The terminal executable is available after installing this package; enabling its optional server-side registration adds package information only. `python -m whab --serve` explicitly starts a persistent headless service.

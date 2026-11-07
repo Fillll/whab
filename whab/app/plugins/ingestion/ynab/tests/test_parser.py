@@ -285,6 +285,23 @@ def test_bad_table_encoding_headers_and_row_shapes_are_sanitized(raw):
         parse_dump(archive(extra=[("invalid.tsv", raw)]))
 
 
+def test_encoding_diagnostic_reports_location_without_private_bytes():
+    with pytest.raises(StoreError, match="utf-8; invalid encoding at byte 7 of 8") as error:
+        parse_dump(archive(extra=[("private.tsv", b"private\xff")]))
+    assert "private" not in str(error.value) and "Re-export" in str(error.value)
+
+
+@pytest.mark.parametrize("failure,message", [(UnicodeError, "encoding"),
+    (csv.Error, "malformed CSV/TSV"), (NotImplementedError, "unsupported compression")])
+def test_format_diagnostics_do_not_reveal_library_or_record_details(monkeypatch, failure, message):
+    def fail(data):
+        raise failure("private record contents")
+    monkeypatch.setattr(parser, "_tables", fail)
+    with pytest.raises(StoreError, match=message) as error:
+        parse_dump(b"fixture")
+    assert "private record" not in str(error.value)
+
+
 def test_missing_or_duplicate_tables_are_rejected():
     with pytest.raises(StoreError, match="duplicate Budget or Register"):
         parse_dump(archive(extra=[("second.tsv", table(REGISTER_HEADERS, []))]))

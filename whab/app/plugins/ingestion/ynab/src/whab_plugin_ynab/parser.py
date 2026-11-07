@@ -278,6 +278,14 @@ def parse_dump(data: bytes) -> YnabDump:
         return YnabDump(
             accounts, tuple(categories.values()), tuple(transactions), tuple(assignments), WARNINGS,
         )
-    except (zipfile.BadZipFile, zipfile.LargeZipFile, RuntimeError, NotImplementedError, OSError,
-            EOFError, UnicodeError, csv.Error, OverflowError):
+    except UnicodeDecodeError as error:
+        raise StoreError(f"YNAB table cannot be decoded as {error.encoding}; invalid encoding at byte {error.start} of {len(error.object)}. Re-export the budget as UTF-8 or BOM-marked UTF-16.") from None
+    except UnicodeError:
+        raise StoreError("YNAB tables must use UTF-8 or BOM-marked UTF-16 encoding.") from None
+    except csv.Error:
+        raise StoreError("YNAB table has malformed CSV/TSV data or exceeds the supported field size.") from None
+    except NotImplementedError:
+        raise StoreError("YNAB ZIP uses an unsupported compression method.") from None
+    except (zipfile.BadZipFile, zipfile.LargeZipFile, RuntimeError, OSError,
+            EOFError, OverflowError):
         raise StoreError("Invalid or unsupported YNAB ZIP export.") from None

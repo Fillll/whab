@@ -882,7 +882,8 @@
       "errors": [
         "Missing/empty/oversized files, invalid currency or a changed reviewed fingerprint are rejected before host acquisition.",
         "Disabled importers, invalid archives and nonempty/unsupported storage are refused. Preview reports canImport and reason.",
-        "A changed parser between fresh preview and commit conflicts; HTTP/transport failures are sanitized and never automatically retried."
+        "A changed parser between fresh preview and commit conflicts; HTTP/transport failures are sanitized and never automatically retried.",
+        "Import HTTP 400/409/413 responses retain bounded authored validation messages. Other statuses, malformed responses and transport failures retain sanitized diagnostics."
       ],
       "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
       "availability": "whab BUDGET import PLUGIN preview FILE --currency USD; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints."
@@ -1017,7 +1018,8 @@
       "errors": [
         "Missing/empty/oversized files, invalid currency or a changed reviewed fingerprint are rejected before host acquisition.",
         "Disabled importers, invalid archives and nonempty/unsupported storage are refused. Preview reports canImport and reason.",
-        "A changed parser between fresh preview and commit conflicts; HTTP/transport failures are sanitized and never automatically retried."
+        "A changed parser between fresh preview and commit conflicts; HTTP/transport failures are sanitized and never automatically retried.",
+        "Import HTTP 400/409/413 responses retain bounded authored validation messages. Other statuses, malformed responses and transport failures retain sanitized diagnostics."
       ],
       "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
       "availability": "whab BUDGET import PLUGIN commit FILE --currency USD --fingerprint SHA256_FROM_PREVIEW; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints."

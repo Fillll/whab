@@ -149,3 +149,32 @@ def test_transport_failure_after_commit_does_not_retry(importer, monkeypatch, ca
     monkeypatch.setattr(console, "exchange", fail_commit)
     assert run(importer, "commit", "--fingerprint", importer[1]) == 1
     assert len(importer[2]) == 3 and "private export" not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("status,body,expected", [
+    (400, {"error": "Invalid table encoding."}, "Invalid table encoding."),
+    (409, {"detail": "The import parser changed."}, "The import parser changed."),
+    (413, {"error": "Request too large"}, "Request too large"),
+    (400, [], None), (400, {"detail": 42}, None), (400, {"detail": ""}, None),
+    (400, {"detail": "x" * 1001}, None), (500, {"error": "private crash"}, None),
+], ids=["authored-error", "conflict-detail", "body-limit", "non-object", "non-string", "empty", "oversized", "server-error"])
+def test_import_errors_show_only_bounded_authored_validation_messages(status, body, expected):
+    def reply(request):
+        return httpx.Response(status, json=body)
+    with httpx.Client(base_url="https://localhost", transport=httpx.MockTransport(reply)) as connection:
+        with pytest.raises(console.CommandError) as result:
+            console.exchange(connection, "POST", "/preview", import_errors=True)
+    assert f"HTTP {status}" in str(result.value)
+    if expected:
+        assert expected in str(result.value)
+    else:
+        assert "Inspect whab budget list" in str(result.value) and "private crash" not in str(result.value)
+
+
+def test_invalid_error_json_retains_sanitized_status():
+    def reply(request):
+        return httpx.Response(400, content=b"private non-JSON response")
+    with httpx.Client(base_url="https://localhost", transport=httpx.MockTransport(reply)) as connection:
+        with pytest.raises(console.CommandError, match="HTTP 400") as result:
+            console.exchange(connection, "POST", "/preview", import_errors=True)
+    assert "private non-JSON" not in str(result.value)

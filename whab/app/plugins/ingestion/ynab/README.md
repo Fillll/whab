@@ -43,6 +43,11 @@ YNAB's exported Activity and Available values are validated but are not stored a
 
 The parser never extracts archive members. It bounds compressed and expanded sizes, member counts and row counts; rejects unsafe paths, symlinks, encrypted members, malformed tables, ambiguous table duplicates and unsupported monetary formats. Errors do not include private record contents.
 
+Text decoding failures report the encoding and byte offset without showing table
+contents. Re-export from YNAB as UTF-8 or BOM-marked UTF-16 when decoding fails;
+the importer does not guess a legacy encoding or discard invalid characters.
+Malformed CSV/TSV and unsupported ZIP compression have separate authored errors.
+
 Run from `whab/app/`:
 
 ```sh
