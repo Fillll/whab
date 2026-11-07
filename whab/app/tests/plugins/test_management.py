@@ -64,7 +64,9 @@ def test_discovery_lists_inactive_plugins_without_importing_or_exposing_settings
     instance = manager(tmp_path, installed)
     state = instance.projection()
     rows = {row["id"]: row for row in state["plugins"]}
-    assert rows["sqlite"]["required"] and rows["web"]["required"]
+    assert rows["sqlite"]["required"] and not rows["web"]["required"]
+    assert rows["web"]["enabled"] and rows["web"]["manageable"]
+    assert rows["web"]["selection_control"] == "visual"
     assert rows["sqlite"]["enabled"] and not rows["sqlite"]["manageable"]
     assert rows["report"]["manageable"] and not rows["report"]["active"]
     assert rows["report"]["kinds"] == []  # Unknown until explicitly loaded.
@@ -74,6 +76,35 @@ def test_discovery_lists_inactive_plugins_without_importing_or_exposing_settings
     assert not (tmp_path / "plugins.json").exists()
     assert "fixture-secret" not in json.dumps(state)
     assert "fixture-key" not in json.dumps(state)
+
+
+def test_management_tool_is_not_a_budget_toggle_and_legacy_selection_is_retained_until_save(tmp_path, installed, monkeypatch):
+    cli = Entry("cli", RuntimeError("Management discovery must not import CLI"), value="whab_plugin_cli.plugin:plugin")
+    entries = (*installed, cli)
+    monkeypatch.setattr("whab.plugins.management.metadata.entry_points", lambda **kwargs: entries)
+    write_selection(tmp_path, ("cli",))
+    instance = manager(tmp_path, installed)
+    state = instance.projection()
+    row = next(row for row in state["plugins"] if row["id"] == "cli")
+    assert row["selection_control"] == "management" and row["enabled"] is None
+    assert not row["manageable"] and not row["required"]
+    assert state["configured"] == state["active"] == [] and not state["restart_required"]
+    assert read_selection(tmp_path) == ("cli",) and cli.loaded == 0
+    for operation in (instance.save, instance.preflight_live, instance.schedule_live):
+        with pytest.raises(PluginError) as error:
+            operation(("cli",))
+        assert error.value.code == "management_tool"
+        assert read_selection(tmp_path) == ("cli",)
+    instance.save(())
+    assert read_selection(tmp_path) == ()
+
+
+def test_management_tool_classification_requires_official_unambiguous_registration(tmp_path, monkeypatch):
+    entries = (Entry("cli", RuntimeError("Never import"), value="third_party:plugin"),)
+    monkeypatch.setattr("whab.plugins.management.metadata.entry_points", lambda **kwargs: entries)
+    instance = PluginManager(settings(tmp_path, ui=""), PluginRegistry())
+    row = next(row for row in instance.projection()["plugins"] if row["id"] == "cli")
+    assert row["selection_control"] == "optional" and row["enabled"] is False
 
 
 def test_disabled_bundled_plugins_keep_canonical_names_without_importing(tmp_path, monkeypatch):

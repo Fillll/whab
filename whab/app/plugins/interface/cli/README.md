@@ -66,6 +66,17 @@ whab api command edit_transaction --help
 whab api describe --plugin ynab-zip-importer --help
 ```
 
+## Plugin controls
+
+CLI is an installed management tool, available to all local budgets without
+per-budget activation. Plugin status and documentation identify it as a management
+tool with `enabled: null`; enabling or disabling it for a budget is rejected.
+Primary storage is required: attempts to disable it fail with a nonzero exit code
+and a clear explanation, without changing the selection. Use storage settings to
+change the primary backend. Web is optional; enabling/disabling it uses the durable
+visual-interface transition and preserves ledger access and saved data. An
+already-applied optional choice succeeds without starting another transition.
+
 ## Local operation
 
 A fresh runtime needs only the host, CLI and storage packages. No AI account, Web

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.2 — 2026-11-07
+
+PR: [#157](https://github.com/Fillll/whab/pull/157)
+
+- Explain management-tool and required-storage controls in CLI help and documentation. Report protected toggle failures with nonzero exits and fixed diagnostics in both consoles, without echoing server records.
+
 ## 2.1.1 — 2026-11-06
 
 PR: [#156](https://github.com/Fillll/whab/pull/156)

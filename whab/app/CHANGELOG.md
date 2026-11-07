@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.57.1 — 2026-11-07
+
+PR: [#157](https://github.com/Fillll/whab/pull/157)
+
+- Reject protected plugin changes before activation and verify the requested state before reporting success. Identify the installed CLI as a management tool without budget activation, and report visual interfaces as optional while retaining their dedicated transition flow.
+
 ## 2.57.0 — 2026-11-06
 
 PR: [#153](https://github.com/Fillll/whab/pull/153)

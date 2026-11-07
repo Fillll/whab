@@ -13,6 +13,7 @@ import httpx
 from whab.plugins.documentation import core_document, installed_catalog
 
 from .config import ConfigError, connection_defaults
+from .errors import PluginSelectionError, selection_error
 from .help import contextual_help, describe, overview, render_catalog
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 
@@ -141,13 +142,17 @@ def _local(args):
             _, method, path, kwargs = request(local, "x" * 32)
             path = prefix + path.partition("/budgets/" + quote(local.budget, safe=""))[2]
         with client.stream(method, path, **kwargs) as response:
-            if response.status_code != 200:
-                raise ValueError("Local operation failed. Inspect the budget before retrying.")
             raw = bytearray()
             for chunk in response.iter_bytes():
                 raw.extend(chunk)
                 if len(raw) > 16 * 1024 * 1024:
                     raise ValueError("Local response exceeds 16 MiB.")
+            if response.status_code != 200:
+                if args.kind == "plugins" and response.status_code in {400, 409}:
+                    message = selection_error(raw)
+                    if message:
+                        raise PluginSelectionError(message)
+                raise ValueError("Local operation failed. Inspect the budget before retrying.")
             result = json.loads(raw)
         if args.kind not in {"plugins", "sync", "jobs"} and (
                 type(result) is not dict or result.get("budgetId") != (args.budget or "default")
@@ -194,7 +199,7 @@ def main(argv=None):
         else:
             print(json.dumps(result, allow_nan=False))
         return 0
-    except ConfigError as error:
+    except (ConfigError, PluginSelectionError) as error:
         print(json.dumps({"error": str(error)}), file=sys.stderr)
         return 1
     except (ValueError, OSError, httpx.HTTPError):

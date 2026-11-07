@@ -664,6 +664,16 @@ settings = PluginSettings(
 
 Host-owned `GET /api/plugins/{id}/settings` returns `insights` and `actions` for an active plugin, with empty lists when it has no custom settings. `POST /api/plugins/{id}/settings/actions/{action_id}` invokes a declared action and returns `message` and refreshed `settings`. Send JSON (`{}` is sufficient); local Host/origin, request-size and no-store guards apply. Unknown/inactive plugins and unavailable actions return sanitized errors. A successful action also clears that plugin's fallback host logo cache. Browsing inactive settings reads only the installed metadata projection and does not execute hooks. Enabling/disabling still applies after restart; an action such as flushing the active logo cache takes effect immediately.
 
+The management projection's `selection_control` is `management`, `required`,
+`visual` or `optional`. The installed CLI tool uses `management`, `enabled: null`
+and `manageable: false`; it is available independently of budget activation and
+cannot be toggled. The primary storage alone is `required`; it cannot be disabled
+through plugin controls. Visual interfaces (including Web) are optional and use
+`visual` controls to preserve browser coordination, rather than the generic
+optional-selection form. Their current selection is reflected by `enabled`.
+Local enable/disable requests reject non-manageable rows before loading code or
+changing configuration, and only report success if the requested selection holds.
+
 The management projection's `category` is one of `interface`, `ingestion`, `insight`, `storage`, `automation`, `extension` or `example`. Bundled registrations can be categorized without importing disabled descriptors; otherwise running capabilities supply a category and unknown registrations use `extension`.
 
 ## Runtime interface for host integration and tests

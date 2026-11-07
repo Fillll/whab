@@ -61,7 +61,8 @@ def render_catalog(catalog):
     lines = ["WHAB operation documentation (" + catalog["source"] + ")", ""]
     documents = ([catalog["core"]] if catalog["core"] else [])
     for plugin in catalog["plugins"]:
-        enabled = "installed; enablement unknown offline" if plugin["enabled"] is None else "enabled" if plugin["enabled"] else "installed; disabled"
+        enabled = ("installed; management tool" if plugin.get("selection_control") == "management" else
+                   "installed; enablement unknown offline" if plugin["enabled"] is None else "enabled" if plugin["enabled"] else "installed; disabled")
         lines.append(f'Plugin {cli_id(plugin["id"])} {plugin["version"]}: {enabled}')
         if plugin["documentation"]:
             documents.append(plugin["documentation"])

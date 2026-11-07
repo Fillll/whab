@@ -16,6 +16,7 @@ from whab.plugins.local import local_connection
 
 from . import client
 from .config import ConfigError, connection_defaults
+from .errors import selection_error
 from .help import describe, overview
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 
@@ -52,7 +53,7 @@ def parser(options):
     scoped.add_argument("target", help=argparse.SUPPRESS)
     commands = scoped.add_subparsers(dest="command", required=True)
     plugins = commands.add_parser("plugin", help="List, enable or disable this budget's plugins",
-        epilog="Example: whab empty-budget plugin enable ynab-zip-importer\nChanges apply live where supported; otherwise restart_required is returned.")
+        epilog="Example: whab empty-budget plugin enable ynab-zip-importer\nChanges apply live where supported; otherwise restart_required is returned. CLI is an installed management tool, not a budget toggle. Required storage cannot be disabled. Web is optional and can be disabled.")
     plugins.add_argument("action", choices=("list", "status", "enable", "disable"))
     plugins.add_argument("plugin", nargs="?", help="Identifier from whab plugin list; required for enable/disable")
     imports = commands.add_parser("import", help="Preview or commit a ZIP import into this empty budget",
@@ -102,7 +103,7 @@ def configuration(args):
     return str(Path(home).expanduser().resolve()), environment, args.ca or defaults.get("ca")
 
 
-def exchange(connection, method, path, *, import_errors=False, **kwargs):
+def exchange(connection, method, path, *, import_errors=False, plugin_errors=False, **kwargs):
     with connection.stream(method, path, **kwargs) as response:
         raw = bytearray()
         for chunk in response.iter_bytes():
@@ -110,6 +111,10 @@ def exchange(connection, method, path, *, import_errors=False, **kwargs):
             if len(raw) > 16 * 1024 * 1024:
                 raise CommandError("WHAB response exceeds 16 MiB.")
         if response.status_code != 200:
+            if plugin_errors and response.status_code in {400, 409}:
+                message = selection_error(raw)
+                if message:
+                    raise CommandError(message)
             detail = None
             if import_errors and response.status_code in {400, 409, 413}:
                 try:
@@ -189,7 +194,8 @@ def execute(args, home, environment, ca):
             else:
                 if not args.plugin:
                     raise CommandError("Choose a plugin identifier. Use whab plugin list to discover plugins.")
-                result = exchange(connection, "POST", prefix + "/plugins", json={"action": args.action, "plugin": host_id(args.plugin)})
+                result = exchange(connection, "POST", prefix + "/plugins", plugin_errors=True,
+                                  json={"action": args.action, "plugin": host_id(args.plugin)})
             return plugin_identifiers(result)
         if args.command == "insights":
             result = exchange(connection, "GET", prefix + "/summary", params={"currency": args.currency, **({"month": args.month} if args.month else {})})

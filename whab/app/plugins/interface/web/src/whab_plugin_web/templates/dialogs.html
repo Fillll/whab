@@ -102,7 +102,7 @@
 {% set manager = plugin_management|default({'plugins': [], 'restart_required': false, 'error': none}) %}
 {% set plugin_categories = {'interface': 'Interfaces', 'ingestion': 'Ingestion', 'insight': 'Insights', 'storage': 'Storage', 'automation': 'Automation', 'extension': 'Extensions'} %}
 {% set visible_plugins = manager.plugins|rejectattr('installed', 'equalto', false)|rejectattr('category', 'equalto', 'example')|rejectattr('id', 'equalto', 'example')|list %}
-{% macro plugin_status(plugin) %}{% if plugin.required %}Required{% elif plugin.active and plugin.enabled %}Enabled{% elif plugin.active %}Will disable after restart{% elif plugin.enabled %}Will enable after restart{% else %}Disabled{% endif %}{% endmacro %}
+{% macro plugin_status(plugin) %}{% if plugin.selection_control=='management' %}Installed · management tool{% elif plugin.required %}Required{% elif plugin.active and plugin.enabled %}Enabled{% elif plugin.active %}Will disable after restart{% elif plugin.enabled %}Will enable after restart{% else %}Disabled{% endif %}{% endmacro %}
 <dialog class="modal settings-modal settings-window" id="settings-dialog" aria-label="Settings">
   <button class="icon-button settings-close" type="button" data-close-dialog aria-label="Close Settings">{{ icon('close', 20) }}</button>
 <article id="settings-home" data-settings-page aria-label="Settings">
@@ -211,13 +211,16 @@
         {% for plugin in category_plugins %}
           <div class="plugin-row">
             <label class="plugin-toggle">
+              {% if plugin.selection_control not in ['management', 'visual'] %}
               <input type="checkbox" value="{{ plugin.id }}"{% if not plugin.required %} name="plugin"{% endif %}{% if plugin.enabled %} checked{% endif %}{% if workspace=='demo' or plugin.required or (not plugin.manageable and not plugin.enabled) %} disabled{% endif %}>
+              {% endif %}
               <strong>{% if plugin.id=='random-forest-categorization' %}{{ icon('forest', 16) }} {% endif %}{{ plugin.display_name }}</strong>
             </label>
             <small class="plugin-meta">{% if plugin.version %}Version {{ plugin.version }}{% endif %}</small>
             <span class="plugin-state">{{ plugin_status(plugin) }}</span>
             <button class="button plugin-settings-button" type="button" data-dialog="plugin-options-{{ plugin.id }}" data-plugin-options aria-label="Settings for {{ plugin.display_name }}">Settings{{ icon('chevron-right', 14) }}</button>
             {% if plugin.reason %}<small class="plugin-reason">{{ plugin.reason }}</small>{% endif %}
+            {% if plugin.selection_control=='visual' %}<small class="plugin-reason">Optional visual interface · manage in Settings.</small>{% endif %}
           </div>
         {% endfor %}
         {% if not category_plugins %}<p class="settings-notice plugin-category-empty">No installed plugins</p>{% endif %}
@@ -256,7 +259,7 @@
     <div><dt>Category</dt><dd>{{ plugin_categories.get(plugin.category|default('extension'), 'Extensions') }}</dd></div>
     <div><dt>Plugin</dt><dd>{{ plugin.distribution or plugin.id }}{% if plugin.version %} · {{ plugin.version }}{% endif %}</dd></div>
     <div><dt>Selection</dt><dd>{{ plugin_status(plugin) }}</dd></div>
-    <div><dt>Runtime</dt><dd>{{ 'Running' if plugin.active else 'Not running' }}</dd></div>
+    <div><dt>Runtime</dt><dd>{{ 'Available on this device' if plugin.selection_control=='management' else 'Running' if plugin.active else 'Not running' }}</dd></div>
   </dl>
   {% if plugin.reason %}<p class="settings-notice">{{ plugin.reason }}</p>{% endif %}
   <section class="plugin-settings" aria-label="Plugin dependencies">
@@ -312,7 +315,7 @@
     <p class="settings-notice" data-appearance-status role="status" aria-live="polite">Changes apply immediately and are remembered in this browser.</p>
   </fieldset>
   {% endif %}
-  <section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings>{% if not plugin.active %}<p class="settings-notice">{% if plugin.enabled %}Apply a supported live selection or restart WHAB to view this plugin’s settings.{% else %}Enable this plugin, then review a supported live selection or save it for restart to view its settings.{% endif %}</p>{% endif %}</section>
+  <section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings>{% if plugin.selection_control=='management' %}<p class="settings-notice">Use whab or whab-cli from the terminal to manage budgets. No budget activation is needed.</p>{% elif not plugin.active %}<p class="settings-notice">{% if plugin.enabled %}Apply a supported live selection or restart WHAB to view this plugin’s settings.{% else %}Enable this plugin, then review a supported live selection or save it for restart to view its settings.{% endif %}</p>{% endif %}</section>
   {% for bank in bank_panels if bank.id == plugin.id %}
     {% with status=bank.status, items=bank['items'] %}{% include bank.template %}{% endwith %}
   {% endfor %}

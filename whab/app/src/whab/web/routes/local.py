@@ -146,6 +146,12 @@ def create_router(app):
         row = next((row for row in rows if row["id"] == body.plugin), None)
         if row is None or not row["installed"]:
             raise HTTPException(400, "Choose an installed plugin.")
+        if not row["manageable"]:
+            code = "management_tool" if row["selection_control"] == "management" else "required_plugin" if row["required"] else "invalid_configuration"
+            return JSONResponse({"error": row["reason"] or "This plugin cannot be changed here.",
+                                 "code": code, "plugin_id": body.plugin}, status_code=409)
+        if row["enabled"] == (body.action == "enable"):
+            return await run_in_threadpool(plugin_projection)
         from whab.plugins.management import installed_entrypoints
         from whab.plugins.runtime import load_descriptors
         descriptor, = await run_in_threadpool(load_descriptors, (body.plugin,), installed_entrypoints())
@@ -174,7 +180,12 @@ def create_router(app):
                 await run_in_threadpool(manager.save, selection)
             else:
                 await manager.live.activate(selection)
-        return await run_in_threadpool(plugin_projection)
+        result = await run_in_threadpool(plugin_projection)
+        changed = next(row for row in result["plugins"] if row["id"] == body.plugin)
+        if changed["enabled"] != (body.action == "enable"):
+            raise PluginError("The requested plugin selection was not applied. Inspect plugin status before retrying.",
+                              code="selection_not_applied", plugin_id=body.plugin)
+        return result
 
     @router.post("/sync")
     async def sync(request: Request, body: SyncBody):
