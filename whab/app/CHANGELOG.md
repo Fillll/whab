@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.58.1 — 2026-11-07
+
+PR: [#159](https://github.com/Fillll/whab/pull/159)
+
+- Fix saving plugin selections that include bank workers with immutable UI resource bundles, while retaining validation for bank plugins that supply resource directories.
+
 ## 2.58.0 — 2026-11-07
 
 PR: [#158](https://github.com/Fillll/whab/pull/158)
