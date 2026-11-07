@@ -1,8 +1,10 @@
 """Name-addressed local console; the host owns storage and financial rules."""
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from urllib.parse import quote
@@ -30,7 +32,7 @@ def parser(options):
     check_identifiers(catalog)
     root = argparse.ArgumentParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
-        epilog="Examples:\n  whab budget create empty-budget --path ~/budgets\n  whab empty-budget plugin enable ynab-zip-importer\n  whab empty-budget insights summary\n  whab empty-budget trnx non-reviewed\n\nEvery command supports --help. Names containing spaces can be quoted.\nUse whab budget list to discover names and permanent IDs.",
+        epilog="Examples:\n  whab budget create empty-budget --path ~/budgets\n  whab empty-budget plugin enable ynab-zip-importer\n  whab empty-budget import ynab-zip-importer preview export.zip --currency USD\n  whab empty-budget insights summary\n  whab empty-budget trnx non-reviewed\n\nEvery command supports --help. Names containing spaces can be quoted.\nUse whab budget list to discover names and permanent IDs.",
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
     budget = groups.add_parser("budget", help="Create and list saved budgets")
@@ -46,13 +48,26 @@ def parser(options):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     plugin.add_argument("action", choices=("list",), nargs="?", default="list", help="List installed plugin documentation offline")
     scoped = groups.add_parser("BUDGET", help="Address a saved budget by its name or permanent ID",
-        usage="whab BUDGET {plugin,insights,transactions,trnx} ...")
+        usage="whab BUDGET {plugin,import,insights,transactions,trnx} ...")
     scoped.add_argument("target", help=argparse.SUPPRESS)
     commands = scoped.add_subparsers(dest="command", required=True)
     plugins = commands.add_parser("plugin", help="List, enable or disable this budget's plugins",
         epilog="Example: whab empty-budget plugin enable ynab-zip-importer\nChanges apply live where supported; otherwise restart_required is returned.")
     plugins.add_argument("action", choices=("list", "status", "enable", "disable"))
     plugins.add_argument("plugin", nargs="?", help="Identifier from whab plugin list; required for enable/disable")
+    imports = commands.add_parser("import", help="Preview or commit a ZIP import into this empty budget",
+        epilog="Enable an importer first: whab BUDGET plugin enable ynab-zip-importer\nThen: whab BUDGET import ynab-zip-importer preview --help",
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    imports.add_argument("plugin", help="Enabled file importer, for example ynab-zip-importer (ynab is also accepted)")
+    stages = imports.add_subparsers(dest="stage", required=True)
+    for stage in ("preview", "commit"):
+        operation = stages.add_parser(stage, help="Read counts and warnings without changing financial data" if stage == "preview" else "Import the reviewed archive atomically into an empty budget",
+            epilog="Example:\n  whab empty-budget import ynab-zip-importer preview '~/Downloads/export.zip' --currency USD\n  whab empty-budget import ynab-zip-importer commit '~/Downloads/export.zip' --currency USD --fingerprint SHA256_FROM_PREVIEW\n\nCommit verifies the reviewed fingerprint, previews again and echoes that parser's identity in the same host lease. Nonempty budgets and changed files/parsers are refused. No automatic retries; after an uncertain commit, preview the same file to inspect alreadyImported before retrying that fingerprint. Imported accounts require classification; exported balances remain unverified estimates.",
+            formatter_class=argparse.RawDescriptionHelpFormatter)
+        operation.add_argument("file", help="Local ZIP export, at most 10 MiB; quoted ~ expands")
+        operation.add_argument("--currency", required=True, help="Confirm the export currency explicitly (USD for YNAB)")
+        if stage == "commit":
+            operation.add_argument("--fingerprint", required=True, help="Exact SHA-256 fingerprint returned by the reviewed preview")
     insights = commands.add_parser("insights", help="Read financial reports without AI")
     reports = insights.add_subparsers(dest="report", required=True)
     summary = reports.add_parser("summary", help="Read the core monthly budget summary in one currency",
@@ -117,7 +132,38 @@ def create_path(name, value):
     return str(path)
 
 
+def import_file(args):
+    """Read bounded bytes and bind explicit confirmation before host acquisition."""
+    with Path(args.file).expanduser().open("rb") as stream:
+        raw = stream.read(10 * 1024 * 1024 + 1)
+    if not raw or len(raw) > 10 * 1024 * 1024:
+        raise CommandError("Choose a ZIP export no larger than 10 MiB.")
+    if not re.fullmatch(r"[A-Z]{3}", args.currency):
+        raise CommandError("Confirm a three-letter uppercase export currency, for example USD.")
+    fingerprint = hashlib.sha256(raw).hexdigest()
+    if args.stage == "commit" and args.fingerprint != fingerprint:
+        raise CommandError("The file does not match the reviewed fingerprint. Preview it again before importing.")
+    return raw, fingerprint
+
+
+def execute_import(connection, identifier, args, raw, fingerprint):
+    path = "/budgets/" + quote(identifier, safe="") + "/api/plugins/" + quote(host_id(args.plugin), safe="") + "/import/"
+    headers = {"Content-Type": "application/zip", "X-Import-Currency": args.currency}
+    preview = exchange(connection, "POST", path + "preview", content=raw, headers=headers)
+    if (not isinstance(preview, dict) or preview.get("fingerprint") != fingerprint or preview.get("currency") != args.currency
+            or not isinstance(preview.get("parserIdentity"), str) or not re.fullmatch(r"[!-~]{1,256}", preview["parserIdentity"])):
+        raise CommandError("WHAB returned an invalid import preview; nothing was committed.")
+    if args.stage == "preview":
+        return {**preview, "budgetId": identifier}
+    if preview.get("canImport") is not True:
+        raise CommandError("This budget cannot import the file. Run preview to inspect the reason; nothing was committed.")
+    result = exchange(connection, "POST", path + "commit", content=raw,
+        headers={**headers, "X-Import-Fingerprint": fingerprint, "X-Import-Parser": preview["parserIdentity"]})
+    return {**result, "budgetId": identifier, "fingerprint": fingerprint}
+
+
 def execute(args, home, environment, ca):
+    raw, fingerprint = import_file(args) if args.scope == "BUDGET" and args.command == "import" else (None, None)
     with local_connection(home, environment, ca=ca) as connection:
         if args.scope == "budget":
             if args.action == "list":
@@ -126,6 +172,8 @@ def execute(args, home, environment, ca):
                 json={"name": args.name, "path": create_path(args.name, args.path)})
         identifier = resolve_budget(connection, args.target)
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
+        if args.command == "import":
+            return execute_import(connection, identifier, args, raw, fingerprint)
         if args.command == "plugin":
             if args.action in {"list", "status"}:
                 result = exchange(connection, "GET", prefix + "/plugins")

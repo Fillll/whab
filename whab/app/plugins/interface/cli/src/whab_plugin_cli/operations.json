@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "cli",
-  "summary": "Name-addressed whab console, offline help and JSON discovery, authenticated local budget creation, plugin management and read-only reports; production is the CLI default.",
+  "summary": "Name-addressed whab console, offline help and JSON discovery, local budget creation, guarded file imports, plugin management and reports; production is the CLI default.",
   "delegates": [
     "core"
   ],
@@ -728,6 +728,299 @@
       ],
       "retry": "Read again as needed. After an uncertain creation or plugin change, inspect budget list and plugin status before any explicit retry. Creation refuses duplicate registered names and existing files.",
       "availability": "whab BUDGET transactions non-reviewed; trnx and unreviewed are aliases. Uses authenticated local queries/transactions."
+    },
+    {
+      "name": "import.preview",
+      "kind": "local",
+      "summary": "Preview a local archive in an explicitly addressed budget without saving financial data.",
+      "input": {
+        "type": "object",
+        "description": "Explicit name-addressed CLI arguments.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique saved budget name or permanent ID, resolved once in the selected runtime."
+          },
+          "plugin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Enabled file importer ID, for example ynab-zip-importer; legacy ynab is accepted."
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Local ZIP path; quoted ~ expands. Nonempty and at most 10 MiB."
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "Explicit confirmation of the export currency; USD for YNAB. No implicit default."
+          }
+        },
+        "required": [
+          "budget",
+          "plugin",
+          "file",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Destination identity and import preview or saved receipt; no financial rows or credentials.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent destination budget identity."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "SHA-256 of the exact uploaded bytes."
+          },
+          "alreadyImported": {
+            "type": "boolean",
+            "description": "Whether this plugin/archive already has an import receipt in this budget."
+          },
+          "accounts": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of imported accounts."
+          },
+          "categories": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of imported categories."
+          },
+          "transactions": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of imported transactions."
+          },
+          "assignments": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of imported assignments."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Confirmed import currency."
+          },
+          "budgetStartMonth": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Earliest imported assignment month."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Parser limitations to review before commit."
+          },
+          "parserIdentity": {
+            "type": "string",
+            "description": "Opaque parser generation for this preview; commit obtains a fresh guarded preview."
+          },
+          "canImport": {
+            "type": "boolean",
+            "description": "Whether the target storage permits this import."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason when the target cannot import this archive."
+          }
+        },
+        "required": [
+          "budgetId",
+          "fingerprint",
+          "alreadyImported",
+          "accounts",
+          "categories",
+          "transactions",
+          "assignments",
+          "currency",
+          "budgetStartMonth",
+          "warnings",
+          "parserIdentity",
+          "canImport",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "empty-budget",
+            "plugin": "ynab-zip-importer",
+            "file": "~/Downloads/fictional.zip",
+            "currency": "USD"
+          },
+          "output": {
+            "budgetId": "fictional-budget-id",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "alreadyImported": false,
+            "accounts": 0,
+            "categories": 0,
+            "transactions": 0,
+            "assignments": 0,
+            "currency": "USD",
+            "budgetStartMonth": null,
+            "warnings": [],
+            "parserIdentity": "fictional-parser",
+            "canImport": true,
+            "reason": ""
+          }
+        }
+      ],
+      "side_effects": "Reads and validates the archive; creates no financial records or budgets.",
+      "permissions": "Device-local home profile over verified HTTPS using the public local host adapter; normal Host/origin guards remain. The importer must already be enabled. Not a remote ledger command.",
+      "scope": "One resolved permanent budget ID and environment; personal workspace only. Currency must match the parser result. Other budgets, bank connections and credentials remain separate.",
+      "errors": [
+        "Missing/empty/oversized files, invalid currency or a changed reviewed fingerprint are rejected before host acquisition.",
+        "Disabled importers, invalid archives and nonempty/unsupported storage are refused. Preview reports canImport and reason.",
+        "A changed parser between fresh preview and commit conflicts; HTTP/transport failures are sanitized and never automatically retried."
+      ],
+      "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
+      "availability": "whab BUDGET import PLUGIN preview FILE --currency USD; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints."
+    },
+    {
+      "name": "import.commit",
+      "kind": "local",
+      "summary": "Atomically import the reviewed archive into the explicitly addressed pristine personal budget.",
+      "input": {
+        "type": "object",
+        "description": "Explicit name-addressed CLI arguments.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique saved budget name or permanent ID, resolved once in the selected runtime."
+          },
+          "plugin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Enabled file importer ID, for example ynab-zip-importer; legacy ynab is accepted."
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Local ZIP path; quoted ~ expands. Nonempty and at most 10 MiB."
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "Explicit confirmation of the export currency; USD for YNAB. No implicit default."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Exact SHA-256 returned by the reviewed preview; changed files are refused before network access."
+          }
+        },
+        "required": [
+          "budget",
+          "plugin",
+          "file",
+          "currency",
+          "fingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Destination identity and import preview or saved receipt; no financial rows or credentials.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent destination budget identity."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "SHA-256 of the exact uploaded bytes."
+          },
+          "alreadyImported": {
+            "type": "boolean",
+            "description": "Whether this plugin/archive already has an import receipt in this budget."
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "accounts": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of imported accounts."
+              },
+              "categories": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of imported categories."
+              },
+              "transactions": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of imported transactions."
+              },
+              "assignments": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of imported assignments."
+              }
+            },
+            "required": [
+              "accounts",
+              "categories",
+              "transactions",
+              "assignments"
+            ],
+            "additionalProperties": false,
+            "description": "Saved account/category/transaction/assignment counts from the atomic import receipt."
+          }
+        },
+        "required": [
+          "budgetId",
+          "fingerprint",
+          "alreadyImported",
+          "counts"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "empty-budget",
+            "plugin": "ynab-zip-importer",
+            "file": "~/Downloads/fictional.zip",
+            "currency": "USD",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "output": {
+            "budgetId": "fictional-budget-id",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "alreadyImported": false,
+            "counts": {
+              "accounts": 0,
+              "categories": 0,
+              "transactions": 0,
+              "assignments": 0
+            }
+          }
+        }
+      ],
+      "side_effects": "Rechecks file SHA-256, obtains a fresh preview, then echoes its fingerprint/parser identity with identical bytes in the same host lease. Storage atomically saves records, assignments, budget start and a receipt. No new budget is created and existing records are never merged or replaced.",
+      "permissions": "Device-local home profile over verified HTTPS using the public local host adapter; normal Host/origin guards remain. The importer must already be enabled. Not a remote ledger command.",
+      "scope": "One resolved permanent budget ID and environment; personal workspace only. Currency must match the parser result. Other budgets, bank connections and credentials remain separate.",
+      "errors": [
+        "Missing/empty/oversized files, invalid currency or a changed reviewed fingerprint are rejected before host acquisition.",
+        "Disabled importers, invalid archives and nonempty/unsupported storage are refused. Preview reports canImport and reason.",
+        "A changed parser between fresh preview and commit conflicts; HTTP/transport failures are sanitized and never automatically retried."
+      ],
+      "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
+      "availability": "whab BUDGET import PLUGIN commit FILE --currency USD --fingerprint SHA256_FROM_PREVIEW; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints."
     }
   ]
 }

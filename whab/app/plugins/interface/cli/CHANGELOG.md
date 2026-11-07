@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 — 2026-11-06
+
+PR: [#155](https://github.com/Fillll/whab/pull/155)
+
+- Add discoverable `whab BUDGET import PLUGIN preview|commit FILE --currency USD` commands using the existing guarded host import API. Preview reports counts, warnings and eligibility; commit requires the reviewed SHA-256, checks bounded file bytes before connecting and obtains a fresh parser identity within the same host lease. Preserve empty-budget safeguards, atomic receipts, exact-file retries and isolation without direct database access or automatic replay.
+
 ## 2.0.0 — 2026-11-06
 
 PR: [#153](https://github.com/Fillll/whab/pull/153)
