@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.57.0 — 2026-11-06
+
+PR: [#153](https://github.com/Fillll/whab/pull/153)
+
+- Add authenticated local budget listing/creation that reuses the active host, saves a new empty SQLite authority, preserves other budgets, and refuses duplicate names, identity collisions, reserved names and existing paths.
+- Expose a lease-scoped local summary using the existing core currency projection; preserve HTTPS, local authentication and demo-management guards.
+
 ## 2.56.2 — 2026-11-04
 
 PR: [#151](https://github.com/Fillll/whab/pull/151)

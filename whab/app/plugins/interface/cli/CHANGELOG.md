@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0 — 2026-11-06
+
+PR: [#153](https://github.com/Fillll/whab/pull/153)
+
+- Add the `whab` console with name-addressed budgets, create/list, per-budget plugin controls, core summaries and unreviewed transaction reads. Support directory/file paths and quoted `~`, default local profiles, nested offline help and advanced `whab api` discovery.
+- **Breaking default change:** CLI commands now select production when neither an option nor profile specifies an environment. Explicit sandbox options/profiles remain supported; the host SDK and developer fixtures retain sandbox defaults. Requires WHAB 2.57 or newer.
+
 ## 1.5.0 — 2026-11-06
 
 PR: [#152](https://github.com/Fillll/whab/pull/152)
