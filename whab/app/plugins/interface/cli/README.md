@@ -137,6 +137,44 @@ sanitized. Plugin changes use existing live transitions, including browser edit
 draining for visual changes; unsupported live changes report their limitation.
 Neither the CLI nor the scheduler reads or writes a database directly.
 
+## File imports
+
+CLI 2.1 adds preview and commit commands for enabled file importers. Start with
+`whab BUDGET import --help` and `whab BUDGET import ynab-zip-importer preview --help`.
+For a new empty budget:
+
+```sh
+whab budget create empty-budget
+whab empty-budget plugin enable ynab-zip-importer
+whab empty-budget import ynab-zip-importer preview '~/Downloads/export.zip' --currency USD
+whab empty-budget import ynab-zip-importer commit '~/Downloads/export.zip' --currency USD --fingerprint SHA256_FROM_PREVIEW
+```
+
+Review the preview's counts, warnings, `canImport`, `reason` and SHA-256
+`fingerprint` before committing. Currency confirmation is required; the bundled
+YNAB parser accepts USD. ZIP files must be nonempty and at most 10 MiB. Quoted
+`~` expands. Use the fingerprint returned by the reviewed preview verbatim.
+
+Commit checks that fingerprint before connecting, obtains a fresh preview and
+echoes its parser identity and fingerprint with the identical archive bytes in
+the same host lease. A parser change between that preview and commit is refused.
+This works even if a temporary headless host exited after the earlier preview.
+Names resolve once to a permanent budget identity; other budgets are unchanged.
+The CLI uses the existing host import routes and never writes a database directly.
+
+This imports into the addressed pristine personal budget, replacing only untouched
+seed categories. Nonempty budgets are refused; financial data is never merged or
+overwritten. Preview saves no financial records. Commit atomically saves the
+import and its receipt. Neither step creates a second budget or switches the
+browser's selected budget. The importer must already be enabled in the target.
+
+No command is automatically retried. After an uncertain commit, preview the same
+file in the same budget and inspect `alreadyImported`; an exact same-file commit
+retry returns the receipt without duplicating records or overwriting later edits.
+A different subsequent archive is refused. See the [YNAB migration limits](../../ingestion/ynab/README.md#migration-limits):
+imported accounts need classification and exported balances remain unverified
+estimates.
+
 ## Remote operation
 
 The `cli` Interface plugin installs `whab-cli`, a noninteractive JSON terminal interface for people and external agents. It needs no Web interface or AI plugins. Run it against a budget explicitly enabled with the [server interface](../server/README.md). The terminal executable is available after installing this package; enabling its optional server-side registration adds package information only. `python -m whab --serve` explicitly starts a persistent headless service.

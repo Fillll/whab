@@ -2,6 +2,7 @@
 
 import json
 from time import monotonic, sleep
+from zipfile import ZipFile
 
 from whab_plugin_cli import console
 
@@ -49,8 +50,28 @@ def test_short_commands_create_reuse_and_reopen_real_budgets(tmp_path, monkeypat
     assert json.loads(endpoint.read_bytes())["pid"] == pid
     assert console.main(["--environment", "sandbox", "budget", "create", "empty-budget"]) == 1
     capsys.readouterr()
+    export = tmp_path / "fictional.zip"
+    with ZipFile(export, "w") as archive:
+        archive.writestr("Budget.csv", "Month,Category Group/Category,Category Group,Category,Assigned,Activity,Available\nOct 2026,Living: Food,Living,Food,$100.00,-$12.34,$87.66\n")
+        archive.writestr("Register.csv", "Account,Flag,Date,Payee,Category Group/Category,Category Group,Category,Memo,Outflow,Inflow,Cleared\nChecking,,2026-10-01,Fixture shop,Living: Food,Living,Food,Synthetic memo,$12.34,$0.00,Uncleared\n")
+    def import_run(stage, *extra):
+        return run("empty-budget", "import", "ynab-zip-importer", stage, str(export), "--currency", "USD", *extra)
+    preview = import_run("preview")
+    assert preview["canImport"] and preview["transactions"] == 1 and not preview["alreadyImported"]
+    assert run("empty-budget", "trnx", "non-reviewed")["data"] == []
+    committed = import_run("commit", "--fingerprint", preview["fingerprint"])
+    assert committed["budgetId"] == created["id"] and not committed["alreadyImported"]
+    assert committed["counts"] == {key: preview[key] for key in ("accounts", "categories", "transactions", "assignments")}
+    assert len(run("empty-budget", "trnx", "non-reviewed")["data"]) == 1
+    assert run("Other Budget", "trnx", "non-reviewed")["data"] == []
+    assert import_run("commit", "--fingerprint", preview["fingerprint"])["alreadyImported"]
+    manifest, ledger = decode_budget((tmp_path / "exports/empty-budget.whab").read_bytes())
+    assert len(ledger["accounts"]) == len(ledger["transactions"]) == len(ledger["assignments"]) == 1
+    assert ledger["transactions"][0]["note"] == "Synthetic memo\n[YNAB: uncleared]"
     wait_for_shutdown()
     # A new temporary host reopens exactly the registered budget and its plugins.
     assert run("empty-budget", "plugin", "status")["configured"] == ["ynab-zip-importer"]
     assert run(created["id"], "transactions", "unreviewed")["budgetId"] == created["id"]
+    # A fresh parser generation still permits an explicit same-file receipt retry.
+    assert import_run("commit", "--fingerprint", preview["fingerprint"])["alreadyImported"]
     wait_for_shutdown()

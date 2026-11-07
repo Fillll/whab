@@ -10,6 +10,8 @@ Enable **YNAB ZIP importer** through Settings → Plugins, save, and restart. Op
 
 The destination is a new empty SQLite budget, so the current budget can already contain accounts or imported data. Existing financial data is never replaced or merged. Preview only reads and validates the ZIP; it creates no budget or financial records. Commit reparses and validates the same SHA-256 fingerprint, and SQLite saves the complete import and receipt in one transaction. Once creation starts, the name stays locked for retries. A failed request can be retried with the same import operation to open the same budget without duplicates or overwriting subsequent edits. Starting a new preview and import creates another separate budget, even for the same archive. Source account records, bank connections, credentials and plugin settings are not copied. The older API for importing directly into a pristine personal budget remains available to integrations.
 
+For terminal operation, CLI 2.1 supports `whab BUDGET import ynab-zip-importer preview FILE --currency USD` and an explicit `commit` with the reviewed fingerprint. This imports into the named empty budget through the existing guarded API. See [CLI file imports](../../interface/cli/README.md#file-imports) for commands, retries and empty-budget requirements.
+
 ## Live parser lifecycle
 
 The parser explicitly supports [live selection and approved worker upgrades](../../../../docs/plugin-workers.md).
