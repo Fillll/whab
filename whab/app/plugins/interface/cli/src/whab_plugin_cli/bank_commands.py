@@ -46,3 +46,13 @@ def bank_request(args, budget):
     if not (args.enable or args.disable):
         raise ValueError('Choose --enable or --disable for background checks.')
     return 'POST', prefix + '/schedule/background', {'json': {'enabled': args.enable}}
+
+
+def bank_error(raw):
+    """Only authored, bounded host validation text reaches the console."""
+    try:
+        result = json.loads(raw)
+    except (ValueError, UnicodeError):
+        return None
+    message = result.get('error') if type(result) is dict else None
+    return message if type(message) is str and 0 < len(message) <= 1000 else None

@@ -59,7 +59,8 @@ class BankJobs:
                          for plugin, interval in self.policies().items()]}
 
     def automatic(self, plugin):
-        return self.policies().get(plugin) is not None
+        policies = self.policies()
+        return plugin not in policies or policies[plugin] is not None
 
     async def configure(self, plugin, interval):
         if plugin not in self.policies():

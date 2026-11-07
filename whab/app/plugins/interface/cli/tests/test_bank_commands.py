@@ -65,3 +65,36 @@ def test_both_console_entry_points_execute_bank_operation(monkeypatch, tmp_path,
     monkeypatch.setattr(console, 'exchange', lambda connection, method, path, **kwargs: {'items': []})
     args = SimpleNamespace(scope='BUDGET', command='bank', target='Fictional', action='connections', plugin='plaid')
     assert console.execute(args, str(tmp_path), 'sandbox', None) == {'items': []}
+
+
+@pytest.mark.parametrize('raw,expected', [
+    (b'{"error":"Choose a same-currency account."}', 'Choose a same-currency account.'),
+    (b'not json', None), (b'\xff', None), (b'[]', None), (b'{"error":true}', None),
+    (b'{"error":""}', None), (json.dumps({'error': 'x' * 1001}).encode(), None),
+])
+def test_bank_validation_errors_are_bounded_authored_host_messages(raw, expected):
+    from whab_plugin_cli.bank_commands import bank_error
+    assert bank_error(raw) == expected
+
+
+@pytest.mark.parametrize('raw,expected', [(b'{"error":"Choose a same-currency account."}', 'same-currency'), (b'{}', 'failed')])
+def test_bank_errors_are_actionable_in_both_cli_entry_points(monkeypatch, tmp_path, capsys, raw, expected):
+    from contextlib import contextmanager
+    class Response:
+        status_code = 400
+        def __enter__(self): return self
+        def __exit__(self, *args): return None
+        def iter_bytes(self): yield raw
+    class Connection:
+        base_url = 'https://localhost:5173'
+        def stream(self, *args, **kwargs): return Response()
+    @contextmanager
+    def local(*args, **kwargs): yield Connection()
+    monkeypatch.setattr('whab.plugins.local.local_connection', local)
+    assert client.main(['--home', str(tmp_path), 'bank', 'connections', 'plaid']) == 1
+    assert expected in capsys.readouterr().err
+    monkeypatch.setattr(console, 'local_connection', local)
+    monkeypatch.setattr(console, 'resolve_budget', lambda *args: 'fictional')
+    assert console.main(['--home', str(tmp_path), 'Fictional', 'bank', 'connections', 'plaid']) == 1
+    error = capsys.readouterr().err
+    assert ('same-currency' if expected == 'same-currency' else 'HTTP 400') in error

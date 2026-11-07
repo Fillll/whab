@@ -142,3 +142,11 @@ def test_invalid_update_frequency_cannot_change_saved_policy(tmp_path, value):
             await jobs.configure('fictional', value)
         assert not jobs.policy_path.exists()
     asyncio.run(run())
+
+
+def test_providers_without_periodic_policy_keep_their_existing_webhook_behavior(tmp_path):
+    selected = runtime()
+    plugin = Plugin("fictional", "Fictional bank", bank=BankAdapter(lambda _: None))
+    selected._active = SimpleNamespace(services={"plugins": SimpleNamespace(bank_plugins=lambda: (plugin,))})
+    jobs = BankJobs(tmp_path, 'sandbox', selected, {})
+    assert jobs.policies() == {} and jobs.automatic('fictional')

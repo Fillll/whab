@@ -12,7 +12,7 @@ import httpx
 
 from whab.plugins.documentation import core_document, installed_catalog
 
-from .bank_commands import add_bank_parser, bank_request
+from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import PluginSelectionError, selection_error
 from .help import contextual_help, describe, overview, render_catalog
@@ -152,6 +152,10 @@ def _local(args):
                 if len(raw) > 16 * 1024 * 1024:
                     raise ValueError("Local response exceeds 16 MiB.")
             if response.status_code != 200:
+                if args.kind == "bank" and response.status_code in {400, 409}:
+                    message = bank_error(raw)
+                    if message:
+                        raise ConfigError(message)
                 if args.kind == "plugins" and response.status_code in {400, 409}:
                     message = selection_error(raw)
                     if message:

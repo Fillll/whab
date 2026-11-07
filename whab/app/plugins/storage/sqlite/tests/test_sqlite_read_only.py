@@ -112,3 +112,32 @@ def test_read_only_mode_requires_boolean(tmp_path, value):
     with pytest.raises(StoreError, match="boolean"):
         Store(tmp_path / "budget.sqlite", read_only=value)
     assert not (tmp_path / "budget.sqlite").exists()
+
+
+def test_bank_setup_upgrade_preserves_legacy_connection_and_read_only_readiness(tmp_path):
+    from tests.storage.test_bank_boundaries import account, changes
+
+    path = tmp_path / 'legacy-bank.sqlite'
+    writer = Store(path, environment='sandbox')
+    writer.save_item('item', 'fictional-encrypted-token', 'Fictional bank')
+    writer.apply_sync('item', changes(), 'legacy-cursor', [account()])
+    writer.db.execute('ALTER TABLE items DROP COLUMN sync_settings')
+    writer.close()
+    reader = Store(path, environment='sandbox', read_only=True)
+    try:
+        assert reader.get_item('item')['cursor'] == 'legacy-cursor'
+        assert 'syncSettings' not in reader.get_item('item')
+        assert 'sync_settings' not in {row[1] for row in reader.db.execute('PRAGMA table_info(items)')}
+    finally:
+        reader.close()
+    upgraded = Store(path, environment='sandbox')
+    try:
+        assert upgraded.get_item('item')['token'] == 'fictional-encrypted-token'
+        upgraded.configure_bank_sync('item', [account()], {'account': {'accountId': 'account', 'since': '2026-10-01'}})
+    finally:
+        upgraded.close()
+    reopened = Store(path, environment='sandbox', read_only=True)
+    try:
+        assert reopened.get_item('item')['syncSettings']['account']['since'] == '2026-10-01'
+    finally:
+        reopened.close()
