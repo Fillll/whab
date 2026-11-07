@@ -84,10 +84,26 @@ def render_catalog(catalog):
     return "\n".join(lines)
 
 
+def account_classification(catalog):
+    """Present the core's account semantics with the existing CLI read/edit path."""
+    fields = operation(catalog["core"], "query", "accounts")["output"]["items"]["properties"]
+    return "\n".join([
+        "Account classification:",
+        "  type: " + fields["type"]["description"],
+        "  onBudget: " + fields["onBudget"]["description"],
+        "  balance: " + fields["balance"]["description"],
+        "Inspect current values: whab-cli CONFIG query accounts (or whab api query accounts).",
+        "Review edit fields/examples offline: whab-cli command update_account --help",
+        "  or whab api command update_account --help.",
+        "Account reads return the stable account ID and revision needed for an explicit edit.",
+    ])
+
+
 def overview(catalog):
     groups = []
     for kind in ("query", "command"):
         groups.append(kind.title() + " operations: " + ", ".join(row["name"] for row in catalog["core"]["operations"] if row["kind"] == kind))
+    groups.append(account_classification(catalog))
     groups.append("Installed plugin documentation (local and SDK entries describe access, not CLI execution):")
     for plugin in catalog["plugins"]:
         document = plugin["documentation"]
