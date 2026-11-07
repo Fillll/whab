@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "cli",
-  "summary": "JSON CLI with local home/environment profiles, temporary authenticated HTTPS host leases, plugin management, bank synchronization, OS scheduling and optional remote HTTPS profiles.",
+  "summary": "Name-addressed whab console, offline help and JSON discovery, authenticated local budget creation, plugin management and read-only reports; production is the CLI default.",
   "delegates": [
     "core"
   ],
@@ -218,6 +218,516 @@
       ],
       "retry": "Never automatically replay failed commands. Inspect status and native recovery before explicitly retrying an uncertain operation.",
       "availability": "Local CLI command with an explicit home profile; not remotely callable. See whab-cli COMMAND --help."
+    },
+    {
+      "name": "budget.list",
+      "kind": "local",
+      "summary": "List available budget names and permanent identities.",
+      "input": {
+        "type": "object",
+        "description": "Explicit console arguments. Home, environment and CA come from options or the selected local profile.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Registered and open budgets in this home/environment.",
+        "properties": {
+          "budgets": {
+            "type": "array",
+            "description": "Available budget identities. Names may be ambiguous in legacy catalogs.",
+            "items": {
+              "type": "object",
+              "description": "Budget catalog entry.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Permanent UUID or the default workspace ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Budget name."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether this is the host startup budget."
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "active"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "budgets"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "budgets": []
+          }
+        }
+      ],
+      "side_effects": "Read-only; does not activate another ledger.",
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One selected runtime home and environment. Production is the CLI default; --environment sandbox or an explicit local profile selects sandbox. Budget reads resolve a unique name or permanent ID; currencies are never combined.",
+      "errors": [
+        "Invalid inputs, unknown or ambiguous names, unavailable plugins, existing paths and duplicate names are rejected.",
+        "TLS, authentication and storage failures are sanitized; failed operations are never replayed automatically."
+      ],
+      "retry": "Read again as needed. After an uncertain creation or plugin change, inspect budget list and plugin status before any explicit retry. Creation refuses duplicate registered names and existing files.",
+      "availability": "whab budget list; GET /api/local/v1/budgets"
+    },
+    {
+      "name": "budget.create",
+      "kind": "local",
+      "summary": "Create and register an empty SQLite budget with no optional feature selection.",
+      "input": {
+        "type": "object",
+        "description": "Explicit console arguments. Home, environment and CA come from options or the selected local profile.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Unique budget name; reserved command/workspace names and case-insensitive duplicate names are refused.",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "path": {
+            "type": "string",
+            "description": "Optional directory or .whab file on this device. The CLI expands quoted ~ and resolves relative paths before sending an absolute file path.",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "The newly saved and registered budget.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Permanent budget UUID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Saved budget name."
+          },
+          "path": {
+            "type": "string",
+            "description": "Absolute portable container location."
+          },
+          "storage": {
+            "type": "string",
+            "const": "sqlite",
+            "description": "Primary local storage plugin."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "storage"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "name": "Fictional budget",
+            "path": "/fictional/budgets/Fictional budget.whab"
+          },
+          "output": {
+            "id": "11111111-1111-4111-8111-111111111111",
+            "name": "Fictional budget",
+            "path": "/fictional/budgets/Fictional budget.whab",
+            "storage": "sqlite"
+          }
+        }
+      ],
+      "side_effects": "Creates a new budget identity, SQLite ledger, portable container and local catalog entry. Includes default category templates, no accounts, transactions, assignments, copied connections or optional features. Reuses the host and never replaces an existing file.",
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One selected runtime home and environment. Production is the CLI default; --environment sandbox or an explicit local profile selects sandbox. Budget reads resolve a unique name or permanent ID; currencies are never combined.",
+      "errors": [
+        "Invalid inputs, unknown or ambiguous names, unavailable plugins, existing paths and duplicate names are rejected.",
+        "TLS, authentication and storage failures are sanitized; failed operations are never replayed automatically."
+      ],
+      "retry": "Read again as needed. After an uncertain creation or plugin change, inspect budget list and plugin status before any explicit retry. Creation refuses duplicate registered names and existing files.",
+      "availability": "whab budget create NAME [--path DIRECTORY_OR_FILE]; POST /api/local/v1/budgets"
+    },
+    {
+      "name": "plugin.list",
+      "kind": "local",
+      "summary": "Discover installed plugin identifiers and operation contracts offline.",
+      "input": {
+        "type": "object",
+        "description": "Explicit console arguments. Home, environment and CA come from options or the selected local profile.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "JSON local host result."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Reads installed metadata only; no server, inference or banking work.",
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One selected runtime home and environment. Production is the CLI default; --environment sandbox or an explicit local profile selects sandbox. Budget reads resolve a unique name or permanent ID; currencies are never combined.",
+      "errors": [
+        "Invalid inputs, unknown or ambiguous names, unavailable plugins, existing paths and duplicate names are rejected.",
+        "TLS, authentication and storage failures are sanitized; failed operations are never replayed automatically."
+      ],
+      "retry": "Read again as needed. After an uncertain creation or plugin change, inspect budget list and plugin status before any explicit retry. Creation refuses duplicate registered names and existing files.",
+      "availability": "whab plugin [list]; whab plugin --help"
+    },
+    {
+      "name": "insights.summary",
+      "kind": "local",
+      "summary": "Read the existing core monthly budget summary for a single currency.",
+      "input": {
+        "type": "object",
+        "description": "Explicit console arguments. Home, environment and CA come from options or the selected local profile.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Unique registered budget name or permanent UUID."
+          },
+          "month": {
+            "type": "string",
+            "description": "Optional YYYY-MM; defaults to the current month.",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency; amounts are integer minor units.",
+            "default": "USD"
+          }
+        },
+        "required": [
+          "budget"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Budget-scoped result with the current ledger revision.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Permanent budget ID or default workspace ID."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Current ledger revision; a read does not authorize a stale write."
+          },
+          "data": {
+            "type": "object",
+            "description": "Single-currency monthly summary.",
+            "properties": {
+              "month": {
+                "type": "string",
+                "description": "Selected YYYY-MM."
+              },
+              "currency": {
+                "type": "string",
+                "description": "ISO currency code."
+              },
+              "currencyMinorUnits": {
+                "type": "integer",
+                "description": "Number of minor-unit decimal places.",
+                "minimum": 0
+              },
+              "summary": {
+                "type": "object",
+                "description": "Existing core summary; amounts are integer minor units in the chosen currency.",
+                "properties": {
+                  "income": {
+                    "type": "integer",
+                    "description": "Core income amount in currency minor units."
+                  },
+                  "carriedIn": {
+                    "type": "integer",
+                    "description": "Core carriedIn amount in currency minor units."
+                  },
+                  "carriedInUnassigned": {
+                    "type": "integer",
+                    "description": "Core carriedInUnassigned amount in currency minor units."
+                  },
+                  "carriedInSetAside": {
+                    "type": "integer",
+                    "description": "Core carriedInSetAside amount in currency minor units."
+                  },
+                  "fundingCapacity": {
+                    "type": "integer",
+                    "description": "Core fundingCapacity amount in currency minor units."
+                  },
+                  "previousOverspending": {
+                    "type": "integer",
+                    "description": "Core previousOverspending amount in currency minor units."
+                  },
+                  "balanceCarryover": {
+                    "type": "integer",
+                    "description": "Core balanceCarryover amount in currency minor units."
+                  },
+                  "assignedNextMonth": {
+                    "type": "integer",
+                    "description": "Core assignedNextMonth amount in currency minor units."
+                  },
+                  "spent": {
+                    "type": "integer",
+                    "description": "Core spent amount in currency minor units."
+                  },
+                  "assigned": {
+                    "type": "integer",
+                    "description": "Core assigned amount in currency minor units."
+                  },
+                  "available": {
+                    "type": "integer",
+                    "description": "Core available amount in currency minor units."
+                  },
+                  "readyToAssign": {
+                    "type": "integer",
+                    "description": "Core readyToAssign amount in currency minor units."
+                  }
+                },
+                "required": [
+                  "income",
+                  "carriedIn",
+                  "carriedInUnassigned",
+                  "carriedInSetAside",
+                  "fundingCapacity",
+                  "previousOverspending",
+                  "balanceCarryover",
+                  "assignedNextMonth",
+                  "spent",
+                  "assigned",
+                  "available",
+                  "readyToAssign"
+                ],
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              }
+            },
+            "required": [
+              "month",
+              "currency",
+              "currencyMinorUnits",
+              "summary"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "budgetId",
+          "revision",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "Fictional budget",
+            "month": "2026-11",
+            "currency": "USD"
+          },
+          "output": {
+            "budgetId": "11111111-1111-4111-8111-111111111111",
+            "revision": "fictional-revision",
+            "data": {
+              "month": "2026-11",
+              "currency": "USD",
+              "currencyMinorUnits": 2,
+              "summary": {
+                "income": 0,
+                "carriedIn": 0,
+                "carriedInUnassigned": 0,
+                "carriedInSetAside": 0,
+                "fundingCapacity": 0,
+                "previousOverspending": 0,
+                "balanceCarryover": 0,
+                "assignedNextMonth": 0,
+                "spent": 0,
+                "assigned": 0,
+                "available": 0,
+                "readyToAssign": 0
+              }
+            }
+          }
+        }
+      ],
+      "side_effects": "Read-only core projection under a budget runtime lease. No AI, category changes or bank synchronization.",
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One selected runtime home and environment. Production is the CLI default; --environment sandbox or an explicit local profile selects sandbox. Budget reads resolve a unique name or permanent ID; currencies are never combined.",
+      "errors": [
+        "Invalid inputs, unknown or ambiguous names, unavailable plugins, existing paths and duplicate names are rejected.",
+        "TLS, authentication and storage failures are sanitized; failed operations are never replayed automatically."
+      ],
+      "retry": "Read again as needed. After an uncertain creation or plugin change, inspect budget list and plugin status before any explicit retry. Creation refuses duplicate registered names and existing files.",
+      "availability": "whab BUDGET insights summary [--month YYYY-MM] [--currency USD]; GET /budgets/{id}/api/local/v1/summary"
+    },
+    {
+      "name": "transactions.non-reviewed",
+      "kind": "local",
+      "summary": "List unreviewed, non-deleted transactions from the public core transaction query.",
+      "input": {
+        "type": "object",
+        "description": "Explicit console arguments. Home, environment and CA come from options or the selected local profile.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Unique registered budget name or permanent UUID."
+          },
+          "month": {
+            "type": "string",
+            "description": "Optional YYYY-MM; omitting it reads all available history.",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          }
+        },
+        "required": [
+          "budget"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Budget-scoped result with the current ledger revision.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Permanent budget ID or default workspace ID."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Current ledger revision; a read does not authorize a stale write."
+          },
+          "data": {
+            "type": "array",
+            "description": "Public account/category/transaction records; identifiers, currencies and integer amounts come from the addressed budget.",
+            "items": {
+              "type": "object",
+              "description": "Public transactions record. Additional compatible projection fields may be present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable record identifier."
+                },
+                "accountId": {
+                  "type": "string",
+                  "description": "Owning account ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "merchantLogo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional public logo key."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Integer minor units; positive outflow, negative inflow."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO currency; no conversion."
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Assigned child category or null."
+                },
+                "pending": {
+                  "type": "boolean",
+                  "description": "Pending rows are excluded from cleared spending."
+                },
+                "reviewed": {
+                  "type": "boolean",
+                  "description": "Explicit transaction review status."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Record origin."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Saved user note."
+                },
+                "isTransfer": {
+                  "type": "boolean",
+                  "description": "Explicit transfer exclusion."
+                },
+                "inferredTransfer": {
+                  "type": "boolean",
+                  "description": "Inferred transfer exclusion."
+                },
+                "categoryEdited": {
+                  "type": "boolean",
+                  "description": "Whether category annotation was explicitly changed."
+                },
+                "deleted": {
+                  "type": "boolean",
+                  "description": "Portable tombstone marker."
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "budgetId",
+          "revision",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "Fictional budget"
+          },
+          "output": {
+            "budgetId": "11111111-1111-4111-8111-111111111111",
+            "revision": "fictional-revision",
+            "data": []
+          }
+        }
+      ],
+      "side_effects": "Read-only filtering of public records; does not mark any transaction reviewed. Reuses core transactions rather than accessing storage directly.",
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One selected runtime home and environment. Production is the CLI default; --environment sandbox or an explicit local profile selects sandbox. Budget reads resolve a unique name or permanent ID; currencies are never combined.",
+      "errors": [
+        "Invalid inputs, unknown or ambiguous names, unavailable plugins, existing paths and duplicate names are rejected.",
+        "TLS, authentication and storage failures are sanitized; failed operations are never replayed automatically."
+      ],
+      "retry": "Read again as needed. After an uncertain creation or plugin change, inspect budget list and plugin status before any explicit retry. Creation refuses duplicate registered names and existing files.",
+      "availability": "whab BUDGET transactions non-reviewed; trnx and unreviewed are aliases. Uses authenticated local queries/transactions."
     }
   ]
 }

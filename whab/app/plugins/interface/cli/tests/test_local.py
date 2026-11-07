@@ -110,7 +110,7 @@ def test_cli_manages_os_schedule_through_sdk(monkeypatch, capsys, action):
     monkeypatch.setattr(scheduling, "configure_schedule", configure)
     assert client.main(["--home", "/fictional", "jobs", action]) == 0
     assert json.loads(capsys.readouterr().out)["enabled"] == (action == "enable")
-    assert calls == [("/fictional", "sandbox", action == "enable")]
+    assert calls == [("/fictional", "production", action == "enable")]
 
 
 @pytest.mark.parametrize("action", ["enable", "disable"])

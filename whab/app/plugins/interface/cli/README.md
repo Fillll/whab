@@ -1,5 +1,71 @@
 # Command line interface
 
+## Simple console
+
+`whab` provides name-addressed local commands. **Production is the default** for
+both `whab` and `whab-cli` from CLI 2.0; use `--environment sandbox` for tests, or
+keep an explicit sandbox environment in a profile. Existing profiles and explicit
+options retain their selections. The host SDK and developer fixtures keep their
+existing sandbox defaults.
+
+```sh
+whab --help
+whab budget --help
+whab budget create --help
+whab budget create empty-budget --path "~/budgets"
+whab budget list
+whab plugin --help
+whab empty-budget plugin enable ynab-zip-importer
+whab empty-budget plugin status
+whab empty-budget insights summary
+whab empty-budget trnx non-reviewed
+```
+
+Every level has `--help`, including reports and plugin controls. `transactions`
+and `trnx` are aliases; `non-reviewed` and `unreviewed` are aliases. Quotes around
+`~` are supported: the CLI expands them itself. `--path` accepts a directory or
+an explicit `.whab` file. Without it, creation uses the runtime-managed budget
+location. Names containing spaces can be quoted. Names are resolved without
+changing the default browser budget; use a permanent ID from `budget list` if
+legacy names are ambiguous. New duplicate names and reserved command/workspace
+names are refused. The CLI never substitutes another ledger after a failed lookup.
+
+Set a local default profile at `~/.config/whab/default.budget` once:
+
+```json
+{"home": "/absolute/path/to/private/runtime"}
+```
+
+Home precedence is `--home`, `WHAB_HOME`, the profile's `home`, then `~/.whab`.
+Use `--profile FILE` to choose another local JSON profile; its relative home/CA
+paths resolve beside that profile. Environment precedence is `--environment`, an
+explicit profile environment, then production. `--ca` overrides the profile CA;
+otherwise the runtime's verified CA is used. Global options work before or after
+subcommands. Help and offline plugin discovery do not load the profile or open a
+connection. Remote profiles remain available through `whab-cli`.
+
+Creation uses the authenticated local host, starts an empty SQLite budget without
+inheriting optional plugin selections or financial data, and registers its saved
+path. Default category templates remain. Existing files are never replaced. The
+original host, other budgets, credentials and active browser selection stay owned
+by their current runtimes. Unknown, ambiguous, busy or failed operations never
+silently target another budget or automatically replay a mutation. After an
+uncertain result, inspect `whab budget list` and plugin status before trying again.
+
+`insights summary` reads the shared core's monthly projection (USD by default,
+`--currency` selects another ISO currency). Money remains in integer minor units;
+no unlike currencies are combined. No AI or bank sync is started. `trnx
+non-reviewed` reads unreviewed, non-deleted public transactions, optionally limited
+by `--month YYYY-MM`; it never changes review status.
+
+The existing detailed JSON vocabulary remains discoverable through:
+
+```sh
+whab api --help
+whab api command edit_transaction --help
+whab api describe --plugin ynab-zip-importer --help
+```
+
 ## Local operation
 
 A fresh runtime needs only the host, CLI and storage packages. No AI account, Web
@@ -123,7 +189,7 @@ Subscription labels apply to matching payments in the same account; see [Subscri
 
 The CLI makes one request, never retries a write or refreshes its revision automatically, rejects redirects/proxies and validates response budget identity. Success prints JSON to stdout and exits 0; failure prints a sanitized JSON error to stderr and exits 1. After an uncertain write, retain the original target, parameters, revision and request ID. Inspect the budget and retry only that exact intent; a restart or stale revision requires reconciliation rather than a new write. Request receipts have the host's documented lifetime; the CLI does not claim durable receipt storage.
 
-Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.56+ are required.
+Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.57+ are required.
 
 ## Operation documentation
 

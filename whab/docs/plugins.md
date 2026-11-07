@@ -848,6 +848,23 @@ budget activation and retain local Host/origin policy. They never bypass budget
 admission, native writer authority, revision checks or financial receipts.
 See the [CLI guide](../app/plugins/interface/cli/README.md).
 
+WHAB 2.57 adds authenticated local `GET /api/local/v1/budgets` and
+`POST /api/local/v1/budgets` for CLI discovery and empty budget creation. Creation
+accepts `{name, path?}` with an absolute `.whab` file path when supplied; the host
+serializes name checks and startup, refuses duplicates/reserved names and existing
+files, and creates a new SQLite authority without optional features or copied
+financial data. It returns `{id, name, path, storage}` after saving and registering
+the budget. This does not switch another browser tab or stop the current host.
+
+`GET /budgets/{id}/api/local/v1/summary?month=YYYY-MM&currency=USD` holds the budget
+runtime lease, reads the public workspace and applies the shared core currency
+projection. It returns the budget ID, revision and `{month, currency,
+currencyMinorUnits, summary}`. These management/report routes require local host
+authentication before dispatch and retain HTTPS and Host/origin checks; demo
+management is refused. The public `whab.plugins.local.local_connection` adapter
+still defaults to sandbox for existing consumers. CLI 2.0 explicitly selects
+production by default and preserves explicit sandbox profiles/options.
+
 `BankAdapter(factory, sync_interval_seconds=None)` may declare a periodic sync
 interval from 60 seconds to 31 days. Existing descriptors default to no scheduled
 work. Plaid declares 3,600 seconds. The host invokes its ordinary coordinator sync,

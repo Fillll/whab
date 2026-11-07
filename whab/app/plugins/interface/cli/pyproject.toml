@@ -1,14 +1,15 @@
 [project]
 name = "whab_plugin_cli"
-version = "1.5.0"
+version = "2.0.0"
 description = "Machine-usable command line interface for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.56,<3"]
+dependencies = ["whab>=2.57,<3"]
 
 [project.scripts]
+whab = "whab_plugin_cli.console:main"
 whab-cli = "whab_plugin_cli.client:main"
 
 [project.entry-points."whab.plugins"]
