@@ -31,9 +31,6 @@ def export_files(store, workspace):
         images = [(transaction_id, store.get_receipt(workspace, transaction_id)) for transaction_id in store.receipt_ids(workspace)]
     clean = Store(":memory:", month=snapshot["budgetStartMonth"], _authority=False)
     try:
-        # Bank connection settings never belong to the credential-free format.
-        # Keep new exports readable by clients predating account sync setup.
-        clean.db.execute("ALTER TABLE items DROP COLUMN sync_settings")
         # Portable images are data containers. Rebuild runtime-only indexes when
         # restoring into a live Store rather than storing and compressing them.
         for name in _ADDITIVE_INDEXES:
@@ -48,6 +45,9 @@ def export_files(store, workspace):
         # installation and must not travel as a second ledger inside its payload.
         for table in ("meta", *_ROW_LIMITS):
             clean.db.execute(f"DELETE FROM {table} WHERE workspace <> 'personal'")
+        # Strip native-only metadata after populating the trusted fresh ledger.
+        # New portable images retain the schema used before bank sync setup.
+        clean.db.execute("ALTER TABLE items DROP COLUMN sync_settings")
         clean.db.execute("VACUUM")
         clean.db.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
         raw = clean.db.serialize()
