@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.44.0 — 2026-11-07
+
+PR: [#158](https://github.com/Fillll/whab/pull/158)
+
+- Add This year and Previous year to the transaction period menu, retaining account, search and review filters and highlighting the selected preset.
+
 ## 1.43.2 — 2026-11-07
 
 PR: [#157](https://github.com/Fillll/whab/pull/157)

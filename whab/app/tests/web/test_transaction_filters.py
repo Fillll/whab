@@ -79,6 +79,36 @@ def test_register_custom_range_multi_account_urls_preserve_scope_and_canonical_i
     assert store.transactions("personal") == before
 
 
+@pytest.mark.parametrize(("selection", "year"), [("current-year", "2025"), ("previous-year", "2024")])
+def test_year_presets_filter_inclusive_calendar_years_and_preserve_account_scope(tmp_path, store, monkeypatch, selection, year):
+    monkeypatch.setattr("whab.web.transaction_filters.current_month", lambda: "2025-01")
+    period = transaction_period("2026-12", "2026-12", selection, "2099-01-01", "2099-01-02", False)
+    assert (period.start, period.end, period.month, period.query_month, period.label, period.count_label) == (
+        f"{year}-01-01", f"{year}-12-31", f"{year}-01", None, year, year,
+    )
+    accounts = [store.add_account("personal", {"name": name, "type": "depository", "balance": 0})
+                for name in ("Selected", "Other")]
+    dates = ("2023-12-31", "2024-01-01", "2024-02-29", "2024-12-31", "2025-01-01", "2025-12-31", "2026-01-01")
+    for index, account in enumerate(accounts):
+        for date in dates:
+            store.add_transaction("personal", {"accountId": account, "date": date,
+                "merchant": f"Year purchase {index} {date}", "amount": 100, "categoryId": None})
+    before = store.transactions("personal")
+    with TestClient(create_app(store=store, settings=settings(tmp_path)), base_url=BASE) as client:
+        response = client.get("/budgets/home/transactions/current-month/usd", params={
+            "accounts": accounts[0], "period": selection, "review": "all",
+        })
+        data = context(response)
+        assert (data["startDate"], data["endDate"], data["transactionPeriod"]) == (period.start, period.end, selection)
+        assert data["selectedAccountId"] == accounts[0]
+        assert parse_qs(urlsplit(data["canonicalUrl"]).query)["period"] == [selection]
+        assert f'data-period-choice="{selection}" aria-pressed="true"' in response.text
+        for index in range(2):
+            for date in dates:
+                assert (f"Year purchase {index} {date}" in response.text) is (index == 0 and date.startswith(year))
+    assert store.transactions("personal") == before
+
+
 def test_page_url_preserves_repeated_account_filters_without_coalescing_identifiers():
     query = parse_qs(urlsplit(page_url("family", "transactions", accounts=["one,two", "three"])).query)
     assert query == {"accounts": ["one,two", "three"]}
