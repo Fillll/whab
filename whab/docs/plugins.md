@@ -112,6 +112,8 @@ The bundled Web UI's **Settings → Plugins → Installed** lists installed regi
 
 **Save plugin selection** loads and validates the proposed descriptors without calling storage/bank factories or reporting hooks. It rejects missing or ambiguous registrations, incompatible descriptors, and attempts to change the selected storage or interface. Saving leaves the running registry, provider services, connections and ledger unchanged; changes apply after restart. An imported bank's history and saved connections remain when its plugin is disabled.
 
+Bank UI validation accepts both plugin resource directories and the SDK-validated immutable resource bundles supplied by plugin workers. Saving a selection that includes a bank plugin does not require filesystem paths for a worker's captured UI files.
+
 For failures that prevent the full application from starting, the explicit
 [`--recover-plugins` listener](plugin-recovery.md) reads package metadata without
 loading plugin targets. It offers revision-checked optional-plugin removal,

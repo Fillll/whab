@@ -81,6 +81,36 @@ print(json.dumps({"reaped":True}))
     assert result == {"reaped": True}
 
 
+def test_restart_selection_saves_installed_bank_and_import_worker_resources():
+    result = fresh_python('''
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from whab.config import Settings
+from whab.plugins import PluginRegistry
+from whab.plugins.configuration import read_selection
+from whab.plugins.management import PluginManager
+from whab.plugins.runtime import load_descriptors
+required = load_descriptors(("sqlite", "web"))
+try:
+    with TemporaryDirectory() as directory:
+        home = Path(directory)
+        settings = Settings(home, 5173, "sandbox", "", "", "", False, "", "", (), ui="web")
+        manager = PluginManager(settings, PluginRegistry(required))
+        state = manager.save(("plaid", "ynab"))
+        assert read_selection(home) == ("plaid", "ynab")
+        assert state["configured"] == ["plaid", "ynab"]
+        assert state["active"] == [] and state["restart_required"]
+        assert [plugin.id for plugin in manager.plugins.descriptors()] == ["sqlite", "web"]
+        assert sorted(path.name for path in home.iterdir()) == ["plugins.json"]
+        print(json.dumps({"saved": state["configured"]}))
+finally:
+    for plugin in required:
+        plugin._process.close()
+''')
+    assert result == {"saved": ["plaid", "ynab"]}
+
+
 def test_reentrant_callbacks_execute_on_waiting_thread_and_keep_lock_ownership():
     seen = []
     lock = RLock()

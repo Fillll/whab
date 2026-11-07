@@ -266,7 +266,9 @@ class PluginManager:
                             plugin_id=plugin.id,
                         )
                 for plugin in (item for item in optional if item.bank is not None):
-                    if plugin.bank_ui and (
+                    # Worker descriptors carry SDK-validated immutable bundles,
+                    # so only path-backed UIs need filesystem checks here.
+                    if plugin.bank_ui and plugin.bank_ui.resources is None and (
                         not (plugin.bank_ui.templates / "accounts.html").is_file()
                         or not (plugin.bank_ui.static / "connect.js").is_file()
                     ):

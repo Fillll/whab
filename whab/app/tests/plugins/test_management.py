@@ -10,9 +10,11 @@ from whab.config import Settings
 from whab.plugins import (
     ENTRYPOINT_GROUP,
     BankUI,
+    FileImport,
     Plugin,
     PluginError,
     PluginRegistry,
+    PluginResources,
     UserInterface,
 )
 from whab.plugins.configuration import read_selection, write_selection
@@ -315,7 +317,39 @@ def test_save_reuses_custom_mandatory_descriptors_without_reimporting_them(tmp_p
     assert all(entry.loaded == 0 for entry in installed if entry.name != "report")
 
 
-def test_missing_optional_bank_resources_are_rejected_before_persistence(tmp_path, installed, monkeypatch):
+@pytest.mark.parametrize("bundled", [False, True])
+def test_save_accepts_bank_and_import_ui_paths_or_worker_resource_bundles(tmp_path, installed, monkeypatch, bundled):
+    templates, static = tmp_path / "templates", tmp_path / "static"
+    templates.mkdir()
+    static.mkdir()
+    (templates / "accounts.html").write_text("Fictional connection controls")
+    (static / "connect.js").write_text("// Fictional bank controls")
+    (static / "import.js").write_text("// Fictional import controls")
+    resources = PluginResources({
+        "templates/accounts.html": b"Fictional connection controls",
+        "static/connect.js": b"// Fictional bank controls",
+        "static/import.js": b"// Fictional import controls",
+    })
+    bank_ui = BankUI(resources=resources) if bundled else BankUI(templates, static)
+    importer = FileImport(forbidden, resources=resources) if bundled else FileImport(forbidden, templates, static)
+    entries = (
+        Entry("bank-ui", Plugin("bank-ui", "Bank UI", bank=forbidden, bank_ui=bank_ui)),
+        Entry("import-ui", Plugin("import-ui", "Import UI", file_import=importer)),
+    )
+    monkeypatch.setattr("whab.plugins.management.metadata.entry_points", lambda **kwargs: (*installed, *entries))
+    instance = manager(tmp_path, installed)
+    state = instance.save(tuple(entry.name for entry in entries))
+    assert state["configured"] == ["bank-ui", "import-ui"]
+    assert state["active"] == [] and state["restart_required"]
+    assert read_selection(tmp_path) == ("bank-ui", "import-ui")
+    assert [plugin.id for plugin in instance.plugins.descriptors()] == ["sqlite", "web"]
+
+
+@pytest.mark.parametrize("missing", ["accounts.html", "connect.js"])
+def test_missing_optional_bank_resources_are_rejected_before_persistence(tmp_path, installed, monkeypatch, missing):
+    for name in ("accounts.html", "connect.js"):
+        if name != missing:
+            (tmp_path / name).write_text("Fictional bank UI")
     entry = Entry("missing_bank_ui", Plugin("missing_bank_ui", "Bank UI", bank=forbidden, bank_ui=BankUI(tmp_path, tmp_path)))
     monkeypatch.setattr("whab.plugins.management.metadata.entry_points", lambda **kwargs: (*installed, entry))
     instance = manager(tmp_path, installed)
