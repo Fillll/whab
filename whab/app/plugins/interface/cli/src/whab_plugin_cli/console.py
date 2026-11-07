@@ -171,6 +171,6 @@ def main(argv=None):
     except (CommandError, ConfigError) as error:
         print(json.dumps({"error": str(error)}), file=sys.stderr)
         return 1
-    except (ValueError, OSError, KeyError, TypeError, httpx.HTTPError):
+    except (ValueError, OSError, KeyError, TypeError, RuntimeError, httpx.HTTPError):
         print(json.dumps({"error": "WHAB command failed. Check the runtime, profile and selected budget. Inspect state before retrying; commands are never automatically replayed."}), file=sys.stderr)
         return 1

@@ -147,12 +147,13 @@ def test_api_delegates_with_production_defaults_and_ca(transport, monkeypatch, c
     assert forwarded[1][-3:] == ["production", "query", "accounts"]
 
 
-def test_failures_are_sanitized_and_requests_are_never_replayed(transport, capsys, monkeypatch):
+@pytest.mark.parametrize("failure", [ValueError, RuntimeError])
+def test_failures_are_sanitized_and_requests_are_never_replayed(transport, capsys, monkeypatch, failure):
     calls, _, state = transport
     state["status"] = 409
     assert console.main(["budget", "create", "new"]) == 1
     assert len(calls) == 1 and "HTTP 409" in capsys.readouterr().err
-    monkeypatch.setattr(console, "configuration", lambda args: (_ for _ in ()).throw(ValueError("private-secret")))
+    monkeypatch.setattr(console, "configuration", lambda args: (_ for _ in ()).throw(failure("private-secret")))
     assert console.main(["budget", "list"]) == 1
     assert "private-secret" not in capsys.readouterr().err
     monkeypatch.setattr(console, "configuration", lambda args: (_ for _ in ()).throw(console.ConfigError("Invalid JSON in CLI config.")))
