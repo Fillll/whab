@@ -82,7 +82,15 @@ class BankStore:
         for item in self._store.items():
             stored = self._store.get_item(item["id"])
             if stored and stored.get("provider", "plaid") == self._provider:
-                result.append({**item, "id": self._external_item_id(item["id"])})
+                settings = stored.get("syncSettings")
+                links = []
+                for account in self._store.accounts("personal"):
+                    if account.get("itemId") == item["id"]:
+                        link = next((row for row in (settings or {}).values() if row["accountId"] == account["id"]), {})
+                        links.append({"accountId": account["id"], "name": account["name"],
+                                      "mask": account.get("mask"), "since": link.get("since")})
+                result.append({**item, "id": self._external_item_id(item["id"]),
+                               "setupConfigured": settings is not None, "accountLinks": links})
         return result
 
     def get_item(self, item_id: str) -> dict | None:

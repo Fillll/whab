@@ -41,7 +41,7 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
         },
         "categories": {"currency": "TEXT NOT NULL DEFAULT 'USD'"},
         "meta": {"budget_start_month": "TEXT"},
-        "items": {"provider": "TEXT NOT NULL DEFAULT 'plaid'"},
+        "items": {"provider": "TEXT NOT NULL DEFAULT 'plaid'", "sync_settings": "TEXT"},
     }
     for table, columns in migrations.items():
         present = {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}

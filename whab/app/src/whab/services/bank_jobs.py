@@ -32,8 +32,24 @@ class BankJobs:
         except (OSError, ValueError, TypeError):
             raise BankError("Saved synchronization status is invalid. Preserve the job file and inspect it before continuing.") from None
 
+        self.policy_path = Path(home) / "plugin-workers" / f"bank-sync-policy-{environment}.json"
+        try:
+            if self.policy_path.stat().st_size > 16 * 1024:
+                raise ValueError
+            self.overrides = json.loads(self.policy_path.read_bytes())
+            if type(self.overrides) is not dict or len(self.overrides) > 100:
+                raise ValueError
+            from whab.plugins.sdk import valid_plugin_name
+            for plugin, interval in self.overrides.items():
+                if not valid_plugin_name(plugin) or interval not in (None, 3600, 10800, 21600) or type(interval) not in (int, type(None)):
+                    raise ValueError
+        except FileNotFoundError:
+            self.overrides = {}
+        except (OSError, ValueError, TypeError):
+            raise BankError("Saved bank update policy is invalid. Preserve it before repairing.") from None
+
     def policies(self):
-        return {plugin.id: plugin.bank.sync_interval_seconds
+        return {plugin.id: self.overrides.get(plugin.id, plugin.bank.sync_interval_seconds)
                 for plugin in self.runtime._active.services["plugins"].bank_plugins()
                 if type(plugin.bank) is BankAdapter and plugin.bank.sync_interval_seconds is not None}
 
@@ -41,6 +57,24 @@ class BankJobs:
         return {"jobs": [{"plugin": plugin, "interval_seconds": interval,
                           **self.record(plugin, interval)}
                          for plugin, interval in self.policies().items()]}
+
+    def automatic(self, plugin):
+        return self.policies().get(plugin) is not None
+
+    async def configure(self, plugin, interval):
+        if plugin not in self.policies():
+            raise BankError("The selected bank plugin has no update schedule.")
+        if type(interval) not in (int, type(None)) or interval not in (None, 3600, 10800, 21600):
+            raise BankError("Choose manual updates or an interval of 1, 3 or 6 hours.")
+        async with self.lock:
+            candidate = {**self.overrides, plugin: interval}
+            atomic_write(self.policy_path, json.dumps(candidate).encode())
+            self.overrides = candidate
+            record = self.records.get(plugin)
+            if record is not None:
+                record['next_due'] = self.next_boundary(self.clock(), interval) if interval else 0
+                atomic_write(self.path, json.dumps(self.records, allow_nan=False).encode())
+        return self.status()
 
     @staticmethod
     def next_boundary(at, interval):
@@ -53,6 +87,10 @@ class BankJobs:
         record = self.records.get(plugin, {"last_attempt": 0, "last_success": 0, "next_due": 0, "error": None})
         # Existing 2.56.0 records used attempt+interval. Bring their effective due
         # time forward without changing their last attempt/success or native data.
+        if interval is None:
+            return {**record, "next_due": 0}
+        if plugin in self.overrides:
+            return {**record, "next_due": self.next_boundary(record["last_attempt"], interval)}
         return {**record, "next_due": min(record["next_due"], self.next_boundary(record["last_attempt"], interval))}
 
     async def run(self, plugin, *, due=False):
@@ -62,13 +100,15 @@ class BankJobs:
                 if bank is None:
                     raise BankError("The selected bank plugin is not enabled.")
                 interval = self.policies().get(plugin, 3600)
+                if due and interval is None:
+                    return {"ok": True, "skipped": True}
                 now = self.clock()
                 record = self.record(plugin, interval)
                 if due and now < record["next_due"]:
                     return {"ok": True, "skipped": True}
                 # Publish the attempt before external work. A crash cannot create
                 # an immediate retry storm or change native uncertainty fencing.
-                record = {**record, "last_attempt": now, "next_due": self.next_boundary(now, interval)}
+                record = {**record, "last_attempt": now, "next_due": self.next_boundary(now, interval) if interval else 0}
                 self.records[plugin] = record
                 atomic_write(self.path, json.dumps(self.records, allow_nan=False).encode())
                 try:

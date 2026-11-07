@@ -581,6 +581,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         replicas = StorageReplicas(storage_runtime)
         from whab.services.bank_jobs import BankJobs
         bank_jobs = BankJobs(worker_home, settings.plaid_env, runtime, leased_banks)
+        bank_lifecycle.automatic_sync = bank_jobs.automatic
 
         @asynccontextmanager
         async def lifespan(_app):
@@ -687,8 +688,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         app.include_router(file_imports_router(
             store, registry, budget_host, budget_session.id if budget_session else "default",
         ))
-        app.include_router(banks_router(None, leased_banks, bank_stores))
-        app.include_router(banks_router("plaid", leased_banks, bank_lifecycle.bank_store("plaid"), prefix="/api/plaid"))
+        app.include_router(banks_router(None, leased_banks, bank_stores, jobs=bank_jobs, settings=settings))
+        app.include_router(banks_router("plaid", leased_banks, bank_lifecycle.bank_store("plaid"), prefix="/api/plaid", jobs=bank_jobs, settings=settings))
         app.include_router(plugins_router(store, registry, plugin_manager))
         app.include_router(
             pages_router(

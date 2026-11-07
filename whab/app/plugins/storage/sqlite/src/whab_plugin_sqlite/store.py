@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from whab.domain import commands
 from whab.domain.accounts import ACCOUNT_TYPES, normalize_account
+from whab.domain.bank_setup import configure_sync, select_sync
 from whab.domain.budget import calculate_workspace
 from whab.domain.categories import create_category, ensure_child_category, public_categories
 from whab.domain.dates import current_month
@@ -230,6 +231,7 @@ class Store(Authority):
                     "error": row["error"],
                     "cursor": row["cursor"],
                     "provider": row["provider"],
+                    **({"syncSettings": json.loads(row["sync_settings"])} if "sync_settings" in row.keys() and row["sync_settings"] is not None else {}),
                 }
         return state
 
@@ -323,7 +325,7 @@ class Store(Authority):
         )
         if workspace == "personal":
             self.db.executemany(
-                "INSERT INTO items(id,token,institution_name,status,last_synced,error,cursor,provider) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET token=excluded.token,institution_name=excluded.institution_name,status=excluded.status,last_synced=excluded.last_synced,error=excluded.error,cursor=excluded.cursor,provider=excluded.provider",
+                "INSERT INTO items(id,token,institution_name,status,last_synced,error,cursor,provider,sync_settings) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET token=excluded.token,institution_name=excluded.institution_name,status=excluded.status,last_synced=excluded.last_synced,error=excluded.error,cursor=excluded.cursor,provider=excluded.provider,sync_settings=excluded.sync_settings",
                 [
                     (
                         item["id"],
@@ -334,6 +336,7 @@ class Store(Authority):
                         item.get("error"),
                         item.get("cursor"),
                         item.get("provider", "plaid"),
+                        json.dumps(item["syncSettings"]) if "syncSettings" in item else None,
                     )
                     for item in state["items"].values()
                 ],
@@ -803,6 +806,7 @@ class Store(Authority):
                 "error": None,
                 "cursor": previous.get("cursor"),
                 "provider": provider_id,
+                **({"syncSettings": previous["syncSettings"]} if "syncSettings" in previous else {}),
             }
 
         self._mutate("personal", operation)
@@ -827,6 +831,14 @@ class Store(Authority):
 
         self._mutate("personal", operation)
 
+    def configure_bank_sync(self, item_id, accounts, selection):
+        def operation(state):
+            result = configure_sync(state, item_id, accounts, selection)
+            for identifier in result["retiredAccounts"]:
+                self.db.execute("DELETE FROM accounts WHERE workspace='personal' AND id=?", (identifier,))
+            return result
+        return self._mutate("personal", operation)
+
     def apply_sync(
         self,
         item_id: str,
@@ -844,6 +856,7 @@ class Store(Authority):
             if expected_cursor is not UNSET and item.get("cursor") != expected_cursor:
                 raise StoreError("Sync cursor changed. Please retry.")
             provider = item.get("provider", "plaid")
+            sync_changes, sync_accounts = select_sync(state, item_id, changes, accounts or [])
 
             def owned_transaction(transaction: dict) -> bool:
                 account = state["accounts"].get(transaction.get("original", {}).get("accountId", transaction["accountId"]))
@@ -856,7 +869,7 @@ class Store(Authority):
             for account in state["accounts"].values():
                 if account.get("itemId") == item_id:
                     account["stale"] = True
-            for account in accounts or []:
+            for account in sync_accounts:
                 normalized_account = imported_account(account)
                 if (
                     normalized_account["itemId"] != item_id
@@ -880,7 +893,7 @@ class Store(Authority):
                     if previous_account.get("nameOverridden"):
                         normalized_account["name"] = previous_account["name"]
                 state["accounts"][normalized_account["id"]] = normalized_account
-            for imported in changes.get("added", []) + changes.get("modified", []):
+            for imported in sync_changes.get("added", []) + sync_changes.get("modified", []):
                 validate_imported_transaction(imported)
                 account = state["accounts"].get(imported["accountId"])
                 if account is None:
@@ -922,7 +935,7 @@ class Store(Authority):
                         "DELETE FROM transaction_receipts WHERE workspace=? AND transaction_id=?",
                         ("personal", pending["id"]),
                     )
-            for removed_id in changes.get("removed", []):
+            for removed_id in sync_changes.get("removed", []):
                 bank_identifier(removed_id)
                 transaction = state["transactions"].get(removed_id)
                 if transaction is None:
@@ -936,6 +949,6 @@ class Store(Authority):
                 status="connected",
                 error=None,
             )
-            return {kind: len(changes.get(kind, [])) for kind in ("added", "modified", "removed")}
+            return {kind: len(sync_changes.get(kind, [])) for kind in ("added", "modified", "removed")}
 
         return self._mutate("personal", operation)

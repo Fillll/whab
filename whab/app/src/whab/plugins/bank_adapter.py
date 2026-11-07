@@ -99,8 +99,11 @@ class BankAdapter:
 
     factory: Callable[[BankProviderContext], BankProvider] = field(repr=False)
     sync_interval_seconds: int | None = None
+    requires_account_setup: bool = False
 
     def __post_init__(self):
+        if type(self.requires_account_setup) is not bool:
+            raise ValueError("Account setup policy must be a boolean.")
         if not callable(self.factory):
             raise ValueError('Bank provider factory must be callable.')
         if self.sync_interval_seconds is not None and (type(self.sync_interval_seconds) is not int

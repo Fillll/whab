@@ -15,6 +15,7 @@ from whab.plugins.documentation import installed_catalog
 from whab.plugins.local import local_connection
 
 from . import client
+from .bank_commands import add_bank_parser, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import selection_error
 from .help import describe, overview
@@ -56,6 +57,7 @@ def parser(options):
         epilog="Example: whab empty-budget plugin enable ynab-zip-importer\nChanges apply live where supported; otherwise restart_required is returned. CLI is an installed management tool, not a budget toggle. Required storage cannot be disabled. Web is optional and can be disabled.")
     plugins.add_argument("action", choices=("list", "status", "enable", "disable"))
     plugins.add_argument("plugin", nargs="?", help="Identifier from whab plugin list; required for enable/disable")
+    add_bank_parser(commands)
     imports = commands.add_parser("import", help="Preview or commit a ZIP import into this empty budget",
         epilog="Enable an importer first: whab BUDGET plugin enable ynab-zip-importer\nThen: whab BUDGET import ynab-zip-importer preview --help",
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -186,6 +188,9 @@ def execute(args, home, environment, ca):
                 json={"name": args.name, "path": create_path(args.name, args.path)})
         identifier = resolve_budget(connection, args.target)
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
+        if args.command == "bank":
+            method, path, kwargs = bank_request(args, identifier)
+            return exchange(connection, method, path, **kwargs)
         if args.command == "import":
             return execute_import(connection, identifier, args, raw, fingerprint)
         if args.command == "plugin":
