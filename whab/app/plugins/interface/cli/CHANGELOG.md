@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1 — 2026-11-07
+
+PR: [#163](https://github.com/Fillll/whab/pull/163)
+
+- Show the core account-classification guide in both console help entry points and expose detailed field meanings and an explicit on-budget credit-card edit example through operation help and offline discovery.
+
 ## 2.2.0 — 2026-11-07
 
 PR: [#160](https://github.com/Fillll/whab/pull/160)
