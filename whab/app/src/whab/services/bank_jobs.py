@@ -91,7 +91,7 @@ class BankJobs:
         if interval is None:
             return {**record, "next_due": 0}
         if plugin in self.overrides:
-            return {**record, "next_due": self.next_boundary(record["last_attempt"], interval)}
+            return {**record, "next_due": self.next_boundary(record["last_attempt"], interval) if record["last_attempt"] else 0}
         return {**record, "next_due": min(record["next_due"], self.next_boundary(record["last_attempt"], interval))}
 
     async def run(self, plugin, *, due=False):

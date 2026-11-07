@@ -298,6 +298,7 @@ function renderSyncSetup(form, preview) {
   form.querySelector('[data-plaid-setup-error]').hidden = true;
   form.hidden = false;
   form.scrollIntoView({block: 'nearest'});
+  form.querySelector('[data-destination]')?.focus();
 }
 
 let disconnectId;

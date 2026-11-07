@@ -115,6 +115,7 @@ def test_custom_cadence_survives_reopen_and_manual_mode_still_allows_explicit_sy
         jobs = BankJobs(tmp_path, 'sandbox', runtime(), banks, clock=lambda: now[0])
         await jobs.configure('fictional', hours * 3600)
         assert jobs.automatic('fictional')
+        assert jobs.status()['jobs'][0]['next_due'] == 0
         await jobs.run_due()
         due = jobs.status()['jobs'][0]['next_due']
         assert due == jobs.next_boundary(now[0], hours * 3600)

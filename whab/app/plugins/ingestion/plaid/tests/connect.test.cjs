@@ -455,6 +455,7 @@ class SetupNode extends Target {
   setAttribute(name, value) {this[name] = value;}
   replaceChildren(...children) {this.children = []; this.append(...children);}
   scrollIntoView() {}
+  focus() {this.focused = true;}
   querySelectorAll(selector) {
     const key = selector.slice(6, -1).replace(/-([a-z])/g, (_, char) => char.toUpperCase());
     const result = [];
