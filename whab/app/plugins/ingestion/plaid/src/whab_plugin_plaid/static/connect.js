@@ -275,7 +275,7 @@ function renderSyncSetup(form, preview) {
         ...preview.destinations.filter(candidate => candidate.currency === account.currency && candidate.available !== false).map(candidate => [candidate.id, candidate.name])]) {
       const option = setupElement('option', text); option.value = value; destination.append(option);
     }
-    destination.value = account.link?.accountId || 'choose';
+    destination.value = account.link?.accountId || (preview.configured ? 'skip' : 'choose');
     const history = setupElement('select'); history.dataset.history = '';
     history.setAttribute('aria-label', `Transaction history for ${account.name}`);
     for (const [value, text] of [['', 'Choose transaction history'], ['date', 'Choose a start date'], ['all', 'All available history']]) {
@@ -292,7 +292,8 @@ function renderSyncSetup(form, preview) {
       since.disabled = history.disabled || history.value !== 'date';
     });
     history.addEventListener('change', () => {since.disabled = history.value !== 'date';});
-    since.disabled = history.value !== 'date';
+    history.disabled = destination.value === 'skip';
+    since.disabled = history.disabled || history.value !== 'date';
     row.append(destination, history, label); choices.append(row);
   }
   form.querySelector('[data-plaid-setup-error]').hidden = true;

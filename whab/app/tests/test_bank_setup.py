@@ -15,6 +15,7 @@ from whab.plugins.storage_transfer import (
     canonical_storage_json,
     read_storage_json,
 )
+from whab.storage.bank import BankStore
 
 
 @pytest.fixture(params=['sqlite', 'json'])
@@ -129,3 +130,4 @@ def test_deselecting_an_account_retains_its_history_and_ignores_later_changes(le
     assert result['modified'] == result['removed'] == 0
     second = next(row for row in ledger.transactions('personal') if row['id'] == 'second')
     assert second['amount'] == 1000  # Public history contains only non-deleted rows.
+    assert [row['accountId'] for row in BankStore(ledger, 'plaid').items()[0]['accountLinks']] == ['account']

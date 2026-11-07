@@ -492,3 +492,14 @@ test('account setup requires explicit history choices and serializes destination
   state.requests[1].reply({ok: true}); await saving;
   assert.equal(state.reloads, 1);
 });
+
+test('reopened setup keeps previously excluded accounts out of the import selection', () => {
+  const state = harness(); state.replace();
+  state.document.createElement = tag => new SetupNode(tag);
+  const form = new SetupNode(), choices = new SetupNode(), error = new SetupNode();
+  choices.dataset.plaidAccountChoices = ''; error.dataset.plaidSetupError = ''; form.append(choices, error);
+  state.context.renderSyncSetup(form, {itemId: 'fictional-item', configured: true, accounts: [{id: 'excluded', name: 'Excluded savings', currency: 'USD', link: null}], destinations: []});
+  assert.equal(form.querySelector('[data-destination]').value, 'skip');
+  assert.equal(form.querySelector('[data-history]').disabled, true);
+  assert.equal(form.querySelector('[data-since]').disabled, true);
+});

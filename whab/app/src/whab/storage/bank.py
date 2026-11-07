@@ -87,6 +87,8 @@ class BankStore:
                 for account in self._store.accounts("personal"):
                     if account.get("itemId") == item["id"]:
                         link = next((row for row in (settings or {}).values() if row["accountId"] == account["id"]), {})
+                        if settings is not None and not link:
+                            continue
                         links.append({"accountId": account["id"], "name": account["name"],
                                       "mask": account.get("mask"), "since": link.get("since")})
                 result.append({**item, "id": self._external_item_id(item["id"]),
