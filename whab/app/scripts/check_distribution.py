@@ -42,7 +42,7 @@ with patch.object(metadata.EntryPoint, "load", side_effect=AssertionError("Docum
     operation_catalog = installed_catalog()
 assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 20
 assert {row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] == "local"} == {
-    "bank.connections", "bank.preview", "bank.configure", "bank.sync", "bank.schedule", "bank.background",
+    "bank.connections", "bank.preview", "bank.configure", "bank.sync", "bank.schedule", "bank.background", "bank.investments",
 }
 assert {row["id"] for row in operation_catalog["plugins"]} == set(expected) - {"whab"}
 assert all(row["documented"] and row["enabled"] is None for row in operation_catalog["plugins"])
@@ -74,6 +74,7 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
 assert any(entry.name == "whab" for entry in metadata.distribution("whab_plugin_cli").entry_points)
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]
+assert metadata.distribution("whab_plugin_plaid").locate_file("whab_plugin_plaid/static/investments.css").is_file()
 assert not metadata.distribution("whab").entry_points
 with patch.object(metadata, "entry_points", side_effect=AssertionError("Catalog must not discover code")):
     catalog = catalog_snapshot()
