@@ -66,6 +66,22 @@ whab api command edit_transaction --help
 whab api describe --plugin ynab-zip-importer --help
 ```
 
+## Account classification help
+
+CLI 2.2.1 with WHAB 2.59.1 or newer makes both `whab --help` and `whab-cli --help` explain account classification offline from the core’s packaged operation descriptions. For the full account fields and explicit edit example:
+
+```sh
+whab api query accounts --help
+whab api command update_account --help
+whab-cli query accounts --help
+whab-cli command update_account --help
+whab-cli describe --offline --plugin core --operation update_account --json
+```
+
+`type` and `onBudget` are separate. `credit` means a credit card or line of credit, treated as debt even when on budget. `other` is a generic unclassified account. Only `depository` and `credit` may be on budget; tracking types remain off budget. New cash/card accounts default on budget, but changing an existing off-budget account to `credit` preserves its scope unless you also pass `"onBudget": true`. Classification alone does not verify an imported balance, connect a bank account, match duplicates or change transaction provenance.
+
+Read the addressed budget with `whab-cli CONFIG query accounts` or `whab --home /absolute/runtime api --budget BUDGET_ID query accounts` to obtain the current type, scope, stable account ID and revision. Then use the existing explicit `update_account` command with the observed revision and a unique request ID; review help before submitting. No classification decision is inferred or saved by help/discovery.
+
 ## Plugin controls
 
 CLI is an installed management tool, available to all local budgets without
@@ -242,7 +258,7 @@ Subscription labels apply to matching payments in the same account; see [Subscri
 
 The CLI makes one request, never retries a write or refreshes its revision automatically, rejects redirects/proxies and validates response budget identity. Success prints JSON to stdout and exits 0; failure prints a sanitized JSON error to stderr and exits 1. After an uncertain write, retain the original target, parameters, revision and request ID. Inspect the budget and retry only that exact intent; a restart or stale revision requires reconciliation rather than a new write. Request receipts have the host's documented lifetime; the CLI does not claim durable receipt storage.
 
-Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.57+ are required.
+Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.59.1+ are required.
 
 ## Operation documentation
 

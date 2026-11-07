@@ -36,14 +36,14 @@
             },
             "type": {
               "type": "string",
-              "description": "Account classification."
+              "description": "Financial account type, independent of budget scope: depository = cash/checking/savings; credit = credit card/line of credit; investment = brokerage; retirement = retirement; property = property; loan = loan; deposit = CD/term deposit; other_asset/other_liability = other tracking asset/debt; other = generic unclassified account, not a credit-card classification. Credit, loan and other_liability are liabilities with a positive amount owed."
             },
             "balance": {
               "type": [
                 "integer",
                 "null"
               ],
-              "description": "Current integer-minor-unit balance; null when unknown."
+              "description": "Current integer-minor-unit balance; null when unknown. Assets carry signed value; liabilities carry a positive amount owed. Classifying an imported account does not verify its balance estimate or fetch a fresh bank balance."
             },
             "currency": {
               "type": "string",
@@ -51,7 +51,7 @@
             },
             "source": {
               "type": "string",
-              "description": "Record origin."
+              "description": "Record origin, such as ynab, plaid or manual; this is separate from the financial type and onBudget classification."
             },
             "stale": {
               "type": "boolean",
@@ -63,7 +63,7 @@
             },
             "onBudget": {
               "type": "boolean",
-              "description": "Whether the account participates in envelopes."
+              "description": "True includes the account in monthly envelope funding/activity; false keeps it for tracking outside envelopes. Only depository and credit may be on budget. New cash/credit accounts default on budget; other types default off budget. An on-budget credit card still represents debt. Existing accounts retain their budget scope when changed to cash/credit unless onBudget is supplied explicitly. Unclassified imports may begin as other, off budget; inspect their saved values before editing."
             },
             "subtype": {
               "type": [
@@ -939,7 +939,7 @@
           },
           "type": {
             "type": "string",
-            "description": "Account classification.",
+            "description": "Financial account type, separate from onBudget. Credit means credit card/line of credit and loan means debt; other is generic/unclassified. Inspect query accounts --help for classification meanings.",
             "enum": [
               "depository",
               "credit",
@@ -952,7 +952,7 @@
           },
           "balance": {
             "type": "integer",
-            "description": "Integer currency minor units; USD cents. Positive outflows, negative inflows."
+            "description": "Initial balance in integer currency minor units (USD cents). Assets carry signed value; credit/loan liabilities carry a positive amount owed."
           },
           "currency": {
             "type": "string",
@@ -962,7 +962,7 @@
           },
           "onBudget": {
             "type": "boolean",
-            "description": "Explicit true/false choice."
+            "description": "Whether the account participates in monthly envelopes. Only depository and credit allow true; defaults to true for these types and false for tracking types. Credit remains debt when on budget."
           },
           "subtype": {
             "type": "string",
@@ -991,6 +991,15 @@
             "balance": 10000
           },
           "output": null
+        },
+        {
+          "input": {
+            "name": "Fictional everyday card",
+            "type": "credit",
+            "onBudget": true,
+            "balance": 2500
+          },
+          "output": null
         }
       ],
       "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
@@ -1006,7 +1015,7 @@
     {
       "name": "update_account",
       "kind": "command",
-      "summary": "Update account metadata. Currency changes require no transaction history.",
+      "summary": "Update account classification or other metadata without rewriting transaction history. Currency changes require no transaction history.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -1019,7 +1028,7 @@
           },
           "type": {
             "type": "string",
-            "description": "Account classification.",
+            "description": "Financial account type, separate from onBudget. Credit means credit card/line of credit and loan means debt; other is generic/unclassified. Inspect query accounts --help for classification meanings.",
             "enum": [
               "depository",
               "credit",
@@ -1032,7 +1041,7 @@
           },
           "onBudget": {
             "type": "boolean",
-            "description": "Explicit true/false choice."
+            "description": "Whether the account participates in monthly envelopes. Only depository and credit allow true. When reclassifying an existing off-budget account as credit, set onBudget: true explicitly to include it; changing type alone preserves its off-budget scope."
           },
           "subtype": {
             "type": [
@@ -1074,9 +1083,18 @@
             "name": "Fictional daily spending"
           },
           "output": null
+        },
+        {
+          "input": {
+            "accountId": "fictional-account",
+            "type": "credit",
+            "onBudget": true,
+            "subtype": "credit_card"
+          },
+          "output": null
         }
       ],
-      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "side_effects": "Applies the explicit metadata edit while preserving transaction IDs, notes, categories and review state. Classification can change envelope/net-worth treatment but does not verify an imported balance, link a bank connection, match duplicate transactions or change their source.",
       "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
       "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
       "errors": [

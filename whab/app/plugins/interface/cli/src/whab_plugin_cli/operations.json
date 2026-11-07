@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "cli",
-  "summary": "Name-addressed whab console, offline help and JSON discovery, local budget creation, guarded file imports, plugin management and reports; production is the CLI default.",
+  "summary": "Name-addressed whab console, offline account-classification help and JSON discovery, local budget creation, guarded file imports, plugin management and reports; production is the CLI default.",
   "delegates": [
     "core"
   ],
@@ -1331,6 +1331,36 @@
       ],
       "retry": "Read status after an uncertain save. Do not recreate a bank connection or blindly replay a financial write. Replaying provider transactions uses stable transaction IDs.",
       "availability": "WHAB 2.59+ with a typed bank adapter; Plaid 1.6+ and CLI 2.2+ supply these controls. Manual budgeting requires no bank provider."
+    },
+    {
+      "name": "help.account-classification",
+      "kind": "local",
+      "summary": "Explain financial account types, on/off-budget scope and the existing account read/edit commands offline.",
+      "input": {
+        "type": "object",
+        "description": "No operation-specific input; read the help text without opening a runtime.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "string",
+        "description": "Human-readable classification guide from the packaged core account descriptions, including Other, liabilities, budget scope and unverified balances."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": "Account classification: type and onBudget are separate. Credit cards are liabilities and may be on budget."
+        }
+      ],
+      "side_effects": "Read-only documentation. Does not contact a server, inspect account data, change classification or start banking work. No profile is required; an explicitly supplied config is parsed normally.",
+      "permissions": "Offline installed-package access; no credentials or budget required.",
+      "scope": "Installed operation documentation; current account classifications require an explicit query of the addressed budget.",
+      "errors": [
+        "Installed documentation must satisfy the supported packaged operation contract."
+      ],
+      "retry": "Read again as needed; help never authorizes or submits a mutation.",
+      "availability": "whab --help; whab-cli --help; whab api query accounts --help; whab-cli query accounts --help; whab api command update_account --help; whab-cli command update_account --help. Machine-readable fields/examples: describe --offline --plugin core --operation update_account --json."
     }
   ]
 }

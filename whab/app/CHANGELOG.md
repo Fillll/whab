@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.59.1 — 2026-11-07
+
+PR: [#163](https://github.com/Fillll/whab/pull/163)
+
+- Explain account types, liability balances, on/off-budget scope and explicit reclassification in the packaged account operation descriptions and fictional examples, without changing financial rules or accepted inputs.
+
 ## 2.59.0 — 2026-11-07
 
 PR: [#160](https://github.com/Fillll/whab/pull/160)

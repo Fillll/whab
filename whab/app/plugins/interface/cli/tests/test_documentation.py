@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from whab_plugin_cli import client
+from whab_plugin_cli import client, console
 from whab_plugin_cli import help as help_module
 
 from whab.plugins.documentation import installed_catalog
@@ -71,6 +71,53 @@ def test_help_needs_no_connection_or_credentials(arguments, expected, monkeypatc
     assert expected in text
     if "edit_transaction" in arguments:
         assert "Retry:" in text and "Side effects:" in text and "Examples:" in text
+
+
+@pytest.mark.parametrize("main,arguments", [
+    (console.main, ["--help"]),
+    (client.main, ["--help"]),
+    (console.main, ["api", "query", "accounts", "--help"]),
+    (client.main, ["query", "accounts", "--help"]),
+])
+def test_classification_help_explains_type_scope_and_balance_without_a_runtime(
+    main, arguments, monkeypatch, capsys,
+):
+    monkeypatch.setattr(console, "configuration", lambda args: pytest.fail("Help cannot load a profile"))
+    monkeypatch.setattr(client, "_local", lambda args: pytest.fail("Help cannot acquire a host"))
+    monkeypatch.setattr(client.httpx, "Client", lambda **kwargs: pytest.fail("Help cannot connect"))
+    with pytest.raises(SystemExit) as result:
+        main(arguments)
+    assert result.value.code == 0
+    text = capsys.readouterr().out
+    for meaning in ("generic unclassified", "credit card/line of credit", "positive amount owed",
+                    "Only depository and credit", "scope", "does not verify", "budget"):
+        assert meaning in text
+
+
+@pytest.mark.parametrize("main,arguments", [
+    (console.main, ["api", "command", "update_account", "--help"]),
+    (client.main, ["command", "update_account", "--help"]),
+])
+def test_reclassification_help_requires_explicit_scope_and_separates_linking(
+    main, arguments, monkeypatch, capsys,
+):
+    monkeypatch.setattr(client.httpx, "Client", lambda **kwargs: pytest.fail("Help cannot connect"))
+    with pytest.raises(SystemExit) as result:
+        main(arguments)
+    assert result.value.code == 0
+    text = capsys.readouterr().out
+    assert "onBudget: true explicitly" in text and "preserves its off-budget scope" in text
+    assert "does not verify" in text and "link a bank connection" in text
+    assert '"type": "credit", "onBudget": true' in text
+
+
+def test_machine_discovery_retains_the_same_account_meanings_and_edit_example(capsys):
+    assert client.main(["describe", "--offline", "--plugin", "core", "--operation", "update_account", "--json"]) == 0
+    row = json.loads(capsys.readouterr().out)["core"]["operations"][0]
+    assert "onBudget: true explicitly" in row["input"]["properties"]["onBudget"]["description"]
+    assert any(example["input"].get("type") == "credit" and example["input"].get("onBudget") is True
+               for example in row["examples"])
+    assert "transaction IDs, notes, categories and review state" in row["side_effects"]
 
 
 def test_offline_describe_filters_and_machine_schema(monkeypatch, capsys):

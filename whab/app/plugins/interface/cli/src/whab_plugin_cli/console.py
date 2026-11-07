@@ -18,7 +18,7 @@ from . import client
 from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import selection_error
-from .help import describe, overview
+from .help import account_classification, describe, overview
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 
 PREFIX = "/api/local/v1"
@@ -34,7 +34,7 @@ def parser(options):
     check_identifiers(catalog)
     root = argparse.ArgumentParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
-        epilog="Examples:\n  whab budget create empty-budget --path ~/budgets\n  whab empty-budget plugin enable ynab-zip-importer\n  whab empty-budget import ynab-zip-importer preview export.zip --currency USD\n  whab empty-budget insights summary\n  whab empty-budget trnx non-reviewed\n\nEvery command supports --help. Names containing spaces can be quoted.\nUse whab budget list to discover names and permanent IDs.",
+        epilog="Examples:\n  whab budget create empty-budget --path ~/budgets\n  whab empty-budget plugin enable ynab-zip-importer\n  whab empty-budget import ynab-zip-importer preview export.zip --currency USD\n  whab empty-budget insights summary\n  whab empty-budget trnx non-reviewed\n\nEvery command supports --help. Names containing spaces can be quoted.\nUse whab budget list to discover names and permanent IDs.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
     budget = groups.add_parser("budget", help="Create and list saved budgets")
