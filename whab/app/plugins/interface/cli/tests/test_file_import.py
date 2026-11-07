@@ -118,6 +118,12 @@ def test_invalid_preview_cannot_commit(importer, capsys, changes):
     assert len(importer[2]) == 2 and "invalid import preview" in capsys.readouterr().err
 
 
+def test_non_object_preview_is_sanitized(importer, capsys):
+    importer[3]["preview"] = []
+    assert run(importer, "commit", "--fingerprint", importer[1]) == 1
+    assert len(importer[2]) == 2 and "invalid import preview" in capsys.readouterr().err
+
+
 def test_nonempty_budget_is_reported_by_preview_and_cannot_commit(importer, capsys):
     importer[3]["preview"].update(canImport=False, reason="File imports require an empty personal workspace.")
     assert run(importer, "preview") == 0

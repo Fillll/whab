@@ -150,17 +150,16 @@ def execute_import(connection, identifier, args, raw, fingerprint):
     path = "/budgets/" + quote(identifier, safe="") + "/api/plugins/" + quote(host_id(args.plugin), safe="") + "/import/"
     headers = {"Content-Type": "application/zip", "X-Import-Currency": args.currency}
     preview = exchange(connection, "POST", path + "preview", content=raw, headers=headers)
-    identity = preview.get("parserIdentity")
-    if (preview.get("fingerprint") != fingerprint or preview.get("currency") != args.currency
-            or not isinstance(identity, str) or not re.fullmatch(r"[!-~]{1,256}", identity)):
+    if (not isinstance(preview, dict) or preview.get("fingerprint") != fingerprint or preview.get("currency") != args.currency
+            or not isinstance(preview.get("parserIdentity"), str) or not re.fullmatch(r"[!-~]{1,256}", preview["parserIdentity"])):
         raise CommandError("WHAB returned an invalid import preview; nothing was committed.")
     if args.stage == "preview":
-        return {"budgetId": identifier, **preview}
+        return {**preview, "budgetId": identifier}
     if preview.get("canImport") is not True:
         raise CommandError("This budget cannot import the file. Run preview to inspect the reason; nothing was committed.")
     result = exchange(connection, "POST", path + "commit", content=raw,
-        headers={**headers, "X-Import-Fingerprint": fingerprint, "X-Import-Parser": identity})
-    return {"budgetId": identifier, "fingerprint": fingerprint, **result}
+        headers={**headers, "X-Import-Fingerprint": fingerprint, "X-Import-Parser": preview["parserIdentity"]})
+    return {**result, "budgetId": identifier, "fingerprint": fingerprint}
 
 
 def execute(args, home, environment, ca):
