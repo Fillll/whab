@@ -13,6 +13,7 @@ from whab.web.bank_schemas import (
     BackgroundBody,
     ExchangeBody,
     FlowId,
+    InvestmentsBody,
     LinkBody,
     ScheduleBody,
     SyncSetupBody,
@@ -99,6 +100,10 @@ def create_router(plugin_id, banks, store, prefix=None, *, jobs=None, settings=N
         if body.itemId is None:
             raise BankError("Choose a bank connection to review.")
         return await invoke(request, "sync_preview", body.itemId)
+
+    @router.post('/investments')
+    async def investments(body: InvestmentsBody, request: Request):
+        return await invoke(request, 'investments', body.itemId, body.bankAccountId, body.startDate, body.endDate)
 
     @router.put("/sync-settings")
     async def configure_sync(body: SyncSetupBody, request: Request):

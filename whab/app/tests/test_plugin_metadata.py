@@ -295,7 +295,7 @@ def test_remote_factory_dynamic_invalid_or_mixed_shapes_cannot_claim_live(metada
 
 @pytest.mark.parametrize("factory", ["BankAdapter(provider)", "BankAdapter(factory=provider)",
                                      "BankAdapter(provider, sync_interval_seconds=3600)",
-                                     "BankAdapter(provider, 3600)", "BankAdapter(provider, requires_account_setup=True)"])
+                                     "BankAdapter(provider, 3600)", "BankAdapter(provider, requires_account_setup=True)", "BankAdapter(provider, supports_investments=True)"])
 def test_static_typed_bank_marker_and_private_top_level_code_are_never_executed(metadata_tool, static_repository, factory):
     root, _, module = static_repository
     path = module / '__init__.py'
@@ -310,7 +310,7 @@ def test_static_typed_bank_marker_and_private_top_level_code_are_never_executed(
 
 @pytest.mark.parametrize('bank,extra,contract', [
     ('legacy_factory', '', ''), ('make_adapter()', '', ''), ('BankAdapter(make_factory())', '', ''),
-    ('BankAdapter(provider, requires_account_setup=1)', '', ''), ('BankAdapter(None)', '', ''), ('BankAdapter(provider, extra=True)', '', ''),
+    ('BankAdapter(provider, requires_account_setup=1)', '', ''), ('BankAdapter(provider, supports_investments=1)', '', ''), ('BankAdapter(None)', '', ''), ('BankAdapter(provider, extra=True)', '', ''),
     ('BankAdapter(provider)', ',settings=settings', ''), ('BankAdapter(provider)', ',bind=binder', ''),
     ('BankAdapter(provider)', ',categorization=engine', ''), ('BankAdapter(provider)', ',file_import=parser', ''),
     ('BankAdapter(provider)', '', ",authority='remote'"), ('BankAdapter(provider)', '', ',state_version=2'),

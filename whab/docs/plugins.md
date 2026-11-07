@@ -899,3 +899,42 @@ WHAB 2.59 adds `BankAdapter.requires_account_setup` (boolean, default false). An
 The host facade adds `sync_preview(item_id)` and `configure_sync(item_id, selection)` behind local bank endpoints. `POST /api/banks/{id}/sync-preview` takes `itemId` and fetches normalized provider accounts through a read-only synchronization request without committing its cursor. It returns account identifiers, names, masks/currencies, saved links and safe destination metadata. `PUT /api/banks/{id}/sync-settings` requires `itemId` and an `accounts` array containing `bankAccountId`, `accountId` (null for new), and explicit `since` (inclusive date or null for all history). Configuration uses the optional durable `configure_bank_sync` storage command; unsupported backends fail explicitly. Native account association/currency rules belong in the domain, and providers retain transport/normalization ownership. Account mappings and cutoffs travel with protected native transfers, not portable credential-free exports.
 
 `GET` / `PUT /api/banks/{id}/schedule` reads/saves `interval_seconds` (null, 3600, 10800 or 21600). A null policy suppresses periodic and webhook-triggered imports while manual sync remains available. Policies are device-local and budget/provider/environment scoped. `POST /api/banks/{id}/schedule/background` takes explicit `enabled` and registers/unregisters the existing device/environment macOS wakeup; due filtering honors each budget’s saved policy. CLI, Web and cron use these same host services. All routes preserve HTTPS, local access, demo rejection and no-store behavior; none becomes a remote ledger operation.
+
+### Optional read-only investment reports
+
+WHAB 2.60 adds `BankAdapter.supports_investments: bool = False`. An opted-in
+adapter implements asynchronous `read_investments(item_id, access_token,
+start_date, end_date, account_id) -> dict` in its typed provider worker. Existing
+adapters do not need this callback. Discovery transports the true marker without
+importing provider code in the host. The worker rejects a missing callback or an
+unbounded/malformed response; host-owned credentials never appear in its output.
+
+The exact provider DTO contains `accounts`, `positions`, `activity`, `asOf`,
+`providerUpdatedAt`, `startDate` and `endDate`. Its complete field schemas and
+fictional example are packaged as `BankProvider.read_investments` in the Plaid
+operation reference. Money is integer ISO currency minor units; quantities and
+prices are decimal strings. Limits are 500 accounts, 10,000 positions and 100,000
+activity events. Unsupported currencies, duplicate/foreign IDs, invalid dates,
+nonfinite numbers or extra fields fail instead of returning partial data.
+
+The guarded local `POST /budgets/{budget}/api/banks/{provider}/investments` takes
+`itemId` plus optional nullable `bankAccountId`, `startDate` and `endDate`.
+`bankAccountId` is the provider account ID, not the linked ledger destination.
+Dates bound activity only; defaults are today and two calendar years earlier
+(February 28 when that earlier year has no leap day). The coordinator holds the
+budget runtime lease and serialization lock through the blocking provider read,
+including admitted work after cancellation, validates Item/account/window scope,
+and calls the financial core to derive the report. No ledger/cursor/settings are
+written and no product is automatically activated. The operation is not added to
+remote ledger dispatch.
+
+Core calculations compare nonshort positions with positive reported basis,
+return nullable unrealized gains and two-decimal percentage strings, and total
+currencies separately with explicit basis coverage. Realized returns stay null
+without lot history. `firstRecordedAddition` is only the earliest uncancelled buy
+or explicit inbound transfer in the returned history, never a presumed original
+acquisition date. `bank.investments` in the core, CLI and Plaid packaged references
+documents the full public report. Provider templates receive a generation-scoped
+`bank_asset_prefix` from their `bank_panels` entry's `asset_prefix`; visual plugins
+pass it through when including provider templates so provider-owned styles remain
+replaceable and retain the captured generation.

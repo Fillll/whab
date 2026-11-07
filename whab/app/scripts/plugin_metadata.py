@@ -245,10 +245,11 @@ def descriptor_metadata(module_path, attribute, root):
     bank_node = descriptor.get("bank")
     bank_factory = None
     if isinstance(bank_node, ast.Call) and isinstance(bank_node.func, ast.Name) and bank_node.func.id == "BankAdapter":
-        fields = _constructor(bank_node, "BankAdapter", ("factory", "sync_interval_seconds", "requires_account_setup"))
+        fields = _constructor(bank_node, "BankAdapter", ("factory", "sync_interval_seconds", "requires_account_setup", "supports_investments"))
         interval = _literal(fields["sync_interval_seconds"]) if "sync_interval_seconds" in fields else None
         setup = _literal(fields["requires_account_setup"]) if "requires_account_setup" in fields else False
-        if (type(setup) is bool and "factory" in fields and fields.keys() <= {"factory", "sync_interval_seconds", "requires_account_setup"}
+        investments = _literal(fields["supports_investments"]) if "supports_investments" in fields else False
+        if (type(setup) is bool and type(investments) is bool and "factory" in fields and fields.keys() <= {"factory", "sync_interval_seconds", "requires_account_setup", "supports_investments"}
                 and isinstance(fields["factory"], ast.Name)
                 and (interval is None or type(interval) is int and 60 <= interval <= 31 * 86400)):
             bank_factory = fields["factory"].id

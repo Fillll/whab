@@ -1,4 +1,6 @@
+{% if bank_asset_prefix is defined %}<link rel="stylesheet" href="{{ bank_asset_prefix }}/investments.css">{% endif %}
 <section class="bank-provider" data-bank-provider="plaid" data-bank-environment="{{ status.environment }}" data-sync-setup="{{ 'true' if status.requiresAccountSetup else 'false' }}">
+  <div data-plaid-connections-view>
   <div class="section-title">
     <h2>Plaid connections</h2>
     <button class="button primary" data-plaid-connect {% if not status.configured %}disabled{% endif %}>{{ icon('link', 16) if icon is defined else '' }}Connect account</button>
@@ -65,6 +67,7 @@
   {% endfor %}
   </div>
   <div class="connection-actions">
+    {% if status.supportsInvestments %}<button class="text-link" data-plaid-investments="{{ item.id }}">Investments</button>{% endif %}
     <button class="text-link" data-plaid-setup="{{ item.id }}">Sync setup</button>
     <button class="text-link" data-plaid-connect="{{ item.id }}">{{ 'Reconnect' if item.status=='reconnect' else 'Manage' }}</button><button class="disconnect-button"
         data-plaid-disconnect="{{ item.id }}"
@@ -104,6 +107,29 @@
   <div class="modal-actions">
     <button class="button secondary" data-plaid-close-dialog>Keep connected</button><button class="button primary" id="plaid-confirm-disconnect">Disconnect</button>
   </div>
+</section>
+
+
+</div>
+<section class="investment-view" data-plaid-investment-view hidden aria-label="Investment positions">
+  <button class="text-link" data-investment-back>← Connections</button>
+  <h3 tabindex="-1" data-investment-heading>Investments</h3>
+  <p class="investment-note" data-investment-snapshot></p>
+  <div class="investment-controls">
+    <label>Account<select data-investment-account aria-label="Investment account"><option value="">All investment accounts</option></select></label>
+    <label>History from<input type="date" data-investment-start aria-label="Investment history start"></label>
+    <label>Through<input type="date" data-investment-end aria-label="Investment history end"></label>
+    <button class="button secondary" data-investment-load>Load positions</button>
+  </div>
+  <p class="investment-note" role="status" aria-live="polite" data-investment-status></p>
+  <p class="field-error" role="alert" data-investment-error hidden></p>
+  <dl class="investment-summary" data-investment-totals></dl>
+  <div class="investment-table-wrap" tabindex="0" aria-label="Positions, scroll horizontally for all columns">
+    <table class="investment-table"><thead><tr><th>Position</th><th>Value</th><th>Cost basis</th><th>Unrealized</th><th>Return</th><th>First recorded addition</th></tr></thead><tbody data-investment-positions></tbody></table>
+  </div>
+  <button class="text-link" data-investment-more hidden>Show more positions</button>
+  <p class="investment-note">First recorded addition is the earliest buy or inbound transfer in the selected history. An unavailable date means earlier acquisition history is missing. Unrealized return compares value with reported position cost basis; dividends and realized returns are excluded. Realized return requires complete lot history and is unavailable here.</p>
+  <details><summary>Investment activity</summary><div class="investment-table-wrap" tabindex="0" aria-label="Investment activity"><table class="investment-table"><thead><tr><th>Event</th><th>Date</th><th>Cash flow</th><th>Fees</th></tr></thead><tbody data-investment-activity></tbody></table><button class="text-link" data-investment-more-activity hidden>Show more activity</button></div></details>
 </section>
 
 </section>

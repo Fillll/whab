@@ -163,7 +163,7 @@ class BankLifecycle:
                         budget_id=self.budget_id, environment=self.settings.plaid_env, provider_id=plugin.id,
                         generation=generation, journal=self._journal(plugin.id), cipher=self.cipher,
                         code_identity=identity, background_scope=self.background_scope,
-                        requires_account_setup=plugin.bank.requires_account_setup,
+                        requires_account_setup=plugin.bank.requires_account_setup, supports_investments=plugin.bank.supports_investments,
                         automatic_sync=lambda: self.automatic_sync(plugin.id))
             else:
                 service = plugin.bank(BankContext(self.bank_store(plugin.id), self.settings.bank_configuration(plugin.id),

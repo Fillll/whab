@@ -304,14 +304,15 @@ function renderSyncSetup(form, preview) {
 
 let disconnectId;
 const bound = new WeakSet();
-function bindButtons(selector, callback) {
+function bindButtons(selector, callback, eventType = 'click') {
   for (const button of document.querySelectorAll(selector)) {
     if (bound.has(button)) continue;
     bound.add(button);
-    button.addEventListener('click', event => callback(button, event));
+    button.addEventListener(eventType, event => callback(button, event));
   }
 }
 function bind() {
+  bindInvestments();
   bindButtons('[data-plaid-setup]', async button => {
     if (button.disabled || linking || activeRequests) return;
     button.disabled = true; activeRequests += 1;
@@ -474,4 +475,122 @@ const previousNotice = sessionStorage.getItem('whab-notice');
 if (previousNotice) {
   sessionStorage.removeItem('whab-notice');
   notify(previousNotice);
+}
+function investmentMoney(value, currency) {
+  if (value === null) return 'Unavailable';
+  const formatter = new Intl.NumberFormat(undefined, {style: 'currency', currency});
+  return formatter.format(value / 10 ** formatter.resolvedOptions().maximumFractionDigits);
+}
+function investmentCell(row, value, className) {
+  const cell = setupElement('td', value);
+  if (className) cell.className = className;
+  row.append(cell);
+  return cell;
+}
+function renderInvestmentReport(view, report) {
+  view.investmentReport = report;
+  const accountNames = new Map(report.accounts.map(account => [account.id, account.name]));
+  const totals = view.querySelector('[data-investment-totals]'); totals.replaceChildren();
+  for (const total of report.totals) {
+    for (const [label, value] of [
+      [`Value · ${total.currency}`, investmentMoney(total.value, total.currency)],
+      ['Cost basis available', total.coveredPositions ? investmentMoney(total.costBasis, total.currency) : 'Unavailable'],
+      ['Unrealized gain/loss', total.coveredPositions ? `${investmentMoney(total.unrealizedGain, total.currency)} · ${total.unrealizedReturnPercent}%` : 'Unavailable'],
+    ]) {
+      const group = setupElement('div'); group.append(setupElement('dt', label), setupElement('dd', value)); totals.append(group);
+    }
+  }
+  const positions = view.querySelector('[data-investment-positions]'); positions.replaceChildren();
+  const limit = Number(view.dataset.positionLimit || 500);
+  for (const position of report.positions.slice(0, limit)) {
+    const row = setupElement('tr'); const identity = investmentCell(row, '');
+    identity.append(setupElement('strong', position.ticker || position.name));
+    identity.append(setupElement('small', `${position.name} · ${position.quantity} units · ${position.status}`));
+    identity.append(setupElement('small', accountNames.get(position.accountId) || ''));
+    if (position.price !== null) identity.append(setupElement('small', `${position.price} ${position.currency} / unit · ${position.priceAsOf || 'Price date unavailable'}`));
+    investmentCell(row, investmentMoney(position.value, position.currency));
+    investmentCell(row, investmentMoney(position.costBasis, position.currency));
+    const gainClass = position.unrealizedGain < 0 ? 'investment-loss' : 'investment-gain';
+    investmentCell(row, investmentMoney(position.unrealizedGain, position.currency), gainClass);
+    investmentCell(row, position.unrealizedReturnPercent === null ? 'Unavailable' : `${position.unrealizedReturnPercent}%`, gainClass);
+    investmentCell(row, position.firstRecordedAddition || 'Unavailable'); positions.append(row);
+  }
+  view.querySelector('[data-investment-more]').hidden = report.positions.length <= limit;
+  const activity = view.querySelector('[data-investment-activity]'); activity.replaceChildren();
+  const activityLimit = Number(view.dataset.activityLimit || 100);
+  for (const event of report.activity.slice(0, activityLimit)) {
+    const row = setupElement('tr'); const name = investmentCell(row, event.name);
+    name.append(setupElement('small', `${event.type}${event.subtype ? ` · ${event.subtype}` : ''}`));
+    investmentCell(row, event.date); investmentCell(row, investmentMoney(-event.amount, event.currency));
+    investmentCell(row, investmentMoney(event.fees, event.currency)); activity.append(row);
+  }
+  view.querySelector('[data-investment-more-activity]').hidden = report.activity.length <= activityLimit;
+  view.querySelector('[data-investment-status]').textContent = report.positions.length
+    ? `${Math.min(limit, report.positions.length)} of ${report.positions.length} positions. ${Math.min(activityLimit, report.activity.length)} of ${report.activity.length} activity records.`
+    : 'No current investment positions were returned for this account.';
+  view.querySelector('[data-investment-snapshot]').textContent = `Snapshot: ${new Date(report.asOf).toLocaleString()}${report.providerUpdatedAt ? ` · Provider update: ${new Date(report.providerUpdatedAt).toLocaleString()}` : ''}`;
+}
+async function loadInvestmentReport(view) {
+  if (activeRequests || linking) return;
+  const provider = view.closest('[data-bank-provider]');
+  const button = view.querySelector('[data-investment-load]');
+  const error = view.querySelector('[data-investment-error]'); error.hidden = true;
+  const account = view.querySelector('[data-investment-account]');
+  const start = view.querySelector('[data-investment-start]'); const end = view.querySelector('[data-investment-end]');
+  const selected = account.value;
+  view.dataset.epoch = String(Number(view.dataset.epoch || 0) + 1); const epoch = view.dataset.epoch;
+  button.disabled = true; activeRequests += 1;
+  for (const control of [account, start, end]) control.disabled = true;
+  view.investmentReport = null;
+  for (const selector of ['[data-investment-positions]', '[data-investment-activity]', '[data-investment-totals]']) view.querySelector(selector).replaceChildren();
+  view.querySelector('[data-investment-snapshot]').textContent = '';
+  view.querySelector('[data-investment-more]').hidden = true; view.querySelector('[data-investment-more-activity]').hidden = true;
+  view.querySelector('[data-investment-status]').textContent = 'Loading investment positions…';
+  try {
+    const report = await api('/plaid/investments', {itemId: view.dataset.itemId, bankAccountId: selected || null,
+      startDate: start.value || null, endDate: end.value || null});
+    if (view.dataset.epoch !== epoch || view.isConnected === false || provider.isConnected === false) return;
+    const known = new Set([...account.options].map(option => option.value));
+    for (const entry of report.accounts) {
+      if (!known.has(entry.id)) {
+        const option = setupElement('option', `${entry.name}${entry.mask ? ` · ${entry.mask}` : ''}`); option.value = entry.id; account.append(option);
+      }
+    }
+    account.value = selected; start.value = report.startDate; end.value = report.endDate;
+    view.dataset.positionLimit = '500'; view.dataset.activityLimit = '100';
+    renderInvestmentReport(view, report);
+  } catch (failure) {
+    if (view.dataset.epoch === epoch) {
+      error.textContent = failure.message; error.hidden = false;
+      view.querySelector('[data-investment-status]').textContent = '';
+    }
+  } finally {
+    button.disabled = false; activeRequests -= 1;
+    for (const control of [account, start, end]) control.disabled = false;
+  }
+}
+function bindInvestments() {
+  bindButtons('[data-plaid-investments]', async button => {
+    if (activeRequests || linking) return;
+    const provider = button.closest('[data-bank-provider]'); const view = provider.querySelector('[data-plaid-investment-view]');
+    view.dataset.itemId = button.dataset.plaidInvestments; view.investmentReport = null;
+    const option = setupElement('option', 'All investment accounts'); option.value = '';
+    view.querySelector('[data-investment-account]').replaceChildren(option);
+    view.querySelector('[data-investment-positions]').replaceChildren(); view.querySelector('[data-investment-activity]').replaceChildren();
+    view.querySelector('[data-investment-totals]').replaceChildren();
+    provider.querySelector('[data-plaid-connections-view]').hidden = true; view.hidden = false;
+    view.querySelector('[data-investment-heading]').focus(); await loadInvestmentReport(view);
+  });
+  bindButtons('[data-investment-back]', button => {
+    const view = button.closest('[data-plaid-investment-view]'); view.dataset.epoch = String(Number(view.dataset.epoch || 0) + 1);
+    view.hidden = true; view.closest('[data-bank-provider]').querySelector('[data-plaid-connections-view]').hidden = false;
+  });
+  bindButtons('[data-investment-load]', button => loadInvestmentReport(button.closest('[data-plaid-investment-view]')));
+  bindButtons('[data-investment-account]', button => loadInvestmentReport(button.closest('[data-plaid-investment-view]')), 'change');
+  for (const [selector, key, size] of [['[data-investment-more]', 'positionLimit', 500], ['[data-investment-more-activity]', 'activityLimit', 100]]) {
+    bindButtons(selector, button => {
+      const view = button.closest('[data-plaid-investment-view]'); view.dataset[key] = String(Number(view.dataset[key] || size) + size);
+      if (view.investmentReport) renderInvestmentReport(view, view.investmentReport);
+    });
+  }
 }

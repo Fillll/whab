@@ -84,6 +84,21 @@ class PlaidProvider(PlaidService):
         except PlaidRemoteError:
             raise ProviderFailure('transport') from None
 
+    async def read_investments(self, item_id, access_token, start_date, end_date, account_id=None):
+        from .investments import read_investments
+        self.require_configured()
+        try:
+            return await read_investments(self._call, access_token, start_date, end_date, account_id)
+        except ProviderFailure:
+            raise
+        except PlaidRemoteError as error:
+            code = ('reconnect' if error.code == 'ITEM_LOGIN_REQUIRED' else
+                    'investments_consent_required' if error.code in {'ADDITIONAL_CONSENT_REQUIRED', 'ACCESS_NOT_GRANTED'} else
+                    'investments_not_ready' if error.code == 'PRODUCT_NOT_READY' else 'transport')
+            raise ProviderFailure(code) from None
+        except (KeyError, TypeError, ValueError):
+            raise ProviderFailure('transport') from None
+
     async def webhook_event(self, raw, headers):
         verification = next((value for name, value in headers.items() if name.lower() == 'plaid-verification'), None)
         if not await self.verify_webhook(raw, verification):

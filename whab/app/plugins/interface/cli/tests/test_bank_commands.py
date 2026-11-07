@@ -98,3 +98,21 @@ def test_bank_errors_are_actionable_in_both_cli_entry_points(monkeypatch, tmp_pa
     assert console.main(['--home', str(tmp_path), 'Fictional', 'bank', 'connections', 'plaid']) == 1
     error = capsys.readouterr().err
     assert ('same-currency' if expected == 'same-currency' else 'HTTP 400') in error
+
+
+@pytest.mark.parametrize('entry', ['advanced', 'simple'])
+@pytest.mark.parametrize('options,expected', [
+    ([], {'itemId': 'item', 'bankAccountId': None, 'startDate': None, 'endDate': None}),
+    (['--bank-account', 'account', '--since', '2025-01-01', '--until', '2026-11-07'],
+     {'itemId': 'item', 'bankAccountId': 'account', 'startDate': '2025-01-01', 'endDate': '2026-11-07'}),
+])
+def test_investment_intents_have_identical_scope_in_both_consoles(entry, options, expected):
+    arguments = ['investments', 'plaid', '--item', 'item', *options]
+    args = client.parser().parse_args(['bank', *arguments]) if entry == 'advanced' else console.parser(console.options_parser()).parse_args(['BUDGET', 'Fictional', 'bank', *arguments])
+    assert bank_request(args, 'fictional') == ('POST', '/budgets/fictional/api/banks/plaid/investments', {'json': expected})
+
+
+def test_investment_read_requires_an_explicit_connection_before_network():
+    args = client.parser().parse_args(['bank', 'investments', 'plaid'])
+    with pytest.raises(ValueError, match='connection ID'):
+        bank_request(args, 'fictional')

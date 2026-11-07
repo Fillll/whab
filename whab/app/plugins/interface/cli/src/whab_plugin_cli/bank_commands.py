@@ -7,10 +7,14 @@ from .identifiers import host_id
 
 
 def add_bank_parser(commands):
-    bank = commands.add_parser('bank', help='Review account links, configure imports and schedule bank updates')
-    bank.add_argument('action', choices=('connections', 'preview', 'configure', 'sync', 'schedule', 'background'))
+    bank = commands.add_parser('bank', help='Review accounts, investments and bank updates',
+        description='Manage bank connections and read investment positions. Investment reports include value, reported cost basis and unrealized returns; missing dates or realized returns remain unavailable. Read bank.investments with describe for the full report contract.')
+    bank.add_argument('action', choices=('connections', 'preview', 'configure', 'sync', 'schedule', 'background', 'investments'))
     bank.add_argument('plugin', help='Enabled bank provider, for example plaid')
     bank.add_argument('--item', help='Connection ID from bank connections')
+    bank.add_argument('--bank-account', help='Provider account ID from bank preview or investments; omit for all investment accounts')
+    bank.add_argument('--since', help='Inclusive investment activity start date YYYY-MM-DD; defaults to two years before --until')
+    bank.add_argument('--until', help='Inclusive investment activity end date YYYY-MM-DD; defaults to today')
     bank.add_argument('--accounts', help='JSON array of {bankAccountId, accountId: null or WHAB ID, since: null or YYYY-MM-DD}; null destination creates a new account')
     cadence = bank.add_mutually_exclusive_group()
     cadence.add_argument('--every-hours', type=int, choices=(1, 3, 6))
@@ -26,8 +30,10 @@ def bank_request(args, budget):
     action = args.action
     if action == 'connections':
         return 'GET', prefix + '/items', {}
-    if action in {'preview', 'configure'} and not args.item:
+    if action in {'preview', 'configure', 'investments'} and not args.item:
         raise ValueError('Choose a connection ID with --item.')
+    if action == 'investments':
+        return 'POST', prefix + '/investments', {'json': {'itemId': args.item, 'bankAccountId': args.bank_account, 'startDate': args.since, 'endDate': args.until}}
     if action == 'preview':
         return 'POST', prefix + '/sync-preview', {'json': {'itemId': args.item}}
     if action == 'configure':
