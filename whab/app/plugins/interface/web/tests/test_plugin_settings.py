@@ -77,6 +77,23 @@ def test_settings_links_to_installed_plugins_with_all_categories_as_default(clie
     assert 'data-settings-back' in installed and '>Settings</button>' in installed
 
 
+def test_management_tools_and_optional_visuals_use_settings_without_budget_checkboxes(client, monkeypatch):
+    text = render(client, monkeypatch,
+        plugin("cli", category="interface", selection_control="management", enabled=None, manageable=False),
+        plugin("web", category="interface", selection_control="visual", active=True, enabled=True),
+        plugin("sqlite", category="storage", selection_control="required", required=True, active=True, enabled=True, manageable=False),
+    )
+    installed = dialog(text, "plugins-dialog")
+    inputs = [attrs for tag, attrs in Tags(installed).tags if tag == "input"]
+    assert [attrs["value"] for attrs in inputs] == ["sqlite"]
+    assert "disabled" in inputs[0] and "name" not in inputs[0]
+    assert "Installed · management tool" in installed
+    assert "Optional visual interface · manage in Settings." in installed
+    options = dialog(text, "plugin-options-cli")
+    assert "Available on this device" in options and "No budget activation is needed" in options
+    assert "Enable this plugin" not in options
+
+
 @pytest.mark.parametrize(("workspace", "label"), [("demo", "Demo budget"), ("personal", "My budget")])
 def test_budget_selection_lives_in_settings_and_preserves_page_context(client, workspace, label):
     response = client.get(

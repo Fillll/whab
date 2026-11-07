@@ -29,6 +29,13 @@ def sample_catalog():
     return value
 
 
+def test_cli_is_documented_as_an_installed_management_tool():
+    catalog = installed_catalog(enabled=set())
+    row = next(row for row in catalog["plugins"] if row["id"] == "cli")
+    assert row["enabled"] is None and row["selection_control"] == "management"
+    assert "installed; management tool" in help_module.render_catalog(catalog)
+
+
 @pytest.mark.parametrize(
     "arguments,expected",
     [

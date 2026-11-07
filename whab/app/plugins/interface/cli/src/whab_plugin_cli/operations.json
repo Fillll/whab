@@ -113,7 +113,7 @@
       },
       "output": {
         "type": "object",
-        "description": "JSON host/plugin/job projection or operation result."
+        "description": "JSON plugin projection. CLI has selection_control management and enabled null (no budget activation). Primary storage is required. Visual interfaces are optional and use visual controls."
       },
       "examples": [
         {
@@ -127,6 +127,7 @@
       "permissions": "Authenticated device-local CLI profile with home and explicit sandbox/production environment. Personal workspace only; not available through remote profiles.",
       "scope": "Selected runtime home, permanent budget identity and environment. Credentials remain machine-local.",
       "errors": [
+        "CLI management-tool toggles and required-storage changes are rejected without mutation; the CLI exits nonzero with a fixed explanation. An already-applied optional choice is a successful no-op.",
         "Unavailable plugins, invalid selections, busy work and failed live transitions are rejected. Restart-required plugin selection is saved for the next startup.",
         "Startup, TLS, authorization, storage or recovery failures return sanitized errors."
       ],

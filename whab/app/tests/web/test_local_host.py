@@ -1,5 +1,6 @@
 """Local authentication precedes activation and retains financial guards."""
 
+import pytest
 from fastapi.testclient import TestClient
 
 from whab import hosting
@@ -58,11 +59,13 @@ def test_local_plugin_restart_selection_is_saved_without_live_activation(store, 
     monkeypatch.setattr(hosting, "_OWNER", owner)
     monkeypatch.setattr(runtime, "load_descriptors", lambda *args: (SimpleNamespace(ui=None, _process=None),))
     manager = app.state.plugin_manager
-    rows = [{"id": "fictional", "installed": True}]
+    rows = [{"id": "fictional", "installed": True, "manageable": True, "enabled": True}]
     monkeypatch.setattr(manager, "projection", lambda: {"plugins": rows, "configured": ["fictional", "retained"]})
     preflight = Mock(side_effect=PluginError("Restart needed.", code="restart_required"))
-    save = Mock()
-    live = SimpleNamespace(activate=AsyncMock())
+    def changed(_):
+        rows[0]["enabled"] = False
+    save = Mock(side_effect=changed)
+    live = SimpleNamespace(activate=AsyncMock(side_effect=changed))
     monkeypatch.setattr(manager, "preflight_live", preflight)
     monkeypatch.setattr(manager, "save", save)
     monkeypatch.setattr(manager, "live", live)
@@ -75,6 +78,7 @@ def test_local_plugin_restart_selection_is_saved_without_live_activation(store, 
         live.activate.assert_not_awaited()
         # Busy/invalid selections must fail without saving a startup fallback.
         save.reset_mock()
+        rows[0]["enabled"] = True
         preflight.side_effect = PluginError("Busy.", code="transition_busy")
         assert client.post(path, json=body).status_code == 400
         save.assert_not_called()
@@ -83,9 +87,58 @@ def test_local_plugin_restart_selection_is_saved_without_live_activation(store, 
         live.activate.side_effect = PluginError("Restart needed.", code="restart_required")
         assert client.post(path, json=body).status_code == 400
         save.assert_not_called()
-        live.activate.side_effect = None
+        live.activate.side_effect = changed
         assert client.post(path, json=body).status_code == 200
         live.activate.assert_awaited_with(("retained",))
+
+
+@pytest.mark.parametrize("plugin,code", [("sqlite", "required_plugin"), ("cli", "management_tool")])
+@pytest.mark.parametrize("action", ["enable", "disable"])
+def test_local_protected_plugins_reject_changes_without_loading_or_transitioning(store, tmp_path, monkeypatch, plugin, code, action):
+    from whab.plugins import runtime
+
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
+    app = create_app(store=store, settings=settings, plugins=PluginRegistry(()))
+    owner = hosting.HostOwner(settings)
+    owner.app = app
+    monkeypatch.setattr(hosting, "_OWNER", owner)
+    monkeypatch.setattr(runtime, "load_descriptors", lambda *args: pytest.fail("Protected selection must not import code"))
+    with TestClient(app, base_url="https://localhost:5173") as client:
+        client.headers["Authorization"] = "Bearer " + owner.token
+        path = "/budgets/default/api/local/v1/plugins"
+        before = client.get(path).json()
+        response = client.post(path, json={"action": action, "plugin": plugin})
+        assert response.status_code == 409 and response.json()["code"] == code
+        after = client.get(path).json()
+        assert after == before
+        assert not (tmp_path / "plugins.json").exists()
+
+
+def test_local_web_is_optional_and_disable_is_durable_without_disabling_storage(tmp_path, monkeypatch):
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="web")
+    app = create_app(settings=settings)
+    owner = hosting.HostOwner(settings)
+    owner.app = app
+    monkeypatch.setattr(hosting, "_OWNER", owner)
+    with TestClient(app, base_url="https://localhost:5173") as client:
+        client.headers["Authorization"] = "Bearer " + owner.token
+        path = "/budgets/default/api/local/v1/plugins"
+        rows = {row["id"]: row for row in client.get(path).json()["plugins"]}
+        assert rows["web"]["enabled"] and rows["web"]["manageable"] and not rows["web"]["required"]
+        assert client.get("/budgets/home/budget/current-month/usd").status_code == 200
+        result = client.post(path, json={"action": "disable", "plugin": "web"})
+        assert result.status_code == 200
+        rows = {row["id"]: row for row in result.json()["plugins"]}
+        assert not rows["web"]["enabled"] and not rows["web"]["active"]
+        assert rows["sqlite"]["required"] and rows["sqlite"]["enabled"]
+        assert client.get("/budgets/home/budget/current-month/usd").status_code == 404
+        generation = app.state.budget_runtime.status()["generation"]
+        assert client.post(path, json={"action": "disable", "plugin": "web"}).status_code == 200
+        assert app.state.budget_runtime.status()["generation"] == generation
+        assert client.get(path.replace("/plugins", "/queries/accounts")).status_code == 200
+    reopened = create_app(settings=settings)
+    with TestClient(reopened, base_url="https://localhost:5173") as client:
+        assert client.get("/budgets/home/budget/current-month/usd").status_code == 404
 
 
 def test_local_budget_creation_is_authenticated_empty_and_preserves_paths(store, tmp_path, monkeypatch):

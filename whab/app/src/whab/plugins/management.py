@@ -45,6 +45,11 @@ def bundled_metadata(name, entries):
     return None
 
 
+def management_tool(name, entries):
+    """The installed console manages budgets independently of their selections."""
+    return name == "cli" and bundled_metadata(name, entries) is not None
+
+
 def plugin_category(name, entries, description):
     """Use known registration metadata or active capabilities, never disabled imports."""
     known = bundled_metadata(name, entries)
@@ -125,12 +130,19 @@ class PluginManager:
         for entry in entries:
             if entry.group == ENTRYPOINT_GROUP and type(entry.name) is str:
                 installed.setdefault(entry.name, []).append(entry)
+        tools = {name for name, matches in installed.items() if management_tool(name, matches)}
+        active = tuple(name for name in active if name not in tools)
+        configured = tuple(name for name in configured if name not in tools)
         names = sorted(set(installed) | set(descriptions) | set(configured) | set(self.required))
         catalog = []
         for name in names:
             description = descriptions.get(name)
             matches = installed.get(name, [])
-            required = name in self.required
+            required = name == self.settings.storage
+            known = bundled_metadata(name, matches)
+            visual = (name == self.settings.ui or name in self.visual_known
+                      or bool(description and description.has_ui) or name == "web" and known is not None)
+            control = "management" if name in tools else "required" if required else "visual" if visual else "optional"
             reason = None
             if not valid_plugin_name(name):
                 reason = "Invalid plugin registration name. Reinstall its package."
@@ -138,12 +150,13 @@ class PluginManager:
                 reason = "Registered more than once. Remove the duplicate installed package."
             elif not matches:
                 reason = "Not installed in this Python environment."
+            elif name in tools:
+                reason = "Installed management tool; available independently of this budget's plugin selection."
             elif required:
-                reason = "Required by the selected storage or user interface."
-            elif description and (description.has_storage or description.has_ui):
-                reason = "Storage and user interfaces are selected with WHAB_STORAGE and WHAB_UI."
+                reason = "Required primary storage for this budget. Change storage through its settings."
+            elif description and description.has_storage:
+                reason = "Choose storage through its settings."
             distribution, version = package_details(matches[0]) if len(matches) == 1 else ("", "")
-            known = bundled_metadata(name, matches)
             manifest = None
             if len(matches) == 1:
                 try:
@@ -169,8 +182,9 @@ class PluginManager:
                     "requirements": [{"name": item.name, "min_version": item.min_version, "max_version": item.max_version} for item in description.requirements],
                 } if description else None,
                 "active": name in descriptions,
-                "enabled": required or name in configured,
+                "enabled": None if name in tools else name in self.required or name in configured,
                 "required": required,
+                "selection_control": control,
                 "manageable": reason is None,
                 "reason": reason,
             })
@@ -194,11 +208,13 @@ class PluginManager:
                 write_selection(self.settings.home, selection)
 
     def preflight_live(self, selection):
+        self._validate_tools(selection)
         if self.live is None:
             raise PluginError("This host has no live runtime coordinator. Save the selection and restart.", code="restart_required")
         self.live.preflight(selection)
 
     def schedule_live(self, selection, *, validated=False):
+        self._validate_tools(selection)
         if self.live is None:
             raise PluginError("This host has no live runtime coordinator. Save the selection and restart.", code="restart_required")
         return self.live.schedule(selection, validated=validated)
@@ -206,6 +222,7 @@ class PluginManager:
     def save(self, selection):
         """Validate descriptors and required capabilities; do not open/close any service."""
         selection = validate_selection(selection)
+        self._validate_tools(selection)
         if any(name in self.required for name in selection):
             raise PluginError(
                 "Storage and user interface plugins are required; choose only optional plugins here.",
@@ -270,3 +287,12 @@ class PluginManager:
             else:
                 write_selection(self.settings.home, selection)
         return self.projection()
+
+    def _validate_tools(self, selection):
+        entries = installed_entrypoints()
+        for name in selection:
+            if management_tool(name, [entry for entry in entries if entry.name == name]):
+                raise PluginError(
+                    "CLI is an installed management tool and cannot be enabled or disabled for a budget.",
+                    code="management_tool", plugin_id=name,
+                )

@@ -14,6 +14,13 @@ The browser registers opaque generation/edit flags with `/api/ui/views`; draft v
 
 The host's local `/api/ui/status`, `/preview`, `/commit` and `/recover` controls prepare, review, schedule and reconcile the selection. A scheduled operation remains pending until its status confirms completion. Approved compatible code uses immutable worker environments; templates/helpers render inside the child from bounded public projections. Financial rules, HTTPS and access guards remain host-owned. Legacy visual descriptors with browser protocol zero retain restart-required behavior. The private device-local visual decision overrides initial `WHAB_UI` on reopen and preserves disabled interfaces and exact retained worker references; see [visual worker lifecycle](../../../../docs/plugin-workers.md#visual-interface-workers).
 
+The installed-plugin list shows CLI as **Installed · management tool**, with no
+budget selection checkbox or activation guidance. Primary storage remains required
+and cannot be unchecked. Web is an optional visual interface: its row links to
+Settings, where **Visual interface → Headless** previews and applies disabling it
+through the existing browser coordination flow. Visual interfaces do not appear
+in the bank/report optional-selection form. CLI remains available when Web is off.
+
 ## Settings navigation
 
 Settings uses one modal window with one backdrop and close control. Budgets, Plugins, each plugin’s settings and About are sections inside it. Forward navigation changes the visible section without reopening or animating a new dialog. Back restores the preceding section, its scroll position and the opening control’s keyboard focus. Close, Escape and clicking the backdrop dismiss the whole Settings window; reopening starts at Settings. Direct `#budgets` and `#plugins` links retain their parent path.

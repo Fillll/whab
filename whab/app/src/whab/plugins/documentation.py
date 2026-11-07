@@ -54,11 +54,16 @@ def plugin_document(plugin_id):
 
 def installed_catalog(enabled=None):
     """Descriptions contain authored examples, never live settings or credentials."""
+    from .management import management_tool
+
     plugins = []
-    for entry in sorted(metadata.entry_points(group="whab.plugins"), key=lambda row: row.name):
+    entries = sorted(metadata.entry_points(group="whab.plugins"), key=lambda row: row.name)
+    for entry in entries:
         document = installed_document(entry)
+        tool = management_tool(entry.name, [row for row in entries if row.name == entry.name])
         plugins.append({"id": entry.name, "version": entry.dist.version,
-                        "enabled": None if enabled is None else entry.name in enabled,
+                        "enabled": None if enabled is None or tool else entry.name in enabled,
+                        **({"selection_control": "management"} if tool else {}),
                         "documented": document is not None, "documentation": document})
     return {"schema_version": 1, "source": "installed" if enabled is None else "authority",
             "core": core_document(), "plugins": plugins}
