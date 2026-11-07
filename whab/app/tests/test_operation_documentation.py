@@ -37,7 +37,7 @@ def test_all_installed_plugins_have_complete_nonexecuting_documents(monkeypatch)
     assert all(row["documented"] and row["enabled"] is None for row in catalog["plugins"])
     assert len([row for row in catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 20
     assert {row["name"] for row in catalog["core"]["operations"] if row["kind"] == "local"} == {
-        "bank.connections", "bank.preview", "bank.configure", "bank.sync", "bank.schedule", "bank.background",
+        "bank.connections", "bank.preview", "bank.configure", "bank.sync", "bank.schedule", "bank.background", "bank.investments",
     }
     for row in catalog["plugins"]:
         validate_document(row["documentation"], row["id"])

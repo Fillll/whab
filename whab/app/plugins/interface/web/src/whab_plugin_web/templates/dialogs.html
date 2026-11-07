@@ -317,7 +317,7 @@
   {% endif %}
   <section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings>{% if plugin.selection_control=='management' %}<p class="settings-notice">Use whab or whab-cli from the terminal to manage budgets. No budget activation is needed.</p>{% elif not plugin.active %}<p class="settings-notice">{% if plugin.enabled %}Apply a supported live selection or restart WHAB to view this plugin’s settings.{% else %}Enable this plugin, then review a supported live selection or save it for restart to view its settings.{% endif %}</p>{% endif %}</section>
   {% for bank in bank_panels if bank.id == plugin.id %}
-    {% with status=bank.status, items=bank['items'] %}{% include bank.template %}{% endwith %}
+    {% with status=bank.status, items=bank['items'], bank_asset_prefix=bank.asset_prefix %}{% include bank.template %}{% endwith %}
   {% endfor %}
   {% for importer in import_panels if importer.id == plugin.id %}
     {% include importer.template %}

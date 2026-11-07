@@ -15,6 +15,11 @@ class ProviderFailure(ValueError):
         'not_configured': 'The bank provider is not configured.',
         'reconnect': 'The bank connection requires a scoped update through its provider.',
         'transport': 'The bank provider request could not complete.',
+        'investments_unavailable': 'Investments is not active on this connection. Enable the product and grant consent before viewing positions.',
+        'investments_consent_required': 'This connection needs Investments consent through its provider before positions can be viewed.',
+        'investments_not_ready': 'Investment data is still loading. Try again shortly.',
+        'investment_history_limit': 'Investment history is too large. Choose a shorter date range.',
+        'unsupported_currency': 'The investment provider returned an unsupported currency.',
     }
 
     def __init__(self, code):
@@ -100,10 +105,13 @@ class BankAdapter:
     factory: Callable[[BankProviderContext], BankProvider] = field(repr=False)
     sync_interval_seconds: int | None = None
     requires_account_setup: bool = False
+    supports_investments: bool = False
 
     def __post_init__(self):
         if type(self.requires_account_setup) is not bool:
             raise ValueError("Account setup policy must be a boolean.")
+        if type(self.supports_investments) is not bool:
+            raise ValueError('Investment support must be a boolean.')
         if not callable(self.factory):
             raise ValueError('Bank provider factory must be callable.')
         if self.sync_interval_seconds is not None and (type(self.sync_interval_seconds) is not int

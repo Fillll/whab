@@ -303,6 +303,19 @@ The packaged [operations.json](src/whab_plugin_cli/operations.json) documents th
 
 ## Bank account setup and update policies
 
+CLI 2.3 with WHAB 2.60 also supports `bank investments PROVIDER --item ID`
+through both `whab BUDGET` and `whab-cli PROFILE`. Optional `--bank-account`
+selects a provider account ID from preview/the report, not a WHAB destination ID.
+`--since YYYY-MM-DD` and `--until YYYY-MM-DD` filter inclusive activity history;
+defaults are the last two years through today. Positions remain current snapshots.
+JSON includes each position's quantity, price/date, value, reported cost basis,
+unrealized gain and percentage, and earliest recorded addition when supported.
+Money is integer currency minor units, quantities/prices/percentages are decimal
+strings, and unknown dates/basis/realized returns are null. Currency totals stay
+separate and describe basis coverage. This reads an already active/consented
+Investments product without importing trades or changing transaction sync.
+`describe --plugin plaid --json` documents `bank.investments` and its limits.
+
 CLI 2.2 with WHAB 2.59 supports `whab BUDGET bank` and `whab-cli PROFILE bank`. Use `connections PROVIDER` to read connection IDs and saved destinations, `preview PROVIDER --item ID` to review bank accounts without importing, and `configure PROVIDER --item ID --accounts JSON` to save account destinations and explicit history choices. The JSON array contains `bankAccountId`, `accountId` (existing same-currency account or explicit null for a new account), and `since` (inclusive YYYY-MM-DD or explicit null for all available history). No history start is inferred. Omitted accounts are not imported. Configuration and synchronization are separate operations: run `bank sync PROVIDER [--item ID]` after reviewing/saving.
 
 Use `bank schedule plaid --every-hours 1`, `--every-hours 3`, `--every-hours 6`, or `--manual`. Omit those flags to read the saved policy and due status. Manual mode disables periodic and webhook-triggered imports while retaining explicit sync. `bank background plaid --enable` / `--disable` controls macOS device/environment wakeups, which check the per-budget policies. Existing `jobs enable`, `jobs disable`, `jobs run` and `sync plaid` remain supported. An hourly cron entry invoking `python -m whab --home /absolute/runtime --environment production --run-jobs` provides the same due-job filtering on other platforms. Bank controls require the local personal budget and preserve HTTPS/authentication; no remote credential or built-in AI is required. See [Plaid setup and limitations](../../ingestion/plaid/README.md#account-destinations-and-transaction-history).

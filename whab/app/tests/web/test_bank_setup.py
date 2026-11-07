@@ -44,7 +44,7 @@ def bank_app(tmp_path):
     injected['plaid'] = coordinator
     try:
         with TestClient(app, base_url='https://127.0.0.1:5173') as client:
-            yield SimpleNamespace(client=client, app=app, store=store, target=target, provider=provider)
+            yield SimpleNamespace(client=client, app=app, store=store, target=target, provider=provider, coordinator=coordinator)
     finally:
         store.close()
 

@@ -135,7 +135,7 @@ class BankCoordinator:
     def __init__(self, provider, tracked, bank_store, *, budget_id, environment, provider_id,
                  generation, home=None, encryption_key=None, journal=None, cipher=None,
                  code_identity='installed', background_scope=None, clock=None,
-                 requires_account_setup=False, automatic_sync=lambda: True):
+                 requires_account_setup=False, supports_investments=False, automatic_sync=lambda: True):
         self.provider, self.tracked, self.bank_store = provider, tracked, bank_store
         self.scope = ContinuationScope(budget_id, environment, provider_id, generation)
         self.code_identity = code_identity
@@ -145,6 +145,9 @@ class BankCoordinator:
         self.requires_account_setup, self.automatic_sync = requires_account_setup, automatic_sync
         if requires_account_setup:
             self.config["requiresAccountSetup"] = True
+        self.supports_investments = supports_investments
+        if supports_investments:
+            self.config["supportsInvestments"] = True
         self.cipher = cipher or BankCipher(encryption_key)
         self.broker = BankNativeBroker(tracked, bank_store, budget_id, environment, provider_id)
         self.journal = journal or BankContinuations(home, budget_id, environment, provider_id,
@@ -397,6 +400,45 @@ class BankCoordinator:
         async with self._serial:
             return (await _blocking(self._sync_preview, item_id))[1]
 
+    def _investments(self, item_id, account_id, start_date, end_date):
+        from datetime import date
+
+        from whab.domain.investments import investment_report
+        from whab.domain.validation import validate_date
+
+        self._ready()
+        self._item(item_id)
+        if not self.supports_investments:
+            raise BankError('This bank provider does not support investment reports.')
+        end_date = end_date or date.today().isoformat()
+        validate_date(end_date)
+        end = date.fromisoformat(end_date)
+        if start_date is None:
+            if end.year < 3:
+                raise BankError('Choose an explicit investment history start date.')
+            try:
+                start_date = end.replace(year=end.year - 2).isoformat()
+            except ValueError:
+                start_date = end.replace(year=end.year - 2, day=28).isoformat()
+        validate_date(start_date)
+        if start_date > end_date:
+            raise BankError('Investment history start must not follow its end.')
+        if account_id is not None:
+            self.bank_store._raw_id(account_id)
+        snapshot = self.provider.call('read_investments', item_id=item_id, access_token=self._access(item_id),
+                                      start_date=start_date, end_date=end_date, account_id=account_id)
+        if snapshot['startDate'] != start_date or snapshot['endDate'] != end_date:
+            raise BankError('The investment provider returned a different history window.')
+        if account_id is not None and any(row['id'] != account_id for row in snapshot['accounts']):
+            raise BankError('The investment provider returned a different account.')
+        report = investment_report(snapshot)
+        report.update(itemId=item_id, provider=self.scope.provider_id)
+        return report
+
+    async def investments(self, item_id, account_id=None, start_date=None, end_date=None):
+        async with self._serial:
+            return await _blocking(self._investments, item_id, account_id, start_date, end_date)
+
     def _configure_sync(self, item_id, selection):
         accounts, _ = self._sync_preview(item_id)
         payload = self.bank_store.prepare_sync(item_id, {'added': [], 'modified': [], 'removed': []}, None, accounts)
@@ -528,7 +570,7 @@ class LeasedBanks(Mapping):
 
 class _BankHandle:
     _METHODS = frozenset({'begin_link', 'complete_link', 'continuation_status', 'cancel_link',
-                          'link_token', 'exchange', 'sync', 'sync_preview', 'configure_sync', 'disconnect', 'webhook', 'close'})
+                          'link_token', 'exchange', 'sync', 'sync_preview', 'configure_sync', 'investments', 'disconnect', 'webhook', 'close'})
 
     def __init__(self, runtime, owner):
         self.runtime, self.owner = runtime, owner

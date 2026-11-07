@@ -38,3 +38,10 @@ class ScheduleBody(Body):
 
 class BackgroundBody(Body):
     enabled: bool
+
+
+class InvestmentsBody(Body):
+    itemId: Id
+    bankAccountId: Id | None = None
+    startDate: Annotated[str, Field(pattern=r'^\d{4}-\d{2}-\d{2}$')] | None = None
+    endDate: Annotated[str, Field(pattern=r'^\d{4}-\d{2}-\d{2}$')] | None = None

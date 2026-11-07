@@ -199,3 +199,12 @@ Subscription classification uses the Subscriptions plugin 1.1+ background job AP
 ## Operation documentation
 
 The packaged [operations.json](src/whab_plugin_web/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin web`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.
+
+### Provider investment views
+
+Web 1.44.1 passes each bank panel's generation-scoped `asset_prefix` into the
+provider template as `bank_asset_prefix`. Plaid 1.7 owns its Investments view,
+styles, scripts and account/history filters; the Web adapter retains the single
+settings window and in-place Back flow. Financial returns come from the shared
+core report, also available through both CLI entry points. See the
+[Plaid investment guide](../../ingestion/plaid/README.md#investment-positions-and-returns).

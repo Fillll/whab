@@ -261,3 +261,27 @@ On Budget, the red rounded frame marks the visible month range. Drag the bottom 
 ### Add a manual transaction
 
 Open **Transactions → Add transaction** to record spending or an inflow in any account, including YNAB-imported and connected bank accounts. The account list uses the current currency view; an individual account’s sidebar link opens its currency. Date, currency, category and money validation remain in force. The action is unavailable only when there is no account in that currency view. Manual entries update the local balance and stay separate from bank-imported records; a future bank refresh supplies its current balance snapshot and preserves the manual entries.
+
+## View investment positions
+
+Open **Settings → Plugins → Plaid → Settings → Investments** on an existing
+connection. Select an investment account to see positions, quantity, current
+value, reported cost basis and unrealized return in money and percent. Expand
+**Investment activity** for the available history. The date filters bound activity;
+positions still represent the current snapshot. **Connections** returns in place.
+
+Both interfaces provide the same report:
+
+```sh
+whab BUDGET bank investments plaid --item CONNECTION_ID
+whab-cli PROFILE bank investments plaid --item CONNECTION_ID --bank-account PROVIDER_ACCOUNT_ID --since 2025-01-01
+```
+
+Use `bank connections plaid` to find the connection, and provider account IDs
+from preview or the report. The default history window is two years through
+today; your institution may return less. First recorded addition is an observed
+buy/inbound transfer in that window, not an original tax-lot date. Missing basis,
+acquisition history and realized returns stay unavailable. Totals keep currencies
+separate and identify basis coverage. Investments must already be active and
+consented on the Item. Reading this report does not import security trades into
+your budget, change transaction cutoffs or force a fresh bank update.

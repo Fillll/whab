@@ -262,6 +262,7 @@ def create_router(
             {
                 "id": p.id,
                 "template": f"banks/{p.id}/{plugins.bank_identity(p.id)}/accounts.html",
+                "asset_prefix": f"{asset_prefix}/banks/{p.id}/{plugins.bank_identity(p.id)}/static",
                 "status": public_bank_status(banks[p.id], environment),
                 "items": bank_stores[p.id].items() if workspace == "personal" else [],
             }

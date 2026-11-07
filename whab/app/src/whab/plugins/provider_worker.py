@@ -19,7 +19,7 @@ from .storage_transfer import storage_identifier
 from .wire import WireError
 
 MAX_PROVIDER_BYTES = 16 * 1024 * 1024
-_COMMANDS = frozenset({'open', 'connection_token', 'exchange_token', 'read_sync', 'remove_token', 'webhook_event', 'close'})
+_COMMANDS = frozenset({'open', 'connection_token', 'exchange_token', 'read_sync', 'read_investments', 'remove_token', 'webhook_event', 'close'})
 
 
 def _text(value, limit=4096, *, nullable=False):
@@ -82,6 +82,9 @@ def read_provider_result(command, value, *, provider_id, environment=None, item_
                 raise WireError()
             imported_account(row)
         return value
+    if command == 'read_investments':
+        from whab.domain.investments import validate_investments
+        return validate_investments(value)
     if command in {'remove_token', 'close'}:
         if value is not None:
             raise WireError()
@@ -125,7 +128,9 @@ class ProviderDispatcher:
                     engine.close()
                 raise WireError()
             self.engine, self.context = engine, context
-            if any(not callable(getattr(engine, name, None)) for name in _COMMANDS - {'open'}):
+            if any(not callable(getattr(engine, name, None)) for name in _COMMANDS - {'open', 'read_investments'}):
+                raise WireError()
+            if self.plugin.bank.supports_investments and not callable(getattr(engine, 'read_investments', None)):
                 raise WireError()
             output = provider_config(dict(engine.config), context.environment)
         elif self.engine is None:
@@ -150,6 +155,18 @@ class ProviderDispatcher:
             _text(value['cursor'], nullable=True)
             _text(value['institution_name'], 200)
             output = self._await(self.engine.read_sync(**value))
+        elif command == 'read_investments':
+            from whab.domain.validation import validate_date
+            if (not self.plugin.bank.supports_investments or value.keys() != {'item_id', 'access_token', 'start_date', 'end_date', 'account_id'}):
+                raise WireError()
+            storage_identifier(value['item_id'])
+            _text(value['access_token'])
+            _text(value['account_id'], 200, nullable=True)
+            validate_date(value['start_date'])
+            validate_date(value['end_date'])
+            if value['start_date'] > value['end_date']:
+                raise WireError()
+            output = self._await(self.engine.read_investments(**value))
         elif command == 'remove_token':
             if value.keys() != {'access_token'}:
                 raise WireError()

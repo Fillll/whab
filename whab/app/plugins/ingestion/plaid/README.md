@@ -88,6 +88,42 @@ From the application directory, use `.venv/bin/python -m pytest plugins/ingestio
 
 Open **Settings → Plugins → Plaid → Settings** to connect, manage, reconnect, sync or disconnect banks. Accounts lists financial accounts without connection setup controls. Disconnect confirmation stays inside the same settings page, and imported records remain in the budget. OAuth continuation keeps its existing addressed Accounts return path and original budget/environment checks, then returns to Plaid settings. The provider emits the public `whab:plugin-settings` document event while opening/exiting Link so a visual adapter can suspend its native settings modal without stacking dialogs. Completed operations reopen `#plugin-settings-plaid`.
 
+## Investment positions and returns
+
+Plaid 1.7 with WHAB 2.60 adds **Investments** to each connection in Plaid settings.
+Open it to select an investment account, inspect current positions and expand
+investment activity. **Connections** returns to the same settings page. The
+account and inclusive history filters also work through both CLI entry points:
+
+```sh
+whab BUDGET bank connections plaid
+whab BUDGET bank investments plaid --item CONNECTION_ID
+whab-cli PROFILE bank investments plaid --item CONNECTION_ID --bank-account PROVIDER_ACCOUNT_ID --since 2025-01-01 --until 2026-11-07
+```
+
+Use the provider account ID returned by preview or the investment report, rather
+than its linked WHAB destination ID. Omitting the account selects all investment
+accounts. History defaults to the last two years through today; institutions may
+provide less. These dates filter activity, while holdings always represent the
+current provider snapshot. They do not change transaction-import cutoffs.
+
+Reports include quantity, price, price date, value, reported total cost basis,
+position status and unrealized gain/loss in currency minor units and percent.
+Unrealized return compares value with positive reported basis for a nonshort
+position; it excludes dividends and realized returns. Unknown/unsupported basis
+stays unavailable, and totals identify positions with known basis and keep
+currencies separate. **First recorded addition** is the earliest uncancelled buy
+or explicit inbound transfer in the selected available history. It is not a
+tax-lot acquisition date. No acquisition date or realized return is invented
+when history is incomplete.
+
+Investments must already be active and consented on this existing Plaid Item.
+The report never activates another product, creates a connection or forces a
+fresh institution fetch. Existing provider billing applies. Reading positions
+does not import trades into the budget, move accounts, advance a transaction
+cursor or change the saved sync schedule. Responses contain no access tokens;
+overlarge or inconsistent provider results fail rather than silently truncating.
+
 ## Operation documentation
 
 The packaged [operations.json](src/whab_plugin_plaid/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin plaid`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

@@ -394,7 +394,7 @@ def _start(template, prepared, home=None, *, worker_owner=None, resource_owner=N
             visual = UserInterface(None, None, proxy_context, resources=worker.visual_resources(),
                                    render=worker.render_ui, **adapters["ui"])
         bank_resources = worker.provider_resources() if adapters["bank"] is not None and adapters["bank"]["ui"] else None
-        proxy = replace(template, bank=BankAdapter(WorkerBankFactory(worker, code_identity=prepared.identifier), adapters["bank"].get("sync_interval_seconds"), adapters["bank"].get("requires_account_setup", False)) if adapters["bank"] is not None else None,
+        proxy = replace(template, bank=BankAdapter(WorkerBankFactory(worker, code_identity=prepared.identifier), adapters["bank"].get("sync_interval_seconds"), adapters["bank"].get("requires_account_setup", False), adapters["bank"].get("supports_investments", False)) if adapters["bank"] is not None else None,
                         bank_ui=BankUI(resources=bank_resources) if bank_resources is not None else None, insights=worker.insights if worker.info["insights"] else None,
                         export=worker.export if worker.info["export"] else None,
                         bank_logos=None if bank is None else BankLogos(

@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.44.1 — 2026-11-07
+
+PR: [#164](https://github.com/Fillll/whab/pull/164)
+
+- Pass the host-captured generation-scoped bank asset prefix to provider templates so investment styles remain owned and served by the provider within the existing settings window.
+
 ## 1.44.0 — 2026-11-07
 
 PR: [#158](https://github.com/Fillll/whab/pull/158)

@@ -2036,6 +2036,557 @@
       ],
       "retry": "Read status after an uncertain save. Do not recreate a bank connection or blindly replay a financial write. Replaying provider transactions uses stable transaction IDs.",
       "availability": "WHAB 2.59+ with a typed bank adapter; Plaid 1.6+ and CLI 2.2+ supply these controls. Manual budgeting requires no bank provider."
+    },
+    {
+      "name": "bank.investments",
+      "kind": "local",
+      "summary": "Read current investment positions, value, reported basis, unrealized dollar/percentage return and available investment activity.",
+      "input": {
+        "type": "object",
+        "description": "POST /budgets/{budget}/api/banks/{provider}/investments. CLI: whab BUDGET bank investments PROVIDER --item ID [--bank-account PROVIDER_ACCOUNT_ID] [--since YYYY-MM-DD] [--until YYYY-MM-DD]; whab-cli PROFILE supports the same command.",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "Existing connection ID from bank connections; required.",
+            "maxLength": 500
+          },
+          "bankAccountId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Provider account ID from preview or this report; null/omitted selects all investment accounts. Not a WHAB destination ID.",
+            "maxLength": 500
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Inclusive activity start; null/omitted defaults to two years before endDate, using Feb 28 for a missing leap day.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Inclusive activity end; null/omitted defaults to today. Holdings always show current provider snapshot.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        },
+        "required": [
+          "itemId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Read-only positions and activity with shared core calculations. Unknown dates/basis/returns remain null; currencies are totaled separately.",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "description": "Provider investment accounts.",
+            "items": {
+              "type": "object",
+              "description": "Provider investment account; IDs are not WHAB ledger account IDs.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Provider account ID accepted by --bank-account.",
+                  "maxLength": 500
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Provider display name.",
+                  "maxLength": 500
+                },
+                "mask": {
+                  "type": "string",
+                  "description": "Masked account suffix, empty when absent.",
+                  "maxLength": 20
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Supported uppercase ISO currency.",
+                  "maxLength": 500
+                },
+                "balance": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Provider current balance; null when absent. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "mask",
+                "currency",
+                "balance"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 500
+          },
+          "positions": {
+            "type": "array",
+            "description": "Current holdings, not historical holdings at --until.",
+            "items": {
+              "type": "object",
+              "description": "Current position, independently of the selected activity window.",
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "description": "Provider account ID within this report.",
+                  "maxLength": 500
+                },
+                "securityId": {
+                  "type": "string",
+                  "description": "Provider security ID.",
+                  "maxLength": 500
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Security display name.",
+                  "maxLength": 500
+                },
+                "ticker": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Ticker, or null when not supplied.",
+                  "maxLength": 500
+                },
+                "quantity": {
+                  "type": "string",
+                  "description": "Current quantity; negative denotes a short position. Finite decimal string, not a binary float."
+                },
+                "price": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Provider institution unit price; null when absent. Finite decimal string, not a binary float."
+                },
+                "value": {
+                  "type": "integer",
+                  "description": "Current institution position value. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                },
+                "costBasis": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Provider total position cost basis; null when absent. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Position and owning account ISO currency.",
+                  "maxLength": 500
+                },
+                "priceAsOf": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Provider price date; null when absent.",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Current quantity status.",
+                  "enum": [
+                    "held",
+                    "closed",
+                    "short"
+                  ]
+                },
+                "unrealizedGain": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Value minus positive reported cost basis for a nonshort position; null otherwise. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                },
+                "unrealizedReturnPercent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "100 * unrealizedGain / costBasis, rounded half away from zero to two decimal places; null when unavailable. Finite decimal string, not a binary float."
+                },
+                "unrealizedUnavailableReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Why unrealized gain and percentage are unavailable.",
+                  "enum": [
+                    null,
+                    "cost_basis_unavailable",
+                    "nonpositive_cost_basis",
+                    "short_position_unavailable"
+                  ]
+                },
+                "firstRecordedAddition": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Earliest uncancelled buy or explicit inbound transfer with positive quantity in this window. Not the original acquisition/tax-lot date; null when absent.",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "realizedGain": {
+                  "type": "null",
+                  "description": "Unavailable: complete acquisition/disposal lot history is not supplied."
+                },
+                "realizedReturnPercent": {
+                  "type": "null",
+                  "description": "Unavailable: no realized lot return is inferred."
+                }
+              },
+              "required": [
+                "accountId",
+                "securityId",
+                "name",
+                "ticker",
+                "quantity",
+                "price",
+                "value",
+                "costBasis",
+                "currency",
+                "priceAsOf",
+                "status",
+                "unrealizedGain",
+                "unrealizedReturnPercent",
+                "unrealizedUnavailableReason",
+                "firstRecordedAddition",
+                "realizedGain",
+                "realizedReturnPercent"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 10000
+          },
+          "activity": {
+            "type": "array",
+            "description": "Available provider investment history in the requested inclusive window.",
+            "items": {
+              "type": "object",
+              "description": "One provider investment event; amounts retain provider sign, positive for cash outflow and negative for inflow.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable provider investment transaction ID.",
+                  "maxLength": 500
+                },
+                "accountId": {
+                  "type": "string",
+                  "description": "Owning provider account ID.",
+                  "maxLength": 500
+                },
+                "securityId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Security ID, or null for unassociated cash activity.",
+                  "maxLength": 500
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Event date within the inclusive requested window.",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Provider event description.",
+                  "maxLength": 500
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Provider investment event type.",
+                  "maxLength": 500
+                },
+                "subtype": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Provider investment event subtype, or null.",
+                  "maxLength": 500
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Signed event cash amount: positive outflow, negative inflow. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                },
+                "fees": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Provider fees, or null. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                },
+                "quantity": {
+                  "type": "string",
+                  "description": "Event quantity; zero when absent. Finite decimal string, not a binary float."
+                },
+                "price": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Event unit price, or null. Finite decimal string, not a binary float."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Event and owning account ISO currency.",
+                  "maxLength": 500
+                },
+                "cancelTransactionId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "ID cancelled by this event, or null.",
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "id",
+                "accountId",
+                "securityId",
+                "date",
+                "name",
+                "type",
+                "subtype",
+                "amount",
+                "fees",
+                "quantity",
+                "price",
+                "currency",
+                "cancelTransactionId"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 100000
+          },
+          "asOf": {
+            "type": "string",
+            "description": "Offset ISO timestamp when WHAB read the cached snapshot.",
+            "maxLength": 500
+          },
+          "providerUpdatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Provider last successful Investments update timestamp, or null.",
+            "maxLength": 500
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Inclusive activity start; does not change transaction import cutoff.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Inclusive activity end; does not change holdings valuation date.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "totals": {
+            "type": "array",
+            "description": "Separate totals per currency; no FX conversion.",
+            "items": {
+              "type": "object",
+              "description": "One currency only. Covered totals include only positions with supported positive cost basis; consult coveredPositions before treating zero as measured.",
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "description": "Supported ISO currency.",
+                  "maxLength": 500
+                },
+                "value": {
+                  "type": "integer",
+                  "description": "Value of all positions. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                },
+                "coveredValue": {
+                  "type": "integer",
+                  "description": "Value of positions with computable unrealized return. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                },
+                "costBasis": {
+                  "type": "integer",
+                  "description": "Cost basis of covered positions only. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                },
+                "unrealizedGain": {
+                  "type": "integer",
+                  "description": "Gain of covered positions only; zero with no covered positions. Integer currency minor units; no conversion.",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000
+                },
+                "coveredPositions": {
+                  "type": "integer",
+                  "description": "Number of positions included in covered totals.",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "unrealizedReturnPercent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Covered gain / covered cost basis * 100; null without coverage. Finite decimal string, not a binary float."
+                }
+              },
+              "required": [
+                "currency",
+                "value",
+                "coveredValue",
+                "costBasis",
+                "unrealizedGain",
+                "coveredPositions",
+                "unrealizedReturnPercent"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 500
+          },
+          "realizedReturnsAvailable": {
+            "type": "boolean",
+            "description": "False: realized returns require complete lot history.",
+            "const": false
+          },
+          "additionDateMeaning": {
+            "type": "string",
+            "description": "Human-readable provenance for firstRecordedAddition.",
+            "maxLength": 500
+          },
+          "returnMeaning": {
+            "type": "string",
+            "description": "Human-readable return limitations.",
+            "maxLength": 500
+          },
+          "itemId": {
+            "type": "string",
+            "description": "Addressed saved connection ID.",
+            "maxLength": 500
+          },
+          "provider": {
+            "type": "string",
+            "description": "Enabled bank provider ID.",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "accounts",
+          "positions",
+          "activity",
+          "asOf",
+          "providerUpdatedAt",
+          "startDate",
+          "endDate",
+          "totals",
+          "realizedReturnsAvailable",
+          "additionDateMeaning",
+          "returnMeaning",
+          "itemId",
+          "provider"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "itemId": "fictional-item",
+            "startDate": "2024-11-07",
+            "endDate": "2026-11-07"
+          },
+          "output": {
+            "asOf": "2026-11-07T12:00:00+00:00",
+            "providerUpdatedAt": null,
+            "startDate": "2024-11-07",
+            "endDate": "2026-11-07",
+            "accounts": [
+              {
+                "id": "account",
+                "name": "Fictional IRA",
+                "mask": "1234",
+                "currency": "USD",
+                "balance": 125500
+              }
+            ],
+            "positions": [
+              {
+                "accountId": "account",
+                "securityId": "fund",
+                "name": "Fictional fund",
+                "ticker": "FUND",
+                "quantity": "10.5",
+                "price": "119.047619",
+                "value": 125000,
+                "costBasis": 100000,
+                "currency": "USD",
+                "priceAsOf": "2026-11-06",
+                "status": "held",
+                "unrealizedGain": 25000,
+                "unrealizedReturnPercent": "25.00",
+                "unrealizedUnavailableReason": null,
+                "firstRecordedAddition": null,
+                "realizedGain": null,
+                "realizedReturnPercent": null
+              }
+            ],
+            "activity": [],
+            "totals": [
+              {
+                "currency": "USD",
+                "value": 125000,
+                "coveredValue": 125000,
+                "costBasis": 100000,
+                "unrealizedGain": 25000,
+                "coveredPositions": 1,
+                "unrealizedReturnPercent": "25.00"
+              }
+            ],
+            "realizedReturnsAvailable": false,
+            "additionDateMeaning": "Earliest recorded buy or inbound transfer within the requested history; not an original tax-lot acquisition date.",
+            "returnMeaning": "Unrealized change versus reported position cost basis; excludes distributions and realized returns. Realized returns require complete lot history.",
+            "itemId": "fictional-item",
+            "provider": "plaid"
+          }
+        }
+      ],
+      "side_effects": "Reads already-active Investments provider endpoints. No ledger import, saved cursor, destination, history cutoff or schedule is changed. Does not enable a product, request consent, reconnect or force a fresh institution fetch. Existing provider product billing applies.",
+      "permissions": "Authenticated local HTTPS host with existing budget/environment/provider access guards and a runtime lease; unavailable through remote ledger operations. Credentials stay in the host/provider worker.",
+      "scope": "One personal budget, environment, provider and existing Item. Optional filter is a provider investment account ID. Currency totals remain separate. Current holdings and selected activity history have different time semantics.",
+      "errors": [
+        "Unavailable provider/configuration, unsupported investment adapter, foreign Item/account or malformed dates fail explicitly.",
+        "Investments must already be active and consented on the Item; no product is silently enabled. Provider not-ready/reconnect conditions require their documented action.",
+        "Invalid provider DTO, unsupported currency, excessive history or inconsistent snapshot/window fails without partial results."
+      ],
+      "retry": "Read-only and safe to retry after addressing the fixed error. Do not create a duplicate connection or infer successful product activation. Loading again reads Plaid cached data and does not force a bank refresh.",
+      "availability": "WHAB 2.60+, CLI 2.3+, and Plaid 1.7+; provider must declare BankAdapter.supports_investments. Plaid Investments must be separately enabled/consented. Investment history availability varies by institution; default window is two years."
     }
   ]
 }
