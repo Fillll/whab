@@ -366,10 +366,10 @@ class BankCoordinator:
         async with self._serial:
             if item_id is not None:
                 return await _blocking(self._sync, item_id)
-            results = [await _blocking(self._sync, item['id']) for item in self.bank_store.items()
-                       if self.bank_store.get_item(item['id'])['token'] is not None
-                       and not (self.requires_account_setup and self.bank_store.get_item(item['id']).get('syncSettings') is None
-                                and item.get('lastSynced') is None)]
+            items = await _blocking(self.bank_store.items)
+            results = [await _blocking(self._sync, item['id']) for item in items
+                       if not (self.requires_account_setup and not item.get('setupConfigured')
+                               and item.get('lastSynced') is None)]
             return {name: sum(result[name] for result in results) for name in ('added', 'modified', 'removed')}
 
     def _sync_preview(self, item_id):

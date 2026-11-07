@@ -422,3 +422,24 @@ def test_new_account_setup_blocks_import_until_user_selects_destinations(setup):
     value.coordinator.automatic_sync = lambda: False
     value.coordinator.queue_sync('fictional-item')
     assert not value.coordinator._queued
+
+
+def test_bulk_sync_metadata_wait_does_not_block_the_event_loop(setup):
+    flow = begin(setup)
+    complete(setup, flow)
+    entered, release = threading.Event(), threading.Event()
+    original = setup.store.items
+    def blocked_items():
+        entered.set()
+        assert release.wait(5)
+        return original()
+    setup.store.items = blocked_items
+    async def scenario():
+        task = asyncio.create_task(setup.coordinator.sync())
+        try:
+            assert await asyncio.to_thread(entered.wait, 3)
+            assert not task.done()
+        finally:
+            release.set()
+        assert await task == {'added': 0, 'modified': 0, 'removed': 0}
+    run(scenario())
