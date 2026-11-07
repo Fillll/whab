@@ -131,3 +131,6 @@ The packaged [operations.json](src/whab_plugin_sqlite/operations.json) documents
 ## Explicit bank account setup
 
 WHAB 2.59 adds the optional durable `configure_bank_sync` native operation. It validates provider ownership, unique destinations, compatible currencies and explicit inclusive date/all-history choices, then atomically saves the connection’s account mapping. Linking an auto-created bank account to an existing account moves references without changing transaction IDs, receipts or annotations. Already imported history is retained; cross-source overlap is not automatically reconciled. Future imports filter new records by the saved date while still processing modifications and pending-to-posted matches for known bank transactions. Lowering the cutoff resets the cursor for idempotent provider replay. Protected local transfers retain the settings; portable exports continue to omit provider credentials and protected connection state.
+
+
+SQLite 1.14.1 accepts exact older portable image schemas that predate the native-only bank sync settings column, including all previously supported planning-table and index combinations. Validation remains read-only and rejects unrecognized schema changes. Opening an existing budget does not replace its committed live ledger with the portable snapshot.

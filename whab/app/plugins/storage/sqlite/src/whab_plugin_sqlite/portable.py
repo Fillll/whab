@@ -31,6 +31,9 @@ def export_files(store, workspace):
         images = [(transaction_id, store.get_receipt(workspace, transaction_id)) for transaction_id in store.receipt_ids(workspace)]
     clean = Store(":memory:", month=snapshot["budgetStartMonth"], _authority=False)
     try:
+        # Bank connection settings never belong to the credential-free format.
+        # Keep new exports readable by clients predating account sync setup.
+        clean.db.execute("ALTER TABLE items DROP COLUMN sync_settings")
         # Portable images are data containers. Rebuild runtime-only indexes when
         # restoring into a live Store rather than storing and compressing them.
         for name in _ADDITIVE_INDEXES:
@@ -113,6 +116,12 @@ def read_files(files, *, with_receipts=False):
         compatible_schemas = [
             [row for row in schema if row[2] not in omitted and row[1] not in omitted_indexes]
             for schema in (expected_schema, legacy_schema)
+            # Bank setup metadata is native-only; older credential-free images
+            # retain their exact earlier items schema, including an empty table.
+            for schema in (schema, [
+                (*row[:3], row[3].replace(", sync_settings TEXT", "")) if row[1] == "items" else row
+                for row in schema
+            ])
             for schema in (schema, [
                 (*row[:3], row[3].replace(
                     ", bank_website TEXT, name_overridden INTEGER NOT NULL DEFAULT 0", ""
