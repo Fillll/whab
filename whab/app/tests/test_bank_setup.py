@@ -128,4 +128,4 @@ def test_deselecting_an_account_retains_its_history_and_ignores_later_changes(le
     result = ledger.apply_sync('item', changes(modified=[transaction('second', account_id='other', amount=999)], removed=['second']), 'two', accounts)
     assert result['modified'] == result['removed'] == 0
     second = next(row for row in ledger.transactions('personal') if row['id'] == 'second')
-    assert not second['deleted'] and second['amount'] == 1000
+    assert second['amount'] == 1000  # Public history contains only non-deleted rows.
