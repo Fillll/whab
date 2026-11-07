@@ -890,3 +890,12 @@ recovery. Provider plugins continue to own transport and normalization.
 registers the device's hourly job entry point (macOS LaunchAgent currently),
 without embedding credentials or financial records. Other platforms may schedule
 `python -m whab --home DIRECTORY --environment sandbox --run-jobs` themselves.
+
+
+## Bank account setup and update policy
+
+WHAB 2.59 adds `BankAdapter.requires_account_setup` (boolean, default false). An opted-in adapter defers first import until the host has an explicit destination/history selection; Plaid 1.6 opts in. Existing previously synchronized connections keep working until explicitly configured. Discovery transports this marker without importing plugin code in the host.
+
+The host facade adds `sync_preview(item_id)` and `configure_sync(item_id, selection)` behind local bank endpoints. `POST /api/banks/{id}/sync-preview` takes `itemId` and fetches normalized provider accounts through a read-only synchronization request without committing its cursor. It returns account identifiers, names, masks/currencies, saved links and safe destination metadata. `PUT /api/banks/{id}/sync-settings` requires `itemId` and an `accounts` array containing `bankAccountId`, `accountId` (null for new), and explicit `since` (inclusive date or null for all history). Configuration uses the optional durable `configure_bank_sync` storage command; unsupported backends fail explicitly. Native account association/currency rules belong in the domain, and providers retain transport/normalization ownership. Account mappings and cutoffs travel with protected native transfers, not portable credential-free exports.
+
+`GET` / `PUT /api/banks/{id}/schedule` reads/saves `interval_seconds` (null, 3600, 10800 or 21600). A null policy suppresses periodic and webhook-triggered imports while manual sync remains available. Policies are device-local and budget/provider/environment scoped. `POST /api/banks/{id}/schedule/background` takes explicit `enabled` and registers/unregisters the existing device/environment macOS wakeup; due filtering honors each budget’s saved policy. CLI, Web and cron use these same host services. All routes preserve HTTPS, local access, demo rejection and no-store behavior; none becomes a remote ledger operation.

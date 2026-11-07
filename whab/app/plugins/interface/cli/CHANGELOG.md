@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.0 — 2026-11-07
+
+PR: [#160](https://github.com/Fillll/whab/pull/160)
+
+- Add matching bank connections, preview, configure, sync, schedule and background commands to the name-addressed console and advanced local CLI.
+
 ## 2.1.2 — 2026-11-07
 
 PR: [#157](https://github.com/Fillll/whab/pull/157)

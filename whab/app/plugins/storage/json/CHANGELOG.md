@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0 — 2026-11-07
+
+PR: [#160](https://github.com/Fillll/whab/pull/160)
+
+- Persist and validate bank account mappings and history cutoffs in native JSON state and protected transfers, with atomic setup and unchanged transaction identities and annotations.
+
 ## 1.5.1 — 2026-11-01
 
 PR: [#142](https://github.com/Fillll/whab/pull/142)

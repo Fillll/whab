@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.14.0 — 2026-11-07
+
+PR: [#160](https://github.com/Fillll/whab/pull/160)
+
+- Persist bank account mappings and history cutoffs with atomic native commands and an additive schema migration. Retain annotations and transaction identities when joining an auto-created account to an existing destination.
+
 ## 1.13.1 — 2026-11-01
 
 PR: [#142](https://github.com/Fillll/whab/pull/142)
