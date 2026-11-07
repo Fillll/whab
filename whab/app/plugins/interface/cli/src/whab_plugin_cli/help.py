@@ -4,10 +4,13 @@ import json
 
 from whab.plugins.documentation import installed_catalog, operation
 
+from .identifiers import catalog_identifiers, cli_id, host_id
+
 
 def describe(catalog, *, plugin=None, kind=None, name=None):
     """Detach and filter static descriptions; this never calls an operation."""
-    value = json.loads(json.dumps(catalog))
+    value = catalog_identifiers(catalog)
+    plugin = cli_id(plugin)
     if plugin is not None:
         if plugin == "core":
             value["plugins"] = []
@@ -59,13 +62,13 @@ def render_catalog(catalog):
     documents = ([catalog["core"]] if catalog["core"] else [])
     for plugin in catalog["plugins"]:
         enabled = "installed; enablement unknown offline" if plugin["enabled"] is None else "enabled" if plugin["enabled"] else "installed; disabled"
-        lines.append(f'Plugin {plugin["id"]} {plugin["version"]}: {enabled}')
+        lines.append(f'Plugin {cli_id(plugin["id"])} {plugin["version"]}: {enabled}')
         if plugin["documentation"]:
             documents.append(plugin["documentation"])
         else:
             lines.append("  Legacy plugin: no packaged operation documentation.")
     for document in documents:
-        lines += ["", document["plugin_id"] + ": " + document["summary"]]
+        lines += ["", cli_id(document["plugin_id"]) + ": " + document["summary"]]
         if document["delegates"]:
             lines.append("Delegates: " + ", ".join(document["delegates"]))
         for row in document["operations"]:
@@ -88,7 +91,8 @@ def overview(catalog):
     for plugin in catalog["plugins"]:
         document = plugin["documentation"]
         names = "; ".join(row["kind"] + " " + row["name"] for row in document["operations"]) if document else "legacy; undocumented"
-        groups.append("  " + plugin["id"] + ": " + names)
+        summary = document["summary"] + "\n    " if document else ""
+        groups.append("  " + cli_id(plugin["id"]) + ": " + summary + names)
     groups.append("Use command OPERATION --help or feature-command PLUGIN ACTION --help for fields and examples.\nUse describe --json for machine-readable schemas, errors and access rules. An authenticated online describe also includes the running HTTP OpenAPI contract. Local/SDK descriptions do not enable remote access.")
     return "\n\n".join(groups)
 
@@ -110,7 +114,7 @@ def contextual_help(argv, catalog=None):
             return render_operation(row) if row else overview(catalog)
         if token in {"feature-query", "feature-command"} and index + 2 < len(argv):
             plugin, name = argv[index + 1:index + 3]
-            document = next((row["documentation"] for row in catalog["plugins"] if row["id"] == plugin), None)
+            document = next((row["documentation"] for row in catalog["plugins"] if row["id"] == host_id(plugin)), None)
             row = operation(document, token, name) if document else None
             return render_operation(row) if row else "No installed documentation for that operation. Use an authenticated describe --json against its authority."
     return overview(catalog)

@@ -127,7 +127,7 @@ archival, and retries the full application on the same local HTTPS listener.
 
 ### YNAB import
 
-Enable **Import from YNAB ZIP file**, save and restart, then open its **Settings**. Choose the ZIP, enter a budget name (the filename supplies an editable suggestion), confirm USD and **Preview import**. **Create budget and import** creates a separate budget with that name, adds it to Settings → Budgets, and opens its Accounts page for classification. Preview creates nothing; retrying a failed commit opens the same new budget. The form is available in the plugin's settings from any page, including Demo. Imported account estimates appear in the sidebar with their source explained on hover and for screen readers; Accounts management still shows **Unavailable** for the unverified balance. Those estimates do not fund the budget or contribute to net-worth totals.
+Enable **YNAB ZIP importer**, save and restart, then open its **Settings**. Choose the ZIP, enter a budget name (the filename supplies an editable suggestion), confirm USD and **Preview import**. **Create budget and import** creates a separate budget with that name, adds it to Settings → Budgets, and opens its Accounts page for classification. Preview creates nothing; retrying a failed commit opens the same new budget. The form is available in the plugin's settings from any page, including Demo. Imported account estimates appear in the sidebar with their source explained on hover and for screen readers; Accounts management still shows **Unavailable** for the unverified balance. Those estimates do not fund the budget or contribute to net-worth totals.
 
 ### Optional bank logos
 

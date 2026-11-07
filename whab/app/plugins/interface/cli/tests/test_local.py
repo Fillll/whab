@@ -111,3 +111,16 @@ def test_cli_manages_os_schedule_through_sdk(monkeypatch, capsys, action):
     assert client.main(["--home", "/fictional", "jobs", action]) == 0
     assert json.loads(capsys.readouterr().out)["enabled"] == (action == "enable")
     assert calls == [("/fictional", "sandbox", action == "enable")]
+
+
+@pytest.mark.parametrize("action", ["enable", "disable"])
+def test_explicit_importer_identifier_targets_existing_budget_plugin(local_transport, capsys, action):
+    calls, result, _ = local_transport
+    result.update(plugins=[{"id": "ynab", "display_name": "YNAB ZIP importer", "dependencies": []}],
+                  configured=["ynab"], active=["ynab"])
+    assert client.main(["--home", "/fictional", "plugins", action, "ynab-zip-importer"]) == 0
+    assert json.loads(calls[-1].content) == {"action": action, "plugin": "ynab"}
+    output = json.loads(capsys.readouterr().out)
+    assert output["plugins"][0]["id"] == "ynab-zip-importer"
+    assert output["configured"] == output["active"] == ["ynab-zip-importer"]
+    assert result["configured"] == ["ynab"]

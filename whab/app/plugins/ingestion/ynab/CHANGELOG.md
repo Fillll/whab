@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.4.3 — 2026-11-06
+
+PR: [#152](https://github.com/Fillll/whab/pull/152)
+
+- Name the plugin **YNAB ZIP importer** in listings and operation documentation, and document the explicit `ynab-zip-importer` CLI identifier.
+
 ## 1.4.2 — 2026-11-01
 
 PR: [#142](https://github.com/Fillll/whab/pull/142)
