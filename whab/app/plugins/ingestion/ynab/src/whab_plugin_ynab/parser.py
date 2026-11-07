@@ -156,7 +156,20 @@ def _date(value: str) -> str:
 
 def _table(data: bytes) -> tuple[tuple[str, ...], list[dict[str, str]]]:
     encoding = "utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
-    text = data.decode(encoding)
+    try:
+        text = data.decode(encoding)
+    except UnicodeDecodeError as original:
+        if encoding != "utf-8-sig":
+            raise
+        # Some YNAB exports encode a UTF-16 surrogate pair as two UTF-8 code
+        # units (CESU-8). Normalize complete pairs only; never replace/drop text
+        # or guess a legacy encoding. Reject lone surrogates with the original
+        # byte location rather than an offset in the intermediate UTF-16 data.
+        try:
+            text = data.decode(encoding, errors="surrogatepass")
+            text = text.encode("utf-16-le", errors="surrogatepass").decode("utf-16-le")
+        except UnicodeError:
+            raise original from None
     if "\x00" in text:
         raise StoreError("Invalid YNAB table encoding.")
     first_line = text.partition("\n")[0]
@@ -278,6 +291,14 @@ def parse_dump(data: bytes) -> YnabDump:
         return YnabDump(
             accounts, tuple(categories.values()), tuple(transactions), tuple(assignments), WARNINGS,
         )
-    except (zipfile.BadZipFile, zipfile.LargeZipFile, RuntimeError, NotImplementedError, OSError,
-            EOFError, UnicodeError, csv.Error, OverflowError):
+    except UnicodeDecodeError as error:
+        raise StoreError(f"YNAB table cannot be decoded as {error.encoding}; invalid encoding at byte {error.start} of {len(error.object)}. Re-export the budget as UTF-8 or BOM-marked UTF-16.") from None
+    except UnicodeError:
+        raise StoreError("YNAB tables must use UTF-8 or BOM-marked UTF-16 encoding.") from None
+    except csv.Error:
+        raise StoreError("YNAB table has malformed CSV/TSV data or exceeds the supported field size.") from None
+    except NotImplementedError:
+        raise StoreError("YNAB ZIP uses an unsupported compression method.") from None
+    except (zipfile.BadZipFile, zipfile.LargeZipFile, RuntimeError, OSError,
+            EOFError, OverflowError):
         raise StoreError("Invalid or unsupported YNAB ZIP export.") from None

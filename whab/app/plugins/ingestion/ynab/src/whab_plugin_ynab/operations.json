@@ -52,7 +52,8 @@
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
-        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict.",
+        "Invalid text encoding reports the decoder and byte offset without table contents; malformed tables and unsupported ZIP compression have authored diagnostics. Complete UTF-8 surrogate pairs are normalized losslessly; lone surrogates and other invalid bytes are rejected without guessing a legacy encoding or dropping text."
       ],
       "retry": "Read again as needed; reads never authorize a later write using an old revision.",
       "availability": "SDK callback only; consult the owning README for the typed in-process contract."

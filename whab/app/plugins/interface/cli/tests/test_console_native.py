@@ -53,7 +53,7 @@ def test_short_commands_create_reuse_and_reopen_real_budgets(tmp_path, monkeypat
     export = tmp_path / "fictional.zip"
     with ZipFile(export, "w") as archive:
         archive.writestr("Budget.csv", "Month,Category Group/Category,Category Group,Category,Assigned,Activity,Available\nOct 2026,Living: Food,Living,Food,$100.00,-$12.34,$87.66\n")
-        archive.writestr("Register.csv", "Account,Flag,Date,Payee,Category Group/Category,Category Group,Category,Memo,Outflow,Inflow,Cleared\nChecking,,2026-10-01,Fixture shop,Living: Food,Living,Food,Synthetic memo,$12.34,$0.00,Uncleared\n")
+        archive.writestr("Register.csv", "Account,Flag,Date,Payee,Category Group/Category,Category Group,Category,Memo,Outflow,Inflow,Cleared\nChecking,,2026-10-01,Fixture shop,Living: Food,Living,Food,Synthetic memo \ud83d\ude00,$12.34,$0.00,Uncleared\n".encode("utf-8", errors="surrogatepass"))
     def import_run(stage, *extra):
         return run("empty-budget", "import", "ynab-zip-importer", stage, str(export), "--currency", "USD", *extra)
     preview = import_run("preview")
@@ -67,7 +67,7 @@ def test_short_commands_create_reuse_and_reopen_real_budgets(tmp_path, monkeypat
     assert import_run("commit", "--fingerprint", preview["fingerprint"])["alreadyImported"]
     manifest, ledger = decode_budget((tmp_path / "exports/empty-budget.whab").read_bytes())
     assert len(ledger["accounts"]) == len(ledger["transactions"]) == len(ledger["assignments"]) == 1
-    assert ledger["transactions"][0]["note"] == "Synthetic memo\n[YNAB: uncleared]"
+    assert ledger["transactions"][0]["note"] == "Synthetic memo 😀\n[YNAB: uncleared]"
     wait_for_shutdown()
     # A new temporary host reopens exactly the registered budget and its plugins.
     assert run("empty-budget", "plugin", "status")["configured"] == ["ynab-zip-importer"]

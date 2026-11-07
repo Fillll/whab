@@ -285,6 +285,49 @@ def test_bad_table_encoding_headers_and_row_shapes_are_sanitized(raw):
         parse_dump(archive(extra=[("invalid.tsv", raw)]))
 
 
+def test_encoding_diagnostic_reports_location_without_private_bytes():
+    with pytest.raises(StoreError, match="utf-8; invalid encoding at byte 7 of 8") as error:
+        parse_dump(archive(extra=[("private.tsv", b"private\xff")]))
+    assert "private" not in str(error.value) and "Re-export" in str(error.value)
+
+
+@pytest.mark.parametrize("encoded,expected", [
+    (b"\xed\xa0\xbd\xed\xb8\x80", "😀"),
+    (b"\xed\xa0\xbd", None), (b"\xed\xb8\x80", None), (b"\xff", None),
+], ids=["complete-pair", "lone-high", "lone-low", "invalid-byte"])
+def test_surrogate_encoded_export_preserves_complete_unicode_and_rejects_invalid_text(encoded, expected):
+    register = table(REGISTER_HEADERS, [transaction(Memo="Café replacement 🐈")]).replace(b"replacement", encoded)
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w") as exported:
+        exported.writestr("Budget.csv", table(BUDGET_HEADERS, [budget()], delimiter=","))
+        exported.writestr("Register.tsv", register)
+    if expected is None:
+        with pytest.raises(StoreError, match="cannot be decoded as utf-8") as error:
+            parse_dump(stream.getvalue())
+        assert "Café" not in str(error.value)
+    else:
+        dump = parse_dump(stream.getvalue())
+        assert dump.transactions[0].memo == f"Café {expected} 🐈"
+        assert dump.transactions[0].amount_cents == 1234
+        assert dump.transactions[0].id == parse_dump(archive(transactions=[transaction(Memo=f"Café {expected} 🐈")])).transactions[0].id
+
+
+def test_invalid_utf16_still_rejects_incomplete_code_units():
+    with pytest.raises(StoreError, match="cannot be decoded as utf-16-le"):
+        parse_dump(archive(extra=[("invalid.tsv", b"\xff\xfeM")]))
+
+
+@pytest.mark.parametrize("failure,message", [(UnicodeError, "encoding"),
+    (csv.Error, "malformed CSV/TSV"), (NotImplementedError, "unsupported compression")])
+def test_format_diagnostics_do_not_reveal_library_or_record_details(monkeypatch, failure, message):
+    def fail(data):
+        raise failure("private record contents")
+    monkeypatch.setattr(parser, "_tables", fail)
+    with pytest.raises(StoreError, match=message) as error:
+        parse_dump(b"fixture")
+    assert "private record" not in str(error.value)
+
+
 def test_missing_or_duplicate_tables_are_rejected():
     with pytest.raises(StoreError, match="duplicate Budget or Register"):
         parse_dump(archive(extra=[("second.tsv", table(REGISTER_HEADERS, []))]))
