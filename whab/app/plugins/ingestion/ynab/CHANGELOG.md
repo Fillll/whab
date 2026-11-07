@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.4.4 — 2026-11-06
+
+PR: [#156](https://github.com/Fillll/whab/pull/156)
+
+- Give encoding failures a decoder/byte-offset diagnostic and re-export guidance without exposing table contents. Distinguish malformed CSV/TSV and unsupported ZIP compression errors while preserving accepted encodings, validation and archive limits.
+
 ## 1.4.3 — 2026-11-06
 
 PR: [#152](https://github.com/Fillll/whab/pull/152)

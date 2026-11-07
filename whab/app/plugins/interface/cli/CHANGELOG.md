@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1 — 2026-11-06
+
+PR: [#156](https://github.com/Fillll/whab/pull/156)
+
+- Preserve bounded authored import validation errors for HTTP 400/409/413 so terminal users can diagnose rejected archives and parser conflicts. Keep malformed responses, server failures and transport diagnostics sanitized; never automatically replay a request.
+
 ## 2.1.0 — 2026-11-06
 
 PR: [#155](https://github.com/Fillll/whab/pull/155)
