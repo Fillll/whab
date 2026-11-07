@@ -90,6 +90,10 @@ def test_local_plugin_restart_selection_is_saved_without_live_activation(store, 
         live.activate.side_effect = changed
         assert client.post(path, json=body).status_code == 200
         live.activate.assert_awaited_with(("retained",))
+        # A transition that returns without applying the choice is not success.
+        rows[0]["enabled"] = True
+        live.activate.side_effect = None
+        assert client.post(path, json=body).status_code == 400
 
 
 @pytest.mark.parametrize("plugin,code", [("sqlite", "required_plugin"), ("cli", "management_tool")])
@@ -112,6 +116,23 @@ def test_local_protected_plugins_reject_changes_without_loading_or_transitioning
         after = client.get(path).json()
         assert after == before
         assert not (tmp_path / "plugins.json").exists()
+
+
+def test_disabling_an_inactive_visual_does_not_disable_the_current_interface(store, tmp_path, monkeypatch):
+    from whab.plugins import runtime
+
+    settings = Settings(tmp_path, 5173, "sandbox", "", "", "", False, "", "", (), ui="")
+    app = create_app(store=store, settings=settings, plugins=PluginRegistry(()))
+    owner = hosting.HostOwner(settings)
+    owner.app = app
+    monkeypatch.setattr(hosting, "_OWNER", owner)
+    state = {"plugins": [{"id": "other-ui", "installed": True, "manageable": True, "enabled": False}]}
+    monkeypatch.setattr(app.state.plugin_manager, "projection", lambda: state)
+    monkeypatch.setattr(runtime, "load_descriptors", lambda *args: pytest.fail("No-op must not load or transition visuals"))
+    with TestClient(app, base_url="https://localhost:5173") as client:
+        client.headers["Authorization"] = "Bearer " + owner.token
+        result = client.post("/budgets/default/api/local/v1/plugins", json={"action": "disable", "plugin": "other-ui"})
+        assert result.status_code == 200 and result.json()["plugins"] == state["plugins"]
 
 
 def test_local_web_is_optional_and_disable_is_durable_without_disabling_storage(tmp_path, monkeypatch):

@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.43.2 — 2026-11-07
+
+PR: [#157](https://github.com/Fillll/whab/pull/157)
+
+- Show CLI as an installed management tool without a budget toggle. Keep primary storage protected and direct optional Web changes to its visual-interface settings rather than the generic optional-feature selection.
+
 ## 1.43.1 — 2026-11-01
 
 PR: [#142](https://github.com/Fillll/whab/pull/142)
