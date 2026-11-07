@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.58.0 — 2026-11-07
+
+PR: [#158](https://github.com/Fillll/whab/pull/158)
+
+- Resolve current-year and previous-year transaction presets to inclusive local calendar-year bounds while preserving existing date-filter bookmarks and account scope.
+
 ## 2.57.1 — 2026-11-07
 
 PR: [#157](https://github.com/Fillll/whab/pull/157)
