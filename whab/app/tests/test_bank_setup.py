@@ -118,3 +118,14 @@ def test_currency_and_foreign_connection_destinations_are_rejected(ledger):
 def test_invalid_account_settings(value):
     with pytest.raises(StoreError):
         validate_sync_settings(deepcopy(value))
+
+
+def test_deselecting_an_account_retains_its_history_and_ignores_later_changes(ledger):
+    accounts = [account(), account('other')]
+    configure(ledger, accounts, {key: {'accountId': key, 'since': None} for key in ('account', 'other')})
+    ledger.apply_sync('item', changes([transaction('first'), transaction('second', account_id='other')]), 'one', accounts)
+    configure(ledger, accounts, {'account': {'accountId': 'account', 'since': None}})
+    result = ledger.apply_sync('item', changes(modified=[transaction('second', account_id='other', amount=999)], removed=['second']), 'two', accounts)
+    assert result['modified'] == result['removed'] == 0
+    second = next(row for row in ledger.transactions('personal') if row['id'] == 'second')
+    assert not second['deleted'] and second['amount'] == 1000

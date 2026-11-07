@@ -94,7 +94,16 @@ def select_sync(state, item_id, changes, accounts):
             raise StoreError('Bank account belongs to another connection.')
         if account['id'] in settings:
             mapped.append({**account, 'id': settings[account['id']]['accountId']})
-    selected = {'added': [], 'modified': [], 'removed': changes['removed']}
+    targets = {link['accountId'] for link in settings.values()}
+    removed = []
+    for identifier in changes['removed']:
+        bank_identifier(identifier)
+        previous = state['transactions'].get(identifier)
+        original = previous.get('original', {}).get('accountId', previous['accountId']) if previous else None
+        owner = state['accounts'].get(original, {})
+        if previous is None or original in targets or owner.get('itemId') != item_id:
+            removed.append(identifier)
+    selected = {'added': [], 'modified': [], 'removed': removed}
     for kind in ('added', 'modified'):
         for record in changes[kind]:
             validate_imported_transaction(record)
