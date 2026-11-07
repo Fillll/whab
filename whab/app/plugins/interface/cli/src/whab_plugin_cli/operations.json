@@ -102,7 +102,7 @@
           },
           "plugin": {
             "type": "string",
-            "description": "Installed plugin ID; required for enable/disable."
+            "description": "CLI plugin identifier, such as ynab-zip-importer; required for enable/disable. The YNAB CLI identifier preserves its existing host and saved-budget identity."
           }
         },
         "required": [

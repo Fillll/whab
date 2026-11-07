@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_ynab"
-version = "1.4.2"
+version = "1.4.3"
 description = "Local YNAB ZIP import plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"

@@ -34,7 +34,7 @@ def test_selected_import_lives_in_plugin_options_on_every_page_and_serves_its_as
     with client_for(store, tmp_path, web_plugin, ynab_plugin) as client:
         response = client.get("/budgets/home/accounts/current-month/usd")
         assert response.status_code == 200
-        assert "Import from YNAB ZIP file" in response.text
+        assert "YNAB ZIP importer" in response.text
         assert 'data-file-import="ynab"' in response.text
         assert "I confirm this export uses US dollars (USD)." in response.text
         assert 'Budget name' in response.text

@@ -72,7 +72,7 @@ def workspace_import(raw: bytes) -> WorkspaceImport:
 
 _ROOT = Path(__file__).parent
 plugin = Plugin(
-    id="ynab", display_name="Import from YNAB ZIP file",
+    id="ynab", display_name="YNAB ZIP importer",
     file_import=FileImport(
         parse=workspace_import, templates=_ROOT / "templates", static=_ROOT / "static",
     ),

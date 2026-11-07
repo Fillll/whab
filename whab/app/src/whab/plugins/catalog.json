@@ -113,7 +113,7 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [],
-      "version": "1.4.1"
+      "version": "1.5.0"
     },
     {
       "api_version": 1,
@@ -1019,7 +1019,7 @@
         }
       ],
       "conflicts": [],
-      "display_name": "Import from YNAB ZIP file",
+      "display_name": "YNAB ZIP importer",
       "distribution": "whab_plugin_ynab",
       "documentation": "https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/ingestion/ynab/README.md",
       "entry_point": {
@@ -1042,7 +1042,7 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [],
-      "version": "1.4.2"
+      "version": "1.4.3"
     }
   ],
   "publisher": {

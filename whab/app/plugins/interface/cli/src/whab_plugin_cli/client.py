@@ -14,10 +14,12 @@ from whab.plugins.documentation import core_document, installed_catalog
 
 from .config import ConfigError, connection_defaults
 from .help import contextual_help, describe, overview, render_catalog
+from .identifiers import check_identifiers, host_id, plugin_identifiers
 
 
 def parser(argv=(), *, defaults=None):
     catalog = installed_catalog()
+    check_identifiers(catalog)
     root = argparse.ArgumentParser(description="Read and change an explicitly addressed WHAB budget.",
         usage="%(prog)s [CONFIG] [OPTIONS] {query,command,feature-query,feature-command,describe,plugins,sync,jobs} ...",
         epilog='Optional CONFIG is a JSON object. Local fields: home, budget, environment, ca, workspace. Remote fields: url, budget, ca, workspace, token_env. Choose home or url. Command-line options override the file. Relative home/CA paths use the config directory.\nLocal example: {"home": "runtime", "budget": "default", "environment": "sandbox"}\nRemote example: {"url": "https://localhost:5173", "budget": "default", "ca": "tls/ca.crt"}\nUsage: whab-cli default.budget --help\n\n' + overview(catalog),
@@ -97,7 +99,7 @@ def request(args, token=None):
     if type(values) is not dict:
         raise ValueError("Parameters must be a JSON object.")
     json.dumps(values, allow_nan=False)
-    payload = {"pluginId": args.plugin, "action": args.action, "parameters": values} if args.kind.startswith("feature-") else values
+    payload = {"pluginId": host_id(args.plugin), "action": args.action, "parameters": values} if args.kind.startswith("feature-") else values
     if args.kind == "feature-query" or args.kind == "query":
         return token, "POST", path + "/queries", {"json": {
             "operation": "feature", "workspace": args.workspace, "parameters": payload,
@@ -127,9 +129,9 @@ def _local(args):
                 if not args.plugin:
                     raise ValueError("Choose a plugin ID.")
                 method, path = "POST", prefix + "/plugins"
-                kwargs = {"json": {"action": args.action, "plugin": args.plugin}}
+                kwargs = {"json": {"action": args.action, "plugin": host_id(args.plugin)}}
         elif args.kind == "sync":
-            method, path, kwargs = "POST", prefix + "/sync", {"json": {"plugin": args.plugin}}
+            method, path, kwargs = "POST", prefix + "/sync", {"json": {"plugin": host_id(args.plugin)}}
         elif args.kind == "jobs":
             method, path = ("POST", prefix + "/jobs/run") if args.action == "run" else ("GET", prefix + "/jobs")
             kwargs = {"json": {}} if args.action == "run" else {}
@@ -151,7 +153,7 @@ def _local(args):
                 type(result) is not dict or result.get("budgetId") != (args.budget or "default")
                 or type(result.get("revision")) is not str or not result["revision"] or "data" not in result):
             raise ValueError("Local host returned another budget or an invalid response.")
-        return result
+        return plugin_identifiers(result) if args.kind == "plugins" else result
 
 
 def main(argv=None):

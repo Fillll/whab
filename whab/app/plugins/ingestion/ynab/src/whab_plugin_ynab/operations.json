@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "ynab",
-  "summary": "Explicit local YNAB archive import, preview and atomic migration.",
+  "summary": "YNAB ZIP importer: import a local YNAB ZIP export with preview and atomic migration.",
   "delegates": [],
   "operations": [
     {

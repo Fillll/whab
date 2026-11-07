@@ -127,6 +127,21 @@ Install only the host, this plugin, and needed storage/server/feature packages f
 
 ## Operation documentation
 
+Top-level help lists each plugin ID with its packaged purpose and documented operations.
+The YNAB importer uses the CLI identifier **`ynab-zip-importer`** and display name
+**YNAB ZIP importer**. For example:
+
+```sh
+whab-cli --home /absolute/runtime --budget BUDGET_ID plugins enable ynab-zip-importer
+whab-cli describe --plugin ynab-zip-importer --help
+```
+
+Help, JSON discovery and plugin listings use this explicit CLI identifier. The CLI
+translates it to the existing host identifier `ynab`, preserving saved budgets and
+compatibility with existing hosts. The old spelling is still accepted in scripts.
+A conflicting installed plugin with the reserved CLI identifier is rejected before
+submitting an operation.
+
 Help and packaged documentation work without a server, token, AI account or source checkout:
 
 ```sh
