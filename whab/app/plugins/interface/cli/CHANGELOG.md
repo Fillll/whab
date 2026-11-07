@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0 — 2026-11-06
+
+PR: [#152](https://github.com/Fillll/whab/pull/152)
+
+- Use `ynab-zip-importer` as the canonical CLI identifier in enable/disable, help, discovery and plugin listings. Translate at the existing host boundary to preserve saved budgets and accept the old spelling in scripts; reject reserved-identifier collisions before submission. Show packaged plugin purposes in top-level help.
+
 ## 1.4.1 — 2026-11-04
 
 PR: [#151](https://github.com/Fillll/whab/pull/151)
