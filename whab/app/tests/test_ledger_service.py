@@ -110,8 +110,8 @@ def test_monthly_rollover_uses_revision_replay_without_moving_money(store):
     assert november["summary"]["readyToAssign"] == 9000
     assert all(row["carryover"] == 0 for row in november["budget"])
     after = store.export_budget()
-    assert {key: value for key, value in after.items() if key != "rolloverModes"} == {
-        key: value for key, value in before.items() if key != "rolloverModes"
+    assert {key: value for key, value in after.items() if key not in {"rolloverModes", "history"}} == {
+        key: value for key, value in before.items() if key not in {"rolloverModes", "history"}
     }
     service.set_rollover_mode("personal", "2026-10", "USD", "category")
     november = service.workspace("personal", "2026-11")

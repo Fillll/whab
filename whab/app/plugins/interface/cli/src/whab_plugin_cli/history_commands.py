@@ -52,7 +52,7 @@ def execute_history(connection, identifier, prefix, args, exchange, error):
         if action != 'snapshot' and args.apply is None:
             return preview
         fingerprint, revision = preview['data']['fingerprint'], preview['revision']
-        if action != 'snapshot' and args.apply != fingerprint:
+        if args.apply is not None and args.apply != fingerprint:
             raise error('Budget changed since the reviewed preview. Preview again before applying.')
     intent = args.request_id or str(uuid4())
     body = {'operation': 'history_apply', 'workspace': 'personal',
@@ -63,5 +63,5 @@ def execute_history(connection, identifier, prefix, args, exchange, error):
     try:
         result = checked(exchange(connection, 'POST', prefix + '/commands', json=body), identifier, error)
     except (ValueError, OSError, RuntimeError, httpx.HTTPError) as failure:
-        raise error(f'History action was not confirmed. Inspect history before retrying; retain --revision {revision} and --request-id {intent} with the original --apply fingerprint. No automatic replay.') from failure
+        raise error(f'History action was not confirmed. Inspect history before retrying; retain --revision {revision} and --request-id {intent} with --apply {fingerprint}. No automatic replay.') from failure
     return {**result, 'requestId': intent, 'expectedRevision': revision, 'fingerprint': fingerprint}

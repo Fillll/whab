@@ -145,7 +145,7 @@ def test_rollover_with_negative_available_money_is_saved_and_survives_reopen(tmp
         before = store.export_budget()
         store.set_rollover_mode("personal", "2026-10", "USD", "category")
         saved = store.export_budget()
-        assert saved == {**before, "rolloverModes": [
+        assert saved == {**before, "history": saved["history"], "rolloverModes": [
             {"month": "2026-10", "currency": "USD", "mode": "category"},
         ]}
         november = store.workspace("personal", "2026-11")
@@ -165,7 +165,8 @@ def test_rollover_with_negative_available_money_is_saved_and_survives_reopen(tmp
             reopened.assign_next_month("personal", "2026-11", "USD", 1)
         assert reopened.export_budget() == saved
         reopened.set_rollover_mode("personal", "2026-10", "USD", "balance")
-        assert reopened.export_budget() == before
+        final = reopened.export_budget()
+        assert {k:v for k,v in final.items() if k != "history"} == {k:v for k,v in before.items() if k != "history"}
         assert reopened.workspace("personal", "2026-11")["summary"]["readyToAssign"] == 0
     finally:
         reopened.close()
@@ -197,7 +198,8 @@ def test_later_balance_boundary_preserves_a_saved_intermediate_rollover_deficit(
     store.assign("personal", "groceries", "2026-11", 10000)
     before = store.export_budget()
     store.set_rollover_mode("personal", "2026-10", "USD", "category")
-    assert store.export_budget() == {**before, "rolloverModes": [
+    saved = store.export_budget()
+    assert saved == {**before, "history": saved["history"], "rolloverModes": [
         {"month": "2026-10", "currency": "USD", "mode": "category"},
         {"month": "2026-11", "currency": "USD", "mode": "balance"},
     ]}

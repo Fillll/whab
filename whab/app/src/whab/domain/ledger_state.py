@@ -84,7 +84,7 @@ def require_pristine(state):
     """A transfer may replace untouched templates, never saved user/provider data."""
     if any(state.get(key) for key in (
         "accounts", "transactions", "budget", "futureFunding", "rolloverModes", "items",
-        "receipts", "importReceipt",
+        "receipts", "importReceipt", "history",
     )):
         raise StoreError("Restoration requires an empty personal workspace.")
     template = initial_state("personal", state["budgetStartMonth"])["categories"]

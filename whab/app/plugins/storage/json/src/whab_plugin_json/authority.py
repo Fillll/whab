@@ -27,6 +27,7 @@ from whab.plugins.storage_transfer import (
     encode_local_state,
     evidence_record,
     local_state_digest,
+    operation_limit,
     read_evidence,
     read_operation_receipt,
     read_storage_json,
@@ -153,14 +154,12 @@ class Authority:
         if type(operation) is not StorageOperation:
             raise StoreError('Durable commands require a validated storage operation.')
         if operation.name == 'recorded_command':
-            value = read_storage_json(operation.payload)
+            value = read_storage_json(operation.payload, limit=operation_limit(operation.name))
             with self.history_scope(value['context']):
                 return self._execute_operation(operation)
         return self._execute_operation(operation)
 
     def _execute_operation(self, operation):
-        if type(operation) is not StorageOperation:
-            raise StoreError("Durable commands require a validated storage operation.")
         with self._lock:
             self._check_current()
             current = self._evidence(self._data)
@@ -174,8 +173,9 @@ class Authority:
                 result = dispatch_storage_operation(self, operation)
                 from whab.domain.history import record_states
                 info = getattr(self, '_history_context', None) or {'actor': 'System', 'actorKind': 'system', 'operation': operation.name}
+                restored_workspace = candidate.pop("historyRestore", None)
                 for workspace, old in self._data['workspaces'].items():
-                    if workspace != operation.workspace:
+                    if workspace != operation.workspace or workspace == restored_workspace:
                         continue
                     record_states(old, candidate['workspaces'][workspace], info)
                 candidate["generation"] += 1

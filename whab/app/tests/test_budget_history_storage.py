@@ -100,3 +100,48 @@ def test_service_batches_cas_and_snapshot_are_explicit(history_store):
     service.command('history_apply', 'personal', {k:v for k,v in p['data'].items() if k != 'changes'}, request_id='snapshot', expected_revision=p['revision'])
     assert backend.budget_history('personal')['entries'][0]['hasSnapshot']
     assert backend.budget_history('personal', limit=1)['next']
+
+
+def test_history_outlives_bounded_retry_receipts_and_cannot_be_overwritten(history_store, monkeypatch):
+    backend, _, _ = history_store
+    if hasattr(backend, 'db'):
+        from whab_plugin_sqlite import authority
+    else:
+        from whab_plugin_json import authority
+    monkeypatch.setattr(authority, 'MAX_OPERATION_RECEIPTS', 2)
+    operations = [command(backend, 'add_account', {'name':f'Fictional {i}', 'type':'depository', 'balance':100})[0] for i in range(4)]
+    assert backend.operation_receipt(operations[0].operation_id) is None
+    assert backend.budget_history('personal')['total'] == 4
+    first = backend.budget_history('personal')['entries'][-1]['id']
+    assert backend.budget_history('personal', snapshot=True, target=first)['snapshot']['accounts']
+    assert backend.budget_history('personal', snapshot=True, target='baseline')['snapshot']['accounts'] == []
+
+
+def test_receipt_barriers_log_without_leaking_attachment_bytes(history_store):
+    from whab_plugin_devkit import receipt_png
+    backend, _, _ = history_store
+    service = LedgerService(backend)
+    account = service.add_account('personal', {'name':'Fictional', 'type':'depository','balance':1000})
+    transaction = service.add_transaction('personal', {'accountId':account,'date':'2026-11-01','merchant':'Fictional receipt','amount':100,'categoryId':None})
+    backend.save_receipt('personal', transaction, receipt_png())
+    entry = backend.budget_history('personal')['entries'][0]
+    assert entry['operation'] == 'save_receipt' and entry['changeCount'] == 0
+    assert 'PNG' not in str(backend.export_budget('personal')['history'])
+    with pytest.raises(StoreError, match='attachment'):
+        backend.history_preview('personal', 'restore', 'baseline')
+    backend.delete_receipt('personal', transaction)
+    assert backend.budget_history('personal')['entries'][0]['operation'] == 'delete_receipt'
+
+
+def test_durable_pristine_restore_adopts_history_without_synthetic_events(history_store):
+    from whab.domain import commands
+    from whab.domain.ledger_state import initial_state, portable_snapshot
+    backend, _, _ = history_store
+    state = initial_state('personal', '2026-11')
+    commands.add_account(state, 'fictional-account', {'name':'Fictional restore','type':'depository','balance':100})
+    operation, _ = command(backend, 'restore_budget', {'snapshot':portable_snapshot(state)})
+    assert backend.execute_operation(operation).replayed
+    assert backend.budget_history('personal')['total'] == 0
+    command(backend, 'add_account', {'name':'First new change','type':'depository','balance':0})
+    baseline = backend.budget_history('personal', snapshot=True, target='baseline')['snapshot']
+    assert baseline['accounts'][0]['id'] == 'fictional-account'

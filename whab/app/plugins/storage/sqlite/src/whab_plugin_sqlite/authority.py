@@ -1,5 +1,6 @@
 """SQLite-owned authority, atomic command receipts and protected local transfer."""
 
+import json
 from contextlib import contextmanager
 from dataclasses import replace
 from uuid import uuid4
@@ -28,6 +29,7 @@ from whab.plugins.storage_transfer import (
     encode_local_state,
     evidence_record,
     local_state_digest,
+    operation_limit,
     read_evidence,
     read_operation_receipt,
     read_storage_json,
@@ -196,7 +198,7 @@ class Authority:
         return self._metadata_evidence(metadata or self._authority_metadata(), local_state_digest(financial, protected))
 
     @contextmanager
-    def _authority_write(self, *, financial=True):
+    def _authority_write(self, *, financial=True, workspace=None, transaction_ids=None):
         if self._read_only:
             raise StoreError("Read-only storage cannot accept mutations.")
         with self._lock:
@@ -227,21 +229,44 @@ class Authority:
                     raise StoreError("This storage instance is fenced and cannot accept financial changes.")
                 transaction = {"metadata": metadata, "dirty": False, "operation": None, "result": None, "receipt": None}
                 self._writing = transaction
-                history_before = {name: self._read_state(name) for name in ("personal", "demo")} if financial else {}
+                from .export_reads import snapshot
+                stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+                cached = getattr(self, '_history_heads', {}) if getattr(self, '_history_stamp', None) == stamp else {}
+                names = (workspace,) if type(workspace) is str and workspace in {'personal', 'demo'} else ('personal', 'demo')
+                history_before = {name: cached[name] if name in cached else snapshot(self, name) for name in names} if financial else {}
+                history_after = dict(cached) if financial else {}
+                selected = (tuple(transaction_ids) if type(transaction_ids) in {tuple, list} and 0 < len(transaction_ids) <= 100 and all(type(key) is str for key in transaction_ids) else None)
+                # User/legacy SQL triggers can touch additional rows; do not use
+                # bounded reads in their presence. Data-version/total-change
+                # checks invalidate cached heads after writes outside this scope.
+                if self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='trigger' LIMIT 1").fetchone():
+                    selected = None
                 yield transaction
                 if transaction["dirty"]:
-                    from whab.domain.history import record_states
+                    from whab.domain.history import record_financial
                     operation = transaction["operation"]
                     info = getattr(self, '_history_context', None)
                     if info is None:
-                        info = {'actor': 'System', 'actorKind': 'system', 'operation': operation.name if operation is not None else 'change'}
+                        info = {'actor': 'System', 'actorKind': 'system', 'operation': operation.name if operation is not None else transaction.get('history_operation', 'change')}
                     for name, old in history_before.items():
                         if name != (operation.workspace if operation is not None else transaction.get("workspace", name)):
                             continue
-                        new = self._read_state(name)
-                        record_states(old, new, info)
-                        if 'history' in new:
-                            self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (name, __import__('json').dumps(new['history'])))
+                        if selected is not None:
+                            new = snapshot(self, name, transaction_ids=selected, include_history=False)
+                            changed = {row['id']: row for row in new['transactions']}
+                            new['transactions'] = [changed.get(row['id'], row) for row in old['transactions']]
+                            if 'history' in old:
+                                new['history'] = old['history']
+                        else:
+                            new = snapshot(self, name)
+                        if not transaction.get("history_restore"):
+                            original_journal = new.get("history") or old.get("history")
+                            journal = record_financial(original_journal, old, new, info)
+                            if journal is not None:
+                                new["history"] = journal
+                                if journal is not original_journal:
+                                    self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (name, json.dumps(journal)))
+                        history_after[name] = new
                     metadata.update(generation=metadata["generation"] + 1,
                                     operationId=transaction["operation"].operation_id if transaction["operation"] is not None else str(uuid4()),
                                     empty=False)
@@ -256,7 +281,10 @@ class Authority:
                 if canonical_storage_json(metadata) != previous_metadata:
                     self._save_authority(metadata)
                 attempted = True
+                next_history_stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
                 self.db.execute("COMMIT")
+                self._history_heads = history_after
+                self._history_stamp = next_history_stamp
             except BaseException as error:
                 if self.db.in_transaction:
                     self.db.execute("ROLLBACK")
@@ -298,15 +326,18 @@ class Authority:
         if type(operation) is not StorageOperation:
             raise StoreError('Durable commands require a validated storage operation.')
         if operation.name == 'recorded_command':
-            value = read_storage_json(operation.payload)
+            value = read_storage_json(operation.payload, limit=operation_limit(operation.name))
             with self.history_scope(value['context']):
                 return self._execute_operation(operation)
         return self._execute_operation(operation)
 
     def _execute_operation(self, operation):
-        if type(operation) is not StorageOperation:
-            raise StoreError("Durable commands require a validated storage operation.")
-        with self._authority_write() as transaction:
+        payload = read_storage_json(operation.payload, limit=operation_limit(operation.name))
+        name = operation.name
+        if name == 'recorded_command':
+            name, payload = payload['operation'], payload['parameters']
+        selected = ([payload.get('transactionId')] if name in {'edit_transaction', 'edit_transaction_details'} else payload.get('transactionIds') if name == 'review_transactions' else None)
+        with self._authority_write(workspace=operation.workspace, transaction_ids=selected) as transaction:
             current = self._current_evidence(transaction["metadata"])
             replay = check_storage_operation(current, operation, self.operation_receipt(operation.operation_id))
             if replay is not None:

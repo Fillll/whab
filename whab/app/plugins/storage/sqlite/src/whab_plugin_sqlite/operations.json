@@ -969,6 +969,282 @@
       ],
       "retry": "Safe capability read. Financial mutations retain their original revision, request ID and native recovery rules.",
       "availability": "WHAB 2.61+ with the updated storage plugin; optional, not part of the required StorageBackend methods."
+    },
+    {
+      "name": "BudgetHistoryStorage.budget_history",
+      "kind": "sdk",
+      "summary": "Optional atomic financial history callback budget_history; see BudgetHistoryStorage in the SDK guide.",
+      "input": {
+        "type": "object",
+        "description": "Typed optional storage callback arguments; represented as JSON for offline documentation.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Host-selected personal or demo workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Page size, default 50.",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "before": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable entry or batch ID, baseline for restore, null for a new snapshot."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable entry or batch ID, baseline for restore, null for a new snapshot."
+          },
+          "snapshot": {
+            "type": "boolean",
+            "description": "Export a read-only historical financial snapshot, default false."
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "history_apply appends one guarded financial reversal/checkpoint atomically; history_scope carries metadata only; other methods are read-only.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "WHAB 2.62+ optional BudgetHistoryStorage callback; consult the owning README."
+    },
+    {
+      "name": "BudgetHistoryStorage.history_preview",
+      "kind": "sdk",
+      "summary": "Optional atomic financial history callback history_preview; see BudgetHistoryStorage in the SDK guide.",
+      "input": {
+        "type": "object",
+        "description": "Typed optional storage callback arguments; represented as JSON for offline documentation.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Host-selected personal or demo workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Reviewed history action.",
+            "enum": [
+              "undo",
+              "redo",
+              "restore",
+              "snapshot"
+            ]
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable entry or batch ID, baseline for restore, null for a new snapshot."
+          }
+        },
+        "required": [
+          "workspace",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "action": "snapshot",
+            "target": null
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "history_apply appends one guarded financial reversal/checkpoint atomically; history_scope carries metadata only; other methods are read-only.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "WHAB 2.62+ optional BudgetHistoryStorage callback; consult the owning README."
+    },
+    {
+      "name": "BudgetHistoryStorage.history_apply",
+      "kind": "sdk",
+      "summary": "Optional atomic financial history callback history_apply; see BudgetHistoryStorage in the SDK guide.",
+      "input": {
+        "type": "object",
+        "description": "Typed optional storage callback arguments; represented as JSON for offline documentation.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Host-selected personal or demo workspace.",
+            "enum": [
+              "personal",
+              "demo"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "Reviewed history action.",
+            "enum": [
+              "undo",
+              "redo",
+              "restore",
+              "snapshot"
+            ]
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable entry or batch ID, baseline for restore, null for a new snapshot."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Exact fingerprint from a reviewed preview.",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "workspace",
+          "action",
+          "target",
+          "fingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "action": "snapshot",
+            "target": null,
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "history_apply appends one guarded financial reversal/checkpoint atomically; history_scope carries metadata only; other methods are read-only.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "WHAB 2.62+ optional BudgetHistoryStorage callback; consult the owning README."
+    },
+    {
+      "name": "BudgetHistoryStorage.history_scope",
+      "kind": "sdk",
+      "summary": "Optional atomic financial history callback history_scope; see BudgetHistoryStorage in the SDK guide.",
+      "input": {
+        "type": "object",
+        "description": "Typed optional storage callback arguments; represented as JSON for offline documentation.",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "description": "Validated actor, actorKind, batchId, operation, requestId, action and target commit context. No credentials or financial records."
+          }
+        },
+        "required": [
+          "metadata"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "metadata": {
+              "actor": "Codex",
+              "actorKind": "agent",
+              "batchId": "fictional-review"
+            }
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "history_apply appends one guarded financial reversal/checkpoint atomically; history_scope carries metadata only; other methods are read-only.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "WHAB 2.62+ optional BudgetHistoryStorage callback; consult the owning README."
     }
   ]
 }

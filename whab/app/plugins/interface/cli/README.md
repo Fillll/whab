@@ -353,7 +353,7 @@ Subscription labels apply to matching payments in the same account; see [Subscri
 
 The CLI makes one request, never retries a write or refreshes its revision automatically, rejects redirects/proxies and validates response budget identity. Success prints JSON to stdout and exits 0; failure prints a sanitized JSON error to stderr and exits 1. After an uncertain write, retain the original target, parameters, revision and request ID. Inspect the budget and retry only that exact intent; a restart or stale revision requires reconciliation rather than a new write. Request receipts have the host's documented lifetime; the CLI does not claim durable receipt storage.
 
-Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.61+ are required.
+Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.62+ are required.
 
 ## Operation documentation
 
@@ -414,3 +414,9 @@ Investments product without importing trades or changing transaction sync.
 CLI 2.2 with WHAB 2.59 supports `whab BUDGET bank` and `whab-cli PROFILE bank`. Use `connections PROVIDER` to read connection IDs and saved destinations, `preview PROVIDER --item ID` to review bank accounts without importing, and `configure PROVIDER --item ID --accounts JSON` to save account destinations and explicit history choices. The JSON array contains `bankAccountId`, `accountId` (existing same-currency account or explicit null for a new account), and `since` (inclusive YYYY-MM-DD or explicit null for all available history). No history start is inferred. Omitted accounts are not imported. Configuration and synchronization are separate operations: run `bank sync PROVIDER [--item ID]` after reviewing/saving.
 
 Use `bank schedule plaid --every-hours 1`, `--every-hours 3`, `--every-hours 6`, or `--manual`. Omit those flags to read the saved policy and due status. Manual mode disables periodic and webhook-triggered imports while retaining explicit sync. `bank background plaid --enable` / `--disable` controls macOS device/environment wakeups, which check the per-budget policies. Existing `jobs enable`, `jobs disable`, `jobs run` and `sync plaid` remain supported. An hourly cron entry invoking `python -m whab --home /absolute/runtime --environment production --run-jobs` provides the same due-job filtering on other platforms. Bank controls require the local personal budget and preserve HTTPS/authentication; no remote credential or built-in AI is required. See [Plaid setup and limitations](../../ingestion/plaid/README.md#account-destinations-and-transaction-history).
+
+## Financial history
+
+See the [budget history workflow](../../../../docs/usage.md#budget-history).
+This version requires WHAB 2.62+. History is saved atomically with financial
+changes and retained across reopen and exports. Earlier changes are not backfilled.

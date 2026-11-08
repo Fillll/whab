@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.62.0 — 2026-11-08
+
+PR: [#169](https://github.com/Fillll/whab/pull/169)
+
+- Add permanent financial change history, guarded entry/batch undo and redo, snapshots and read-only historical exports. Carry explicit actor/batch metadata through worker and HTTPS boundaries; append reversals without replaying bank operations or credentials.
+
 ## 2.61.0 — 2026-11-07
 
 PR: [#167](https://github.com/Fillll/whab/pull/167)

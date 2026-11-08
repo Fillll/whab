@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.16.0 — 2026-11-08
+
+PR: [#169](https://github.com/Fillll/whab/pull/169)
+
+- Save permanent financial history in the same SQLite transaction as ledger changes; preserve history through reopen, guarded reversals and portable/protected transfer.
+
 ## 1.15.0 — 2026-11-07
 
 PR: [#167](https://github.com/Fillll/whab/pull/167)

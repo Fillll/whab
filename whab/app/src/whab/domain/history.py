@@ -8,6 +8,7 @@ import json
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
+from operator import itemgetter
 from uuid import uuid4
 
 from .errors import StoreError
@@ -74,12 +75,14 @@ def context(value=None, *, operation='change'):
     return result
 
 
-def financial(snapshot):
+def financial(snapshot, *, trusted=False):
     if type(snapshot) is not dict:
         raise StoreError('Invalid financial snapshot.')
-    result = validate_portable_budget({k: deepcopy(v) for k, v in snapshot.items() if k != 'history'})
+    result = {k: v if trusted else deepcopy(v) for k, v in snapshot.items() if k != 'history'}
+    if not trusted:
+        result = validate_portable_budget(result)
     for section, fields in _COLLECTIONS.items():
-        result[section].sort(key=lambda row: tuple(row[k] for k in fields))
+        result[section].sort(key=itemgetter(*fields))
     return result
 
 
@@ -137,6 +140,8 @@ def validate_history(value):
         raise StoreError('Nested budget history is not allowed.')
     baseline = financial(value['baseline'])
     previous = digest(baseline)
+    previous_state_digest = previous
+    rows = flatten(baseline)
     seen = set()
     for entry in value['entries']:
         if type(entry) is not dict or not _ENTRY_FIELDS <= entry.keys() or entry.keys() - _ENTRY_FIELDS - {'snapshot'}:
@@ -154,6 +159,10 @@ def validate_history(value):
             raise StoreError('Invalid history entry.')
         for change in entry['changes']:
             _change(change)
+        if entry['beforeDigest'] != previous_state_digest:
+            raise StoreError('Budget history state chain is inconsistent.')
+        _apply(rows, entry['changes'], inverse=False)
+        previous_state_digest = entry['afterDigest']
         if any(type(entry[k]) is not str or len(entry[k]) != 64 or any(c not in '0123456789abcdef' for c in entry[k]) for k in ('beforeDigest', 'afterDigest', 'hash')):
             raise StoreError('Invalid history digest.')
         if 'snapshot' in entry:
@@ -162,22 +171,26 @@ def validate_history(value):
         if digest({k: v for k, v in entry.items() if k != 'hash'}) != entry['hash']:
             raise StoreError('Budget history entry checksum does not match.')
         previous = entry['hash']
+    if digest(unflatten(rows)) != previous_state_digest:
+        raise StoreError('Budget history final state digest does not match.')
     return {'formatVersion': 1, 'baseline': baseline, 'entries': deepcopy(value['entries'])}
 
 
-def append(journal, before, after, metadata=None):
-    before, after = financial(before), financial(after)
+def append(journal, before, after, metadata=None, *, trusted=False, before_digest=None):
+    if not trusted:
+        before, after = financial(before), financial(after)
     changes = difference(before, after)
     info = context(metadata)
     if not changes and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
         return journal
-    journal = {**journal, 'entries': list(journal['entries'])} if journal else {'formatVersion': 1, 'baseline': before, 'entries': []}
+    journal = {**journal, 'entries': list(journal['entries'])} if journal else {'formatVersion': 1, 'baseline': deepcopy(before), 'entries': []}
+    before_digest = before_digest or digest(before)
     entry = {'id': str(uuid4()), 'time': datetime.now(timezone.utc).isoformat(), **info,
-             'changes': changes, 'beforeDigest': digest(before), 'afterDigest': digest(after),
+             'changes': changes, 'beforeDigest': before_digest, 'afterDigest': digest(after),
              'reversible': info['operation'] in REVERSIBLE,
-             'previousHash': journal['entries'][-1]['hash'] if journal['entries'] else digest(journal['baseline'])}
+             'previousHash': journal['entries'][-1]['hash'] if journal['entries'] else before_digest}
     if info['action'] == 'snapshot' or (len(journal['entries']) + 1) % 1000 == 0:
-        entry['snapshot'] = after
+        entry['snapshot'] = deepcopy(after)
     entry['hash'] = digest(entry)
     journal['entries'].append(entry)
     return journal
@@ -227,6 +240,8 @@ def _apply(rows, changes, *, inverse):
 
 def preview(journal, current, action, target):
     current = financial(current)
+    if journal:
+        journal = validate_history(journal)
     if action == 'snapshot':
         return {'action': action, 'target': None, 'changes': [], 'fingerprint': digest([digest(current), 'snapshot']), 'state': current}
     if not journal:
@@ -269,6 +284,14 @@ def apply_to_state(state, wanted):
     old_accounts = state['accounts']
     candidate = dict(state)
     restore_snapshot(candidate, wanted, mark_external_stale=False)
+    removed_accounts = old_accounts.keys() - candidate['accounts'].keys()
+    linked = {key for key, row in old_accounts.items() if row.get('itemId') is not None}
+    linked.update(link['accountId'] for item in state.get('items', {}).values()
+                  for link in (item.get('syncSettings') or {}).values())
+    if removed_accounts & linked:
+        raise StoreError('This reversal would detach a linked bank account. Review the bank setup first.')
+    if any(old_accounts[key]['currency'] != candidate['accounts'][key]['currency'] for key in linked & candidate['accounts'].keys()):
+        raise StoreError('This reversal would change a linked bank account currency.')
     allowed = ACCOUNT_FIELDS | {'bankWebsite', 'nameOverridden'}
     for identifier, account in candidate['accounts'].items():
         previous = old_accounts.get(identifier, {})
@@ -279,17 +302,31 @@ def apply_to_state(state, wanted):
         state[name] = candidate[name]
 
 
-def record_states(before, after, metadata=None):
-    """Record one adapter-owned commit; adopt imported journals without resetting them."""
-    from .ledger_state import portable_snapshot
+def record_financial(journal, before, after, metadata=None):
+    """Commit adapters supply detached allowlisted snapshots from one native transaction."""
     info = context(metadata)
+    old, new = financial(before, trusted=True), financial(after, trusted=True)
+    if old == new and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
+        return journal
+    # Pristine restores preserve their incoming journal. Reconcile any deliberate
+    # provider detachment or external edit when the first new change is made.
+    old_digest = None
+    if journal:
+        last = journal['entries'][-1] if journal['entries'] else None
+        expected = last['afterDigest'] if last else digest(journal['baseline'])
+        old_digest = digest(old)
+        if old_digest != expected:
+            previous = snapshot_at(journal, last['id'] if last else 'baseline')
+            journal = append(journal, previous, old, {'actor': 'System', 'actorKind': 'system', 'operation': 'import_workspace'})
+    return append(journal, old, new, info, trusted=True, before_digest=old_digest)
+
+
+def record_states(before, after, metadata=None):
+    """Record one adapter-owned commit without resetting imported journals."""
+    from .ledger_state import portable_snapshot
     journal = after.get('history') or before.get('history')
-    old = financial(portable_snapshot(before, validate=False))
-    if after.get('history') is not None and after.get('history') != before.get('history'):
-        imported = after['history']
-        old = snapshot_at(imported, imported['entries'][-1]['id'] if imported['entries'] else 'baseline')
-    new = financial(portable_snapshot(after, validate=False))
-    updated = append(journal, old, new, info)
+    updated = record_financial(journal, portable_snapshot(before, validate=False),
+                               portable_snapshot(after, validate=False), metadata)
     if updated is not None:
         after['history'] = updated
 
@@ -297,6 +334,8 @@ def record_states(before, after, metadata=None):
 def public_preview(state, action, target):
     from .ledger_state import portable_snapshot
     result = preview(state.get('history'), portable_snapshot(state, validate=False), action, target)
+    if action != 'snapshot':
+        apply_to_state(dict(state), result['state'])
     return {k: v for k, v in result.items() if k != 'state'}
 
 

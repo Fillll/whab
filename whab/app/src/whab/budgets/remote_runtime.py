@@ -318,6 +318,7 @@ class RemoteSelectionBody(BaseModel):
 
 class RemoteFinishBody(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
+    history: dict | None = None
     operation: str = Field(min_length=1, max_length=200)
     workspace: str
     payload: dict

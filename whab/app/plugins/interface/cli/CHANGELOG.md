@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.7.0 — 2026-11-08
+
+PR: [#169](https://github.com/Fillll/whab/pull/169)
+
+- Add name-addressed history list/show/export, snapshot and previewed undo/redo/restore commands, explicit category --batch labels, guarded fingerprint application and retained exact-intent retry diagnostics.
+
 ## 2.6.0 — 2026-11-08
 
 PR: [#168](https://github.com/Fillll/whab/pull/168)

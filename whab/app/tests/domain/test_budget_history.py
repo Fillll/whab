@@ -35,7 +35,9 @@ def test_batch_undo_redo_preserves_history_and_disjoint_later_changes():
     edit(s, 'groceries')
     edit(s, 'dining')
     original = deepcopy(s['history']['entries'])
+    previous = deepcopy(s)
     commands.add_account(s, 'savings', {'name': 'Fictional saving', 'type': 'depository', 'balance': 300})
+    history.record_states(previous, s, {'operation':'add_account'})
     apply(s, 'undo', 'agent-batch')
     assert s['transactions']['purchase']['categoryId'] is None
     assert 'categoryAgent' not in s['transactions']['purchase']
@@ -43,7 +45,7 @@ def test_batch_undo_redo_preserves_history_and_disjoint_later_changes():
     apply(s, 'redo', 'agent-batch')
     assert s['transactions']['purchase']['categoryId'] == 'dining'
     assert s['transactions']['purchase']['categoryAgent'] == 'Codex'
-    assert len(s['history']['entries']) == 4
+    assert len(s['history']['entries']) == 5
     history.validate_history(s['history'])
 
 
@@ -102,3 +104,57 @@ def test_removing_an_account_used_by_later_rows_and_orphaning_attachments_is_ref
     s['receipts']['new'] = b'fictional image'
     with pytest.raises(StoreError, match='orphan'):
         history.apply_request(s, 'undo', s['history']['entries'][-1]['id'], history.public_preview(s, 'undo', s['history']['entries'][-1]['id'])['fingerprint'])
+
+
+def test_checkpoint_pagination_and_long_history_do_not_prune_old_entries():
+    snapshot = history.financial(portable_snapshot(state()))
+    journal = None
+    for _ in range(1000):
+        journal = history.append(journal, snapshot, snapshot, {'action':'snapshot'})
+    assert len(journal['entries']) == 1000
+    first = journal['entries'][0]['id']
+    page = history.listing(journal, limit=1)
+    assert page['total'] == 1000 and page['next']
+    assert history.listing(journal, limit=1, before=page['next'])['total'] == 1000
+    assert history.snapshot_at(journal, first) == snapshot
+    history.validate_history(journal)
+    with pytest.raises(StoreError):
+        history.listing(journal, before='missing')
+    with pytest.raises(StoreError):
+        history.snapshot_at(journal, 'missing')
+
+
+@pytest.mark.parametrize('corrupt', [None, {}, {'formatVersion':1,'baseline':None,'entries':[]}, {'formatVersion':True,'baseline':{},'entries':[]}])
+def test_invalid_history_shapes_have_authored_errors(corrupt):
+    with pytest.raises(StoreError):
+        history.validate_history(corrupt)
+
+
+def test_history_cannot_hide_unknown_original_fields_or_forged_state_chain():
+    s = state()
+    edit(s,'groceries')
+    entry = s['history']['entries'][0]
+    for kind in ['original', 'chain']:
+        broken = deepcopy(s['history'])
+        row = broken['entries'][0]
+        if kind == 'original':
+            row['changes'][0]['after']['original'] = {'accessToken':'fictional-secret'}
+        else:
+            row['afterDigest'] = 'f' * 64
+        row['hash'] = history.digest({k:v for k,v in row.items() if k != 'hash'})
+        with pytest.raises(StoreError):
+            history.validate_history(broken)
+    assert s['history']['entries'][0] == entry
+
+
+def test_undo_cannot_detach_an_account_referenced_by_current_bank_settings():
+    s = initial_state('personal', '2026-11')
+    before = deepcopy(s)
+    commands.add_account(s, 'linked', {'name':'Fictional linked','type':'depository','balance':100})
+    history.record_states(before, s, {'operation':'add_account'})
+    s['items']['fictional'] = {'syncSettings':{'provider-account':{'accountId':'linked','since':'2026-11-01'}}}
+    identifier = s['history']['entries'][-1]['id']
+    before = deepcopy(s)
+    with pytest.raises(StoreError, match='linked bank account'):
+        history.public_preview(s, 'undo', identifier)
+    assert s == before

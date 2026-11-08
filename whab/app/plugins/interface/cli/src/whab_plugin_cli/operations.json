@@ -2306,6 +2306,10 @@
           "requestId": {
             "type": "string",
             "description": "Optional unique intent ID; otherwise generated and returned."
+          },
+          "batch": {
+            "type": "string",
+            "description": "Optional explicit batch ID for atomic history batch reversal."
           }
         },
         "required": [
@@ -2338,6 +2342,337 @@
       ],
       "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
       "availability": "CLI 2.6+ and WHAB 2.61+. whab BUDGET trnx categories or categorize; transactions/categorise aliases supported."
+    },
+    {
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "name": "history.list",
+      "kind": "local",
+      "summary": "Name-addressed history list; consult whab BUDGET history list --help.",
+      "input": {
+        "type": "object",
+        "description": "Arguments after whab BUDGET history list. Production is the default runtime.",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "--limit, default 50.",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "before": {
+            "type": "string",
+            "description": "--before entry cursor for older changes."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public budgetId/revision/data envelope; edits also return transactionId, categoryId, expectedRevision and requestId."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "list/show/export and undo/redo/restore without --apply are read-only; snapshot and reviewed --apply commit one event atomically.",
+      "errors": [
+        "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
+      ],
+      "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
+      "availability": "CLI 2.7+, WHAB 2.62+ and BudgetHistoryStorage; history starts with the next financial change."
+    },
+    {
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "name": "history.show",
+      "kind": "local",
+      "summary": "Name-addressed history show; consult whab BUDGET history show --help.",
+      "input": {
+        "type": "object",
+        "description": "Arguments after whab BUDGET history show. Production is the default runtime.",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Entry or batch ID; export/restore also accept baseline."
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public budgetId/revision/data envelope; edits also return transactionId, categoryId, expectedRevision and requestId."
+      },
+      "examples": [
+        {
+          "input": {
+            "target": "fictional-entry"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "list/show/export and undo/redo/restore without --apply are read-only; snapshot and reviewed --apply commit one event atomically.",
+      "errors": [
+        "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
+      ],
+      "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
+      "availability": "CLI 2.7+, WHAB 2.62+ and BudgetHistoryStorage; history starts with the next financial change."
+    },
+    {
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "name": "history.export",
+      "kind": "local",
+      "summary": "Name-addressed history export; consult whab BUDGET history export --help.",
+      "input": {
+        "type": "object",
+        "description": "Arguments after whab BUDGET history export. Production is the default runtime.",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Entry or batch ID; export/restore also accept baseline."
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public budgetId/revision/data envelope; edits also return transactionId, categoryId, expectedRevision and requestId."
+      },
+      "examples": [
+        {
+          "input": {
+            "target": "fictional-entry"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "list/show/export and undo/redo/restore without --apply are read-only; snapshot and reviewed --apply commit one event atomically.",
+      "errors": [
+        "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
+      ],
+      "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
+      "availability": "CLI 2.7+, WHAB 2.62+ and BudgetHistoryStorage; history starts with the next financial change."
+    },
+    {
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "name": "history.snapshot",
+      "kind": "local",
+      "summary": "Name-addressed history snapshot; consult whab BUDGET history snapshot --help.",
+      "input": {
+        "type": "object",
+        "description": "Arguments after whab BUDGET history snapshot. Production is the default runtime.",
+        "properties": {
+          "apply": {
+            "type": "string",
+            "description": "--apply fingerprint; required to commit undo/redo/restore. For snapshot, optional original fingerprint on exact retry."
+          },
+          "agent": {
+            "type": "string",
+            "description": "--agent explicit self-declared actor label."
+          },
+          "revision": {
+            "type": "string",
+            "description": "--revision original observed ledger revision for an exact retry."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "--request-id unique original intent ID for exact retry."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public budgetId/revision/data envelope; edits also return transactionId, categoryId, expectedRevision and requestId."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "list/show/export and undo/redo/restore without --apply are read-only; snapshot and reviewed --apply commit one event atomically.",
+      "errors": [
+        "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
+      ],
+      "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
+      "availability": "CLI 2.7+, WHAB 2.62+ and BudgetHistoryStorage; history starts with the next financial change."
+    },
+    {
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "name": "history.undo",
+      "kind": "local",
+      "summary": "Name-addressed history undo; consult whab BUDGET history undo --help.",
+      "input": {
+        "type": "object",
+        "description": "Arguments after whab BUDGET history undo. Production is the default runtime.",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Entry or batch ID; export/restore also accept baseline."
+          },
+          "apply": {
+            "type": "string",
+            "description": "--apply fingerprint; required to commit undo/redo/restore. For snapshot, optional original fingerprint on exact retry."
+          },
+          "agent": {
+            "type": "string",
+            "description": "--agent explicit self-declared actor label."
+          },
+          "revision": {
+            "type": "string",
+            "description": "--revision original observed ledger revision for an exact retry."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "--request-id unique original intent ID for exact retry."
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public budgetId/revision/data envelope; edits also return transactionId, categoryId, expectedRevision and requestId."
+      },
+      "examples": [
+        {
+          "input": {
+            "target": "fictional-entry"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "list/show/export and undo/redo/restore without --apply are read-only; snapshot and reviewed --apply commit one event atomically.",
+      "errors": [
+        "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
+      ],
+      "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
+      "availability": "CLI 2.7+, WHAB 2.62+ and BudgetHistoryStorage; history starts with the next financial change."
+    },
+    {
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "name": "history.redo",
+      "kind": "local",
+      "summary": "Name-addressed history redo; consult whab BUDGET history redo --help.",
+      "input": {
+        "type": "object",
+        "description": "Arguments after whab BUDGET history redo. Production is the default runtime.",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Entry or batch ID; export/restore also accept baseline."
+          },
+          "apply": {
+            "type": "string",
+            "description": "--apply fingerprint; required to commit undo/redo/restore. For snapshot, optional original fingerprint on exact retry."
+          },
+          "agent": {
+            "type": "string",
+            "description": "--agent explicit self-declared actor label."
+          },
+          "revision": {
+            "type": "string",
+            "description": "--revision original observed ledger revision for an exact retry."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "--request-id unique original intent ID for exact retry."
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public budgetId/revision/data envelope; edits also return transactionId, categoryId, expectedRevision and requestId."
+      },
+      "examples": [
+        {
+          "input": {
+            "target": "fictional-entry"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "list/show/export and undo/redo/restore without --apply are read-only; snapshot and reviewed --apply commit one event atomically.",
+      "errors": [
+        "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
+      ],
+      "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
+      "availability": "CLI 2.7+, WHAB 2.62+ and BudgetHistoryStorage; history starts with the next financial change."
+    },
+    {
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "name": "history.restore",
+      "kind": "local",
+      "summary": "Name-addressed history restore; consult whab BUDGET history restore --help.",
+      "input": {
+        "type": "object",
+        "description": "Arguments after whab BUDGET history restore. Production is the default runtime.",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Entry or batch ID; export/restore also accept baseline."
+          },
+          "apply": {
+            "type": "string",
+            "description": "--apply fingerprint; required to commit undo/redo/restore. For snapshot, optional original fingerprint on exact retry."
+          },
+          "agent": {
+            "type": "string",
+            "description": "--agent explicit self-declared actor label."
+          },
+          "revision": {
+            "type": "string",
+            "description": "--revision original observed ledger revision for an exact retry."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "--request-id unique original intent ID for exact retry."
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public budgetId/revision/data envelope; edits also return transactionId, categoryId, expectedRevision and requestId."
+      },
+      "examples": [
+        {
+          "input": {
+            "target": "fictional-entry"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "list/show/export and undo/redo/restore without --apply are read-only; snapshot and reviewed --apply commit one event atomically.",
+      "errors": [
+        "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
+      ],
+      "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
+      "availability": "CLI 2.7+, WHAB 2.62+ and BudgetHistoryStorage; history starts with the next financial change."
     }
   ]
 }

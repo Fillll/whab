@@ -965,3 +965,27 @@ and normalize null to absence. Storage adapters must retain it across public
 reads, checkpoints, native reopen and portable roundtrips. Legacy history has no
 inferred author. Labels identify a caller's claim and are not authentication or
 an immutable audit log. See the [CLI examples](../app/plugins/interface/cli/README.md#agent-category-labels).
+
+## BudgetHistoryStorage (optional, WHAB 2.62+)
+
+`budget_history(workspace, limit=50, before=None, target=None, snapshot=False)`
+returns paginated metadata (1–100 entries), entry/batch changes, or a sanitized
+historical financial snapshot. `history_preview(workspace, action, target=None)`
+returns changed records and a fingerprint for undo/redo/restore/snapshot.
+`history_apply(workspace, action, target, fingerprint)` atomically appends a new
+history event with the financial change and normal native authority evidence.
+Implement `history_scope(metadata)` to capture explicit actor/actorKind/batchId
+and the host's operation/requestId/action/target for that commit. Older adapters
+remain usable for ordinary financial commands; explicit batching requires this
+capability. The optional portable v1 `history` field carries the baseline and
+checksum-linked entries. It never contains banking tokens, cursors or attachments.
+Checksums detect accidental corruption; they do not authenticate actor claims or
+protect against an owner rewriting the entire file. Preserve the complete journal
+in native transfers/copies; do not silently prune it or infer history from imports.
+
+HTTPS queries `history`, `history_preview` and command `history_apply` share the
+existing ledger protocol. The optional command-envelope `history` object accepts
+only actor, actorKind and batchId and participates in intent fingerprints. Ordinary
+commands keep their previous envelope when no explicit history metadata is needed.
+Local Web routes are GET `/api/history`, POST `/api/history/preview` and POST
+`/api/history/apply`, with ordinary budget, workspace, HTTPS and Host/origin guards.

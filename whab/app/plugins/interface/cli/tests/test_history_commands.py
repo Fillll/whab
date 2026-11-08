@@ -17,7 +17,7 @@ def history_cli(monkeypatch, tmp_path):
         calls.append(request)
         if request.url.path.endswith('/budgets'):
             return httpx.Response(200, json={'budgets':[{'id':'budget', 'name':'Fictional'}]})
-        body = json.loads(request.content)
+        json.loads(request.content)
         if request.url.path.endswith('/commands'):
             if state['fail']:
                 raise httpx.ReadError('private information')

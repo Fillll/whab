@@ -286,3 +286,44 @@ acquisition history and realized returns stay unavailable. Totals keep currencie
 separate and identify basis coverage. Investments must already be active and
 consented on the Item. Reading this report does not import security trades into
 your budget, change transaction cutoffs or force a fresh bank update.
+
+## Budget history
+
+WHAB 2.62 with SQLite 1.16 or JSON 1.8 records financial changes permanently in
+the same native commit as the change. Settings → Budget history shows the actor,
+time, changed records and optional batch. Preview an entry or batch before applying
+Undo or Redo. New snapshot creates a financial checkpoint; restoring a snapshot
+creates another history event. The original entries remain unchanged.
+
+History begins with a baseline on the first new financial change after upgrading;
+earlier categorization and import sessions cannot be reconstructed. It records
+accounts, categories, transactions, assignments and carryover/future-funding policy.
+Bank credentials, sync cursors, plugin configuration and attachment bytes are
+excluded. Provider/import/attachment changes are logged as barriers: full restore
+cannot cross them. Entry/batch undo compares the complete affected records and
+refuses conflicts or invalid references/currencies; disjoint later edits survive.
+No external bank operation is replayed. Historical snapshot export is read-only.
+
+CLI examples (replace fictional names/IDs and review the returned preview):
+
+```sh
+whab "My budget" history list
+whab "My budget" history show ENTRY_OR_BATCH
+whab "My budget" history export baseline
+whab "My budget" history snapshot
+whab "My budget" trnx categorize TRANSACTION --category "Food / Groceries" --agent Codex --batch october-review
+whab "My budget" history undo october-review
+whab "My budget" history undo october-review --apply PREVIEW_FINGERPRINT
+whab "My budget" history redo october-review
+whab "My budget" history restore SNAPSHOT_ENTRY
+```
+
+`undo`, `redo` and `restore` only preview unless `--apply` supplies the reviewed
+fingerprint. Application also checks the ledger revision. Labels are self-declared
+provenance, not authenticated identities; `--agent` is explicit. History is not
+pruned when bounded retry receipts expire. Native and portable file size limits
+still apply: reaching them refuses a new commit rather than dropping history.
+Keep independent protected backups. After an unknown response, inspect history
+and retain the exact original fingerprint, revision, request ID and labels. There
+is no automatic write replay. The Web UI retains that original request in the
+current browser session and offers an explicit retry of the same request.

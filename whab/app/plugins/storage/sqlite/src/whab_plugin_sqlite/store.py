@@ -362,7 +362,7 @@ class Store(Authority):
         *,
         write_if: Callable[[Any], bool] | None = None,
     ) -> Any:
-        with self._authority_write() as transaction:
+        with self._authority_write(workspace=workspace) as transaction:
             transaction["workspace"] = workspace
             state = self.state(workspace)
             result = operation(state)
@@ -444,6 +444,8 @@ class Store(Authority):
         templates = build_initial_state("personal", state["budgetStartMonth"])["categories"]
         if state["categories"] and state["categories"] != templates:
             raise StoreError("File imports require untouched template categories.")
+        if state.get("history"):
+            raise StoreError("File imports cannot replace recorded budget history.")
         return None
 
     def preview_workspace_import(self, workspace: str, plugin_id: str, fingerprint: str) -> dict:
@@ -525,11 +527,13 @@ class Store(Authority):
         reuse their validated export snapshot without validating history twice.
         """
         workspace = state["_id"]
-        if "history" in restored:
-            state["history"] = restored["history"]
+        if self._writing is not None:
+            self._writing["history_restore"] = True
         receipt = self._workspace_import_receipt(state, "portable-budget", "restore")
         if receipt is not None:
             raise StoreError("Portable budgets require an empty personal workspace.")
+        if "history" in restored:
+            state["history"] = restored["history"]
         self.db.execute("DELETE FROM categories WHERE workspace=?", (workspace,))
         state["accounts"] = {
             record["id"]: {
@@ -692,6 +696,7 @@ class Store(Authority):
 
         with self._authority_write() as transaction:
             save(self, workspace, transaction_id, raw)
+            transaction.update(workspace=workspace, history_operation="save_receipt")
             transaction["dirty"] = True
 
     def delete_receipt(self, workspace: str, transaction_id: str) -> None:
@@ -699,6 +704,7 @@ class Store(Authority):
 
         with self._authority_write() as transaction:
             delete(self, workspace, transaction_id)
+            transaction.update(workspace=workspace, history_operation="delete_receipt")
             transaction["dirty"] = True
 
     def transactions(self, workspace: str, month: str | None = None) -> list[dict]:
@@ -984,9 +990,9 @@ class Store(Authority):
                 self._history_context = previous
 
     def budget_history(self, workspace, limit=50, before=None, target=None, snapshot=False):
-        from whab.domain.history import listing, snapshot_at
+        from whab.domain.history import listing, snapshot_at, validate_history
         state = self.state(workspace)
-        journal = state.get('history')
+        journal = validate_history(state['history']) if state.get('history') else None
         if snapshot:
             if not journal:
                 raise StoreError('This budget has no recorded history yet.')
@@ -1000,7 +1006,9 @@ class Store(Authority):
 
     def history_preview(self, workspace, action, target=None):
         from whab.domain.history import public_preview
-        return public_preview(self.state(workspace), action, target)
+        state = self.state(workspace)
+        state['receipts'] = {row[0]: None for row in self.db.execute('SELECT transaction_id FROM transaction_receipts WHERE workspace=?', (workspace,))}
+        return public_preview(state, action, target)
 
     def history_apply(self, workspace, action, target, fingerprint):
         from whab.domain.history import apply_request

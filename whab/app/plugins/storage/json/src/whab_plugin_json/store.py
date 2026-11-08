@@ -217,18 +217,21 @@ class Store(Authority):
             self._check_current()
             return copy.deepcopy((self._pending or self._data)["workspaces"][workspace])
 
-    def _mutate(self, workspace, operation, *, write_if=None):
+    def _mutate(self, workspace, operation, *, write_if=None, record_history=True, history_operation="change"):
         self._workspace_name(workspace)
         with self._lock:
             self._check_current()
             require_primary(self._evidence(self._data))
             if self._pending is not None:
+                if not record_history:
+                    self._pending["historyRestore"] = workspace
                 return operation(self._pending["workspaces"][workspace])
             candidate = copy.deepcopy(self._data)
             result = operation(candidate["workspaces"][workspace])
             if write_if is None or write_if(result):
                 from whab.domain.history import record_states
-                record_states(self._data['workspaces'][workspace], candidate['workspaces'][workspace], getattr(self, '_history_context', None) or {'actor': 'System', 'actorKind': 'system'})
+                if record_history:
+                    record_states(self._data['workspaces'][workspace], candidate['workspaces'][workspace], getattr(self, '_history_context', None) or {'actor': 'System', 'actorKind': 'system', 'operation': history_operation})
                 candidate["generation"] += 1
                 candidate["operationId"] = str(uuid4())
                 candidate["authority"]["empty"] = False
@@ -402,14 +405,14 @@ class Store(Authority):
             state["receipts"][transaction_id] = raw
             codec.export_files(state)
 
-        return self._mutate(workspace, operation)
+        return self._mutate(workspace, operation, history_operation="save_receipt")
 
     def delete_receipt(self, workspace, transaction_id):
         def operation(state):
             self._receipt_target(state, transaction_id)
             state["receipts"].pop(transaction_id, None)
 
-        return self._mutate(workspace, operation)
+        return self._mutate(workspace, operation, history_operation="delete_receipt")
 
     def export_budget(self, workspace="personal"):
         return portable_snapshot(self._read(workspace))
@@ -422,7 +425,7 @@ class Store(Authority):
             require_pristine(state)
             restore_snapshot(state, data)
 
-        return self._mutate(workspace, operation)
+        return self._mutate(workspace, operation, record_history=False)
 
     def export_budget_files(self, workspace="personal"):
         return codec.export_files(self._read(workspace))
@@ -439,7 +442,7 @@ class Store(Authority):
             state.clear()
             state.update(copy.deepcopy(restored))
 
-        return self._mutate(workspace, operation)
+        return self._mutate(workspace, operation, record_history=False)
 
     def prepare_budget_files(self, workspace, files, *, existing=False):
         if workspace != "personal" or type(existing) is not bool or not isinstance(files, Mapping):
@@ -514,9 +517,9 @@ class Store(Authority):
                 self._history_context = previous
 
     def budget_history(self, workspace, limit=50, before=None, target=None, snapshot=False):
-        from whab.domain.history import listing, snapshot_at
+        from whab.domain.history import listing, snapshot_at, validate_history
         state = self._read(workspace)
-        journal = state.get('history')
+        journal = validate_history(state['history']) if state.get('history') else None
         if snapshot:
             if not journal:
                 raise StoreError('This budget has no recorded history yet.')

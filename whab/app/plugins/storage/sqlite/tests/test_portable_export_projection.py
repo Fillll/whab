@@ -20,6 +20,7 @@ def previous_snapshot(store, workspace):
     """Reference the original full-domain-state public snapshot contract."""
     state = store.state(workspace)
     return validate_portable_budget({
+        **({"history": state["history"]} if "history" in state else {}),
         "formatVersion": 1, "budgetStartMonth": state["budgetStartMonth"],
         "accounts": [
             {**{key: row[key] for key in ACCOUNT_FIELDS},
@@ -222,3 +223,13 @@ def test_export_metadata_transactions_and_receipts_share_one_snapshot(tmp_path, 
     finally:
         writer.close()
         store.close()
+
+
+def test_pre_history_native_schema_remains_readable():
+    legacy = Store(':memory:', month='2026-10', _authority=False)
+    try:
+        legacy.db.execute('DROP TABLE budget_history')
+        assert 'history' not in legacy.state('personal')
+        assert 'history' not in legacy.export_budget('personal')
+    finally:
+        legacy.close()

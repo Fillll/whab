@@ -783,6 +783,10 @@
             "items": {
               "type": "object"
             }
+          },
+          "history": {
+            "type": "object",
+            "description": "Optional permanent financial baseline and append-only checksum-linked changes. No credentials, provider cursors or attachment bytes."
           }
         }
       },
