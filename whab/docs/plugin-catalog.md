@@ -11,7 +11,7 @@ See [the canonical supported set](../app/plugins/README.md#supported-plugins) an
 | --- | --- | --- | --- | --- |
 | [ai-credentials](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/automation/ai-credentials/README.md) | `whab_plugin_ai_credentials 1.1.0` | `whab>=2.54,<3` | restart-required | maintained |
 | [bank-logos](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/interface/bank-logos/README.md) | `whab_plugin_bank_logos 1.4.2` | `whab>=2.31,<3` | stateless-optional-worker | maintained |
-| [cli](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/interface/cli/README.md) | `whab_plugin_cli 2.5.0` | `whab>=2.61,<3` | restart-required | maintained |
+| [cli](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/interface/cli/README.md) | `whab_plugin_cli 2.6.0` | `whab>=2.61,<3` | restart-required | maintained |
 | [client](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/storage/client/README.md) | `whab_plugin_client 1.6.2` | `whab>=2.39,<3` | declarative-remote-client-worker | maintained |
 | [example](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/example/example/README.md) | `whab_plugin_example 1.4.2` | `whab>=2.24,<3` | stateless-report-worker | teaching |
 | [example-api](https://github.com/Fillll/whab/blob/a2b238bceeadbde923bf2568868169e9a046b90d/whab/app/plugins/example/example-api/README.md) | `whab_plugin_example_api 1.0.2` | `whab>=2.34,<3` | declarative-api-worker | teaching |

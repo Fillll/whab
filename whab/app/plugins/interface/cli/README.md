@@ -99,6 +99,37 @@ whab api command edit_transaction --help
 whab api describe --plugin ynab-zip-importer --help
 ```
 
+## Simple category edits
+
+CLI 2.6 adds category editing directly under `whab BUDGET trnx` (`transactions`
+and British-spelled `categorise` are aliases). No JSON, advanced command syntax,
+revision or request ID is needed for an ordinary edit:
+
+```sh
+whab "My budget" trnx categories
+whab "My budget" trnx categorize TRANSACTION_ID --category "Food / Groceries" --agent Codex --needs-review
+whab "My budget" trnx categorize TRANSACTION_ID --category CATEGORY_ID
+whab "My budget" trnx categorize TRANSACTION_ID --clear
+```
+
+`--category` accepts an exact stable ID, a unique category name or `Group / Name`.
+Name matching ignores case and outer whitespace. Ambiguous or missing names fail
+before writing. Use the categories list to disambiguate; IDs take precedence.
+Core still validates the transaction, currency and category on the addressed budget.
+
+Each invocation resolves the budget once, reads categories and their revision,
+and submits one guarded category edit. Success returns `requestId` and
+`expectedRevision` with the public result. Agents that already observed a decision
+revision may pass `--revision`; `--request-id` retains an explicit intent identity.
+There is no automatic write retry or revision refresh. After an uncertain result,
+inspect the transaction and keep the original arguments and reported revision and
+request ID; only an exact intent can be retried while its receipt remains available.
+The existing 16 MiB response bound and verified local HTTPS connection apply.
+
+Review status stays unchanged unless `--needs-review` is supplied. `--agent LABEL`
+is explicit opt-in; normal manual category edits/clears remove a previous agent
+marker. No bank synchronization or model categorization is started.
+
 ## Agent category labels
 
 CLI 2.5 with WHAB 2.61 adds an explicit `--agent LABEL` option to

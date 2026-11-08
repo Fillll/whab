@@ -2230,6 +2230,114 @@
       ],
       "retry": "Safe to rerun a read, including after a revision mismatch. No automatic replay or mutation is performed.",
       "availability": "CLI 2.4+ with WHAB 2.60+. whab BUDGET trnx uncategorized; transactions and uncategorised are aliases. Uses the existing authenticated local queries/transactions and queries/accounts. --help remains offline. Records retain optional categoryAgent when an agent explicitly cleared a category."
+    },
+    {
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "name": "transactions.categories",
+      "kind": "local",
+      "summary": "List category IDs, names and groups for a name-addressed budget.",
+      "input": {
+        "type": "object",
+        "description": "Name-addressed personal-budget CLI arguments; help stays offline.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public budgetId/revision/data envelope; edits also return transactionId, categoryId, expectedRevision and requestId."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "budgetId": "fictional-budget",
+            "revision": "fictional-revision",
+            "data": []
+          }
+        }
+      ],
+      "side_effects": "Read-only category discovery; no financial or review changes.",
+      "errors": [
+        "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
+      ],
+      "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
+      "availability": "CLI 2.6+ and WHAB 2.61+. whab BUDGET trnx categories or categorize; transactions/categorise aliases supported."
+    },
+    {
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "name": "transactions.categorize",
+      "kind": "local",
+      "summary": "Assign or clear one transaction category without advanced JSON syntax.",
+      "input": {
+        "type": "object",
+        "description": "Name-addressed personal-budget CLI arguments; help stays offline.",
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Stable transaction ID."
+          },
+          "category": {
+            "type": "string",
+            "description": "Exact ID, unique name or Group / Name; mutually exclusive with clear."
+          },
+          "clear": {
+            "type": "boolean",
+            "description": "Clear category instead of assigning one.",
+            "default": false
+          },
+          "agent": {
+            "type": "string",
+            "description": "Optional explicit self-declared agent label.",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "needsReview": {
+            "type": "boolean",
+            "description": "Set reviewed=false; otherwise preserve review state.",
+            "default": false
+          },
+          "revision": {
+            "type": "string",
+            "description": "Optional previously observed revision; otherwise fresh category-read revision."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Optional unique intent ID; otherwise generated and returned."
+          }
+        },
+        "required": [
+          "transactionId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Public budgetId/revision/data envelope; edits also return transactionId, categoryId, expectedRevision and requestId."
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionId": "fictional-payment",
+            "category": "Food / Groceries",
+            "agent": "Codex",
+            "needsReview": true
+          },
+          "output": {
+            "budgetId": "fictional-budget",
+            "revision": "fictional-revision",
+            "data": null
+          }
+        }
+      ],
+      "side_effects": "One core-validated edit_transaction; manual assignments clear old attribution, explicit agent labels persist with the category. Review changes only with needsReview. No sync/model activity.",
+      "errors": [
+        "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
+      ],
+      "retry": "Inspect uncertain state and retain original arguments and returned/reported revision and request ID. Explicit overrides preserve exact-intent retries; no automatic retry.",
+      "availability": "CLI 2.6+ and WHAB 2.61+. whab BUDGET trnx categories or categorize; transactions/categorise aliases supported."
     }
   ]
 }

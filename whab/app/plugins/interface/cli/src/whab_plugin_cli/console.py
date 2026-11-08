@@ -20,6 +20,7 @@ from .config import ConfigError, connection_defaults
 from .errors import selection_error
 from .help import account_classification, describe, overview
 from .identifiers import check_identifiers, host_id, plugin_identifiers
+from .transaction_commands import add_category_parsers, execute_category
 from .transaction_reads import add_uncategorized_parser, transaction_table, uncategorized_report
 
 PREFIX = "/api/local/v1"
@@ -78,12 +79,13 @@ def parser(options):
         epilog="Example: whab empty-budget insights summary --month 2026-11 --currency USD\nAmounts are integer currency minor units. No AI or bank sync is started.")
     summary.add_argument("--month", help="YYYY-MM; default: current month")
     summary.add_argument("--currency", default="USD", help="ISO currency code (default: USD); currencies are never combined")
-    transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read transactions (trnx is an alias)")
+    transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read and categorize transactions (trnx is an alias)")
     reads = transactions.add_subparsers(dest="filter", required=True)
     unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
         epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
     unreviewed.add_argument("--month", help="Limit to YYYY-MM; default: all history")
     add_uncategorized_parser(reads)
+    add_category_parsers(reads)
     groups.add_parser("api", help="Advanced local operations; use whab api --help")
     return root
 
@@ -194,6 +196,8 @@ def execute(args, home, environment, ca):
                 json={"name": args.name, "path": create_path(args.name, args.path)})
         identifier = resolve_budget(connection, args.target)
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
+        if args.command in {"transactions", "trnx"} and args.filter in {"categories", "categorize", "categorise"}:
+            return execute_category(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "bank":
             method, path, kwargs = bank_request(args, identifier)
             return exchange(connection, method, path, bank_errors=True, **kwargs)
