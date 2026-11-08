@@ -57,7 +57,13 @@ def snapshot(store, workspace):
                 "SELECT month,currency,mode FROM rollover_modes WHERE workspace=? ORDER BY month,currency",
                 (workspace,),
             )]
+        history = {}
+        if store.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='budget_history'").fetchone():
+            row = store.db.execute("SELECT record FROM budget_history WHERE workspace=?", (workspace,)).fetchone()
+            if row is not None:
+                history = {'history': json.loads(row[0])}
         return {
+            **history,
             "formatVersion": 1, "budgetStartMonth": meta["budget_start_month"],
             "accounts": accounts, "categories": categories, "transactions": transactions,
             "assignments": [

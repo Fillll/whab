@@ -26,6 +26,7 @@ from .storage_worker import StorageWorker, storage_error
 from .storage_worker_codec import CONTROL_WRITES, METHODS
 
 _MUTATIONS = {
+    "history_apply": (("workspace", "action", "target", "fingerprint"), {}),
     "add_account": (("workspace", "account"), {}),
     "update_account": (("workspace", "account_id", "changes"), {}),
     "add_category": (("workspace", "category"), {}),
@@ -219,6 +220,10 @@ class StorageWorkerProxy:
         with self.lock:
             self._check_write()
             current = self._call("commit_evidence")
+            info = getattr(self, '_history_context', None)
+            if info is not None:
+                payload = canonical_storage_json({'operation': name, 'parameters': read_storage_json(payload, limit=operation_limit(name)), 'context': info}, limit=operation_limit(name))
+                name = 'recorded_command'
             operation = StorageOperation(str(uuid4()), current.authority_epoch, current.generation, workspace, name, payload)
             result = self.execute_operation(operation)
             return read_storage_json(result.receipt.result)
@@ -395,3 +400,16 @@ class StorageWorkerProxy:
             if self.intents is not None:
                 self.intents.close()
             self._closed = True
+
+    @contextmanager
+    def history_scope(self, metadata):
+        from whab.domain.history import context
+        with self.lock:
+            previous = getattr(self, '_history_context', None)
+            self._history_context = context(metadata) if 'budget_history' in self.worker.methods else None
+            if self._history_context is None and (metadata.get('batchId')):
+                raise StoreError('Update the storage plugin to record labelled budget history.')
+            try:
+                yield
+            finally:
+                self._history_context = previous

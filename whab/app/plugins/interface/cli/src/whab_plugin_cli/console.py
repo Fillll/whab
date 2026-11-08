@@ -19,6 +19,7 @@ from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import selection_error
 from .help import account_classification, describe, overview
+from .history_commands import add_history_parser, execute_history
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 from .transaction_commands import add_category_parsers, execute_category
 from .transaction_reads import add_uncategorized_parser, transaction_table, uncategorized_report
@@ -60,6 +61,7 @@ def parser(options):
     plugins.add_argument("action", choices=("list", "status", "enable", "disable"))
     plugins.add_argument("plugin", nargs="?", help="Identifier from whab plugin list; required for enable/disable")
     add_bank_parser(commands)
+    add_history_parser(commands)
     imports = commands.add_parser("import", help="Preview or commit a ZIP import into this empty budget",
         epilog="Enable an importer first: whab BUDGET plugin enable ynab-zip-importer\nThen: whab BUDGET import ynab-zip-importer preview --help",
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -198,6 +200,8 @@ def execute(args, home, environment, ca):
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
         if args.command in {"transactions", "trnx"} and args.filter in {"categories", "categorize", "categorise"}:
             return execute_category(connection, identifier, prefix, args, exchange, CommandError)
+        if args.command == "history":
+            return execute_history(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "bank":
             method, path, kwargs = bank_request(args, identifier)
             return exchange(connection, method, path, bank_errors=True, **kwargs)

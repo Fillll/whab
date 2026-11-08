@@ -9,6 +9,7 @@ from whab.domain.validation import validate_month
 def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
     db.executescript("""
         PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+        CREATE TABLE IF NOT EXISTS budget_history(workspace TEXT PRIMARY KEY,record TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS meta(workspace TEXT PRIMARY KEY,opening_cash INTEGER NOT NULL DEFAULT 0,baseline_ready INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS accounts(id TEXT NOT NULL,workspace TEXT NOT NULL,name TEXT NOT NULL,institution TEXT NOT NULL,type TEXT NOT NULL,balance INTEGER NOT NULL,source TEXT NOT NULL,item_id TEXT,mask TEXT,PRIMARY KEY(workspace,id));
         CREATE TABLE IF NOT EXISTS categories(id TEXT NOT NULL,workspace TEXT NOT NULL,name TEXT NOT NULL,group_name TEXT NOT NULL,target INTEGER NOT NULL,PRIMARY KEY(workspace,id));

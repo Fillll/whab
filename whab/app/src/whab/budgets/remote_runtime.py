@@ -505,7 +505,7 @@ class RemoteClientLifecycle:
         with self.operation_scope(), self.tracked.lock:
             ledger = self.runtime._active.services["ledger"]
             normalized = ledger.validate_command(body.operation, body.workspace, body.payload)
-            result = self.tracked.store.finish_original(body.operation, body.workspace, normalized)
+            result = self.tracked.store.finish_original(body.operation, body.workspace, normalized, **({"history": body.history} if body.history is not None else {}))
             ledger.invalidate_revision()
             return result
 

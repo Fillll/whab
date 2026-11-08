@@ -20,6 +20,7 @@ def add_category_parsers(commands):
     choice.add_argument('--category', help='Category ID, unique name or Group / Name')
     choice.add_argument('--clear', action='store_true', help='Clear the assigned category')
     edit.add_argument('--agent', type=validate_category_agent, help='Explicit self-declared agent label; omit for manual attribution')
+    edit.add_argument('--batch', help='Group related history entries under this explicit batch ID')
     edit.add_argument('--needs-review', action='store_true', help='Set reviewed=false with this category edit')
     edit.add_argument('--revision', help='Use this observed revision instead of the fresh category-read revision')
     edit.add_argument('--request-id', help='Explicit unique intent ID; otherwise generated once and returned')
@@ -53,9 +54,10 @@ def execute_category(connection, identifier, prefix, args, exchange, error):
         payload['reviewed'] = False
     revision = args.revision or categories['revision']
     intent = args.request_id or str(uuid4())
+    history = {'batchId': args.batch} if args.batch else None
     try:
         result = checked(exchange(connection, 'POST', prefix + '/commands',
-            json={'operation': 'edit_transaction', 'workspace': 'personal', 'payload': payload, 'expected_revision': revision, 'request_id': intent}), identifier, error)
+            json={'operation': 'edit_transaction', 'workspace': 'personal', 'payload': payload, 'expected_revision': revision, 'request_id': intent, **({'history': history} if history else {})}), identifier, error)
     except (ValueError, OSError, RuntimeError, httpx.HTTPError) as failure:
         raise error(f'Categorization was not confirmed; inspect the transaction before retrying. No automatic retry. Retain original arguments, --revision {revision} and --request-id {intent}.') from failure
     return {**result, 'transactionId': args.transaction_id, 'categoryId': selected,

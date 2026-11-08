@@ -30,6 +30,29 @@ from whab.web.schemas import (
 def create_router(store):
     router = APIRouter()
 
+    class HistoryPreviewBody(BaseModel):
+        model_config = ConfigDict(extra='forbid', strict=True)
+        workspace: Workspace
+        action: str
+        target: str | None = None
+
+    class HistoryApplyBody(HistoryPreviewBody):
+        fingerprint: str
+        revision: str
+        requestId: str
+
+    @router.get('/api/history')
+    def budget_history(workspace: Workspace, limit: int = 50, before: str | None = None, target: str | None = None, snapshot: bool = False):
+        return store.query('history', workspace, parameters={'limit': limit, 'before': before, 'target': target, 'snapshot': snapshot})
+
+    @router.post('/api/history/preview')
+    def history_preview(body: HistoryPreviewBody):
+        return store.query('history_preview', body.workspace, parameters={'action': body.action, 'target': body.target})
+
+    @router.post('/api/history/apply')
+    def history_apply(body: HistoryApplyBody):
+        return store.command('history_apply', body.workspace, {'action': body.action, 'target': body.target, 'fingerprint': body.fingerprint}, request_id=body.requestId, expected_revision=body.revision)
+
     @router.get("/api/workspace")
     def workspace_data(workspace: Workspace, month: str | None = None, currency: str | None = None):
         month = month or current_month()

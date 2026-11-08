@@ -75,6 +75,8 @@ def portable_snapshot(state, *, validate=True):
             for month, rows in state.get("rolloverModes", {}).items() for currency, mode in rows.items()
         ],
     }
+    if "history" in state:
+        snapshot["history"] = state["history"]
     return validate_portable_budget(snapshot) if validate else snapshot
 
 
@@ -93,6 +95,8 @@ def require_pristine(state):
 def restore_snapshot(state, snapshot, *, mark_external_stale=True):
     """Populate plain state from validated neutral records, with independent maps."""
     restored = validate_portable_budget(snapshot)
+    if "history" in restored:
+        state["history"] = restored["history"]
     state["budgetStartMonth"] = restored["budgetStartMonth"]
     state["accounts"] = {
         record["id"]: {

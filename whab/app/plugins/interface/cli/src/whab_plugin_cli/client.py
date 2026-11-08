@@ -53,6 +53,7 @@ def parser(argv=(), *, defaults=None):
     query.add_argument("--parameters", help="JSON parameters for a generic feature query")
     command = group("command", "Apply an explicit public ledger command")
     command.add_argument("operation", choices=tuple(row["name"] for row in core_document()["operations"] if row["kind"] == "command"))
+    command.add_argument('--batch', help='Explicit budget-history batch ID')
     command.add_argument('--agent', type=validate_category_agent, metavar='LABEL',
                          help='Explicit categorizing agent label, for edit_transaction with categoryId only; saved as categoryAgent. Omit for normal manual edits.')
     for name in ("feature-query", "feature-command"):
@@ -114,12 +115,13 @@ def request(args, token=None):
     payload = {"pluginId": host_id(args.plugin), "action": args.action, "parameters": values} if args.kind.startswith("feature-") else values
     if args.kind == "feature-query" or args.kind == "query":
         return token, "POST", path + "/queries", {"json": {
-            "operation": "feature", "workspace": args.workspace, "parameters": payload,
+            "operation": "feature" if args.kind == "feature-query" else args.operation, "workspace": args.workspace, "parameters": payload,
         }}
     return token, "POST", path + "/commands", {"json": {
         "operation": "feature" if args.kind == "feature-command" else args.operation,
         "workspace": args.workspace, "payload": payload,
         "request_id": args.request_id, "expected_revision": args.revision,
+        **({"history": {"batchId": args.batch}} if getattr(args, "batch", None) else {}),
     }}
 
 

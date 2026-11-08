@@ -379,3 +379,23 @@ def test_preworker_acknowledged_baseline_cannot_regress_during_read_fault_recove
         assert [row["balance"] for row in backend.accounts("personal")] == [77]
     finally:
         backend.close()
+
+
+def test_history_actor_batch_and_reversal_survive_native_process_and_restart(proxy):
+    service = LedgerService(proxy)
+    service.command('add_account', 'personal', {'name':'Fictional history', 'type':'depository', 'balance':100},
+                    request_id='fictional-history', expected_revision=service.revision,
+                    history={'actor':'Codex','actorKind':'agent','batchId':'fictional-batch'})
+    entries = service.query('history', 'personal')['data']['entries']
+    assert entries[0]['actor'] == 'Codex' and entries[0]['batchId'] == 'fictional-batch'
+    preview = service.query('history_preview', 'personal', parameters={'action':'undo','target':'fictional-batch'})
+    service.command('history_apply', 'personal', {k:v for k,v in preview['data'].items() if k != 'changes'}, request_id='undo-history', expected_revision=preview['revision'])
+    assert proxy.accounts('personal') == []
+    assert proxy.budget_history('personal')['total'] == 2
+    proxy.close()
+    replacement = StorageWorkerProxy(StorageWorker(proxy.worker.plugin_id), proxy.context, proxy.context.home / 'new-intents')
+    try:
+        assert replacement.budget_history('personal')['total'] == 2
+        assert replacement.budget_history('personal', target='fictional-batch')['entries'][0]['actor'] == 'Codex'
+    finally:
+        replacement.close()

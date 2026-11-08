@@ -2641,6 +2641,167 @@
       ],
       "retry": "Read-only and safe to retry after addressing the fixed error. Do not create a duplicate connection or infer successful product activation. Loading again reads Plaid cached data and does not force a bank refresh.",
       "availability": "WHAB 2.60+, CLI 2.3+, and Plaid 1.7+; provider must declare BankAdapter.supports_investments. Plaid Investments must be separately enabled/consented. Investment history availability varies by institution; default window is two years."
+    },
+    {
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "name": "history",
+      "kind": "query",
+      "summary": "Read permanent financial history.",
+      "input": {
+        "type": "object",
+        "description": "Explicit budget/workspace history parameters.",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Page size, 1\u2013100.",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "before": {
+            "type": "string",
+            "description": "Earlier-than entry cursor."
+          },
+          "target": {
+            "type": "string",
+            "description": "Entry or batch ID to inspect."
+          },
+          "snapshot": {
+            "type": "boolean",
+            "description": "Return a historical financial snapshot instead of entry metadata."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "History metadata, changes/preview fingerprint, historical snapshot or action result."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Read only; excludes credentials, provider cursors and attachment bytes.",
+      "errors": [
+        "Unavailable history storage, invalid/stale preview, missing/ambiguous target or conflicting later edits fail explicitly."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.62+ and a BudgetHistoryStorage adapter. History starts with a baseline; earlier edits are not reconstructed."
+    },
+    {
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "name": "history_preview",
+      "kind": "query",
+      "summary": "Preview guarded financial history changes.",
+      "input": {
+        "type": "object",
+        "description": "Explicit budget/workspace history parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Guarded action.",
+            "enum": [
+              "undo",
+              "redo",
+              "restore",
+              "snapshot"
+            ]
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Entry/batch ID, baseline for restore or null for new snapshot."
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "History metadata, changes/preview fingerprint, historical snapshot or action result."
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "snapshot"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "Read only; excludes credentials, provider cursors and attachment bytes.",
+      "errors": [
+        "Unavailable history storage, invalid/stale preview, missing/ambiguous target or conflicting later edits fail explicitly."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.62+ and a BudgetHistoryStorage adapter. History starts with a baseline; earlier edits are not reconstructed."
+    },
+    {
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "name": "history_apply",
+      "kind": "command",
+      "summary": "Commit the reviewed history action atomically as a new append-only history event.",
+      "input": {
+        "type": "object",
+        "description": "Explicit budget/workspace history parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Reviewed action.",
+            "enum": [
+              "undo",
+              "redo",
+              "restore",
+              "snapshot"
+            ]
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewed target."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Exact fingerprint from a fresh preview.",
+            "minLength": 64,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "action",
+          "fingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "History metadata, changes/preview fingerprint, historical snapshot or action result."
+      },
+      "examples": [
+        {
+          "input": {
+            "action": "snapshot",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "One atomic financial change with append-only history. Conflicting later edits and provider/import barriers reject before committing. External bank operations are never replayed.",
+      "errors": [
+        "Unavailable history storage, invalid/stale preview, missing/ambiguous target or conflicting later edits fail explicitly."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.62+ and a BudgetHistoryStorage adapter. History starts with a baseline; earlier edits are not reconstructed."
     }
   ]
 }

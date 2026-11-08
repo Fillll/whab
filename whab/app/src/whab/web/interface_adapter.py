@@ -21,6 +21,7 @@ class RemoteCommand(BaseModel):
     payload: dict
     request_id: Annotated[StrictStr, Field(min_length=1, max_length=200)]
     expected_revision: Annotated[StrictStr, Field(min_length=1, max_length=200)]
+    history: dict | None = None
 
 
 class RemoteQuery(BaseModel):
@@ -89,7 +90,8 @@ class BoundRemoteInterface:
             raise HTTPException(405, "Remote commands are disabled by this interface.")
         try:
             result = self.context.service.command(body.operation, body.workspace, body.payload,
-                request_id=body.request_id, expected_revision=body.expected_revision)
+                request_id=body.request_id, expected_revision=body.expected_revision,
+                **({"history": body.history} if body.history is not None else {}))
         except (RevisionConflict, RequestConflict) as error:
             raise HTTPException(409, str(error)) from None
         except StoreError as error:

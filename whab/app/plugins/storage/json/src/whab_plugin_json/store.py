@@ -5,6 +5,7 @@ import os
 import re
 import tempfile
 from collections.abc import Mapping
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
@@ -226,6 +227,8 @@ class Store(Authority):
             candidate = copy.deepcopy(self._data)
             result = operation(candidate["workspaces"][workspace])
             if write_if is None or write_if(result):
+                from whab.domain.history import record_states
+                record_states(self._data['workspaces'][workspace], candidate['workspaces'][workspace], getattr(self, '_history_context', None) or {'actor': 'System', 'actorKind': 'system'})
                 candidate["generation"] += 1
                 candidate["operationId"] = str(uuid4())
                 candidate["authority"]["empty"] = False
@@ -498,3 +501,43 @@ class Store(Authority):
             return {"counts": counts.copy(), "alreadyImported": False}
 
         return self._mutate(workspace, operation, write_if=lambda result: not result["alreadyImported"])
+
+    @contextmanager
+    def history_scope(self, metadata):
+        from whab.domain.history import context
+        with self._lock:
+            previous = getattr(self, '_history_context', None)
+            self._history_context = context(metadata)
+            try:
+                yield
+            finally:
+                self._history_context = previous
+
+    def budget_history(self, workspace, limit=50, before=None, target=None, snapshot=False):
+        from whab.domain.history import listing, snapshot_at
+        state = self._read(workspace)
+        journal = state.get('history')
+        if snapshot:
+            if not journal:
+                raise StoreError('This budget has no recorded history yet.')
+            return {'snapshot': snapshot_at(journal, target)}
+        if target is not None:
+            entries = [e for e in (journal['entries'] if journal else []) if e['id'] == target or e['batchId'] == target]
+            if not entries:
+                raise StoreError('History entry or batch not found.')
+            return {'entries': [{k: v for k, v in e.items() if k != 'snapshot'} for e in entries]}
+        return listing(journal, limit=limit, before=before)
+
+    def history_preview(self, workspace, action, target=None):
+        from whab.domain.history import public_preview
+        return public_preview(self._read(workspace), action, target)
+
+    def history_apply(self, workspace, action, target, fingerprint):
+        from whab.domain.history import apply_request
+        info = {**(getattr(self, '_history_context', None) or {}), 'operation': 'history', 'action': action, 'target': target}
+        with self.history_scope(info):
+            def change(state):
+                result = apply_request(state, action, target, fingerprint)
+                pass
+                return result
+            return self._mutate(workspace, change)

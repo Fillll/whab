@@ -162,8 +162,13 @@ class RemoteStore:
                 if unresolved or self._captured is not None:
                     raise StoreError("A remote change has an unknown outcome. Reads remain available. Use Finish original request with its exact original change.")
             intent = {"operation": operation, "workspace": workspace, "payload": payload}
+            metadata = getattr(self, "_history_context", None)
+            # Ordinary commands retain their original wire shape for older hosts.
+            # Category provenance already travels in its explicit payload field.
+            if metadata and (metadata.get('batchId') or metadata.get('actor', 'User') not in {'User', payload.get('categoryAgent')}):
+                intent["history"] = {k: v for k, v in metadata.items() if k in {"actor", "actorKind", "batchId"}}
             if self._pending is not None:
-                if any(self._pending[key] != value for key, value in intent.items()):
+                if {key: value for key, value in self._pending.items() if key not in {"request_id", "expected_revision"}} != intent:
                     raise StoreError("Confirm the previous remote change by retrying it before making another.")
                 body = self._pending
             else:
@@ -210,7 +215,7 @@ class RemoteStore:
         self._pending, self._captured = None, None
         return data
 
-    def finish_original(self, operation, workspace, payload):
+    def finish_original(self, operation, workspace, payload, history=None):
         """Explicit completion, never a receipt lookup or automatic retry.
 
         The host validates the public command first. Reconstruct only a body
@@ -232,6 +237,8 @@ class RemoteStore:
                 raise StoreError("There is no retained remote request to finish.")
             body = {"operation": operation, "workspace": workspace, "payload": deepcopy(payload),
                     "request_id": known["request_id"], "expected_revision": known["expected_revision"]}
+            if history is not None:
+                body["history"] = history
             if command_fingerprint(body) != known["fingerprint"]:
                 raise StoreError("This change does not match the exact original remote request. Preserve it; do not substitute a new request or revision.")
             if pending is None:
@@ -366,3 +373,22 @@ class RemoteStore:
         raise StoreError("Bank connections run on the budget server. Disable bank plugins on this client.")
 
     get_item = save_item = set_item_status = disconnect_item = apply_sync = _private
+
+    @contextmanager
+    def history_scope(self, metadata):
+        with self._lock:
+            previous = getattr(self, '_history_context', None)
+            self._history_context = metadata
+            try:
+                yield
+            finally:
+                self._history_context = previous
+
+    def budget_history(self, workspace, limit=50, before=None, target=None, snapshot=False):
+        return self._query('history', workspace, parameters={'limit': limit, 'before': before, 'target': target, 'snapshot': snapshot})
+
+    def history_preview(self, workspace, action, target=None):
+        return self._query('history_preview', workspace, parameters={'action': action, 'target': target})
+
+    def history_apply(self, workspace, action, target, fingerprint):
+        return self._command('history_apply', workspace, {'action': action, 'target': target, 'fingerprint': fingerprint})

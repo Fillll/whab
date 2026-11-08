@@ -227,8 +227,21 @@ class Authority:
                     raise StoreError("This storage instance is fenced and cannot accept financial changes.")
                 transaction = {"metadata": metadata, "dirty": False, "operation": None, "result": None, "receipt": None}
                 self._writing = transaction
+                history_before = {name: self._read_state(name) for name in ("personal", "demo")} if financial else {}
                 yield transaction
                 if transaction["dirty"]:
+                    from whab.domain.history import record_states
+                    operation = transaction["operation"]
+                    info = getattr(self, '_history_context', None)
+                    if info is None:
+                        info = {'actor': 'System', 'actorKind': 'system', 'operation': operation.name if operation is not None else 'change'}
+                    for name, old in history_before.items():
+                        if name != (operation.workspace if operation is not None else transaction.get("workspace", name)):
+                            continue
+                        new = self._read_state(name)
+                        record_states(old, new, info)
+                        if 'history' in new:
+                            self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (name, __import__('json').dumps(new['history'])))
                     metadata.update(generation=metadata["generation"] + 1,
                                     operationId=transaction["operation"].operation_id if transaction["operation"] is not None else str(uuid4()),
                                     empty=False)
@@ -282,6 +295,15 @@ class Authority:
         return receipt
 
     def execute_operation(self, operation):
+        if type(operation) is not StorageOperation:
+            raise StoreError('Durable commands require a validated storage operation.')
+        if operation.name == 'recorded_command':
+            value = read_storage_json(operation.payload)
+            with self.history_scope(value['context']):
+                return self._execute_operation(operation)
+        return self._execute_operation(operation)
+
+    def _execute_operation(self, operation):
         if type(operation) is not StorageOperation:
             raise StoreError("Durable commands require a validated storage operation.")
         with self._authority_write() as transaction:

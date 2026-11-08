@@ -1,5 +1,6 @@
 /* WHAB controls. Business rules live in Python; bank UI is loaded by enabled plugins. */
 import {api, apiUrl, getContext, notify, pageUrl} from './client.js';
+import {initBudgetHistory} from './budget-history.js';
 import {initBudgetEdits, syncBudgetGroups} from './budget-edits.js';
 import {initMonthRange} from './month-range.js';
 import {initBudgetSourceLinks} from './budget-source-links.js';
@@ -171,6 +172,9 @@ initAccountSettings({
   },
 });
 
+let historyChanged = false;
+initBudgetHistory({api, getContext, beforeChange: requireSavedEdits, onChanged: () => {historyChanged = true;}});
+document.getElementById('settings-dialog').addEventListener('close', () => {if (historyChanged) location.reload();});
 const settingsNavigation = initSettingsNavigation({beforeOpen: () => accountNavigation.cancelPending()});
 
 document.addEventListener('click', event => {
@@ -184,15 +188,15 @@ document.addEventListener('click', event => {
 });
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => {
   const dialog = button.closest('dialog');
-  if (!dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy]')) dialog.close();
+  if (!dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy], [data-budget-history][data-busy]')) dialog.close();
 });
 for (const dialog of document.querySelectorAll('dialog')) {
   if (dialog.hasAttribute('data-transaction-receipt-dialog')) continue;
   dialog.addEventListener('click', event => {
-    if (event.target === dialog && !dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy]')) dialog.close();
+    if (event.target === dialog && !dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy], [data-budget-history][data-busy]')) dialog.close();
   });
   dialog.addEventListener('cancel', event => {
-    if (dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy]')) event.preventDefault();
+    if (dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-budget-history][data-busy]')) event.preventDefault();
   });
 }
 document.querySelector('[data-dismiss-toast]').addEventListener('click', () => {
@@ -239,7 +243,7 @@ if (pluginSelection) {
       submit.disabled = false;
     }
   });
-  const initialSettingsPage = {'#settings': 'settings-home', '#budgets': 'budgets-dialog', '#plugins': 'plugins-dialog'}[location.hash];
+  const initialSettingsPage = {'#settings': 'settings-home', '#budgets': 'budgets-dialog', '#plugins': 'plugins-dialog', '#history': 'budget-history-page'}[location.hash];
   if (initialSettingsPage) settingsNavigation.open(initialSettingsPage);
   const pluginPage = /^#plugin-settings-([a-z][a-z0-9-]*)$/.exec(location.hash);
   if (pluginPage) settingsNavigation.open(`plugin-options-${pluginPage[1]}`);

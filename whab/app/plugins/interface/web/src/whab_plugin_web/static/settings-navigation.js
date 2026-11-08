@@ -7,7 +7,7 @@ export function initSettingsNavigation({document: page = document, beforeOpen = 
   const window = page.getElementById('settings-dialog');
   const pages = [...window.querySelectorAll('[data-settings-page]')];
   const home = page.getElementById('settings-home');
-  const busySelector = '[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy]';
+  const busySelector = '[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy], [data-budget-history][data-busy]';
   let current = home, history = [], origin = null;
   const busy = () => Boolean(window.querySelector(busySelector));
   function leave() {

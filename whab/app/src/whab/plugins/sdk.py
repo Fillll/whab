@@ -262,6 +262,16 @@ InsightsHook: TypeAlias = Callable[[BudgetSnapshot], tuple[Insight, ...]]
 ExportHook: TypeAlias = Callable[[BudgetSnapshot], ExportTable]
 
 
+class BudgetHistoryStorage(Protocol):
+    """Optional atomic permanent financial history and guarded replay."""
+
+    def budget_history(self, workspace: str, limit: int = 50, before: str | None = None, target: str | None = None, snapshot: bool = False) -> dict: ...
+
+    def history_preview(self, workspace: str, action: str, target: str | None = None) -> dict: ...
+
+    def history_apply(self, workspace: str, action: str, target: str | None, fingerprint: str) -> dict: ...
+
+
 class AgentCategoryStorage(Protocol):
     """Optional explicit category-agent annotations, persisted atomically with edits."""
 
