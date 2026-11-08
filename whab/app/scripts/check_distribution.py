@@ -64,7 +64,8 @@ from whab_plugin_cli.console import main as console_main
 for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
              ["plugin", "--help"], ["fictional", "plugin", "--help"],
              ["fictional", "insights", "summary", "--help"],
-             ["fictional", "trnx", "non-reviewed", "--help"]):
+             ["fictional", "trnx", "non-reviewed", "--help"],
+             ["fictional", "trnx", "uncategorized", "--help"]):
     with redirect_stdout(StringIO()) as output:
         try:
             console_main(args)

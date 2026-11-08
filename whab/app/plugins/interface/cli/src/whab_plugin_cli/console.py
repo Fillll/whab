@@ -20,6 +20,7 @@ from .config import ConfigError, connection_defaults
 from .errors import selection_error
 from .help import account_classification, describe, overview
 from .identifiers import check_identifiers, host_id, plugin_identifiers
+from .transaction_reads import add_uncategorized_parser, transaction_table, uncategorized_report
 
 PREFIX = "/api/local/v1"
 ROOT_COMMANDS = {"budget", "plugin", "api", "BUDGET"}
@@ -34,7 +35,7 @@ def parser(options):
     check_identifiers(catalog)
     root = argparse.ArgumentParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
-        epilog="Examples:\n  whab budget create empty-budget --path ~/budgets\n  whab empty-budget plugin enable ynab-zip-importer\n  whab empty-budget import ynab-zip-importer preview export.zip --currency USD\n  whab empty-budget insights summary\n  whab empty-budget trnx non-reviewed\n\nEvery command supports --help. Names containing spaces can be quoted.\nUse whab budget list to discover names and permanent IDs.\n\n" + account_classification(catalog),
+        epilog="Examples:\n  whab budget create empty-budget --path ~/budgets\n  whab empty-budget plugin enable ynab-zip-importer\n  whab empty-budget import ynab-zip-importer preview export.zip --currency USD\n  whab empty-budget insights summary\n  whab empty-budget trnx non-reviewed\n  whab empty-budget trnx uncategorized --limit 10 --format table\n\nEvery command supports --help. Names containing spaces can be quoted.\nUse whab budget list to discover names and permanent IDs.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
     budget = groups.add_parser("budget", help="Create and list saved budgets")
@@ -50,7 +51,7 @@ def parser(options):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     plugin.add_argument("action", choices=("list",), nargs="?", default="list", help="List installed plugin documentation offline")
     scoped = groups.add_parser("BUDGET", help="Address a saved budget by its name or permanent ID",
-        usage="whab BUDGET {plugin,import,insights,transactions,trnx} ...")
+        usage="whab BUDGET {plugin,bank,import,insights,transactions,trnx} ...")
     scoped.add_argument("target", help=argparse.SUPPRESS)
     commands = scoped.add_subparsers(dest="command", required=True)
     plugins = commands.add_parser("plugin", help="List, enable or disable this budget's plugins",
@@ -82,6 +83,7 @@ def parser(options):
     unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
         epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
     unreviewed.add_argument("--month", help="Limit to YYYY-MM; default: all history")
+    add_uncategorized_parser(reads)
     groups.add_parser("api", help="Advanced local operations; use whab api --help")
     return root
 
@@ -213,6 +215,11 @@ def execute(args, home, environment, ca):
         if result.get("budgetId") != identifier or not result.get("revision") or "data" not in result:
             raise CommandError("WHAB returned another budget or an invalid response.")
         if args.command in {"transactions", "trnx"}:
+            if args.filter in {'uncategorized', 'uncategorised'}:
+                accounts = exchange(connection, 'GET', prefix + '/queries/accounts', params={'workspace': 'personal'})
+                if accounts.get('budgetId') != identifier or accounts.get('revision') != result['revision']:
+                    raise CommandError('WHAB changed while reading account names or returned another budget. Run the read again.')
+                return uncategorized_report(result, accounts, args)
             result["data"] = [row for row in result["data"] if not row.get("reviewed", False) and not row.get("deleted", False)]
         return result
 
@@ -238,7 +245,7 @@ def main(argv=None):
             result = describe(installed_catalog())
         else:
             result = execute(args, *configuration(args))
-        print(json.dumps(result, allow_nan=False))
+        print(transaction_table(result) if getattr(args, 'format', None) == 'table' else json.dumps(result, allow_nan=False))
         return 0
     except (CommandError, ConfigError) as error:
         print(json.dumps({"error": str(error)}), file=sys.stderr)
