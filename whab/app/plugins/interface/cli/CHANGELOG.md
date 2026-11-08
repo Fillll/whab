@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.6.0 — 2026-11-08
+
+PR: [#168](https://github.com/Fillll/whab/pull/168)
+
+- Add name-addressed category listing and transaction categorization with exact IDs or unique/qualified names, explicit agent attribution, optional Needs review, manual clearing and automatic guarded intent/revision handling. Retain explicit exact-intent retries without automatic write replay.
+
 ## 2.5.0 — 2026-11-07
 
 PR: [#167](https://github.com/Fillll/whab/pull/167)
