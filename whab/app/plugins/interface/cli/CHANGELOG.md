@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.0 — 2026-11-07
+
+PR: [#165](https://github.com/Fillll/whab/pull/165)
+
+- Add name-addressed uncategorized transaction reads to whab with full-history counts, account names, sampling, optional month/posted/transfer filters and currency-aware table output. Preserve review/category independence, budget/revision guards and complete JSON records without changing the ledger.
+
 ## 2.3.0 — 2026-11-07
 
 PR: [#164](https://github.com/Fillll/whab/pull/164)

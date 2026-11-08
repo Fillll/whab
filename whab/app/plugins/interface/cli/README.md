@@ -19,6 +19,7 @@ whab empty-budget plugin enable ynab-zip-importer
 whab empty-budget plugin status
 whab empty-budget insights summary
 whab empty-budget trnx non-reviewed
+whab empty-budget trnx uncategorized --limit 10 --format table
 ```
 
 Every level has `--help`, including reports and plugin controls. `transactions`
@@ -57,6 +58,38 @@ uncertain result, inspect `whab budget list` and plugin status before trying aga
 no unlike currencies are combined. No AI or bank sync is started. `trnx
 non-reviewed` reads unreviewed, non-deleted public transactions, optionally limited
 by `--month YYYY-MM`; it never changes review status.
+
+CLI 2.4 adds `whab BUDGET trnx uncategorized` (`transactions` and British-spelled
+`uncategorised` are aliases). It reads the full available history by default and
+selects rows whose category ID is null, independently of review status. Deleted
+rows are excluded. Pending transactions, explicit/inferred transfers, inflows,
+zero amounts and off-budget accounts remain included unless explicitly filtered.
+
+```sh
+# All uncategorized transactions, counts and account names in JSON.
+whab "My budget" trnx uncategorized
+# Ten examples without jq; newest dates first.
+whab "My budget" trnx uncategorized --limit 10 --format table
+# Posted transactions excluding both explicit and inferred transfers.
+whab "My budget" trnx uncategorized --posted --exclude-transfers --format table
+# One calendar month.
+whab "My budget" trnx uncategorized --month 2026-11
+```
+
+JSON includes `total` (all filtered matches), `returned` (rows actually shown),
+`pending`, `transferFlagged`, `postedNonTransfer`, `bySource`, `byCurrency` and
+the complete `data` rows with `accountName`. Pending and transfer counts can
+overlap. Filters apply before counts and `--limit`; omitting the limit returns
+every match. Dates descend, with IDs breaking ties without claiming an intraday
+chronology. JSON retains integer currency minor units and full field text; table
+output uses each currency's precision, escapes terminal controls and shortens long
+text. No amounts of different currencies are summed.
+
+Only authenticated local public queries are used. The budget name resolves once;
+transaction and account-name reads must match its permanent ID and ledger revision
+or fail without partial output. No categories, review flags or sync state change.
+The response bound is 16 MiB; `--limit` limits output, not the initial history
+read, so choose `--month` if a larger budget exceeds that bound.
 
 The existing detailed JSON vocabulary remains discoverable through:
 

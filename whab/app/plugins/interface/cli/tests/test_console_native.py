@@ -43,6 +43,8 @@ def test_short_commands_create_reuse_and_reopen_real_budgets(tmp_path, monkeypat
     assert summary["budgetId"] == created["id"] and summary["data"]["currency"] == "USD"
     assert summary["data"]["summary"]["spent"] == 0
     assert run("empty-budget", "trnx", "non-reviewed")["data"] == []
+    uncategorized = run("empty-budget", "trnx", "uncategorized", "--limit", "10")
+    assert uncategorized['total'] == uncategorized['returned'] == 0
     other = run("budget", "create", "Other Budget")
     assert other["id"] != created["id"]
     assert run("Other Budget", "plugin", "status")["configured"] == []
@@ -63,6 +65,8 @@ def test_short_commands_create_reuse_and_reopen_real_budgets(tmp_path, monkeypat
     assert committed["budgetId"] == created["id"] and not committed["alreadyImported"]
     assert committed["counts"] == {key: preview[key] for key in ("accounts", "categories", "transactions", "assignments")}
     assert len(run("empty-budget", "trnx", "non-reviewed")["data"]) == 1
+    # A categorized import is still unreviewed; those are independent filters.
+    assert run("empty-budget", "transactions", "uncategorized")['total'] == 0
     assert run("Other Budget", "trnx", "non-reviewed")["data"] == []
     assert import_run("commit", "--fingerprint", preview["fingerprint"])["alreadyImported"]
     manifest, ledger = decode_budget((tmp_path / "exports/empty-budget.whab").read_bytes())
@@ -72,6 +76,7 @@ def test_short_commands_create_reuse_and_reopen_real_budgets(tmp_path, monkeypat
     # A new temporary host reopens exactly the registered budget and its plugins.
     assert run("empty-budget", "plugin", "status")["configured"] == ["ynab-zip-importer"]
     assert run(created["id"], "transactions", "unreviewed")["budgetId"] == created["id"]
+    assert run(created['id'], 'trnx', 'uncategorised')['budgetId'] == created['id']
     # A fresh parser generation still permits an explicit same-file receipt retry.
     assert import_run("commit", "--fingerprint", preview["fingerprint"])["alreadyImported"]
     wait_for_shutdown()

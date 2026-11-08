@@ -1912,6 +1912,306 @@
       ],
       "retry": "Read-only and safe to retry after addressing the fixed error. Do not create a duplicate connection or infer successful product activation. Loading again reads Plaid cached data and does not force a bank refresh.",
       "availability": "WHAB 2.60+, CLI 2.3+, and Plaid 1.7+; provider must declare BankAdapter.supports_investments. Plaid Investments must be separately enabled/consented. Investment history availability varies by institution; default window is two years."
+    },
+    {
+      "name": "transactions.uncategorized",
+      "kind": "local",
+      "summary": "List uncategorized transactions with full-match counts, account names, sampling and optional plain table output.",
+      "input": {
+        "type": "object",
+        "description": "whab BUDGET trnx uncategorized [--month YYYY-MM] [--limit N] [--posted] [--exclude-transfers] [--format json|table]. transactions and uncategorised are aliases. Name-addressed personal-workspace read.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Unique registered budget name or permanent UUID."
+          },
+          "month": {
+            "type": "string",
+            "description": "Optional YYYY-MM; omitting it reads all available history.",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Positive maximum number of returned rows; omit for all. Does not reduce full-match counts or the initial server history read.",
+            "minimum": 1
+          },
+          "posted": {
+            "type": "boolean",
+            "description": "Exclude pending rows when true.",
+            "default": false
+          },
+          "excludeTransfers": {
+            "type": "boolean",
+            "description": "--exclude-transfers excludes both explicit and inferred transfers.",
+            "default": false
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json",
+            "description": "JSON retains full fields and integer currency minor units. Table formats each currency separately, escapes terminal controls and shortens long text."
+          }
+        },
+        "required": [
+          "budget"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "object",
+          "string"
+        ],
+        "description": "Default JSON projection, or human-readable table text for --format table. All counts are after filters but before the sampling limit. Pending and transfer counts may overlap. No financial amounts are aggregated.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Permanent budget ID or default workspace ID."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Current ledger revision; a read does not authorize a stale write."
+          },
+          "data": {
+            "type": "array",
+            "description": "Matching public transactions, newest date first with ID tie-breaker. No intraday time is inferred. Includes reviewed rows, transfers, pending transactions, inflows, zero amounts and off-budget accounts unless explicitly filtered.",
+            "items": {
+              "type": "object",
+              "description": "Public transactions record. Additional compatible projection fields may be present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable record identifier."
+                },
+                "accountId": {
+                  "type": "string",
+                  "description": "Owning account ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "merchantLogo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional public logo key."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Integer minor units; positive outflow, negative inflow."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO currency; no conversion."
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Assigned child category or null."
+                },
+                "pending": {
+                  "type": "boolean",
+                  "description": "Pending rows are excluded from cleared spending."
+                },
+                "reviewed": {
+                  "type": "boolean",
+                  "description": "Explicit transaction review status."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Record origin."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Saved user note."
+                },
+                "isTransfer": {
+                  "type": "boolean",
+                  "description": "Explicit transfer exclusion."
+                },
+                "inferredTransfer": {
+                  "type": "boolean",
+                  "description": "Inferred transfer exclusion."
+                },
+                "categoryEdited": {
+                  "type": "boolean",
+                  "description": "Whether category annotation was explicitly changed."
+                },
+                "deleted": {
+                  "type": "boolean",
+                  "description": "Portable tombstone marker."
+                },
+                "accountName": {
+                  "type": "string",
+                  "description": "Name from the same-budget, same-revision public accounts read; falls back to the account ID if the account is unavailable."
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Number of all matching non-deleted transactions, before --limit.",
+            "minimum": 0
+          },
+          "returned": {
+            "type": "integer",
+            "description": "Number of rows actually returned in data.",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "integer",
+            "description": "Number of pending matches before the sample limit.",
+            "minimum": 0
+          },
+          "transferFlagged": {
+            "type": "integer",
+            "description": "Number flagged as explicit or inferred transfers; can overlap pending.",
+            "minimum": 0
+          },
+          "postedNonTransfer": {
+            "type": "integer",
+            "description": "Number that are neither pending nor explicit/inferred transfers.",
+            "minimum": 0
+          },
+          "bySource": {
+            "type": "array",
+            "description": "Full filtered match counts grouped by source; no monetary total or currency conversion.",
+            "items": {
+              "type": "object",
+              "description": "One distinct source and its count.",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "description": "Public source value; missing source is labeled unknown."
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of matching transactions in this group."
+                }
+              },
+              "required": [
+                "source",
+                "count"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byCurrency": {
+            "type": "array",
+            "description": "Full filtered match counts grouped by currency; no monetary total or currency conversion.",
+            "items": {
+              "type": "object",
+              "description": "One distinct currency and its count.",
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "description": "Public currency value; missing source is labeled unknown."
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of matching transactions in this group."
+                }
+              },
+              "required": [
+                "currency",
+                "count"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "budgetId",
+          "revision",
+          "data",
+          "total",
+          "returned",
+          "pending",
+          "transferFlagged",
+          "postedNonTransfer",
+          "bySource",
+          "byCurrency"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "Fictional budget",
+            "limit": 10
+          },
+          "output": {
+            "budgetId": "11111111-1111-4111-8111-111111111111",
+            "revision": "fictional-revision",
+            "total": 1,
+            "returned": 1,
+            "pending": 0,
+            "transferFlagged": 0,
+            "postedNonTransfer": 1,
+            "bySource": [
+              {
+                "source": "manual",
+                "count": 1
+              }
+            ],
+            "byCurrency": [
+              {
+                "currency": "USD",
+                "count": 1
+              }
+            ],
+            "data": [
+              {
+                "id": "fictional-transaction",
+                "accountId": "fictional-account",
+                "accountName": "Fictional checking",
+                "date": "2026-11-07",
+                "merchant": "Fictional coffee",
+                "amount": 450,
+                "currency": "USD",
+                "categoryId": null,
+                "reviewed": true,
+                "pending": false,
+                "isTransfer": false,
+                "inferredTransfer": false,
+                "source": "manual",
+                "note": ""
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "budget": "Fictional empty budget",
+            "format": "table"
+          },
+          "output": "Uncategorized: 0 matched, 0 shown\nPending: 0 | Transfer-flagged: 0 | Posted non-transfer: 0\nNo matching transactions."
+        }
+      ],
+      "side_effects": "Read-only public transaction/account queries. No categorization, review, import, sync or ledger/settings change. Does not start inference or access a storage plugin directly.",
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget in the selected runtime and environment. Default is full available history across all accounts/currencies; --month narrows history. Reviewed and uncategorized are independent flags. Production is the CLI default. Monetary values retain their own currency.",
+      "errors": [
+        "Invalid options or nonpositive --limit fail before host acquisition. Invalid month is rejected by the existing host query.",
+        "Unknown/ambiguous budget names, foreign-budget responses or different transaction/account revisions fail without partial output.",
+        "HTTPS/authentication/storage failures are sanitized; responses over 16 MiB fail. --limit bounds display only; use --month to reduce an oversized history read."
+      ],
+      "retry": "Safe to rerun a read, including after a revision mismatch. No automatic replay or mutation is performed.",
+      "availability": "CLI 2.4+ with WHAB 2.60+. whab BUDGET trnx uncategorized; transactions and uncategorised are aliases. Uses the existing authenticated local queries/transactions and queries/accounts. --help remains offline."
     }
   ]
 }
