@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.15.0 — 2026-11-07
+
+PR: [#167](https://github.com/Fillll/whab/pull/167)
+
+- Persist optional category-agent labels atomically in an additive nullable column. Preserve attribution across optimized reads, provider refresh, review, reopen and portable exports; retain legacy file compatibility without inferring historical authors.
+
 ## 1.14.1 — 2026-11-07
 
 PR: [#161](https://github.com/Fillll/whab/pull/161)
