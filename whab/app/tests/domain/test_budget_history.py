@@ -158,3 +158,20 @@ def test_undo_cannot_detach_an_account_referenced_by_current_bank_settings():
     with pytest.raises(StoreError, match='linked bank account'):
         history.public_preview(s, 'undo', identifier)
     assert s == before
+
+
+def test_full_restore_refuses_unrecorded_import_or_external_financial_changes():
+    s = state()
+    apply(s, 'snapshot', None)
+    saved = s['history']['entries'][-1]['id']
+    s['accounts']['checking']['balance'] += 100
+    before = deepcopy(s)
+    with pytest.raises(StoreError, match='Unrecorded import or external changes'):
+        history.public_preview(s, 'restore', saved)
+    assert s == before
+    # A new explicit snapshot records the adopted state as a barrier and keeps
+    # both historical exports available without crossing that barrier.
+    apply(s, 'snapshot', None)
+    assert s['history']['entries'][-2]['operation'] == 'import_workspace'
+    with pytest.raises(StoreError, match='provider/import'):
+        history.public_preview(s, 'restore', saved)

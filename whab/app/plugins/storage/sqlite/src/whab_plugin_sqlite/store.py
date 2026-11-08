@@ -1006,9 +1006,10 @@ class Store(Authority):
 
     def history_preview(self, workspace, action, target=None):
         from whab.domain.history import public_preview
-        state = self.state(workspace)
-        state['receipts'] = {row[0]: None for row in self.db.execute('SELECT transaction_id FROM transaction_receipts WHERE workspace=?', (workspace,))}
-        return public_preview(state, action, target)
+        with self._snapshot():
+            state = self.state(workspace)
+            state['receipts'] = {row[0]: None for row in self.db.execute('SELECT transaction_id FROM transaction_receipts WHERE workspace=?', (workspace,))}
+            return public_preview(state, action, target)
 
     def history_apply(self, workspace, action, target, fingerprint):
         from whab.domain.history import apply_request

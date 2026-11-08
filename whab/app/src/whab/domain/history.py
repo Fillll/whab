@@ -248,6 +248,9 @@ def preview(journal, current, action, target):
         raise StoreError('This budget has no recorded history yet.')
     entries = journal['entries']
     if action == 'restore':
+        expected = entries[-1]['afterDigest'] if entries else digest(journal['baseline'])
+        if digest(current) != expected:
+            raise StoreError('Unrecorded import or external changes prevent restoration. Export the historical snapshot for inspection instead.')
         ids = [e['id'] for e in entries]
         if target != 'baseline' and target not in ids:
             raise StoreError('History snapshot not found.')
