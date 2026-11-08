@@ -16,7 +16,7 @@ function harness({present = true, saved = null} = {}) {
   const state = {fail:false, gate:null};
   const control = context.initBudgetHistory({document, getContext:()=>({budgetUrl:'/fictional',workspace:'personal'}), beforeChange:async()=>{}, api:async(url,body)=> {
     calls.push({url,body});
-    if (body && url.endsWith('/apply')) {if (state.gate) await state.gate; if (state.fail) throw new Error('Unknown outcome'); return {};}
+    if (body && url.endsWith('/apply')) {if (state.gate) await state.gate; if (state.fail) {const failure = new Error('Unknown outcome'); failure.code = state.code; throw failure;} return {};}
     if (body) return {revision:'original-revision',data:{fingerprint:'a'.repeat(64),changes:[{path:['transactions','fictional'],before:{categoryId:null,merchant:'<script>'},after:{categoryId:'food',merchant:'<script>'}}]}};
     return {data:{entries:[],next:null}};
   }});
@@ -43,4 +43,13 @@ test('reloaded uncertain intent never submits automatically',async()=> {
   const h = harness({saved:JSON.stringify({workspace:'personal',action:'undo',target:'batch',fingerprint:'a'.repeat(64),revision:'old',requestId:'retained'})});
   await h.control.load(); assert.equal(h.calls.filter(c=>c.body).length,0);
   await h.control.commit(true); assert.equal(h.calls.find(c=>c.body).body.requestId,'retained');
+});
+
+test('known first revision rejection releases preview but an uncertain retry retains its original intent',async()=> {
+  const h = harness(); await h.control.prepare('undo','batch');
+  h.state.fail = true; h.state.code = 'history_revision_conflict';
+  await h.control.commit(); assert.equal(h.storage.size,0);
+  await h.control.prepare('undo','batch'); h.state.code = null;
+  await h.control.commit(); assert.equal(h.storage.size,1);
+  h.state.code = 'history_revision_conflict'; await h.control.commit(true); assert.equal(h.storage.size,1);
 });

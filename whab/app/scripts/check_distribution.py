@@ -40,7 +40,7 @@ from fastapi.testclient import TestClient
 target = Path(sys.argv[1]).resolve()
 with patch.object(metadata.EntryPoint, "load", side_effect=AssertionError("Documentation must not load hooks")):
     operation_catalog = installed_catalog()
-assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 20
+assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 23
 assert {row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] == "local"} == {
     "bank.connections", "bank.preview", "bank.configure", "bank.sync", "bank.schedule", "bank.background", "bank.investments",
 }
@@ -76,6 +76,7 @@ assert any(entry.name == "whab" for entry in metadata.distribution("whab_plugin_
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]
 assert metadata.distribution("whab_plugin_plaid").locate_file("whab_plugin_plaid/static/investments.css").is_file()
+assert metadata.distribution("whab_plugin_web").locate_file("whab_plugin_web/static/budget-history.js").is_file()
 assert not metadata.distribution("whab").entry_points
 with patch.object(metadata, "entry_points", side_effect=AssertionError("Catalog must not discover code")):
     catalog = catalog_snapshot()
@@ -254,6 +255,15 @@ with TestClient(create_app(settings=json_settings), base_url="https://127.0.0.1:
     })
     assert transaction.status_code == 200
     assert client.get("/api/workspace?workspace=personal").json()["accounts"][0]["balance"] == 12220
+    history = client.get('/api/history?workspace=personal').json()['data']
+    assert history['total'] == 2
+    original = history['entries'][0]['id']
+    for action in ('undo', 'redo'):
+        preview = client.post('/api/history/preview', json={'workspace':'personal','action':action,'target':original}).json()
+        applied = client.post('/api/history/apply', json={'workspace':'personal','action':action,'target':original,'fingerprint':preview['data']['fingerprint'],'revision':preview['revision'],'requestId':'installed-history-' + action})
+        assert applied.status_code == 200
+        assert client.get('/api/workspace?workspace=personal').json()['accounts'][0]['balance'] == (12345 if action == 'undo' else 12220)
+    assert client.get('/api/history?workspace=personal').json()['data']['total'] == 4
     exported = decode_container(client.get("/api/budget/export").content)
     assert exported.manifest["storage"] == "json" and "plugins/json/budget.json" in exported.files
     demo = decode_container(client.get("/api/budget/export?workspace=demo").content)

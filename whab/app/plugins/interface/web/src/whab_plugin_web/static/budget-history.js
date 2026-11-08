@@ -116,7 +116,7 @@ export function initBudgetHistory({api, getContext, beforeChange, onChanged = ()
     } catch (failure) {fail(failure);}
   }
   async function commit(original = false) {
-    if (busy || (!original && !current) || (original && !intent)) return;
+    if (busy || (!original && (!current || intent)) || (original && !intent)) return;
     error.hidden = true;
     setBusy(true); ++serial; ++detailSerial;
     try {
@@ -129,8 +129,15 @@ export function initBudgetHistory({api, getContext, beforeChange, onChanged = ()
       sessionStorage.removeItem(storageKey()); intent = null; current = null;
       previewBox.hidden = true; status.textContent = 'Saved. The financial state and its history were committed together.';
       onChanged();
-    } catch (failure) {fail(failure);}
-    finally {setBusy(false);}
+    } catch (failure) {
+      // A first attempt rejected by the revision guard never reached storage.
+      // A retry after an unknown response still preserves its original intent.
+      if (!original && failure.code === 'history_revision_conflict') {
+        sessionStorage.removeItem(storageKey()); intent = null; current = null;
+        previewBox.hidden = true; status.textContent = 'Budget changed. Preview again before applying.';
+      }
+      fail(failure);
+    } finally {setBusy(false);}
     await load();
   }
   root.addEventListener('whab:settings-enter', () => {void load();});

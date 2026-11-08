@@ -16,7 +16,7 @@ def test_settings_history_routes_preview_apply_and_conflict(client):
     assert client.post('/api/history/apply', json=body).status_code == 200
     assert account not in {a['id'] for a in client.get('/api/workspace?workspace=personal&month=2026-10').json()['accounts']}
     assert client.get('/api/history?workspace=personal').json()['data']['total'] == 2
-    assert client.post('/api/history/apply', json={**body,'requestId':'new-intent'}).status_code == 400
+    assert client.post('/api/history/apply', json={**body,'requestId':'new-intent'}).status_code == 409
     assert client.get('/api/history?workspace=personal&limit=101').status_code == 400
     assert client.post('/api/history/preview', json={'workspace':'personal','action':'invalid'}).status_code == 400
     assert client.post('/api/history/preview', json={'workspace':'personal','action':'snapshot','unexpected':True}).status_code == 400

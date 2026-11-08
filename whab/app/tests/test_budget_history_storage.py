@@ -145,3 +145,14 @@ def test_durable_pristine_restore_adopts_history_without_synthetic_events(histor
     command(backend, 'add_account', {'name':'First new change','type':'depository','balance':0})
     baseline = backend.budget_history('personal', snapshot=True, target='baseline')['snapshot']
     assert baseline['accounts'][0]['id'] == 'fictional-account'
+
+
+def test_snapshot_only_history_cannot_be_replaced_by_a_pristine_restore(history_store):
+    from whab.domain.ledger_state import initial_state, portable_snapshot
+    backend, _, _ = history_store
+    preview = backend.history_preview('personal', 'snapshot')
+    backend.history_apply('personal', 'snapshot', None, preview['fingerprint'])
+    before = backend.export_budget('personal')
+    with pytest.raises(StoreError, match='history|empty'):
+        backend.restore_budget('personal', portable_snapshot(initial_state('personal','2026-11')))
+    assert backend.export_budget('personal') == before

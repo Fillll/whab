@@ -4,13 +4,14 @@ import csv
 import io
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict
 
 from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
+from whab.services.ledger import RevisionConflict
 from whab.web.csv import safe_cell
 from whab.web.schemas import (
     AccountBody,
@@ -51,7 +52,10 @@ def create_router(store):
 
     @router.post('/api/history/apply')
     def history_apply(body: HistoryApplyBody):
-        return store.command('history_apply', body.workspace, {'action': body.action, 'target': body.target, 'fingerprint': body.fingerprint}, request_id=body.requestId, expected_revision=body.revision)
+        try:
+            return store.command('history_apply', body.workspace, {'action': body.action, 'target': body.target, 'fingerprint': body.fingerprint}, request_id=body.requestId, expected_revision=body.revision)
+        except RevisionConflict as error:
+            return JSONResponse({'error': str(error), 'code': 'history_revision_conflict'}, status_code=409)
 
     @router.get("/api/workspace")
     def workspace_data(workspace: Workspace, month: str | None = None, currency: str | None = None):

@@ -161,6 +161,17 @@ def test_agent_labels_roundtrip_through_whab_api_and_native_storage(tmp_path, mo
     assert retry == result
     run(budget, "transactions", "categorise", identifier, "--clear")
     assert "categoryAgent" not in run(budget, "trnx", "uncategorized")["data"][0]
+    category = run(budget, 'trnx', 'categorize', identifier, '--category', 'Groceries', '--agent', 'Codex', '--batch', 'fictional-review')
+    entries = run(budget, 'history', 'list')['data']['entries']
+    assert entries[0]['batchId'] == 'fictional-review' and entries[0]['actor'] == 'Codex'
+    preview = run(budget, 'history', 'undo', 'fictional-review')
+    run(budget, 'history', 'undo', 'fictional-review', '--apply', preview['data']['fingerprint'])
+    assert run(budget, 'trnx', 'uncategorized')['data'][0]['categoryId'] is None
+    redo = run(budget, 'history', 'redo', 'fictional-review')
+    run(budget, 'history', 'redo', 'fictional-review', '--apply', redo['data']['fingerprint'])
+    assert run(budget, 'history', 'show', 'fictional-review')['data']['entries'][0]['requestId'] == category['requestId']
+    run(budget, 'history', 'snapshot')
+    assert run(budget, 'history', 'export', 'baseline')['data']['snapshot']['accounts'] == []
     endpoint = home / "run/sandbox/host.json"
     deadline = monotonic() + 10
     while endpoint.exists() and monotonic() < deadline:
