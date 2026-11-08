@@ -262,6 +262,14 @@ InsightsHook: TypeAlias = Callable[[BudgetSnapshot], tuple[Insight, ...]]
 ExportHook: TypeAlias = Callable[[BudgetSnapshot], ExportTable]
 
 
+class AgentCategoryStorage(Protocol):
+    """Optional explicit category-agent annotations, persisted atomically with edits."""
+
+    def supports_category_agent(self) -> bool: ...
+
+    def edit_transaction_details(self, workspace: str, transaction_id: str, changes: dict) -> None: ...
+
+
 class BulkReviewStorage(Protocol):
     """Optional atomic review flags for one to 100 distinct transaction IDs.
 

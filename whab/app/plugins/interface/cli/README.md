@@ -99,6 +99,37 @@ whab api command edit_transaction --help
 whab api describe --plugin ynab-zip-importer --help
 ```
 
+## Agent category labels
+
+CLI 2.5 with WHAB 2.61 adds an explicit `--agent LABEL` option to
+`command edit_transaction`, available through both `whab api` and `whab-cli`.
+Normal CLI category changes do not claim an agent. Read the transactions and
+categories first, then use their observed revision and a unique request ID:
+
+```sh
+whab api --budget BUDGET_ID query transactions
+whab api --budget BUDGET_ID query categories
+whab api --budget BUDGET_ID command edit_transaction --agent Codex --parameters '{"transactionId":"PAYMENT_ID","categoryId":"CATEGORY_ID","reviewed":false}' --revision OBSERVED_REVISION --request-id UNIQUE_INTENT_ID
+# Equivalent detailed interface:
+whab-cli --budget BUDGET_ID command edit_transaction --agent Codex --parameters '{"transactionId":"PAYMENT_ID","categoryId":"CATEGORY_ID"}' --revision OBSERVED_REVISION --request-id UNIQUE_INTENT_ID
+```
+
+`--agent` requires `categoryId` in the same edit. It saves the optional public
+`categoryAgent` field atomically with that category. The same field can be
+provided directly in JSON; conflicting labels are rejected. Labels contain
+1–80 printable characters without surrounding whitespace. They are self-declared
+provenance, not authenticated identities. The transaction's import `source`
+(Plaid, YNAB or manual) remains separate.
+
+The Web register shows **Agent · Codex** beside the category. Review, memo and
+financial-detail-only edits retain the label; a category change without an agent
+label clears it, including selecting the same category manually. Existing review
+status is preserved unless explicitly set; include `"reviewed":false` to put an
+already-reviewed transaction back in the review queue. Refreshes, posted matches,
+reopening and portable saves retain the marker. Older transactions stay unlabelled.
+A storage adapter must explicitly advertise durable support; an unsupported
+adapter rejects the labelled write instead of silently discarding the marker.
+
 ## Account classification help
 
 CLI 2.2.1 with WHAB 2.59.1 or newer makes both `whab --help` and `whab-cli --help` explain account classification offline from the core’s packaged operation descriptions. For the full account fields and explicit edit example:
@@ -291,7 +322,7 @@ Subscription labels apply to matching payments in the same account; see [Subscri
 
 The CLI makes one request, never retries a write or refreshes its revision automatically, rejects redirects/proxies and validates response budget identity. Success prints JSON to stdout and exits 0; failure prints a sanitized JSON error to stderr and exits 1. After an uncertain write, retain the original target, parameters, revision and request ID. Inspect the budget and retry only that exact intent; a restart or stale revision requires reconciliation rather than a new write. Request receipts have the host's documented lifetime; the CLI does not claim durable receipt storage.
 
-Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.59.1+ are required.
+Install only the host, this plugin, and needed storage/server/feature packages for a model-free environment. The `bundled` extra also installs optional AI packages but does not enable them. Python 3.14+ and WHAB 2.61+ are required.
 
 ## Operation documentation
 

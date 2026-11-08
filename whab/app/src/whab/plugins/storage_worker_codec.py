@@ -35,6 +35,7 @@ _RECORDS = {record.__name__: record for record in (
 # (required positional names, optional names/defaults). No arbitrary attribute
 # lookup, kwargs, database handle or implementation-specific state is exposed.
 METHODS = {
+    "supports_category_agent": ((), {}),
     "prepare_existing": (("workspace", "files"), {}),
     "accounts": (("workspace",), {}), "categories": (("workspace",), {}),
     "transactions": (("workspace",), {"month": None}),

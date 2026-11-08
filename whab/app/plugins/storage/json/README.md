@@ -211,3 +211,14 @@ The packaged [operations.json](src/whab_plugin_json/operations.json) documents t
 ## Explicit bank account setup
 
 WHAB 2.59 adds the optional durable `configure_bank_sync` native operation. It validates provider ownership, unique destinations, compatible currencies and explicit inclusive date/all-history choices, then atomically saves the connection’s account mapping. Linking an auto-created bank account to an existing account moves references without changing transaction IDs, receipts or annotations. Already imported history is retained; cross-source overlap is not automatically reconciled. Future imports filter new records by the saved date while still processing modifications and pending-to-posted matches for known bank transactions. Lowering the cutoff resets the cursor for idempotent provider replay. Protected local transfers retain the settings; portable exports continue to omit provider credentials and protected connection state.
+
+
+## Category agent attribution
+
+With WHAB 2.61, `supports_category_agent()` returns `True`. The optional
+`categoryAgent` label is persisted atomically with explicit category edits through
+`edit_transaction_details`. Public reads, review-only edits, provider refreshes,
+posting replacements, checkpoints, reopen and portable exports retain it. Manual
+category writes without a label clear it; existing history remains unlabelled.
+This self-declared label is separate from import `source` and review state.
+See the [SDK contract](../../../../docs/plugins.md#explicit-categorizing-agents).

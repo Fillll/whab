@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 — 2026-11-07
+
+PR: [#167](https://github.com/Fillll/whab/pull/167)
+
+- Advertise durable category-agent support and preserve explicit attribution through atomic edits, review, provider refreshes, checkpoints, native reopen and portable saves. Keep legacy unlabelled history compatible.
+
 ## 1.6.0 — 2026-11-07
 
 PR: [#160](https://github.com/Fillll/whab/pull/160)

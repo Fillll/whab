@@ -251,6 +251,15 @@
             "deleted": {
               "type": "boolean",
               "description": "Portable tombstone marker."
+            },
+            "categoryAgent": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
+              "minLength": 1,
+              "maxLength": 80
             }
           },
           "additionalProperties": true
@@ -471,6 +480,15 @@
                 "deleted": {
                   "type": "boolean",
                   "description": "Portable tombstone marker."
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
+                  "minLength": 1,
+                  "maxLength": 80
                 }
               },
               "additionalProperties": true
@@ -723,6 +741,15 @@
                 "deleted": {
                   "type": "boolean",
                   "description": "Portable tombstone marker."
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
+                  "minLength": 1,
+                  "maxLength": 80
                 }
               },
               "additionalProperties": true
@@ -1211,6 +1238,15 @@
             "type": "string",
             "description": "User note; empty string clears it.",
             "maxLength": 1000
+          },
+          "categoryAgent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
+            "minLength": 1,
+            "maxLength": 80
           }
         },
         "required": [
@@ -1305,6 +1341,15 @@
           "amount": {
             "type": "integer",
             "description": "Integer currency minor units; USD cents. Positive outflows, negative inflows."
+          },
+          "categoryAgent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Explicit self-declared categorizing agent label (1\u201380 printable characters); not an authenticated identity. Omit on a category edit for normal manual attribution, which clears an earlier agent label. Review-only, memo-only and detail-only edits preserve it. Requires categoryId in the same command. Agent attribution does not change review status.",
+            "minLength": 1,
+            "maxLength": 80
           }
         },
         "required": [
@@ -1326,9 +1371,18 @@
             "categoryId": "fictional-category"
           },
           "output": null
+        },
+        {
+          "input": {
+            "transactionId": "fictional-payment",
+            "categoryId": "fictional-category",
+            "categoryAgent": "Codex",
+            "reviewed": false
+          },
+          "output": null
         }
       ],
-      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly. Explicit categoryAgent is persisted with the category when storage supports it. Manual category changes clear old agent attribution; review/note/detail-only changes preserve it.",
       "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
       "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
       "errors": [

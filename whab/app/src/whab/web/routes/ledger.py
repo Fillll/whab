@@ -109,6 +109,7 @@ def create_router(store):
         category = body.categoryId if "categoryId" in body.model_fields_set else UNSET
         store.edit_transaction(
             body.workspace, transaction_id, category_id=category, reviewed=body.reviewed,
+            **({'category_agent': body.categoryAgent} if 'categoryAgent' in body.model_fields_set else {}),
             **({"details": body.model_dump(include=body.model_fields_set & {"accountId", "date", "merchant", "amount"})}
                if body.model_fields_set & {"accountId", "date", "merchant", "amount"} else {}),
             **({"suggestion_id": body.suggestionId} if body.suggestionId is not None else {}),

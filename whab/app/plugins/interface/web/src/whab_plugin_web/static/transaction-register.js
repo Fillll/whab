@@ -345,6 +345,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     }, {
       saved(patch) {
         Object.assign(committed, patch);
+        if ('categoryId' in patch || patch.reviewed === true && row.dataset.suggestionId) row.querySelector('[data-category-agent]')?.remove();
         if ('reviewed' in patch) row.dataset.reviewed = String(patch.reviewed);
         if (patch.reviewed === true && row.dataset.suggestionId) {
           delete row.dataset.suggestionId;

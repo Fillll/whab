@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.45.0 — 2026-11-07
+
+PR: [#167](https://github.com/Fillll/whab/pull/167)
+
+- Display escaped Agent · LABEL attribution beside transaction categories, including loaded fragments and accessible full-text descriptions. Preserve the badge after review or failed saves and clear it only after a successful manual category assignment.
+
 ## 1.44.2 — 2026-11-07
 
 PR: [#166](https://github.com/Fillll/whab/pull/166)

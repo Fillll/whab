@@ -134,3 +134,16 @@ WHAB 2.59 adds the optional durable `configure_bank_sync` native operation. It v
 
 
 SQLite 1.14.1 accepts exact older portable image schemas that predate the native-only bank sync settings column, including all previously supported planning-table and index combinations. Validation remains read-only and rejects unrecognized schema changes. Opening an existing budget does not replace its committed live ledger with the portable snapshot.
+
+
+## Category agent attribution
+
+With WHAB 2.61, `supports_category_agent()` returns `True`. The optional
+`categoryAgent` label is persisted atomically with explicit category edits through
+`edit_transaction_details`. Public reads, review-only edits, provider refreshes,
+posting replacements, checkpoints, reopen and portable exports retain it. Manual
+category writes without a label clear it; existing history remains unlabelled.
+This self-declared label is separate from import `source` and review state.
+See the [SDK contract](../../../../docs/plugins.md#explicit-categorizing-agents).
+
+An additive nullable `category_agent` column retains labels; legacy native and portable files remain readable, and ordinary writable opens add the column without inferring past attribution. Update the stopped host before opening a candidate against an older schema.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.0 — 2026-11-07
+
+PR: [#167](https://github.com/Fillll/whab/pull/167)
+
+- Add explicit --agent LABEL on edit_transaction through whab api and whab-cli. Require a category in the same write, reject conflicting labels and document self-declared provenance, review choices and manual replacement.
+
 ## 2.4.0 — 2026-11-07
 
 PR: [#165](https://github.com/Fillll/whab/pull/165)

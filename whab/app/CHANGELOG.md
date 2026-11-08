@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.61.0 — 2026-11-07
+
+PR: [#167](https://github.com/Fillll/whab/pull/167)
+
+- Add optional explicit category-agent provenance to public transaction edits and portable records, including bounded validation, atomic persistence capability checks, worker/remote forwarding and preservation through provider refreshes. Keep import source and review status separate.
+
 ## 2.60.0 — 2026-11-07
 
 PR: [#164](https://github.com/Fillll/whab/pull/164)

@@ -38,6 +38,7 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
             "inferred_transfer": "INTEGER NOT NULL DEFAULT 0",
             "merchant_logo": "TEXT",
             "original_details": "TEXT",
+            "category_agent": "TEXT",
         },
         "categories": {"currency": "TEXT NOT NULL DEFAULT 'USD'"},
         "meta": {"budget_start_month": "TEXT"},

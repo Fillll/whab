@@ -30,7 +30,12 @@ from whab.domain.imports import (
     validate_imported_transaction,
 )
 from whab.domain.portable import validate_portable_budget
-from whab.domain.transactions import UNSET, transaction_rows
+from whab.domain.transactions import (
+    UNSET,
+    category_agent_fields,
+    public_transaction,
+    transaction_rows,
+)
 from whab.domain.validation import validate_label
 
 from .authority import Authority
@@ -200,6 +205,7 @@ class Store(Authority):
                 "merchantLogo": row["merchant_logo"],
                 "amount": row["amount"],
                 "categoryId": row["category_id"],
+                **category_agent_fields(dict(row).get("category_agent")),
                 "pending": bool(row["pending"]),
                 "reviewed": bool(row["reviewed"]),
                 "source": row["source"],
@@ -273,7 +279,7 @@ class Store(Authority):
             ],
         )
         self.db.executemany(
-            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer,merchant_logo,original_details) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer,merchant_logo=excluded.merchant_logo,original_details=excluded.original_details",
+            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer,merchant_logo,original_details,category_agent) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer,merchant_logo=excluded.merchant_logo,original_details=excluded.original_details,category_agent=excluded.category_agent",
             [
                 (
                     t["id"],
@@ -293,6 +299,7 @@ class Store(Authority):
                     int(t.get("inferredTransfer", False)),
                     t.get("merchantLogo"),
                     json.dumps(t["original"]) if "original" in t else None,
+                    t.get("categoryAgent"),
                 )
                 for t in state["transactions"].values()
             ],
@@ -624,7 +631,7 @@ class Store(Authority):
                 "SELECT t.id,t.account_id AS accountId,t.date,t.merchant,"
                 "t.merchant_logo AS merchantLogo,t.amount,t.category_id AS categoryId,"
                 "t.pending,t.reviewed,t.source,t.note,t.is_transfer AS isTransfer,"
-                "t.inferred_transfer AS inferredTransfer,a.currency "
+                "t.inferred_transfer AS inferredTransfer,t.category_agent AS categoryAgent,a.currency "
                 "FROM transactions t JOIN accounts a "
                 "ON a.workspace=t.workspace AND a.id=t.account_id WHERE "
                 + " AND ".join(conditions) + " ORDER BY t.date DESC,t.id DESC",
@@ -633,9 +640,9 @@ class Store(Authority):
             return {
                 "accounts": accounts, "categories": categories,
                 "transactions": [
-                    {**dict(row), **{key: bool(row[key]) for key in (
+                    public_transaction({**dict(row), **{key: bool(row[key]) for key in (
                         "pending", "reviewed", "isTransfer", "inferredTransfer",
-                    )}}
+                    )}})
                     for row in rows
                 ],
             }
@@ -731,6 +738,9 @@ class Store(Authority):
         return self._mutate(
             workspace, lambda state: commands.add_transaction(state, transaction_id, transaction, source),
         )
+
+    def supports_category_agent(self):
+        return True
 
     def edit_transaction_details(self, workspace, transaction_id, changes):
         from .transaction_edits import edit_transaction

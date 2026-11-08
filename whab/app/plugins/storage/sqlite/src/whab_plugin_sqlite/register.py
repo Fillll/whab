@@ -1,6 +1,9 @@
 """Bounded public register snapshots with complete-selection counts."""
 
 
+from whab.domain.transactions import public_transaction
+
+
 def transaction_register_page(
     store, workspace, start_date, end_date, currency, account_ids, search, review, page, page_size,
 ):
@@ -72,7 +75,7 @@ def transaction_register_page(
             "SELECT t.id,t.account_id AS accountId,t.date,t.merchant,"
             "t.merchant_logo AS merchantLogo,t.amount,t.category_id AS categoryId,"
             "t.pending,t.reviewed,t.source,t.note,t.is_transfer AS isTransfer,"
-            "t.inferred_transfer AS inferredTransfer,a.currency"
+            "t.inferred_transfer AS inferredTransfer,t.category_agent AS categoryAgent,a.currency"
             + scope + (" AND " + " AND ".join(matches) if matches else "")
             + " ORDER BY t.date DESC,t.id DESC LIMIT ? OFFSET ?",
             [*arguments, *match_arguments, page_size, offset],
@@ -80,9 +83,9 @@ def transaction_register_page(
         return {
             "accounts": accounts, "categories": categories,
             "transactions": [
-                {**dict(row), **{key: bool(row[key]) for key in (
+                public_transaction({**dict(row), **{key: bool(row[key]) for key in (
                     "pending", "reviewed", "isTransfer", "inferredTransfer",
-                )}}
+                )}})
                 for row in rows
             ],
             "transactionPage": {

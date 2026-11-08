@@ -51,6 +51,14 @@ Use `--page accounts` or `--page budget` for the affected view, `--summary` for 
 
 ## Register rendering and navigation
 
+Explicit categorizer provenance appears beside the category as **Agent · LABEL**.
+The escaped, bounded label is supplied through the public CLI/API; ordinary CLI
+writes remain manual. The accessible label and tooltip expose its full text and
+explain that it is self-declared. Reviewing or editing a memo preserves it. A
+successful manual category save clears the badge; failed saves retain it. Saved
+fragments and refreshes show the durable value independently of Plaid/YNAB source.
+See [CLI agent labels](../cli/README.md#agent-category-labels).
+
 Model category predictions display a small forest icon beside the **ML suggested** badge in the transaction register. The same icon identifies Random forest categorization in the installed-plugin list. Suggested categories remain provisional until manual review.
 
 Compatible model settings expose **Preview low-score guesses**, an explicit action that includes uncertain guesses for review without changing the automatic score cutoff. The register shows the score and **Low score** on these predictions. This action requires WHAB 2.20 or newer and a compatible categorization plugin on the budget host.

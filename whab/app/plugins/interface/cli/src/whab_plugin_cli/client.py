@@ -10,6 +10,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
+from whab.plugins import validate_category_agent
 from whab.plugins.documentation import core_document, installed_catalog
 
 from .bank_commands import add_bank_parser, bank_error, bank_request
@@ -52,6 +53,8 @@ def parser(argv=(), *, defaults=None):
     query.add_argument("--parameters", help="JSON parameters for a generic feature query")
     command = group("command", "Apply an explicit public ledger command")
     command.add_argument("operation", choices=tuple(row["name"] for row in core_document()["operations"] if row["kind"] == "command"))
+    command.add_argument('--agent', type=validate_category_agent, metavar='LABEL',
+                         help='Explicit categorizing agent label, for edit_transaction with categoryId only; saved as categoryAgent. Omit for normal manual edits.')
     for name in ("feature-query", "feature-command"):
         feature = group(name, "Call an operation listed by query features")
         feature.add_argument("plugin")
@@ -101,6 +104,12 @@ def request(args, token=None):
     values = json.loads(raw)
     if type(values) is not dict:
         raise ValueError("Parameters must be a JSON object.")
+    if args.kind == 'command' and getattr(args, 'agent', None) is not None:
+        if args.operation != 'edit_transaction' or 'categoryId' not in values:
+            raise ConfigError('--agent requires edit_transaction with an explicit categoryId.')
+        if 'categoryAgent' in values and values['categoryAgent'] != args.agent:
+            raise ConfigError('--agent conflicts with categoryAgent in the parameters.')
+        values['categoryAgent'] = args.agent
     json.dumps(values, allow_nan=False)
     payload = {"pluginId": host_id(args.plugin), "action": args.action, "parameters": values} if args.kind.startswith("feature-") else values
     if args.kind == "feature-query" or args.kind == "query":

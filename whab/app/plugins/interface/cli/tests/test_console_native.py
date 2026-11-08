@@ -80,3 +80,81 @@ def test_short_commands_create_reuse_and_reopen_real_budgets(tmp_path, monkeypat
     # A fresh parser generation still permits an explicit same-file receipt retry.
     assert import_run("commit", "--fingerprint", preview["fingerprint"])["alreadyImported"]
     wait_for_shutdown()
+
+
+def test_agent_labels_roundtrip_through_whab_api_and_native_storage(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "agent-runtime"
+    monkeypatch.setattr(console.Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("WHAB_UI", "")
+    monkeypatch.setenv("WHAB_PLUGINS", "")
+    monkeypatch.setenv("WHAB_STORAGE", "sqlite")
+    monkeypatch.setenv("ALLOW_LIVE_PLAID", "false")
+
+    def run(*args):
+        assert console.main(["--home", str(home), "--environment", "sandbox", *args]) == 0
+        return json.loads(capsys.readouterr().out)
+
+    budget = run("budget", "create", "Fictional agent budget")["id"]
+    revision = run("api", "--budget", budget, "query", "accounts")["revision"]
+
+    def change(operation, parameters, identity, agent=None):
+        nonlocal revision
+        args = [
+            "api",
+            "--budget",
+            budget,
+            "command",
+            operation,
+            "--parameters",
+            json.dumps(parameters),
+            "--revision",
+            revision,
+            "--request-id",
+            identity,
+        ]
+        if agent is not None:
+            args += ["--agent", agent]
+        result = run(*args)
+        revision = result["revision"]
+        return result["data"]
+
+    account = change(
+        "add_account",
+        {"name": "Fictional checking", "type": "depository", "balance": 100000},
+        "create-account",
+    )
+    identifier = change(
+        "add_transaction",
+        {
+            "accountId": account,
+            "date": "2026-10-01",
+            "merchant": "Fictional shop",
+            "amount": 1200,
+            "categoryId": None,
+        },
+        "create-transaction",
+    )
+    change(
+        "edit_transaction",
+        {"transactionId": identifier, "categoryId": "groceries"},
+        "agent-category",
+        "Codex",
+    )
+    row = run("api", "--budget", budget, "query", "transactions")["data"][0]
+    assert (
+        row["categoryAgent"] == "Codex" and row["source"] == "manual" and row["reviewed"] is False
+    )
+    change("edit_transaction", {"transactionId": identifier, "reviewed": True}, "human-review")
+    assert (
+        run("api", "--budget", budget, "query", "transactions")["data"][0]["categoryAgent"]
+        == "Codex"
+    )
+    change(
+        "edit_transaction", {"transactionId": identifier, "categoryId": "dining"}, "human-category"
+    )
+    assert "categoryAgent" not in run("api", "--budget", budget, "query", "transactions")["data"][0]
+    endpoint = home / "run/sandbox/host.json"
+    deadline = monotonic() + 10
+    while endpoint.exists() and monotonic() < deadline:
+        sleep(0.05)
+    assert not endpoint.exists()

@@ -5,14 +5,35 @@ from whab.domain.errors import StoreError
 UNSET = object()
 
 
+def validate_category_agent(value):
+    """A bounded self-declared categorizer label, never an authenticated identity."""
+    if value is not None and (
+        type(value) is not str
+        or not 1 <= len(value) <= 80
+        or value != value.strip()
+        or not value.isprintable()
+    ):
+        raise StoreError(
+            "Agent label must be 1–80 printable characters without surrounding whitespace."
+        )
+    return value
+
+
+def category_agent_fields(value):
+    """Keep legacy records unchanged when no category attribution is known."""
+    return {} if value is None else {"categoryAgent": validate_category_agent(value)}
+
+
 def validate_review_batch(transaction_ids, reviewed) -> tuple[str, ...]:
     """Validate one bounded, review-only intent without changing its target order."""
     if type(transaction_ids) not in (list, tuple) or not 1 <= len(transaction_ids) <= 100:
         raise StoreError("Review batch must contain between 1 and 100 transaction IDs.")
     if type(reviewed) is not bool:
         raise StoreError("Invalid review status.")
-    if any(type(value) is not str or not 1 <= len(value) <= 200 or "\x00" in value
-           for value in transaction_ids):
+    if any(
+        type(value) is not str or not 1 <= len(value) <= 200 or "\x00" in value
+        for value in transaction_ids
+    ):
         raise StoreError("Invalid transaction ID.")
     if len(set(transaction_ids)) != len(transaction_ids):
         raise StoreError("Review batch transaction IDs must be distinct.")
@@ -21,23 +42,26 @@ def validate_review_batch(transaction_ids, reviewed) -> tuple[str, ...]:
 
 def public_transaction(transaction: dict) -> dict:
     return {
-        key: transaction.get(key)
-        for key in (
-            "id",
-            "accountId",
-            "date",
-            "merchant",
-            "merchantLogo",
-            "amount",
-            "categoryId",
-            "pending",
-            "reviewed",
-            "source",
-            "note",
-            "isTransfer",
-            "inferredTransfer",
-            "currency",
-        )
+        **category_agent_fields(transaction.get("categoryAgent")),
+        **{
+            key: transaction.get(key)
+            for key in (
+                "id",
+                "accountId",
+                "date",
+                "merchant",
+                "merchantLogo",
+                "amount",
+                "categoryId",
+                "pending",
+                "reviewed",
+                "source",
+                "note",
+                "isTransfer",
+                "inferredTransfer",
+                "currency",
+            )
+        },
     }
 
 
