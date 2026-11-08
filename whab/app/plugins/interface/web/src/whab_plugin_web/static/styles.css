@@ -4374,7 +4374,7 @@ main:has(.budget-planner) > .demo-ribbon,
 /* Category suggestions stay visibly provisional until manual review. */
 .transaction-category-editor { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .transaction-category-editor > select { flex: 1 1 0; min-width: 0; width: 0; }
-.category-agent-badge { display: inline-flex; flex: 0 1 auto; align-items: center; max-width: 48%; min-width: 48px; padding: 4px 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 650; line-height: 1.4; color: var(--yellow-ink); background: var(--accent); border: 1px solid var(--line); border-radius: 3px; }
+.category-agent-badge { display: block; flex: 0 1 auto; max-width: 48%; min-width: 48px; padding: 4px 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 650; line-height: 1.4; color: var(--yellow-ink); background: var(--accent); border: 1px solid var(--line); border-radius: 3px; }
 .ml-suggestion { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; height: 26px; padding: 0 4px; white-space: nowrap; font-size: 10px; font-weight: 650; color: var(--yellow-ink); background: var(--accent); border-radius: 3px; }
 .ml-suggestion svg { flex: 0 0 auto; }
 .ml-suggestion button { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 22px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; }
