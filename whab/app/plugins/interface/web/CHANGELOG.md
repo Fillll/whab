@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.44.2 — 2026-11-07
+
+PR: [#166](https://github.com/Fillll/whab/pull/166)
+
+- Restore All as a one-click full-history transaction period preset and label legacy all-date views consistently, while preserving account, currency, search and review filters.
+
 ## 1.44.1 — 2026-11-07
 
 PR: [#164](https://github.com/Fillll/whab/pull/164)
