@@ -277,6 +277,9 @@ class Store(Authority):
         identifier = transaction.get("id") or str(uuid4())
         return self._mutate(workspace, lambda state: commands.add_transaction(state, identifier, transaction, source))
 
+    def supports_category_agent(self):
+        return True
+
     def edit_transaction_details(self, workspace, transaction_id, changes):
         return self._mutate(workspace, lambda state: commands.edit_transaction_details(state, transaction_id, changes))
 

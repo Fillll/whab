@@ -939,6 +939,36 @@
       ],
       "retry": "Use the original durable operation ID, authority epoch and generation for exact receipt reconciliation; never fabricate commit evidence.",
       "availability": "Optional native storage operation in WHAB 2.59+. Older backends report unsupported setup."
+    },
+    {
+      "name": "Storage.supports_category_agent",
+      "kind": "sdk",
+      "summary": "Advertise atomic explicit category-agent annotations through edit_transaction_details.",
+      "input": {
+        "type": "object",
+        "description": "No arguments; an optional host-only storage capability read.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True means categoryAgent is validated and persisted atomically alongside categoryId, including portable/reopen/sync preservation. Older backends may omit this method."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read-only; never categorizes or changes saved data.",
+      "permissions": "Host SDK callback over the existing authenticated local storage worker. No remote ledger operation is added.",
+      "scope": "One selected storage implementation. Category writes stay workspace/budget/environment scoped.",
+      "errors": [
+        "Missing/false support rejects explicit categoryAgent writes before mutation rather than silently dropping provenance."
+      ],
+      "retry": "Safe capability read. Financial mutations retain their original revision, request ID and native recovery rules.",
+      "availability": "WHAB 2.61+ with the updated storage plugin; optional, not part of the required StorageBackend methods."
     }
   ]
 }

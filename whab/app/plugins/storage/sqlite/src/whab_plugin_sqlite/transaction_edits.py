@@ -3,6 +3,7 @@
 import json
 
 from whab.domain import commands
+from whab.domain.transactions import category_agent_fields
 from whab.plugins import UNSET, StoreError
 
 
@@ -33,15 +34,16 @@ def edit_transaction(
                 row = store.db.execute(
                     "SELECT id,account_id AS accountId,category_id AS categoryId,reviewed,note,"
                     "is_transfer AS isTransfer,inferred_transfer AS inferredTransfer,"
-                    "category_edited AS categoryEdited,deleted, date,merchant,amount,source,original_details "
+                    "category_edited AS categoryEdited,deleted, date,merchant,amount,source,original_details,category_agent "
                     "FROM transactions WHERE workspace=? AND id=?", (workspace, transaction_id),
                 ).fetchone()
                 if row is not None:
                     state["transactions"][row["id"]] = {
-                        **dict(row), **{key: bool(row[key]) for key in (
+                        **dict(row), **category_agent_fields(row["category_agent"]), **{key: bool(row[key]) for key in (
                             "reviewed", "isTransfer", "inferredTransfer", "categoryEdited", "deleted",
                         )},
                     }
+                    state["transactions"][row["id"]].pop("category_agent")
             if details is not None:
                 transaction = state["transactions"].get(transaction_id)
                 if transaction is not None:
@@ -64,10 +66,10 @@ def edit_transaction(
                 commands.edit_transaction(state, transaction_id, category_id, reviewed, note)
                 transaction = state["transactions"][transaction_id]
             store.db.execute(
-                "UPDATE transactions SET category_id=?,reviewed=?,note=?,is_transfer=?,category_edited=? "
+                "UPDATE transactions SET category_id=?,reviewed=?,note=?,is_transfer=?,category_edited=?,category_agent=? "
                 "WHERE workspace=? AND id=?",
                 (transaction["categoryId"], int(transaction["reviewed"]), transaction["note"],
-                 int(transaction["isTransfer"]), int(transaction["categoryEdited"]), workspace, transaction_id),
+                 int(transaction["isTransfer"]), int(transaction["categoryEdited"]), transaction.get("categoryAgent"), workspace, transaction_id),
             )
             write["dirty"] = True
         except Exception:

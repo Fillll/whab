@@ -123,7 +123,7 @@ def add_transaction(
 
 def edit_transaction(
     state: dict, transaction_id: str, category_id: object = UNSET, reviewed: bool | None = None,
-    note: object = UNSET,
+    note: object = UNSET, *, category_agent: object = UNSET,
 ) -> None:
     """Validate annotations together before changing category, review status or memo."""
     transaction = state["transactions"].get(transaction_id)
@@ -138,7 +138,16 @@ def edit_transaction(
         raise StoreError("Invalid review status.")
     if note is not UNSET and (not isinstance(note, str) or len(note) > 1000):
         raise StoreError("Invalid note.")
+    if category_agent is not UNSET:
+        from .transactions import validate_category_agent
+        validate_category_agent(category_agent)
+        if category_id is UNSET:
+            raise StoreError('An agent label requires an explicit category change.')
     if category_id is not UNSET:
+        if category_agent is UNSET or category_agent is None:
+            transaction.pop('categoryAgent', None)
+        else:
+            transaction['categoryAgent'] = category_agent
         transaction.update(
             categoryId=category_id,
             categoryEdited=True,
@@ -156,9 +165,11 @@ def edit_transaction(
 def edit_transaction_details(state: dict, transaction_id: str, changes: dict) -> None:
     """Correct register fields atomically, retaining imported originals for refreshes."""
     if type(changes) is not dict or not changes or changes.keys() - {
-        "accountId", "date", "merchant", "amount", "categoryId", "reviewed", "note",
+        "accountId", "date", "merchant", "amount", "categoryId", "reviewed", "note", "categoryAgent",
     }:
         raise StoreError("Invalid transaction fields.")
+    if 'categoryAgent' in changes and 'categoryId' not in changes:
+        raise StoreError('An agent label requires an explicit category change.')
     transaction = state["transactions"].get(transaction_id)
     if not transaction or transaction.get("deleted"):
         raise StoreError("Transaction not found.")
@@ -180,10 +191,13 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
     # a partly corrected record to the caller when any validation fails.
     detached = {**state, "transactions": {transaction_id: candidate}}
     edit_transaction(detached, transaction_id, candidate.get("categoryId"),
-                     changes.get("reviewed"), changes.get("note", UNSET))
+                     changes.get("reviewed"), changes.get("note", UNSET),
+                     category_agent=changes.get('categoryAgent', UNSET))
     if "categoryId" not in changes:
         candidate["categoryEdited"] = transaction["categoryEdited"]
         candidate["isTransfer"] = transaction["isTransfer"]
+        if 'categoryAgent' in transaction:
+            candidate['categoryAgent'] = transaction['categoryAgent']
     balances = {}
     if transaction["source"] in {"manual", "demo"}:
         balances[old_account["id"]] = old_account["balance"] - (

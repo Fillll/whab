@@ -45,6 +45,7 @@ function harness(count = 5, options = {}) {
     const controls = Object.fromEntries(['[data-select-transaction]', '[data-transaction-field="note"]',
       '[data-transaction-field="categoryId"]', '[data-transaction-reviewed]', '[data-transaction-receipt]']
       .map(selector => [selector, element()]));
+    if (options.agentLabel) controls['[data-category-agent]'] = element({removed: false, remove() {this.removed = true;}});
     controls['[data-select-transaction]'].checked = true;
     controls['[data-transaction-reviewed]'].setAttribute('aria-pressed', 'false');
     controls['[data-transaction-receipt]'].disabled = true;
@@ -820,5 +821,31 @@ test('appended rows retain editing, receipt markers and ID de-duplication', asyn
   state.requests[0].resolve({ok: true});
   assert.equal(await flushed, true);
   assert.equal(state.stream.ready(), true);
+  state.register.dispose();
+});
+
+
+test('agent badge survives review and clears only after a successful manual category save', async () => {
+  const state = harness(1, {agentLabel: 'Codex'});
+  const controls = state.rows[0].controls;
+  const badge = controls['[data-category-agent]'];
+  controls['[data-transaction-reviewed]'].emit('click');
+  state.requests[0].resolve({ok: true}); await tick();
+  assert.equal(badge.removed, false);
+  controls['[data-transaction-field="categoryId"]'].value = 'dining';
+  controls['[data-transaction-field="categoryId"]'].emit('change');
+  assert.equal(badge.removed, false);
+  state.requests[1].resolve({ok: true}); await tick();
+  assert.equal(badge.removed, true);
+  state.register.dispose();
+});
+
+test('a rejected category change leaves the saved agent badge intact', async () => {
+  const state = harness(1, {agentLabel: 'Codex'});
+  const controls = state.rows[0].controls;
+  controls['[data-transaction-field="categoryId"]'].value = 'dining';
+  controls['[data-transaction-field="categoryId"]'].emit('change');
+  state.requests[0].reject(new Error('Fictional rejected save')); await tick();
+  assert.equal(controls['[data-category-agent]'].removed, false);
   state.register.dispose();
 });

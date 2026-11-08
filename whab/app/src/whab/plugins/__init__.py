@@ -16,7 +16,7 @@ from whab.domain.formatting import format_date, format_money
 from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
 from whab.domain.money import SUPPORTED_CURRENCIES, currency_code, currency_minor_units
 from whab.domain.receipts import MAX_RECEIPT_BYTES, validate_receipt_selection
-from whab.domain.transactions import UNSET, validate_review_batch
+from whab.domain.transactions import UNSET, validate_category_agent, validate_review_batch
 from whab.receipts import receipt_media_type
 from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
 
@@ -37,6 +37,7 @@ from .sdk import (
     AccountOverview,
     AccountSettings,
     AccountSnapshot,
+    AgentCategoryStorage,
     BankAdapter,
     BankContext,
     BankContinuationService,
@@ -143,9 +144,11 @@ __all__ = [
     "format_date",
     "format_money",
     "API_VERSION",
+    "AgentCategoryStorage",
     "ENTRYPOINT_GROUP",
     "UNSET",
     "validate_review_batch",
+    "validate_category_agent",
     "validate_receipt_selection",
     "LedgerService",
     "RequestConflict",

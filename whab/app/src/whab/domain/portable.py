@@ -12,6 +12,7 @@ from .budget import ROLLOVER_MODES
 from .categories import validate_child_category
 from .errors import StoreError
 from .money import MAX_SAFE_INTEGER, currency_code, minor_units
+from .transactions import validate_category_agent
 from .validation import validate_date, validate_month
 
 ACCOUNT_FIELDS = frozenset({
@@ -101,7 +102,7 @@ def validate_portable_budget(data: object) -> dict:
             account["type"] = "other"
         accounts[index] = normalize_account(account)
     categories = _records(data["categories"], CATEGORY_FIELDS, 10000)
-    transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000, optional=frozenset({"original"}))
+    transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000, optional=frozenset({"original", "categoryAgent"}))
     assignments = _records(data["assignments"], ASSIGNMENT_FIELDS, 250000)
     future_funding = _records(data.get("futureFunding", []), FUTURE_FUNDING_FIELDS, 250000)
     rollover_modes = _records(data.get("rolloverModes", []), ROLLOVER_MODE_FIELDS, 250000)
@@ -157,6 +158,12 @@ def validate_portable_budget(data: object) -> dict:
         _booleans(transaction, (
             "pending", "reviewed", "isTransfer", "inferredTransfer", "categoryEdited", "deleted",
         ))
+        if "categoryAgent" in transaction:
+            label = validate_category_agent(transaction["categoryAgent"])
+            if label is None:
+                transaction.pop("categoryAgent")
+            elif not transaction["categoryEdited"]:
+                raise StoreError("Agent attribution requires an explicitly edited category.")
         money(transaction["amount"], account["currency"])
         if "original" in transaction:
             original = transaction["original"]

@@ -156,6 +156,9 @@ def annotated_transaction(record: ImportedTransaction, annotations: dict) -> dic
         "categoryEdited": bool(annotations.get("categoryEdited")),
         "deleted": False,
     }
+    if annotations.get('categoryEdited') and annotations.get('categoryAgent') is not None:
+        from .transactions import category_agent_fields
+        result.update(category_agent_fields(annotations['categoryAgent']))
 
     if "original" in annotations:
         result["original"] = {key: result[key] for key in annotations["original"]}

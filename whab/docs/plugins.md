@@ -938,3 +938,30 @@ documents the full public report. Provider templates receive a generation-scoped
 `bank_asset_prefix` from their `bank_panels` entry's `asset_prefix`; visual plugins
 pass it through when including provider templates so provider-owned styles remain
 replaceable and retain the captured generation.
+
+
+## Explicit categorizing agents
+
+WHAB 2.61 adds the optional public transaction field `categoryAgent` and SDK
+`AgentCategoryStorage`. An adapter opts in with `supports_category_agent() -> bool`
+returning exactly `True` and an atomic `edit_transaction_details` implementation.
+The host forwards `categoryId` and `categoryAgent` in the same changes object;
+missing/false capability rejects labelled edits before mutation. Existing required
+`StorageBackend` methods stay unchanged. Native workers advertise the optional
+method, and remote clients forward the complete intent for authority validation.
+An older authority rejects the unknown field rather than dropping it.
+
+Use SDK `validate_category_agent` for `None` or a 1–80 character printable string
+without surrounding whitespace. A label (including explicit null) requires an
+explicit `categoryId` in the same edit. Null or an omitted label on a category
+write clears prior attribution. Review, memo and financial-detail-only changes
+preserve it. Review state changes only when requested. Provider refreshes and
+pending-to-posted matches preserve the marker with the category override, without
+altering import `source`.
+
+Public transactions omit `categoryAgent` when unknown. Portable v1 transactions
+accept this optional field, require a category override for non-null attribution
+and normalize null to absence. Storage adapters must retain it across public
+reads, checkpoints, native reopen and portable roundtrips. Legacy history has no
+inferred author. Labels identify a caller's claim and are not authentication or
+an immutable audit log. See the [CLI examples](../app/plugins/interface/cli/README.md#agent-category-labels).

@@ -304,6 +304,11 @@ class LedgerService:
             if "amount" in payload and not payload["amount"]:
                 raise StoreError("Amount must not be zero.")
         if operation == "edit_transaction":
+            if 'categoryAgent' in payload:
+                from whab.domain.transactions import validate_category_agent
+                validate_category_agent(payload['categoryAgent'])
+                if 'categoryId' not in payload:
+                    raise StoreError('An agent label requires an explicit category change.')
             if not payload.keys() & {"categoryId", "reviewed", "note", "accountId", "date", "merchant", "amount"}:
                 raise StoreError("No transaction changes provided.")
             if "reviewed" in payload and type(payload["reviewed"]) is not bool:
@@ -374,7 +379,11 @@ class LedgerService:
                         if payload.get("reviewed") is not True:
                             raise StoreError("Review the transaction to accept a category suggestion.")
                         payload.setdefault("categoryId", suggestion["categoryId"])
-                    if payload.keys() & {"accountId", "date", "merchant", "amount"}:
+                    if 'categoryAgent' in payload:
+                        supported = getattr(self._store, 'supports_category_agent', None)
+                        if not callable(supported) or supported() is not True:
+                            raise StoreError('Update the budget storage plugin to save agent category labels.')
+                    if payload.keys() & {"accountId", "date", "merchant", "amount", "categoryAgent"}:
                         details = getattr(self._store, "edit_transaction_details", None)
                         if not callable(details):
                             raise StoreError("Update the budget storage plugin to edit transaction details.")
@@ -771,12 +780,14 @@ class LedgerService:
     def categorize(self, workspace, payload):
         return self._local_command("categorization", workspace, payload)
 
-    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET, suggestion_id=None, details=None):
+    def edit_transaction(self, workspace, transaction_id, category_id=UNSET, reviewed=None, note=UNSET, suggestion_id=None, details=None, category_agent=UNSET):
         payload = {"transactionId": transaction_id}
         if suggestion_id is not None:
             payload["suggestionId"] = suggestion_id
         if category_id is not UNSET:
             payload["categoryId"] = category_id
+        if category_agent is not UNSET:
+            payload['categoryAgent'] = category_agent
         if reviewed is not None:
             payload["reviewed"] = reviewed
         if note is not UNSET:

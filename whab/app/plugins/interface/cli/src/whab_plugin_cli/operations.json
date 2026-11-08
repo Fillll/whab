@@ -695,6 +695,15 @@
                 "deleted": {
                   "type": "boolean",
                   "description": "Portable tombstone marker."
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
+                  "minLength": 1,
+                  "maxLength": 80
                 }
               },
               "additionalProperties": true
@@ -2055,6 +2064,15 @@
                 "accountName": {
                   "type": "string",
                   "description": "Name from the same-budget, same-revision public accounts read; falls back to the account ID if the account is unavailable."
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
+                  "minLength": 1,
+                  "maxLength": 80
                 }
               },
               "additionalProperties": true
@@ -2211,7 +2229,7 @@
         "HTTPS/authentication/storage failures are sanitized; responses over 16 MiB fail. --limit bounds display only; use --month to reduce an oversized history read."
       ],
       "retry": "Safe to rerun a read, including after a revision mismatch. No automatic replay or mutation is performed.",
-      "availability": "CLI 2.4+ with WHAB 2.60+. whab BUDGET trnx uncategorized; transactions and uncategorised are aliases. Uses the existing authenticated local queries/transactions and queries/accounts. --help remains offline."
+      "availability": "CLI 2.4+ with WHAB 2.60+. whab BUDGET trnx uncategorized; transactions and uncategorised are aliases. Uses the existing authenticated local queries/transactions and queries/accounts. --help remains offline. Records retain optional categoryAgent when an agent explicitly cleared a category."
     }
   ]
 }

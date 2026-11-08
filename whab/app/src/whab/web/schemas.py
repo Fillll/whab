@@ -39,6 +39,7 @@ class Body(BaseModel):
 
 
 class ReviewBody(Body):
+    categoryAgent: Annotated[str, StringConstraints(min_length=1, max_length=80)] | None = None
     date: str | None = None
     merchant: Label | None = None
     amount: Cents | None = None
