@@ -153,6 +153,14 @@ def test_agent_labels_roundtrip_through_whab_api_and_native_storage(tmp_path, mo
         "edit_transaction", {"transactionId": identifier, "categoryId": "dining"}, "human-category"
     )
     assert "categoryAgent" not in run("api", "--budget", budget, "query", "transactions")["data"][0]
+    assert run(budget, "trnx", "categories")["data"]
+    result = run(budget, "trnx", "categorize", identifier, "--category", "Groceries", "--agent", "Codex", "--needs-review")
+    row = run(budget, "trnx", "non-reviewed")["data"][0]
+    assert row["categoryAgent"] == "Codex" and row["reviewed"] is False
+    retry = run(budget, "trnx", "categorize", identifier, "--category", "Groceries", "--agent", "Codex", "--needs-review", "--revision", result["expectedRevision"], "--request-id", result["requestId"])
+    assert retry == result
+    run(budget, "transactions", "categorise", identifier, "--clear")
+    assert "categoryAgent" not in run(budget, "trnx", "uncategorized")["data"][0]
     endpoint = home / "run/sandbox/host.json"
     deadline = monotonic() + 10
     while endpoint.exists() and monotonic() < deadline:

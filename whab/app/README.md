@@ -8,7 +8,7 @@ A Python budgeting app with monthly envelopes and rollover, transaction review, 
 
 The CLI plugin installs `whab`. Start with `whab --help`, then
 `whab budget create --help`. Name-addressed commands create budgets, manage
-plugins and read reports through the existing local host. CLI commands default
+plugins, read reports and categorize transactions through the existing local host. CLI commands default
 to production; choose `--environment sandbox` explicitly for tests. See the
 [CLI guide](plugins/interface/cli/README.md#simple-console) for default profiles
 and examples. The detailed `whab-cli` interface remains available.
