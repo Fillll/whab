@@ -175,3 +175,27 @@ def test_full_restore_refuses_unrecorded_import_or_external_financial_changes():
     assert s['history']['entries'][-2]['operation'] == 'import_workspace'
     with pytest.raises(StoreError, match='provider/import'):
         history.public_preview(s, 'restore', saved)
+
+
+@pytest.mark.parametrize('action', ['undo', 'redo'])
+def test_planning_reversal_cannot_overcommit_funds_used_by_later_allocations(action):
+    s = initial_state('personal','2026-11')
+    commands.add_account(s,'cash',{'name':'Fictional','type':'depository','balance':10000})
+    def assign(category, value):
+        before = deepcopy(s)
+        commands.assign(s,category,'2026-11',value,as_of_month='2026-11')
+        history.record_states(before,s,{'operation':'assign'})
+        return s['history']['entries'][-1]['id']
+    original = assign('groceries',10000)
+    if action == 'undo':
+        target = assign('groceries',0)
+    else:
+        target = original
+        apply(s,'undo',target)
+    assign('dining',10000)
+    before = deepcopy(s)
+    with pytest.raises(StoreError, match='Later financial changes'):
+        history.public_preview(s,action,target)
+    assert s == before
+    apply(s,'restore',original)
+    assert s['budget']['2026-11'] == {'groceries':10000}

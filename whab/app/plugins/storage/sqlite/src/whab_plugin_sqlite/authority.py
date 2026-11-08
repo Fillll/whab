@@ -233,7 +233,7 @@ class Authority:
                 stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
                 cached = getattr(self, '_history_heads', {}) if getattr(self, '_history_stamp', None) == stamp else {}
                 names = (workspace,) if type(workspace) is str and workspace in {'personal', 'demo'} else ('personal', 'demo')
-                history_before = {name: cached[name] if name in cached else snapshot(self, name) for name in names} if financial else {}
+                history_before = {name: cached[name] if name in cached else snapshot(self, name) for name in names if self.db.execute("SELECT 1 FROM meta WHERE workspace=?", (name,)).fetchone()} if financial else {}
                 history_after = dict(cached) if financial else {}
                 selected = (tuple(transaction_ids) if type(transaction_ids) in {tuple, list} and 0 < len(transaction_ids) <= 100 and all(type(key) is str for key in transaction_ids) else None)
                 # User/legacy SQL triggers can touch additional rows; do not use

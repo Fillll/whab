@@ -238,6 +238,16 @@ def _apply(rows, changes, *, inverse):
             rows[path] = deepcopy(wanted)
 
 
+def _annotations_only(entries):
+    allowed = {'categoryId', 'categoryAgent', 'categoryEdited', 'isTransfer',
+               'inferredTransfer', 'reviewed', 'note', 'merchant', 'merchantLogo', 'date'}
+    return all(change['path'][0] == 'transactions'
+               and change['before'] is not None and change['after'] is not None
+               and {key for key in change['before'].keys() | change['after'].keys()
+                    if change['before'].get(key) != change['after'].get(key)} <= allowed
+               for entry in entries for change in entry['changes'])
+
+
 def preview(journal, current, action, target):
     current = financial(current)
     if journal:
@@ -267,6 +277,11 @@ def preview(journal, current, action, target):
             raise StoreError('This history target is already undone.')
         if action == 'redo' and (not related or related[-1]['action'] != 'undo'):
             raise StoreError('Redo requires a matching undo.')
+        if not _annotations_only(selected):
+            anchor = entries.index(related[-1]) if related else min(entries.index(entry) for entry in selected)
+            selected_ids = {entry['id'] for entry in selected}
+            if any(entry['changes'] and entry['id'] not in selected_ids for entry in entries[anchor + 1:]):
+                raise StoreError('Later financial changes may depend on this earlier state. Restore a complete reviewed snapshot instead of reversing this entry or batch.')
         rows = flatten(current)
         if action == 'undo':
             for entry in reversed(selected):

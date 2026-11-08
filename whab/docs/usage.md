@@ -301,7 +301,10 @@ accounts, categories, transactions, assignments and carryover/future-funding pol
 Bank credentials, sync cursors, plugin configuration and attachment bytes are
 excluded. Provider/import/attachment changes are logged as barriers: full restore
 cannot cross them. Entry/batch undo compares the complete affected records and
-refuses conflicts or invalid references/currencies; disjoint later edits survive.
+refuses conflicts or invalid references/currencies. Transaction annotations retain
+disjoint later edits; other reversals require no later financial changes that
+might depend on the earlier state. A complete reviewed snapshot restores the
+whole financial state instead.
 No external bank operation is replayed. Historical snapshot export is read-only.
 
 CLI examples (replace fictional names/IDs and review the returned preview):
