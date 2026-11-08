@@ -248,6 +248,7 @@ class Authority:
                     info = getattr(self, '_history_context', None)
                     if info is None:
                         info = {'actor': 'System', 'actorKind': 'system', 'operation': operation.name if operation is not None else transaction.get('history_operation', 'change')}
+                    info = {**info, **transaction.get('history_action', {})}
                     for name, old in history_before.items():
                         if name != (operation.workspace if operation is not None else transaction.get("workspace", name)):
                             continue
@@ -343,6 +344,8 @@ class Authority:
             if replay is not None:
                 return replay
             transaction["operation"] = operation
+            if name == "history_apply":
+                transaction["history_action"] = {"operation": "history", "action": payload["action"], "target": payload.get("target")}
             transaction["result"] = dispatch_storage_operation(self, operation)
             transaction["dirty"] = True
         return OperationResult(transaction["receipt"])

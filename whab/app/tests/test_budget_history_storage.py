@@ -156,3 +156,17 @@ def test_snapshot_only_history_cannot_be_replaced_by_a_pristine_restore(history_
     with pytest.raises(StoreError, match='history|empty'):
         backend.restore_budget('personal', portable_snapshot(initial_state('personal','2026-11')))
     assert backend.export_budget('personal') == before
+
+
+def test_raw_native_history_commands_preserve_action_without_a_host_metadata_scope(history_store):
+    backend, _, _ = history_store
+    command(backend, 'add_account', {'name':'Fictional raw SDK','type':'depository','balance':100})
+    target = backend.budget_history('personal')['entries'][0]['id']
+    for action, identifier in [('undo',target),('redo',target),('snapshot',None)]:
+        preview = backend.history_preview('personal', action, identifier)
+        evidence = backend.commit_evidence()
+        operation = StorageOperation(str(uuid4()), evidence.authority_epoch, evidence.generation, 'personal', 'history_apply', canonical_storage_json({'action':action,'target':identifier,'fingerprint':preview['fingerprint']}))
+        backend.execute_operation(operation)
+        entry = backend.budget_history('personal')['entries'][0]
+        assert entry['action'] == action and entry['target'] == identifier
+    assert backend.budget_history('personal')['entries'][0]['hasSnapshot']

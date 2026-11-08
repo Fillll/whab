@@ -173,6 +173,12 @@ class Authority:
                 result = dispatch_storage_operation(self, operation)
                 from whab.domain.history import record_states
                 info = getattr(self, '_history_context', None) or {'actor': 'System', 'actorKind': 'system', 'operation': operation.name}
+                values = read_storage_json(operation.payload, limit=operation_limit(operation.name))
+                name = operation.name
+                if name == 'recorded_command':
+                    name, values = values['operation'], values['parameters']
+                if name == 'history_apply':
+                    info = {**info, 'operation': 'history', 'action': values['action'], 'target': values.get('target')}
                 restored_workspace = candidate.pop("historyRestore", None)
                 for workspace, old in self._data['workspaces'].items():
                     if workspace != operation.workspace or workspace == restored_workspace:
