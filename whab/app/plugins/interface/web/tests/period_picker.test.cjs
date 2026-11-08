@@ -35,7 +35,7 @@ function harness() {
   const start = element(), end = element();
   const form = element({elements: {start_date: start, end_date: end},
     querySelector: selector => selector.includes('start_date') ? start : selector.includes('end_date') ? end : null});
-  const choices = ['current-month', 'previous-month', 'current-year', 'previous-year'].map(period => element({dataset: {periodChoice: period}}));
+  const choices = ['current-month', 'previous-month', 'current-year', 'previous-year', 'all'].map(period => element({dataset: {periodChoice: period}}));
   const picker = element({querySelector: selector => ({
     '#transaction-period-toggle': toggle, '[data-period-popup]': popup, '[data-period-form]': form,
     '[data-period-error]': error,
@@ -51,7 +51,7 @@ function harness() {
 }
 
 test('period presets choose a relative period and close the popup', () => {
-  for (const [index, period] of ['current-month', 'previous-month', 'current-year', 'previous-year'].entries()) {
+  for (const [index, period] of ['current-month', 'previous-month', 'current-year', 'previous-year', 'all'].entries()) {
     const state = harness();
     state.toggle.emit('click');
     assert.equal(state.popup.hidden, false);
