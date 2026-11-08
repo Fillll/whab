@@ -3,7 +3,7 @@
 {% set selected_ids = selected_account_ids|default([selected_account.id] if selected_account else []) %}
 {% set show_account_column = true %}
 {% set filter_period = transaction_period|default('all' if transaction_all_dates else 'custom') %}
-{% set period_label = transaction_period_label|default('Custom dates' if transaction_all_dates else month_label(month)) %}
+{% set period_label = 'All' if filter_period == 'all' else transaction_period_label|default('Custom dates' if transaction_all_dates else month_label(month)) %}
 {% set review_state = transaction_review_filter|default('all') %}
 {% set review_labels = {'all': 'All', 'needs-review': 'Needs review', 'reviewed': 'Reviewed'} %}
 {% set next_review_labels = {'all': 'Needs review', 'needs-review': 'Reviewed', 'reviewed': 'All'} %}
@@ -49,6 +49,7 @@
     <button class="account-picker-toggle" id="transaction-period-toggle" type="button" aria-label="Transaction period: {{ period_label }}" aria-expanded="false" aria-controls="transaction-period-options"><span data-period-label>{{ period_label }}</span>{{ icon('chevron-down',14) }}</button>
     <div id="transaction-period-options" class="transaction-period-popup" data-period-popup hidden>
       <div class="transaction-period-presets">
+        <button type="button" data-period-choice="all" aria-pressed="{{ 'true' if filter_period == 'all' else 'false' }}">All</button>
         <button type="button" data-period-choice="current-month" aria-pressed="{{ 'true' if filter_period == 'current-month' else 'false' }}">This month</button>
         <button type="button" data-period-choice="previous-month" aria-pressed="{{ 'true' if filter_period == 'previous-month' else 'false' }}">Previous month</button>
         <button type="button" data-period-choice="current-year" aria-pressed="{{ 'true' if filter_period == 'current-year' else 'false' }}">This year</button>

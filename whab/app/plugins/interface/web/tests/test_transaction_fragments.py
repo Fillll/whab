@@ -207,3 +207,27 @@ def test_register_fragment_does_not_bypass_local_request_guards(client, header, 
     response = client.get("/budgets/demo/transactions/2026-08/usd", headers={**fragment, **header})
     assert response.status_code == status
     assert "transactions-table" not in response.text
+
+
+@pytest.mark.parametrize('headers', [{}, FRAGMENT])
+def test_all_period_exposes_full_history_with_account_search_and_review_scope(client, store, headers):
+    account = store.add_account('personal', {'name': 'Fictional scoped wallet', 'type': 'depository', 'balance': 100000})
+    other = store.add_account('personal', {'name': 'Other fictional wallet', 'type': 'depository', 'balance': 100000})
+    identifiers = [store.add_transaction('personal', {
+        'accountId': account, 'date': date, 'merchant': 'Matched fictional purchase', 'amount': 100, 'categoryId': None,
+    }) for date in ('2024-01-02', '2026-11-03', '2027-02-04')]
+    excluded = store.add_transaction('personal', {
+        'accountId': other, 'date': '2024-01-02', 'merchant': 'Matched other account', 'amount': 100, 'categoryId': None,
+    })
+    path = f'/budgets/home/transactions/current-month/usd?account={account}&period=all&q=Matched&review=needs-review'
+    response = client.get(path, headers=headers)
+    assert response.status_code == 200
+    assert 'data-period-choice="all" aria-pressed="true">All</button>' in response.text
+    assert 'data-period-label>All</span>' in response.text
+    assert all(f'data-transaction-id="{identifier}"' in response.text for identifier in identifiers)
+    assert f'data-transaction-id="{excluded}"' not in response.text
+    assert '3 transactions · All dates' in response.text
+    store.edit_transaction('personal', identifiers[0], reviewed=True)
+    reviewed = client.get(path, headers=headers)
+    assert f'data-transaction-id="{identifiers[0]}"' not in reviewed.text
+    assert all(f'data-transaction-id="{identifier}"' in reviewed.text for identifier in identifiers[1:])
