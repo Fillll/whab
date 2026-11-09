@@ -911,11 +911,11 @@ class Store(Authority):
                 ):
                     raise StoreError("An existing account currency cannot change.")
                 if previous_account:
-                    for field in ("type", "onBudget", "subtype", "closed"):
-                        normalized_account[field] = previous_account.get(field, False) if field == "closed" else previous_account[field]
-                    for field in ("bankWebsite", "nameOverridden"):
+                    for field in ("type", "onBudget", "subtype"):
+                        normalized_account[field] = previous_account[field]
+                    for field in ("bankWebsite", "nameOverridden", "closed"):
                         if field in previous_account:
-                            normalized_account[field] = previous_account.get(field, False) if field == "closed" else previous_account[field]
+                            normalized_account[field] = previous_account[field]
                     if previous_account.get("nameOverridden"):
                         normalized_account["name"] = previous_account["name"]
                 state["accounts"][normalized_account["id"]] = normalized_account
