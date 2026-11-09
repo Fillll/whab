@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.2 — 2026-11-09
+
+PR: [#177](https://github.com/Fillll/whab/pull/177)
+
+- Require Python 3.15.x only in package metadata and current guidance; retain the existing public behavior and data contracts.
+
 ## 0.11.1 — 2026-11-01
 
 PR: [#143](https://github.com/Fillll/whab/pull/143)

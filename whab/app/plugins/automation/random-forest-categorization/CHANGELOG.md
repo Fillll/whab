@@ -1,5 +1,11 @@
 # Random forest categorization plugin changelog
 
+## 1.3.3 — 2026-11-09
+
+PR: [#177](https://github.com/Fillll/whab/pull/177)
+
+- Require Python 3.15.x only in package metadata and current guidance; retain the existing public behavior and data contracts.
+
 ## 1.3.2 — 2026-11-01
 
 PR: [#142](https://github.com/Fillll/whab/pull/142)

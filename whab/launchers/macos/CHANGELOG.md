@@ -1,5 +1,11 @@
 # macOS launcher changelog
 
+## 1.3.0 — 2026-11-09
+
+PR: [#177](https://github.com/Fillll/whab/pull/177)
+
+- Bundle and invoke Python 3.15.x only. Validate cached interpreters before reuse/launch and before stopping for Restart; document the supported runtime switch while preserving existing homes, keys and backups.
+
 ## Unreleased
 
 ## 1.2.0 — 2026-11-04

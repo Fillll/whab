@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.4.7 — 2026-11-09
+
+PR: [#177](https://github.com/Fillll/whab/pull/177)
+
+- Require Python 3.15.x only in package metadata and current guidance; retain the existing public behavior and data contracts.
+
 ## 1.4.6 — 2026-11-08
 
 PR: [#175](https://github.com/Fillll/whab/pull/175)
