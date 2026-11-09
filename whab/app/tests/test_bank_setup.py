@@ -114,6 +114,18 @@ def test_currency_and_foreign_connection_destinations_are_rejected(ledger):
         configure(ledger, [account()], {'account': {'accountId': 'foreign-account', 'since': None}})
 
 
+def test_unclassified_imported_destination_requires_an_explicit_financial_type(ledger):
+    target = ledger.add_account('personal', {'name': 'Checking name cannot classify it', 'type': 'other', 'balance': 0})
+    before = ledger.commit_evidence()
+    with pytest.raises(StoreError, match='Classify this destination'):
+        configure(ledger, [account()], {'account': {'accountId': target, 'since': None}})
+    assert ledger.commit_evidence() == before
+    assert ledger.accounts('personal')[0]['type'] == 'other'
+    ledger.update_account('personal', target, {'type': 'depository'})
+    configure(ledger, [account()], {'account': {'accountId': target, 'since': None}})
+    assert ledger.get_item('item')['syncSettings']['account']['accountId'] == target
+
+
 @pytest.mark.parametrize('value', [None, [], {'': {}}, {'a': {}}, {'a': {'accountId': 'b', 'since': 'invalid'}},
     {'a': {'accountId': 'b', 'since': None}, 'c': {'accountId': 'b', 'since': None}}])
 def test_invalid_account_settings(value):

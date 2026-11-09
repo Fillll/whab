@@ -499,7 +499,7 @@ class BankCoordinator:
                 for account in response['accounts']],
             'destinations': [{key: account[key] for key in ('id', 'name', 'currency', 'itemId') if key in account}
                 | {'latestDate': latest.get(account['id']), 'type': account['type'],
-                   'available': account['type'] != 'unclassified' and account.get('itemId') in (None, self.bank_store.item_identity(item_id))} for account in accounts],
+                   'available': account['type'] not in {'other', 'unclassified'} and account.get('itemId') in (None, self.bank_store.item_identity(item_id))} for account in accounts],
         }
 
     async def sync_preview(self, item_id):
