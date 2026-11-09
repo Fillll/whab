@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.10.0 — 2026-11-08
+
+PR: [#175](https://github.com/Fillll/whab/pull/175)
+
+- Add name-addressed account close/reopen, independent lifecycle state in JSON/tables, active/closed list filters and detailed offline help. Expose the existing deposit/cd classification and all canonical types; keep scope explicit, preserve lifecycle when classifying, and verify each guarded saved result without uncertain-write replay.
+
 ## 2.9.1 — 2026-11-08
 
 PR: [#174](https://github.com/Fillll/whab/pull/174)

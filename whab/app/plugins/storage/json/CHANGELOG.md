@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0 — 2026-11-08
+
+PR: [#175](https://github.com/Fillll/whab/pull/175)
+
+- Persist archive state and bounded private account resume cursors through native reopen/copies/recovery, while portable exports retain only financial lifecycle. Preserve compatible open-default digests and expose durable lifecycle support; bank merges skip archives without blocking open peers.
+
 ## 1.8.0 — 2026-11-08
 
 PR: [#169](https://github.com/Fillll/whab/pull/169)
