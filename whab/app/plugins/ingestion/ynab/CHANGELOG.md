@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.4.5 — 2026-11-08
+
+PR: [#174](https://github.com/Fillll/whab/pull/174)
+
+- Add one packaged eight-stage CLI migration guide covering permanent budget selection, reviewed USD/fingerprint import, confirmed account classification, optional shared Plaid attachment, explicit account mapping/history choices, reviewed sync, financial verification limits and six-hour updates. Separate optional device/environment background wakeups and preserve the SDK-only parser boundary.
+
 ## 1.4.4 — 2026-11-06
 
 PR: [#156](https://github.com/Fillll/whab/pull/156)
