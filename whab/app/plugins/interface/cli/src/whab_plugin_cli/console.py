@@ -25,6 +25,7 @@ from .history_commands import add_history_parser, execute_history
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 from .transaction_commands import add_category_parsers, execute_category
 from .transaction_reads import add_uncategorized_parser, transaction_table, uncategorized_report
+from .transaction_search import add_search_parser, execute_search, search_table, validate_search
 
 PREFIX = "/api/local/v1"
 ROOT_COMMANDS = {"budget", "plugin", "api", "BUDGET"}
@@ -92,6 +93,7 @@ def parser(options, argv=()):
         epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
     unreviewed.add_argument("--month", help="Limit to YYYY-MM; default: all history")
     add_uncategorized_parser(reads)
+    add_search_parser(reads, catalog)
     add_category_parsers(reads)
     groups.add_parser("api", help="Advanced local operations; use whab api --help")
     return root
@@ -194,6 +196,8 @@ def execute_import(connection, identifier, args, raw, fingerprint):
 
 
 def execute(args, home, environment, ca):
+    if args.scope == "BUDGET" and args.command in {"transactions", "trnx"} and args.filter == "list":
+        validate_search(args, CommandError)
     raw, fingerprint = import_file(args) if args.scope == "BUDGET" and args.command == "import" else (None, None)
     with local_connection(home, environment, ca=ca) as connection:
         if args.scope == "budget":
@@ -203,6 +207,8 @@ def execute(args, home, environment, ca):
                 json={"name": args.name, "path": create_path(args.name, args.path)})
         identifier = resolve_budget(connection, args.target)
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
+        if args.command in {"transactions", "trnx"} and args.filter == "list":
+            return execute_search(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter in {"categories", "categorize", "categorise"}:
             return execute_category(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "category":
@@ -263,7 +269,8 @@ def main(argv=None):
         else:
             result = execute(args, *configuration(args))
         if getattr(args, "format", None) == "table":
-            print(account_table(result) if args.command == "account" else category_table(result) if args.command == "category" else transaction_table(result))
+            print(account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
+                  else search_table(result) if args.filter == "list" else transaction_table(result))
         else:
             print(json.dumps(result, allow_nan=False))
         return 0

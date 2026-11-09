@@ -1923,6 +1923,325 @@
       "availability": "WHAB 2.60+, CLI 2.3+, and Plaid 1.7+; provider must declare BankAdapter.supports_investments. Plaid Investments must be separately enabled/consented. Investment history availability varies by institution; default window is two years."
     },
     {
+      "name": "transactions.list",
+      "kind": "local",
+      "summary": "Complete transaction search (read-only):\n  whab \"My budget\" trnx list --since 2026-08-01 --merchant \"Fictional Village\" --format table\n  whab \"My budget\" trnx list --since 2026-08-01 --until 2026-08-31 --merchant \"Fictional Mortgage\"\n  whab \"My budget\" trnx list --merchant \"Fictional Village\" --merchant \"Fictional Mortgage\"\n\nDefault: all available nondeleted history, all accounts/currencies, reviewed and\nunreviewed, categorized and uncategorized, pending/posted, transfers and refunds.\n--since and --until are inclusive YYYY-MM-DD bounds; either can be omitted.\n--merchant matches a case-insensitive literal substring of the merchant only.\nRepeat it for OR (ANY supplied text). Spaces/emoji/non-Latin text are supported;\nquote spaces. No fuzzy, regex, wildcard, synonym or lender inference. Different\nmortgage lenders are not aliases. Without --merchant, all merchants match.\n--month YYYY-MM optionally restricts the initial public read and intersects bounds.\n\nResults: budgetId/revision, filters, total/returned, complete=true and every matching\npublic transaction, newest date first with stable ID tie-breaker (no intraday time).\nRows retain IDs, dates, account IDs/names, merchants, integer minor-unit amounts,\ncurrencies, category IDs/names/groups, notes, agent labels and pending/review status.\nTables show stable IDs in full, separate currency and review/status columns; names\nmay be shortened. JSON is authoritative. Positive amounts are outflows, negative\namounts are inflows/refunds. Never combine currencies.\n\nCompleteness: no default limit or hidden pagination. Every successful read returns\nall matches (total=returned=len(data), complete=true). Each public response is\nbounded to 16 MiB; oversized, failed or inconsistent budget/revision reads fail\nwithout partial output. Date/merchant filters run locally after the history read;\nuse --month and inspect each month separately if the initial history is too large.\nRerun a read after a concurrent change; do not treat a stale revision as write consent.\n\nNext: inspect ALL matches and categories before deciding:\n  whab \"My budget\" trnx categories\n  whab \"My budget\" trnx categorize TRANSACTION_ID --category \"Housing / Fictional home\" --agent Codex\nRerun the identical list after edits; compare stable ID sets/counts and category IDs.\nCategorize is a separate guarded edit; review is preserved unless --needs-review.\nRetain original arguments/revision/request ID after an uncertain write, inspect the\nsaved result, and never automatically replay a new intent. This list never edits,\nreviews, syncs or creates a persistent future categorization rule. Help is offline.",
+      "input": {
+        "type": "object",
+        "description": "whab BUDGET trnx list [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--month YYYY-MM] [--merchant TEXT ...] [--format json|table]. transactions is an alias.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Unique registered budget name or permanent ID; quote spaces and Unicode names."
+          },
+          "since": {
+            "type": "string",
+            "format": "date",
+            "description": "--since inclusive lower date in strict YYYY-MM-DD form; omitted means unbounded."
+          },
+          "until": {
+            "type": "string",
+            "format": "date",
+            "description": "--until inclusive upper date in strict YYYY-MM-DD form; omitted means unbounded. Must not precede since."
+          },
+          "month": {
+            "type": "string",
+            "description": "Optional YYYY-MM; omitting it reads all available history.",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "merchant": {
+            "type": "array",
+            "description": "Repeated --merchant literal substrings, OR together. Unicode casefold matching against merchant only, preserving spaces exactly. No regex/wildcards/fuzzy/lender inference; omit for all merchants. Empty/whitespace-only values are refused.",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Nonblank literal merchant substring."
+            },
+            "default": []
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json",
+            "description": "JSON retains full fields and integer currency minor units. Table formats each currency separately, escapes terminal controls and shortens long text."
+          }
+        },
+        "required": [
+          "budget"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "object",
+          "string"
+        ],
+        "description": "Complete JSON result or readable table text. Success guarantees total=returned=len(data) and complete=true. Amounts retain currency and no financial sums are performed.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Permanent budget ID or default workspace ID."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Current ledger revision; a read does not authorize a stale write."
+          },
+          "complete": {
+            "type": "boolean",
+            "const": true,
+            "description": "True only on success: every matching transaction is returned, with no hidden truncation."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Complete number of matches; equals returned and data length."
+          },
+          "returned": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of returned matches; equals total and data length."
+          },
+          "filters": {
+            "type": "object",
+            "description": "Effective search filters, including omitted/unbounded choices.",
+            "properties": {
+              "since": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Inclusive lower bound or null."
+              },
+              "until": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Inclusive upper bound or null."
+              },
+              "month": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Initial calendar-month read restriction or null."
+              },
+              "merchant": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One literal merchant substring."
+                },
+                "description": "OR merchant text filters; empty matches all."
+              },
+              "merchantMatch": {
+                "type": "string",
+                "const": "case-insensitive-literal-substring-any",
+                "description": "Exact documented matching policy; no inference."
+              }
+            },
+            "required": [
+              "since",
+              "until",
+              "month",
+              "merchant",
+              "merchantMatch"
+            ],
+            "additionalProperties": false
+          },
+          "data": {
+            "type": "array",
+            "description": "All nondeleted matching public transactions, sorted by descending date/ID. All review/category states, pending rows, transfers, refunds and currencies remain included.",
+            "items": {
+              "type": "object",
+              "description": "Public transactions record. Additional compatible projection fields may be present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable record identifier."
+                },
+                "accountId": {
+                  "type": "string",
+                  "description": "Owning account ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Calendar date YYYY-MM-DD."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Payee display name."
+                },
+                "merchantLogo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional public logo key."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Integer minor units; positive outflow, negative inflow."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO currency; no conversion."
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Assigned child category or null."
+                },
+                "pending": {
+                  "type": "boolean",
+                  "description": "Pending rows are excluded from cleared spending."
+                },
+                "reviewed": {
+                  "type": "boolean",
+                  "description": "Explicit transaction review status."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Record origin."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Saved user note."
+                },
+                "isTransfer": {
+                  "type": "boolean",
+                  "description": "Explicit transfer exclusion."
+                },
+                "inferredTransfer": {
+                  "type": "boolean",
+                  "description": "Inferred transfer exclusion."
+                },
+                "categoryEdited": {
+                  "type": "boolean",
+                  "description": "Whether category annotation was explicitly changed."
+                },
+                "deleted": {
+                  "type": "boolean",
+                  "description": "Portable tombstone marker."
+                },
+                "accountName": {
+                  "type": "string",
+                  "description": "Name from the same-budget, same-revision public accounts read; falls back to the account ID if the account is unavailable."
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "categoryName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Assigned category name from the same-budget/same-revision read; null for no category or an unavailable category."
+                },
+                "categoryGroup": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Assigned category parent group from the same-budget/same-revision read; null if unavailable."
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "budgetId",
+          "revision",
+          "complete",
+          "total",
+          "returned",
+          "filters",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "Fictional budget",
+            "since": "2026-08-01",
+            "merchant": [
+              "Fictional Village"
+            ]
+          },
+          "output": {
+            "budgetId": "fictional-budget-id",
+            "revision": "observed-revision",
+            "complete": true,
+            "total": 1,
+            "returned": 1,
+            "filters": {
+              "since": "2026-08-01",
+              "until": null,
+              "month": null,
+              "merchant": [
+                "Fictional Village"
+              ],
+              "merchantMatch": "case-insensitive-literal-substring-any"
+            },
+            "data": [
+              {
+                "id": "fictional-refund",
+                "accountId": "fictional-checking",
+                "accountName": "Fictional checking",
+                "date": "2026-08-01",
+                "merchant": "Fictional Village refund",
+                "amount": -450,
+                "currency": "USD",
+                "categoryId": "fictional-housing",
+                "categoryName": "Fictional home",
+                "categoryGroup": "Housing",
+                "reviewed": true,
+                "pending": false,
+                "source": "manual",
+                "note": "Preserved fictional note",
+                "categoryAgent": "Codex",
+                "isTransfer": false,
+                "inferredTransfer": false
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "budget": "Fictional budget",
+            "merchant": [
+              "No match"
+            ],
+            "format": "table"
+          },
+          "output": "Budget: fictional-budget-id\nTransactions: 0 matched, 0 shown (complete)\nNo matching transactions."
+        }
+      ],
+      "side_effects": "Read-only public transactions/accounts/categories queries. No categorization, review, history, annotation, financial field, settings, sync or bank mutation. Creates no persistent future categorization rule.",
+      "permissions": "Device-local authenticated HTTPS host with ordinary Host/origin protections. Budget management and these reports are personal-workspace only; not a remote ledger API.",
+      "scope": "One name/ID-resolved personal budget, selected runtime/environment (production by default). All accounts and currencies, including off-budget and closed account history. Full nondeleted history unless explicit intersecting date/month/merchant filters. Reviewed/categorized status does not filter results.",
+      "errors": [
+        "Invalid dates, blank merchant text or reversed date bounds fail before host acquisition. Invalid month fails through the existing public query.",
+        "Unknown/ambiguous budget or foreign/mismatched revision responses fail without partial output.",
+        "HTTPS/authentication/storage/transport failures or any response over 16 MiB fail explicitly; no truncated success. Use --month to split an oversized initial history read."
+      ],
+      "retry": "Read-only and safe to rerun after a failure or concurrent revision change. No automatic mutation/replay. After separate categorize writes, rerun identical filters and compare stable IDs/counts/category IDs; this is saved-state verification, not a future rule.",
+      "availability": "CLI 2.12+ with existing WHAB 2.65+ public transaction/account/category queries. --help and packaged offline describe need no runtime, profile or credentials. No new shared API or storage access is required."
+    },
+    {
       "name": "transactions.uncategorized",
       "kind": "local",
       "summary": "List uncategorized transactions with full-match counts, account names, sampling and optional plain table output.",

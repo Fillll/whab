@@ -49,7 +49,7 @@ def uncategorized_report(result, accounts, args):
 
 def terminal_text(value, limit):
     text = ''.join(char if char.isprintable() else f'\\u{ord(char):04x}' for char in str(value))
-    return text if len(text) <= limit else text[:limit - 1] + '…'
+    return text if limit is None or len(text) <= limit else text[:limit - 1] + '…'
 
 
 def transaction_table(result):
