@@ -19,6 +19,7 @@ runtime's original default budget, not whichever budget is open in a browser.
 whab --help
 whab budget list
 whab "My budget" --help
+whab "My budget" trnx list --since 2026-08-01 --merchant "Fictional Village" --format table
 whab "My budget" trnx uncategorized --month 2026-11 --format table
 whab "My budget" trnx categories
 whab "My budget" trnx categorize TRANSACTION_ID --category "Food / Groceries" --agent Codex --needs-review --batch UNIQUE_RUN_ID
@@ -172,6 +173,64 @@ whab api --help
 whab api command edit_transaction --help
 whab api describe --plugin ynab-zip-importer --help
 ```
+
+## Complete transaction search
+
+CLI 2.12 adds `whab BUDGET trnx list` (`transactions list` is an alias). Unlike
+the specialized unreviewed/uncategorized reads, it includes **all** nondeleted
+transactions: reviewed and unreviewed, categorized and uncategorized, pending and
+posted, transfers, refunds, zero amounts, and on/off-budget or archived accounts.
+
+```sh
+whab "My budget" trnx list --help
+whab "My budget" trnx list --since 2026-08-01 --merchant "Fictional Village" --format table
+whab "My budget" trnx list --since 2026-08-01 --until 2026-08-31 --merchant "Fictional Mortgage"
+# Repeated merchant options match ANY supplied text (OR).
+whab "My budget" trnx list --since 2026-08-01 --merchant "Fictional Village" --merchant "Fictional Mortgage"
+```
+
+Date bounds are inclusive and accept real dates in strict `YYYY-MM-DD` form;
+omitting either leaves that side unbounded. Merchant matching is a Unicode
+case-insensitive **literal substring of the merchant only**. Spaces are preserved;
+quote names with spaces/emoji/non-Latin text. There is no regex, wildcard, fuzzy,
+synonym or lender inference: another mortgage lender is not Fictional Mortgage.
+Omit `--merchant` to include all merchants. Optional `--month YYYY-MM` restricts
+the initial public read and intersects the date bounds.
+
+JSON returns `budgetId`, `revision`, effective `filters`, `complete: true`, `total`,
+`returned` and `data`. Success means `total == returned == len(data)`; every match
+is included, with no limit or hidden pagination. Rows retain all public fields,
+including stable IDs, dates, merchant, account ID, amount/currency, category ID,
+notes, agent annotation and pending/review status. `accountName`, `categoryName`
+and `categoryGroup` come from the same budget and revision. Unavailable account
+names fall back to the ID; unavailable/no category names are null, retaining any
+category ID. Results sort by descending date then ID, without inventing intraday
+times. Tables include full transaction IDs, category, currency and separate review
+and posting status; they escape terminal controls and may shorten names. JSON
+retains full text and integer currency minor units. Negative amounts are inflows
+or refunds; currencies are never combined.
+
+All queries are read-only and revision-checked. An oversized response (16 MiB per
+public query), changed revision, foreign budget or transport/storage error fails
+explicitly without partial output. Date/merchant filtering happens after the
+history read; use `--month` and inspect every relevant month separately if the
+initial full history is too large. No shared API was added: the CLI composes the
+existing public transactions, accounts and categories queries.
+
+Inspect **all** results and category definitions before applying a confirmed choice:
+
+```sh
+whab "My budget" trnx categories
+whab "My budget" trnx categorize TRANSACTION_ID --category "Housing / Fictional home" --agent Codex
+whab "My budget" trnx list --since 2026-08-01 --merchant "Fictional Village" --merchant "Fictional Mortgage"
+```
+
+Each category change is a separate existing guarded edit. It preserves review
+unless `--needs-review` is explicit. Re-run the identical list, compare the complete
+stable ID set/count and inspect category IDs to verify saved results. Retain the
+original revision/request ID/arguments after uncertain edits and inspect before
+retrying; never replay with a new intent automatically. Listing never edits,
+reviews or syncs, and creates no persistent future categorization rule.
 
 ## Simple category edits
 
