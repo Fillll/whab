@@ -10,6 +10,27 @@ from whab_plugin_sqlite.schema import initialize_schema
 from whab.domain.errors import StoreError
 
 
+@pytest.mark.parametrize('value', [2, -1, 'closed'])
+def test_portable_archive_flag_rejects_invalid_values_without_mutating_destination(store, value):
+    store.add_account('personal', {'name':'Fictional CD','type':'deposit','subtype':'cd','balance':123})
+    connection = sqlite3.connect(':memory:')
+    try:
+        connection.deserialize(store.export_budget_files()['budget.sqlite'])
+        connection.execute('UPDATE accounts SET closed=?', (value,))
+        connection.commit()
+        image = connection.serialize()
+    finally:
+        connection.close()
+    target = Store(':memory:', month='2026-10')
+    try:
+        before = target.export_budget()
+        with pytest.raises(StoreError, match='integer booleans'):
+            target.restore_budget_files('personal', {'budget.sqlite':image})
+        assert target.export_budget() == before
+    finally:
+        target.close()
+
+
 def test_account_classification_survives_reopen_and_both_portable_formats(tmp_path):
     path = tmp_path / "accounts.sqlite"
     original = Store(path, month="2026-10")

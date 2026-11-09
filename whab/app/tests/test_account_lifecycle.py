@@ -17,8 +17,16 @@ def lifecycle_store(request, tmp_path):
         from whab_plugin_json import Store
         path = tmp_path / 'fictional.json'
     store = Store(path, month='2026-10')
-    yield store, lambda: Store(path, month='2026-10')
-    store.close()
+    opened = [store]
+
+    def reopen():
+        restored = Store(path, month='2026-10')
+        opened.append(restored)
+        return restored
+
+    yield store, reopen
+    for handle in opened:
+        handle.close()
 
 
 def account(identifier='cd', **changes):
@@ -92,7 +100,9 @@ def test_imported_cd_unknown_balance_history_and_portable_roundtrip(lifecycle_st
 
 
 def test_closed_bank_account_is_frozen_while_peer_syncs_and_reopen_replays_checkpoint(lifecycle_store):
-    store,_=lifecycle_store
+    from whab.plugins.storage_transfer import decode_local_state
+
+    store,reopen=lifecycle_store
     store.save_item('item','fictional-encrypted-token','Fictional bank')
     records=[account(), account('peer',type='depository',subtype='checking',onBudget=True)]
     store.apply_sync('item',delta(added=[transaction('old'), transaction('peer-old','peer')]),'cursor-1',records)
@@ -116,6 +126,15 @@ def test_closed_bank_account_is_frozen_while_peer_syncs_and_reopen_replays_check
     store.update_account('personal','cd',{'closed':True})
     store.save_item('item','fictional-refreshed-token','Fictional bank')
     assert store.get_item('item')['closedAccountCursors']=={'cd':'cursor-2'}
+    # Resume intent survives both native protected copies and process restarts.
+    snapshot = store.export_local()
+    copied = decode_local_state(snapshot.financial, snapshot.protected)
+    assert copied['personal']['items']['item']['closedAccountCursors'] == {'cd':'cursor-2'}
+    assert copied['personal']['accounts']['cd']['closed']
+    store.close()
+    store = reopen()
+    assert store.get_item('item')['closedAccountCursors'] == {'cd':'cursor-2'}
+    assert next(row for row in store.accounts('personal') if row['id']=='cd') == frozen
     store.update_account('personal','cd',{'closed':False})
     assert store.get_item('item')['cursor']=='cursor-2'
     assert 'closedAccountCursors' not in store.get_item('item')
@@ -123,6 +142,26 @@ def test_closed_bank_account_is_frozen_while_peer_syncs_and_reopen_replays_check
     assert len([row for row in store.transactions('personal') if row['id']=='peer-new'])==1
     assert 'skipped' in {row['id'] for row in store.transactions('personal')}
     assert not next(row for row in store.accounts('personal') if row['id']=='cd').get('closed',False)
+
+
+def test_closed_destinations_keep_existing_mapping_but_reject_new_links(lifecycle_store):
+    store,_ = lifecycle_store
+    store.save_item('item','fictional-encrypted-token','Fictional bank')
+    records = [account()]
+    store.apply_sync('item',delta(),'cursor-1',records)
+    selection = {'cd': {'accountId':'cd','since':None}}
+    store.configure_bank_sync('item',records,selection)
+    store.update_account('personal','cd',{'closed':True})
+    before = store.accounts('personal')
+    store.configure_bank_sync('item',[account(balance=999999)],selection)
+    assert store.accounts('personal') == before
+    assert store.get_item('item')['syncSettings'] == selection
+    target = store.add_account('personal',{'name':'Fictional archived destination','type':'deposit','subtype':'cd','balance':100})
+    store.update_account('personal',target,{'closed':True})
+    evidence = store.commit_evidence()
+    with pytest.raises(StoreError,match='Reopen'):
+        store.configure_bank_sync('item',records,{'cd': {'accountId':target,'since':None}})
+    assert store.commit_evidence() == evidence
 
 
 def test_history_preview_does_not_reopen_or_mutate_resume_cursor(lifecycle_store):
