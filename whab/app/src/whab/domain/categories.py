@@ -85,7 +85,7 @@ def validate_category_groups(groups):
 
 def category_groups(categories: Mapping[str, dict] | Iterable[dict], saved=()) -> list[dict]:
     """Project unique nonassignable parents in their first-seen ledger order."""
-    groups = {row['id']: row for row in validate_category_groups(list(saved))}
+    groups = {row['id']: row for row in validate_category_groups(list(saved) if type(saved) is tuple else saved)}
     for category in _children(categories):
         group_id = category_group_id(category["group"])
         groups.setdefault(group_id, {"id": group_id, "name": _label(category["group"])})

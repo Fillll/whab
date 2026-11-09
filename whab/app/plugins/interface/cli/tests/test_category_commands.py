@@ -300,3 +300,8 @@ def test_detailed_offline_help_without_profile_or_host(monkeypatch, tmp_path, ca
         "no manual reorder",
     ]:
         assert phrase in help_text
+
+
+def test_qualified_names_normalize_legacy_outer_whitespace():
+    row = {"id": "fictional", "name": " 工作室 ", "group": " Finance "}
+    assert resolve_category([row], " finance / 工作室 ", ValueError) == row

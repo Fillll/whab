@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from whab.domain.categories import category_group_id, validate_category_groups
+from whab.domain.categories import category_group_id, category_tree, validate_category_groups
 from whab.plugins import LedgerService, StoreError
 from whab.plugins.storage_transfer import decode_local_state
 from whab.services.ledger import RevisionConflict
@@ -206,6 +206,8 @@ def test_history_can_undo_redo_group_creation_and_move(category_store):
 def test_malformed_saved_groups_are_rejected(groups):
     with pytest.raises(StoreError):
         validate_category_groups(groups)
+    with pytest.raises(StoreError):
+        category_tree({}, groups)
 
 
 def test_older_storage_can_read_derived_groups_but_cannot_mutate_them():

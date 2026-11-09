@@ -106,7 +106,7 @@ def resolve_category(rows, value, error, *, parent=False):
         row
         for row in rows
         if row["name"].strip().casefold() == key
-        or (not parent and f"{row['group']} / {row['name']}".casefold() == key)
+        or (not parent and f"{row['group'].strip()} / {row['name'].strip()}".casefold() == key)
     ]
     if len(matches) != 1:
         candidates = [
