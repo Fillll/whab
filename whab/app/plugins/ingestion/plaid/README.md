@@ -145,9 +145,9 @@ Institution freshness remains provider-dependent. See [Plaid transaction updates
 
 ## Account destinations and transaction history
 
-Plaid 1.6 requires WHAB 2.59+. After connecting a new institution, open **Sync setup** in Plaid settings before the first import. Reviewing accounts fetches provider data without importing transactions or advancing the saved cursor. For each account, select an existing WHAB account in the same currency, create a new account, or choose **Do not import**. Choose a start date explicitly (inclusive), or explicitly select **All available history**. No date is selected automatically. **Save and sync now** saves the selection and imports only the selected accounts.
+Plaid 1.6 requires WHAB 2.59+. After connecting a new institution, select **Choose destinations** beside the bank in Plaid settings before the first import. Reviewing accounts fetches provider data without importing transactions or advancing the saved cursor. For each account, select an existing WHAB account in the same currency, create a new account, or choose **Do not import**. Choose a start date explicitly (inclusive), or explicitly select **All available history**. No date is selected automatically. **Save and sync now** saves the selection and imports only the selected accounts.
 
-Connected-bank rows show each destination account, last four digits when available, and saved history choice on its own line, keeping Sync setup and management controls beside the complete list. Existing connections can also use Sync setup. Linking an auto-created bank account to an existing account joins its existing transaction references while preserving transaction IDs, notes, reviews, categories and receipts. Old history is retained, including rows before the new cutoff; overlapping YNAB/manual history is not automatically matched. Once an explicit destination is saved, changing it to a different account is refused. Moving a cutoff earlier resets the cursor and replays stable provider transaction IDs without duplicating those bank records. Provider availability still bounds the history returned.
+Expand **WHAB destinations** under a connected bank to review its mappings, last four digits and history choices. **Edit destinations** reopens setup in the same window. The picker lists existing WHAB accounts first; unavailable entries show the reason, including unclassified accounts that need an account type in **Accounts**. Linking an auto-created bank account to an existing account joins its existing transaction references while preserving transaction IDs, notes, reviews, categories and receipts. Old history is retained, including rows before the new cutoff; overlapping YNAB/manual history is not automatically matched. Once an explicit destination is saved, changing it to a different account is refused. Moving a cutoff earlier resets the cursor and replays stable provider transaction IDs without duplicating those bank records. Provider availability still bounds the history returned.
 
 ## Manual and regular updates
 
@@ -174,7 +174,7 @@ Use JSON `null` for a new destination account or an explicitly chosen all-histor
 Plaid 1.8 requires WHAB 2.63+. **Use existing connection** lists connections on
 this device in the selected environment, their provider account profile, stable
 connection ID, safe account names/masks, owner and budget attachments. Choose
-**Use this connection**, then **Sync setup** to select this budget's destinations
+**Use this connection**, then **Choose destinations** to select this budget's destinations
 and an explicit inclusive date or **All available history**. Attachment performs
 no Link flow, import or ledger copy. Classify unclassified YNAB destinations
 first; WHAB never infers account types from names. Overlapping YNAB and Plaid

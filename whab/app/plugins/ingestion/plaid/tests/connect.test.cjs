@@ -456,6 +456,7 @@ class SetupNode extends Target {
   append(...children) {for (const child of children) {this.children.push(child); child.parent = this;}}
   setAttribute(name, value) {this[name] = value;}
   replaceChildren(...children) {this.children = []; this.append(...children);}
+  prepend(...children) {this.children.unshift(...children);}
   scrollIntoView() {}
   focus() {this.focused = true;}
   querySelectorAll(selector) {
@@ -472,18 +473,19 @@ test('account setup requires explicit history choices and serializes destination
   const state = harness(); state.replace();
   state.document.createElement = tag => new SetupNode(tag);
   const form = new SetupNode(), choices = new SetupNode(), error = new SetupNode(), save = new SetupNode();
-  choices.dataset.plaidAccountChoices = ''; error.dataset.plaidSetupError = ''; form.append(choices, error, save);
+  choices.dataset.plaidAccountChoices = ''; error.dataset.plaidSetupError = ''; const context = new SetupNode(); context.dataset.plaidSetupContext = ''; form.append(context, choices, error, save);
   save.dataset.plaidSetupSave = '';
   state.current.buttons['[data-plaid-setup-save]'] = [save];
   state.ready();
   state.context.renderSyncSetup(form, {itemId: 'fictional-item', accounts: [{id: 'remote', name: 'Fictional bank', currency: 'USD', mask: '1234', link: null}], destinations: [{id: 'local', name: 'My existing account', currency: 'USD', latestDate: '2026-10-31'}]});
+  assert.equal(form.querySelector('[data-since]').parent.hidden, true);
   const destination = form.querySelector('[data-destination]'), history = form.querySelector('[data-history]'), since = form.querySelector('[data-since]');
   assert.equal(history.value, ''); assert.equal(since.value, '');
   destination.value = 'local'; await destination.emit('change');
   assert.equal(since.value, '');  // Never infer a start date from existing history.
   await save.emit('click'); assert.equal(error.hidden, false); assert.equal(state.requests.length, 0);
   history.value = 'date'; await history.emit('change');
-  assert.equal(since.disabled, false);
+  assert.equal(since.disabled, false); assert.equal(since.parent.hidden, false);
   await save.emit('click'); assert.equal(state.requests.length, 0);
   since.value = '2026-11-01';
   const saving = save.emit('click');
@@ -499,11 +501,51 @@ test('reopened setup keeps previously excluded accounts out of the import select
   const state = harness(); state.replace();
   state.document.createElement = tag => new SetupNode(tag);
   const form = new SetupNode(), choices = new SetupNode(), error = new SetupNode();
-  choices.dataset.plaidAccountChoices = ''; error.dataset.plaidSetupError = ''; form.append(choices, error);
+  choices.dataset.plaidAccountChoices = ''; error.dataset.plaidSetupError = ''; const context = new SetupNode(); context.dataset.plaidSetupContext = ''; form.append(context, choices, error);
   state.context.renderSyncSetup(form, {itemId: 'fictional-item', configured: true, accounts: [{id: 'excluded', name: 'Excluded savings', currency: 'USD', link: null}], destinations: []});
   assert.equal(form.querySelector('[data-destination]').value, 'skip');
   assert.equal(form.querySelector('[data-history]').disabled, true);
   assert.equal(form.querySelector('[data-since]').disabled, true);
+});
+
+test('picker shows named accounts first, explains unavailable choices, and preserves saved destination', () => {
+  const state = harness(); state.replace();
+  state.document.createElement = tag => new SetupNode(tag);
+  const picker = new SetupNode('select');
+  const count = state.context.destinationChoices(picker, {currency: 'USD', link: {accountId: 'local'}}, [
+    {id: 'classified', name: 'Imported savings', currency: 'USD', available: false, type: 'unclassified'},
+    {id: 'local', name: 'Household checking', currency: 'USD', available: true},
+    {id: 'foreign', name: 'Travel', currency: 'EUR', available: true},
+    {id: 'connected', name: 'Other bank', currency: 'USD', available: false, type: 'credit'},
+  ]);
+  assert.equal(count, 1); assert.equal(picker.value, 'local');
+  const [, existing, alternatives, unavailable] = picker.children;
+  assert.equal(existing.label, 'Existing WHAB accounts');
+  assert.deepEqual(existing.children.map(option => option.textContent), ['Household checking']);
+  assert.deepEqual(alternatives.children.map(option => option.value), ['', 'skip']);
+  assert.ok(unavailable.children.every(option => option.disabled));
+  assert.deepEqual(unavailable.children.map(option => option.textContent), [
+    'Imported savings · classify in Accounts', 'Travel · EUR', 'Other bank · linked to another bank']);
+});
+
+test('schedule shows the one available background action and updates it after success', async () => {
+  const state = harness(); state.replace();
+  const panel = new SetupNode(), cadence = new SetupNode(), save = new SetupNode(), background = new SetupNode(), status = new SetupNode();
+  for (const [node, key] of [[cadence,'plaidCadence'], [save,'plaidScheduleSave'], [background,'plaidBackground'], [status,'plaidScheduleStatus']]) {
+    node.dataset[key] = ''; panel.append(node);
+  }
+  for (const [name, node] of [['schedule', panel], ['schedule-save', save], ['background', background]]) state.current.buttons['[data-plaid-' + name + ']'] = [node];
+  state.ready();
+  state.requests[0].reply({jobs: [{plugin: 'plaid', interval_seconds: 3600}], background: {enabled: true}}); await tick();
+  assert.equal(cadence.value, '3600'); assert.equal(background.textContent, 'Disable background checks');
+  const changing = background.emit('click');
+  assert.deepEqual(JSON.parse(state.requests[1].options.body), {enabled: false});
+  state.requests[1].reply({enabled: false}); await changing;
+  assert.equal(background.textContent, 'Enable background checks');
+  cadence.value = 'manual'; const saving = save.emit('click');
+  assert.deepEqual(JSON.parse(state.requests[2].options.body), {interval_seconds: null});
+  state.requests[2].reply({jobs: [{plugin: 'plaid', interval_seconds: null}]}); await saving;
+  assert.match(status.textContent, /Automatic updates are off/);
 });
 
 function sharedHarness() {

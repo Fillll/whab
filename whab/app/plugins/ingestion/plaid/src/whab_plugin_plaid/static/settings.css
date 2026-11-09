@@ -1,0 +1,46 @@
+/* Plaid settings share the host's colors and native form controls. */
+[data-bank-provider="plaid"] {container-type: inline-size; min-width: 0; font-size: 14px; line-height: 1.45;}
+[data-bank-provider="plaid"] :is(.plaid-banks,.plaid-add,.plaid-schedule,.plaid-setup) p {color: var(--muted); font-size: 13px; line-height: 1.5; margin: 4px 0 0;}
+[data-bank-provider="plaid"] :is(.plaid-banks,.plaid-add,.plaid-schedule,.plaid-setup) h3 {font-size: 17px; line-height: 1.3; margin: 0; letter-spacing: -.025em;}
+[data-bank-provider="plaid"] :is(.button,.text-link,summary,.disconnect-button) {font-size: 13px;}
+[data-bank-provider="plaid"] summary {cursor: pointer; color: var(--text-secondary); padding: 5px 0;}
+[data-bank-provider="plaid"] summary:hover {color: var(--ink);}
+.plaid-section-heading,.plaid-bank-heading,.plaid-background {display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;}
+.plaid-banks {margin-top: 22px;}
+.plaid-bank {padding: 15px 0; border-bottom: 1px solid var(--line);}
+.plaid-bank-heading > div {min-width: 0; overflow-wrap: anywhere;}
+.plaid-bank h4 {font-size: 15px; line-height: 1.35; margin: 0;}
+.plaid-bank-tools,.plaid-actions {display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px;}
+.plaid-bank-tools {margin-top: 7px;}
+.plaid-bank-tools details[open] {width: 100%;}
+.plaid-identifiers {display: grid; grid-template-columns: auto minmax(0,1fr); gap: 3px 14px; margin: 8px 0 14px; font-size: 12px;}
+.plaid-identifiers dt,.plaid-mappings small,.plaid-mappings span {color: var(--muted);}
+.plaid-identifiers dd {margin: 0; overflow-wrap: anywhere;}
+.plaid-mappings {margin-top: 6px;}
+.plaid-mappings ul {margin: 4px 0; padding: 0; list-style: none;}
+.plaid-mappings li {display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 7px 0; font-size: 13px; border-top: 1px solid var(--line);}
+.plaid-mappings small {display: block; font-size: 12px;}
+.plaid-add,.plaid-schedule {padding: 20px 0; border-bottom: 1px solid var(--line);}
+.plaid-add > .plaid-actions,.plaid-profiles {margin-top: 12px;}
+.plaid-schedule-controls {display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin: 14px 0 8px;}
+.plaid-background {border-top: 1px solid var(--line); margin-top: 15px; padding: 12px 0 8px;}
+.plaid-background strong {font-size: 14px;}
+.plaid-setup > header {margin: 12px 0 5px;}
+[data-bank-provider="plaid"] .plaid-setup h3 {font-size: 21px;}
+[data-bank-provider="plaid"] .plaid-setup header p {color: var(--ink); font-weight: 600; font-size: 15px;}
+.plaid-help {margin: 8px 0 12px;}
+.plaid-setup fieldset {min-width: 0; padding: 0 0 15px; margin: 0; border: 0;}
+.plaid-setup legend {float: left; width: 100%; border-top: 1px solid var(--line); padding: 14px 0 8px; font-size: 15px; font-weight: 600; overflow-wrap: anywhere;}
+.plaid-setup legend small {display: block; font-size: 12px; font-weight: 400; color: var(--muted);}
+.plaid-fields {clear: both; display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1fr); align-items: start; gap: 8px 12px;}
+.plaid-fields > label:last-child {grid-column: 2;}
+.plaid-fields label,.plaid-schedule-controls label {display: grid; gap: 4px; min-width: 0; color: var(--text-secondary); font-size: 13px; font-weight: 500;}
+.plaid-fields :is(input,select),.plaid-schedule-controls select {display: block; width: 100%; min-width: 0; height: 38px; font-size: 14px; color: var(--ink);}
+.plaid-setup footer {position: sticky; bottom: 0; background: var(--surface); padding: 10px 0; border-top: 1px solid var(--line);}
+.plaid-setup footer .plaid-actions {justify-content: flex-end; gap: 8px;}
+[data-bank-provider="plaid"] p.field-error {color: var(--danger); margin: 0 0 8px;}
+@container (max-width: 460px) {
+  .plaid-fields {grid-template-columns: minmax(0,1fr);}
+  .plaid-fields > label:last-child {grid-column: auto;}
+  .plaid-background {align-items: start;}
+}

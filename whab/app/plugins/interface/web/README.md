@@ -211,7 +211,7 @@ The packaged [operations.json](src/whab_plugin_web/operations.json) documents th
 ### Provider investment views
 
 Web 1.44.1 passes each bank panel's generation-scoped `asset_prefix` into the
-provider template as `bank_asset_prefix`. Plaid 1.7 owns its Investments view,
+provider template as `bank_asset_prefix`. In bank settings, **Plugin information** expands package details and dependencies, keeping the connection controls near the top. Plaid 1.7 owns its Investments view,
 styles, scripts and account/history filters; the Web adapter retains the single
 settings window and in-place Back flow. Financial returns come from the shared
 core report, also available through both CLI entry points. See the

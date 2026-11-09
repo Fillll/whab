@@ -261,46 +261,89 @@ function setupElement(tag, text) {
   if (text !== undefined) element.textContent = text;
   return element;
 }
+function addOption(parent, value, text, disabled = false) {
+  const option = setupElement('option', text);
+  option.value = value; option.disabled = disabled; parent.append(option);
+}
+function setupField(title, control) {
+  const label = setupElement('label', title); label.append(control); return label;
+}
+function destinationChoices(select, account, candidates) {
+  addOption(select, 'choose', 'Select a WHAB account', true);
+  const existing = setupElement('optgroup'), unavailable = setupElement('optgroup');
+  existing.label = 'Existing WHAB accounts'; unavailable.label = 'Unavailable accounts';
+  let available = 0;
+  for (const candidate of candidates) {
+    const reason = candidate.currency !== account.currency ? candidate.currency :
+      candidate.available === false ? (['unclassified', 'other'].includes(candidate.type) ? 'classify in Accounts' : 'linked to another bank') : '';
+    if (reason) addOption(unavailable, candidate.id, candidate.name + ' · ' + reason, true);
+    else {addOption(existing, candidate.id, candidate.name); available++;}
+  }
+  if (available) select.append(existing);
+  const alternatives = setupElement('optgroup'); alternatives.label = 'Other choices';
+  addOption(alternatives, '', 'Create a new WHAB account'); addOption(alternatives, 'skip', 'Do not import');
+  select.append(alternatives);
+  if (unavailable.children.length) select.append(unavailable);
+  select.value = account.link?.accountId || 'choose';
+  return available;
+}
 function renderSyncSetup(form, preview) {
   form.dataset.itemId = preview.itemId;
+  form.querySelector('[data-plaid-setup-context]').textContent = preview.institution;
   const choices = form.querySelector('[data-plaid-account-choices]');
   choices.replaceChildren();
+  const candidates = [...preview.destinations].sort((a, b) => a.name.localeCompare(b.name));
   for (const account of preview.accounts) {
     const row = setupElement('fieldset');
     row.dataset.bankAccountId = account.id;
-    row.append(setupElement('legend', `${account.name}${account.mask ? ` · ending ${account.mask}` : ''} · ${account.currency}`));
+    const legend = setupElement('legend', account.name);
+    legend.append(setupElement('small', [account.mask && ('Ending ' + account.mask), account.currency].filter(Boolean).join(' · ')));
+    row.append(legend);
+    const fields = setupElement('div'); fields.className = 'plaid-fields';
     const destination = setupElement('select');
     destination.setAttribute('aria-label', `WHAB destination for ${account.name}`);
     destination.dataset.destination = '';
-    for (const [value, text] of [['choose', 'Choose a WHAB destination'], ['skip', 'Do not import'], ['', 'Create a new WHAB account'],
-        ...preview.destinations.filter(candidate => candidate.currency === account.currency && candidate.available !== false).map(candidate => [candidate.id, candidate.name])]) {
-      const option = setupElement('option', text); option.value = value; destination.append(option);
-    }
-    destination.value = account.link?.accountId || (preview.configured ? 'skip' : 'choose');
+    const available = destinationChoices(destination, account, candidates);
+    if (!account.link && preview.configured) destination.value = 'skip';
     const history = setupElement('select'); history.dataset.history = '';
     history.setAttribute('aria-label', `Transaction history for ${account.name}`);
-    for (const [value, text] of [['', 'Choose transaction history'], ['date', 'Choose a start date'], ['all', 'All available history']]) {
-      const option = setupElement('option', text); option.value = value; history.append(option);
-    }
+    addOption(history, '', 'Choose history', true); addOption(history, 'date', 'Choose a start date');
+    addOption(history, 'all', 'All available history');
     history.value = account.link ? (account.link.since ? 'date' : 'all') : '';
-    const label = setupElement('label', 'Import transactions since');
     const since = setupElement('input'); since.type = 'date'; since.dataset.since = '';
     since.setAttribute('aria-label', `Import start date for ${account.name}`);
     since.value = account.link?.since || '';
-    label.append(since);
-    destination.addEventListener('change', () => {
-      history.disabled = destination.value === 'skip';
-      since.disabled = history.disabled || history.value !== 'date';
-    });
-    history.addEventListener('change', () => {since.disabled = history.value !== 'date';});
-    history.disabled = destination.value === 'skip';
-    since.disabled = history.disabled || history.value !== 'date';
-    row.append(destination, history, label); choices.append(row);
+    const historyField = setupField('Transaction history', history), dateField = setupField('Start date (inclusive)', since);
+    function updateFields() {
+      historyField.hidden = history.disabled = destination.value === 'skip';
+      dateField.hidden = since.disabled = history.disabled || history.value !== 'date';
+    }
+    destination.addEventListener('change', updateFields); history.addEventListener('change', updateFields); updateFields();
+    fields.append(setupField('WHAB destination', destination), historyField, dateField);
+    row.append(fields);
+    if (!available) row.append(setupElement('p', 'No existing WHAB accounts are available for this bank account.'));
+    choices.append(row);
+  }
+  if (candidates.some(candidate => candidate.available === false && ['other', 'unclassified'].includes(candidate.type))) {
+    const help = setupElement('p', 'To link an unclassified account, set its account type in ');
+    const link = setupElement('a', 'Accounts'); const url = accountsUrl(); url.hash = '';
+    link.href = url.href; link.target = '_blank'; link.rel = 'noopener'; link.className = 'text-link';
+    help.append(link, document.createTextNode(', then reopen destination setup.')); choices.prepend(help);
   }
   form.querySelector('[data-plaid-setup-error]').hidden = true;
-  form.hidden = false;
-  form.scrollIntoView({block: 'nearest'});
-  form.querySelector('[data-destination]')?.focus();
+}
+
+function displayBackground(button, enabled) {
+  button.dataset.plaidBackground = String(!enabled);
+  button.textContent = enabled ? 'Disable background checks' : 'Enable background checks';
+  button.disabled = false;
+}
+function displayCadence(panel, job) {
+  const select = panel.querySelector('[data-plaid-cadence]');
+  select.value = job.interval_seconds === null ? 'manual' : String(job.interval_seconds);
+  select.disabled = false; panel.querySelector('[data-plaid-schedule-save]').disabled = false;
+  return job.interval_seconds === null ? 'Automatic updates are off.' :
+    `Next check: ${job.next_due ? new Date(job.next_due * 1000).toLocaleString() : 'when due'}.`;
 }
 
 let disconnectId;
@@ -322,11 +365,22 @@ function bind() {
     button.disabled = true; activeRequests += 1;
     try {
       const preview = await api('/plaid/sync-preview', {itemId: button.dataset.plaidSetup});
-      renderSyncSetup(document.querySelector('[data-plaid-sync-form]'), preview);
+      const provider = button.closest('[data-bank-provider]');
+      const form = provider.querySelector('[data-plaid-sync-form]');
+      renderSyncSetup(form, preview);
+      provider.querySelector('[data-plaid-connections-view]').hidden = true; form.hidden = false;
+      form.querySelector('[data-plaid-setup-heading]').focus();
+      form.scrollIntoView({block: 'start'});
     } catch (failure) {notify(failure.message);}
     finally {button.disabled = false; activeRequests -= 1;}
   });
-  bindButtons('[data-plaid-setup-cancel]', button => {button.closest('[data-plaid-sync-form]').hidden = true;});
+  bindButtons('[data-plaid-setup-cancel]', button => {
+    if (activeRequests) return;
+    const form = button.closest('[data-plaid-sync-form]');
+    const view = form.closest('[data-bank-provider]').querySelector('[data-plaid-connections-view]');
+    form.hidden = true; view.hidden = false;
+    [...view.querySelectorAll('[data-plaid-setup]')].find(opener => opener.dataset.plaidSetup === form.dataset.itemId)?.focus();
+  });
   bindButtons('[data-plaid-setup-save]', async button => {
     if (button.disabled) return;
     const form = button.closest('[data-plaid-sync-form]');
@@ -334,11 +388,12 @@ function bind() {
     const error = form.querySelector('[data-plaid-setup-error]'); error.hidden = true;
     try {
       const rows = [...form.querySelectorAll('[data-bank-account-id]')].filter(row => row.querySelector('[data-destination]').value !== 'skip');
-      if (rows.some(row => row.querySelector('[data-destination]').value === 'choose')) {
-        throw new Error('Choose a WHAB destination for each bank account.');
-      }
-      if (rows.some(row => !row.querySelector('[data-history]').value || (row.querySelector('[data-history]').value === 'date' && !row.querySelector('[data-since]').value))) {
-        throw new Error('Choose a start date or All available history for each bank account.');
+      if (!rows.length) throw new Error('Choose at least one bank account to import.');
+      for (const row of rows) {
+        const destination = row.querySelector('[data-destination]'), history = row.querySelector('[data-history]'), since = row.querySelector('[data-since]');
+        if (destination.value === 'choose') {destination.focus(); throw new Error('Choose a WHAB destination or Do not import.');}
+        if (!history.value) {history.focus(); throw new Error('Choose how much transaction history to import.');}
+        if (history.value === 'date' && !since.value) {since.focus(); throw new Error('Enter an import start date.');}
       }
       const accounts = rows.map(row => ({
         bankAccountId: row.dataset.bankAccountId, accountId: row.querySelector('[data-destination]').value || null,
@@ -355,11 +410,9 @@ function bind() {
     bound.add(panel);
     api('/plaid/schedule').then(result => {
       const job = result.jobs[0];
-      if (!job) return;
-      panel.querySelector('[data-plaid-cadence]').value = job.interval_seconds === null ? 'manual' : String(job.interval_seconds);
-      const cadence = job.interval_seconds === null ? 'Automatic updates are off.' :
-        `Next check: ${job.next_due ? new Date(job.next_due * 1000).toLocaleString() : 'When due'}.`;
-      panel.querySelector('[data-plaid-schedule-status]').textContent = `${cadence} Background checks: ${result.background?.enabled ? 'enabled' : 'off'}.`;
+      if (!job) throw new Error('No update schedule is available for this budget.');
+      panel.querySelector('[data-plaid-schedule-status]').textContent = displayCadence(panel, job);
+      displayBackground(panel.querySelector('[data-plaid-background]'), result.background.enabled);
     }).catch(failure => {panel.querySelector('[data-plaid-schedule-status]').textContent = failure.message;});
   }
   bindButtons('[data-plaid-schedule-save]', async button => {
@@ -367,16 +420,17 @@ function bind() {
     button.disabled = true;
     try {
       const value = panel.querySelector('[data-plaid-cadence]').value;
-      await api('/plaid/schedule', {interval_seconds: value === 'manual' ? null : Number(value)}, 'PUT');
-      panel.querySelector('[data-plaid-schedule-status]').textContent = 'Update frequency saved.';
+      const result = await api('/plaid/schedule', {interval_seconds: value === 'manual' ? null : Number(value)}, 'PUT');
+      panel.querySelector('[data-plaid-schedule-status]').textContent = 'Frequency saved. ' + displayCadence(panel, result.jobs.find(job => job.plugin === 'plaid'));
     } catch (failure) {panel.querySelector('[data-plaid-schedule-status]').textContent = failure.message;}
     finally {button.disabled = false;}
   });
   bindButtons('[data-plaid-background]', async button => {
     const panel = button.closest('[data-plaid-schedule]'); button.disabled = true;
     try {
-      await api('/plaid/schedule/background', {enabled: button.dataset.plaidBackground === 'true'});
-      panel.querySelector('[data-plaid-schedule-status]').textContent = button.dataset.plaidBackground === 'true' ? 'Background checks enabled.' : 'Background checks disabled.';
+      const result = await api('/plaid/schedule/background', {enabled: button.dataset.plaidBackground === 'true'});
+      displayBackground(button, result.enabled);
+      panel.querySelector('[data-plaid-schedule-status]').textContent = result.enabled ? 'Background checks enabled.' : 'Background checks disabled.';
     } catch (failure) {panel.querySelector('[data-plaid-schedule-status]').textContent = failure.message;}
     finally {button.disabled = false;}
   });
@@ -536,7 +590,7 @@ function bindSharedConnections() {
       }
       view.querySelector('[data-plaid-existing-status]').textContent = result.unavailableBudgets.length
         ? 'Some saved budgets are unavailable; their connections could not be checked. Preserve their files and restore access.'
-        : result.connections.length ? 'Choose a connection, then open Sync setup after attaching.' : 'No existing connections on this device in this environment.';
+        : result.connections.length ? 'Choose a connection, then choose destinations after attaching.' : 'No existing connections on this device in this environment.';
     } catch (failure) {view.querySelector('[data-plaid-existing-status]').textContent = failure.message;}
     finally {button.disabled = false; activeRequests -= 1;}
   });

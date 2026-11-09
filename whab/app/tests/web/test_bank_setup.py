@@ -72,7 +72,7 @@ def test_web_connection_waits_for_explicit_history_and_preserves_destination_aft
     assert item['accountLinks'][0]['name'] == 'Fictional existing checking'
     assert item['accountLinks'][0]['since'] == '2026-10-01'
     page = client.get('/budgets/home/accounts/2026-10/usd')
-    assert page.status_code == 200 and 'Choose where to sync' in page.text
+    assert page.status_code == 200 and 'Edit destinations for Fictional bank' in page.text
     assert 'data-sync-setup="true"' in page.text and 'Fictional existing checking' in page.text
     assert 'fictional-access-token' not in page.text
 
