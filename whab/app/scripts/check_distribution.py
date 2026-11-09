@@ -111,19 +111,23 @@ for identifier, record in expected.items():
     assert Path(module.__file__).resolve().is_relative_to(target), identifier
 for row in catalog_snapshot()["plugins"]:
     descriptor = load_descriptors((row["id"],))[0]
-    contract = contract_for(descriptor)
-    assert row["display_name"] == descriptor.display_name
-    assert row["api_version"] == descriptor.api_version
-    assert row["capabilities"] == sorted((asdict(value) for value in contract.provides), key=lambda value: value["name"])
-    assert row["requires"] == [
-        {key: value for key, value in asdict(requirement).items() if value is not None}
-        for requirement in contract.requires
-    ]
-    assert row["conflicts"] == list(contract.conflicts)
-    assert row["lifecycle"] == contract.lifecycle and row["authority"] == contract.authority
-    assert row["state_version"] == contract.state_version
-    assert row["state_upgrades"] == [list(edge) for edge in contract.state_upgrades]
-    assert row["legacy"] == (descriptor.contract is None)
+    try:
+        contract = contract_for(descriptor)
+        assert row["display_name"] == descriptor.display_name
+        assert row["api_version"] == descriptor.api_version
+        assert row["capabilities"] == sorted((asdict(value) for value in contract.provides), key=lambda value: value["name"])
+        assert row["requires"] == [
+            {key: value for key, value in asdict(requirement).items() if value is not None}
+            for requirement in contract.requires
+        ]
+        assert row["conflicts"] == list(contract.conflicts)
+        assert row["lifecycle"] == contract.lifecycle and row["authority"] == contract.authority
+        assert row["state_version"] == contract.state_version
+        assert row["state_upgrades"] == [list(edge) for edge in contract.state_upgrades]
+        assert row["legacy"] == (descriptor.contract is None)
+    finally:
+        # Discovery checks own their children; do not retain every worker until exit.
+        descriptor._process.close()
 # Shared credential dependencies compose with both independent consumers.
 ai_registry = load_plugins(("ai-credentials", "llm-categorization", "subscriptions"))
 assert {p.id for p in ai_registry.describe()} == {"ai-credentials", "llm-categorization", "subscriptions"}
