@@ -235,21 +235,75 @@ reopening and portable saves retain the marker. Older transactions stay unlabell
 A storage adapter must explicitly advertise durable support; an unsupported
 adapter rejects the labelled write instead of silently discarding the marker.
 
-## Account classification help
+## Simple account classification
 
-CLI 2.2.1 with WHAB 2.59.1 or newer makes both `whab --help` and `whab-cli --help` explain account classification offline from the core’s packaged operation descriptions. For the full account fields and explicit edit example:
+CLI 2.9 adds `account list`, `account show` and `account classify` under the
+existing name/ID-addressed budget. Every level has detailed offline `--help`.
+These commands are noninteractive and use the existing public `accounts` query
+and guarded `update_account` operation. No shared API was added.
+
+```sh
+whab "My budget" account --help
+whab "My budget" account list --unclassified --format table
+whab "My budget" account show "🍏Example Card"
+whab "My budget" account classify "🍏Example Card" --type credit --subtype credit_card --on-budget
+whab "My budget" account classify ACCOUNT_ID --type investment --off-budget
+whab "My budget" account classify --help
+```
+
+Account IDs take precedence. Names match exactly after ignoring case and outer
+whitespace; spaces, emoji and non-Latin characters are supported. Missing or
+ambiguous names fail with up to 20 candidate names/IDs; use `account list` and an
+exact ID to disambiguate. No fuzzy match is ever selected. Budget resolution uses
+the existing catalog name/ID mechanism; it never changes the browser selection.
+
+JSON is the default. List returns the public `budgetId`, `revision` and `data`
+array; show/classify return one public account in `data`. Results also include the
+addressed `budget` argument and an `unclassified` boolean (type equals `other`).
+`--unclassified` filters only by that type, independently of balance verification.
+`--format table` shows names, IDs, types, subtypes, scope and unclassified status;
+long text is shortened and terminal controls escaped. JSON keeps full public fields.
+
+`--type` uses the existing public update contract: `depository`, `credit`,
+`investment`, `retirement`, `property`, `loan` or `other`. `credit` means a card or
+line of credit; `other` means unclassified. `--subtype` accepts the domain's
+subtype for that type (see classify help). Omitted subtype stays unchanged when
+the type stays the same, and clears when the type changes.
+
+`--on-budget` and `--off-budget` are mutually exclusive. **Omitting scope preserves
+the existing account's scope**, including an imported off-budget account changed
+to credit. Only depository and credit may be on budget. An incompatible preserved
+scope is rejected; pass `--off-budget` explicitly when moving an on-budget account
+to a tracking type. The public SDK's domain validator rejects invalid combinations
+before writing; the host validates them again. Results clearly show saved scope.
+
+Each classification reads the account and revision, generates one unique request
+ID, then submits exactly one guarded write. Users supply no JSON, revision or
+request ID. A second public account read verifies the saved result and revision
+before success is reported. A stale write fails; a failed/mismatched verification
+reports an unconfirmed result, which may already have been saved. There are no
+automatic write retries or revision refreshes. After an uncertain response, inspect
+`account show` and `history list`; **do not rerun classify as a retry**, because that
+would create a new intent. Keep the original budget ID and complete intent printed
+in the error for reconciliation or an exact advanced retry while its receipt is
+available. Advanced operation help documents that contract:
 
 ```sh
 whab api query accounts --help
 whab api command update_account --help
-whab-cli query accounts --help
-whab-cli command update_account --help
-whab-cli describe --offline --plugin core --operation update_account --json
+whab api describe --offline --plugin cli --operation account.classify --json
 ```
 
-`type` and `onBudget` are separate. `credit` means a credit card or line of credit, treated as debt even when on budget. `other` is a generic unclassified account. Only `depository` and `credit` may be on budget; tracking types remain off budget. New cash/card accounts default on budget, but changing an existing off-budget account to `credit` preserves its scope unless you also pass `"onBudget": true`. Classification alone does not verify an imported balance, connect a bank account, match duplicates or change transaction provenance.
+Classification preserves account identity, transactions, notes, categories,
+reviews, earlier history and bank mappings. It adds the normal classification
+history entry and changes financial treatment across the account's full history.
+Imported balance estimates remain unverified; no bank sync is requested.
 
-Read the addressed budget with `whab-cli CONFIG query accounts` or `whab --home /absolute/runtime api --budget BUDGET_ID query accounts` to obtain the current type, scope, stable account ID and revision. Then use the existing explicit `update_account` command with the observed revision and a unique request ID; review help before submitting. No classification decision is inferred or saved by help/discovery.
+For a conversational review, list unclassified accounts, show one account, ask the
+user to confirm its type/subtype/scope, classify only that confirmed choice, verify
+with show, then continue. Separate invocations are separate decisions; already
+classified accounts are excluded by `--unclassified` and are never bulk modified.
+Develop and test with fictional isolated Sandbox budgets, never family data.
 
 ## Plugin controls
 

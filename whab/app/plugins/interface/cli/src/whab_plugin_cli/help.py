@@ -10,6 +10,7 @@ from .identifiers import catalog_identifiers, cli_id, host_id
 
 AGENT_WORKFLOW = """Agent workflow (examples use fictional names/IDs):
   whab budget list
+  whab "My budget" account list --unclassified --format table
   whab "My budget" trnx uncategorized --month 2026-11 --format table
   whab "My budget" trnx categories
   whab "My budget" trnx categorize TRANSACTION_ID --category "Food / Groceries" --agent Codex --needs-review --batch UNIQUE_RUN_ID
@@ -26,6 +27,7 @@ and request ID for an exact retry. Never create a new intent just to retry.
 
 Discovery:
   whab BUDGET --help                     name-addressed local commands
+  whab BUDGET account --help             inspect/classify by unique name or ID
   whab BUDGET bank --help                mappings, schedules and investments
   whab BUDGET history --help             checkpoints and previewed undo/redo
   whab api command edit_transaction --help
