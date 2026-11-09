@@ -75,7 +75,8 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
 assert any(entry.name == "whab" for entry in metadata.distribution("whab_plugin_cli").entry_points)
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]
-assert metadata.distribution("whab_plugin_plaid").locate_file("whab_plugin_plaid/static/investments.css").is_file()
+for stylesheet in ("investments.css", "settings.css"):
+    assert metadata.distribution("whab_plugin_plaid").locate_file(f"whab_plugin_plaid/static/{stylesheet}").is_file()
 assert metadata.distribution("whab_plugin_web").locate_file("whab_plugin_web/static/budget-history.js").is_file()
 assert not metadata.distribution("whab").entry_points
 with patch.object(metadata, "entry_points", side_effect=AssertionError("Catalog must not discover code")):
