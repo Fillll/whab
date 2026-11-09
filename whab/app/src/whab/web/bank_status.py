@@ -20,4 +20,5 @@ def public_bank_status(bank, environment):
         "enabled": bank is not None,
         **({"requiresAccountSetup": True} if config.get("requiresAccountSetup") is True else {}),
         **({"supportsInvestments": True} if config.get("supportsInvestments") is True else {}),
+        **({"sharedConnections": True} if config.get("sharedConnections") is True else {}),
     }

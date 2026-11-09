@@ -11,6 +11,7 @@ from whab.plugins.effect_store import EffectError
 from whab.plugins.sdk import valid_plugin_name
 from whab.web.bank_schemas import (
     BackgroundBody,
+    DisconnectBody,
     ExchangeBody,
     FlowId,
     InvestmentsBody,
@@ -50,7 +51,7 @@ def _status(result, *, flow_id=None, begin=False, kind=None):
     return dict(result)
 
 
-def create_router(plugin_id, banks, store, prefix=None, *, jobs=None, settings=None):
+def create_router(plugin_id, banks, store, prefix=None, *, jobs=None, settings=None, host=None):
     router = APIRouter(prefix=prefix or (f"/api/banks/{plugin_id}" if plugin_id else "/api/banks/{provider_id}"))
 
     def owner(request):
@@ -92,8 +93,29 @@ def create_router(plugin_id, banks, store, prefix=None, *, jobs=None, settings=N
     @router.get("/items")
     def items(request: Request):
         service(request)
-        scoped = store[owner(request)] if plugin_id is None else store
+        scoped = store[owner(request)] if plugin_id is None or prefix == '/api/plaid' and host is not None else store
         return {"items": scoped.items()}
+
+    @router.get('/connections')
+    async def shared_connections(request: Request):
+        service(request)
+        unavailable = await host.discover_connections(owner(request)) if host is not None else []
+        result = await invoke(request, 'shared_connections')
+        names = {row['id']: row['name'] for row in host.list(host.default_id)['budgets']} if host else {}
+        for connection in result['connections']:
+            for attachment in connection['attachments']:
+                attachment['budgetName'] = names.get(attachment['budgetId'], attachment['budgetId'])
+        return {**result, 'unavailableBudgets': unavailable}
+
+    @router.post('/attachments')
+    async def attach(body: LinkBody, request: Request):
+        if body.itemId is None:
+            raise BankError('Choose an existing connection to attach.')
+        return await invoke(request, 'attach', body.itemId)
+
+    @router.delete('/attachments/{item_id:path}')
+    async def detach(item_id: str, request: Request):
+        return await invoke(request, 'detach', item_id)
 
     @router.post("/sync-preview")
     async def preview_sync(body: LinkBody, request: Request):
@@ -185,8 +207,14 @@ def create_router(plugin_id, banks, store, prefix=None, *, jobs=None, settings=N
         return {"ok": True, **{key: result[key] for key in fields}}
 
     @router.delete("/items/{item_id:path}")
-    async def disconnect(item_id: str, request: Request):
-        await invoke(request, "disconnect", item_id)
+    async def disconnect(item_id: str, request: Request, body: DisconnectBody | None = None):
+        shared = service(request).config.get('sharedConnections') is True
+        if shared and host is not None and await host.discover_connections(owner(request)):
+            raise BankError('Some saved budgets are unavailable. Restore access and review every attachment before disconnecting the bank.')
+        if shared:
+            await invoke(request, 'disconnect', item_id, body.budgetIds if body else None)
+        else:
+            await invoke(request, 'disconnect', item_id)
         return {"ok": True}
 
     @router.post("/webhook")

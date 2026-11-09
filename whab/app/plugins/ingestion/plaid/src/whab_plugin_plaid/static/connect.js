@@ -303,6 +303,8 @@ function renderSyncSetup(form, preview) {
 }
 
 let disconnectId;
+let disconnectMode = 'disconnect';
+let affectedBudgets;
 const bound = new WeakSet();
 function bindButtons(selector, callback, eventType = 'click') {
   for (const button of document.querySelectorAll(selector)) {
@@ -313,6 +315,7 @@ function bindButtons(selector, callback, eventType = 'click') {
 }
 function bind() {
   bindInvestments();
+  bindSharedConnections();
   bindButtons('[data-plaid-setup]', async button => {
     if (button.disabled || linking || activeRequests) return;
     button.disabled = true; activeRequests += 1;
@@ -440,9 +443,26 @@ function bind() {
       button.disabled = false;
     } finally {activeRequests -= 1;}
   });
-  bindButtons('[data-plaid-disconnect]', button => {
+  bindButtons('[data-plaid-disconnect]', async button => {
     disconnectId = button.dataset.plaidDisconnect;
+    disconnectMode = 'disconnect'; affectedBudgets = undefined;
+    const shared = button.closest('[data-bank-provider]')?.querySelector('[data-plaid-existing]');
+    if (shared) {
+      button.disabled = true; activeRequests += 1;
+      try {
+        const result = await api('/plaid/connections');
+        if (result.unavailableBudgets.length) throw new Error('Some saved budgets are unavailable. Restore access before disconnecting the bank.');
+        const connection = result.connections.find(row => row.itemId === disconnectId);
+        if (!connection) throw new Error('Connection not found. Refresh settings.');
+        const affected = connection.attachments.filter(row => ['attached', 'pending'].includes(row.state));
+        affectedBudgets = affected.map(row => row.budgetId).sort();
+        document.querySelector('[data-plaid-affected-budgets]').textContent = `This disconnects every attached budget: ${affected.map(row => `${row.budgetName} (${row.budgetId})`).join(', ')}.`;
+      } catch (failure) {notify(failure.message); return;}
+      finally {button.disabled = false; activeRequests -= 1;}
+    }
     document.querySelector('#plaid-disconnect-dialog h2').textContent = `Disconnect ${button.dataset.institution}?`;
+    document.querySelector('#plaid-disconnect-dialog .modal-description').textContent = 'This stops importing for every attached budget and revokes this bank connection. Imported history stays in each budget.';
+    document.getElementById('plaid-confirm-disconnect').textContent = 'Disconnect from bank';
     document.getElementById('plaid-disconnect-dialog').hidden = false;
     document.getElementById('plaid-confirm-disconnect').focus();
   });
@@ -451,12 +471,58 @@ function bind() {
     button.disabled = true;
     activeRequests += 1;
     try {
-      await api(`/plaid/items/${encodeURIComponent(disconnectId)}`, {}, 'DELETE');
+      await api(`/plaid/${disconnectMode === 'detach' ? 'attachments' : 'items'}/${encodeURIComponent(disconnectId)}`,
+        affectedBudgets === undefined ? {} : {budgetIds: affectedBudgets}, 'DELETE');
       reloadSettings();
     } catch (failure) {
       notify(failure.message);
       button.disabled = false;
     } finally {activeRequests -= 1;}
+  });
+}
+function bindSharedConnections() {
+  bindButtons('[data-plaid-existing-back]', button => {button.closest('[data-plaid-existing-view]').hidden = true;});
+  bindButtons('[data-plaid-existing]', async button => {
+    if (activeRequests || linking) return;
+    const view = button.closest('[data-bank-provider]').querySelector('[data-plaid-existing-view]');
+    const list = view.querySelector('[data-plaid-existing-list]'); list.replaceChildren();
+    view.hidden = false; button.disabled = true; activeRequests += 1;
+    try {
+      const result = await api('/plaid/connections');
+      for (const connection of result.connections) {
+        const row = setupElement('section');
+        row.append(setupElement('h4', connection.institutionName));
+        row.append(setupElement('p', `Connection ${connection.itemId} · ${connection.status}`));
+        for (const account of connection.accounts) row.append(setupElement('p', `${account.name}${account.mask ? ` · ending ${account.mask}` : ''} · ${account.currency || ''}`));
+        row.append(setupElement('p', `Budgets: ${connection.attachments.map(entry => `${entry.budgetName} (${entry.state})`).join(', ')}`));
+        const attach = setupElement('button', connection.attached ? 'Attached to this budget' : 'Use this connection');
+        attach.className = 'button secondary';
+        attach.disabled = connection.attached || ['revoking', 'disconnected'].includes(connection.status);
+        attach.addEventListener('click', async () => {
+          if (activeRequests || linking) return;
+          attach.disabled = true; activeRequests += 1;
+          try {
+            await api('/plaid/attachments', {itemId: connection.itemId});
+            reloadSettings();
+          } catch (failure) {notify(failure.message); attach.disabled = false;}
+          finally {activeRequests -= 1;}
+        });
+        row.append(attach); list.append(row);
+      }
+      view.querySelector('[data-plaid-existing-status]').textContent = result.unavailableBudgets.length
+        ? 'Some saved budgets are unavailable; their connections could not be checked. Preserve their files and restore access.'
+        : result.connections.length ? 'Choose a connection, then open Sync setup after attaching.' : 'No existing connections on this device in this environment.';
+    } catch (failure) {view.querySelector('[data-plaid-existing-status]').textContent = failure.message;}
+    finally {button.disabled = false; activeRequests -= 1;}
+  });
+  bindButtons('[data-plaid-detach]', button => {
+    disconnectId = button.dataset.plaidDetach; disconnectMode = 'detach'; affectedBudgets = undefined;
+    document.querySelector('#plaid-disconnect-dialog h2').textContent = `Detach ${button.dataset.institution} from this budget?`;
+    document.querySelector('#plaid-disconnect-dialog .modal-description').textContent = 'This stops imports into this budget. The bank connection remains available on this device.';
+    document.querySelector('[data-plaid-affected-budgets]').textContent = 'Other budgets stay connected. This budget keeps its financial history, mappings and progress. Reattach to resume.';
+    document.getElementById('plaid-confirm-disconnect').textContent = 'Detach from this budget';
+    document.getElementById('plaid-disconnect-dialog').hidden = false;
+    document.getElementById('plaid-confirm-disconnect').focus();
   });
 }
 bind();

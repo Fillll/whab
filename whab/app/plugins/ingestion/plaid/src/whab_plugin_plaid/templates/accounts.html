@@ -4,7 +4,15 @@
   <div class="section-title">
     <h2>Plaid connections</h2>
     <button class="button primary" data-plaid-connect {% if not status.configured %}disabled{% endif %}>{{ icon('link', 16) if icon is defined else '' }}Connect account</button>
+    {% if status.sharedConnections %}<button class="button secondary" data-plaid-existing>Use existing connection</button>{% endif %}
   </div>
+  <section data-plaid-existing-view hidden aria-label="Existing bank connections">
+    <button class="text-link" data-plaid-existing-back>← Connections</button>
+    <h3>Use an existing connection</h3>
+    <p>Attach a connection on this computer without connecting to the bank again. Then choose this budget’s destination accounts and transaction history. Attaching does not import transactions or copy another budget.</p>
+    <div data-plaid-existing-list></div>
+    <p data-plaid-existing-status role="status"></p>
+  </section>
   <div class="connection-notice" data-plaid-continuation hidden>
     <div><strong>Unfinished bank connection</strong><p>Check the original session before connecting again. An uncertain exchange must be reconciled first.</p>
       <button class="text-link" data-plaid-check-link>Check status</button>
@@ -53,6 +61,7 @@
       <div class="connection-row">
         <div>
           <strong>{{ item.institutionName }}</strong>
+          {% if status.sharedConnections %}<p>Connection <code>{{ item.id }}</code> · {{ item.status }} · Owner budget <code>{{ item.ownerBudgetId }}</code></p>{% endif %}
           <p>
           {% if item.lastSynced %}Last sync <time data-local-time
        datetime="{{ item.lastSynced }}">{{ item.lastSynced }}</time>
@@ -69,9 +78,10 @@
   <div class="connection-actions">
     {% if status.supportsInvestments %}<button class="text-link" data-plaid-investments="{{ item.id }}">Investments</button>{% endif %}
     <button class="text-link" data-plaid-setup="{{ item.id }}">Sync setup</button>
+    {% if status.sharedConnections %}<button class="text-link" data-plaid-detach="{{ item.id }}" data-institution="{{ item.institutionName }}">Detach from this budget</button>{% endif %}
     <button class="text-link" data-plaid-connect="{{ item.id }}">{{ 'Reconnect' if item.status=='reconnect' else 'Manage' }}</button><button class="disconnect-button"
         data-plaid-disconnect="{{ item.id }}"
-        data-institution="{{ item.institutionName }}">Disconnect</button>
+        data-institution="{{ item.institutionName }}">{{ 'Disconnect from bank for all budgets' if status.sharedConnections else 'Disconnect' }}</button>
   </div>
   </div>
 {% endfor %}
@@ -104,6 +114,7 @@
 <section class="plaid-disconnect-confirm" hidden role="region" aria-label="Confirm bank disconnection"
         id="plaid-disconnect-dialog"><div class="modal-heading"><div><h2>Disconnect this bank?</h2><p>Imported transactions will stay in your budget.</p></div><button class="icon-button" data-plaid-close-dialog aria-label="Close dialog">{{ icon('close', 20) if icon is defined else '' }}</button></div>
   <p class="modal-description">This stops bank importing and revokes this connection. A new connection will use another Trial slot.</p>
+  <p data-plaid-affected-budgets></p>
   <div class="modal-actions">
     <button class="button secondary" data-plaid-close-dialog>Keep connected</button><button class="button primary" id="plaid-confirm-disconnect">Disconnect</button>
   </div>

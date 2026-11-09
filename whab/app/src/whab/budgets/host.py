@@ -88,6 +88,7 @@ class BudgetHost:
         self._legacy_export = None
         self._exports = {}
         self._open_lock = asyncio.Lock()
+        self._connection_lock = asyncio.Lock()
         self._recent_path = settings.home / "budgets" / f"index-{settings.plaid_env}.json"
         self.recent = self._read_recent()
         self.route_aliases = RouteAliases(settings.home / "budgets" / f"routes-{settings.plaid_env}.json")
@@ -184,6 +185,59 @@ class BudgetHost:
             _, session = self.applications[self.default_id]
             if session:
                 await run_in_threadpool(self._remember, session)
+
+    async def discover_connections(self, provider):
+        """Migrate dormant/disabled budgets using public storage, without bank HTTP."""
+        from whab.app import create_app
+
+        unavailable = []
+        async with self._connection_lock, self._open_lock:
+            for identifier in sorted(set(self.recent) | set(self.applications) | {'default'}):
+                try:
+                    current = self.applications.get(identifier)
+                    if current is not None:
+                        await run_in_threadpool(current[0].state.bank_lifecycle.migrate_connections, provider)
+                        continue
+                    session = None
+                    if identifier != 'default':
+                        session = await run_in_threadpool(BudgetSession.open, self.settings.home,
+                            self.settings.plaid_env, self.recent[identifier]['path'])
+                        if session.id != identifier:
+                            raise StoreError('Budget identity changed.')
+                    settings = replace(self.settings, budget_path=session.path if session else None, copy_paths=())
+                    app = await run_in_threadpool(create_app, settings=settings, budget_session=session,
+                        budget_host=self, _child=True, _bank_maintenance=True)
+                    async with app.router.lifespan_context(app):
+                        if app.state.bank_lifecycle.allow_banks:
+                            await run_in_threadpool(app.state.bank_lifecycle.migrate_connections, provider)
+                except Exception:
+                    unavailable.append(identifier)
+        return unavailable
+
+    async def bank_event(self, source_budget, provider, item, sync, reconnect):
+        source = self.applications.get(source_budget)
+        if source is None:
+            return
+        connections = source[0].state.bank_lifecycle.connections
+        record = await run_in_threadpool(connections.get, provider, item)
+        if reconnect:
+            await run_in_threadpool(connections.update, provider, item, status='reconnect',
+                error='The bank connection requires a scoped update through its provider.')
+        if not sync:
+            return
+        for identifier, state in record['attachments'].items():
+            if identifier == source_budget or state != 'attached':
+                continue
+            try:
+                await self.activate(identifier)
+                app = self.applications[identifier][0]
+                bank = app.state.banks.get(provider)
+                if bank is not None and app.state.bank_jobs.automatic(provider):
+                    await bank.notify_sync(item)
+            except Exception:
+                # An unavailable budget retains its cursor; its next scheduled or
+                # explicit sync replays all updates from that cursor.
+                continue
 
     async def close(self):
         async with self._open_lock:

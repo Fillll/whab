@@ -19,6 +19,7 @@ from whab.plugins.runtime import PluginError
 from whab.plugins.sdk import valid_plugin_name
 from whab.storage.bank import BankStore
 
+from .bank_connections import REFERENCE, AttachedBankStore, BankConnections
 from .bank_runtime import BankCoordinator, OnDemandBankProvider
 
 
@@ -84,11 +85,14 @@ class BankLifecycle:
         self.background_scope = None
         self.allow_banks = allow_banks
         self.automatic_sync = lambda _owner: True
+        self.shared_event = None
         self._closed = False
         try:
             self.cipher = BankCipher(settings.encryption_key)
         except ValueError:
             self.cipher = None
+        self.connections = BankConnections(settings.home, settings.plaid_env, self.cipher) if self.cipher and allow_banks else None
+        self.shared_providers = set()
         directory = home / 'plugin-workers' / 'bank-continuations' / settings.plaid_env
         try:
             if directory.exists():
@@ -113,7 +117,24 @@ class BankLifecycle:
         return self.journals[owner]
 
     def bank_store(self, owner):
-        return BankStore(self.tracked, owner, suggestions_only=self.suggestions_only)
+        store = BankStore(self.tracked, owner, suggestions_only=self.suggestions_only)
+        return AttachedBankStore(store, self.connections, self.budget_id) if owner in self.shared_providers else store
+
+    def migrate_connections(self, owner):
+        """No provider calls; retain native cursor/settings and recovery evidence."""
+        if self.connections is None:
+            return
+        store = BankStore(self.tracked, owner)
+        with self.tracked.lock:
+            for summary in store.items():
+                item = store.get_item(summary['id'])
+                self.connections.register(owner, {**item, 'storedIdentity': store.item_identity(item['id'])},
+                    self.budget_id, [row for row in self.tracked.accounts('personal')
+                                     if row.get('itemId') == store.item_identity(item['id'])])
+                if not item['token'].startswith(REFERENCE):
+                    store.save_item(item['id'], self.connections.reference(owner, item['id']), item['institutionName'])
+                    store.set_item_status(item['id'], item['status'], item.get('error'))
+        self.shared_providers.add(owner)
 
     def _provider(self, plugin):
         # Validate the bounded config before acquiring an installed child.
@@ -159,12 +180,14 @@ class BankLifecycle:
                 if self.cipher is None:
                     service = UnconfiguredBank(provider)
                 else:
+                    self.migrate_connections(plugin.id)
                     service = BankCoordinator(provider, self.tracked, self.bank_store(plugin.id),
                         budget_id=self.budget_id, environment=self.settings.plaid_env, provider_id=plugin.id,
                         generation=generation, journal=self._journal(plugin.id), cipher=self.cipher,
                         code_identity=identity, background_scope=self.background_scope,
                         requires_account_setup=plugin.bank.requires_account_setup, supports_investments=plugin.bank.supports_investments,
-                        automatic_sync=lambda: self.automatic_sync(plugin.id))
+                        automatic_sync=lambda: self.automatic_sync(plugin.id), connections=self.connections,
+                        shared_event=self.shared_event)
             else:
                 service = plugin.bank(BankContext(self.bank_store(plugin.id), self.settings.bank_configuration(plugin.id),
                     self.settings.plaid_env, self.settings.encryption_key,
