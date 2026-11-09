@@ -4091,7 +4091,7 @@
             "type": "string",
             "description": "Existing child ID, unique name or Group / Name.",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 403
           },
           "parent": {
             "type": "string",

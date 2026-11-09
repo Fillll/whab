@@ -2985,7 +2985,7 @@
           "name": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 100,
+            "maxLength": 200,
             "description": "Display name of this group or child."
           }
         },
