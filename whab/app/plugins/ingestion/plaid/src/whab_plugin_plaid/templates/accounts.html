@@ -1,31 +1,6 @@
-{% if bank_asset_prefix is defined %}<link rel="stylesheet" href="{{ bank_asset_prefix }}/investments.css">{% endif %}
+{% if bank_asset_prefix is defined %}<link rel="stylesheet" href="{{ bank_asset_prefix }}/investments.css"><link rel="stylesheet" href="{{ bank_asset_prefix }}/settings.css">{% endif %}
 <section class="bank-provider" data-bank-provider="plaid" data-bank-environment="{{ status.environment }}" data-sync-setup="{{ 'true' if status.requiresAccountSetup else 'false' }}">
   <div data-plaid-connections-view>
-  {% if status.sharedConnections %}
-  <section data-plaid-profiles data-live-enabled="{{ 'true' if status.liveEnabled else 'false' }}">
-    <label>Plaid account for new connections<select data-plaid-profile aria-label="Plaid account profile"><option value="default">Default account</option></select></label>
-    <details><summary>Add a separate Plaid account</summary>
-      <p>Use a named profile for separate Plaid API credentials. Existing connections keep their original account profile. Profiles and credentials stay encrypted on this computer.</p>
-      <label>Profile name<input data-plaid-profile-name autocomplete="off" placeholder="second-account"></label>
-      <label>Client ID<input data-plaid-client-id autocomplete="off"></label>
-      <label>Secret<input type="password" data-plaid-secret autocomplete="new-password"></label>
-      <button class="button secondary" data-plaid-profile-save>Save account profile</button>
-    </details>
-    <p data-plaid-profile-status role="status"></p>
-  </section>
-  {% endif %}
-  <div class="section-title">
-    <h2>Plaid connections</h2>
-    <button class="button primary" data-plaid-connect {% if not status.configured %}disabled{% endif %}>{{ icon('link', 16) if icon is defined else '' }}Connect account</button>
-    {% if status.sharedConnections %}<button class="button secondary" data-plaid-existing>Use existing connection</button>{% endif %}
-  </div>
-  <section data-plaid-existing-view hidden aria-label="Existing bank connections">
-    <button class="text-link" data-plaid-existing-back>← Connections</button>
-    <h3>Use an existing connection</h3>
-    <p>Attach a connection on this computer without connecting to the bank again. Then choose this budget’s destination accounts and transaction history. Attaching does not import transactions or copy another budget.</p>
-    <div data-plaid-existing-list></div>
-    <p data-plaid-existing-status role="status"></p>
-  </section>
   <div class="connection-notice" data-plaid-continuation hidden>
     <div><strong>Unfinished bank connection</strong><p>Check the original session before connecting again. An uncertain exchange must be reconciled first.</p>
       <button class="text-link" data-plaid-check-link>Check status</button>
@@ -64,66 +39,87 @@
 {% endif %}
 </section>
 {% endif %}
-{% if items %}
-  <section class="connected-items">
-    <div class="section-title">
-      <h2>Connected banks</h2>
-      <button class="button secondary compact" data-plaid-sync>{{ icon('refresh', 14) if icon is defined else '' }}Sync now</button>
-    </div>
+  <section class="plaid-banks" aria-label="Connected banks">
+    <header class="plaid-section-heading">
+      <h3>Connected banks</h3>
+      {% if items %}<button class="button secondary compact" data-plaid-sync>{{ icon('refresh', 14) if icon is defined else '' }}Sync now</button>{% endif %}
+    </header>
     {% for item in items %}
-      <div class="connection-row">
-        <div>
-          <strong>{{ item.institutionName }}</strong>
-          {% if status.sharedConnections %}<p>Connection <code>{{ item.id }}</code> · Plaid account {{ item.profileId }} · {{ item.status }} · Owner budget <code>{{ item.ownerBudgetId }}</code></p>{% endif %}
-          <p>
-          {% if item.lastSynced %}Last sync <time data-local-time
-       datetime="{{ item.lastSynced }}">{{ item.lastSynced }}</time>
-    {% else %}Initial import pending
-    {% endif %}
-    {% if not item.setupConfigured %}<br>Review account destinations and transaction start dates in Sync setup.{% endif %}
-    {% if item.error %} · {{ item.error }}
-    {% endif %}
-  </p>
-  {% for link in item.accountLinks %}
-  <p>{% if link.mask %}Account ending {{ link.mask }} → {% endif %}<strong>{{ link.name }}</strong> · {{ 'Transactions since ' ~ link.since if link.since else 'All available history' }}</p>
-  {% endfor %}
-  </div>
-  <div class="connection-actions">
-    {% if status.supportsInvestments %}<button class="text-link" data-plaid-investments="{{ item.id }}">Investments</button>{% endif %}
-    <button class="text-link" data-plaid-setup="{{ item.id }}">Sync setup</button>
-    {% if status.sharedConnections %}<button class="text-link" data-plaid-detach="{{ item.id }}" data-institution="{{ item.institutionName }}">Detach from this budget</button>{% endif %}
-    <button class="text-link" data-plaid-connect="{{ item.id }}">{{ 'Reconnect' if item.status=='reconnect' else 'Manage' }}</button><button class="disconnect-button"
-        data-plaid-disconnect="{{ item.id }}"
-        data-institution="{{ item.institutionName }}">{{ 'Disconnect from bank for all budgets' if status.sharedConnections else 'Disconnect' }}</button>
-  </div>
-  </div>
-{% endfor %}
-</section>
-{% endif %}
-<section data-plaid-sync-form hidden aria-label="Bank account sync setup">
-  <h3>Choose where to sync</h3>
-  <p>Link each bank account to an existing WHAB account, create a new account, or leave it out. Classify imported or unclassified accounts in account settings before linking them. The start date includes that day. Existing history and annotations are retained; overlapping imported history is not automatically matched.</p>
-  <div data-plaid-account-choices></div>
-  <p class="field-error" data-plaid-setup-error hidden></p>
-  <button class="button primary" data-plaid-setup-save>Save and sync now</button>
-  <button class="text-link" data-plaid-setup-cancel>Cancel</button>
-</section>
-<section data-plaid-schedule>
-  <h3>Regular updates</h3>
-  <label>Check for new transactions
-    <select data-plaid-cadence aria-label="Plaid update frequency">
-      <option value="manual">Manual only</option>
-      <option value="3600">Every hour</option>
-      <option value="10800">Every 3 hours</option>
-      <option value="21600">Every 6 hours</option>
-    </select>
-  </label>
-  <button class="button secondary" data-plaid-schedule-save>Save update frequency</button>
-  <p data-plaid-schedule-status aria-live="polite"></p>
-  <p>Automatic checks run while WHAB is open. On macOS, enable background checks to run the saved schedule when WHAB is closed. Manual only also stops webhook-triggered imports; use Sync now whenever you want to check.</p>
-  <button class="text-link" data-plaid-background="true">Enable background checks</button>
-  <button class="text-link" data-plaid-background="false">Disable background checks</button>
-</section>
+    <section class="plaid-bank">
+      <div class="plaid-bank-heading">
+        <div><h4>{{ item.institutionName }}</h4>
+          <p>{% if item.lastSynced %}Last sync <time data-local-time datetime="{{ item.lastSynced }}">{{ item.lastSynced }}</time>{% else %}Initial import pending{% endif %}</p>
+        </div>
+        <button class="button {{ 'secondary' if item.setupConfigured else 'primary' }} compact" data-plaid-setup="{{ item.id }}" aria-label="{{ 'Edit' if item.setupConfigured else 'Choose' }} destinations for {{ item.institutionName }}">{{ 'Edit destinations' if item.setupConfigured else 'Choose destinations' }}</button>
+      </div>
+      {% if item.error %}<p class="field-error" role="alert">{{ item.error }}</p>{% endif %}
+      {% if item.status == 'reconnect' %}<button class="button secondary compact" data-plaid-connect="{{ item.id }}">Reconnect</button>{% endif %}
+      {% if item.accountLinks %}
+      <details class="plaid-mappings"><summary>WHAB destinations ({{ item.accountLinks|length }})</summary>
+        <ul>{% for link in item.accountLinks %}<li><div><strong>{{ link.name }}</strong>{% if link.mask %}<small>Bank account ending {{ link.mask }}</small>{% endif %}</div>
+          <span>{{ 'Since ' ~ link.since if link.since else 'All available history' }}</span></li>{% endfor %}</ul>
+      </details>
+      {% endif %}
+      <div class="plaid-bank-tools">
+        {% if status.supportsInvestments %}<button class="text-link" data-plaid-investments="{{ item.id }}">Investments</button>{% endif %}
+        <details><summary>Connection details</summary>
+          {% if status.sharedConnections %}<dl class="plaid-identifiers"><dt>Plaid profile</dt><dd>{{ item.profileId }}</dd><dt>Status</dt><dd>{{ item.status }}</dd><dt>Connection ID</dt><dd>{{ item.id }}</dd><dt>Owner budget ID</dt><dd>{{ item.ownerBudgetId }}</dd></dl>{% endif %}
+          <div class="plaid-actions">
+            {% if item.status != 'reconnect' %}<button class="button secondary compact" data-plaid-connect="{{ item.id }}">Manage bank access</button>{% endif %}
+            {% if status.sharedConnections %}<button class="text-link" data-plaid-detach="{{ item.id }}" data-institution="{{ item.institutionName }}">Detach from this budget</button>{% endif %}
+            <button class="disconnect-button" data-plaid-disconnect="{{ item.id }}" data-institution="{{ item.institutionName }}">{{ 'Disconnect from bank for all budgets' if status.sharedConnections else 'Disconnect' }}</button>
+          </div>
+        </details>
+      </div>
+    </section>
+    {% else %}<p>No banks connected to this budget.</p>{% endfor %}
+  </section>
+  <section class="plaid-add">
+    <h3>Add a connection</h3>
+    <div class="plaid-actions">
+      <button class="button {{ 'secondary' if items else 'primary' }}" data-plaid-connect {% if not status.configured %}disabled{% endif %}>{{ icon('link', 16) if icon is defined else '' }}Connect account</button>
+      {% if status.sharedConnections %}<button class="button secondary" data-plaid-existing>Use existing connection</button>{% endif %}
+    </div>
+  {% if status.sharedConnections %}
+  <details class="plaid-profiles" data-plaid-profiles data-live-enabled="{{ 'true' if status.liveEnabled else 'false' }}">
+    <summary>Plaid account profiles</summary>
+    <label>Plaid account for new connections<select data-plaid-profile aria-label="Plaid account profile"><option value="default">Default account</option></select></label>
+    <details><summary>Add a separate Plaid account</summary>
+      <p>Use a named profile for separate Plaid API credentials. Existing connections keep their original account profile. Profiles and credentials stay encrypted on this computer.</p>
+      <label>Profile name<input data-plaid-profile-name autocomplete="off" placeholder="second-account"></label>
+      <label>Client ID<input data-plaid-client-id autocomplete="off"></label>
+      <label>Secret<input type="password" data-plaid-secret autocomplete="new-password"></label>
+      <button class="button secondary" data-plaid-profile-save>Save account profile</button>
+    </details>
+    <p data-plaid-profile-status role="status"></p>
+  </details>
+  {% endif %}
+  <section data-plaid-existing-view hidden aria-label="Existing bank connections">
+    <button class="text-link" data-plaid-existing-back>← Connections</button>
+    <h3>Use an existing connection</h3>
+    <p>Attach a connection on this computer without connecting to the bank again. Then choose this budget’s destination accounts and transaction history. Attaching does not import transactions or copy another budget.</p>
+    <div data-plaid-existing-list></div>
+    <p data-plaid-existing-status role="status"></p>
+  </section>
+  </section>
+  <section class="plaid-schedule" data-plaid-schedule aria-label="Regular updates">
+    <h3>Regular updates</h3>
+    <div class="plaid-schedule-controls">
+      <label>Check for new transactions
+        <select data-plaid-cadence aria-label="Plaid update frequency" disabled>
+          <option value="manual">Manual only</option><option value="3600">Every hour</option>
+          <option value="10800">Every 3 hours</option><option value="21600">Every 6 hours</option>
+        </select>
+      </label>
+      <button class="button secondary" data-plaid-schedule-save disabled>Save frequency</button>
+    </div>
+    <p data-plaid-schedule-status role="status"></p>
+    <div class="plaid-background"><div><strong>Background checks</strong>
+      <p>On macOS, run scheduled checks even when WHAB is closed.</p></div>
+      <button class="button secondary compact" data-plaid-background disabled>Loading…</button>
+    </div>
+    <p>Manual only pauses scheduled and webhook imports. You can still use Sync now.</p>
+  </section>
 <section class="plaid-disconnect-confirm" hidden role="region" aria-label="Confirm bank disconnection"
         id="plaid-disconnect-dialog"><div class="modal-heading"><div><h2>Disconnect this bank?</h2><p>Imported transactions will stay in your budget.</p></div><button class="icon-button" data-plaid-close-dialog aria-label="Close dialog">{{ icon('close', 20) if icon is defined else '' }}</button></div>
   <p class="modal-description">This stops bank importing and revokes this connection. A new connection will use another Trial slot.</p>
@@ -135,6 +131,16 @@
 
 
 </div>
+<section class="plaid-setup" data-plaid-sync-form hidden aria-label="Bank account sync setup">
+  <button type="button" class="text-link" data-plaid-setup-cancel>← Connected banks</button>
+  <header><h3 tabindex="-1" data-plaid-setup-heading>Account destinations</h3><p data-plaid-setup-context></p></header>
+  <p>Choose a WHAB destination and how much history to import for each bank account.</p>
+  <details class="plaid-help"><summary>About importing history</summary><p>The start date includes that day. WHAB keeps existing history and annotations; overlapping manual or imported transactions are not automatically matched.</p></details>
+  <div data-plaid-account-choices></div>
+  <footer><p class="field-error" role="alert" data-plaid-setup-error hidden></p>
+    <div class="plaid-actions"><button type="button" class="button secondary" data-plaid-setup-cancel>Cancel</button>
+      <button type="button" class="button primary" data-plaid-setup-save>Save and sync now</button></div></footer>
+</section>
 <section class="investment-view" data-plaid-investment-view hidden aria-label="Investment positions">
   <button class="text-link" data-investment-back>← Connections</button>
   <h3 tabindex="-1" data-investment-heading>Investments</h3>

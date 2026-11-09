@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_plaid"
-version = "1.8.0"
+version = "1.8.1"
 description = "Plaid bank ingestion plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"

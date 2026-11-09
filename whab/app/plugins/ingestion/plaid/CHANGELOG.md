@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.8.1 — 2026-11-08
+
+PR: [#172](https://github.com/Fillll/whab/pull/172)
+
+- Make each bank’s destination setup directly accessible. Label existing WHAB account choices and explain unavailable accounts, show the date only for a dated import, and separate schedule and bank management controls.
+
 ## 1.8.0 — 2026-11-08
 
 PR: [#171](https://github.com/Fillll/whab/pull/171)
