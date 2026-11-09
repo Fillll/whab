@@ -16,7 +16,7 @@ from whab.plugins.documentation import core_document, installed_catalog
 from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import PluginSelectionError, selection_error
-from .help import AGENT_WORKFLOW, contextual_help, describe, overview, render_catalog
+from .help import AGENT_WORKFLOW, bank_help, contextual_help, describe, overview, render_catalog
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 
 
@@ -36,7 +36,7 @@ def parser(argv=(), *, defaults=None):
     root.add_argument("--workspace", choices=("personal", "demo"), default="personal", help="Addressed workspace (default: %(default)s)")
     root.set_defaults(**(defaults or {}))
     commands = root.add_subparsers(dest="kind", required=True)
-    add_bank_parser(commands)
+    add_bank_parser(commands, documentation=bank_help(argv, catalog))
     manage = commands.add_parser("plugins", help="Manage installed plugins on the local host")
     manage.add_argument("action", choices=("list", "status", "enable", "disable"), help="list/status read selections; enable/disable save an explicit plugin choice for this local budget")
     manage.add_argument("plugin", nargs="?", help="Installed plugin ID for enable/disable")

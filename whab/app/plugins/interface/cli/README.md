@@ -558,3 +558,17 @@ commands work through `whab-cli PROFILE bank ...`; `describe --plugin plaid
 --operation bank.attach` and operation-specific help document inputs, effects and
 recovery. Profiles/attachments are device-local and environment-isolated; bank
 consent and reauthentication remain interactive Web operations.
+
+All bank actions support provider-specific offline help, for example:
+
+```sh
+whab BUDGET bank attach plaid --help
+whab BUDGET bank profile-save plaid --help
+whab-cli bank disconnect plaid --help
+whab api describe --plugin plaid --help
+whab api describe --plugin plaid --operation bank.configure --help
+```
+
+Selected-action help includes Plaid's packaged inputs/outputs, runnable commands
+for both entry points, permissions, scope, examples, side effects and recovery.
+No runtime profile, credentials, enabled plugin or provider request is needed.

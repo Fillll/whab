@@ -255,3 +255,30 @@ def test_app_tail_failure_releases_retained_bank_journal_without_opening_provide
     with UISelectionStore(tmp_path, 'default', 'sandbox', None):
         pass
     assert store.accounts('personal') == []
+
+
+def test_profile_open_failure_can_reopen_another_account_without_using_stale_credentials():
+    class ProfileWorker:
+        healthy = True
+        def __init__(self):
+            self.active = None
+        def provider(self, command, values):
+            if command == 'open':
+                assert self.active is None
+                if values['config'].get('ACCOUNT') == 'bad':
+                    raise ValueError('Fictional invalid profile')
+                self.active = values['config']['ACCOUNT']
+                return {'environment': 'sandbox', 'configured': True, 'liveEnabled': True, 'missingConfig': []}
+            if command == 'close':
+                assert self.active is not None
+                self.active = None
+                return None
+            assert command == 'read_sync'
+            return self.active
+    worker = ProfileWorker()
+    provider = WorkerBankProvider(worker, BankProviderContext('fictional-budget', 'sandbox', {'ACCOUNT': 'original'}))
+    with pytest.raises(ValueError):
+        provider.call_with_config({'ACCOUNT': 'bad'}, 'read_sync')
+    assert provider.call_with_config({'ACCOUNT': 'original'}, 'read_sync') == 'original'
+    assert provider.call_with_config({'ACCOUNT': 'second'}, 'read_sync') == 'second'
+    provider.close()

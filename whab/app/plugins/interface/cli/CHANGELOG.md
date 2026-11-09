@@ -4,7 +4,7 @@
 
 PR: [#171](https://github.com/Fillll/whab/pull/171)
 
-- Add shared connection/attachment inspection, attach/detach, reviewed global disconnect, account-profile listing and encrypted credential-file/stdin profile setup to both console entry points.
+- Add shared connection/attachment inspection, attach/detach, reviewed global disconnect, account-profile listing and encrypted credential-file/stdin profile setup to both console entry points. Include provider-specific action help with runnable examples; recognize bank commands before optional profile filenames.
 
 ## 2.7.1 — 2026-11-08
 

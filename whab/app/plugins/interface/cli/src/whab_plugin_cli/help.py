@@ -5,6 +5,7 @@ import shlex
 
 from whab.plugins.documentation import installed_catalog, operation
 
+from .bank_commands import BANK_FLAGS
 from .identifiers import catalog_identifiers, cli_id, host_id
 
 AGENT_WORKFLOW = """Agent workflow (examples use fictional names/IDs):
@@ -81,6 +82,16 @@ def _fields(schema, prefix=""):
 def invocation(row, plugin):
     """Only render routes supported by the public CLI adapter."""
     kind, name = row['kind'], row['name']
+    if kind == 'local' and name.startswith('bank.') and name[5:] in BANK_FLAGS:
+        action = name[5:]
+        provider = 'PROVIDER' if plugin == 'cli' else cli_id(plugin)
+        command = f'bank {action} {provider}'
+        return ('CLI template (replace fictional IDs and review writes first):\n'
+                f'  whab BUDGET {command}{BANK_FLAGS[action]}\n'
+                f'  whab-cli CONFIG {command}{BANK_FLAGS[action]}\n'
+                f'Flags: whab BUDGET {command} --help\n'
+                'These local results are direct JSON, without a remote ledger response envelope.\n'
+                'Use --credentials-file - for private profile input from stdin; never pass secrets in arguments.')
     if kind in {'query', 'command'} and (plugin == 'core' or name.startswith('categorization.')):
         route = f'{kind} ' + ('categorization' if name.startswith('categorization.') else name)
     elif kind in {'feature-query', 'feature-command'}:
@@ -194,3 +205,13 @@ def contextual_help(argv, catalog=None):
             row = operation(document, token, name) if document else None
             return render_operation(row, plugin) if row else "No installed documentation for that operation. Use an authenticated describe --json against its authority."
     return overview(catalog)
+
+
+def bank_help(argv, catalog):
+    for index, token in enumerate(argv):
+        if token == 'bank' and index + 2 < len(argv) and argv[index + 1] in BANK_FLAGS:
+            plugin = host_id(argv[index + 2])
+            document = next((row['documentation'] for row in catalog['plugins'] if row['id'] == plugin), None)
+            row = operation(document, 'local', 'bank.' + argv[index + 1]) if document else None
+            return render_operation(row, plugin) if row else 'No installed operation documentation for this provider; use whab api describe --help.'
+    return None

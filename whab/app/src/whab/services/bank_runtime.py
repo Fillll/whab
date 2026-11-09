@@ -97,7 +97,13 @@ class WorkerBankProvider:
         if self.closed:
             raise EffectError('effect_unavailable')
         if config != self._active_config:
-            self.worker.provider('close', {})
+            previous, self._active_config = self._active_config, None
+            if previous is not None:
+                try:
+                    self.worker.provider('close', {})
+                except BaseException:
+                    self.closed = True
+                    raise
             self.worker.provider('open', {'budget_id': self.context.budget_id,
                 'environment': self.context.environment, 'config': dict(config)})
             self._active_config = dict(config)
