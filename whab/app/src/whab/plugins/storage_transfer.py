@@ -41,8 +41,8 @@ _BULK_OPERATIONS = frozenset({"recorded_command", "restore_budget", "restore_bud
 _OPERATION_FIELDS = {
     "recorded_command": ({"operation", "parameters", "context"}, set()),
     "history_apply": ({"action", "target", "fingerprint"}, set()),
-    "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype"}),
-    "update_account": ({"accountId"}, {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}),
+    "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype", "closed"}),
+    "update_account": ({"accountId"}, {"type", "onBudget", "subtype", "name", "bankWebsite", "currency", "closed"}),
     "add_category": ({"name", "target"}, {"group", "parentId", "currency"}),
     "add_transaction": ({"accountId", "date", "merchant", "amount", "categoryId"}, {"note", "source", "id"}),
     "edit_transaction_details": ({"transactionId", "changes"}, set()),
@@ -541,7 +541,11 @@ def decode_local_state(financial, protected):
             _invalid()
         for item in _records(private["items"], 1000):
             _exact(item, {"id", "token", "institutionName", "status", "lastSynced", "error", "cursor", "provider"}
-                   | ({"syncSettings"} if "syncSettings" in item else set()))
+                   | ({"syncSettings"} if "syncSettings" in item else set())
+                   | ({"closedAccountCursors"} if "closedAccountCursors" in item else set()))
+            if "closedAccountCursors" in item:
+                from whab.domain.bank_setup import validate_closed_account_cursors
+                validate_closed_account_cursors(item["closedAccountCursors"])
             if "syncSettings" in item:
                 from whab.domain.bank_setup import validate_sync_settings
                 validate_sync_settings(item["syncSettings"])

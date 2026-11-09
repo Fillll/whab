@@ -28,7 +28,7 @@ _COLLECTIONS = {
     'rolloverModes': ('month', 'currency'),
 }
 _FIELDS = {
-    'accounts': (ACCOUNT_FIELDS, {'bankWebsite', 'nameOverridden'}),
+    'accounts': (ACCOUNT_FIELDS, {'bankWebsite', 'nameOverridden', 'closed'}),
     'categories': (CATEGORY_FIELDS, set()),
     'transactions': (TRANSACTION_FIELDS, {'categoryAgent', 'original'}),
     'assignments': (ASSIGNMENT_FIELDS, set()),
@@ -310,12 +310,16 @@ def apply_to_state(state, wanted):
         raise StoreError('This reversal would detach a linked bank account. Review the bank setup first.')
     if any(old_accounts[key]['currency'] != candidate['accounts'][key]['currency'] for key in linked & candidate['accounts'].keys()):
         raise StoreError('This reversal would change a linked bank account currency.')
-    allowed = ACCOUNT_FIELDS | {'bankWebsite', 'nameOverridden'}
+    allowed = ACCOUNT_FIELDS | {'bankWebsite', 'nameOverridden', 'closed'}
     for identifier, account in candidate['accounts'].items():
         previous = old_accounts.get(identifier, {})
         candidate['accounts'][identifier] = {**{k: v for k, v in previous.items() if k not in allowed}, **account}
     if any(identifier not in candidate['transactions'] for identifier in state.get('receipts', {})):
         raise StoreError('This reversal would orphan a receipt attachment.')
+    from .bank_setup import reconcile_account_closed
+    state['items'] = deepcopy(state.get('items', {}))
+    for identifier, account in candidate['accounts'].items():
+        reconcile_account_closed(state, identifier, old_accounts.get(identifier, {}).get('closed', False), account.get('closed', False))
     for name in ('budgetStartMonth', 'accounts', 'categories', 'transactions', 'budget', 'futureFunding', 'rolloverModes'):
         state[name] = candidate[name]
 

@@ -38,7 +38,7 @@ def add_account(state: dict, account_id: str, account: dict) -> str:
         "name": name,
         "institution": "Manual account",
         "type": kind,
-        **{key: account[key] for key in ("onBudget", "subtype") if key in account},
+        **{key: account[key] for key in ("onBudget", "subtype", "closed") if key in account},
         "balance": balance,
         "currency": currency,
         "source": "manual",
@@ -52,7 +52,7 @@ def update_account(state: dict, account_id: str, changes: dict) -> None:
     account = state["accounts"].get(account_id)
     if account is None:
         raise StoreError("Account not found.")
-    if type(changes) is not dict or not changes or changes.keys() - {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}:
+    if type(changes) is not dict or not changes or changes.keys() - {"type", "onBudget", "subtype", "name", "bankWebsite", "currency", "closed"}:
         raise StoreError("Invalid account classification fields.")
     candidate = {**account, **changes}
     if "name" in changes:
@@ -76,7 +76,10 @@ def update_account(state: dict, account_id: str, changes: dict) -> None:
                 if type(changes["type"]) is str and changes["type"] in ON_BUDGET_ACCOUNT_TYPES
                 else False
             )
-    state["accounts"][account_id] = normalize_account(candidate)
+    normalized = normalize_account(candidate)
+    from .bank_setup import reconcile_account_closed
+    reconcile_account_closed(state, account_id, account.get('closed', False), normalized.get('closed', False))
+    state["accounts"][account_id] = normalized
 
 
 def add_transaction(
@@ -92,6 +95,8 @@ def add_transaction(
     account = state["accounts"].get(transaction["accountId"])
     if not account:
         raise StoreError("Account not found.")
+    if account.get('closed', False):
+        raise StoreError('Reopen this archived account before adding transactions.')
     category = transaction.get("categoryId")
     if category is not None:
         child = ensure_child_category(state["categories"], category)
@@ -185,6 +190,8 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
     account = state["accounts"].get(candidate["accountId"])
     if account is None:
         raise StoreError("Account not found.")
+    if account['id'] != old_account['id'] and account.get('closed', False):
+        raise StoreError('Reopen this archived account before moving transactions into it.')
     if account.get("currency", "USD") != old_account.get("currency", "USD"):
         raise StoreError("Transaction accounts must have the same currency.")
     # Annotation validation sees the new account/category pair, without exposing

@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.8.2 — 2026-11-08
+
+PR: [#175](https://github.com/Fillll/whab/pull/175)
+
+- Document canonical off-budget deposit/cd classification and host-managed archive behavior: closed accounts are excluded from bank updates/new destinations, open peers/shared budgets continue, and reopening resumes configured history without triggering sync.
+
 ## 1.8.1 — 2026-11-08
 
 PR: [#172](https://github.com/Fillll/whab/pull/172)

@@ -56,6 +56,7 @@ export function initAccountSettings({api, readForm, updateFields, flush, refresh
       const account = result.account;
       form.elements.name.value = account.name;
       form.elements.onBudget.value = String(account.onBudget);
+      form.elements.closed.value = String(account.closed || false);
       updateFields(form);
       form.elements.type.value = account.type;
       updateFields(form);

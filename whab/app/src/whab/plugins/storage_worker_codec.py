@@ -38,6 +38,7 @@ METHODS = {
     "budget_history": (("workspace",), {"limit": 50, "before": None, "target": None, "snapshot": False}),
     "history_preview": (("workspace", "action"), {"target": None}),
     "supports_category_agent": ((), {}),
+    "supports_account_lifecycle": ((), {}),
     "prepare_existing": (("workspace", "files"), {}),
     "accounts": (("workspace",), {}), "categories": (("workspace",), {}),
     "transactions": (("workspace",), {"month": None}),

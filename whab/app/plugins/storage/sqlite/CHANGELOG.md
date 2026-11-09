@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.17.0 — 2026-11-08
+
+PR: [#175](https://github.com/Fillll/whab/pull/175)
+
+- Persist account archive state and private per-account bank resume checkpoints through native reopen, history, copies/recovery and compatible portable images. Preserve existing history digests with canonical open defaults, skip archived bank changes and advertise optional durable lifecycle support.
+
 ## 1.16.0 — 2026-11-08
 
 PR: [#169](https://github.com/Fillll/whab/pull/169)

@@ -28,7 +28,7 @@ have their own runtime/environment scope. Resume an existing migration from its
 actual stage instead of recreating or reimporting it.
 
 The maintained guide is the `local import.workflow` documentation topic in
-[operations.json](src/whab_plugin_ynab/operations.json). CLI 2.9.1+ renders that
+[operations.json](src/whab_plugin_ynab/operations.json). CLI 2.10+ with WHAB 2.64+ renders that
 same packaged text in plugin discovery and importer/preview/commit help without
 executing plugin code or opening a host. It is guidance, not a callable command;
 `FileImport.parse` remains a correctly labeled SDK callback. JSON discovery:

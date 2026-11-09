@@ -449,7 +449,7 @@
     {
       "name": "bank.sync",
       "kind": "local",
-      "summary": "Check the selected connection, or configured connections, immediately.",
+      "summary": "Check configured open destinations on the selected connection, or all configured connections, immediately.",
       "input": {
         "type": "object",
         "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
@@ -467,7 +467,7 @@
       },
       "output": {
         "type": "object",
-        "description": "Safe connection/account setup projection, synchronization counters, update-policy status or background registration result. Bank access tokens, encrypted credentials and cursors are excluded.",
+        "description": "Safe connection/account setup projection, synchronization counters, update-policy status or background registration result. Bank access tokens, encrypted credentials and cursors are excluded. Addressed all-closed connections return zero added/modified/removed counts and skippedClosed (the number of archived destinations), without a provider request. Aggregate synchronization reports only the three transaction counters.",
         "additionalProperties": true
       },
       "examples": [
@@ -478,9 +478,20 @@
           "output": {
             "ok": true
           }
+        },
+        {
+          "input": {
+            "itemId": "fictional-archived-item"
+          },
+          "output": {
+            "added": 0,
+            "modified": 0,
+            "removed": 0,
+            "skippedClosed": 1
+          }
         }
       ],
-      "side_effects": "Imports configured accounts using saved cutoffs and advances their cursors atomically. No new external bank connection is created.",
+      "side_effects": "Imports configured open accounts using saved cutoffs and advances their cursors atomically. Archived balances and transactions are unchanged; all-closed connections are skipped before provider access. Shared open destinations may still fetch the connection. No new external bank connection is created.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
       "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [

@@ -125,7 +125,15 @@ def normalize_account(account: dict) -> dict:
         type(subtype) is not str or subtype not in ACCOUNT_SUBTYPES.get(kind, {})
     ):
         raise StoreError("Invalid account subtype.")
+    closed = account.get("closed", False)
+    if type(closed) is not bool:
+        raise StoreError("Invalid account lifecycle state.")
     result = {**account, "onBudget": on_budget, "subtype": subtype}
+    # Elide the compatible default in canonical saved state: existing financial
+    # history hashes and native recovery evidence must remain byte-compatible.
+    result.pop("closed", None)
+    if closed:
+        result["closed"] = True
     if "bankWebsite" in account:
         result["bankWebsite"] = bank_website(account["bankWebsite"])
     if "nameOverridden" in account and type(account["nameOverridden"]) is not bool:

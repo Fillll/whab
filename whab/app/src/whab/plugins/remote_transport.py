@@ -335,6 +335,10 @@ class RemoteStore:
     def edit_transaction_details(self, workspace, transaction_id, changes):
         return self._command("edit_transaction", workspace, {"transactionId": transaction_id, **changes})
 
+    def supports_account_lifecycle(self):
+        """The addressed authority validates durable lifecycle support."""
+        return True
+
     def supports_category_agent(self):
         """Forward explicitly attributed edits; older authorities reject the field."""
         return True

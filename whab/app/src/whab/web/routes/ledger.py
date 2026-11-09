@@ -179,7 +179,8 @@ def create_router(store):
 
     @router.post("/api/accounts")
     def account(body: AccountBody):
-        account_id = store.add_account(body.workspace, body.model_dump(exclude={"workspace"}))
+        excluded = {"workspace"} | ({"closed"} if "closed" not in body.model_fields_set else set())
+        account_id = store.add_account(body.workspace, body.model_dump(exclude=excluded))
         return {"ok": True, "accountId": account_id}
 
     @router.patch("/api/accounts/{account_id}")

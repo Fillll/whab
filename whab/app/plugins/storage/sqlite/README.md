@@ -153,3 +153,16 @@ An additive nullable `category_agent` column retains labels; legacy native and p
 See the [budget history workflow](../../../../docs/usage.md#budget-history).
 This version requires WHAB 2.62+. History is saved atomically with financial
 changes and retained across reopen and exports. Earlier changes are not backfilled.
+
+## Durable archived accounts
+
+With WHAB 2.64+, `supports_account_lifecycle()` advertises persistent account
+`closed` state for every type, including off-budget `deposit` / `cd`. Existing
+accounts default open without changing their financial history hashes or recovery
+digests. Close/reopen retain identity, amounts, uncertainty, currency, annotations
+and mappings. New manual entries are rejected for archives; bank merges skip their
+account snapshots/transactions while open peers continue. Private per-account
+cursor checkpoints survive native reopen, copy/transfer and recovery; reopening
+replays from that checkpoint on the next normal sync. No synchronization is started
+by close/reopen. Portable exports retain lifecycle but omit protected bank state.
+See [the core semantics](../../../../docs/architecture.md#account-lifecycle-and-cds).

@@ -161,3 +161,51 @@ def test_tables_escape_controls_and_explain_empty_list(account_transport, capsys
     account_transport[0]['rows'].clear()
     assert run('list', '--unclassified', '--format', 'table') == 0
     assert 'No matching accounts' in capsys.readouterr().out
+
+
+def test_cd_and_lifecycle_commands_use_one_guarded_public_write(account_transport, capsys):
+    assert run('classify','a','--type','deposit','--subtype','cd','--off-budget')==0
+    cd=json.loads(capsys.readouterr().out)['data']
+    assert cd['type']=='deposit' and cd['subtype']=='cd' and not cd['onBudget'] and not cd['closed']
+    for action,closed in [('close',True),('reopen',False)]:
+        assert run(action,'🍏 Fictional Card')==0
+        result=json.loads(capsys.readouterr().out)
+        assert result['data']['closed'] is closed
+        body=json.loads(account_transport[1][-2].content)
+        assert body['payload']=={'accountId':'a','closed':closed}
+        assert body['request_id']==result['requestId']
+        assert run('show','a','--format','table')==0
+        assert ('closed' if closed else 'open') in capsys.readouterr().out
+
+
+def test_closed_active_filters_and_classification_preserve_archive_state(account_transport,capsys):
+    account_transport[0]['rows'][0]['closed']=True
+    assert run('list','--closed')==0
+    assert [row['id'] for row in json.loads(capsys.readouterr().out)['data']]==['a']
+    assert run('list','--active')==0
+    assert all(row['id']!='a' for row in json.loads(capsys.readouterr().out)['data'])
+    assert run('classify','a','--type','deposit','--subtype','cd')==0
+    assert json.loads(capsys.readouterr().out)['data']['closed']
+    with pytest.raises(SystemExit) as result:
+        run('list','--active','--closed')
+    assert result.value.code==2
+    capsys.readouterr()
+
+
+@pytest.mark.parametrize('action',['close','reopen'])
+def test_lifecycle_help_is_offline_and_covers_archive_sync_and_unknown_balances(account_transport,capsys,action):
+    with pytest.raises(SystemExit):
+        run(action,'--help')
+    text=capsys.readouterr().out
+    for phrase in ['Every account type','unknown/nonzero','no new manual', 'saved account cursor','Neither command starts sync','stale or uncertain']:
+        assert phrase in text or phrase=='no new manual' and 'refuse new manual' in text
+    assert not account_transport[1]
+
+
+@pytest.mark.parametrize('action',['close','reopen'])
+def test_uncertain_lifecycle_mutations_never_replay(account_transport,capsys,action):
+    account_transport[0]['failure']='lost'
+    assert run(action,'a')==1
+    error=capsys.readouterr().err
+    assert 'do not rerun '+action in error and 'request_id' in error
+    assert sum(request.method=='POST' for request in account_transport[1])==1

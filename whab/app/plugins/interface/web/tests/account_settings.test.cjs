@@ -43,7 +43,7 @@ function currencySelect(code) {
 function harness({flush = async () => true, logo = true, lazyCurrency = false, initialCurrency = 'USD'} = {}) {
   const requests = [], refreshed = [], updates = [], order = [];
   const error = {hidden: true, textContent: ''}, status = {textContent: ''}, submit = {disabled: true};
-  const elements = Object.fromEntries(Object.entries({workspace: 'personal', name: '', onBudget: 'true',
+  const elements = Object.fromEntries(Object.entries({workspace: 'personal', name: '', onBudget: 'true', closed: 'false',
     type: 'depository', subtype: '', currency: initialCurrency, ...(logo ? {bankWebsite: ''} : {})})
     .map(([name, value]) => [name, {name, value, disabled: name === 'currency',
       focus() {this.focused = true;}}]));
@@ -77,7 +77,7 @@ function harness({flush = async () => true, logo = true, lazyCurrency = false, i
     },
     readForm() {
       return Object.fromEntries(Object.values(elements).filter(field => !field.disabled)
-        .map(field => [field.name, field.name === 'onBudget' ? field.value === 'true' :
+        .map(field => [field.name, ['onBudget', 'closed'].includes(field.name) ? field.value === 'true' :
           field.name === 'subtype' ? field.value || null : field.value]));
     },
     updateFields() {updates.push({onBudget: elements.onBudget.value, type: elements.type.value});},
@@ -270,7 +270,7 @@ test('one save PATCH includes classification and an editable currency, then refr
   savedEdits.resolve(true);
   await tick();
   assert.deepEqual(state.requests[1].body, {workspace: 'personal', name: 'Household savings',
-    onBudget: false, type: 'investment', subtype: null, currency: 'EUR', bankWebsite: 'https://savings.example'});
+    onBudget: false, closed: false, type: 'investment', subtype: null, currency: 'EUR', bankWebsite: 'https://savings.example'});
   assert.equal(state.requests[1].path, '/accounts/checking');
   assert.equal(state.requests[1].method, 'PATCH');
   assert.equal(state.dialog.open, true);

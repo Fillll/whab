@@ -256,6 +256,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     if (event.target.matches('select[data-account-options-lazy]') && accountOptions?.content) {
       const value = event.target.value; event.target.replaceChildren(accountOptions.content.cloneNode(true));
       event.target.value = value; event.target.removeAttribute('data-account-options-lazy');
+      for (const option of event.target.options) option.disabled = option.hasAttribute('data-account-closed') && option.value !== value;
     }
     if (event.target.matches('select[data-category-options-lazy]')) {
       hydrateTransactionCategories(event.target, categoryOptions);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.64.0 — 2026-11-08
+
+PR: [#175](https://github.com/Fillll/whab/pull/175)
+
+- Expose canonical deposit/CD types in public account commands and add a separate guarded archive lifecycle for every account type. Preserve compatible defaults, historical financial treatment, uncertainty and native recovery hashes; pause archived account updates while open bank peers continue, and retain private cursor checkpoints for later reopen/catch-up. Reuse update_account and add optional durable storage capability detection.
+
 ## 2.63.0 — 2026-11-08
 
 PR: [#171](https://github.com/Fillll/whab/pull/171)

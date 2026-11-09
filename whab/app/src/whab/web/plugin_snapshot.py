@@ -22,6 +22,7 @@ def build_snapshot(workspace, data):
                 stale=bool(a.get("stale")),
                 balance_unknown=bool(a.get("balanceUnknown")),
                 on_budget=is_on_budget(a),
+                closed=a.get("closed", False),
             )
             for a in data["accounts"]
         ),

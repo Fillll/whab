@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.4.6 — 2026-11-08
+
+PR: [#175](https://github.com/Fillll/whab/pull/175)
+
+- Extend the packaged migration guide with explicit open/closed decisions and short commands for an off-budget closed CD. Keep archives out of new bank destinations and distinguish reopening from classification, scope and synchronization.
+
 ## 1.4.5 — 2026-11-08
 
 PR: [#174](https://github.com/Fillll/whab/pull/174)

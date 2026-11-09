@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.47.0 — 2026-11-08
+
+PR: [#175](https://github.com/Fillll/whab/pull/175)
+
+- Expose Open / Closed archive status in inline and register account settings, keep archives accessible in historical registers, and exclude them from active sidebar/new-entry choices. Preserve scope/balances and require reopening for new manual entries or incoming account moves.
+
 ## 1.46.1 — 2026-11-08
 
 PR: [#172](https://github.com/Fillll/whab/pull/172)

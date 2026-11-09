@@ -41,6 +41,11 @@ def test_remote_scope_changes_preserve_budget_and_portable_semantics(store):
                 "type": "depository", "subtype": "savings", "onBudget": True,
             })
             assert with_remote.workspace("personal", "2026-10")["summary"]["readyToAssign"] == 70000
+            with_remote.update_account("personal", account, {"closed": True})
+            assert with_remote.accounts("personal")[0]["closed"]
+            assert with_remote.supports_account_lifecycle() is True
+            with_remote.update_account("personal", account, {"closed": False})
+            assert not with_remote.accounts("personal")[0].get("closed", False)
             portable = with_remote.export_budget()
             assert portable["accounts"][0]["onBudget"] is True
             assert portable["accounts"][0]["subtype"] == "savings"

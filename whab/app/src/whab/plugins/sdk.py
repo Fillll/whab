@@ -109,6 +109,7 @@ class AccountSnapshot:
     balance_unknown: bool = False
     stale: bool = False
     on_budget: bool | None = None
+    closed: bool = False
 
     def __post_init__(self) -> None:
         _identifier(self.id, "Account ID")
@@ -118,6 +119,7 @@ class AccountSnapshot:
         _integer(self.balance_cents, "Account balance")
         _boolean(self.balance_unknown, "Unknown balance")
         _boolean(self.stale, "Stale balance")
+        _boolean(self.closed, "Account lifecycle")
         if self.on_budget is None:
             object.__setattr__(self, "on_budget", is_on_budget({"type": self.type}))
         _boolean(self.on_budget, "Account budget scope")
@@ -270,6 +272,12 @@ class BudgetHistoryStorage(Protocol):
     def history_preview(self, workspace: str, action: str, target: str | None = None) -> dict: ...
 
     def history_apply(self, workspace: str, action: str, target: str | None, fingerprint: str) -> dict: ...
+
+
+class AccountLifecycleStorage(Protocol):
+    """Optional durable archive state, including paused account synchronization."""
+
+    def supports_account_lifecycle(self) -> bool: ...
 
 
 class AgentCategoryStorage(Protocol):

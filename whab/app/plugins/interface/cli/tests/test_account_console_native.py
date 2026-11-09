@@ -64,6 +64,18 @@ def test_installed_console_classification_preserves_import_and_isolation(tmp_pat
     assert 'Only cash' in rejected['error']
     assert run(budget, 'account', 'show', before['id'])['revision'] == revision
 
+    # Actual installed entry point supports a CD archive without changing the
+    # imported estimate or another budget. Classification preserves closed state.
+    cd = run(budget, 'account', 'classify', before['id'], '--type', 'deposit', '--subtype', 'cd', '--off-budget')
+    closed = run(budget, 'account', 'close', '🍏 Fictional карта')
+    assert closed['data']['closed'] and closed['data']['balanceUnknown']
+    assert closed['data']['balance'] == cd['data']['balance']
+    assert run(budget, 'account', 'list', '--closed')['data'] == [closed['data']]
+    reopened = run(budget, 'account', 'reopen', before['id'])
+    assert not reopened['data']['closed'] and reopened['data']['subtype'] == 'cd'
+    assert run(other, 'account', 'list')['data'] == []
+    saved = run(budget, 'account', 'classify', before['id'], '--type', 'credit', '--subtype', 'credit_card', '--on-budget')
+
     # A real concurrent public write between read and classification is refused.
     exchange = console.exchange
     def concurrent(connection, method, path, **kwargs):
