@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.46.1 — 2026-11-08
+
+PR: [#172](https://github.com/Fillll/whab/pull/172)
+
+- Keep bank settings controls near the top of the dialog by folding package metadata and dependencies under Plugin information.
+
 ## 1.46.0 — 2026-11-08
 
 PR: [#169](https://github.com/Fillll/whab/pull/169)
