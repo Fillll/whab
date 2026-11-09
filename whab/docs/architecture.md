@@ -321,6 +321,16 @@ are shared status; destination failures and import progress remain budget-local.
 
 ## Explicit category parents and reparenting
 
+WHAB 2.67 adds public `delete_category` and `delete_category_group`, with optional
+`CategoryDeletion` storage support. Deletion safety belongs to core: every current
+transaction reference (including deleted/pending/reviewed rows), every assignment
+row in any month (including zero values), and every child of a group are protected.
+No deletion cascades or reassigns financial records. Removing an unused child
+retains its empty parent until a separate explicit group deletion. Native adapters
+commit the removal with audit history and receipts; the CLI resolves exact names
+or IDs, guards the observed revision and verifies the full saved hierarchy. Existing
+history previews allow compatible undo/redo without discarding prior audit entries.
+
 Core owns the fixed two-level category hierarchy. Nonassignable parent identity
 continues to derive from its normalized group label; children retain their stable
 IDs and stored `group` label. WHAB 2.65 adds optional explicit parent metadata to

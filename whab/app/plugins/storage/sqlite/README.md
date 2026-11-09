@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.65 or newer for the public local-authority and
+This version requires WHAB 2.67 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -9,6 +9,14 @@ Distributed independently as `whab_plugin_sqlite`. Its version and dependency co
 `src/whab_plugin_sqlite/` owns the bundled SQLite descriptor, ledger transactions, additive schema upgrades and fictional seeding. Keep its implementation and tests in this folder. The host uses the public storage protocol rather than importing this package.
 
 ## Reads and atomic mutations
+
+Version 1.19 with WHAB 2.67 implements optional `CategoryDeletion`: core rejects
+all current transaction references (including tombstones), assignment rows
+(including zeros), and groups with children. An approved unused child is deleted
+by its exact workspace/ID inside the native transaction; its empty parent is kept.
+Empty parent deletion changes only parent metadata. Financial state, audit history
+and native receipts commit atomically; write failures roll back the deletion. No
+schema migration, financial cascade, bank-mapping change or sync is performed.
 
 Optional bounded register reads count and select under one snapshot, with Unicode casefold search and stable date/ID ordering; additive indexes support paging and account-history checks. Account overview/settings queries read metadata and counts without exporting history. A batch workspace query reads one ledger snapshot for consecutive months. Transaction annotation edits invoke the existing core command and update only the addressed row inside one transaction, preserving receipts, balances, synchronization fields and rollback on error. No persistent financial-page cache is used; later reads see committed changes.
 
@@ -169,7 +177,7 @@ See [the core semantics](../../../../docs/architecture.md#account-lifecycle-and-
 
 ## Category management
 
-This version requires WHAB 2.65+ for optional SDK `CategoryManagement`.
+This version requires WHAB 2.67+ for optional SDK `CategoryManagement`.
 `category_tree(workspace)` includes real empty parents; `add_category_group(workspace,
 name)` creates one; `move_category(workspace, category_id, parent_id)` preserves the
 child ID, target, currency, transaction references and all monthly assignments.

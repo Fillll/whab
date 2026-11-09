@@ -39,6 +39,7 @@ METHODS = {
     "history_preview": (("workspace", "action"), {"target": None}),
     "supports_category_agent": ((), {}),
     "supports_account_lifecycle": ((), {}),
+    "supports_category_deletion": ((), {}),
     "prepare_existing": (("workspace", "files"), {}),
     "category_tree": (("workspace",), {}),
     "accounts": (("workspace",), {}), "categories": (("workspace",), {}),

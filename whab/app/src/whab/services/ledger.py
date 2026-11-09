@@ -361,6 +361,12 @@ class LedgerService:
         _identifier(request_id)
         _identifier(expected_revision)
         payload = self._validate(operation, payload)
+        if operation in {'delete_category', 'delete_category_group'}:
+            supported = getattr(self._store, 'supports_category_deletion', None)
+            if (not callable(supported) or supported() is not True
+                    or not all(callable(getattr(self._store, name, None)) for name in
+                               ('delete_category', 'delete_category_group', 'category_tree', 'budget_history', 'history_scope'))):
+                raise StoreError('Update the storage plugin to support safe category deletion with audit history.')
         if operation in {'add_category_group', 'move_category'} and (
             not callable(getattr(self._store, 'category_tree', None))
             or not callable(getattr(self._store, operation, None))
@@ -425,6 +431,9 @@ class LedgerService:
                     mutate = getattr(self._store, operation)
                     data = (mutate(workspace, payload["name"]) if operation == "add_category_group"
                             else mutate(workspace, payload["categoryId"], payload["parentId"]))
+                elif operation in {'delete_category', 'delete_category_group'}:
+                    data = getattr(self._store, operation)(
+                        workspace, payload['categoryId'] if operation == 'delete_category' else payload['parentId'])
                 elif operation == "update_account":
                     update = getattr(self._store, "update_account", None)
                     if not callable(update):

@@ -28,7 +28,7 @@ and request ID for an exact retry. Never create a new intent just to retry.
 
 Discovery:
   whab BUDGET --help                     name-addressed local commands
-  whab BUDGET category --help            create parents/children and move by name
+  whab BUDGET category --help            create, move and safely delete by name/ID
   whab BUDGET account --help             inspect/classify by unique name or ID
   whab BUDGET bank --help                mappings, schedules and investments
   whab BUDGET import --help              importer-owned migration workflows

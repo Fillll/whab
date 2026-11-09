@@ -20,6 +20,8 @@ from whab.domain.categories import (
     add_category_group,
     category_tree,
     create_category,
+    delete_category,
+    delete_category_group,
     move_category,
     public_categories,
 )
@@ -274,6 +276,15 @@ class Store(Authority):
 
     def update_account(self, workspace, account_id, changes):
         return self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
+
+    def supports_category_deletion(self):
+        return True
+
+    def delete_category(self, workspace, category_id):
+        return self._mutate(workspace, lambda state: delete_category(state, category_id))
+
+    def delete_category_group(self, workspace, parent_id):
+        return self._mutate(workspace, lambda state: delete_category_group(state, parent_id))
 
     def add_category_group(self, workspace, name):
         return self._mutate(workspace, lambda state: add_category_group(state, name))

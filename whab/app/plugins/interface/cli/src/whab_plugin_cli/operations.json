@@ -4217,7 +4217,7 @@
     {
       "name": "category.workflow",
       "kind": "local",
-      "summary": "Category workflow (fictional budget; no wizard):\n  whab \"My budget\" category list --format table\n  whab \"My budget\" category group create \"Projects\"\n  whab \"My budget\" category move \"Finance / Example studio\" --parent \"Projects\"\n  whab \"My budget\" category create \"Example venture\" --parent \"Projects\"\n  whab \"My budget\" category list --parent \"Projects\" --format table\n  whab \"My budget\" history list\n\nRead the hierarchy, confirm the intended parent and child with the user, apply one\nconfirmed choice, then inspect the verified result before continuing. All commands\naddress the budget by its existing unique name or stable ID. Groups accept an exact\nunique name or stable ID; children also accept \"Group / Name\". Names ignore case\nand outer whitespace; spaces, emoji and non-Latin text work when quoted. No fuzzy\nmatch is selected. Missing/ambiguous names show candidate names and IDs.\n\nGroups are real nonassignable parents and may be empty. Only children can receive\ntransactions, targets or monthly assignments; deeper nesting is refused. Child\ncreation requires an existing --parent, defaults to --currency USD and --target 0,\nand refuses duplicate sibling names. Target is a nonnegative integer in currency\nminor units (USD 1234 = $12.34). No currency conversion is performed. Moves preserve\nchild identity, currency, targets, transaction references, every month's assignments\nand prior history. Unrelated children and the original parent remain intact, even\nwhen the original parent becomes empty. Existing ledger order is preserved on move;\nthere is currently no manual reorder operation or requested-order guarantee.\n\nJSON is the default and retains full IDs/fields; --format table is for readable\ninspection. Successful writes report the addressed budget and verified saved group\nor child. Revisions and unique request IDs are handled internally. Each command is\none atomic change; the sequence is not one transaction. Stale state is refused.\nNo bank synchronization is started. After an uncertain response, inspect category\nlist and history and retain the complete reported original intent (budget, payload,\nrevision and request ID). Never automatically rerun a write with a new intent.\n\nHelp works offline without a profile or running host. The category management\ncommands require WHAB 2.65+; saving empty groups and moving children require native\nSQLite 1.18+, JSON 1.10+ or another adapter implementing CategoryManagement. Older\nstorage can still provide derived nonempty groups for reads; unsupported writes\nfail explicitly. Use whab BUDGET category ACTION --help for each command.",
+      "summary": "Category workflow (fictional budget; no wizard):\n  whab \"My budget\" category list --format table\n  whab \"My budget\" category group create \"Projects\"\n  whab \"My budget\" category move \"Finance / Example studio\" --parent \"Projects\"\n  whab \"My budget\" category create \"Example venture\" --parent \"Projects\"\n  whab \"My budget\" category list --parent \"Projects\" --format table\n  whab \"My budget\" category delete \"Projects / Example venture\"\n  whab \"My budget\" category group delete \"Projects\"\n  whab \"My budget\" history list\n\nRead the hierarchy, confirm the intended parent and child with the user, apply one\nconfirmed choice, then inspect the verified result before continuing. All commands\naddress the budget by its existing unique name or stable ID. Groups accept an exact\nunique name or stable ID; children also accept \"Group / Name\". Names ignore case\nand outer whitespace; spaces, emoji and non-Latin text work when quoted. No fuzzy\nmatch is selected. Missing/ambiguous names show candidate names and IDs.\n\nGroups are real nonassignable parents and may be empty. Only children can receive\ntransactions, targets or monthly assignments; deeper nesting is refused. Child\ncreation requires an existing --parent, defaults to --currency USD and --target 0,\nand refuses duplicate sibling names. Target is a nonnegative integer in currency\nminor units (USD 1234 = $12.34). No currency conversion is performed. Moves preserve\nchild identity, currency, targets, transaction references, every month's assignments\nand prior history. Unrelated children and the original parent remain intact, even\nwhen the original parent becomes empty. Existing ledger order is preserved on move;\nthere is currently no manual reorder operation or requested-order guarantee.\n\nJSON is the default and retains full IDs/fields; --format table is for readable\ninspection. Successful writes report the addressed budget and verified saved group\nor child. Revisions and unique request IDs are handled internally. Each command is\none atomic change; the sequence is not one transaction. Stale state is refused.\nNo bank synchronization is started. After an uncertain response, inspect category\nlist and history and retain the complete reported original intent (budget, payload,\nrevision and request ID). Never automatically rerun a write with a new intent.\n\nHelp works offline without a profile or running host. The category management\ncommands require WHAB 2.65+; saving empty groups and moving children require native\nSQLite 1.18+, JSON 1.10+ or another adapter implementing CategoryManagement. Older\nstorage can still provide derived nonempty groups for reads; unsupported writes\nfail explicitly. Use whab BUDGET category ACTION --help for each command.\n\nSafe deletion (CLI 2.13+, WHAB 2.67+, SQLite 1.19+/JSON 1.11+):\n  whab \"My budget\" category delete \"Fictional maintenance / Example home\"\n  whab \"My budget\" category list --parent \"Fictional maintenance\"\n  whab \"My budget\" category group delete \"Fictional maintenance\"\n  whab \"My budget\" category list --format table\n  whab \"My budget\" history list\n\nDeletion accepts the same exact names/IDs and child Group / Name resolution.\nA child must have NO transaction references (including pending, reviewed and deleted\nrecords) and NO monthly assignment rows in any month (including zero-valued rows).\nA group must have NO children. Refusals never remove or reassign financial records.\nThere is no cascade or --force. Deleting an unused child removes its target metadata\nand retains its empty parent. Delete that parent in a separate confirmed command.\nInspect category list first, confirm the exact unused target, then delete and check\nthe verified result. Success reports deleted=true, the original record/ID and a\nverified same-revision hierarchy with every other group/child unchanged. Each\nsuccessful delete is audited; history list/show inspect it, and guarded history\nundo/redo preview can restore/reapply it when valid. Full history is preserved.\nStorage must explicitly opt in to safe deletion with atomic history; older adapters\nare refused. Revisions/request IDs are internal. Stale state is safely refused;\na timeout or failed verification is uncertain, never proof of rollback. Inspect\ncategory list/history and retain the COMPLETE reported original intent; never\nrerun deletion with a new request ID to retry. Neither deletion starts bank sync.",
       "input": {
         "type": "object",
         "description": "Simple category-command arguments inside one explicitly addressed budget.",
@@ -4476,6 +4476,220 @@
       ],
       "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
       "availability": "CLI 2.11+, WHAB 2.65+; native category-management adapters for creation/moves. category.workflow is documentation only."
+    },
+    {
+      "name": "category.delete",
+      "kind": "local",
+      "summary": "Safely delete an unused child category by exact name, ID or Group / Name.",
+      "input": {
+        "type": "object",
+        "description": "whab BUDGET category delete CATEGORY [--format json|table]. No JSON, revision or request ID is required.",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Existing child ID, unique name or Group / Name.",
+            "minLength": 1,
+            "maxLength": 403
+          },
+          "format": {
+            "type": "string",
+            "description": "Output presentation; JSON retains complete saved fields.",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json"
+          }
+        },
+        "required": [
+          "category"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "object",
+          "string"
+        ],
+        "description": "Verified JSON envelope or table. data is the removed record with deleted=true; the complete saved hierarchy/revision were checked and every other group/child is unchanged.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Addressed budget name/ID."
+          },
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent budget ID."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Verified saved revision."
+          },
+          "data": {
+            "type": "object",
+            "description": "Original removed child/group metadata, retained for confirmation; not a live record.",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Removed stable identity."
+              },
+              "deleted": {
+                "type": "boolean",
+                "const": true,
+                "description": "Verified absent from the saved hierarchy."
+              }
+            },
+            "required": [
+              "id",
+              "deleted"
+            ],
+            "additionalProperties": true
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Unique original guarded intent identity."
+          },
+          "expectedRevision": {
+            "type": "string",
+            "description": "Observed decision revision."
+          }
+        },
+        "required": [
+          "budget",
+          "budgetId",
+          "revision",
+          "data",
+          "requestId",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "category": "Fictional maintenance / Example home",
+            "format": "table"
+          },
+          "output": "Budget: Fictional budget (fictional-id)\nDeleted and verified absent; other groups/children are unchanged."
+        }
+      ],
+      "side_effects": "Invoke one existing-guard public deletion intent and verify the complete saved category tree/revision. Removes only the addressed unused category/empty group and records permanent audit history atomically. No cascade, force, transaction/assignment deletion, bank sync or uncertain replay.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One explicitly addressed budget, personal workspace; currencies never combined.",
+      "errors": [
+        "Missing/ambiguous/wrong-kind names show candidates; no fuzzy target is selected.",
+        "Groups with children and children referenced by any transaction or assignment are refused, including deleted transactions and zero assignments.",
+        "Stale/foreign/mismatched/uncertain responses fail; retain exact original intent and inspect list/history before any explicit retry. Unsupported storage fails safely."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.13+, WHAB 2.67+, SQLite 1.19+/JSON 1.11+ or explicit CategoryDeletion support. Detailed offline --help renders category.workflow without a runtime or profile."
+    },
+    {
+      "name": "category.group.delete",
+      "kind": "local",
+      "summary": "Safely delete an empty parent group by exact name or ID.",
+      "input": {
+        "type": "object",
+        "description": "whab BUDGET category group delete CATEGORY [--format json|table]. No JSON, revision or request ID is required.",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Existing empty parent group by exact unique name or stable ID.",
+            "minLength": 1,
+            "maxLength": 403
+          },
+          "format": {
+            "type": "string",
+            "description": "Output presentation; JSON retains complete saved fields.",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json"
+          }
+        },
+        "required": [
+          "category"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": [
+          "object",
+          "string"
+        ],
+        "description": "Verified JSON envelope or table. data is the removed record with deleted=true; the complete saved hierarchy/revision were checked and every other group/child is unchanged.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Addressed budget name/ID."
+          },
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent budget ID."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Verified saved revision."
+          },
+          "data": {
+            "type": "object",
+            "description": "Original removed child/group metadata, retained for confirmation; not a live record.",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Removed stable identity."
+              },
+              "deleted": {
+                "type": "boolean",
+                "const": true,
+                "description": "Verified absent from the saved hierarchy."
+              }
+            },
+            "required": [
+              "id",
+              "deleted"
+            ],
+            "additionalProperties": true
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Unique original guarded intent identity."
+          },
+          "expectedRevision": {
+            "type": "string",
+            "description": "Observed decision revision."
+          }
+        },
+        "required": [
+          "budget",
+          "budgetId",
+          "revision",
+          "data",
+          "requestId",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "category": "Fictional empty",
+            "format": "table"
+          },
+          "output": "Budget: Fictional budget (fictional-id)\nDeleted and verified absent; other groups/children are unchanged."
+        }
+      ],
+      "side_effects": "Invoke one existing-guard public deletion intent and verify the complete saved category tree/revision. Removes only the addressed unused category/empty group and records permanent audit history atomically. No cascade, force, transaction/assignment deletion, bank sync or uncertain replay.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One explicitly addressed budget, personal workspace; currencies never combined.",
+      "errors": [
+        "Missing/ambiguous/wrong-kind names show candidates; no fuzzy target is selected.",
+        "Groups with children and children referenced by any transaction or assignment are refused, including deleted transactions and zero assignments.",
+        "Stale/foreign/mismatched/uncertain responses fail; retain exact original intent and inspect list/history before any explicit retry. Unsupported storage fails safely."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.13+, WHAB 2.67+, SQLite 1.19+/JSON 1.11+ or explicit CategoryDeletion support. Detailed offline --help renders category.workflow without a runtime or profile."
     }
   ]
 }

@@ -1072,3 +1072,25 @@ The category-management capability includes all three methods together. Before
 admitting either hierarchy write, the host requires the `category_tree` read
 contract as well as its mutation method; an older native worker does not opt in
 merely because a generic proxy exposes a write wrapper.
+
+WHAB 2.67 adds separate optional `CategoryDeletion`, leaving `CategoryManagement`
+unchanged. It defines `supports_category_deletion() -> bool`,
+`delete_category(workspace, category_id) -> None` and
+`delete_category_group(workspace, parent_id) -> None`. Opt-in requires a true
+capability declaration, the category tree read, both delete methods and atomic
+budget history/receipts. Older native workers lacking the declaration fail before
+write admission; a generic proxy method is insufficient. Remote transports forward
+the corresponding guarded public operations to the authority, which applies the
+same validation and audit requirement.
+
+The public commands accept `{categoryId}` and `{parentId}` respectively. These are
+actual missing operations: creation and reparenting cannot remove obsolete records.
+Core validates all current transaction references, including deleted tombstones,
+pending and reviewed rows, and all monthly assignment rows including zero values.
+Any reference blocks child deletion. A parent with any child is protected. There
+is no cascade, force flag or financial reassignment. An unused child's target
+metadata is removed; its parent remains explicitly present, including on legacy
+ledgers. All other financial/provider data and existing history are preserved.
+Native adapters commit the deletion, audit entry and receipt together. Existing
+guarded history previews/undo/redo retain deleted identities and metadata and
+refuse incompatible changes. No schema migration or bank sync is required.

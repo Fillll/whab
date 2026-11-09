@@ -3076,6 +3076,94 @@
       ],
       "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
       "availability": "WHAB 2.65+ and a storage adapter implementing CategoryManagement (SQLite 1.18+, JSON 1.10+)."
+    },
+    {
+      "name": "delete_category",
+      "kind": "command",
+      "summary": "Delete one unused child category; refuse every transaction reference and monthly assignment.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "categoryId"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit category-management operation parameters."
+      },
+      "output": {
+        "type": "null",
+        "description": "Null after one committed deletion; verify absence using category_tree at the returned revision."
+      },
+      "examples": [
+        {
+          "input": {
+            "categoryId": "fictional-child"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Atomically deletes only the addressed unused child or empty parent, with permanent audit history and the existing guarded receipt. Child deletion retains its parent, including a formerly derived legacy parent. Refuses all current transaction references (including pending, reviewed and deleted tombstones) and all monthly assignment rows (including zero values). Removes the deleted child target metadata only; preserves all other identities, transactions, annotations, assignments, balances, history and bank mappings. No cascade, force option, reassignment or sync.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Missing/wrong-kind category/group IDs are refused. A group with children cannot be deleted.",
+        "Any referencing transaction, including tombstones, or monthly assignment row, including zero values, blocks child deletion without mutation.",
+        "Storage must explicitly support CategoryDeletion with atomic audit history; older adapters fail before a mutation.",
+        "Stale revisions conflict; an uncertain write must retain its exact original parameters/revision/request ID and must not be replayed with a new intent."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.67+; optional CategoryDeletion, CategoryManagement tree read and BudgetHistoryStorage support. SQLite 1.19+, JSON 1.11+ or compatible adapters. Remote authorities enforce the same guards."
+    },
+    {
+      "name": "delete_category_group",
+      "kind": "command",
+      "summary": "Delete one empty category group; never cascade to children.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "parentId"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit category-management operation parameters."
+      },
+      "output": {
+        "type": "null",
+        "description": "Null after one committed deletion; verify absence using category_tree at the returned revision."
+      },
+      "examples": [
+        {
+          "input": {
+            "parentId": "category-group:fictional-parent"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Atomically deletes only the addressed unused child or empty parent, with permanent audit history and the existing guarded receipt. Child deletion retains its parent, including a formerly derived legacy parent. Refuses all current transaction references (including pending, reviewed and deleted tombstones) and all monthly assignment rows (including zero values). Removes the deleted child target metadata only; preserves all other identities, transactions, annotations, assignments, balances, history and bank mappings. No cascade, force option, reassignment or sync.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Missing/wrong-kind category/group IDs are refused. A group with children cannot be deleted.",
+        "Any referencing transaction, including tombstones, or monthly assignment row, including zero values, blocks child deletion without mutation.",
+        "Storage must explicitly support CategoryDeletion with atomic audit history; older adapters fail before a mutation.",
+        "Stale revisions conflict; an uncertain write must retain its exact original parameters/revision/request ID and must not be replayed with a new intent."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.67+; optional CategoryDeletion, CategoryManagement tree read and BudgetHistoryStorage support. SQLite 1.19+, JSON 1.11+ or compatible adapters. Remote authorities enforce the same guards."
     }
   ]
 }
