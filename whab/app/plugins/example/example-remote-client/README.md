@@ -1,6 +1,6 @@
 # example-remote-client
 
-This independently packaged fictional remote client requires Python 3.14+ and
+This independently packaged fictional remote client requires Python 3.15.x and
 WHAB 2.40+ within major 2. Its public `RemoteLedgerClient` declaration gives a
 worker only protocol and host setting names. The host owns HTTPS, bearer values,
 remote budget identity, financial validation, transport, revisions and durable

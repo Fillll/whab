@@ -246,7 +246,7 @@ def inventory_fixture(root):
     plugin = application / "plugins/interface/web"
     plugin.mkdir(parents=True)
     (plugin / "pyproject.toml").write_text(
-        '[project]\nname = "whab_plugin_web"\nversion = "1.0.0"\nrequires-python = ">=3.14"\ndependencies = ["whab>=1,<3"]\n'
+        '[project]\nname = "whab_plugin_web"\nversion = "1.0.0"\nrequires-python = ">=3.15,<3.16"\ndependencies = ["whab>=1,<3"]\n'
         '[project.entry-points."whab.plugins"]\nweb = "web:plugin"\n'
         '[tool.whab.plugin]\napi-version = 1\ncapabilities = [{name="interface.ui",version=1,composition="singleton"}]\n'
         'requires = []\nconflicts = []\nlifecycle = "restart"\nlegacy = true\nauthority = "unknown"\nstate-version = 1\nstate-upgrades = []\nsupport = "maintained"\n'
@@ -470,3 +470,11 @@ def test_official_toolkit_and_reviewed_fixture_recipes_are_checked_without_priva
     assert checker.source_document("whab/app/devtools/plugin-devkit/fixtures/runtime-peers/README.md")
     assert not checker.source_document("whab/app/devtools/plugin-devkit/runtime/private.md")
     assert not checker.source_document("whab/app/devtools/plugin-devkit/.venv/README.md")
+
+
+@pytest.mark.parametrize("checker", ["check"], indirect=True)
+@pytest.mark.parametrize("version", [(3, 13), (3, 14), (3, 16), (4, 0)])
+def test_only_python315_can_run_contribution_checks(checker, monkeypatch, version):
+    monkeypatch.setattr(checker.sys, "version_info", version)
+    with pytest.raises(ValueError, match="Python 3.15"):
+        checker.preflight(docs_only=True, quick=False)

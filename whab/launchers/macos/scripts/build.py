@@ -95,12 +95,12 @@ def python_metadata(python):
             "'executable':sys.executable}))")
     result = run([python, "-I", "-c", code], stdout=subprocess.PIPE, env=clean_environment())
     metadata = json.loads(result.stdout)
-    if metadata["version"][:2] != [3, 14]:
-        raise RuntimeError("Build with a relocatable Python 3.14 interpreter.")
+    if metadata["version"][:2] != [3, 15]:
+        raise RuntimeError("Build with a relocatable Python 3.15 interpreter.")
     prefix = Path(metadata["prefix"]).resolve()
     if (metadata["framework"] or str(prefix).startswith(("/System/", "/usr/", "/Library/", "/opt/homebrew/"))
-            or not (prefix / "bin/python3.14").is_file()
-            or not (prefix / "lib/libpython3.14.dylib").is_file()):
+            or not (prefix / "bin/python3.15").is_file()
+            or not (prefix / "lib/libpython3.15.dylib").is_file()):
         raise RuntimeError("Use a clean python-build-standalone installation, not macOS, Homebrew or framework Python.")
     return prefix
 
@@ -109,10 +109,10 @@ def copy_python(python, destination):
     prefix = python_metadata(python)
     (destination / "bin").mkdir(parents=True)
     (destination / "lib").mkdir()
-    shutil.copy2(prefix / "bin/python3.14", destination / "bin/python3.14")
+    shutil.copy2(prefix / "bin/python3.15", destination / "bin/python3.15")
     for alias in ("python", "python3"):
-        (destination / "bin" / alias).symlink_to("python3.14")
-    shutil.copy2(prefix / "lib/libpython3.14.dylib", destination / "lib/libpython3.14.dylib")
+        (destination / "bin" / alias).symlink_to("python3.15")
+    shutil.copy2(prefix / "lib/libpython3.15.dylib", destination / "lib/libpython3.15.dylib")
 
     def ignore(directory, names):
         if Path(directory).name == "site-packages":
@@ -121,9 +121,9 @@ def copy_python(python, destination):
             return [name for name in names if name != "pip" and not name.startswith("pip-")]
         return [name for name in names if name == "__pycache__" or name.endswith((".pyc", ".pyo"))]
 
-    shutil.copytree(prefix / "lib/python3.14", destination / "lib/python3.14", ignore=ignore)
-    run([destination / "bin/python3.14", "-I", "-c",
-         "import ssl,sqlite3,venv,sys; assert sys.version_info[:2] == (3,14); print(sys.version.split()[0])"],
+    shutil.copytree(prefix / "lib/python3.15", destination / "lib/python3.15", ignore=ignore)
+    run([destination / "bin/python3.15", "-I", "-c",
+         "import ssl,sqlite3,venv,sys; assert sys.version_info[:2] == (3,15); print(sys.version.split()[0])"],
         env=clean_environment())
 
 
@@ -160,7 +160,7 @@ def write_icon(iconset, destination):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--python", default=sys.executable, help="Clean relocatable Python 3.14 interpreter (a venv using it is accepted).")
+    parser.add_argument("--python", default=sys.executable, help="Clean relocatable Python 3.15 interpreter (a venv using it is accepted).")
     parser.add_argument("--output", type=Path, default=LAUNCHER / "dist/WHAB.app")
     parser.add_argument("--skip-runtime", action="store_true", help="Build only the native shell for CI; output cannot launch WHAB.")
     parser.add_argument("--replace", action="store_true", help="Replace an existing output .app after the new bundle is complete.")
@@ -207,7 +207,7 @@ def main():
         if not args.skip_runtime:
             copy_python(args.python, resources / "python")
             # Build all wheels with the relocated runtime to verify pip also relocates.
-            build_wheelhouse(resources / "python/bin/python3.14", seed, resources / "wheelhouse")
+            build_wheelhouse(resources / "python/bin/python3.15", seed, resources / "wheelhouse")
         else:
             (resources / "DEVELOPMENT_ONLY").write_text("Native shell only. Rebuild without --skip-runtime to run WHAB.\n")
         # Sign nested native code before sealing the enclosing app. This local ad-hoc
@@ -216,7 +216,7 @@ def main():
             for native in sorted((resources / "python").rglob("*")):
                 if native.is_file() and not native.is_symlink() and native.suffix in (".so", ".dylib"):
                     run(["codesign", "--force", "--sign", "-", native], stdout=subprocess.DEVNULL)
-            run(["codesign", "--force", "--sign", "-", resources / "python/bin/python3.14"], stdout=subprocess.DEVNULL)
+            run(["codesign", "--force", "--sign", "-", resources / "python/bin/python3.15"], stdout=subprocess.DEVNULL)
         run(["codesign", "--force", "--sign", "-", bundle], stdout=subprocess.DEVNULL)
         run(["codesign", "--verify", "--deep", "--strict", bundle])
         if output.exists():

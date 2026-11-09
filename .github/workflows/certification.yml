@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.14", "3.15"]
+        python-version: ["3.15"]
     env:
       PLAID_ENV: sandbox
       ALLOW_LIVE_PLAID: "false"
@@ -86,7 +86,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       - run: python -m unittest discover -s whab/launchers/macos/tests -p 'test_*.py'
       - run: python whab/launchers/macos/scripts/test_build.py
       - run: swift test --package-path whab/launchers/macos --scratch-path /tmp/whab-launcher-swift --disable-sandbox
@@ -115,7 +115,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       - name: Publish the declared version from the exact green nightly commit
         working-directory: whab/app
         env:

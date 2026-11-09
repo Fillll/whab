@@ -1,6 +1,6 @@
 # __PLUGIN_ID__
 
-This fictional declaration requires Python 3.14+ and WHAB 2.40+ within major 2.
+This fictional declaration requires Python 3.15.x and WHAB 2.40+ within major 2.
 The public RemoteLedgerClient ABI begins in 2.39; this project's actual 2.40 floor
 also requires custom configuration to be excluded from offline provisioning.
 The host owns HTTPS, bearer authorization, remote budget identity, financial

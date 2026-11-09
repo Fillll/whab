@@ -72,7 +72,7 @@ the browser. Reopening it from Spotlight or the Dock does the same.
 ## Build a complete local app
 
 From `whab/app/`, use the development environment backed by a clean relocatable
-Python 3.14 distribution, such as python-build-standalone:
+Python 3.15 distribution, such as python-build-standalone:
 
 ```sh
 .venv/bin/python ../launchers/macos/scripts/build.py --python .venv/bin/python
@@ -125,7 +125,7 @@ whab/launchers/macos/dist/WHAB.app/Contents/MacOS/WHABLauncher \
 ```
 
 Verify a complete bundle's offline lifecycle with the supported development
-Python 3.14 interpreter, from `whab/app/`:
+Python 3.15 interpreter, from `whab/app/`:
 
 ```sh
 .venv/bin/python ../launchers/macos/scripts/check_bundle.py \

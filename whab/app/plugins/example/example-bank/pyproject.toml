@@ -1,9 +1,9 @@
 [project]
 name = "whab_plugin_example_bank"
-version = "1.0.2"
+version = "1.0.3"
 description = "Offline fictional bank teaching plugin for WHAB"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.15,<3.16"
 license = "MIT"
 license-files = ["LICENSE"]
 dependencies = ["whab>=2.38,<3"]

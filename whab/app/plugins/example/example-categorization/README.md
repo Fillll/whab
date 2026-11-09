@@ -4,7 +4,7 @@ This deliberately small categorizer learns one exact-merchant lookup from review
 
 Predictions are suggestions for unreviewed uncategorized rows. A score of `1.0` means an exact teaching-rule match, with no claim of measured predictive confidence. The example never changes the ledger. Tests reopen the model through a fresh factory and check currency isolation and invalid saved state.
 
-This independently packaged teaching plugin requires Python 3.14+ and WHAB 2.22+ within major 2. It advertises restart lifecycle support. WHAB 2.26+ hides it from ordinary Settings; enable `example-categorization` explicitly. See the [teaching guide](../README.md).
+This independently packaged teaching plugin requires Python 3.15.x and WHAB 2.22+ within major 2. It advertises restart lifecycle support. WHAB 2.26+ hides it from ordinary Settings; enable `example-categorization` explicitly. See the [teaching guide](../README.md).
 
 Build and test from a copy of this folder outside the WHAB checkout, in a clean environment containing the approved host and toolkit artifacts:
 

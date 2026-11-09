@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.66.0 — 2026-11-09
+
+PR: [#177](https://github.com/Fillll/whab/pull/177)
+
+- Support Python 3.15.x only across the host, package requirements, validation and single-version CI/certification/publication gates; retain complete source and plugin coverage requirements.
+
 ## 2.65.0 — 2026-11-08
 
 PR: [#176](https://github.com/Fillll/whab/pull/176)

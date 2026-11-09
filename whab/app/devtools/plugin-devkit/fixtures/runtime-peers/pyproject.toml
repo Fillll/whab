@@ -3,7 +3,7 @@ name = "whab_devkit_runtime_peers"
 version = "1.0.0"
 description = "Reviewed fictional peers for WHAB runtime conformance only"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.15,<3.16"
 license = "MIT"
 license-files = ["LICENSE"]
 dependencies = ["whab_plugin_devkit>=0.4,<1", "whab>=2.22,<3"]

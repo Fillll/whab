@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Private, stdlib-only WHAB installation and process manager (Python >=3.14).
+"""Private, stdlib-only WHAB installation and process manager (Python 3.15.x only).
 
 The native app is a client of this JSON CLI. It never imports the managed app,
 reads banking state, modifies OS trust, or signals a process by its port.
@@ -28,7 +28,7 @@ from pathlib import Path
 
 REPOSITORY = "Fillll/whab"
 API = f"https://api.github.com/repos/{REPOSITORY}"
-REQUIRED_CHECKS = {"CI (Python 3.14)", "CI (Python 3.15)"}
+REQUIRED_CHECKS = {"CI (Python 3.15)"}
 CHANNELS = ("main", "alpha", "stable")
 PLUGINS = (
     "interface/bank-logos", "storage/client", "ingestion/plaid", "interface/server",
@@ -603,14 +603,14 @@ class Manager:
             (self.root / "update.json").unlink(missing_ok=True)
         return self.status() | {"message": "WHAB runtime configured. Existing runtime settings are preserved."}
 
-    def verify_python(self, config):
-        executable = self.python_override or Path(config.get("python", sys.executable))
+    def verify_python(self, config, *, interpreter=None):
+        executable = Path(interpreter) if interpreter is not None else self.python_override or Path(config.get("python", sys.executable))
         try:
-            result = subprocess.run([str(executable), "-I", "-B", "-c", "import sys; print(int(sys.version_info >= (3,14)))"], capture_output=True, text=True, timeout=10, check=True)
+            result = subprocess.run([str(executable), "-I", "-B", "-c", "import sys; print(int(sys.version_info[:2] == (3,15)))"], capture_output=True, text=True, timeout=10, check=True)
             if result.stdout.strip() != "1":
                 raise ValueError()
         except (OSError, ValueError, subprocess.SubprocessError):
-            raise LauncherError("python_unavailable", "WHAB requires a working Python 3.14 or newer. Rebuild the app with its bundled runtime or configure an absolute Python path.") from None
+            raise LauncherError("python_unavailable", "WHAB requires a working Python 3.15.x. Rebuild the app with its bundled runtime or configure an absolute Python path.") from None
         return str(executable)
 
     def stable_python(self, config):
@@ -626,7 +626,7 @@ class Manager:
             details = json.loads(result.stdout)
             prefix = absolute(details["prefix"])
             minor = details["minor"]
-            if not re.fullmatch(r"3\.\d+", minor):
+            if minor != "3.15":
                 raise ValueError()
         except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
             raise LauncherError("python_unavailable", "The selected Python runtime could not identify its installation.") from None
@@ -744,6 +744,7 @@ class Manager:
         directory = self.root / "versions" / build
         manifest = read_json(directory / "installation.json")
         if manifest:
+            self.verify_python(config, interpreter=manifest["python"])
             # The exact source may have first been installed through Alpha and
             # later passed CI. Only this newly resolved target supplies its
             # selected channel and CI provenance; a selector change alone does
@@ -844,6 +845,7 @@ class Manager:
 
     def launch(self, installation, home, port, smoke=False):
         available_port(port)
+        self.verify_python({}, interpreter=installation["python"])
         self.setup(installation, home, port, smoke)
         instance = str(uuid.uuid4())
         server = Path(__file__).resolve().with_name("server.py")
@@ -1041,6 +1043,7 @@ class Manager:
         current = self.active()
         if not current:
             return self.start()
+        self.verify_python({}, interpreter=current["python"])
         self.stop()
         config = self.config()
         self.launch(current, absolute(config["runtime_home"]), config["port"])
@@ -1087,9 +1090,21 @@ class Manager:
 
 
 def parser():
-    result = argparse.ArgumentParser(description=__doc__)
+    result = argparse.ArgumentParser(description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Python 3.15.x only. Use a rebuilt complete app when migrating from an older runtime.
+Global options precede the command. Example (already configured runtime):
+  python3.15 launcher.py --python /absolute/WHAB.app/Contents/Resources/python/bin/python3.15 stop
+  python3.15 launcher.py --python /absolute/WHAB.app/Contents/Resources/python/bin/python3.15 configure
+  python3.15 launcher.py --python /absolute/WHAB.app/Contents/Resources/python/bin/python3.15 update
+  python3.15 launcher.py doctor
+Stop before configuring. Omitting home/channel/port preserves those saved choices;
+configure records the supplied interpreter. Update prepares code, backs up the owned
+runtime and restarts it. Doctor verifies the owned process over trusted HTTPS.
+Keep keys/certificates with the existing runtime. Tests require a separate fictional
+Sandbox home. Commands never create release tags or change certificate trust.""")
     result.add_argument("--root", default=str(DEFAULT_ROOT))
-    result.add_argument("--python")
+    result.add_argument("--python", help="Absolute Python 3.15.x interpreter; standalone runtimes are copied privately before installing versions")
     result.add_argument("--seed")
     result.add_argument("--wheelhouse")
     commands = result.add_subparsers(dest="command", required=True)

@@ -1,6 +1,6 @@
 # __PLUGIN_ID__
 
-A complete read-only fictional visual interface for Python 3.14+ and WHAB
+A complete read-only fictional visual interface for Python 3.15.x and WHAB
 **2.36+** within major 2. `UserInterface(view_protocol=1)` supplies bounded
 templates/assets and a context helper. WHAB owns public data projections,
 financial validation, HTTPS, local access guards and per-budget handover.

@@ -88,8 +88,8 @@ def generate_project(plugin_id, capability, destination, *, ci_ref=None):
                 value = value.replace(old, new)
             path.write_text(value)
         project = destination / "pyproject.toml"
-        project.write_text(project.read_text().replace('requires-python = ">=3.14"',
-            'requires-python = ">=3.14"\nclassifiers = ["Operating System :: POSIX", "Programming Language :: Python :: 3"]'))
+        project.write_text(project.read_text().replace('requires-python = ">=3.15,<3.16"',
+            'requires-python = ">=3.15,<3.16"\nclassifiers = ["Operating System :: POSIX", "Programming Language :: Python :: 3"]'))
     if capability == "bank":
         project = destination / "pyproject.toml"
         project.write_text(project.read_text().replace('minimum-host = "2.38.0"', 'minimum-host = "2.38.0"\noffline-bank-fixture = "fictional-v1"'))

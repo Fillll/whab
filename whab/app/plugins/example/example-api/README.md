@@ -1,6 +1,6 @@
 # example-api
 
-This independently packaged fictional API interface requires Python 3.14+ and
+This independently packaged fictional API interface requires Python 3.15.x and
 WHAB **2.34+** within major 2. It declares `Interface(adapter=RemoteLedgerInterface(...))`
 and a live lifecycle. It supplies no router, ledger handle, callback or credential
 value to a worker. The host owns native HTTPS, constant-time bearer authorization,

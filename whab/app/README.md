@@ -21,10 +21,10 @@ is initialized privately and its temporary HTTPS host exits after the command.
 Use `plugins enable web` with the same home to request a persistent browser
 interface. See [local CLI profiles and scheduled bank jobs](plugins/interface/cli/README.md#local-operation).
 
-Use the [macOS launcher](../launchers/macos/README.md) for native installation and process controls. Source development requires **Python 3.14 or newer**. [Existing checkouts must preserve their runtime home](../README.md#existing-development-checkouts) before running setup from the new location. Run application commands from `whab/app/`:
+Use the [macOS launcher](../launchers/macos/README.md) for native installation and process controls. Source development requires **Python 3.15.x**. [Existing checkouts must preserve their runtime home](../README.md#existing-development-checkouts) before running setup from the new location. Run application commands from `whab/app/`:
 
 ```sh
-python3.14 -m venv .venv
+python3.15 -m venv .venv
 .venv/bin/python scripts/install.py --dev --example
 .venv/bin/python scripts/preview.py
 ```
@@ -71,7 +71,7 @@ Install Node.js 22 or newer for the browser tests; the application has no Node b
 .venv/bin/python scripts/check_pr.py local --base origin/main
 ```
 
-Required PR CI runs the complete source suite in parallel on Python 3.14 and 3.15, verifies 100% plugin statement/branch coverage and checks installed wheels. Run exhaustive certification manually when needed:
+Required PR CI runs the complete source suite in parallel on Python 3.15 and 3.15, verifies 100% plugin statement/branch coverage and checks installed wheels. Run exhaustive certification manually when needed:
 
 ```sh
 .venv/bin/python scripts/check.py

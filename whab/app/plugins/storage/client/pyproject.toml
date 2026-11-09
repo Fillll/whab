@@ -1,9 +1,9 @@
 [project]
 name = "whab_plugin_client"
-version = "1.6.2"
+version = "1.6.3"
 description = "HTTPS remote budget client plugin for WHAB"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.15,<3.16"
 license = "MIT"
 license-files = ["LICENSE"]
 dependencies = ["whab>=2.39,<3", "httpx==0.28.1"]

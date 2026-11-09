@@ -1,6 +1,6 @@
 # Offline fictional bank
 
-This independently packaged teaching plugin requires Python 3.14+ and WHAB 2.38+ within major 2. Enable `example-bank` explicitly in a disposable Sandbox home. It advertises the typed live bank lifecycle. Production is unconfigured and refuses connection, exchange, synchronization and removal requests.
+This independently packaged teaching plugin requires Python 3.15.x and WHAB 2.38+ within major 2. Enable `example-bank` explicitly in a disposable Sandbox home. It advertises the typed live bank lifecycle. Production is unconfigured and refuses connection, exchange, synchronization and removal requests.
 
 `FictionalProvider` receives only public `BankProviderContext` data and delegates to an injectable asynchronous transport. The default `OfflineTransport` has no HTTP client, URLs or external service. Its only accepted public token is `fictional-public-token`; all returned tokens and account records are fictional. One first synchronization adds a pending USD 7.25 grocery transaction. The next synchronization posts it using `pendingTransactionId`; subsequent calls return no changes at the retained cursor. Both budgets deliberately receive the same raw identifiers, so the host remains responsible for isolation and stable scoping.
 

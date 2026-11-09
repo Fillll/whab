@@ -24,7 +24,8 @@ on:
         default: ""
         type: string
       python-version:
-        default: "3.14"
+        description: Only Python 3.15 is supported
+        default: "3.15"
         type: string
 
 permissions:
@@ -38,10 +39,15 @@ jobs:
     steps:
       - name: Validate immutable source selection
         env:
+          WHAB_CI_PYTHON: ${{ inputs.python-version }}
           WHAB_CI_REF: ${{ inputs.whab-ref }}
           WHAB_CI_EXTRA_DIRECTORY: ${{ inputs.extra-wheelhouse-directory }}
           WHAB_CI_EXTRA_ARTIFACT: ${{ inputs.extra-wheelhouse-artifact }}
         run: |
+          if [[ "$WHAB_CI_PYTHON" != "3.15" ]]; then
+            echo "Only Python 3.15 is supported" >&2
+            exit 1
+          fi
           if [[ ! "$WHAB_CI_REF" =~ ^[0-9a-f]{40}$ ]]; then
             echo "whab-ref must be a full reviewed lowercase commit SHA" >&2
             exit 1
@@ -66,7 +72,7 @@ jobs:
       - name: Set up supported Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: "3.15"
       - name: Download caller-approved dependency wheels
         if: inputs.extra-wheelhouse-artifact != ''
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

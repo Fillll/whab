@@ -40,7 +40,7 @@ Advanced whab api is a supported CLI interface. Use permanent IDs from budget li
 not browser slugs. Offline documentation does not prove a plugin is enabled;
 query describe/features checks the addressed running budget. Local/SDK entries
 describe access boundaries; they are not arbitrary executable command names.
-Production is the default. Use --environment sandbox for experiments.
+Runtime: Python 3.15.x only. Production is the default. Use --environment sandbox for experiments.
 JSON is the authoritative output; tables are for display. Success exits 0;
 a successful preview has not committed. Failures use stderr (exit 1), usage errors 2.
 See the CLI README's Agent workflow for scope, retry and recovery details."""

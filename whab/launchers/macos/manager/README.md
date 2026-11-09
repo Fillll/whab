@@ -1,12 +1,11 @@
 # Launcher manager protocol
 
-`launcher.py` uses only the Python standard library and requires Python 3.14 or
-newer. The native macOS app invokes it as a separate process:
+`launcher.py` uses only the Python standard library and requires Python 3.15.x only. The native macOS app invokes it as a separate process:
 
 ```sh
-python3.14 launcher.py \
+python3.15 launcher.py \
   --root "$HOME/Library/Application Support/WHAB/launcher" \
-  --python "/absolute/WHAB.app/Contents/Resources/python/bin/python3.14" \
+  --python "/absolute/WHAB.app/Contents/Resources/python/bin/python3.15" \
   --seed "/absolute/WHAB.app/Contents/Resources/seed" \
   --wheelhouse "/absolute/WHAB.app/Contents/Resources/wheelhouse" \
   status
@@ -65,7 +64,7 @@ contents. Detailed subprocess output goes to private `logs/install.log`,
 ## Installation and trust
 
 The main channel selects the newest of the last ten main commits whose latest
-GitHub Actions checks named `CI (Python 3.14)` and `CI (Python 3.15)` both succeeded.
+GitHub Actions check named `CI (Python 3.15)` succeeded.
 The stable channel resolves the latest non-prerelease semantic version tag to an
 exact commit and requires the same checks. The opt-in `alpha` channel resolves
 `GET /repos/Fillll/whab/commits/main` directly and accepts its exact 40-character
@@ -178,5 +177,23 @@ operation, backup deletion or version pruning in this first implementation.
 Run isolated manager tests from the repository root:
 
 ```sh
-python3.14 -m unittest discover -s whab/launchers/macos/tests -p 'test_*.py'
+python3.15 -m unittest discover -s whab/launchers/macos/tests -p 'test_*.py'
 ```
+
+## Switching the managed runtime to Python 3.15
+
+Launcher 1.3 bundles Python 3.15.x and accepts only that minor version. Replace an
+older app with the complete rebuilt bundle; a host-only update cannot replace the
+old app's Python runtime. Preserve the existing launcher root, runtime home, keys
+and certificates. Use the new bundle's manager and `--python` interpreter to stop
+the owned host, then `configure` without home/channel arguments to preserve those
+choices while recording the new interpreter, followed by `update`. The supported
+update procedure backs up the existing runtime before starting the candidate.
+`doctor` and CA-verified health must confirm the running version/build. Test with a
+separate Sandbox home; never use household records as fixtures. No release/tag is
+created by this process. Global `--help` explains the command sequence offline.
+
+Cached installations are probed before reuse or launch. An older cached Python
+minor is rejected without relabelling its provenance, touching its files, or
+stopping an existing process for Restart. Keep those files for explicit recovery;
+use Update with the new bundled interpreter to prepare the current installation.

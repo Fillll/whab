@@ -1,7 +1,7 @@
 # __PLUGIN_ID__
 
 An independently packaged teaching plugin built with the public WHAB SDK.
-This project needs Python 3.14+ and WHAB 2.22+ within major 2. It is trusted
+This project needs Python 3.15.x and WHAB 2.22+ within major 2. It is trusted
 executable Python, with restart-only lifecycle support. Installing it does not
 enable it. It creates no bank connection and uses no external service.
 
