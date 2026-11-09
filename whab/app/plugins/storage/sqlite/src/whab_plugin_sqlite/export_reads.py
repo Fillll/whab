@@ -17,7 +17,7 @@ def snapshot(store, workspace, *, transaction_ids=None, include_history=True):
             raise StoreError("Workspace not found.")
         accounts = [
             {**{key: record[key] for key in ACCOUNT_FIELDS},
-             **{key: record[key] for key in ("bankWebsite", "nameOverridden") if key in record}}
+             **{key: record[key] for key in ("bankWebsite", "nameOverridden", "closed") if key in record and (key != "closed" or record[key])}}
             for record in store._read_accounts(workspace)
         ]
         categories = [dict(row) for row in store.db.execute(

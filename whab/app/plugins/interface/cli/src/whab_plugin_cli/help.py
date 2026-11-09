@@ -165,6 +165,7 @@ def account_classification(catalog):
         "  type: " + fields["type"]["description"],
         "  onBudget: " + fields["onBudget"]["description"],
         "  balance: " + fields["balance"]["description"],
+        "  closed: " + fields["closed"]["description"],
         "Inspect current values: whab BUDGET account list or account show ACCOUNT_NAME_OR_ID.",
         "Classify by unique name/ID: whab BUDGET account classify --help (no JSON/revision/request ID needed).",
         "Advanced edit fields/examples: whab-cli command update_account --help",

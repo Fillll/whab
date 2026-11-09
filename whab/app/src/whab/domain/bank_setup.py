@@ -63,6 +63,10 @@ def configure_sync(state, item_id, accounts, selection):
             if any(other != source and row["accountId"] == target_id
                    for other, row in (previous or {}).items()):
                 raise StoreError("Destination account is already linked to another bank account.")
+        if target and target.get('closed', False):
+            if not previous or previous.get(source, {}).get('accountId') != target_id:
+                raise StoreError('Reopen this archived account before linking a bank account.')
+            continue
         if target_id != source:
             for transaction in state["transactions"].values():
                 if transaction["accountId"] == source:
@@ -73,17 +77,19 @@ def configure_sync(state, item_id, accounts, selection):
                 del state["accounts"][source]
                 retired.append(source)
         state["accounts"][target_id] = {
-            **bank, **({key: target[key] for key in ("name", "type", "onBudget", "subtype", "bankWebsite")
+            **bank, **({key: target[key] for key in ("name", "type", "onBudget", "subtype", "bankWebsite", "closed")
                        if key in target and (key == "name" or target["type"] != "unclassified")} if target else {}),
             "id": target_id, "nameOverridden": target is not None,
         }
     # Re-read the original cursor on the next sync, including when the cutoff is
     # moved earlier. Provider transaction identities make replay idempotent.
+    if item.get('closedAccountCursors'):
+        item['closedAccountCursors'] = dict.fromkeys(item['closedAccountCursors'])
     item.update(syncSettings=selected, cursor=None)
     return {"configured": True, "retiredAccounts": retired}
 
 
-def select_sync(state, item_id, changes, accounts):
+def _selected_sync(state, item_id, changes, accounts):
     """Map provider identities and filter only new rows before the chosen date."""
     item = state['items'][item_id]
     settings = item.get('syncSettings')
@@ -119,3 +125,69 @@ def select_sync(state, item_id, changes, accounts):
                 continue
             selected[kind].append({**record, 'accountId': link['accountId']})
     return selected, mapped
+
+
+def validate_closed_account_cursors(value):
+    """Bound private resume checkpoints; absence retains legacy native records."""
+    if type(value) is not dict or len(value) > 1000:
+        raise StoreError('Invalid archived-account sync checkpoints.')
+    for identifier, cursor in value.items():
+        bank_identifier(identifier)
+        if cursor is not None:
+            bank_identifier(cursor, limit=16384)
+
+
+def reconcile_account_closed(state, account_id, before, closed):
+    """Pause only this account; reopening replays its original scoped cursor."""
+    if before == closed:
+        return
+    account = state['accounts'].get(account_id, {})
+    for item in state.get('items', {}).values():
+        linked = account.get('itemId') == item['id'] or any(
+            row['accountId'] == account_id for row in (item.get('syncSettings') or {}).values())
+        if not linked:
+            continue
+        checkpoints = dict(item.get('closedAccountCursors', {}))
+        if closed:
+            checkpoints.setdefault(account_id, item.get('cursor'))
+        elif account_id in checkpoints:
+            item['cursor'] = checkpoints.pop(account_id)
+        if checkpoints:
+            item['closedAccountCursors'] = checkpoints
+        else:
+            item.pop('closedAccountCursors', None)
+
+
+def select_sync(state, item_id, changes, accounts):
+    """Preserve archived accounts and transactions while open peers keep syncing."""
+    if type(changes) is not dict or changes.keys() != {'added', 'modified', 'removed'}:
+        raise StoreError('Invalid normalized synchronization changes.')
+    if type(accounts) is not list or any(type(changes[key]) is not list for key in changes):
+        raise StoreError('Invalid normalized synchronization records.')
+    selected, mapped = _selected_sync(state, item_id, changes, accounts)
+    closed = {identifier for identifier, row in state['accounts'].items() if row.get('closed', False)}
+    kept_accounts = []
+    for record in mapped:
+        normalized = imported_account(record)
+        if normalized['itemId'] != item_id or normalized['source'] != state['items'][item_id].get('provider', 'plaid'):
+            raise StoreError('Bank account belongs to another connection.')
+        previous = state['accounts'].get(normalized['id'])
+        if previous and previous.get('itemId') != item_id:
+            raise StoreError('Bank account belongs to another connection.')
+        if normalized['id'] not in closed:
+            kept_accounts.append(record)
+    kept = {'added': [], 'modified': [], 'removed': []}
+    for kind in ('added', 'modified'):
+        for record in selected[kind]:
+            validate_imported_transaction(record)
+            if record['source'] != state['items'][item_id].get('provider', 'plaid'):
+                raise StoreError('Bank transaction belongs to another connection.')
+            if record['accountId'] not in closed:
+                kept[kind].append(record)
+    for identifier in selected['removed']:
+        bank_identifier(identifier)
+        previous = state['transactions'].get(identifier)
+        original = previous.get('original', {}).get('accountId', previous['accountId']) if previous else None
+        if original not in closed:
+            kept['removed'].append(identifier)
+    return kept, kept_accounts

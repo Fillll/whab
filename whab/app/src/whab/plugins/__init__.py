@@ -34,6 +34,7 @@ from .runtime import PluginError, PluginRegistry, copy_snapshot, load_descriptor
 from .sdk import (
     API_VERSION,
     ENTRYPOINT_GROUP,
+    AccountLifecycleStorage,
     AccountOverview,
     AccountSettings,
     AccountSnapshot,
@@ -146,6 +147,7 @@ __all__ = [
     "format_money",
     "API_VERSION",
     "AgentCategoryStorage",
+    "AccountLifecycleStorage",
     "BudgetHistoryStorage",
     "ENTRYPOINT_GROUP",
     "UNSET",

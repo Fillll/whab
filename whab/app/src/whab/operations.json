@@ -36,7 +36,19 @@
             },
             "type": {
               "type": "string",
-              "description": "Financial account type, independent of budget scope: depository = cash/checking/savings; credit = credit card/line of credit; investment = brokerage; retirement = retirement; property = property; loan = loan; deposit = CD/term deposit; other_asset/other_liability = other tracking asset/debt; other = generic unclassified account, not a credit-card classification. Credit, loan and other_liability are liabilities with a positive amount owed."
+              "description": "Financial account type, independent of budget scope: depository = cash/checking/savings; credit = credit card/line of credit; investment = brokerage; retirement = retirement; property = property; loan = loan; deposit = CD/term deposit; other_asset/other_liability = other tracking asset/debt; other = generic unclassified account, not a credit-card classification. Credit, loan and other_liability are liabilities with a positive amount owed.",
+              "enum": [
+                "depository",
+                "credit",
+                "investment",
+                "retirement",
+                "property",
+                "loan",
+                "deposit",
+                "other_asset",
+                "other_liability",
+                "other"
+              ]
             },
             "balance": {
               "type": [
@@ -70,7 +82,12 @@
                 "string",
                 "null"
               ],
-              "description": "Optional account subtype."
+              "description": "Domain-specific detail or null. A certificate of deposit is type=deposit, subtype=cd, always off budget; other type/subtype combinations use the domain inventory."
+            },
+            "closed": {
+              "type": "boolean",
+              "default": false,
+              "description": "True for an archived account, independent of onBudget. Compatible older records default false. Closing does not zero/verify balances, settle debt or rewrite historical financial treatment."
             }
           },
           "additionalProperties": true
@@ -978,6 +995,9 @@
               "retirement",
               "property",
               "loan",
+              "deposit",
+              "other_asset",
+              "other_liability",
               "other"
             ]
           },
@@ -997,7 +1017,11 @@
           },
           "subtype": {
             "type": "string",
-            "description": "Subtype supported by the chosen account type."
+            "description": "Domain-specific detail or null. A certificate of deposit is type=deposit, subtype=cd, always off budget; other type/subtype combinations use the domain inventory."
+          },
+          "closed": {
+            "type": "boolean",
+            "description": "Archive lifecycle, separate from type/subtype and budget scope. Default false. Closed accounts retain balances/history but reject new manual entries and skip bank sync updates; reopening resumes the original configured bank history cursor without initiating sync."
           }
         },
         "required": [
@@ -1067,6 +1091,9 @@
               "retirement",
               "property",
               "loan",
+              "deposit",
+              "other_asset",
+              "other_liability",
               "other"
             ]
           },
@@ -1079,7 +1106,7 @@
               "string",
               "null"
             ],
-            "description": "Account subtype or null."
+            "description": "Domain-specific detail or null. A certificate of deposit is type=deposit, subtype=cd, always off budget; other type/subtype combinations use the domain inventory."
           },
           "name": {
             "type": "string",
@@ -1093,6 +1120,10 @@
             "type": "string",
             "description": "ISO currency code; no currency conversion is performed.",
             "pattern": "^[A-Z]{3}$"
+          },
+          "closed": {
+            "type": "boolean",
+            "description": "Archive lifecycle, separate from type/subtype and budget scope. Default false. Closed accounts retain balances/history but reject new manual entries and skip bank sync updates; reopening resumes the original configured bank history cursor without initiating sync."
           }
         },
         "required": [
@@ -1123,9 +1154,32 @@
             "subtype": "credit_card"
           },
           "output": null
+        },
+        {
+          "input": {
+            "accountId": "fictional-cd",
+            "type": "deposit",
+            "subtype": "cd",
+            "onBudget": false
+          },
+          "output": null
+        },
+        {
+          "input": {
+            "accountId": "fictional-cd",
+            "closed": true
+          },
+          "output": null
+        },
+        {
+          "input": {
+            "accountId": "fictional-cd",
+            "closed": false
+          },
+          "output": null
         }
       ],
-      "side_effects": "Applies the explicit metadata edit while preserving transaction IDs, notes, categories and review state. Classification can change envelope/net-worth treatment but does not verify an imported balance, link a bank connection, match duplicate transactions or change their source.",
+      "side_effects": "Applies the explicit metadata edit while preserving transaction IDs, notes, categories and review state. Classification can change envelope/net-worth treatment but does not verify an imported balance, link a bank connection, match duplicate transactions or change their source. Lifecycle is independent: closing freezes bank application and rejects new manual entries without zeroing/verifying balances, changing scope or disconnecting Items. Open peers keep syncing. Reopen restores this budget’s native account checkpoint for the next normal sync; no synchronization starts here.",
       "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
       "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
       "errors": [
@@ -1351,7 +1405,7 @@
               "string",
               "null"
             ],
-            "description": "Explicit self-declared categorizing agent label (1\u201380 printable characters); not an authenticated identity. Omit on a category edit for normal manual attribution, which clears an earlier agent label. Review-only, memo-only and detail-only edits preserve it. Requires categoryId in the same command. Agent attribution does not change review status.",
+            "description": "Explicit self-declared categorizing agent label (1–80 printable characters); not an authenticated identity. Omit on a category edit for normal manual attribution, which clears an earlier agent label. Review-only, memo-only and detail-only edits preserve it. Requires categoryId in the same command. Agent attribution does not change review status.",
             "minLength": 1,
             "maxLength": 80
           }
@@ -1814,7 +1868,7 @@
       ],
       "side_effects": "Read-only local saved connection metadata.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1858,7 +1912,7 @@
       ],
       "side_effects": "Fetches provider data for review without importing transactions or advancing the saved cursor.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1946,7 +2000,7 @@
       ],
       "side_effects": "Atomically saves links, joins an existing auto-created account when selected, retains transaction IDs/annotations and resets the cursor for idempotent replay. Does not delete old history or start synchronization.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1991,7 +2045,7 @@
       ],
       "side_effects": "Imports configured accounts using saved cutoffs and advances their cursors atomically. No new external bank connection is created.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -2040,9 +2094,9 @@
           }
         }
       ],
-      "side_effects": "With an interval, saves this provider\u2019s budget-local update policy. Does not fetch transactions or register an OS job.",
+      "side_effects": "With an interval, saves this provider’s budget-local update policy. Does not fetch transactions or register an OS job.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -2086,7 +2140,7 @@
       ],
       "side_effects": "Registers or removes the existing WHAB launchd task. It can start WHAB to check due jobs in saved budgets. Other platforms use cron with python -m whab --run-jobs.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -2658,7 +2712,7 @@
         "properties": {
           "limit": {
             "type": "integer",
-            "description": "Page size, 1\u2013100.",
+            "description": "Page size, 1–100.",
             "minimum": 1,
             "maximum": 100,
             "default": 50

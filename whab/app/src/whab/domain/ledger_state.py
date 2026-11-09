@@ -56,7 +56,7 @@ def portable_snapshot(state, *, validate=True):
         "formatVersion": 1, "budgetStartMonth": state["budgetStartMonth"],
         "accounts": [
             {**{key: account[key] for key in ACCOUNT_FIELDS},
-             **{key: account[key] for key in ("bankWebsite", "nameOverridden") if key in account}}
+             **{key: account[key] for key in ("bankWebsite", "nameOverridden", "closed") if key in account}}
             for record in state["accounts"].values()
             for account in (normalize_account({"balanceUnknown": False, "stale": False, **record}),)
         ],

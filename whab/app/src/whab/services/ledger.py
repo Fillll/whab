@@ -24,7 +24,7 @@ from whab.domain.portable import ACCOUNT_FIELDS, validate_portable_budget
 from whab.domain.transactions import UNSET, validate_review_batch
 from whab.domain.validation import validate_date, validate_label, validate_month
 
-_PRIVATE_FIELDS = frozenset({"token", "accesstoken", "encryptedtoken", "cursor", "encryptionkey", "items"})
+_PRIVATE_FIELDS = frozenset({"token", "accesstoken", "encryptedtoken", "cursor", "encryptionkey", "items", "closedaccountcursors"})
 
 
 class RevisionConflict(StoreError):
@@ -313,12 +313,14 @@ class LedgerService:
         ):
             raise StoreError("Rollover mode must be category or balance.")
         if operation == "update_account":
-            if not payload.keys() & {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}:
+            if not payload.keys() & {"type", "onBudget", "subtype", "name", "bankWebsite", "currency", "closed"}:
                 raise StoreError("No account changes provided.")
             if "bankWebsite" in payload:
                 payload["bankWebsite"] = bank_website_entry(payload["bankWebsite"])
             if "type" in payload:
                 normalize_account(payload)
+            if 'closed' in payload and type(payload['closed']) is not bool:
+                raise StoreError('Invalid account lifecycle state.')
             if "onBudget" in payload and type(payload["onBudget"]) is not bool:
                 raise StoreError("Invalid account budget scope.")
             if "subtype" in payload and payload["subtype"] is not None and type(payload["subtype"]) is not str:
@@ -356,6 +358,10 @@ class LedgerService:
         _identifier(request_id)
         _identifier(expected_revision)
         payload = self._validate(operation, payload)
+        if 'closed' in payload and (operation == 'update_account' or operation == 'add_account' and payload['closed']):
+            supported = getattr(self._store, 'supports_account_lifecycle', None)
+            if not callable(supported) or supported() is not True:
+                raise StoreError('Update the storage plugin to save account lifecycle state.')
         from whab.domain.history import context
         if history is not None and (type(history) is not dict or history.keys() - {'actor', 'actorKind', 'batchId'}):
             raise StoreError('Invalid history context fields.')
@@ -795,7 +801,7 @@ class LedgerService:
             if account is None or account.get("id") != account_id:
                 raise StoreError("Account not found.")
             account = {key: value for key, value in account.items()
-                       if key in ACCOUNT_FIELDS | {"bankWebsite", "nameOverridden"}}
+                       if key in ACCOUNT_FIELDS | {"bankWebsite", "nameOverridden", "closed"}}
             return {"account": account, "currencyEditable": editable}
 
     def add_category(self, workspace, category):

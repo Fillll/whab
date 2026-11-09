@@ -54,10 +54,11 @@ export function initAccountList({root = document, api, updateFields, onDraft = (
         currencyButton.textContent = freshCurrency.textContent;
         currencyButton.setAttribute('aria-label', freshCurrency.getAttribute('aria-label'));
         form.querySelector('[data-sidebar-visible]').setAttribute('aria-label', freshForm.querySelector('[data-sidebar-visible]').getAttribute('aria-label'));
-        for (const name of ['name', 'onBudget', 'type', 'subtype', 'currency', 'bankWebsite']) {
+        for (const name of ['name', 'onBudget', 'type', 'subtype', 'closed', 'currency', 'bankWebsite']) {
           const label = freshForm.elements[name]?.getAttribute('aria-label');
           if (label) form.elements[name]?.setAttribute('aria-label', label);
         }
+        form.querySelector('[data-sidebar-visible]').disabled = form.elements.closed.value === 'true';
         const register = form.querySelector('[data-account-register]');
         register.href = freshForm.querySelector('[data-account-register]').href;
       }
@@ -78,11 +79,12 @@ export function initAccountList({root = document, api, updateFields, onDraft = (
     const currency = form.elements.currency, website = form.elements.bankWebsite;
     const extra = form.querySelector('[data-account-extra]'), logo = initAccountLogoPreview(form, api);
     const visibility = form.querySelector('[data-sidebar-visible]');
+    visibility.disabled = form.elements.closed.value === 'true';
     let visible = visibility.checked, pending = null, loading = null, loaded = false;
     let committed = values();
     function values() {
       return {name: form.elements.name.value, onBudget: form.elements.onBudget.value === 'true',
-        type: form.elements.type.value, subtype: form.elements.subtype.value || null,
+        type: form.elements.type.value, subtype: form.elements.subtype.value || null, closed: form.elements.closed.value === 'true',
         ...(loaded ? {currency: currency.value, ...(website ? {bankWebsite: website.value} : {})} : {})};
     }
     function changed() {return Object.keys(accountChanges(values(), committed)).length > 0;}

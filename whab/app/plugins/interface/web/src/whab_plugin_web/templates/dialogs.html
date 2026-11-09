@@ -83,6 +83,7 @@
     <p class="settings-notice" id="account-currency-hint">Currency can change only before this account has transaction history. Amounts are never converted.</p>
     <div class="account-classification-fields">{{ account_classification() }}</div>
     <p class="settings-notice">Budget scope applies to all transactions. Off-budget accounts track net worth and are excluded from budget income and spending.</p>
+    <p class="settings-notice">Closed accounts are archives: no new manual entries or bank updates. Closing does not zero or verify balances, settle debt, or change budget scope and historical reporting. Reopening permits entries and resumes configured bank history on the next sync.</p>
     {% if account_logo_provider|default(none) %}
     <section class="account-logo-settings" aria-labelledby="account-logo-title">
       <div class="account-logo-heading"><h3 id="account-logo-title">Account logo</h3><button class="text-link" type="button" data-dialog="plugin-options-{{ account_logo_provider.id }}" data-plugin-options>{{ account_logo_provider.display_name }} settings{{ icon('chevron-right', 14) }}</button></div>

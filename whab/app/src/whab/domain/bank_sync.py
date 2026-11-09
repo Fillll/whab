@@ -36,19 +36,15 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
         return account is not None and account.get("itemId") == item_id and transaction["source"] == provider
 
     for account in state["accounts"].values():
-        if account.get("itemId") == item_id:
+        if account.get("itemId") == item_id and not account.get("closed", False):
             account["stale"] = True
     for record in accounts:
         normalized = imported_account(record)
-        if normalized["itemId"] != item_id or normalized["source"] != provider:
-            raise StoreError("Bank account belongs to another connection.")
         previous = state["accounts"].get(normalized["id"])
-        if previous and previous.get("itemId") != item_id:
-            raise StoreError("Bank account belongs to another connection.")
         if previous and previous.get("currency", "USD") != normalized["currency"]:
             raise StoreError("An existing account currency cannot change.")
         if previous:
-            for field in ("type", "onBudget", "subtype", "bankWebsite", "nameOverridden"):
+            for field in ("type", "onBudget", "subtype", "bankWebsite", "nameOverridden", "closed"):
                 if field in previous:
                     normalized[field] = previous[field]
             if previous.get("nameOverridden"):

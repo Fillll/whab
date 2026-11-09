@@ -448,6 +448,13 @@ class BankCoordinator:
     def _sync(self, item_id):
         self._ready()
         item = self._item(item_id)
+        links = item.get('syncSettings')
+        owned = self.bank_store.item_identity(item_id)
+        destinations = [row for row in self.tracked.accounts('personal')
+                        if row['id'] in {link['accountId'] for link in links.values()}] if links is not None else [
+                            row for row in self.tracked.accounts('personal') if row.get('itemId') == owned]
+        if destinations and all(row.get('closed', False) for row in destinations):
+            return {'added': 0, 'modified': 0, 'removed': 0, 'skippedClosed': len(destinations)}
         if self.requires_account_setup and item.get('syncSettings') is None and item.get('lastSynced') is None:
             raise BankError('Choose destination accounts and an import start date in Sync setup first.')
         try:
@@ -499,7 +506,7 @@ class BankCoordinator:
                 for account in response['accounts']],
             'destinations': [{key: account[key] for key in ('id', 'name', 'currency', 'itemId') if key in account}
                 | {'latestDate': latest.get(account['id']), 'type': account['type'],
-                   'available': account['type'] not in {'other', 'unclassified'} and account.get('itemId') in (None, self.bank_store.item_identity(item_id))} for account in accounts],
+                   'closed': account.get('closed', False), 'available': not account.get('closed', False) and account['type'] not in {'other', 'unclassified'} and account.get('itemId') in (None, self.bank_store.item_identity(item_id))} for account in accounts],
         }
 
     async def sync_preview(self, item_id):

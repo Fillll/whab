@@ -172,6 +172,7 @@ from whab.plugins import (
 AccountSnapshot(
     id: str, name: str, type: str, subtype: str, balance_cents: int,
     balance_unknown: bool = False, stale: bool = False, on_budget: bool | None = None,
+    closed: bool = False,
 )
 CategorySnapshot(
     id: str, name: str, group: str,
@@ -891,6 +892,21 @@ registers the device's hourly job entry point (macOS LaunchAgent currently),
 without embedding credentials or financial records. Other platforms may schedule
 `python -m whab --home DIRECTORY --environment sandbox --run-jobs` themselves.
 
+
+## Account lifecycle storage (optional, WHAB 2.64+)
+
+`from whab.plugins import AccountLifecycleStorage` exposes
+`supports_account_lifecycle() -> bool`. A true result promises atomic persistence
+of the strict account `closed` flag, compatible false defaults, archive-aware bank
+merges and private resume cursors through reopen, history, native recovery and
+copies. The host rejects explicit lifecycle edits when this optional method is
+absent/false. `update_account` remains the public guarded mutation; no separate
+closure storage model is introduced. SQLite 1.17+ and JSON 1.9+ implement it.
+
+Public accounts may omit the compatible false default; missing means open.
+`AccountSnapshot.closed: bool = False` makes lifecycle explicit in immutable plugin
+reports. Portable accounts retain true archive state but never native bank
+checkpoints. See [lifecycle semantics](architecture.md#account-lifecycle-and-cds).
 
 ## Bank account setup and update policy
 

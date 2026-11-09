@@ -283,6 +283,9 @@ class Store(Authority):
         identifier = transaction.get("id") or str(uuid4())
         return self._mutate(workspace, lambda state: commands.add_transaction(state, identifier, transaction, source))
 
+    def supports_account_lifecycle(self):
+        return True
+
     def supports_category_agent(self):
         return True
 
@@ -333,6 +336,7 @@ class Store(Authority):
                 "status": "connected", "lastSynced": previous.get("lastSynced"), "error": None,
                 "cursor": previous.get("cursor"), "provider": provider_id,
                 **({"syncSettings": previous["syncSettings"]} if "syncSettings" in previous else {}),
+                **({"closedAccountCursors": previous["closedAccountCursors"]} if "closedAccountCursors" in previous else {}),
             }
 
         return self._mutate("personal", operation)
@@ -352,7 +356,7 @@ class Store(Authority):
                 raise StoreError("Connection not found.")
             item.update(token=None, cursor=None, status="disconnected", error=None)
             for account in state["accounts"].values():
-                if account.get("itemId") == item_id:
+                if account.get("itemId") == item_id and not account.get("closed", False):
                     account["stale"] = True
 
         return self._mutate("personal", operation)

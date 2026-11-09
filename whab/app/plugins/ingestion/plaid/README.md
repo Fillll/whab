@@ -232,3 +232,18 @@ the existing continuation; do not reconnect or repeat provider removal. Back up
 all runtime data and keys together. Reopening retries only recoverable local
 registration/attachment writes; original connection ownership and native progress
 are retained. See the [ownership decision](../../../../docs/architecture.md#shared-bank-connection-ownership).
+
+## Closed accounts and CDs
+
+Plaid depository/CD records already normalize to the core asset classification
+`deposit` / `cd`, off budget. CLI uses those same spellings. With WHAB 2.64 and
+lifecycle-capable storage, user-closed accounts are archives: bank refreshes cannot
+reopen them, replace their saved classification/balances, add/modify/remove their
+transactions or mark their snapshots stale as part of an ordinary sync. Open
+accounts on the same shared connection and other budgets continue normally. An
+all-closed Item is skipped before provider access; mixed Items can still be fetched
+for open accounts, with archived records excluded on atomic application. Existing
+mappings/history choices remain. New destination pickers exclude closed accounts;
+reopen before linking a new destination. Reopening replays this budget's saved
+checkpoint at the next due/explicit sync, subject to provider history availability,
+without starting sync itself or changing the connection/schedule.

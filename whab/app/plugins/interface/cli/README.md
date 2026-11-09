@@ -204,6 +204,41 @@ Review status stays unchanged unless `--needs-review` is supplied. `--agent LABE
 is explicit opt-in; normal manual category edits/clears remove a previous agent
 marker. No bank synchronization or model categorization is started.
 
+## Account archives and certificates of deposit
+
+CLI 2.10 with WHAB 2.64 adds `account close` and `account reopen` for every account
+type, independent of classification and budget scope. A CD is `deposit` / `cd`:
+
+```sh
+whab "My budget" account classify "Example CD" --type deposit --subtype cd --off-budget
+whab "My budget" account close "Example CD"
+whab "My budget" account show "Example CD"
+whab "My budget" account list --closed --format table
+whab "My budget" account list --active
+whab "My budget" account reopen "Example CD"
+whab "My budget" account close --help
+```
+
+Names/IDs use the same exact resolution as classification. List defaults to all
+accounts; `--active` and `--closed` are exclusive, and combine with `--unclassified`.
+JSON always includes `closed`; tables show State. Classification preserves it.
+Each lifecycle command reads the account/revision, submits one guarded
+`update_account`, generates one request ID and verifies the saved classification
+and lifecycle. No JSON, revisions, request IDs or terminal wizard are needed.
+After an uncertain result, inspect show/history and retain the complete reported
+intent; do not rerun close/reopen blindly. Older storage without durable lifecycle
+support is refused before mutation; SQLite 1.17+ and JSON 1.9+ support it.
+
+Closed accounts are archives: no new manual entries, incoming transaction moves
+or bank updates. Historical records, annotations, currency, imported balance
+uncertainty, bank mappings and schedule choices remain. Closing neither zeroes nor
+verifies a balance, settles debt nor changes budget scope/historical financial
+treatment. Known balances still follow that scope in totals/funding; off-budget
+CDs never fund envelopes. Other open accounts/shared attachments keep working.
+Reopening resumes the saved bank cursor/history choices on the next normal sync,
+with stable-ID replay rather than duplicated provider rows; neither command
+initiates sync. See [the full lifecycle contract](../../../../docs/architecture.md#account-lifecycle-and-cds).
+
 ## Agent category labels
 
 CLI 2.5 with WHAB 2.61 adds an explicit `--agent LABEL` option to

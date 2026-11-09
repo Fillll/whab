@@ -443,3 +443,39 @@ def test_bulk_sync_metadata_wait_does_not_block_the_event_loop(setup):
             release.set()
         assert await task == {'added': 0, 'modified': 0, 'removed': 0}
     run(scenario())
+
+
+def test_archived_only_bank_item_makes_no_provider_request_and_mixed_item_keeps_peer_syncing(setup):
+    from whab.plugins import LedgerService
+    value=setup
+    flow=begin(value)
+    complete(value,flow)
+    original=value.provider.call
+    records=[{'id':'fixture-cd','itemId':'fictional-item','name':'Fictional CD','institution':'Fictional institution','type':'deposit','subtype':'cd','onBudget':False,'balance':10000,'currency':'USD','source':'fictional-bank'}]
+    def provider(command,**values):
+        if command=='read_sync':
+            value.provider.calls.append((command,values))
+            return {'changes':{'added':[],'modified':[],'removed':[]},'cursor':'next-cursor','accounts':records,'historical_complete':True}
+        return original(command,**values)
+    value.provider.call=provider
+    run(value.coordinator.sync('fictional-item'))
+    row=value.tracked.accounts('personal')[0]
+    service=LedgerService(value.tracked)
+    service.update_account('personal',row['id'],{'closed':True})
+    value.provider.calls.clear()
+    result=run(value.coordinator.sync('fictional-item'))
+    assert result['skippedClosed']==1 and value.provider.calls==[]
+    assert value.tracked.accounts('personal')[0]['closed']
+    service.update_account('personal',row['id'],{'closed':False})
+    records.append({**records[0],'id':'fixture-peer','name':'Open peer','type':'depository','subtype':'checking','onBudget':True})
+    run(value.coordinator.sync('fictional-item'))
+    service.update_account('personal',row['id'],{'closed':True})
+    frozen=next(account for account in value.tracked.accounts('personal') if account['id']==row['id'])
+    records[0]={**records[0],'balance':99999}
+    records[1]={**records[1],'balance':30000}
+    value.provider.calls.clear()
+    run(value.coordinator.sync('fictional-item'))
+    assert [call[0] for call in value.provider.calls]==['read_sync']
+    saved=value.tracked.accounts('personal')
+    assert next(account for account in saved if account['id']==row['id'])==frozen
+    assert next(account for account in saved if account['id']!=row['id'])['balance']==30000

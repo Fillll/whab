@@ -4347,7 +4347,7 @@ main:has(.budget-planner) > .demo-ribbon,
 .account-logo-retrieval .settings-notice {flex:1; min-width:160px; margin:0;}
 .account-logo-preview {flex:none; object-fit:contain; border:1px solid var(--line); border-radius:6px; background:var(--surface); padding:4px;}
 .account-settings-dialog {width:min(760px,calc(100vw - 32px));}
-.account-classification-fields {display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px;}
+.account-classification-fields {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px;}
 .account-settings-dialog [data-account-settings-status]:empty {display:none;}
 
 .storage-roles {display:flex; flex-wrap:wrap; gap:10px 24px; min-width:0; border:0; padding:0; margin:16px 0;}
@@ -4524,7 +4524,7 @@ main:has(.budget-planner) > .demo-ribbon,
 .account-inline {align-items:flex-start; padding:20px 3px; gap:14px;}
 .account-inline .account-logo-toggle {border:1px solid var(--line); cursor:pointer; margin-top:18px; padding:0;}
 .account-logo-toggle:hover, .account-logo-toggle:focus-visible {border-color:var(--brand-red);}
-.account-inline-fields {display:grid; grid-template-columns:minmax(180px,1.5fr) repeat(3,minmax(135px,1fr)); gap:12px;}
+.account-inline-fields {display:grid; grid-template-columns:minmax(180px,1.5fr) repeat(4,minmax(110px,1fr)); gap:12px;}
 .account-inline-fields label, .account-inline-extra label {display:grid; gap:5px; font-size:10px; color:var(--muted);}
 .account-inline-fields input, .account-inline-fields select, .account-inline-extra input, .account-inline-extra select {min-width:0; width:100%; height:36px; font-size:12px; padding:6px 9px; border:1px solid var(--line); border-radius:5px; background:var(--surface); color:var(--ink);}
 .account-inline-fields .account-name-field input {font-weight:600;}
@@ -4542,6 +4542,7 @@ main:has(.budget-planner) > .demo-ribbon,
 .account-inline [hidden] {display:none;}
 @media (max-width:1200px) {
   .account-inline-fields {grid-template-columns:repeat(2,minmax(130px,1fr));}
+  .account-inline-fields .account-name-field {grid-column:1/-1;}
   .account-row-aside {flex-direction:column; align-items:flex-end;}
 }
 @media (max-width:600px) {

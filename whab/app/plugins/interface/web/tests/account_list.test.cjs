@@ -15,7 +15,7 @@ function events(properties = {}) {
 }
 function harness() {
   const requests = [], errors = {hidden: true}, status = {hidden: true}, actions = {hidden: true}, submit = {};
-  const elements = Object.fromEntries(Object.entries({name: 'Fictional checking', onBudget: 'true', type: 'depository', subtype: '', currency: 'USD', bankWebsite: ''})
+  const elements = Object.fromEntries(Object.entries({name: 'Fictional checking', onBudget: 'true', closed: 'false', type: 'depository', subtype: '', currency: 'USD', bankWebsite: ''})
     .map(([name, value]) => [name, events({name, value, disabled: ['currency', 'bankWebsite'].includes(name)})]));
   const visibility = events({checked: true, disabled: false}), cancel = events(), toggle = events({setAttribute() {}}), extra = {hidden: true};
   let valid = true;

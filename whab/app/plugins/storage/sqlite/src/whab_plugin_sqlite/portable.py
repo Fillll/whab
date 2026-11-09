@@ -24,6 +24,14 @@ def _schema(connection):
     ]
 
 
+
+def _without_lifecycle_columns(schema):
+    """Recognize only the exact new additive columns without schema products."""
+    return [(*row[:3], row[3].replace(", closed INTEGER NOT NULL DEFAULT 0", "")) if row[1] == 'accounts'
+            else (*row[:3], row[3].replace(", closed_account_cursors TEXT", "")) if row[1] == 'items'
+            else row for row in schema]
+
+
 def export_files(store, workspace):
     """Serialize a fresh database that has never contained connection credentials."""
     with store._snapshot():
@@ -48,6 +56,7 @@ def export_files(store, workspace):
         # Strip native-only metadata after populating the trusted fresh ledger.
         # New portable images retain the schema used before bank sync setup.
         clean.db.execute("ALTER TABLE items DROP COLUMN sync_settings")
+        clean.db.execute("ALTER TABLE items DROP COLUMN closed_account_cursors")
         clean.db.execute("VACUUM")
         clean.db.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
         raw = clean.db.serialize()
@@ -85,9 +94,10 @@ def _validate_rows(connection, *, legacy_accounts, legacy_tables):
         for row in connection.execute(f"SELECT {columns} FROM {table}"):
             if any(type(value) is not int or value not in (0, 1) for value in row):
                 raise StoreError("SQLite budget flags must be integer booleans.")
-    if "name_overridden" in {row["name"] for row in connection.execute("PRAGMA table_info(accounts)")}:
-        if any(type(row[0]) is not int or row[0] not in (0, 1) for row in connection.execute("SELECT name_overridden FROM accounts")):
-            raise StoreError("SQLite budget flags must be integer booleans.")
+    for column in ('name_overridden', 'closed'):
+        if column in {row["name"] for row in connection.execute("PRAGMA table_info(accounts)")}:
+            if any(type(row[0]) is not int or row[0] not in (0, 1) for row in connection.execute(f"SELECT {column} FROM accounts")):
+                raise StoreError("SQLite budget flags must be integer booleans.")
 
 
 def read_files(files, *, with_receipts=False):
@@ -102,7 +112,7 @@ def read_files(files, *, with_receipts=False):
         raise StoreError("This SQLite budget payload is invalid or exceeds the size limit.")
     reader = Store(":memory:", month="2026-10", _authority=False)
     try:
-        expected_schema = _schema(reader.db)
+        expected_schema = _without_lifecycle_columns(_schema(reader.db))
         # Earlier format-1 images predate account scope. Keep their exact trusted
         # schema allowlisted and infer defaults while reading their data only.
         legacy_schema = [
@@ -151,7 +161,7 @@ def read_files(files, *, with_receipts=False):
         actual_schema = _schema(reader.db)
         if (
             reader.db.execute("PRAGMA user_version").fetchone()[0] != _FORMAT_VERSION
-            or actual_schema not in compatible_schemas
+            or _without_lifecycle_columns(actual_schema) not in compatible_schemas
         ):
             raise StoreError("This SQLite budget has an unsupported database schema.")
         if [row[0] for row in reader.db.execute("PRAGMA quick_check")] != ["ok"]:

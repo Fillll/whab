@@ -16,4 +16,10 @@
       {% for account_type, choices in account_subtypes.items() %}{% for subtype, label in choices.items() %}<option value="{{ subtype }}" data-account-type="{{ account_type }}"{% if account_type!=(account.type if account else 'depository') %} disabled hidden{% endif %}{% if account and account.subtype==subtype %} selected{% endif %}>{{ label }}</option>{% endfor %}{% endfor %}
       </select>
     </label>
+    <label>
+      Account status<select name="closed" data-boolean-value{% if account %} aria-label="Account status for {{ account.name }}"{% endif %}>
+      <option value="false"{% if not account or not account.closed|default(false) %} selected{% endif %}>Open</option>
+      <option value="true"{% if account and account.closed|default(false) %} selected{% endif %}>Closed · archive</option>
+      </select>
+    </label>
 {% endmacro %}

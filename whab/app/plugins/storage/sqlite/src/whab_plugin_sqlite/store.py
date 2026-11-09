@@ -238,6 +238,7 @@ class Store(Authority):
                     "cursor": row["cursor"],
                     "provider": row["provider"],
                     **({"syncSettings": json.loads(row["sync_settings"])} if "sync_settings" in row.keys() and row["sync_settings"] is not None else {}),
+                    **({"closedAccountCursors": json.loads(row["closed_account_cursors"])} if "closed_account_cursors" in row.keys() and row["closed_account_cursors"] is not None else {}),
                 }
         if self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='budget_history'").fetchone():
             row = self.db.execute("SELECT record FROM budget_history WHERE workspace=?", (workspace,)).fetchone()
@@ -254,7 +255,7 @@ class Store(Authority):
             (workspace, state["budgetStartMonth"]),
         )
         self.db.executemany(
-            "INSERT INTO accounts(id,workspace,name,institution,type,balance,source,item_id,mask,active,balance_unknown,currency,on_budget,subtype,bank_website,name_overridden) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,institution=excluded.institution,type=excluded.type,balance=excluded.balance,source=excluded.source,item_id=excluded.item_id,mask=excluded.mask,active=excluded.active,balance_unknown=excluded.balance_unknown,currency=excluded.currency,on_budget=excluded.on_budget,subtype=excluded.subtype,bank_website=excluded.bank_website,name_overridden=excluded.name_overridden",
+            "INSERT INTO accounts(id,workspace,name,institution,type,balance,source,item_id,mask,active,balance_unknown,currency,on_budget,subtype,bank_website,name_overridden,closed) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,institution=excluded.institution,type=excluded.type,balance=excluded.balance,source=excluded.source,item_id=excluded.item_id,mask=excluded.mask,active=excluded.active,balance_unknown=excluded.balance_unknown,currency=excluded.currency,on_budget=excluded.on_budget,subtype=excluded.subtype,bank_website=excluded.bank_website,name_overridden=excluded.name_overridden,closed=excluded.closed",
             [
                 (
                     a["id"],
@@ -273,6 +274,7 @@ class Store(Authority):
                     a["subtype"],
                     a.get("bankWebsite"),
                     int(a.get("nameOverridden", False)),
+                    int(a.get("closed", False)),
                 )
                 for a in map(normalize_account, state["accounts"].values())
             ],
@@ -338,7 +340,7 @@ class Store(Authority):
         )
         if workspace == "personal":
             self.db.executemany(
-                "INSERT INTO items(id,token,institution_name,status,last_synced,error,cursor,provider,sync_settings) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET token=excluded.token,institution_name=excluded.institution_name,status=excluded.status,last_synced=excluded.last_synced,error=excluded.error,cursor=excluded.cursor,provider=excluded.provider,sync_settings=excluded.sync_settings",
+                "INSERT INTO items(id,token,institution_name,status,last_synced,error,cursor,provider,sync_settings,closed_account_cursors) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET token=excluded.token,institution_name=excluded.institution_name,status=excluded.status,last_synced=excluded.last_synced,error=excluded.error,cursor=excluded.cursor,provider=excluded.provider,sync_settings=excluded.sync_settings,closed_account_cursors=excluded.closed_account_cursors",
                 [
                     (
                         item["id"],
@@ -350,6 +352,7 @@ class Store(Authority):
                         item.get("cursor"),
                         item.get("provider", "plaid"),
                         json.dumps(item["syncSettings"]) if "syncSettings" in item else None,
+                        json.dumps(item["closedAccountCursors"]) if "closedAccountCursors" in item else None,
                     )
                     for item in state["items"].values()
                 ],
@@ -485,6 +488,7 @@ class Store(Authority):
                 account["bankWebsite"] = row["bank_website"]
             if "name_overridden" in row.keys() and row["name_overridden"]:
                 account["nameOverridden"] = bool(row["name_overridden"])
+            account["closed"] = bool(row["closed"]) if "closed" in row.keys() else False
             accounts.append(normalize_account(account))
         return accounts
 
@@ -754,6 +758,9 @@ class Store(Authority):
             workspace, lambda state: commands.add_transaction(state, transaction_id, transaction, source),
         )
 
+    def supports_account_lifecycle(self):
+        return True
+
     def supports_category_agent(self):
         return True
 
@@ -832,6 +839,7 @@ class Store(Authority):
                 "cursor": previous.get("cursor"),
                 "provider": provider_id,
                 **({"syncSettings": previous["syncSettings"]} if "syncSettings" in previous else {}),
+                **({"closedAccountCursors": previous["closedAccountCursors"]} if "closedAccountCursors" in previous else {}),
             }
 
         self._mutate("personal", operation)
@@ -851,7 +859,7 @@ class Store(Authority):
                 raise StoreError("Connection not found.")
             item.update(token=None, cursor=None, status="disconnected", error=None)
             for account in state["accounts"].values():
-                if account.get("itemId") == item_id:
+                if account.get("itemId") == item_id and not account.get("closed", False):
                     account["stale"] = True
 
         self._mutate("personal", operation)
@@ -892,29 +900,22 @@ class Store(Authority):
                 )
 
             for account in state["accounts"].values():
-                if account.get("itemId") == item_id:
+                if account.get("itemId") == item_id and not account.get("closed", False):
                     account["stale"] = True
             for account in sync_accounts:
                 normalized_account = imported_account(account)
-                if (
-                    normalized_account["itemId"] != item_id
-                    or normalized_account["source"] != provider
-                ):
-                    raise StoreError("Bank account belongs to another connection.")
                 previous_account = state["accounts"].get(normalized_account["id"])
-                if previous_account and previous_account.get("itemId") != item_id:
-                    raise StoreError("Bank account belongs to another connection.")
                 if (
                     previous_account
                     and previous_account.get("currency", "USD") != normalized_account["currency"]
                 ):
                     raise StoreError("An existing account currency cannot change.")
                 if previous_account:
-                    for field in ("type", "onBudget", "subtype"):
-                        normalized_account[field] = previous_account[field]
+                    for field in ("type", "onBudget", "subtype", "closed"):
+                        normalized_account[field] = previous_account.get(field, False) if field == "closed" else previous_account[field]
                     for field in ("bankWebsite", "nameOverridden"):
                         if field in previous_account:
-                            normalized_account[field] = previous_account[field]
+                            normalized_account[field] = previous_account.get(field, False) if field == "closed" else previous_account[field]
                     if previous_account.get("nameOverridden"):
                         normalized_account["name"] = previous_account["name"]
                 state["accounts"][normalized_account["id"]] = normalized_account

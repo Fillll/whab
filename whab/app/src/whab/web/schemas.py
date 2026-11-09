@@ -141,12 +141,15 @@ class AccountBody(Body):
     balance: Cents
     currency: str = "USD"
     onBudget: StrictBool | None = None
+    closed: StrictBool = False
     subtype: str | None = None
     _currency = field_validator("currency")(currency_code)
 
     @model_validator(mode="after")
     def classification(self):
         record = self.model_dump(exclude={"workspace"})
+        if "closed" not in self.model_fields_set:
+            record.pop("closed")
         if "onBudget" not in self.model_fields_set:
             record.pop("onBudget")
         normalized = normalize_account(record)
@@ -161,6 +164,7 @@ class AccountClassificationBody(Body):
     currency: str | None = None
     type: str | None = None
     onBudget: StrictBool | None = None
+    closed: StrictBool | None = None
     subtype: str | None = None
     _website = field_validator("bankWebsite")(bank_website_entry)
 
@@ -171,6 +175,8 @@ class AccountClassificationBody(Body):
             raise ValueError("No account changes provided")
         if "type" in changes:
             normalize_account(self.model_dump(include=changes))
+        if "closed" in changes and self.closed is None:
+            raise ValueError("Invalid account lifecycle state")
         if "onBudget" in changes and self.onBudget is None:
             raise ValueError("Invalid account budget scope")
         return self

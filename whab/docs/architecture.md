@@ -180,6 +180,49 @@ Ready to assign uses on-budget depository balance snapshots, subtracts on-budget
 
 Manual transactions can be added to any existing account, including imported, connected, stale and off-budget accounts. Each entry retains manual provenance and updates that account’s balance with the core asset/liability sign convention. Account origin, connection ownership, currency and snapshot freshness are preserved. A later bank refresh keeps manual entries and supplies a fresh provider balance snapshot; automatic matching between a manual entry and a later imported entry is not implemented. Ordinary public transaction views omit internal mutation metadata. Raw store state and Item records are internal and may contain encrypted credentials; do not pass them directly to browser responses or plugins.
 
+
+## Account lifecycle and CDs
+
+A certificate of deposit is canonically `type=deposit`, `subtype=cd`,
+`onBudget=false`: an asset outside envelope funding. This is the same classification
+Plaid uses for provider depository/CD records. It is separate from savings or
+brokerage. The public type inventory includes every domain type, including
+`deposit`, `other_asset` and `other_liability`.
+
+`closed` is a separate strict boolean, defaulting to false for existing accounts.
+Every type can close/reopen, including nonzero or unknown balances. Closing does
+not settle funds/debts, change currency/scope, fabricate zero or verify an imported
+balance. Historical records and financial treatment retain their saved type and
+budget scope; unknown/stale snapshots remain excluded under the existing rules.
+Known recorded balances continue to contribute according to that scope; closure
+alone cannot make a debt disappear or change envelope history.
+
+A closed account is an archive: it stays visible in Accounts and historical
+registers/reports, is omitted from active sidebar/new-entry choices, rejects new
+manual transactions and incoming account moves, and receives no bank account or
+transaction updates (including removals). Existing annotations/corrections remain
+available. Existing mappings/history starts and the shared connection stay saved.
+Open accounts on the same Item and other budgets continue syncing. An all-closed
+Item is skipped before contacting the provider; mixed Items can still be fetched
+for open accounts, but archived account records are not applied.
+
+The native Item privately checkpoints each account's cursor when it closes.
+Reopening rewinds this budget's cursor to that checkpoint so the next separately
+requested/due sync catches up under the original mappings and inclusive start
+choices. Stable provider IDs make replay of open peers idempotent. Neither action
+initiates sync or changes its schedule. Provider availability still limits catch-up.
+Changing bank setup explicitly resets the checkpoint to the reviewed beginning.
+Undo/redo preserve archive state and reconcile these native checkpoints; previews
+do not mutate them. Native copies/recovery retain checkpoints, while sanitized
+portable exports omit bank credentials, mappings and cursors as before.
+
+Financial/native canonical records omit the false default to preserve existing
+history hashes and recovery digests. A missing `closed` means open; CLI list/show
+always expose its boolean. Older storage plugins without durable lifecycle support
+reject lifecycle writes before mutation; use SQLite 1.17+ or JSON 1.9+ with WHAB
+2.64+. The optional SDK `AccountLifecycleStorage.supports_account_lifecycle()`
+advertises durable support without changing the required storage API v1.
+
 ## Plaid synchronization and secrets
 
 The browser obtains a short-lived Link token from the server and returns a public token after linking. The server exchanges that token, encrypts the access token and stores the Item before synchronizing. Reconnecting an existing Item uses Link update mode. Disconnecting removes its token and marks its account snapshots stale while retaining ledger history.

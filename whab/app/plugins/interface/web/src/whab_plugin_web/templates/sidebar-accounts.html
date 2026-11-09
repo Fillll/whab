@@ -2,7 +2,7 @@
 <div class="nav-label">ACCOUNTS <a href="{{ url('accounts') }}" aria-label="Add bank account">{{ icon('plus', 15) }}</a></div>
 {% set shown = namespace(count=0) %}
 {% for group in account_groups %}
-  {% set visible_accounts = group.accounts|rejectattr("id", "in", hidden_account_ids|default([]))|list %}
+  {% set visible_accounts = group.accounts|rejectattr("closed")|rejectattr("id", "in", hidden_account_ids|default([]))|list %}
   {% if visible_accounts %}
   {% set shown.count = shown.count + visible_accounts|length %}
   <div class="sidebar-account-scope">{{ group.label }}</div>
