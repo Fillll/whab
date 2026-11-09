@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.0 — 2026-11-09
+
+PR: [#179](https://github.com/Fillll/whab/pull/179)
+
+- Implement optional CategoryDeletion through core safety rules and the existing atomic candidate/receipt/history commit. Refuse referenced children and nonempty parents, retain empty groups, and preserve saved financial/provider data and compatible undo/redo without a schema migration.
+
 ## 1.10.1 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.67.0 — 2026-11-09
+
+PR: [#179](https://github.com/Fillll/whab/pull/179)
+
+- Add guarded public child/empty-group deletion with shared financial reference validation, an additive optional CategoryDeletion SDK contract, native-worker/remote forwarding and reversible atomic audit history. Protect all transaction references and monthly assignments, retain empty parents, and refuse unsupported storage before mutation.
+
 ## 2.66.0 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)
