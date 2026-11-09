@@ -26,6 +26,7 @@ _COLLECTIONS = {
     'accounts': ('id',), 'categories': ('id',), 'transactions': ('id',),
     'assignments': ('month', 'categoryId'), 'futureFunding': ('month', 'currency'),
     'rolloverModes': ('month', 'currency'),
+    'categoryGroups': ('id',),
 }
 _FIELDS = {
     'accounts': (ACCOUNT_FIELDS, {'bankWebsite', 'nameOverridden', 'closed'}),
@@ -34,9 +35,10 @@ _FIELDS = {
     'assignments': (ASSIGNMENT_FIELDS, set()),
     'futureFunding': (FUTURE_FUNDING_FIELDS, set()),
     'rolloverModes': (ROLLOVER_MODE_FIELDS, set()),
+    'categoryGroups': ({'id', 'name'}, set()),
 }
 REVERSIBLE = frozenset({
-    'add_account', 'update_account', 'add_category', 'add_transaction',
+    'add_account', 'update_account', 'add_category', 'add_category_group', 'move_category', 'add_transaction',
     'edit_transaction', 'edit_transaction_details', 'review_transactions',
     'assign', 'assign_next_month', 'set_rollover_mode',
 })
@@ -82,14 +84,15 @@ def financial(snapshot, *, trusted=False):
     if not trusted:
         result = validate_portable_budget(result)
     for section, fields in _COLLECTIONS.items():
-        result[section].sort(key=itemgetter(*fields))
+        if section in result:
+            result[section].sort(key=itemgetter(*fields))
     return result
 
 
 def flatten(snapshot):
     result = {('budgetStartMonth',): snapshot['budgetStartMonth']}
     for section, keys in _COLLECTIONS.items():
-        for row in snapshot[section]:
+        for row in snapshot.get(section, []):
             result[(section, *(row[k] for k in keys))] = row
     return result
 
@@ -322,6 +325,9 @@ def apply_to_state(state, wanted):
         reconcile_account_closed(state, identifier, old_accounts.get(identifier, {}).get('closed', False), account.get('closed', False))
     for name in ('budgetStartMonth', 'accounts', 'categories', 'transactions', 'budget', 'futureFunding', 'rolloverModes'):
         state[name] = candidate[name]
+    state.pop('categoryGroups', None)
+    if candidate.get('categoryGroups'):
+        state['categoryGroups'] = candidate['categoryGroups']
 
 
 def record_financial(journal, before, after, metadata=None):

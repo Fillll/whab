@@ -1040,3 +1040,30 @@ The [ownership and recovery decision](architecture.md#shared-bank-connection-own
 uses public backend operations and independent atomic cursors rather than a
 shared transaction feed. Portable exports remain credential-free; full runtime
 backups must include the existing `plugin-workers` root and encryption keys.
+
+## Category management and explicit parents
+
+WHAB 2.65 adds optional `CategoryManagement` with
+`category_tree(workspace) -> list[dict]`,
+`add_category_group(workspace, name) -> str`, and
+`move_category(workspace, category_id, parent_id) -> None`. Public query
+`category_tree` returns the usual `{id, name, children}` two-level tree, including
+empty parents. Public guarded commands `add_category_group` and `move_category`
+accept `{name}` and `{categoryId, parentId}` respectively. They are actual missing
+contracts: existing `add_category` could create only children and parents used to
+be derived from nonempty groups. Reads on older storage fall back to derived
+parents; unsupported writes fail explicitly. Remote authorities validate the same
+commands; no raw storage method becomes a remote operation.
+
+Native/neutral ledgers optionally carry `categoryGroups: [{id, name}]`, without
+`children` on these metadata records. IDs retain the existing deterministic
+`category-group:` identity. Missing or empty metadata is omitted canonically to
+preserve existing financial/history/recovery digests; derived legacy groups remain
+visible. Saving a group or moving a child retains explicit parents, including
+emptied source groups. Financial snapshots, protected copies, portable formats and
+undo/redo retain these parents. Moves preserve the existing child ID, currency,
+target, transaction references and all monthly assignments. Only child records can
+receive money; missing parents, child-as-parent/deeper nesting and duplicate
+siblings at a move destination are rejected. CLI creation also refuses unintended
+duplicate names under a parent while guarding the observed revision. There is no
+manual category ordering contract; moves retain ledger order.

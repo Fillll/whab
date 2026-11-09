@@ -40,6 +40,7 @@ METHODS = {
     "supports_category_agent": ((), {}),
     "supports_account_lifecycle": ((), {}),
     "prepare_existing": (("workspace", "files"), {}),
+    "category_tree": (("workspace",), {}),
     "accounts": (("workspace",), {}), "categories": (("workspace",), {}),
     "transactions": (("workspace",), {"month": None}),
     "workspace": (("workspace",), {"month": None}),

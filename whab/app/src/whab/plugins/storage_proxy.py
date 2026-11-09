@@ -30,6 +30,8 @@ _MUTATIONS = {
     "add_account": (("workspace", "account"), {}),
     "update_account": (("workspace", "account_id", "changes"), {}),
     "add_category": (("workspace", "category"), {}),
+    "add_category_group": (("workspace", "name"), {}),
+    "move_category": (("workspace", "category_id", "parent_id"), {}),
     "add_transaction": (("workspace", "transaction"), {"source": "manual"}),
     "edit_transaction_details": (("workspace", "transaction_id", "changes"), {}),
     "edit_transaction": (("workspace", "transaction_id"), {"category_id": UNSET, "reviewed": None, "note": UNSET}),
@@ -103,7 +105,7 @@ def operation_payload(name, args, kwargs):
         keys = {"account_id": "accountId", "category_id": "categoryId", "transaction_id": "transactionId",
                 "transaction_ids": "transactionIds", "item_id": "itemId", "encrypted_token": "encryptedToken",
                 "institution_name": "institutionName", "provider_id": "providerId", "historical_complete": "historicalComplete",
-                "expected_cursor": "expectedCursor"}
+                "expected_cursor": "expectedCursor", "parent_id": "parentId"}
         payload = {keys.get(key, key): _plain(value) for key, value in values.items() if value is not UNSET}
     return workspace, canonical_storage_json(payload, limit=operation_limit(name))
 

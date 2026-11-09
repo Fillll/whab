@@ -77,6 +77,8 @@ def portable_snapshot(state, *, validate=True):
     }
     if "history" in state:
         snapshot["history"] = state["history"]
+    if state.get('categoryGroups'):
+        snapshot['categoryGroups'] = [row.copy() for row in state['categoryGroups']]
     return validate_portable_budget(snapshot) if validate else snapshot
 
 
@@ -84,7 +86,7 @@ def require_pristine(state):
     """A transfer may replace untouched templates, never saved user/provider data."""
     if any(state.get(key) for key in (
         "accounts", "transactions", "budget", "futureFunding", "rolloverModes", "items",
-        "receipts", "importReceipt", "history",
+        "receipts", "importReceipt", "history", "categoryGroups",
     )):
         raise StoreError("Restoration requires an empty personal workspace.")
     template = initial_state("personal", state["budgetStartMonth"])["categories"]
@@ -107,6 +109,9 @@ def restore_snapshot(state, snapshot, *, mark_external_stale=True):
         for record in restored["accounts"]
     }
     state["categories"] = {record["id"]: record for record in restored["categories"]}
+    state.pop('categoryGroups', None)
+    if restored.get('categoryGroups'):
+        state['categoryGroups'] = restored['categoryGroups']
     state["transactions"] = {record["id"]: record for record in restored["transactions"]}
     for name, key, value in (
         ("assignments", "categoryId", "assigned"),

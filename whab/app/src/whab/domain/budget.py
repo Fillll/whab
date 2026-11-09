@@ -415,7 +415,7 @@ def _prepare_workspace(state: dict) -> dict:
             },
         }
         histories[currency] = _currency_history(scoped[currency])
-    return {"accounts": accounts, "categories": categories, "currencies": currencies,
+    return {"categoryGroups": state.get("categoryGroups", []), "accounts": accounts, "categories": categories, "currencies": currencies,
             "scoped": scoped, "histories": histories}
 
 
@@ -436,7 +436,7 @@ def _project_workspace(prepared: dict, month: str) -> dict:
         "currencies": list(currencies),
         "accounts": [account.copy() for account in accounts.values()],
         "categories": [category.copy() for category in categories.values()],
-        "categoryGroups": category_tree(categories),
+        "categoryGroups": category_tree(categories, prepared["categoryGroups"]),
         "transactions": sorted(
             [t for p in projections.values() for t in p["transactions"]],
             key=lambda t: (t["date"], t["id"]),
@@ -479,7 +479,7 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
             currency, account_summary(accounts)
         ),
         "categories": categories,
-        "categoryGroups": category_tree(categories),
+        "categoryGroups": category_tree(categories, [{"id": row["id"], "name": row["name"]} for row in data.get("categoryGroups", []) if not row["children"]]),
         "transactions": [t for t in data["transactions"] if t["accountId"] in account_ids],
         "budget": [b for b in data["budget"] if b["categoryId"] in category_ids],
         "summary": data.get("summariesByCurrency", {"USD": data["summary"]}).get(

@@ -3894,6 +3894,241 @@
       ],
       "retry": "Never automatically retry a stale/uncertain write. Inspect account show/history and retain the reported complete original intent/revision/request ID; do not rerun this lifecycle action blindly.",
       "availability": "CLI 2.9+; whab BUDGET account show --help. Packaged documentation: whab api describe --offline --plugin cli --operation account.show --json. Delegates to core accounts/update_account; no new shared API. CLI 2.10+ / WHAB 2.64 supports deposit/cd and independent closed lifecycle with account close/reopen. SQLite 1.17+ or JSON 1.9+ is required for durable lifecycle writes."
+    },
+    {
+      "name": "category.workflow",
+      "kind": "local",
+      "summary": "Category workflow (fictional budget; no wizard):\n  whab \"My budget\" category list --format table\n  whab \"My budget\" category group create \"Projects\"\n  whab \"My budget\" category move \"Finance / Example studio\" --parent \"Projects\"\n  whab \"My budget\" category create \"Example venture\" --parent \"Projects\"\n  whab \"My budget\" category list --parent \"Projects\" --format table\n  whab \"My budget\" history list\n\nRead the hierarchy, confirm the intended parent and child with the user, apply one\nconfirmed choice, then inspect the verified result before continuing. All commands\naddress the budget by its existing unique name or stable ID. Groups accept an exact\nunique name or stable ID; children also accept \"Group / Name\". Names ignore case\nand outer whitespace; spaces, emoji and non-Latin text work when quoted. No fuzzy\nmatch is selected. Missing/ambiguous names show candidate names and IDs.\n\nGroups are real nonassignable parents and may be empty. Only children can receive\ntransactions, targets or monthly assignments; deeper nesting is refused. Child\ncreation requires an existing --parent, defaults to --currency USD and --target 0,\nand refuses duplicate sibling names. Target is a nonnegative integer in currency\nminor units (USD 1234 = $12.34). No currency conversion is performed. Moves preserve\nchild identity, currency, targets, transaction references, every month's assignments\nand prior history. Unrelated children and the original parent remain intact, even\nwhen the original parent becomes empty. Existing ledger order is preserved on move;\nthere is currently no manual reorder operation or requested-order guarantee.\n\nJSON is the default and retains full IDs/fields; --format table is for readable\ninspection. Successful writes report the addressed budget and verified saved group\nor child. Revisions and unique request IDs are handled internally. Each command is\none atomic change; the sequence is not one transaction. Stale state is refused.\nNo bank synchronization is started. After an uncertain response, inspect category\nlist and history and retain the complete reported original intent (budget, payload,\nrevision and request ID). Never automatically rerun a write with a new intent.\n\nHelp works offline without a profile or running host. The category management\ncommands require WHAB 2.65+; saving empty groups and moving children require native\nSQLite 1.18+, JSON 1.10+ or another adapter implementing CategoryManagement. Older\nstorage can still provide derived nonempty groups for reads; unsupported writes\nfail explicitly. Use whab BUDGET category ACTION --help for each command.",
+      "input": {
+        "type": "object",
+        "description": "Simple category-command arguments inside one explicitly addressed budget.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Read-only documentation topic."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Read-only documentation topic; not an executable command.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One explicitly addressed budget, personal workspace; currencies never combined.",
+      "errors": [
+        "Missing/ambiguous budget fails without fallback. Missing/ambiguous account fails with up to 20 candidates; IDs take precedence, no fuzzy matching.",
+        "Domain-invalid type/subtype/scope fails without mutation. Stale revisions conflict. Wrong-budget, changed verification or uncertain responses fail without automatic mutation replay."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.11+, WHAB 2.65+; native category-management adapters for creation/moves. category.workflow is documentation only."
+    },
+    {
+      "name": "category.list",
+      "kind": "local",
+      "summary": "List real parent groups and children, including empty groups.",
+      "input": {
+        "type": "object",
+        "description": "Simple category-command arguments inside one explicitly addressed budget.",
+        "properties": {
+          "parent": {
+            "type": "string",
+            "description": "Optional parent name or ID.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "format": {
+            "type": "string",
+            "description": "Output presentation.",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Verified public response with budget, budgetId, revision and data; JSON retains stable IDs and financial fields.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Read-only.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One explicitly addressed budget, personal workspace; currencies never combined.",
+      "errors": [
+        "Missing/ambiguous budget fails without fallback. Missing/ambiguous account fails with up to 20 candidates; IDs take precedence, no fuzzy matching.",
+        "Domain-invalid type/subtype/scope fails without mutation. Stale revisions conflict. Wrong-budget, changed verification or uncertain responses fail without automatic mutation replay."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.11+, WHAB 2.65+; native category-management adapters for creation/moves. category.workflow is documentation only."
+    },
+    {
+      "name": "category.group.create",
+      "kind": "local",
+      "summary": "Create a real empty nonassignable parent group.",
+      "input": {
+        "type": "object",
+        "description": "Simple category-command arguments inside one explicitly addressed budget.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New unique parent name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Verified public response with budget, budgetId, revision and data; JSON retains stable IDs and financial fields.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "name": "Fictional projects"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "One guarded public ledger mutation, followed by verification; no bank sync or automatic uncertain-write replay.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One explicitly addressed budget, personal workspace; currencies never combined.",
+      "errors": [
+        "Missing/ambiguous budget fails without fallback. Missing/ambiguous account fails with up to 20 candidates; IDs take precedence, no fuzzy matching.",
+        "Domain-invalid type/subtype/scope fails without mutation. Stale revisions conflict. Wrong-budget, changed verification or uncertain responses fail without automatic mutation replay."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.11+, WHAB 2.65+; native category-management adapters for creation/moves. category.workflow is documentation only."
+    },
+    {
+      "name": "category.create",
+      "kind": "local",
+      "summary": "Create an assignable child under an existing named parent.",
+      "input": {
+        "type": "object",
+        "description": "Simple category-command arguments inside one explicitly addressed budget.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New child name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "parent": {
+            "type": "string",
+            "description": "Existing parent name or ID.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "currency": {
+            "type": "string",
+            "description": "Supported ISO currency.",
+            "default": "USD"
+          },
+          "target": {
+            "type": "integer",
+            "description": "Nonnegative currency minor units.",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "required": [
+          "name",
+          "parent"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Verified public response with budget, budgetId, revision and data; JSON retains stable IDs and financial fields.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "name": "Fictional venture",
+            "parent": "Fictional projects"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "One guarded public ledger mutation, followed by verification; no bank sync or automatic uncertain-write replay.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One explicitly addressed budget, personal workspace; currencies never combined.",
+      "errors": [
+        "Missing/ambiguous budget fails without fallback. Missing/ambiguous account fails with up to 20 candidates; IDs take precedence, no fuzzy matching.",
+        "Domain-invalid type/subtype/scope fails without mutation. Stale revisions conflict. Wrong-budget, changed verification or uncertain responses fail without automatic mutation replay."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.11+, WHAB 2.65+; native category-management adapters for creation/moves. category.workflow is documentation only."
+    },
+    {
+      "name": "category.move",
+      "kind": "local",
+      "summary": "Move an existing child by name or ID without replacing its financial identity.",
+      "input": {
+        "type": "object",
+        "description": "Simple category-command arguments inside one explicitly addressed budget.",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Existing child ID, unique name or Group / Name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "parent": {
+            "type": "string",
+            "description": "Existing parent name or ID.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "category",
+          "parent"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Verified public response with budget, budgetId, revision and data; JSON retains stable IDs and financial fields.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "category": "Finance / Fictional studio",
+            "parent": "Fictional projects"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "One guarded public ledger mutation, followed by verification; no bank sync or automatic uncertain-write replay.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One explicitly addressed budget, personal workspace; currencies never combined.",
+      "errors": [
+        "Missing/ambiguous budget fails without fallback. Missing/ambiguous account fails with up to 20 candidates; IDs take precedence, no fuzzy matching.",
+        "Domain-invalid type/subtype/scope fails without mutation. Stale revisions conflict. Wrong-budget, changed verification or uncertain responses fail without automatic mutation replay."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.11+, WHAB 2.65+; native category-management adapters for creation/moves. category.workflow is documentation only."
     }
   ]
 }

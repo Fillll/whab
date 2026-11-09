@@ -1275,6 +1275,165 @@
       ],
       "retry": "Read-only; repeat safely.",
       "availability": "Optional SDK capability, WHAB 2.64+. Public mutations use guarded update_account; not a standalone CLI command."
+    },
+    {
+      "name": "CategoryManagement.category_tree",
+      "kind": "sdk",
+      "summary": "Read the public two-level hierarchy, including saved empty groups.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "Optional CategoryManagement SDK capability, WHAB 2.65+; reached through guarded public category operations, never arbitrary remote storage access."
+    },
+    {
+      "name": "CategoryManagement.add_category_group",
+      "kind": "sdk",
+      "summary": "Save a real nonassignable parent without a placeholder child.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "New unique parent name."
+          }
+        },
+        "required": [
+          "workspace",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "name": "fictional-name"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Atomically save hierarchy metadata with native evidence, receipt and budget history. No bank sync.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
+      "availability": "Optional CategoryManagement SDK capability, WHAB 2.65+; reached through guarded public category operations, never arbitrary remote storage access."
+    },
+    {
+      "name": "CategoryManagement.move_category",
+      "kind": "sdk",
+      "summary": "Change only the existing child parent; preserve identity, currency, target, assignments and transactions.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "category_id": {
+            "type": "string",
+            "description": "Existing stable child identity."
+          },
+          "parent_id": {
+            "type": "string",
+            "description": "Existing stable organizational parent identity."
+          }
+        },
+        "required": [
+          "workspace",
+          "category_id",
+          "parent_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "category_id": "fictional-category_id",
+            "parent_id": "fictional-parent_id"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Atomically save hierarchy metadata with native evidence, receipt and budget history. No bank sync.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
+      "availability": "Optional CategoryManagement SDK capability, WHAB 2.65+; reached through guarded public category operations, never arbitrary remote storage access."
     }
   ]
 }

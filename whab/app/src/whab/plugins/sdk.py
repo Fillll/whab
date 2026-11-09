@@ -274,6 +274,14 @@ class BudgetHistoryStorage(Protocol):
     def history_apply(self, workspace: str, action: str, target: str | None, fingerprint: str) -> dict: ...
 
 
+class CategoryManagement(Protocol):
+    """Optional durable empty parents and identity-preserving child reparenting."""
+
+    def category_tree(self, workspace: str) -> list[dict]: ...
+    def add_category_group(self, workspace: str, name: str) -> str: ...
+    def move_category(self, workspace: str, category_id: str, parent_id: str) -> None: ...
+
+
 class AccountLifecycleStorage(Protocol):
     """Optional durable archive state, including paused account synchronization."""
 

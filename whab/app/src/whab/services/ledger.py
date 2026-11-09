@@ -245,6 +245,9 @@ class LedgerService:
                 if exporter is None:
                     raise StoreError("This storage plugin does not support portable budgets.")
                 data = validate_portable_budget(exporter(workspace))
+            elif operation == "category_tree":
+                read = getattr(self._store, "category_tree", None)
+                data = read(workspace) if callable(read) else category_tree(self._store.categories(workspace))
             elif operation in {"accounts", "categories"}:
                 data = getattr(self._store, operation)(workspace)
             elif operation in {"transactions", "workspace"}:
@@ -413,6 +416,12 @@ class LedgerService:
                         data = remote(workspace, payload)
                 elif operation in {"add_account", "add_category", "add_transaction"}:
                     data = getattr(self._store, operation)(workspace, payload)
+                elif operation in {"add_category_group", "move_category"}:
+                    mutate = getattr(self._store, operation, None)
+                    if not callable(mutate):
+                        raise StoreError("Update the storage plugin to manage category groups and moves.")
+                    data = (mutate(workspace, payload["name"]) if operation == "add_category_group"
+                            else mutate(workspace, payload["categoryId"], payload["parentId"]))
                 elif operation == "update_account":
                     update = getattr(self._store, "update_account", None)
                     if not callable(update):

@@ -17,6 +17,7 @@ from whab.plugins.local import local_connection
 from . import client
 from .account_commands import account_table, add_account_parser, execute_account
 from .bank_commands import add_bank_parser, bank_error, bank_request
+from .category_commands import add_category_parser, category_table, execute_categories
 from .config import ConfigError, connection_defaults
 from .errors import selection_error
 from .help import AGENT_WORKFLOW, account_classification, bank_help, describe, import_help, overview
@@ -54,7 +55,7 @@ def parser(options, argv=()):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     plugin.add_argument("action", choices=("list",), nargs="?", default="list", help="List installed plugin documentation offline")
     scoped = groups.add_parser("BUDGET", help="Address a saved budget by its name or permanent ID",
-        usage="whab BUDGET {account,plugin,bank,history,import,insights,transactions,trnx} ...")
+        usage="whab BUDGET {account,category,plugin,bank,history,import,insights,transactions,trnx} ...")
     scoped.add_argument("target", help=argparse.SUPPRESS)
     commands = scoped.add_subparsers(dest="command", required=True)
     plugins = commands.add_parser("plugin", help="List, enable or disable this budget's plugins",
@@ -64,6 +65,7 @@ def parser(options, argv=()):
     add_bank_parser(commands, documentation=bank_help(argv, catalog))
     add_history_parser(commands)
     add_account_parser(commands, catalog)
+    add_category_parser(commands, catalog)
     workflow = import_help(argv, catalog)
     imports = commands.add_parser("import", help="Preview or commit a ZIP import into this empty budget",
         epilog="Enable an importer first: whab BUDGET plugin enable ynab-zip-importer\nThen: whab BUDGET import ynab-zip-importer preview --help\n\n" + workflow,
@@ -203,6 +205,8 @@ def execute(args, home, environment, ca):
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
         if args.command in {"transactions", "trnx"} and args.filter in {"categories", "categorize", "categorise"}:
             return execute_category(connection, identifier, prefix, args, exchange, CommandError)
+        if args.command == "category":
+            return execute_categories(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "account":
             return execute_account(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "history":
@@ -259,7 +263,7 @@ def main(argv=None):
         else:
             result = execute(args, *configuration(args))
         if getattr(args, "format", None) == "table":
-            print(account_table(result) if args.command == "account" else transaction_table(result))
+            print(account_table(result) if args.command == "account" else category_table(result) if args.command == "category" else transaction_table(result))
         else:
             print(json.dumps(result, allow_nan=False))
         return 0

@@ -260,6 +260,9 @@ class RemoteStore:
     def accounts(self, workspace):
         return self._query("accounts", workspace)
 
+    def category_tree(self, workspace):
+        return self._query("category_tree", workspace)
+
     def categories(self, workspace):
         return self._query("categories", workspace)
 
@@ -313,6 +316,12 @@ class RemoteStore:
 
     def update_account(self, workspace, account_id, changes):
         return self._command("update_account", workspace, {**changes, "accountId": account_id})
+
+    def add_category_group(self, workspace, name):
+        return self._command("add_category_group", workspace, {"name": name})
+
+    def move_category(self, workspace, category_id, parent_id):
+        return self._command("move_category", workspace, {"categoryId": category_id, "parentId": parent_id})
 
     def add_category(self, workspace, category):
         return self._command("add_category", workspace, category)

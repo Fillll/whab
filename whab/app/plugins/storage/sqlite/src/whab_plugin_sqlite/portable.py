@@ -25,10 +25,11 @@ def _schema(connection):
 
 
 
-def _without_lifecycle_columns(schema):
+def _without_additive_columns(schema):
     """Recognize only the exact new additive columns without schema products."""
     return [(*row[:3], row[3].replace(", closed INTEGER NOT NULL DEFAULT 0", "")) if row[1] == 'accounts'
             else (*row[:3], row[3].replace(", closed_account_cursors TEXT", "")) if row[1] == 'items'
+            else (*row[:3], row[3].replace(", category_groups TEXT", "")) if row[1] == "meta"
             else row for row in schema]
 
 
@@ -112,7 +113,7 @@ def read_files(files, *, with_receipts=False):
         raise StoreError("This SQLite budget payload is invalid or exceeds the size limit.")
     reader = Store(":memory:", month="2026-10", _authority=False)
     try:
-        expected_schema = _without_lifecycle_columns(_schema(reader.db))
+        expected_schema = _without_additive_columns(_schema(reader.db))
         # Earlier format-1 images predate account scope. Keep their exact trusted
         # schema allowlisted and infer defaults while reading their data only.
         legacy_schema = [
@@ -161,7 +162,7 @@ def read_files(files, *, with_receipts=False):
         actual_schema = _schema(reader.db)
         if (
             reader.db.execute("PRAGMA user_version").fetchone()[0] != _FORMAT_VERSION
-            or _without_lifecycle_columns(actual_schema) not in compatible_schemas
+            or _without_additive_columns(actual_schema) not in compatible_schemas
         ):
             raise StoreError("This SQLite budget has an unsupported database schema.")
         if [row[0] for row in reader.db.execute("PRAGMA quick_check")] != ["ok"]:

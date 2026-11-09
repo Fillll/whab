@@ -1,0 +1,280 @@
+"""Name-addressed hierarchy management over guarded public ledger operations."""
+
+import argparse
+import json
+from uuid import uuid4
+
+import httpx
+
+from whab.plugins.documentation import operation
+
+from .transaction_commands import checked
+from .transaction_reads import terminal_text
+
+
+def add_category_parser(commands, catalog):
+    document = next(row["documentation"] for row in catalog["plugins"] if row["id"] == "cli")
+    guide = operation(document, "local", "category.workflow")["summary"]
+    group = commands.add_parser(
+        "category",
+        help="List, create and move categories by name or ID",
+        description="Manage the two-level category hierarchy in one explicitly addressed budget.",
+        epilog=guide,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    actions = group.add_subparsers(dest="category_action", required=True)
+    listing = actions.add_parser(
+        "list",
+        help="Read parent groups and child categories, including empty groups",
+        description="Read names, stable IDs, parent paths, currencies and integer targets. No financial changes.",
+        epilog=guide,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    listing.add_argument(
+        "--parent", help="Only this parent group, by exact unique name or stable ID"
+    )
+    parents = actions.add_parser(
+        "group",
+        help="Manage nonassignable parent groups",
+        epilog=guide,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parent_actions = parents.add_subparsers(dest="group_action", required=True)
+    parent_create = parent_actions.add_parser(
+        "create",
+        help="Save a real empty parent group",
+        description="Create an organizational parent without adding a placeholder child, target or assignment.",
+        epilog=guide,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parent_create.add_argument(
+        "name", help="New unique group name; quote spaces, emoji and non-Latin names"
+    )
+    create = actions.add_parser(
+        "create",
+        help="Create an assignable child under an existing parent",
+        description="Create a child with target zero by default; duplicate sibling names are refused.",
+        epilog=guide,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    create.add_argument(
+        "name",
+        help="New child name; duplicate siblings are refused, ignoring case/outer whitespace",
+    )
+    create.add_argument(
+        "--currency",
+        default="USD",
+        help="Supported ISO currency (default: USD); never converts money",
+    )
+    create.add_argument(
+        "--target",
+        dest="category_target",
+        type=int,
+        default=0,
+        help="Nonnegative integer currency minor units (default: 0); USD 1234 is $12.34",
+    )
+    move = actions.add_parser(
+        "move",
+        help="Move an existing child without changing its identity or financial history",
+        description="Reparent only; preserves ID, target, currency, transactions and monthly assignments.",
+        epilog=guide,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    move.add_argument(
+        "category", help='Stable child ID, unique name or "Group / Name"; no fuzzy matching'
+    )
+    for parser in (create, move):
+        parser.add_argument(
+            "--parent",
+            required=True,
+            help="Existing parent group by unique exact name or stable ID; children cannot be parents",
+        )
+    for parser in (listing, parent_create, create, move):
+        parser.add_argument(
+            "--format",
+            choices=("json", "table"),
+            default="json",
+            help="Output format (default: json); tables may shorten text",
+        )
+
+
+def resolve_category(rows, value, error, *, parent=False):
+    if type(value) is not str:
+        raise error("WHAB returned an invalid category identity.")
+    key = value.strip().casefold()
+    matches = [row for row in rows if row["id"] == value] or [
+        row
+        for row in rows
+        if row["name"].strip().casefold() == key
+        or (not parent and f"{row['group']} / {row['name']}".casefold() == key)
+    ]
+    if len(matches) != 1:
+        candidates = [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                **({"group": row["group"]} if "group" in row else {}),
+            }
+            for row in (matches or rows)[:20]
+        ]
+        raise error(
+            "Unknown or ambiguous category "
+            + ("group" if parent else "child")
+            + ". Candidates (up to 20): "
+            + json.dumps(candidates, ensure_ascii=True)
+            + ". Use category list and an exact ID; no fuzzy match was selected."
+        )
+    return matches[0]
+
+
+def execute_categories(connection, identifier, prefix, args, exchange, error):
+    def read():
+        return checked(
+            exchange(
+                connection,
+                "GET",
+                prefix + "/queries/category_tree",
+                params={"workspace": "personal"},
+            ),
+            identifier,
+            error,
+        )
+
+    observed = read()
+    groups = observed["data"]
+    children = [row for group in groups for row in group["children"]]
+    if args.category_action == "list":
+        selected = (
+            [resolve_category(groups, args.parent, error, parent=True)] if args.parent else groups
+        )
+        return {**observed, "budget": args.target, "data": selected}
+    if args.category_action == "group":
+        if any(row["name"].strip().casefold() == args.name.strip().casefold() for row in groups):
+            raise error(
+                "Category group already exists. Inspect category list; no duplicate was created."
+            )
+        operation_name, payload = "add_category_group", {"name": args.name}
+    else:
+        parent = resolve_category(groups, args.parent, error, parent=True)
+        if args.category_action == "create":
+            if any(
+                row["name"].strip().casefold() == args.name.strip().casefold()
+                for row in parent["children"]
+            ):
+                raise error(
+                    "A category with this name already exists under this parent; no duplicate was created."
+                )
+            operation_name = "add_category"
+            payload = {
+                "name": args.name,
+                "parentId": parent["id"],
+                "target": args.category_target,
+                "currency": args.currency,
+            }
+        else:
+            child = resolve_category(children, args.category, error)
+            if any(
+                row["id"] != child["id"]
+                and row["name"].strip().casefold() == child["name"].strip().casefold()
+                for row in parent["children"]
+            ):
+                raise error(
+                    "A category with this name already exists under this destination; nothing was moved."
+                )
+            operation_name, payload = (
+                "move_category",
+                {"categoryId": child["id"], "parentId": parent["id"]},
+            )
+    intent = {
+        "operation": operation_name,
+        "workspace": "personal",
+        "payload": payload,
+        "expected_revision": observed["revision"],
+        "request_id": str(uuid4()),
+    }
+    try:
+        saved = checked(
+            exchange(connection, "POST", prefix + "/commands", json=intent), identifier, error
+        )
+        verified = read()
+        if verified["revision"] != saved["revision"]:
+            raise error("Category hierarchy changed during verification.")
+        rows = (
+            verified["data"]
+            if args.category_action == "group"
+            else [row for group in verified["data"] for row in group["children"]]
+        )
+        actual = resolve_category(
+            rows,
+            child["id"] if operation_name == "move_category" else saved["data"],
+            error,
+            parent=args.category_action == "group",
+        )
+        expected = (
+            {"name": args.name.strip()}
+            if args.category_action == "group"
+            else {**child, "parentId": parent["id"], "group": parent["name"]}
+            if operation_name == "move_category"
+            else {
+                "name": args.name.strip(),
+                "parentId": parent["id"],
+                "group": parent["name"],
+                "target": args.category_target,
+                "currency": args.currency,
+            }
+        )
+        if any(actual.get(key) != value for key, value in expected.items()):
+            raise error("Saved category does not match the addressed intent.")
+    except (ValueError, OSError, RuntimeError, KeyError, TypeError, httpx.HTTPError) as failure:
+        raise error(
+            "Category change was not confirmed; it may have been saved. No automatic retry. Inspect category list and history; "
+            "do not rerun the write as a retry. Retain budgetId "
+            + identifier
+            + " and the exact original intent: "
+            + json.dumps(intent)
+            + "."
+        ) from failure
+    return {
+        **verified,
+        "budget": args.target,
+        "data": actual,
+        "requestId": intent["request_id"],
+        "expectedRevision": observed["revision"],
+    }
+
+
+def category_table(result):
+    data = result["data"]
+    groups = data if isinstance(data, list) else [data]
+    cells = [["Kind", "Name / path", "ID", "Currency", "Target"]]
+    for row in groups:
+        if "children" in row:
+            cells.append(["group", row["name"], row["id"], "—", "—"])
+            leaves = row["children"]
+        else:
+            leaves = [row]
+        cells.extend(
+            [
+                "child",
+                f"{child['group']} / {child['name']}",
+                child["id"],
+                child["currency"],
+                child["target"],
+            ]
+            for child in leaves
+        )
+    cells = [
+        [terminal_text(value, limit) for value, limit in zip(row, (6, 48, 80, 8, 18), strict=True)]
+        for row in cells
+    ]
+    widths = [max(len(row[index]) for row in cells) for index in range(5)]
+    return "\n".join(
+        [
+            f"Budget: {terminal_text(result['budget'], 100)} ({terminal_text(result['budgetId'], 200)})",
+            *[
+                "  ".join(value.ljust(width) for value, width in zip(row, widths, strict=True))
+                for row in cells
+            ],
+            "Targets are integer currency minor units. Groups cannot receive assignments. JSON retains complete fields.",
+        ]
+    )

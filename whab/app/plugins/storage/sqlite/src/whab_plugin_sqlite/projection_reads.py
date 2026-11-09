@@ -10,6 +10,8 @@ This is not a replacement for Store.state: mutation, export and private connecti
 reads continue to use their existing complete records.
 """
 
+import json
+
 from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
 from whab.domain.transactions import category_agent_fields
@@ -31,6 +33,8 @@ def snapshot(store, workspace: str, month: str, count: int = 1) -> dict:
             "categories": {}, "transactions": {}, "budget": {},
             "futureFunding": {}, "rolloverModes": {},
         }
+        if "category_groups" in meta.keys() and meta["category_groups"] is not None:
+            state["categoryGroups"] = json.loads(meta["category_groups"])
         for row in store.db.execute("SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,)):
             state["categories"][row["id"]] = {
                 "id": row["id"], "name": row["name"], "group": row["group_name"],

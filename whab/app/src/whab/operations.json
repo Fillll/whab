@@ -2888,6 +2888,194 @@
       ],
       "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
       "availability": "WHAB 2.62+ and a BudgetHistoryStorage adapter. History starts with a baseline; earlier edits are not reconstructed."
+    },
+    {
+      "name": "category_tree",
+      "kind": "query",
+      "summary": "Read real parent groups and assignable children, including saved empty groups.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Stable group or child identity from this budget."
+            },
+            "name": {
+              "type": "string",
+              "description": "Display name of this group or child."
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "description": "Public categories record. Additional compatible projection fields may be present.",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Stable record identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Display name."
+                  },
+                  "group": {
+                    "type": "string",
+                    "description": "Parent category group display name."
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "description": "Parent group identity; parents are not assignable."
+                  },
+                  "target": {
+                    "type": "integer",
+                    "description": "Category target in minor units."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "ISO currency; no conversion."
+                  }
+                },
+                "additionalProperties": true
+              },
+              "description": "Assignable child categories directly under this parent."
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "Public parent or child record in the addressed budget."
+        },
+        "description": "Saved identity for creation, null for a completed move, or the public two-level tree for a read."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": []
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Read again as needed; reads never authorize a later write using an old revision.",
+      "availability": "WHAB 2.65+; older storage falls back to derived nonempty parents for reads."
+    },
+    {
+      "name": "add_category_group",
+      "kind": "command",
+      "summary": "Create a real empty organizational parent group; parents cannot receive transactions or assignments.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Display name of this group or child."
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit category-management operation parameters."
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "name": "Fictional businesses"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Saves only explicit hierarchy metadata and records financial history atomically. Existing parent groups, child identities, targets, balances, assignments and transaction references remain intact. No bank sync is started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict.",
+        "Duplicate group names or destination siblings are refused. Missing parents, child-as-parent and deeper hierarchies are invalid.",
+        "Stale state fails; uncertain writes must not be replayed with a new request identity."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.65+ and a storage adapter implementing CategoryManagement (SQLite 1.18+, JSON 1.10+)."
+    },
+    {
+      "name": "move_category",
+      "kind": "command",
+      "summary": "Move an existing child to an existing parent without changing its ID, currency, target, transactions or monthly assignments.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "parentId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "categoryId",
+          "parentId"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit category-management operation parameters."
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "categoryId": "fictional-child",
+            "parentId": "category-group:fictional"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Saves only explicit hierarchy metadata and records financial history atomically. Existing parent groups, child identities, targets, balances, assignments and transaction references remain intact. No bank sync is started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict.",
+        "Duplicate group names or destination siblings are refused. Missing parents, child-as-parent and deeper hierarchies are invalid.",
+        "Stale state fails; uncertain writes must not be replayed with a new request identity."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.65+ and a storage adapter implementing CategoryManagement (SQLite 1.18+, JSON 1.10+)."
     }
   ]
 }
