@@ -318,6 +318,7 @@ class RemoteSelectionBody(BaseModel):
 
 class RemoteFinishBody(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
+    history: dict | None = None
     operation: str = Field(min_length=1, max_length=200)
     workspace: str
     payload: dict
@@ -505,7 +506,7 @@ class RemoteClientLifecycle:
         with self.operation_scope(), self.tracked.lock:
             ledger = self.runtime._active.services["ledger"]
             normalized = ledger.validate_command(body.operation, body.workspace, body.payload)
-            result = self.tracked.store.finish_original(body.operation, body.workspace, normalized)
+            result = self.tracked.store.finish_original(body.operation, body.workspace, normalized, **({"history": body.history} if body.history is not None else {}))
             ledger.invalidate_revision()
             return result
 

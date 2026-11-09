@@ -42,8 +42,12 @@ def test_targeted_edit_matches_core_without_changing_other_records(store, annota
     count = store.db.total_changes
     assert edit_transaction(store, "personal", annotated_transaction, **changes) is None
     # The addressed annotation and its durable authority generation commit together.
-    assert store.db.total_changes == count + 2
-    assert store.state("personal") == expected
+    actual = store.state('personal')
+    changed_history = actual.get('history') != before.get('history')
+    assert store.db.total_changes == count + 2 + int(changed_history)
+    assert actual['history']['entries'][:len(before['history']['entries'])] == before['history']['entries']
+    expected['history'] = actual['history']
+    assert actual == expected
     assert store.db.execute(
         "SELECT image FROM transaction_receipts WHERE workspace='personal' AND transaction_id=?",
         (annotated_transaction,),
@@ -133,6 +137,7 @@ def test_update_failure_rolls_back_and_keeps_original_transaction(store, annotat
 
 
 def test_edit_uses_one_scoped_update_without_loading_full_state(store, annotated_transaction, monkeypatch):
+    edit_transaction(store, "personal", annotated_transaction, note="Warm history baseline")
     queries = []
     store.db.set_trace_callback(queries.append)
     monkeypatch.setattr(store, "state", lambda *_: pytest.fail("Annotations must not load ledger history"))
@@ -140,6 +145,42 @@ def test_edit_uses_one_scoped_update_without_loading_full_state(store, annotated
     edit_transaction(store, "personal", annotated_transaction, UNSET, True, "Memo")
     store.db.set_trace_callback(None)
     assert sum(query.startswith("UPDATE transactions") for query in queries) == 1
-    assert not any(query.startswith(("INSERT", "DELETE")) for query in queries)
-    assert sum("FROM transactions" in query for query in queries) == 1
+    assert not any(query.startswith(("INSERT", "DELETE")) and "budget_history" not in query for query in queries)
+    assert sum("FROM transactions" in query for query in queries) == 2
     assert queries[0] == "BEGIN IMMEDIATE" and queries[-1] == "COMMIT"
+
+
+def test_history_head_cache_invalidates_external_writes_and_accounts_for_sql_triggers(store, annotated_transaction):
+    edit_transaction(store, 'personal', annotated_transaction, note='Warm baseline')
+    # Direct legacy SQL is outside the commit scope; the next edit must read the
+    # actual state and record the gap before its ordinary reversible entry.
+    store.db.execute('UPDATE transactions SET merchant=? WHERE id=?', ('Fictional external edit', annotated_transaction))
+    edit_transaction(store, 'personal', annotated_transaction, note='After external edit')
+    journal = store.export_budget('personal')['history']
+    assert journal['entries'][-2]['operation'] == 'import_workspace'
+    assert journal['entries'][-1]['changes'][0]['before']['merchant'] == 'Fictional external edit'
+    account = store.accounts('personal')[0]['id']
+    second = store.add_transaction('personal', {'accountId':account,'date':'2026-10-02','merchant':'Fictional second','amount':100,'categoryId':None})
+    store.db.execute("CREATE TRIGGER touch_other AFTER UPDATE OF reviewed ON transactions BEGIN UPDATE transactions SET note='Fictional trigger' WHERE id='" + second + "'; END")
+    edit_transaction(store, 'personal', annotated_transaction, reviewed=True)
+    assert len(store.budget_history('personal', target=store.budget_history('personal')['entries'][0]['id'])['entries'][0]['changes']) == 2
+
+
+def test_history_cache_reloads_after_another_connection_commits(tmp_path):
+    from whab_plugin_sqlite import Store
+    path = tmp_path / 'fictional-cache.sqlite'
+    store = Store(path, month='2026-10')
+    try:
+        account = store.add_account('personal', {'name':'Fictional','type':'depository','balance':1000})
+        transaction = store.add_transaction('personal', {'accountId':account,'date':'2026-10-01','merchant':'Fictional','amount':100,'categoryId':None})
+        edit_transaction(store, 'personal', transaction, note='Warm cache')
+        other = sqlite3.connect(path)
+        try:
+            other.execute('UPDATE transactions SET merchant=? WHERE id=?', ('Fictional second connection', transaction))
+            other.commit()
+        finally:
+            other.close()
+        edit_transaction(store, 'personal', transaction, note='New change')
+        assert store.budget_history('personal')['entries'][1]['operation'] == 'import_workspace'
+    finally:
+        store.close()

@@ -69,3 +69,10 @@ def test_invalid_flag_label_is_rejected_by_offline_argument_validation(label):
     with pytest.raises(SystemExit) as error:
         arguments({"transactionId": "transaction", "categoryId": "groceries"}, "--agent", label)
     assert error.value.code == 2
+
+
+def test_explicit_batch_is_part_of_the_original_guarded_command():
+    args = arguments({'transactionId':'transaction','categoryId':'groceries'}, '--batch','fictional-october','--agent','Codex')
+    _, _, _, kwargs = client.request(args, 'x' * 32)
+    assert kwargs['json']['history'] == {'batchId':'fictional-october'}
+    assert kwargs['json']['payload']['categoryAgent'] == 'Codex'

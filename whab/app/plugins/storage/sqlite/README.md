@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.47 or newer for the public local-authority and
+This version requires WHAB 2.62 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -147,3 +147,9 @@ This self-declared label is separate from import `source` and review state.
 See the [SDK contract](../../../../docs/plugins.md#explicit-categorizing-agents).
 
 An additive nullable `category_agent` column retains labels; legacy native and portable files remain readable, and ordinary writable opens add the column without inferring past attribution. Update the stopped host before opening a candidate against an older schema.
+
+## Financial history
+
+See the [budget history workflow](../../../../docs/usage.md#budget-history).
+This version requires WHAB 2.62+. History is saved atomically with financial
+changes and retained across reopen and exports. Earlier changes are not backfilled.

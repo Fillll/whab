@@ -5,7 +5,7 @@ from whab.plugins import validate_review_batch
 
 
 def review_transactions(store, workspace, transaction_ids, reviewed):
-    with store._authority_write() as transaction:
+    with store._authority_write(workspace=workspace, transaction_ids=transaction_ids) as transaction:
         try:
             store._require_workspace(workspace)
             selected = validate_review_batch(transaction_ids, reviewed)
@@ -40,6 +40,7 @@ def review_transactions(store, workspace, transaction_ids, reviewed):
                 "UPDATE transactions SET reviewed=? WHERE workspace=? AND id IN (" + placeholders + ")",
                 [int(reviewed), workspace, *selected],
             )
+            transaction.update(workspace=workspace, history_operation="review_transactions")
             transaction["dirty"] = True
         except BaseException:
             raise

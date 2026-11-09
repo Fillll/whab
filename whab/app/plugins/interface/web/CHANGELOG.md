@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.46.0 — 2026-11-08
+
+PR: [#169](https://github.com/Fillll/whab/pull/169)
+
+- Add Budget history inside Settings with explicit undo/redo previews, snapshots, actor/batch labels and retained original-request recovery.
+
 ## 1.45.0 — 2026-11-07
 
 PR: [#167](https://github.com/Fillll/whab/pull/167)

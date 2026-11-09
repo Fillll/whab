@@ -239,10 +239,16 @@ class Store(Authority):
                     "provider": row["provider"],
                     **({"syncSettings": json.loads(row["sync_settings"])} if "sync_settings" in row.keys() and row["sync_settings"] is not None else {}),
                 }
+        if self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='budget_history'").fetchone():
+            row = self.db.execute("SELECT record FROM budget_history WHERE workspace=?", (workspace,)).fetchone()
+            if row is not None:
+                state["history"] = json.loads(row[0])
         return state
 
     def _write_state(self, state: dict) -> None:
         workspace = state["_id"]
+        if "history" in state:
+            self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (workspace, json.dumps(state["history"])))
         self.db.execute(
             "INSERT INTO meta(workspace,budget_start_month) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET budget_start_month=excluded.budget_start_month",
             (workspace, state["budgetStartMonth"]),
@@ -356,7 +362,8 @@ class Store(Authority):
         *,
         write_if: Callable[[Any], bool] | None = None,
     ) -> Any:
-        with self._authority_write() as transaction:
+        with self._authority_write(workspace=workspace) as transaction:
+            transaction["workspace"] = workspace
             state = self.state(workspace)
             result = operation(state)
             if write_if is None or write_if(result):
@@ -437,6 +444,8 @@ class Store(Authority):
         templates = build_initial_state("personal", state["budgetStartMonth"])["categories"]
         if state["categories"] and state["categories"] != templates:
             raise StoreError("File imports require untouched template categories.")
+        if state.get("history"):
+            raise StoreError("File imports cannot replace recorded budget history.")
         return None
 
     def preview_workspace_import(self, workspace: str, plugin_id: str, fingerprint: str) -> dict:
@@ -518,9 +527,13 @@ class Store(Authority):
         reuse their validated export snapshot without validating history twice.
         """
         workspace = state["_id"]
+        if self._writing is not None:
+            self._writing["history_restore"] = True
         receipt = self._workspace_import_receipt(state, "portable-budget", "restore")
         if receipt is not None:
             raise StoreError("Portable budgets require an empty personal workspace.")
+        if "history" in restored:
+            state["history"] = restored["history"]
         self.db.execute("DELETE FROM categories WHERE workspace=?", (workspace,))
         state["accounts"] = {
             record["id"]: {
@@ -683,6 +696,7 @@ class Store(Authority):
 
         with self._authority_write() as transaction:
             save(self, workspace, transaction_id, raw)
+            transaction.update(workspace=workspace, history_operation="save_receipt")
             transaction["dirty"] = True
 
     def delete_receipt(self, workspace: str, transaction_id: str) -> None:
@@ -690,6 +704,7 @@ class Store(Authority):
 
         with self._authority_write() as transaction:
             delete(self, workspace, transaction_id)
+            transaction.update(workspace=workspace, history_operation="delete_receipt")
             transaction["dirty"] = True
 
     def transactions(self, workspace: str, month: str | None = None) -> list[dict]:
@@ -962,3 +977,50 @@ class Store(Authority):
             return {kind: len(sync_changes.get(kind, [])) for kind in ("added", "modified", "removed")}
 
         return self._mutate("personal", operation)
+
+    @contextmanager
+    def history_scope(self, metadata):
+        from whab.domain.history import context
+        with self._lock:
+            previous = getattr(self, '_history_context', None)
+            self._history_context = context(metadata)
+            try:
+                yield
+            finally:
+                self._history_context = previous
+
+    def budget_history(self, workspace, limit=50, before=None, target=None, snapshot=False):
+        from whab.domain.history import listing, snapshot_at, validate_history
+        state = self.state(workspace)
+        journal = validate_history(state['history']) if state.get('history') else None
+        if snapshot:
+            if not journal:
+                raise StoreError('This budget has no recorded history yet.')
+            return {'snapshot': snapshot_at(journal, target)}
+        if target is not None:
+            entries = [e for e in (journal['entries'] if journal else []) if e['id'] == target or e['batchId'] == target]
+            if not entries:
+                raise StoreError('History entry or batch not found.')
+            return {'entries': [{k: v for k, v in e.items() if k != 'snapshot'} for e in entries]}
+        return listing(journal, limit=limit, before=before)
+
+    def history_preview(self, workspace, action, target=None):
+        from whab.domain.history import public_preview
+        with self._snapshot():
+            state = self.state(workspace)
+            state['receipts'] = {row[0]: None for row in self.db.execute('SELECT transaction_id FROM transaction_receipts WHERE workspace=?', (workspace,))}
+            return public_preview(state, action, target)
+
+    def history_apply(self, workspace, action, target, fingerprint):
+        from whab.domain.history import apply_request
+        info = {**(getattr(self, '_history_context', None) or {}), 'operation': 'history', 'action': action, 'target': target}
+        with self.history_scope(info):
+            def change(state):
+                state["receipts"] = {row[0]: None for row in self.db.execute("SELECT transaction_id FROM transaction_receipts WHERE workspace=?", (workspace,))}
+                result = apply_request(state, action, target, fingerprint)
+                for table, collection in (('transactions', 'transactions'), ('accounts', 'accounts'), ('categories', 'categories')):
+                    existing = [row[0] for row in self.db.execute(f'SELECT id FROM {table} WHERE workspace=?', (workspace,))]
+                    self.db.executemany(f'DELETE FROM {table} WHERE workspace=? AND id=?', [(workspace, identifier) for identifier in existing if identifier not in state[collection]])
+                self.db.execute('DELETE FROM budget WHERE workspace=?', (workspace,))
+                return result
+            return self._mutate(workspace, change)

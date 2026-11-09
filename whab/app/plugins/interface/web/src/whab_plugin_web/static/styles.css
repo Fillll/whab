@@ -4623,3 +4623,12 @@ main:has(.budget-planner) > .demo-ribbon,
 .subscriptions-workspace { min-width: 0; }
 .subscriptions-workspace .subscription-header { position: sticky; top: 0; padding-top: 0; background: var(--page); z-index: 3; }
 .subscriptions-workspace .subscription-plans-scroll { max-height: min(60vh, 660px); }
+
+/* Financial history reuses the single Settings window and existing type/color tokens. */
+.history-actions {display:flex; flex-wrap:wrap; gap:8px; margin:12px 0;}
+.history-row {padding:16px 0; border-bottom:1px solid var(--line);}
+.history-row > small {display:block; margin-top:5px; color:var(--text-secondary); overflow-wrap:anywhere;}
+.history-change {padding:12px 0; border-bottom:1px solid var(--line); overflow-wrap:anywhere;}
+.history-change-values {display:grid; grid-template-columns:1fr 2fr auto 2fr; gap:8px; margin-top:6px; font-size:12px;}
+.history-change-values > span {min-width:0; overflow-wrap:anywhere;}
+@media(max-width:540px) {.history-change-values {grid-template-columns:1fr auto 1fr;} .history-change-values > span:first-child {grid-column:1/-1; font-weight:600;}}

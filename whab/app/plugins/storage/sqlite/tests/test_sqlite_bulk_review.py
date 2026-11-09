@@ -84,8 +84,12 @@ def test_batch_matches_core_and_preserves_other_fields_scopes_and_images(review_
     changes = store.db.total_changes
     assert store.review_transactions(workspace, collection(selected), reviewed) is None
     # One runtime authority row advances with the selected annotation rows.
-    assert store.db.total_changes == changes + len(selected) + 1
-    assert store.state(workspace) == expected
+    actual = store.state(workspace)
+    changed_history = actual.get('history') != before.get('history')
+    assert store.db.total_changes == changes + len(selected) + 1 + int(changed_history)
+    assert actual['history']['entries'][:len(before['history']['entries'])] == before['history']['entries']
+    expected['history'] = public['history'] = actual['history']
+    assert actual == expected
     assert store.state(other) == unrelated
     assert store.export_budget(workspace) == public
     assert [tuple(row) for row in store.db.execute("SELECT * FROM transaction_receipts ORDER BY workspace,transaction_id")] == images
@@ -171,7 +175,7 @@ def test_sql_update_failure_rolls_back_all_selected_flags(review_ledger):
 
 
 def test_commit_failure_rolls_back_selected_flags(review_ledger):
-    before = review_ledger.db.serialize()
+    before = {name: review_ledger.state(name) for name in ("personal", "demo")}
 
     def authorize(action, operation, _column, _database, _trigger):
         return sqlite3.SQLITE_DENY if action == sqlite3.SQLITE_TRANSACTION and operation == "COMMIT" else sqlite3.SQLITE_OK
@@ -182,10 +186,11 @@ def test_commit_failure_rolls_back_selected_flags(review_ledger):
             review_ledger.review_transactions("personal", ["bulk-0", "bulk-1"], True)
     finally:
         review_ledger.db.set_authorizer(None)
-    assert review_ledger.db.serialize() == before and not review_ledger.db.in_transaction
+    assert {name: review_ledger.state(name) for name in ("personal", "demo")} == before and not review_ledger.db.in_transaction
 
 
 def test_batch_reads_metadata_and_targets_once_and_updates_only_reviewed(review_ledger, monkeypatch):
+    review_ledger.review_transactions("personal", ["bulk-0", "bulk-1"], False)
     for method in ("state", "transactions", "_write_state"):
         monkeypatch.setattr(review_ledger, method, lambda *_: pytest.fail("Batch must not load or rewrite full history"))
     original = bulk_review.validate_review_batch
@@ -200,7 +205,7 @@ def test_batch_reads_metadata_and_targets_once_and_updates_only_reviewed(review_
             return sqlite3.SQLITE_DENY
         if action == sqlite3.SQLITE_UPDATE:
             writes.append((table, column))
-            return sqlite3.SQLITE_OK if (table, column) in {("transactions", "reviewed"), ("storage_authority", "record")} else sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK if (table, column) in {("transactions", "reviewed"), ("budget_history", "record"), ("storage_authority", "record")} else sqlite3.SQLITE_DENY
         return sqlite3.SQLITE_OK
 
     monkeypatch.setattr(bulk_review, "validate_review_batch", validate)
@@ -213,10 +218,10 @@ def test_batch_reads_metadata_and_targets_once_and_updates_only_reviewed(review_
         review_ledger.db.set_authorizer(None)
         review_ledger.db.set_trace_callback(None)
     assert calls == [(["bulk-0", "bulk-1"], True)]
-    assert writes == [("transactions", "reviewed"), ("storage_authority", "record")]
-    assert sum("FROM accounts" in sql for sql in statements) == 1
-    assert sum("FROM categories" in sql for sql in statements) == 1
-    assert sum("FROM transactions" in sql for sql in statements) == 1
+    assert writes == [("transactions", "reviewed"), ("budget_history", "record"), ("storage_authority", "record")]
+    assert sum("FROM accounts" in sql for sql in statements) == 2
+    assert sum("FROM categories" in sql for sql in statements) == 2
+    assert sum("FROM transactions" in sql for sql in statements) == 2
     assert sum(sql.startswith("UPDATE transactions SET reviewed=") for sql in statements) == 1
     assert statements[0] == "BEGIN IMMEDIATE" and statements[-1] == "COMMIT"
     assert [tuple(row) for row in review_ledger.db.execute("SELECT name,sql FROM sqlite_schema WHERE type='index' ORDER BY name")] == indexes
@@ -234,7 +239,9 @@ def test_hundred_distinct_ids_are_supported_without_touching_unselected_rows(rev
     review_ledger.review_transactions("personal", selected, True)
     for key in selected:
         commands.edit_transaction(before, key, reviewed=True)
-    assert review_ledger.state("personal") == before
+    actual = review_ledger.state('personal')
+    before['history'] = actual['history']
+    assert actual == before
 
 
 def test_atomic_batch_matches_separate_core_edits_and_exact_portable_payload(review_ledger, tmp_path):
@@ -247,9 +254,17 @@ def test_atomic_batch_matches_separate_core_edits_and_exact_portable_payload(rev
         for key in selected:
             legacy.edit_transaction("personal", key, reviewed=True)
         review_ledger.review_transactions("personal", selected, True)
-        assert review_ledger.state("personal") == legacy.state("personal")
+        actual, separate = review_ledger.state('personal'), legacy.state('personal')
+        actual_history, separate_history = actual.pop('history'), separate.pop('history')
+        assert actual == separate
+        assert actual_history['entries'][-1]['operation'] == 'review_transactions'
+        assert separate_history['entries'][-1]['operation'] == 'edit_transaction'
         files = review_ledger.export_budget_files()
-        assert files == legacy.export_budget_files()
+        left, left_images = read_files(files, with_receipts=True)
+        right, right_images = read_files(legacy.export_budget_files(), with_receipts=True)
+        left.pop('history')
+        right.pop('history')
+        assert left == right and left_images == right_images
         snapshot, images = read_files(files, with_receipts=True)
         assert snapshot == review_ledger.export_budget()
         assert images == [("bulk-0", png())]

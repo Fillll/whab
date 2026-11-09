@@ -6,7 +6,7 @@ personal and fictional demo workspaces in one versioned JSON data file at
 different files. It uses no database driver or other storage implementation.
 The host supplies financial commands, currency rules and workspace projections.
 
-Install its wheel with a compatible host (WHAB 2.47+ within major 2), then select
+Install its wheel with a compatible host (WHAB 2.62+ within major 2), then select
 `WHAB_STORAGE=json` for a new original runtime or initial CLI budget creation.
 An opened budget chooses its backend through its manifest. Selecting JSON does
 not migrate an existing ledger. JSON belongs to the supported bundled set;
@@ -222,3 +222,9 @@ posting replacements, checkpoints, reopen and portable exports retain it. Manual
 category writes without a label clear it; existing history remains unlabelled.
 This self-declared label is separate from import `source` and review state.
 See the [SDK contract](../../../../docs/plugins.md#explicit-categorizing-agents).
+
+## Financial history
+
+See the [budget history workflow](../../../../docs/usage.md#budget-history).
+This version requires WHAB 2.62+. History is saved atomically with financial
+changes and retained across reopen and exports. Earlier changes are not backfilled.

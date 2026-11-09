@@ -191,7 +191,9 @@ def test_pdf_receipts_use_shared_validation_and_survive_native_reopen(json_store
     before = json_store.export_budget("personal")
     json_store.save_receipt("personal", "import-transaction", document)
     assert json_store.get_receipt("personal", "import-transaction") == document
-    assert json_store.export_budget("personal") == before
+    after = json_store.export_budget("personal")
+    assert after["history"]["entries"][-1]["operation"] == "save_receipt"
+    assert {k:v for k,v in after.items() if k != "history"} == {k:v for k,v in before.items() if k != "history"}
     json_store.close()
     reopened = Store(json_store.path)
     assert reopened.get_receipt("personal", "import-transaction") == document

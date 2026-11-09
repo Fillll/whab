@@ -11,7 +11,7 @@ def edit_transaction(
     store, workspace: str, transaction_id: str, category_id=UNSET,
     reviewed: bool | None = None, note=UNSET, *, details=None,
 ) -> None:
-    with store._authority_write() as write:
+    with store._authority_write(workspace=workspace, transaction_ids=[transaction_id]) as write:
         try:
             if not isinstance(workspace, str) or workspace not in {"demo", "personal"}:
                 raise StoreError("Invalid workspace.")
@@ -71,6 +71,7 @@ def edit_transaction(
                 (transaction["categoryId"], int(transaction["reviewed"]), transaction["note"],
                  int(transaction["isTransfer"]), int(transaction["categoryEdited"]), transaction.get("categoryAgent"), workspace, transaction_id),
             )
+            write.update(workspace=workspace, history_operation="edit_transaction_details" if details is not None else "edit_transaction")
             write["dirty"] = True
         except Exception:
             raise

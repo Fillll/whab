@@ -27,8 +27,10 @@ from whab.plugins.storage_transfer import (
     encode_local_state,
     evidence_record,
     local_state_digest,
+    operation_limit,
     read_evidence,
     read_operation_receipt,
+    read_storage_json,
     receipt_record,
     storage_identifier,
 )
@@ -150,7 +152,14 @@ class Authority:
 
     def execute_operation(self, operation):
         if type(operation) is not StorageOperation:
-            raise StoreError("Durable commands require a validated storage operation.")
+            raise StoreError('Durable commands require a validated storage operation.')
+        if operation.name == 'recorded_command':
+            value = read_storage_json(operation.payload, limit=operation_limit(operation.name))
+            with self.history_scope(value['context']):
+                return self._execute_operation(operation)
+        return self._execute_operation(operation)
+
+    def _execute_operation(self, operation):
         with self._lock:
             self._check_current()
             current = self._evidence(self._data)
@@ -162,6 +171,19 @@ class Authority:
             self._pending = candidate
             try:
                 result = dispatch_storage_operation(self, operation)
+                from whab.domain.history import record_states
+                info = getattr(self, '_history_context', None) or {'actor': 'System', 'actorKind': 'system', 'operation': operation.name}
+                values = read_storage_json(operation.payload, limit=operation_limit(operation.name))
+                name = operation.name
+                if name == 'recorded_command':
+                    name, values = values['operation'], values['parameters']
+                if name == 'history_apply':
+                    info = {**info, 'operation': 'history', 'action': values['action'], 'target': values.get('target')}
+                restored_workspace = candidate.pop("historyRestore", None)
+                for workspace, old in self._data['workspaces'].items():
+                    if workspace != operation.workspace or workspace == restored_workspace:
+                        continue
+                    record_states(old, candidate['workspaces'][workspace], info)
                 candidate["generation"] += 1
                 candidate["operationId"] = operation.operation_id
                 candidate["authority"]["empty"] = False

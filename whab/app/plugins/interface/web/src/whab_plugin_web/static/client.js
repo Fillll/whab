@@ -102,6 +102,10 @@ export async function api(path, body, method = 'POST') {
     },
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error || 'The request could not be completed.');
+  if (!response.ok) {
+    const failure = new Error(result.error || 'The request could not be completed.');
+    failure.code = result.code;
+    throw failure;
+  }
   return result;
 }

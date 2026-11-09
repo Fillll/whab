@@ -106,7 +106,10 @@ def _validate(value):
 
 def command_fingerprint(body):
     """Match the public server's canonical validated command and original CAS."""
-    raw = json.dumps([body["operation"], body["workspace"], body["payload"], body["expected_revision"]],
+    intent = [body["operation"], body["workspace"], body["payload"], body["expected_revision"]]
+    if "history" in body:
+        intent.append(body["history"])
+    raw = json.dumps(intent,
                      sort_keys=True, allow_nan=False).encode("utf-8")
     if len(raw) > 8 * 1024 * 1024:
         invalid()

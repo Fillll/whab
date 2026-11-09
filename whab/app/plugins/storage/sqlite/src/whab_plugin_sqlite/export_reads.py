@@ -7,7 +7,7 @@ from whab.domain.transactions import category_agent_fields
 from whab.plugins import StoreError
 
 
-def snapshot(store, workspace):
+def snapshot(store, workspace, *, transaction_ids=None, include_history=True):
     """Read only public columns atomically; the caller must validate the result."""
     if not isinstance(workspace, str) or workspace not in {"demo", "personal"}:
         raise StoreError("Invalid workspace.")
@@ -32,7 +32,7 @@ def snapshot(store, workspace):
             "category_id AS categoryId,pending,reviewed,source,note,is_transfer AS isTransfer,"
             "inferred_transfer AS inferredTransfer,category_edited AS categoryEdited,deleted "
             + (",original_details " if original_column else "") + (",category_agent " if agent_column else "") +
-            "FROM transactions WHERE workspace=? ORDER BY rowid", (workspace,),
+            "FROM transactions WHERE workspace=? " + ("AND id IN (" + ",".join("?" for _ in transaction_ids) + ") " if transaction_ids is not None else "") + "ORDER BY rowid", (workspace, *(transaction_ids or ())),
         ):
             record = dict(row)
             record.update(category_agent_fields(record.pop("category_agent", None)))
@@ -57,7 +57,13 @@ def snapshot(store, workspace):
                 "SELECT month,currency,mode FROM rollover_modes WHERE workspace=? ORDER BY month,currency",
                 (workspace,),
             )]
+        history = {}
+        if include_history and store.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='budget_history'").fetchone():
+            row = store.db.execute("SELECT record FROM budget_history WHERE workspace=?", (workspace,)).fetchone()
+            if row is not None:
+                history = {'history': json.loads(row[0])}
         return {
+            **history,
             "formatVersion": 1, "budgetStartMonth": meta["budget_start_month"],
             "accounts": accounts, "categories": categories, "transactions": transactions,
             "assignments": [

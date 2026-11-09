@@ -261,7 +261,11 @@ def test_one_tracked_batch_checkpoints_once_and_reopens_all_flags(tracked_review
     for row in expected["transactions"]:
         if row["id"] in identifiers[:2]:
             row["reviewed"] = True
-    assert backend.export_budget() == decode_budget(session.path.read_bytes())[1] == expected
+    saved = backend.export_budget()
+    assert saved == decode_budget(session.path.read_bytes())[1]
+    assert saved['history']['entries'][:-1] == before['history']['entries']
+    expected['history'] = saved['history']
+    assert saved == expected
 
 
 def test_pending_checkpoint_keeps_receipt_and_retry_does_not_repeat_write(tracked_review, monkeypatch):

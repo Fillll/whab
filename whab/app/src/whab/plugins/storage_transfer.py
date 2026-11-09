@@ -32,13 +32,15 @@ MAX_BULK_OPERATION_BYTES = 72 * 1024 * 1024
 MAX_OPERATION_RECEIPTS = 4096
 STORAGE_ROLES = frozenset({"primary", "staged", "copy", "fenced", "retired"})
 STORAGE_OPERATIONS = frozenset({
-    "add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details",
+    "add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details", "recorded_command", "history_apply",
     "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "save_item",
     "set_item_status", "disconnect_item", "configure_bank_sync", "apply_sync", "import_workspace", "restore_budget",
     "save_receipt", "delete_receipt", "restore_budget_files", "prepare_budget_files",
 })
-_BULK_OPERATIONS = frozenset({"restore_budget", "restore_budget_files", "prepare_budget_files", "import_workspace"})
+_BULK_OPERATIONS = frozenset({"recorded_command", "restore_budget", "restore_budget_files", "prepare_budget_files", "import_workspace"})
 _OPERATION_FIELDS = {
+    "recorded_command": ({"operation", "parameters", "context"}, set()),
+    "history_apply": ({"action", "target", "fingerprint"}, set()),
     "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype"}),
     "update_account": ({"accountId"}, {"type", "onBudget", "subtype", "name", "bankWebsite", "currency"}),
     "add_category": ({"name", "target"}, {"group", "parentId", "currency"}),
@@ -372,6 +374,16 @@ def dispatch_storage_operation(backend, operation):
         _invalid()
     name, workspace = operation.name, operation.workspace
     payload = read_storage_json(operation.payload, limit=operation_limit(operation.name))
+    if name == "recorded_command":
+        from whab.domain.history import context
+        inner = payload['operation']
+        if inner not in STORAGE_OPERATIONS - {'recorded_command'}:
+            raise StoreError('Invalid recorded command.')
+        context(payload['context'])
+        nested = StorageOperation(operation.operation_id, operation.authority_epoch, operation.expected_generation, workspace, inner, canonical_storage_json(payload['parameters'], limit=operation_limit(inner)))
+        return dispatch_storage_operation(backend, nested)
+    if name == "history_apply":
+        return backend.history_apply(workspace, payload['action'], payload['target'], payload['fingerprint'])
     if name in {"add_account", "add_category"}:
         return getattr(backend, name)(workspace, payload)
     if name == "add_transaction":

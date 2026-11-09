@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.0 — 2026-11-08
+
+PR: [#169](https://github.com/Fillll/whab/pull/169)
+
+- Save append-only financial history in the same atomic JSON publication as each change, including explicit actors/batches, guarded replay and preservation across reopen and exports.
+
 ## 1.7.0 — 2026-11-07
 
 PR: [#167](https://github.com/Fillll/whab/pull/167)

@@ -75,6 +75,8 @@ def portable_snapshot(state, *, validate=True):
             for month, rows in state.get("rolloverModes", {}).items() for currency, mode in rows.items()
         ],
     }
+    if "history" in state:
+        snapshot["history"] = state["history"]
     return validate_portable_budget(snapshot) if validate else snapshot
 
 
@@ -82,7 +84,7 @@ def require_pristine(state):
     """A transfer may replace untouched templates, never saved user/provider data."""
     if any(state.get(key) for key in (
         "accounts", "transactions", "budget", "futureFunding", "rolloverModes", "items",
-        "receipts", "importReceipt",
+        "receipts", "importReceipt", "history",
     )):
         raise StoreError("Restoration requires an empty personal workspace.")
     template = initial_state("personal", state["budgetStartMonth"])["categories"]
@@ -93,6 +95,8 @@ def require_pristine(state):
 def restore_snapshot(state, snapshot, *, mark_external_stale=True):
     """Populate plain state from validated neutral records, with independent maps."""
     restored = validate_portable_budget(snapshot)
+    if "history" in restored:
+        state["history"] = restored["history"]
     state["budgetStartMonth"] = restored["budgetStartMonth"]
     state["accounts"] = {
         record["id"]: {

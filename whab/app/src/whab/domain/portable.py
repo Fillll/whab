@@ -83,13 +83,17 @@ def validate_portable_budget(data: object) -> dict:
     """Validate exact JSON records and references, returning independent copies."""
     if (
         type(data) is not dict or not _ROOT_FIELDS <= data.keys()
-        or not data.keys() <= _ROOT_FIELDS | {"futureFunding", "rolloverModes"}
+        or not data.keys() <= _ROOT_FIELDS | {"futureFunding", "rolloverModes", "history"}
     ):
         raise StoreError("Invalid portable budget fields.")
     if type(data["formatVersion"]) is not int or data["formatVersion"] != 1:
         raise StoreError("Unsupported portable budget version.")
     _text(data["budgetStartMonth"], limit=7)
     validate_month(data["budgetStartMonth"])
+    history = None
+    if "history" in data:
+        from .history import validate_history
+        history = validate_history(data["history"])
     accounts = _records(
         data["accounts"], _LEGACY_ACCOUNT_FIELDS, 1000,
         optional=frozenset({"onBudget", "subtype", "bankWebsite", "nameOverridden"}),
@@ -222,6 +226,7 @@ def validate_portable_budget(data: object) -> dict:
             raise StoreError("Duplicate portable rollover mode.")
         mode_keys.add(key)
     return {
+        **({"history": history} if history is not None else {}),
         "formatVersion": 1,
         "budgetStartMonth": data["budgetStartMonth"],
         "accounts": accounts,

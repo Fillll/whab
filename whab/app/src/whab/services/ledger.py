@@ -185,8 +185,25 @@ class LedgerService:
         if month is not None:
             _month(month)
         with self._lock:
-            if parameters is not None and operation != "feature":
+            if parameters is not None and operation not in {"feature", "history", "history_preview"}:
                 raise StoreError("Only feature queries accept parameters.")
+            if operation in {'history', 'history_preview'}:
+                from whab.domain.history import label
+                values = parameters or {}
+                allowed = {'limit', 'before', 'target', 'snapshot'} if operation == 'history' else {'action', 'target'}
+                if type(values) is not dict or values.keys() - allowed:
+                    raise StoreError('Invalid history query fields.')
+                for key in ('before', 'target'):
+                    if key in values:
+                        label(values[key], nullable=True, limit=200)
+                if 'snapshot' in values and type(values['snapshot']) is not bool:
+                    raise StoreError('Invalid history snapshot flag.')
+                callback = getattr(self._store, 'budget_history' if operation == 'history' else 'history_preview', None)
+                if not callable(callback):
+                    raise StoreError('Update the storage plugin to use budget history.')
+                if operation == 'history_preview' and values.get('action') not in {'undo', 'redo', 'restore', 'snapshot'}:
+                    raise StoreError('Choose undo, redo, restore or snapshot.')
+                return {'revision': self._revision, 'data': _public(callback(workspace, **values))}
             if operation == "describe":
                 remote = getattr(self._store, "describe_operations", None)
                 if callable(remote):
@@ -247,6 +264,15 @@ class LedgerService:
         if (type(payload) is not dict or not set(schema["required"]) <= payload.keys()
                 or payload.keys() - schema["properties"].keys()):
             raise StoreError("Invalid ledger command fields.")
+        if operation == 'history_apply':
+            from whab.domain.history import label
+            if payload.get('action') not in {'undo', 'redo', 'restore', 'snapshot'}:
+                raise StoreError('Choose undo, redo, restore or snapshot.')
+            label(payload.get('target'), nullable=payload['action'] == 'snapshot', limit=200)
+            fingerprint = payload.get('fingerprint')
+            if type(fingerprint) is not str or len(fingerprint) != 64 or any(c not in '0123456789abcdef' for c in fingerprint):
+                raise StoreError('Use the fingerprint from a history preview.')
+            return deepcopy(payload)
         if operation == "categorization":
             if type(payload["action"]) is not str or payload["action"] not in {"status", "suggest", "preview", "train", "step", "cancel", "select", "delete", "rename", "dismiss"}:
                 raise StoreError("Unknown categorization action.")
@@ -324,14 +350,23 @@ class LedgerService:
 
     def command(
         self, operation: str, workspace: str, payload: dict, *,
-        request_id: str, expected_revision: str,
+        request_id: str, expected_revision: str, history: dict | None = None,
     ) -> dict:
         self._workspace(workspace)
         _identifier(request_id)
         _identifier(expected_revision)
         payload = self._validate(operation, payload)
+        from whab.domain.history import context
+        if history is not None and (type(history) is not dict or history.keys() - {'actor', 'actorKind', 'batchId'}):
+            raise StoreError('Invalid history context fields.')
+        info = context({**({'actor': payload['categoryAgent'], 'actorKind': 'agent'} if payload.get('categoryAgent') else {}),
+                        **(history or {}), 'operation': operation, 'requestId': request_id,
+                        **({'action': payload['action'], 'target': payload.get('target')} if operation == 'history_apply' else {})})
+        intent = [operation, workspace, payload, expected_revision]
+        if history is not None:
+            intent.append(history)
         fingerprint = sha256(dumps(
-            [operation, workspace, payload, expected_revision], sort_keys=True,
+            intent, sort_keys=True,
         ).encode()).hexdigest()
         with self._lock:
             if request_id in self._receipts:
@@ -350,8 +385,17 @@ class LedgerService:
             durable_scope = getattr(self._store, "durable_command_scope", None)
             scope = (durable_scope(request_id, fingerprint, response_revision)
                      if operation not in {"categorization", "feature"} and callable(durable_scope) else nullcontext())
-            with scope:
-                if operation == "feature":
+            history_scope = getattr(self._store, 'history_scope', None)
+            recorded = history_scope(info) if callable(history_scope) and operation not in {'feature', 'categorization'} else nullcontext()
+            if history is not None and not callable(history_scope):
+                raise StoreError('Update the storage plugin to record labelled budget history.')
+            with scope, recorded:
+                if operation == 'history_apply':
+                    apply = getattr(self._store, 'history_apply', None)
+                    if not callable(apply):
+                        raise StoreError('Update the storage plugin to use budget history.')
+                    data = apply(workspace, payload['action'], payload.get('target'), payload['fingerprint'])
+                elif operation == "feature":
                     data = _public(self._feature(workspace, payload, command=True))
                 elif operation == "categorization":
                     if self.categorization is not None:

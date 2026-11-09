@@ -103,7 +103,7 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     text = response.text
     settings = dialog(text, "settings-home")
     assert re.findall(r'data-dialog="([^"]+)"', settings) == [
-        "budgets-dialog", "plugins-dialog", "about-dialog",
+        "budgets-dialog", "plugins-dialog", "budget-history-page", "about-dialog",
     ]
     assert f"Current budget · {label}" in settings
     budgets = dialog(text, "budgets-dialog")

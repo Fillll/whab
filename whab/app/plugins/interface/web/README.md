@@ -1,6 +1,6 @@
 # Web interface plugin
 
-Distributed independently as `whab_plugin_web`. Bounded register and account metadata reads require WHAB 2.14 or newer. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_web`; this version requires WHAB 2.62+. Bounded register and account metadata reads require WHAB 2.14 or newer. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
 `src/whab_plugin_web/` owns the bundled visual descriptor, view models, icons, Jinja templates and browser assets. Keep rendering and presentation tests alongside them in this folder. The host owns HTTPS routes and access guards through the public UI contract. Every request requires TLS; ordinary visual/private routes remain loopback-only, with only bearer-authorized remote protocol and verified bank-webhook routes exempt from local Host/origin checks.
 
@@ -225,3 +225,9 @@ selected account, currency, search and review filter. The button displays **All*
 and remains selected after refresh or fragment navigation; legacy `all_dates`
 bookmarks show the same label. Custom dates still support independently open
 bounds. This changes the visible shortcut, not financial or storage rules.
+
+## Financial history
+
+See the [budget history workflow](../../../../docs/usage.md#budget-history).
+This version requires WHAB 2.62+. History is saved atomically with financial
+changes and retained across reopen and exports. Earlier changes are not backfilled.

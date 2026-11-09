@@ -38,7 +38,10 @@ def test_receipt_upload_view_replace_and_delete_are_local_and_do_not_change_ledg
         assert image.headers["cache-control"] == "no-store"
         assert image.headers["x-content-type-options"] == "nosniff"
         assert "sandbox" in image.headers["content-security-policy"]
-        assert store.export_budget() == before
+        after = store.export_budget()
+        assert {k:v for k,v in after.items() if k != 'history'} == {k:v for k,v in before.items() if k != 'history'}
+        assert after['history']['entries'][:-1] == before['history']['entries']
+        assert after['history']['entries'][-1]['operation'] == 'save_receipt'
         assert client.put(endpoint, content=png(2, 1), headers={"content-type": "image/png"}).status_code == 200
         assert client.get(endpoint).content == png(2, 1)
         assert client.get(endpoint.replace("personal", "demo")).status_code == 400
@@ -138,7 +141,10 @@ def test_pdf_upload_round_trip_and_export_preserve_documents_and_ledger(store, t
         assert saved.headers["content-disposition"] == 'inline; filename="receipt.pdf"'
         assert saved.headers["cache-control"] == "no-store" and saved.headers["x-content-type-options"] == "nosniff"
         assert "sandbox" in saved.headers["content-security-policy"]
-        assert store.export_budget() == before
+        after = store.export_budget()
+        assert {k:v for k,v in after.items() if k != 'history'} == {k:v for k,v in before.items() if k != 'history'}
+        assert after['history']['entries'][:-1] == before['history']['entries']
+        assert after['history']['entries'][-1]['operation'] == 'save_receipt'
         container = decode_container(client.get("/api/budget/export?workspace=personal").content)
         _, receipts = read_files({name.removeprefix("plugins/sqlite/"): raw for name, raw in container.files.items()}, with_receipts=True)
         assert receipts == [(key, document)]
