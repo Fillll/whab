@@ -52,6 +52,15 @@ def test_local_profiles_resolve_relative_home_and_select_environment(tmp_path):
     assert connection_defaults([str(path)])[1] == {"home": str(tmp_path / "runtime"), "budget": "default", "environment": "production"}
 
 
+def test_local_history_parameters_reach_the_public_query_body(local_transport, capsys):
+    calls, _, _ = local_transport
+    assert client.main(['--home', '/fictional/runtime', 'query', 'history', '--parameters', '{"limit":1}']) == 0
+    capsys.readouterr()
+    assert calls[-1].method == 'POST'
+    assert calls[-1].url.path == '/budgets/default/api/local/v1/queries'
+    assert json.loads(calls[-1].content)['parameters'] == {'limit': 1}
+
+
 @pytest.mark.parametrize("values", [{"home": "runtime", "url": "https://localhost"}, {"environment": "typo"}])
 def test_invalid_local_profile_is_rejected_before_help(tmp_path, capsys, values):
     path = tmp_path / "local.budget"

@@ -2660,15 +2660,16 @@
             "type": "integer",
             "description": "Page size, 1\u2013100.",
             "minimum": 1,
-            "maximum": 100
+            "maximum": 100,
+            "default": 50
           },
           "before": {
             "type": "string",
-            "description": "Earlier-than entry cursor."
+            "description": "Exact data.next cursor from the preceding page; omit to start with newest entries. Stop when next is null."
           },
           "target": {
             "type": "string",
-            "description": "Entry or batch ID to inspect."
+            "description": "Entry/batch ID from history; baseline is accepted only with snapshot:true."
           },
           "snapshot": {
             "type": "boolean",
@@ -2680,19 +2681,25 @@
       },
       "output": {
         "type": "object",
-        "description": "History metadata, changes/preview fingerprint, historical snapshot or action result."
+        "description": "List returns total, entries (newest first) and next (cursor or null). target returns entries with changes; snapshot:true returns the historical financial state in data.snapshot, not a .whab backup."
       },
       "examples": [
         {
-          "input": {},
-          "output": {}
+          "input": {
+            "limit": 10
+          },
+          "output": {
+            "total": 0,
+            "entries": [],
+            "next": null
+          }
         }
       ],
       "side_effects": "Read only; excludes credentials, provider cursors and attachment bytes.",
       "errors": [
         "Unavailable history storage, invalid/stale preview, missing/ambiguous target or conflicting later edits fail explicitly."
       ],
-      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "retry": "Read again as needed. Use the returned revision only for a decision based on this read.",
       "availability": "WHAB 2.62+ and a BudgetHistoryStorage adapter. History starts with a baseline; earlier edits are not reconstructed."
     },
     {
@@ -2730,21 +2737,27 @@
       },
       "output": {
         "type": "object",
-        "description": "History metadata, changes/preview fingerprint, historical snapshot or action result."
+        "description": "Read-only preview with action, target, changes and fingerprint. Review all changes; the exact fingerprint and enclosing revision authorize history_apply. Preview success has not committed."
       },
       "examples": [
         {
           "input": {
-            "action": "snapshot"
+            "action": "snapshot",
+            "target": null
           },
-          "output": {}
+          "output": {
+            "action": "snapshot",
+            "target": null,
+            "changes": [],
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
         }
       ],
       "side_effects": "Read only; excludes credentials, provider cursors and attachment bytes.",
       "errors": [
         "Unavailable history storage, invalid/stale preview, missing/ambiguous target or conflicting later edits fail explicitly."
       ],
-      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "retry": "Read again as needed. If state changes, obtain and review a new preview before applying a new decision.",
       "availability": "WHAB 2.62+ and a BudgetHistoryStorage adapter. History starts with a baseline; earlier edits are not reconstructed."
     },
     {
@@ -2789,7 +2802,7 @@
       },
       "output": {
         "type": "object",
-        "description": "History metadata, changes/preview fingerprint, historical snapshot or action result."
+        "description": "Committed action, target and changeCount in data; enclosing revision is the new concurrency guard. The action is recorded as a new permanent event and does not delete prior history."
       },
       "examples": [
         {
@@ -2797,7 +2810,11 @@
             "action": "snapshot",
             "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
           },
-          "output": {}
+          "output": {
+            "action": "snapshot",
+            "target": null,
+            "changeCount": 0
+          }
         }
       ],
       "side_effects": "One atomic financial change with append-only history. Conflicting later edits and provider/import barriers reject before committing. External bank operations are never replayed.",

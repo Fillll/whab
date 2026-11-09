@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_cli"
-version = "2.7.0"
+version = "2.7.1"
 description = "Machine-usable command line interface for WHAB"
 readme = "README.md"
 requires-python = ">=3.14"

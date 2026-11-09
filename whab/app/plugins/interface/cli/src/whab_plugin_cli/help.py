@@ -1,10 +1,44 @@
 """Human-readable and machine-readable help from packaged operation contracts."""
 
 import json
+import shlex
 
 from whab.plugins.documentation import installed_catalog, operation
 
 from .identifiers import catalog_identifiers, cli_id, host_id
+
+AGENT_WORKFLOW = """Agent workflow (examples use fictional names/IDs):
+  whab budget list
+  whab "My budget" trnx uncategorized --month 2026-11 --format table
+  whab "My budget" trnx categories
+  whab "My budget" trnx categorize TRANSACTION_ID --category "Food / Groceries" --agent Codex --needs-review --batch UNIQUE_RUN_ID
+  whab "My budget" history list
+
+Read transactions and categories before deciding; leave ambiguous payees uncategorized.
+Use an explicit --agent LABEL for agent category edits. --batch groups history;
+separate CLI calls are separate atomic commits. Verify the returned budget and changes.
+Amounts are integer currency minor units (USD 1234 = $12.34); never combine currencies.
+Revision is an opaque concurrency guard, not a historical version number. Advanced
+writes require the revision used for the decision and a unique --request-id.
+For an uncertain write, inspect the budget; preserve ALL original arguments, revision
+and request ID for an exact retry. Never create a new intent just to retry.
+
+Discovery:
+  whab BUDGET --help                     name-addressed local commands
+  whab BUDGET bank --help                mappings, schedules and investments
+  whab BUDGET history --help             checkpoints and previewed undo/redo
+  whab api command edit_transaction --help
+  whab api describe --offline --json     installed schemas; no connection needed
+  whab api --budget BUDGET_ID query describe
+  whab api --budget BUDGET_ID query features
+Advanced whab api is a supported CLI interface. Use permanent IDs from budget list,
+not browser slugs. Offline documentation does not prove a plugin is enabled;
+query describe/features checks the addressed running budget. Local/SDK entries
+describe access boundaries; they are not arbitrary executable command names.
+Production is the default. Use --environment sandbox for experiments.
+JSON is the authoritative output; tables are for display. Success exits 0;
+a successful preview has not committed. Failures use stderr (exit 1), usage errors 2.
+See the CLI README's Agent workflow for scope, retry and recovery details."""
 
 
 def describe(catalog, *, plugin=None, kind=None, name=None):
@@ -30,9 +64,13 @@ def _fields(schema, prefix=""):
     required = set(schema.get("required", ()))
     for name, field in schema.get("properties", {}).items():
         kind = field.get("type", "SDK value")
+        if isinstance(kind, list):
+            kind = " | ".join(kind)
         values = f'; choices: {json.dumps(field["enum"])}' if "enum" in field else ""
         default = f'; default: {json.dumps(field["default"])}' if "default" in field else ""
-        lines.append(f'  {prefix}{name} ({kind}, {"required" if name in required else "optional"}{values}{default}): {field["description"]}')
+        constraints = ''.join(f'; {key}: {json.dumps(field[key])}' for key in
+                              ('const', 'minimum', 'maximum', 'minLength', 'maxLength', 'minItems', 'maxItems', 'pattern', 'format') if key in field)
+        lines.append(f'  {prefix}{name} ({kind}, {"required" if name in required else "optional"}{values}{default}{constraints}): {field["description"]}')
         lines.extend(_fields(field, prefix + name + "."))
     items = schema.get("items")
     if isinstance(items, dict):
@@ -40,8 +78,29 @@ def _fields(schema, prefix=""):
     return lines
 
 
-def render_operation(row):
-    lines = [f'{row["kind"]} {row["name"]}', row["summary"], "", "Input fields:"]
+def invocation(row, plugin):
+    """Only render routes supported by the public CLI adapter."""
+    kind, name = row['kind'], row['name']
+    if kind in {'query', 'command'} and (plugin == 'core' or name.startswith('categorization.')):
+        route = f'{kind} ' + ('categorization' if name.startswith('categorization.') else name)
+    elif kind in {'feature-query', 'feature-command'}:
+        route = f'{kind} {cli_id(plugin)} {name}'
+    else:
+        return 'CLI access: use the documented local workflow or SDK integration below; this entry is not a generic CLI operation.'
+    example = row['examples'][0]['input']
+    parameters = shlex.quote(json.dumps(example, separators=(',', ':')))
+    arguments = f' --parameters {parameters}'
+    if kind == 'query' and name not in {'feature', 'history', 'history_preview'}:
+        arguments = f' --month {shlex.quote(example["month"])}' if 'month' in example else ''
+    guard = ' --revision OBSERVED_REVISION --request-id UNIQUE_INTENT_ID' if kind in {'command', 'feature-command'} else ''
+    return (f'CLI template (replace fictional IDs/values; examples are not observed state):\n'
+            f'  whab api --budget BUDGET_ID {route}{arguments}{guard}\n'
+            'Output examples describe data inside the budgetId/revision/data response envelope.\n'
+            'Use describe --json for full schemas, including conditional requirements.')
+
+
+def render_operation(row, plugin='core'):
+    lines = [f'{row["kind"]} {row["name"]}', row["summary"], "", invocation(row, plugin), "", "Input fields:"]
     lines.extend(_fields(row["input"]))
     if not row["input"].get("properties"):
         lines.append("  No operation-specific fields.")
@@ -73,7 +132,7 @@ def render_catalog(catalog):
         if document["delegates"]:
             lines.append("Delegates: " + ", ".join(document["delegates"]))
         for row in document["operations"]:
-            lines += ["", render_operation(row)]
+            lines += ["", render_operation(row, document['plugin_id'])]
     if "http" in catalog:
         lines += ["", "HTTP API (running authority)", catalog["http"]["access"]]
         for path, methods in catalog["http"]["openapi"].get("paths", {}).items():
@@ -133,5 +192,5 @@ def contextual_help(argv, catalog=None):
             plugin, name = argv[index + 1:index + 3]
             document = next((row["documentation"] for row in catalog["plugins"] if row["id"] == host_id(plugin)), None)
             row = operation(document, token, name) if document else None
-            return render_operation(row) if row else "No installed documentation for that operation. Use an authenticated describe --json against its authority."
+            return render_operation(row, plugin) if row else "No installed documentation for that operation. Use an authenticated describe --json against its authority."
     return overview(catalog)

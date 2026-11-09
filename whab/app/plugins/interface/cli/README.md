@@ -1,5 +1,79 @@
 # Command line interface
 
+## Agent workflow
+
+Start with `whab --help`, then `whab budget list`. `whab` is the preferred
+name-addressed local console; `whab api` exposes the supported advanced commands
+using the same local connection. `whab-cli` also supports remote JSON profiles.
+These are CLI commands: an agent does not need to construct HTTP requests, read
+private runtime files or edit SQLite. Built-in AI plugins are optional.
+
+Check the runtime home and environment before working. Production is the default;
+use `--environment sandbox` for experiments. The local console uses the personal
+workspace. Advanced queries support an explicit `--workspace`; never mix demo and
+personal results. Discover permanent budget IDs with `budget list`; browser slugs
+and account names are not advanced `--budget` identifiers. `default` means the
+runtime's original default budget, not whichever budget is open in a browser.
+
+```sh
+whab --help
+whab budget list
+whab "My budget" --help
+whab "My budget" trnx uncategorized --month 2026-11 --format table
+whab "My budget" trnx categories
+whab "My budget" trnx categorize TRANSACTION_ID --category "Food / Groceries" --agent Codex --needs-review --batch UNIQUE_RUN_ID
+whab "My budget" history list
+```
+
+Replace fictional names, IDs and values with observed results. Read transactions
+and category definitions before deciding. Unclear payees should stay uncategorized;
+uncategorized reads can include transfers, pending entries, inflows and off-budget
+accounts unless filtered. Include an explicit `--agent LABEL` for agent category
+changes; the CLI never assumes every caller is an agent. `--needs-review` leaves
+the result visible for review. Each CLI edit commits atomically; `--batch` groups
+history entries and does not turn separate invocations into one transaction.
+Verify the returned budget identity and saved transactions after editing.
+
+Amounts are integer minor units of each currency (USD 1234 is $12.34; JPY 1234 is
+¥1234). Never sum unlike currencies. Liability balances use a positive amount owed.
+Account `type` and `onBudget` scope are separate; use account-classification help
+before changing either. Investment reports preserve missing values as null; reported
+cost basis and unrealized gain do not establish realized or total returns.
+
+For advanced writes, the revision is an opaque concurrency guard from the read
+used to make the decision, not a history version number. Generate a unique request
+ID for each new intent. After a stale-state conflict, read and reconsider. After
+an uncertain write, inspect the saved result and retain **all** original parameters,
+revision, request ID and actor/batch metadata for an exact retry. Do not automatically
+retry with a fresh revision or new request ID. Request receipts have a bounded
+lifetime; permanent history has a separate retention contract.
+
+Discover capabilities before using them:
+
+```sh
+whab api command edit_transaction --help
+whab api describe --offline --json
+whab api describe --plugin core --operation history --help
+whab api --budget BUDGET_ID query describe
+whab api --budget BUDGET_ID query features
+```
+
+Help and offline discovery need no credentials, profile or running server. They
+describe installed packages; plugin enablement can be unknown. `query describe`
+and `query features` read the running addressed budget. `describe` without a remote
+URL remains offline even when `whab api` supplies a local home. `local` and `sdk`
+documentation entries describe their own access boundaries; they are not arbitrary
+names accepted by `command`. Delegated `categorization.ACTION` entries use
+`command categorization`, while feature operations use `feature-query` or
+`feature-command`. If no documented command supports a task, report the gap.
+
+Success uses stdout, usually a JSON envelope with `budgetId`, `revision` and `data`;
+discovery and management responses have their documented shapes. Human tables may
+shorten text; use JSON for decisions. A preview also exits 0 and has not committed.
+Operational failures print JSON to stderr and exit 1; argument usage errors exit 2.
+Keep access tokens in the named environment variable, and preserve HTTPS certificate
+verification. Read the sections below for profile precedence and remote access.
+
 ## Simple console
 
 `whab` provides name-addressed local commands. **Production is the default** for
@@ -420,3 +494,41 @@ Use `bank schedule plaid --every-hours 1`, `--every-hours 3`, `--every-hours 6`,
 See the [budget history workflow](../../../../docs/usage.md#budget-history).
 This version requires WHAB 2.62+. History is saved atomically with financial
 changes and retained across reopen and exports. Earlier changes are not backfilled.
+
+```sh
+whab "My budget" history --help
+whab "My budget" history list --limit 50
+whab "My budget" history list --before NEXT_CURSOR
+whab "My budget" history show ENTRY_OR_BATCH_ID
+whab "My budget" history export baseline
+whab "My budget" history snapshot --agent Codex
+whab "My budget" history undo ENTRY_OR_BATCH_ID
+whab "My budget" history undo ENTRY_OR_BATCH_ID --apply REVIEWED_FINGERPRINT --agent Codex
+```
+
+List page sizes are 1–100 (default 50); pass the exact preceding `data.next` cursor
+to `--before` until it is null. `show` accepts an entry or batch ID. `export`
+returns the historical financial state in JSON `data.snapshot`; it is not a `.whab`
+backup and excludes credentials, provider cursors and attachment bytes. `baseline`
+is accepted by export and restore. `snapshot` writes a checkpoint immediately.
+
+Undo, redo and restore preview by default. Inspect `data.changes`, then repeat the
+same action and target with `--apply` set to the exact `data.fingerprint`. Stale
+previews, conflicting later edits and provider/import/attachment barriers fail
+without partially applying the action. Later financial dependencies can block
+reversal; annotation-only reversal can preserve disjoint later edits. External bank
+operations are never replayed. Restore reverses to a financial snapshot as a new
+recorded event, rather than deleting history.
+
+After an uncertain apply, inspect history before retrying. Use the reported
+`expectedRevision`, `requestId` and `fingerprint` as `--revision`, `--request-id`
+and `--apply`, retaining the same action, target and agent label. This also applies
+to retrying a snapshot. The advanced equivalent accepts query parameters:
+
+```sh
+whab api --budget BUDGET_ID query history --parameters '{"limit":10}'
+whab api --budget BUDGET_ID query history_preview --parameters '{"action":"undo","target":"ENTRY_OR_BATCH_ID"}'
+```
+
+`--parameters` accepts a JSON object or `-` for stdin, at most 1 MiB. Do not combine
+it with `--month`; put an operation's supported fields in the JSON object.
