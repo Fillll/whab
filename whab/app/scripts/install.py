@@ -1,4 +1,4 @@
-"""Install the source host and maintained plugins together without index lookups for plugins."""
+"""Install the source host and maintained plugins using Python 3.15.x only."""
 
 import argparse
 import importlib.metadata as metadata
@@ -70,6 +70,8 @@ def main():
     parser.add_argument("--example", action="store_true", help="Also install teaching example plugins.")
     parser.add_argument("--runtime-fixtures", action="store_true", help="Include development tools and explicit reviewed peers required by native conformance tests.")
     args = parser.parse_args()
+    if sys.version_info[:2] != (3, 15):
+        parser.error("Python 3.15.x is required. Recreate .venv with python3.15 -m venv .venv, then rerun this installer.")
     development = args.dev or args.runtime_fixtures
     legacy_plugins = installed_legacy_plugins()
     include_examples = args.example or "whab-example-plugin" in legacy_plugins

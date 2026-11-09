@@ -38,7 +38,7 @@ def test_oldest_host_uses_unmodified_backend_from_same_pinned_commit(checker, tm
     assert (reference / "pyproject.toml").read_bytes() == original
 
 
-@pytest.mark.parametrize("dependency", ["whab>=3", "whab>=2; python_version < '3.14'", "whab[extra]>=2", "whab @ https://example.invalid/host.whl", "unrelated>=1"])
+@pytest.mark.parametrize("dependency", ["whab>=3", "whab>=2; python_version < '3.15'", "whab[extra]>=2", "whab @ https://example.invalid/host.whl", "unrelated>=1"])
 def test_invalid_reference_cannot_weaken_actual_host_compatibility(checker, tmp_path, dependency):
     current = project(tmp_path / "current", "1.10.0", dependency)
     with pytest.raises(ValueError, match="reference backend"):

@@ -16,10 +16,10 @@ REPOSITORY = "Fillll/whab"
 PREFIX = f"/repos/{REPOSITORY}"
 VERSION = r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
 CERTIFICATION_JOBS = {
-    "Certification (Python 3.14)", "Certification (Python 3.15)",
+    "Certification (Python 3.15)",
     "Reusable external plugin workflow / contracts", "macOS launcher certification",
 }
-CI_CHECKS = {"CI (Python 3.14)", "CI (Python 3.15)"}
+CI_CHECKS = {"CI (Python 3.15)"}
 PUBLISH_JOB = "Publish certified stable release"
 
 

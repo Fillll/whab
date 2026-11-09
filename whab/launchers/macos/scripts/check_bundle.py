@@ -71,7 +71,7 @@ class BundleCheck:
         directory = directory.resolve()
         self.bundle = bundle
         self.resources = bundle / "Contents/Resources"
-        self.python = self.resources / "python/bin/python3.14"
+        self.python = self.resources / "python/bin/python3.15"
         self.root = directory / "launcher"
         self.runtime = directory / "runtime"
         self.storage = storage
@@ -242,7 +242,7 @@ def main():
     args = parser.parse_args()
     bundle = args.bundle.expanduser().resolve()
     require(bundle.suffix == ".app" and bundle.is_dir(), "--bundle must name an existing WHAB.app directory.")
-    # Python 3.14 is the project's supported development runtime. delete=False
+    # Python 3.15 is the project's supported development runtime. delete=False
     # permits retaining diagnostics if an owned process cannot stop gracefully.
     temporary = tempfile.TemporaryDirectory(prefix="whab-bundle-check-", delete=False)
     directory = Path(temporary.name)

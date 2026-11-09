@@ -16,7 +16,7 @@ The source reorganization moves tracked application files into `app/`. Existing 
 
 ```sh
 cd whab/app
-python3.14 -m venv .venv
+python3.15 -m venv .venv
 .venv/bin/python scripts/install.py --dev
 export WHAB_HOME="$(cd .. && pwd)"
 .venv/bin/python scripts/setup.py

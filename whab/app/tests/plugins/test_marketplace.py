@@ -17,7 +17,7 @@ def manifest(identifier, dependencies=()):
 
 def row(identifier, dependencies=()):
     return {**manifest(identifier, dependencies), "distribution": "whab_plugin_" + identifier.replace("-", "_"),
-            "version": "1.0.0", "display_name": identifier, "requires_host": "whab>=2,<3", "requires_python": ">=3.14",
+            "version": "1.0.0", "display_name": identifier, "requires_host": "whab>=2,<3", "requires_python": ">=3.15,<3.16",
             "source": "whab/app/plugins/extension/" + identifier}
 
 

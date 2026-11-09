@@ -40,7 +40,7 @@ def manifests(checker):
     from pr_shard import partition
 
     collected = [f"test_rules.py::test_rule_{n}" for n in range(90)]
-    identity = {"revision": "a" * 40, "python": [3, 14]}
+    identity = {"revision": "a" * 40, "python": [3, 15]}
     rows = [{"index": index, "count": 3, "identity": identity, "collected": collected,
              "selected": partition(collected, index, 3)} for index in range(3)]
     for row in rows:
@@ -144,11 +144,16 @@ def test_parallel_workers_own_separate_default_runtime_homes(checker, monkeypatc
         assert (tmp_path / worker).is_dir()
 
 
-def test_certification_is_separate_and_existing_required_contexts_remain():
+def test_certification_is_separate_and_only_python315_is_supported():
     root = Path(__file__).resolve().parents[3]
     ci = (root / ".github/workflows/ci.yml").read_text()
     certification = (root / ".github/workflows/certification.yml").read_text()
     assert "name: CI (Python ${{ matrix.python-version }})" in ci
+    assert 'python-version: ["3.15"]' in ci and 'python-version: ["3.15"]' in certification
+    assert "3.14" not in ci and "3.14" not in certification
+    safeguards = json.loads((root / ".github/main-safeguards.json").read_text())
+    required = next(row for row in safeguards["rules"] if row["type"] == "required_status_checks")
+    assert required["parameters"]["required_status_checks"] == [{"context": "CI (Python 3.15)", "integration_id": 15368}]
     assert "if: always()" in ci and "coverage==7.16.2" in ci
     assert "check_pr.py aggregate --count 8" in ci and "include-hidden-files: true" in ci
     assert "check_plugin_generation.py" not in ci and "plugin-conformance.yml" not in ci

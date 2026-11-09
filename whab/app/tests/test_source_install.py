@@ -292,3 +292,14 @@ def test_missing_requested_runtime_fixture_source_fails_before_install(tmp_path,
     with pytest.raises(SystemExit) as rejected:
         installer.main()
     assert rejected.value.code == 2
+
+
+@pytest.mark.parametrize("version", [(3, 14), (3, 16)])
+def test_source_installer_rejects_other_python_minors_before_installing(monkeypatch, capsys, version):
+    monkeypatch.setattr(installer.sys, "argv", ["install.py"])
+    monkeypatch.setattr(installer.sys, "version_info", version)
+    monkeypatch.setattr(installer.subprocess, "run", lambda *a, **k: pytest.fail("No installation may start"))
+    with pytest.raises(SystemExit) as stopped:
+        installer.main()
+    assert stopped.value.code == 2
+    assert "Python 3.15.x is required" in capsys.readouterr().err

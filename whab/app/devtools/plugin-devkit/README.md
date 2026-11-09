@@ -7,7 +7,7 @@ the bundled plugin set, a SQLite implementation, a provider account, or pytest a
 
 The toolkit provides synchronous storage conformance, nine complete teaching
 project generators and constrained configuration replay through public
-`whab.plugins` contracts. It requires Python 3.14+ and WHAB 2.22+ within major 2.
+`whab.plugins` contracts. It requires Python 3.15.x and WHAB 2.22+ within major 2.
 Compatibility ranges require testing the minimum supported host artifact and the
 current candidate; an API import alone does not establish compatibility.
 

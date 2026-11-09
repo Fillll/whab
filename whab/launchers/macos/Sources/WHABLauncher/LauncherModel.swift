@@ -168,7 +168,7 @@ struct ManagerInvocation {
     let arguments: [String]
 
     init(resources: URL, root: URL, command: String, options: [String] = []) {
-        executable = resources.appendingPathComponent("python/bin/python3.14")
+        executable = resources.appendingPathComponent("python/bin/python3.15")
         arguments = [
             "-I", "-B",
             resources.appendingPathComponent("manager/launcher.py").path,

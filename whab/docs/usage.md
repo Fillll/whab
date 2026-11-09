@@ -19,16 +19,16 @@ Detailed operating guidance for WHAB. Start with the [quick start](../app/README
 
 Run the commands below from the application directory (`whab/app/`).
 
-Requires **Python 3.14 or newer**. Older Python versions are unsupported and rejected by package installation. For development, use an editable source install as shown below. The source installer installs the host and the [supported plugin set](../app/plugins/README.md#supported-plugins) together. Templates and static assets belong to their owning plugin wheels. When compatible host/plugin wheels are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the same set; a wheel deployment must also provision the private runtime configuration and valid TLS certificate/key described below. Use the [development runbook](development.md) for disposable runtimes, iteration checks and verification of the running installation.
+Requires **Python 3.15.x**. Other Python minor versions are unsupported and rejected by package installation. For development, use an editable source install as shown below. The source installer installs the host and the [supported plugin set](../app/plugins/README.md#supported-plugins) together. Templates and static assets belong to their owning plugin wheels. When compatible host/plugin wheels are available in the chosen package index or local wheelhouse, `pip install 'whab[bundled]'` selects the same set; a wheel deployment must also provision the private runtime configuration and valid TLS certificate/key described below. Use the [development runbook](development.md) for disposable runtimes, iteration checks and verification of the running installation.
 
 ```sh
-python3.14 -m venv .venv
+python3.15 -m venv .venv
 .venv/bin/python scripts/install.py --dev
 .venv/bin/python scripts/setup.py
 .venv/bin/python -m whab
 ```
 
-When upgrading from an older Python version, stop WHAB and recreate `.venv` with Python 3.14 or newer, then reinstall the app and any additional plugins. Preserve the existing runtime home, including `.env`, `data/`, `budgets/` and `tls/`, with its token encryption key and credentials.
+When upgrading from an older Python version, stop WHAB and recreate `.venv` with Python 3.15.x, then reinstall the app and any additional plugins. Preserve the existing runtime home, including `.env`, `data/`, `budgets/` and `tls/`, with its token encryption key and credentials.
 
 After [trusting the local CA](#local-https), open https://127.0.0.1:5173. **Demo Budget** contains fictional data. Open **My Budget** for your own accounts. A manual account works immediately without Plaid.
 

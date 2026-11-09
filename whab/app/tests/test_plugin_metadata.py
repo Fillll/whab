@@ -37,7 +37,7 @@ def static_repository(tmp_path):
     (project / "pyproject.toml").write_text('''[project]
 name="whab_plugin_fictional"
 version="1.0.0"
-requires-python=">=3.14"
+requires-python=">=3.15,<3.16"
 dependencies=["whab>=2.22,<3"]
 [project.entry-points."whab.plugins"]
 fictional="whab_plugin_fictional:plugin"
@@ -325,3 +325,21 @@ def test_unsupported_or_dynamic_bank_metadata_refuses_without_execution(metadata
                     ",contract=PluginContract(lifecycle='live'" + declared + "))\n")
     with pytest.raises(ValueError, match="supported capability adapter"):
         metadata_tool.descriptor_metadata(path, 'plugin', root)
+
+
+def test_all_current_packages_and_generated_projects_require_python315_only():
+    import tomllib
+    from pathlib import Path
+
+    from packaging.specifiers import SpecifierSet
+
+    root = Path(__file__).resolve().parents[1]
+    projects = [root / "pyproject.toml", *root.glob("plugins/*/*/pyproject.toml"),
+                root / "devtools/plugin-devkit/pyproject.toml",
+                root / "devtools/plugin-devkit/fixtures/runtime-peers/pyproject.toml",
+                root / "devtools/plugin-devkit/src/whab_plugin_devkit/templates/project.toml.txt"]
+    for project in projects:
+        declaration = next(line for line in project.read_text().splitlines() if line.startswith("requires-python"))
+        supported = SpecifierSet(tomllib.loads(declaration)["requires-python"])
+        assert supported.contains("3.15.0") and supported.contains("3.15.9"), project
+        assert not supported.contains("3.14.9") and not supported.contains("3.16.0"), project

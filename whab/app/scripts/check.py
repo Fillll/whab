@@ -29,8 +29,8 @@ def check_environment(home: Path | None = None) -> dict[str, str]:
 
 def preflight(*, docs_only: bool, quick: bool, env: dict[str, str] | None = None) -> str | None:
     """Fail before running checks when their required tools are unavailable."""
-    if sys.version_info < (3, 14):
-        raise ValueError("Python 3.14 or newer is required; use the development environment's Python.")
+    if sys.version_info[:2] != (3, 15):
+        raise ValueError("Python 3.15.x is required; use the development environment's Python.")
     if not shutil.which("git"):
         raise ValueError("Git is required to discover source documentation and changelogs.")
     if docs_only:

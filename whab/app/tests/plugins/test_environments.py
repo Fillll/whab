@@ -425,7 +425,7 @@ def make_wheel(directory, version="1.0.0", *, source=None, metadata_suffix="", e
         "plugin = Plugin('fictional-reports', 'Fictional reports', insights=insights, export=export, contract=PluginContract(lifecycle='live'))\n"
     )
     files = {"fictional_reports/__init__.py": source.encode(),
-             prefix + "METADATA": (f"Metadata-Version: 2.3\nName: {name}\nVersion: {version}\nRequires-Python: >=3.14\nRequires-Dist: whab{host_requirement or '==' + __version__}\n" + metadata_suffix).encode(),
+             prefix + "METADATA": (f"Metadata-Version: 2.3\nName: {name}\nVersion: {version}\nRequires-Python: >=3.15,<3.16\nRequires-Dist: whab{host_requirement or '==' + __version__}\n" + metadata_suffix).encode(),
              prefix + "WHEEL": b"Wheel-Version: 1.0\nGenerator: reviewed-test-fixture\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
              prefix + "entry_points.txt": f"[whab.plugins]\nfictional-reports = {entrypoint}\n".encode(),
              **(extra_files or {})}
@@ -626,7 +626,7 @@ def test_static_inspection_exposes_identity_requirements_and_hash_without_import
     assert record.distribution == "whab_plugin_fictional_reports"
     assert record.canonical_name == "whab-plugin-fictional-reports"
     assert record.version == "1.0.0" and record.sha256 == approve(wheel).sha256
-    assert record.requires_python == ">=3.14"
+    assert record.requires_python == ">=3.15,<3.16"
     assert record.requirements == (f"whab=={__version__}",)
     assert record.entry_points == (("whab.plugins", "fictional-reports", "fictional_reports:plugin"),)
 
@@ -653,7 +653,7 @@ def test_wheel_paths_cannot_escape_installation_or_alias_namespaces(tmp_path, na
     assert raised.value.code == "invalid_wheel"
 
 
-@pytest.mark.parametrize("metadata_suffix", ["Name: duplicate\n", "Version: 2.0.0\n", "Requires-Python: >=3.14\n",
+@pytest.mark.parametrize("metadata_suffix", ["Name: duplicate\n", "Version: 2.0.0\n", "Requires-Python: >=3.15,<3.16\n",
                                            "Requires-Dist: arbitrary @ https://invalid.example/plugin.whl\n"])
 def test_duplicate_identity_python_fields_and_remote_dependency_references_are_rejected(tmp_path, metadata_suffix):
     path = make_wheel(tmp_path, metadata_suffix=metadata_suffix)
@@ -671,7 +671,7 @@ def test_incompatible_python_and_unsafe_entrypoints_fail_statically(tmp_path):
     with zipfile.ZipFile(path) as archive:
         files = {info.filename: archive.read(info) for info in archive.infolist()}
     metadata_name = next(name for name in files if name.endswith("/METADATA"))
-    files[metadata_name] = files[metadata_name].replace(b">=3.14", b">=99")
+    files[metadata_name] = files[metadata_name].replace(b">=3.15,<3.16", b">=99")
     with zipfile.ZipFile(path, "w") as archive:
         for name, raw in files.items():
             archive.writestr(name, raw)

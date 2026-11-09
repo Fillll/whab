@@ -186,7 +186,7 @@ final class LauncherModelTests: XCTestCase {
         let invocation = ManagerInvocation(resources: URL(fileURLWithPath: "/Applications/WHAB App.app/Contents/Resources"),
                                            root: URL(fileURLWithPath: "/Users/Example/Library/Application Support/WHAB/launcher"),
                                            command: "configure", options: ["--runtime-home", "/Users/Example/My Budget"])
-        XCTAssertEqual(invocation.executable.lastPathComponent, "python3.14")
+        XCTAssertEqual(invocation.executable.lastPathComponent, "python3.15")
         XCTAssertEqual(Array(invocation.arguments.prefix(2)), ["-I", "-B"])
         XCTAssertEqual(invocation.arguments.suffix(3), ["configure", "--runtime-home", "/Users/Example/My Budget"])
         XCTAssertTrue(invocation.arguments.contains("/Users/Example/Library/Application Support/WHAB/launcher"))

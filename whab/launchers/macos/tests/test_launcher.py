@@ -131,6 +131,34 @@ class IsolatedManagerTest(unittest.TestCase):
         self.assertEqual(status["latest_version"], OTHER_SHA[:12])
         self.assertFalse(launcher.read_json(self.root / "update.json")["target"]["tested"])
 
+    def test_cached_retired_interpreter_is_not_reused_or_relabelled(self):
+        self.config()
+        installation = self.installation() | {"python": "/fictional/python3.14", "channel": "alpha", "tested": False}
+        path = Path(installation["directory"]) / "installation.json"
+        launcher.write_json(path, installation)
+        with patch.object(subprocess, "run", return_value=Mock(stdout="0")):
+            with self.assertRaisesRegex(launcher.LauncherError, "Python 3.15"):
+                self.manager.prepare({"build": SHA, "channel": "main", "tested": True})
+        self.assertEqual(launcher.read_json(path), installation)
+
+    def test_retired_interpreter_is_rejected_before_runtime_setup_or_launch(self):
+        self.config()
+        installation = self.installation() | {"python": "/fictional/python3.14"}
+        with patch.object(subprocess, "run", return_value=Mock(stdout="0")), patch.object(self.manager, "setup") as setup, patch.object(subprocess, "Popen") as process:
+            with self.assertRaisesRegex(launcher.LauncherError, "Python 3.15"):
+                self.manager.launch(installation, self.home, 6412)
+        setup.assert_not_called()
+        process.assert_not_called()
+
+    def test_unsupported_cached_restart_does_not_stop_the_current_process(self):
+        self.config()
+        installation = self.installation() | {"python": "/fictional/python3.14"}
+        launcher.write_json(self.root / "active.json", installation)
+        with patch.object(subprocess, "run", return_value=Mock(stdout="0")), patch.object(self.manager, "stop") as stop:
+            with self.assertRaisesRegex(launcher.LauncherError, "Python 3.15"):
+                self.manager.restart()
+        stop.assert_not_called()
+
     def test_cached_installation_refreshes_provenance_only_from_resolved_target(self):
         self.config()
         installation = self.installation() | {"channel": "alpha", "tested": False}
@@ -329,7 +357,7 @@ class IsolatedManagerTest(unittest.TestCase):
         self.config()
         child = Mock(pid=123)
         child.poll.return_value = None
-        with patch.object(launcher, "available_port"), patch.object(self.manager, "setup"), patch.object(launcher, "process_identity", return_value=None), patch.object(subprocess, "Popen", return_value=child), patch.object(launcher.time, "sleep"):
+        with patch.object(self.manager, "verify_python", return_value=sys.executable), patch.object(launcher, "available_port"), patch.object(self.manager, "setup"), patch.object(launcher, "process_identity", return_value=None), patch.object(subprocess, "Popen", return_value=child), patch.object(launcher.time, "sleep"):
             with self.assertRaisesRegex(launcher.LauncherError, "could not verify its new process identity"):
                 self.manager.launch(self.installation(), self.home, 6412)
         child.terminate.assert_called_once_with()
@@ -378,24 +406,24 @@ class IsolatedManagerTest(unittest.TestCase):
         self.config()
         prefix = self.base / "Original.app/Contents/Resources/python"
         (prefix / "bin").mkdir(parents=True)
-        (prefix / "lib/python3.14").mkdir(parents=True)
-        (prefix / "bin/python3.14").write_bytes(b"relocatable executable")
-        (prefix / "lib/libpython3.14.dylib").write_bytes(b"relocatable library")
-        (prefix / "lib/python3.14/ssl.py").write_bytes(b"stdlib marker")
+        (prefix / "lib/python3.15").mkdir(parents=True)
+        (prefix / "bin/python3.15").write_bytes(b"relocatable executable")
+        (prefix / "lib/libpython3.15.dylib").write_bytes(b"relocatable library")
+        (prefix / "lib/python3.15/ssl.py").write_bytes(b"stdlib marker")
         def probe(arguments, **_kwargs):
             if "sys.version_info.major" in arguments[-1]:
-                value = json.dumps({"prefix": str(prefix), "minor": "3.14", "version": "3.14.8-test"})
+                value = json.dumps({"prefix": str(prefix), "minor": "3.15", "version": "3.15.8-test"})
             else:
                 value = str(Path(arguments[0]).parent.parent)
             return subprocess.CompletedProcess(arguments, 0, stdout=value)
-        with patch.object(self.manager, "verify_python", return_value=str(prefix / "bin/python3.14")), patch.object(subprocess, "run", side_effect=probe):
+        with patch.object(self.manager, "verify_python", return_value=str(prefix / "bin/python3.15")), patch.object(subprocess, "run", side_effect=probe):
             durable = Path(self.manager.stable_python(self.manager.config()))
         self.assertTrue(durable.is_relative_to(self.root))
         self.assertEqual(self.manager.config()["python"], str(durable))
         (self.base / "Original.app").rename(self.base / "Moved.app")
         self.assertTrue(durable.is_file())
-        self.assertEqual((durable.parent.parent / "lib/python3.14/ssl.py").read_bytes(), b"stdlib marker")
-        self.assertFalse((prefix / "bin/python3.14").exists())
+        self.assertEqual((durable.parent.parent / "lib/python3.15/ssl.py").read_bytes(), b"stdlib marker")
+        self.assertFalse((prefix / "bin/python3.15").exists())
 
     def test_health_rejects_another_instance_even_with_whab_body(self):
         response = Mock()
@@ -489,7 +517,7 @@ class IsolatedManagerTest(unittest.TestCase):
 
     def code_environment(self, prefix="", *, family=None):
         manifest = {"format": 1, "plugin": "fictional", "host_sdk": 1,
-                    "python": {"version": "3.14", "sha256": "a" * 64}, "wheels": []}
+                    "python": {"version": "3.15", "sha256": "a" * 64}, "wheels": []}
         if family is not None:
             manifest.update(format=2, family=family)
         identifier = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -590,7 +618,7 @@ class IsolatedManagerTest(unittest.TestCase):
 
     def test_default_and_named_budget_code_aliases_are_archived_without_following(self):
         self.config("PORT=6412\n")
-        external = self.base / "outside/python3.14"
+        external = self.base / "outside/python3.15"
         external.parent.mkdir()
         external.write_bytes(b"outside interpreter bytes must never be read or copied")
         expected = []
@@ -636,7 +664,7 @@ class IsolatedManagerTest(unittest.TestCase):
             path.unlink()
         root, environment = self.code_environment()
         (environment / "bin").mkdir()
-        (environment / "bin/python").symlink_to("python3.14")
+        (environment / "bin/python").symlink_to("python3.15")
         (root / "ready.json").unlink()
         with self.assertRaisesRegex(launcher.LauncherError, "ready manifest"):
             self.manager.backup(self.home, self.installation())
@@ -646,17 +674,17 @@ class IsolatedManagerTest(unittest.TestCase):
         root, environment = self.code_environment()
         (environment / "bin").mkdir()
         link = environment / "bin/python"
-        link.symlink_to("python3.14")
+        link.symlink_to("python3.15")
         before = launcher.runtime_fingerprint(self.home)
         link.unlink()
-        link.symlink_to("python3.15")
+        link.symlink_to("python3.16")
         self.assertNotEqual(launcher.runtime_fingerprint(self.home), before)
         link.unlink()
-        link.symlink_to("../private/python3.14")
+        link.symlink_to("../private/python3.15")
         with self.assertRaises(launcher.LauncherError):
             launcher.runtime_fingerprint(self.home)
         link.unlink()
-        link.symlink_to("python3.14")
+        link.symlink_to("python3.15")
         ready = launcher.read_json(root / "ready.json")
         ready["plugin"] = "changed"
         launcher.write_json(root / "ready.json", ready)
@@ -787,23 +815,27 @@ class IsolatedManagerTest(unittest.TestCase):
 
 
 class SourceVerificationTest(unittest.TestCase):
-    def check(self, sha=SHA, name="CI (Python 3.14)", status="completed", conclusion="success", app="github-actions", identifier=1):
+    def check(self, sha=SHA, name="CI (Python 3.15)", status="completed", conclusion="success", app="github-actions", identifier=1):
         return {"id": identifier, "head_sha": sha, "name": name, "status": status, "conclusion": conclusion, "app": {"slug": app}}
 
-    def test_required_ci_checks_must_both_pass_for_exact_commit(self):
-        checks = [self.check(), self.check(name="CI (Python 3.15)")]
+    def test_required_python315_check_must_pass_for_exact_commit(self):
+        checks = [self.check()]
         with patch.object(launcher, "request_json", return_value={"check_runs": checks}):
             self.assertTrue(launcher.successful_checks(SHA))
         for failed in (self.check(name="CI (Python 3.15)", conclusion="failure"), self.check(name="CI (Python 3.15)", sha=OTHER_SHA), self.check(name="CI (Python 3.15)", app="untrusted")):
-            with patch.object(launcher, "request_json", return_value={"check_runs": [self.check(), failed]}):
+            with patch.object(launcher, "request_json", return_value={"check_runs": [failed]}):
                 self.assertFalse(launcher.successful_checks(SHA))
 
+    def test_retired_python314_check_does_not_satisfy_the_gate(self):
+        with patch.object(launcher, "request_json", return_value={"check_runs": [self.check(name="CI (Python 3.14)")]}):
+            self.assertFalse(launcher.successful_checks(SHA))
+
     def test_newer_failed_rerun_invalidates_previous_success(self):
-        checks = [self.check(), self.check(identifier=2, conclusion="failure"), self.check(name="CI (Python 3.15)")]
+        checks = [self.check(), self.check(identifier=2, conclusion="failure")]
         with patch.object(launcher, "request_json", return_value={"check_runs": checks}):
             self.assertFalse(launcher.successful_checks(SHA))
 
-    def test_main_selects_newest_commit_with_both_successful_checks(self):
+    def test_main_selects_newest_commit_with_successful_python315_check(self):
         with patch.object(launcher, "request_json", return_value=[{"sha": SHA}, {"sha": OTHER_SHA}]), patch.object(launcher, "successful_checks", side_effect=[False, True]):
             self.assertEqual(launcher.latest_target("main")["build"], OTHER_SHA)
 

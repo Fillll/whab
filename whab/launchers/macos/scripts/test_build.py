@@ -23,8 +23,8 @@ class BundleSourceBoundaryTests(unittest.TestCase):
     def test_excludes_runtime_secrets_and_generated_developer_state(self):
         for path in (
             ".env", ".env.production", "data/whab-production.sqlite", "tls/ca.key",
-            "tls/ca.crt", "budgets/private/budget.json", "work/python/bin/python3.14",
-            ".venv/lib/python3.14/site-packages/private.py", "tests/private_fixture.py",
+            "tls/ca.crt", "budgets/private/budget.json", "work/python/bin/python3.15",
+            ".venv/lib/python3.15/site-packages/private.py", "tests/private_fixture.py",
             "plugins/ingestion/plaid/.env", "plugins/ingestion/plaid/tests/private.py",
             "src/whab/__pycache__/app.pyc", "src/whab/private.key",
             "plugins/ingestion/plaid/src/whab_plugin_plaid/.env.local",

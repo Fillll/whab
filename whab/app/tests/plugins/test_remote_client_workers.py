@@ -40,7 +40,7 @@ def wheel(directory, version, *, missing_setting=False):
         "    contract=PluginContract(authority='remote', lifecycle='live'))\n"
     )
     files = {f"{package}/__init__.py": source.encode(),
-        prefix + "METADATA": f"Metadata-Version: 2.3\nName: {distribution}\nVersion: {version}\nRequires-Python: >=3.14\nRequires-Dist: whab=={__version__}\n".encode(),
+        prefix + "METADATA": f"Metadata-Version: 2.3\nName: {distribution}\nVersion: {version}\nRequires-Python: >=3.15,<3.16\nRequires-Dist: whab=={__version__}\n".encode(),
         prefix + "WHEEL": b"Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
         prefix + "entry_points.txt": f"[whab.plugins]\nclient = {package}:plugin\n".encode()}
     record = io.StringIO()

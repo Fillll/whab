@@ -4,7 +4,7 @@ This parser accepts at most 16 KiB of UTF-8 JSON with exactly `name` and integer
 
 For example, `{"name": "Fictional checking", "balance": 12500}` describes a balance of USD 125.00. No bank provider or external service is involved.
 
-This independently packaged teaching plugin requires Python 3.14+ and WHAB 2.22+ within major 2. It advertises restart lifecycle support. WHAB 2.26+ hides it from ordinary Settings; enable `example-file-import` explicitly. See the [teaching guide](../README.md).
+This independently packaged teaching plugin requires Python 3.15.x and WHAB 2.22+ within major 2. It advertises restart lifecycle support. WHAB 2.26+ hides it from ordinary Settings; enable `example-file-import` explicitly. See the [teaching guide](../README.md).
 
 Build and test from a copy of this folder outside the WHAB checkout, in a clean environment containing the approved host and toolkit artifacts:
 
