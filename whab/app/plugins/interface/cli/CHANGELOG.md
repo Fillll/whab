@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.12.0 — 2026-11-09
+
+PR: [#178](https://github.com/Fillll/whab/pull/178)
+
+- Add complete name/ID-addressed `trnx list` (`transactions list`) with inclusive date bounds, literal case-insensitive merchant substring matching and OR filters. Return every nondeleted match across review/category states, pending entries, refunds and accounts, with stable IDs, saved annotations, account/category names and explicit completeness counts in JSON or readable tables.
+- Package detailed offline help and schemas/examples; reject inconsistent/oversized reads without partial output. Keep existing guarded categorization separate, preserve financial fields/history and make no future-rule or lender-alias inference.
+
 ## 2.11.1 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)
