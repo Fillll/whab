@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -11,6 +12,9 @@ from uuid import uuid4
 def test_real_console_creates_groups_moves_preserving_history_and_isolates_budgets(
     tmp_path, monkeypatch
 ):
+    today = date.today()
+    month = today.strftime("%Y-%m")
+    next_month = (today.replace(day=28) + timedelta(days=4)).strftime("%Y-%m")
     home = tmp_path / "runtime"
     env = {
         **os.environ,
@@ -76,15 +80,15 @@ def test_real_console_creates_groups_moves_preserving_history_and_isolates_budge
         "add_transaction",
         {
             "accountId": cash,
-            "date": "2026-11-01",
+            "date": month + "-01",
             "merchant": "Fictional invoice",
             "amount": 100,
             "categoryId": studio["id"],
             "note": "Keep note",
         },
     )
-    advanced("assign", {"categoryId": studio["id"], "month": "2026-11", "assigned": 900})
-    advanced("assign", {"categoryId": studio["id"], "month": "2026-12", "assigned": 700})
+    advanced("assign", {"categoryId": studio["id"], "month": month, "assigned": 900})
+    advanced("assign", {"categoryId": studio["id"], "month": next_month, "assigned": 700})
     before = run("api", "--budget", budget, "query", "portable")["data"]
     projects = run("Fictional категории", "category", "group", "create", "Fictional проекты")[
         "data"
