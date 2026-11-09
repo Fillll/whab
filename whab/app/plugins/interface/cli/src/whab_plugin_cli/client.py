@@ -16,7 +16,7 @@ from whab.plugins.documentation import core_document, installed_catalog
 from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import PluginSelectionError, selection_error
-from .help import contextual_help, describe, overview, render_catalog
+from .help import AGENT_WORKFLOW, contextual_help, describe, overview, render_catalog
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 
 
@@ -25,7 +25,7 @@ def parser(argv=(), *, defaults=None):
     check_identifiers(catalog)
     root = argparse.ArgumentParser(description="Read and change an explicitly addressed WHAB budget.",
         usage="%(prog)s [CONFIG] [OPTIONS] {query,command,feature-query,feature-command,describe,plugins,sync,jobs,bank} ...",
-        epilog='Optional CONFIG is a JSON object. Local fields: home, budget, environment, ca, workspace. Remote fields: url, budget, ca, workspace, token_env. Choose home or url. Command-line options override the file. Relative home/CA paths use the config directory.\nLocal example: {"home": "runtime", "budget": "default", "environment": "sandbox"}\nRemote example: {"url": "https://localhost:5173", "budget": "default", "ca": "tls/ca.crt"}\nUsage: whab-cli default.budget --help\n\n' + overview(catalog),
+        epilog='Optional CONFIG is a JSON object. Local fields: home, budget, environment, ca, workspace. Remote fields: url, budget, ca, workspace, token_env. Choose home or url. Command-line options override the file. Relative home/CA paths use the config directory.\nLocal example: {"home": "runtime", "budget": "default", "environment": "sandbox"}\nRemote example: {"url": "https://localhost:5173", "budget": "default", "ca": "tls/ca.crt"}\nUsage: whab-cli default.budget --help\n\n' + AGENT_WORKFLOW + '\n\n' + overview(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     root.add_argument("--url", help="HTTPS server origin; omit for offline documentation")
     root.add_argument("--home", help="Local runtime home; reuse its host or start a temporary host")
@@ -38,28 +38,28 @@ def parser(argv=(), *, defaults=None):
     commands = root.add_subparsers(dest="kind", required=True)
     add_bank_parser(commands)
     manage = commands.add_parser("plugins", help="Manage installed plugins on the local host")
-    manage.add_argument("action", choices=("list", "status", "enable", "disable"))
+    manage.add_argument("action", choices=("list", "status", "enable", "disable"), help="list/status read selections; enable/disable save an explicit plugin choice for this local budget")
     manage.add_argument("plugin", nargs="?", help="Installed plugin ID for enable/disable")
     sync = commands.add_parser("sync", help="Synchronize existing bank connections without opening Link")
     sync.add_argument("plugin", help="Enabled bank plugin ID, for example plaid")
     jobs = commands.add_parser("jobs", help="Inspect/run due bank jobs or enable/disable the OS schedule")
-    jobs.add_argument("action", choices=("status", "run", "enable", "disable"))
+    jobs.add_argument("action", choices=("status", "run", "enable", "disable"), help="status reads jobs; run executes due checks; enable/disable changes OS wakeups for this home/environment")
     topic = contextual_help(argv, catalog)
     def group(name, text):
         return commands.add_parser(name, help=text, epilog=topic, formatter_class=argparse.RawDescriptionHelpFormatter)
     query = group("query", "Read a public ledger projection")
-    query.add_argument("operation", choices=tuple(row["name"] for row in core_document()["operations"] if row["kind"] == "query"))
-    query.add_argument("--month")
-    query.add_argument("--parameters", help="JSON parameters for a generic feature query")
+    query.add_argument("operation", choices=tuple(row["name"] for row in core_document()["operations"] if row["kind"] == "query"), help="Public core read; append --help for fields, defaults and examples")
+    query.add_argument("--month", help="YYYY-MM for transactions/workspace reads; omit for that operation's documented default")
+    query.add_argument("--parameters", help="Query JSON object (for example history, history_preview or feature); '-' reads stdin, at most 1 MiB")
     command = group("command", "Apply an explicit public ledger command")
-    command.add_argument("operation", choices=tuple(row["name"] for row in core_document()["operations"] if row["kind"] == "command"))
+    command.add_argument("operation", choices=tuple(row["name"] for row in core_document()["operations"] if row["kind"] == "command"), help="Public core write; append --help before constructing a guarded intent")
     command.add_argument('--batch', help='Explicit budget-history batch ID')
     command.add_argument('--agent', type=validate_category_agent, metavar='LABEL',
                          help='Explicit categorizing agent label, for edit_transaction with categoryId only; saved as categoryAgent. Omit for normal manual edits.')
     for name in ("feature-query", "feature-command"):
         feature = group(name, "Call an operation listed by query features")
-        feature.add_argument("plugin")
-        feature.add_argument("action")
+        feature.add_argument("plugin", help="Enabled plugin ID from query features; no private settings or SDK callbacks")
+        feature.add_argument("action", help="Public action name listed by query features; append --help for installed documentation")
     for command_parser in (command, commands.choices["feature-query"], commands.choices["feature-command"]):
         command_parser.add_argument("--parameters", required=True, help="JSON object; use '-' to read standard input")
     for command_parser in (command, commands.choices["feature-command"]):
@@ -69,7 +69,7 @@ def parser(argv=(), *, defaults=None):
     docs.add_argument("--json", action="store_true", help="Output machine-readable schemas and examples")
     docs.add_argument("--offline", action="store_true", help="Use installed package documentation even when a URL is supplied")
     docs.add_argument("--plugin", help="Filter to core or an installed plugin ID")
-    docs.add_argument("--kind", dest="filter_kind", choices=("query", "command", "feature-query", "feature-command", "local", "sdk"))
+    docs.add_argument("--kind", dest="filter_kind", choices=("query", "command", "feature-query", "feature-command", "local", "sdk"), help="Filter contract type; local/SDK entries do not grant generic CLI execution")
     docs.add_argument("--operation", help="Filter by exact operation name")
     return root
 
@@ -92,7 +92,9 @@ def request(args, token=None):
     path = "/remote/v1/budgets/" + quote(args.budget, safe="")
     if args.kind == "describe":
         return token, "GET", path + "/queries/describe", {"params": {"workspace": args.workspace}}
-    if args.kind == "query" and args.operation != "feature":
+    if args.kind == 'query' and args.parameters is not None and args.operation not in {'feature', 'history', 'history_preview'}:
+        raise ConfigError('--parameters is supported by query feature, history and history_preview only; use --month for transactions/workspace.')
+    if args.kind == "query" and args.operation != "feature" and args.parameters is None:
         params = {"workspace": args.workspace}
         if args.month is not None:
             params["month"] = args.month
@@ -105,6 +107,8 @@ def request(args, token=None):
     values = json.loads(raw)
     if type(values) is not dict:
         raise ValueError("Parameters must be a JSON object.")
+    if args.kind == 'query' and args.month is not None:
+        raise ConfigError('Choose --month or --parameters for a query, not both; put month inside the JSON parameters where supported.')
     if args.kind == 'command' and getattr(args, 'agent', None) is not None:
         if args.operation != 'edit_transaction' or 'categoryId' not in values:
             raise ConfigError('--agent requires edit_transaction with an explicit categoryId.')

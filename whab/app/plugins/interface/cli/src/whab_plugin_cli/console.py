@@ -18,7 +18,7 @@ from . import client
 from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import selection_error
-from .help import account_classification, describe, overview
+from .help import AGENT_WORKFLOW, account_classification, describe, overview
 from .history_commands import add_history_parser, execute_history
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 from .transaction_commands import add_category_parsers, execute_category
@@ -37,7 +37,7 @@ def parser(options):
     check_identifiers(catalog)
     root = argparse.ArgumentParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
-        epilog="Examples:\n  whab budget create empty-budget --path ~/budgets\n  whab empty-budget plugin enable ynab-zip-importer\n  whab empty-budget import ynab-zip-importer preview export.zip --currency USD\n  whab empty-budget insights summary\n  whab empty-budget trnx non-reviewed\n  whab empty-budget trnx uncategorized --limit 10 --format table\n\nEvery command supports --help. Names containing spaces can be quoted.\nUse whab budget list to discover names and permanent IDs.\n\n" + account_classification(catalog),
+        epilog=AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
     budget = groups.add_parser("budget", help="Create and list saved budgets")
@@ -53,12 +53,12 @@ def parser(options):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     plugin.add_argument("action", choices=("list",), nargs="?", default="list", help="List installed plugin documentation offline")
     scoped = groups.add_parser("BUDGET", help="Address a saved budget by its name or permanent ID",
-        usage="whab BUDGET {plugin,bank,import,insights,transactions,trnx} ...")
+        usage="whab BUDGET {plugin,bank,history,import,insights,transactions,trnx} ...")
     scoped.add_argument("target", help=argparse.SUPPRESS)
     commands = scoped.add_subparsers(dest="command", required=True)
     plugins = commands.add_parser("plugin", help="List, enable or disable this budget's plugins",
         epilog="Example: whab empty-budget plugin enable ynab-zip-importer\nChanges apply live where supported; otherwise restart_required is returned. CLI is an installed management tool, not a budget toggle. Required storage cannot be disabled. Web is optional and can be disabled.")
-    plugins.add_argument("action", choices=("list", "status", "enable", "disable"))
+    plugins.add_argument("action", choices=("list", "status", "enable", "disable"), help="list/status read selections; enable/disable save an explicit plugin choice")
     plugins.add_argument("plugin", nargs="?", help="Identifier from whab plugin list; required for enable/disable")
     add_bank_parser(commands)
     add_history_parser(commands)

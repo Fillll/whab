@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.1 — 2026-11-08
+
+PR: [#170](https://github.com/Fillll/whab/pull/170)
+
+- Explain agent scope, discovery, category attribution, minor units, revisions, exact retries and history recovery in root help and the CLI guide. Add missing argument help, public invocation templates and human-readable schema bounds across installed operation contracts.
+- Expand bank mapping, scheduling and investment help; clarify history pagination, preview versus immediate checkpoint writes and financial snapshot exports. Preserve history/history_preview JSON query parameters through both local and remote CLI transports instead of silently discarding them.
+
 ## 2.7.0 — 2026-11-08
 
 PR: [#169](https://github.com/Fillll/whab/pull/169)

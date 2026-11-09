@@ -66,6 +66,16 @@ def test_cli_edits_categories_and_subscription_labels_on_real_headless_host(stor
         stale = [*intent[:-1], "another-intent"]
         assert client.main(ARGS + stale) == 1
         assert "error" in json.loads(capsys.readouterr().err)
+        # Query JSON parameters must reach real dispatch, rather than silently
+        # becoming an unfiltered GET. Preview is also a parameterized read.
+        history = run('query', 'history', '--parameters', '{"limit":1}')
+        assert history['data']['total'] >= 2 and len(history['data']['entries']) == 1
+        assert history['data']['next'] is not None
+        older = run('query', 'history', '--parameters', json.dumps({'limit': 1, 'before': history['data']['next']}))
+        assert older['data']['entries'][0]['id'] != history['data']['entries'][0]['id']
+        preview = run('query', 'history_preview', '--parameters', '{"action":"snapshot"}')
+        assert preview['data']['action'] == 'snapshot' and preview['data']['changes'] == []
+        assert run('query', 'history', '--parameters', '{"limit":1}') == history
 
 
 @pytest.mark.parametrize("url", ["http://localhost", "https://user:secret@localhost", "https://localhost/path", "https://localhost?q=1", "https://localhost/#fragment", "https://local host", "https://localhost:invalid"])
