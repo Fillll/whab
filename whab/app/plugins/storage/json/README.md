@@ -6,7 +6,7 @@ personal and fictional demo workspaces in one versioned JSON data file at
 different files. It uses no database driver or other storage implementation.
 The host supplies financial commands, currency rules and workspace projections.
 
-Install its wheel with a compatible host (WHAB 2.62+ within major 2), then select
+Install its wheel with a compatible host (WHAB 2.65+ within major 2), then select
 `WHAB_STORAGE=json` for a new original runtime or initial CLI budget creation.
 An opened budget chooses its backend through its manifest. Selecting JSON does
 not migrate an existing ledger. JSON belongs to the supported bundled set;
@@ -241,3 +241,17 @@ cursor checkpoints survive native reopen, copy/transfer and recovery; reopening
 replays from that checkpoint on the next normal sync. No synchronization is started
 by close/reopen. Portable exports retain lifecycle but omit protected bank state.
 See [the core semantics](../../../../docs/architecture.md#account-lifecycle-and-cds).
+
+## Category management
+
+This version requires WHAB 2.65+ for optional SDK `CategoryManagement`.
+`category_tree(workspace)` includes real empty parents; `add_category_group(workspace,
+name)` creates one; `move_category(workspace, category_id, parent_id)` preserves the
+child ID, target, currency, transaction references and all monthly assignments.
+The financial core validates the two-level hierarchy and duplicate destinations.
+Native evidence/receipts/history commit with the metadata. SQL uses an additive
+nullable `meta.category_groups` column; JSON stores the optional neutral
+`categoryGroups` collection. Omitted metadata preserves legacy digests. Portable
+and protected native copies retain explicit parents, including emptied sources.
+There is no manual reorder operation; moves retain the existing ledger order.
+Use the [simple CLI workflow](../../interface/cli/README.md#category-management).

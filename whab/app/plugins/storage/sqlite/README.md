@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.62 or newer for the public local-authority and
+This version requires WHAB 2.65 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -166,3 +166,17 @@ cursor checkpoints survive native reopen, copy/transfer and recovery; reopening
 replays from that checkpoint on the next normal sync. No synchronization is started
 by close/reopen. Portable exports retain lifecycle but omit protected bank state.
 See [the core semantics](../../../../docs/architecture.md#account-lifecycle-and-cds).
+
+## Category management
+
+This version requires WHAB 2.65+ for optional SDK `CategoryManagement`.
+`category_tree(workspace)` includes real empty parents; `add_category_group(workspace,
+name)` creates one; `move_category(workspace, category_id, parent_id)` preserves the
+child ID, target, currency, transaction references and all monthly assignments.
+The financial core validates the two-level hierarchy and duplicate destinations.
+Native evidence/receipts/history commit with the metadata. SQL uses an additive
+nullable `meta.category_groups` column; JSON stores the optional neutral
+`categoryGroups` collection. Omitted metadata preserves legacy digests. Portable
+and protected native copies retain explicit parents, including emptied sources.
+There is no manual reorder operation; moves retain the existing ledger order.
+Use the [simple CLI workflow](../../interface/cli/README.md#category-management).

@@ -68,9 +68,24 @@ def _children(categories: Mapping[str, dict] | Iterable[dict]) -> list[dict]:
     return children
 
 
-def category_groups(categories: Mapping[str, dict] | Iterable[dict]) -> list[dict]:
+def validate_category_groups(groups):
+    """Validate explicit nonassignable parents, including empty groups."""
+    if type(groups) is not list or len(groups) > 10000:
+        raise StoreError('Invalid category groups.')
+    result = []
+    identifiers = set()
+    for group in groups:
+        if (type(group) is not dict or group.keys() != {'id', 'name'}
+                or group['id'] != category_group_id(group['name']) or group['id'] in identifiers):
+            raise StoreError('Invalid or duplicate category group.')
+        identifiers.add(group['id'])
+        result.append(group.copy())
+    return result
+
+
+def category_groups(categories: Mapping[str, dict] | Iterable[dict], saved=()) -> list[dict]:
     """Project unique nonassignable parents in their first-seen ledger order."""
-    groups = {}
+    groups = {row['id']: row for row in validate_category_groups(list(saved) if type(saved) is tuple else saved)}
     for category in _children(categories):
         group_id = category_group_id(category["group"])
         groups.setdefault(group_id, {"id": group_id, "name": _label(category["group"])})
@@ -89,10 +104,11 @@ def public_categories(categories: Mapping[str, dict] | Iterable[dict]) -> list[d
     ]
 
 
-def category_tree(categories: Mapping[str, dict] | Iterable[dict]) -> list[dict]:
+def category_tree(categories: Mapping[str, dict] | Iterable[dict], saved=()) -> list[dict]:
     """Expose exactly two levels; parent groups contain child leaves only."""
-    groups = {}
-    for category in public_categories(categories):
+    children = public_categories(categories)
+    groups = {row['id']: {**row, 'children': []} for row in category_groups(children, saved)}
+    for category in children:
         group_id = category["parentId"]
         group = groups.setdefault(
             group_id, {"id": group_id, "name": _label(category["group"]), "children": []}
@@ -110,6 +126,7 @@ def create_category(
     categories: Mapping[str, dict] | Iterable[dict] = (),
     parent_id: str | None = None,
     currency: str = "USD",
+    groups=(),
 ) -> dict:
     """Create an assignable child by parent label or an existing parent ID."""
     category_id = _identifier(category_id)
@@ -122,7 +139,7 @@ def create_category(
     if any(category["id"] == category_id for category in existing):
         raise StoreError("Category already exists.")
     if parent_id is not None:
-        parents = {parent["id"]: parent for parent in category_groups(existing)}
+        parents = {parent["id"]: parent for parent in category_groups(existing, groups)}
         if type(parent_id) is not str or parent_id not in parents:
             raise StoreError("Parent category group not found.")
         parent_name = parents[parent_id]["name"]
@@ -132,6 +149,35 @@ def create_category(
     return {
         "id": category_id, "name": name, "group": _label(group), "target": target,
         "currency": currency,
+    }
+
+
+def add_category_group(state, name):
+    """Create a real empty parent; never manufacture a placeholder child."""
+    name = _label(name)
+    groups = category_groups(state['categories'], state.get('categoryGroups', ()))
+    if any(row['name'].strip().casefold() == name.strip().casefold() for row in groups):
+        raise StoreError('Category group already exists. Use its name or ID.')
+    identifier = category_group_id(name)
+    state['categoryGroups'] = [*groups, {'id': identifier, 'name': name}]
+    return identifier
+
+
+def move_category(state, category_id, parent_id):
+    """Reparent one leaf without replacing its identity, money or references."""
+    child = ensure_child_category(state['categories'], category_id)
+    groups = category_groups(state['categories'], state.get('categoryGroups', ()))
+    parent = next((row for row in groups if row['id'] == parent_id), None)
+    if parent is None:
+        raise StoreError('Parent category group not found. Only two levels are supported.')
+    if any(row['id'] != category_id and row['group'] == parent['name']
+           and row['name'].strip().casefold() == child['name'].strip().casefold()
+           for row in state['categories'].values()):
+        raise StoreError('A category with this name already exists in the destination group.')
+    state['categoryGroups'] = groups
+    state['categories'][category_id] = {
+        **{key: value for key, value in child.items() if key != 'parentId'},
+        'group': parent['name'],
     }
 
 

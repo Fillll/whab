@@ -9,7 +9,7 @@ import re
 
 from .accounts import ACCOUNT_TYPES, normalize_account
 from .budget import ROLLOVER_MODES
-from .categories import validate_child_category
+from .categories import validate_category_groups, validate_child_category
 from .errors import StoreError
 from .money import MAX_SAFE_INTEGER, currency_code, minor_units
 from .transactions import validate_category_agent
@@ -83,13 +83,14 @@ def validate_portable_budget(data: object) -> dict:
     """Validate exact JSON records and references, returning independent copies."""
     if (
         type(data) is not dict or not _ROOT_FIELDS <= data.keys()
-        or not data.keys() <= _ROOT_FIELDS | {"futureFunding", "rolloverModes", "history"}
+        or not data.keys() <= _ROOT_FIELDS | {"futureFunding", "rolloverModes", "history", "categoryGroups"}
     ):
         raise StoreError("Invalid portable budget fields.")
     if type(data["formatVersion"]) is not int or data["formatVersion"] != 1:
         raise StoreError("Unsupported portable budget version.")
     _text(data["budgetStartMonth"], limit=7)
     validate_month(data["budgetStartMonth"])
+    groups = validate_category_groups(data.get('categoryGroups', []))
     history = None
     if "history" in data:
         from .history import validate_history
@@ -226,6 +227,7 @@ def validate_portable_budget(data: object) -> dict:
             raise StoreError("Duplicate portable rollover mode.")
         mode_keys.add(key)
     return {
+        **({'categoryGroups': groups} if groups else {}),
         **({"history": history} if history is not None else {}),
         "formatVersion": 1,
         "budgetStartMonth": data["budgetStartMonth"],

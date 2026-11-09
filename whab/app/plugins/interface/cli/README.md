@@ -669,3 +669,37 @@ whab api describe --plugin plaid --operation bank.configure --help
 Selected-action help includes Plaid's packaged inputs/outputs, runnable commands
 for both entry points, permissions, scope, examples, side effects and recovery.
 No runtime profile, credentials, enabled plugin or provider request is needed.
+
+## Category management
+
+CLI 2.11+ offers ordinary name-addressed category commands with WHAB 2.65+:
+
+```sh
+whab "My budget" category list --format table
+whab "My budget" category group create "Projects"
+whab "My budget" category move "Finance / Example studio" --parent "Projects"
+whab "My budget" category create "Example venture" --parent "Projects"
+whab "My budget" category list --parent "Projects" --format table
+whab "My budget" category move --help
+```
+
+Names match exactly ignoring case and outer whitespace; stable IDs take precedence.
+Children also accept `Group / Name`; spaces, emoji and non-Latin names work when
+quoted. Missing/ambiguous names show candidates; no fuzzy choice is made. New
+parents are real groups and can be empty. Children require an existing `--parent`;
+`--currency` defaults to USD and `--target` to zero integer minor units. Duplicate
+groups/siblings and invalid/deeper hierarchies are refused. Groups never receive
+transactions or assignments. A move changes the parent only and retains the old
+group even when empty, plus child ID, target, currency, references and every month's
+assignments/history. Existing ledger order is preserved; there is no manual reorder
+operation or requested-order guarantee.
+
+Each mutation reads a revision, generates one unique request ID and invokes the
+guarded public operation, then verifies the saved hierarchy and revision.
+No bank sync is started. Calls are separate atomic commits. After an uncertain
+response, inspect `category list` and `history list`; retain the complete reported
+original intent and never automatically rerun with a new request identity. JSON is
+the default; `--format table` is for readable inspection. Unsupported storage fails
+explicitly for group creation/moves; older adapters may still read derived parents.
+Detailed offline help for every command renders one maintained workflow from
+packaged `category.workflow` documentation; the topic itself is not executable.

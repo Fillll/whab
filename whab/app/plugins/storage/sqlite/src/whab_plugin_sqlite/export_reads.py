@@ -64,6 +64,7 @@ def snapshot(store, workspace, *, transaction_ids=None, include_history=True):
                 history = {'history': json.loads(row[0])}
         return {
             **history,
+            **({"categoryGroups": json.loads(meta["category_groups"])} if "category_groups" in meta.keys() and meta["category_groups"] is not None else {}),
             "formatVersion": 1, "budgetStartMonth": meta["budget_start_month"],
             "accounts": accounts, "categories": categories, "transactions": transactions,
             "assignments": [

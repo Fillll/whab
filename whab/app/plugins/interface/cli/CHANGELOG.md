@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.11.0 — 2026-11-08
+
+PR: [#176](https://github.com/Fillll/whab/pull/176)
+
+- Add name/ID-addressed `category list`, `category group create`, `category create` and `category move`, with JSON/table output, internally guarded intents, saved-result verification and one packaged offline help workflow.
+
 ## 2.10.0 — 2026-11-08
 
 PR: [#175](https://github.com/Fillll/whab/pull/175)

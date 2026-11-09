@@ -17,7 +17,14 @@ from whab.domain import commands
 from whab.domain.accounts import ACCOUNT_TYPES, normalize_account
 from whab.domain.bank_setup import configure_sync, select_sync
 from whab.domain.budget import calculate_workspace
-from whab.domain.categories import create_category, ensure_child_category, public_categories
+from whab.domain.categories import (
+    add_category_group,
+    category_tree,
+    create_category,
+    ensure_child_category,
+    move_category,
+    public_categories,
+)
 from whab.domain.dates import current_month
 from whab.domain.errors import StoreError
 from whab.domain.file_imports import WorkspaceImport, validate_workspace_import
@@ -183,6 +190,8 @@ class Store(Authority):
             "rolloverModes": {},
             "items": {},
         }
+        if "category_groups" in meta.keys() and meta["category_groups"] is not None:
+            state["categoryGroups"] = json.loads(meta["category_groups"])
         state["accounts"] = {row["id"]: row for row in self._read_accounts(workspace)}
         for row in self.db.execute(
             "SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,)
@@ -254,6 +263,8 @@ class Store(Authority):
             "INSERT INTO meta(workspace,budget_start_month) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET budget_start_month=excluded.budget_start_month",
             (workspace, state["budgetStartMonth"]),
         )
+        self.db.execute("UPDATE meta SET category_groups=? WHERE workspace=?",
+                        (json.dumps(state["categoryGroups"]) if state.get("categoryGroups") else None, workspace))
         self.db.executemany(
             "INSERT INTO accounts(id,workspace,name,institution,type,balance,source,item_id,mask,active,balance_unknown,currency,on_budget,subtype,bank_website,name_overridden,closed) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,institution=excluded.institution,type=excluded.type,balance=excluded.balance,source=excluded.source,item_id=excluded.item_id,mask=excluded.mask,active=excluded.active,balance_unknown=excluded.balance_unknown,currency=excluded.currency,on_budget=excluded.on_budget,subtype=excluded.subtype,bank_website=excluded.bank_website,name_overridden=excluded.name_overridden,closed=excluded.closed",
             [
@@ -442,7 +453,7 @@ class Store(Authority):
             if receipt["plugin_id"] != plugin_id or receipt["fingerprint"] != fingerprint:
                 raise StoreError("This workspace has already received a different file import.")
             return receipt
-        if any(state[key] for key in ("accounts", "transactions", "budget", "futureFunding", "rolloverModes", "items")):
+        if state.get('categoryGroups') or any(state[key] for key in ("accounts", "transactions", "budget", "futureFunding", "rolloverModes", "items")):
             raise StoreError("File imports require an empty personal workspace.")
         templates = build_initial_state("personal", state["budgetStartMonth"])["categories"]
         if state["categories"] and state["categories"] != templates:
@@ -547,6 +558,9 @@ class Store(Authority):
             for record in restored["accounts"]
         }
         state["categories"] = {record["id"]: record for record in restored["categories"]}
+        state.pop("categoryGroups", None)
+        if restored.get("categoryGroups"):
+            state["categoryGroups"] = restored["categoryGroups"]
         state["transactions"] = {record["id"]: record for record in restored["transactions"]}
         state["budget"] = {}
         for assignment in restored["assignments"]:
@@ -596,6 +610,13 @@ class Store(Authority):
             raise StoreError("Invalid workspace.")
         if not self.db.execute("SELECT 1 FROM meta WHERE workspace=?", (workspace,)).fetchone():
             raise StoreError("Workspace not found.")
+
+    def category_tree(self, workspace):
+        with self._snapshot():
+            self._require_workspace(workspace)
+            meta = self.db.execute("SELECT * FROM meta WHERE workspace=?", (workspace,)).fetchone()
+            groups = json.loads(meta["category_groups"]) if "category_groups" in meta.keys() and meta["category_groups"] is not None else []
+            return category_tree(self.categories(workspace), groups)
 
     def categories(self, workspace: str) -> list[dict]:
         with self._snapshot():
@@ -733,6 +754,12 @@ class Store(Authority):
     def update_account(self, workspace: str, account_id: str, changes: dict) -> None:
         self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
 
+    def add_category_group(self, workspace, name):
+        return self._mutate(workspace, lambda state: add_category_group(state, name))
+
+    def move_category(self, workspace, category_id, parent_id):
+        return self._mutate(workspace, lambda state: move_category(state, category_id, parent_id))
+
     def add_category(self, workspace: str, category: dict) -> str:
         category_id = str(uuid4())
         if set(category) - {"name", "group", "target", "parentId", "currency"}:
@@ -744,7 +771,7 @@ class Store(Authority):
                 category["name"],
                 category.get("group"),
                 category.get("target", 0),
-                categories=state["categories"],
+                categories=state["categories"], groups=state.get("categoryGroups", ()),
                 parent_id=category.get("parentId"),
                 currency=category.get("currency", "USD"),
             )

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.0 — 2026-11-08
+
+PR: [#176](https://github.com/Fillll/whab/pull/176)
+
+- Persist optional explicit category parents and apply core-validated child moves atomically; preserve empty source groups, financial references, targets, assignments and history across copies and reopening.
+
 ## 1.9.0 — 2026-11-08
 
 PR: [#175](https://github.com/Fillll/whab/pull/175)

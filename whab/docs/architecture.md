@@ -318,3 +318,26 @@ provider removal. The existing encrypted continuation captures the result and
 native receipt. Uncertain removal is never replayed automatically; preserve its
 continuation and inspect status. Reauthentication and provider connection errors
 are shared status; destination failures and import progress remain budget-local.
+
+## Explicit category parents and reparenting
+
+Core owns the fixed two-level category hierarchy. Nonassignable parent identity
+continues to derive from its normalized group label; children retain their stable
+IDs and stored `group` label. WHAB 2.65 adds optional explicit parent metadata to
+represent empty groups and preserve a source parent after its last child moves.
+The neutral `categoryGroups` collection contains only `{id, name}`; public trees
+add children. Metadata remains absent on untouched legacy ledgers, preserving
+existing history hashes and native recovery digests. Undo/redo and all native and
+portable copies retain explicit parents. Native SQLite stores this in an additive
+nullable metadata column, while JSON uses the neutral field.
+
+The existing public contract lacked standalone group creation and reparenting, so
+`category_tree`, guarded `add_category_group`/`move_category`, and optional storage
+`CategoryManagement` are necessary shared additions. CLI owns names, parsing and
+presentation; native adapters own atomic persistence; financial rules stay in core.
+No placeholder child or runtime sidecar stands in for a parent. Moves change only
+the parent label, retain the original group, and preserve child IDs, currency,
+targets, references, assignments and prior history. Invalid/deeper hierarchy changes
+and duplicate destinations fail atomically. Revisions and one intent guard each
+CLI change; uncertain responses never trigger automatic replay. Existing ledger
+order is preserved, without introducing a manual reorder contract.

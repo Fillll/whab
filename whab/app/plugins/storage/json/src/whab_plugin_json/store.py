@@ -16,7 +16,13 @@ from whab.domain.accounts import normalize_account
 from whab.domain.bank_setup import configure_sync
 from whab.domain.bank_sync import merge_sync
 from whab.domain.budget import calculate_workspace, calculate_workspace_periods
-from whab.domain.categories import create_category, public_categories
+from whab.domain.categories import (
+    add_category_group,
+    category_tree,
+    create_category,
+    move_category,
+    public_categories,
+)
 from whab.domain.dates import current_month
 from whab.domain.errors import StoreError
 from whab.domain.file_imports import validate_workspace_import
@@ -242,6 +248,10 @@ class Store(Authority):
         return [normalize_account({"balanceUnknown": False, "stale": False, **record})
                 for record in self._read(workspace)["accounts"].values()]
 
+    def category_tree(self, workspace):
+        state = self._read(workspace)
+        return category_tree(state["categories"], state.get("categoryGroups", ()))
+
     def categories(self, workspace):
         return public_categories(self._read(workspace)["categories"])
 
@@ -265,6 +275,12 @@ class Store(Authority):
     def update_account(self, workspace, account_id, changes):
         return self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
 
+    def add_category_group(self, workspace, name):
+        return self._mutate(workspace, lambda state: add_category_group(state, name))
+
+    def move_category(self, workspace, category_id, parent_id):
+        return self._mutate(workspace, lambda state: move_category(state, category_id, parent_id))
+
     def add_category(self, workspace, category):
         if type(category) is not dict or category.keys() - {"name", "group", "target", "parentId", "currency"}:
             raise StoreError("Categories support exactly two levels.")
@@ -273,7 +289,7 @@ class Store(Authority):
         def operation(state):
             state["categories"][identifier] = create_category(
                 identifier, category["name"], category.get("group"), category.get("target", 0),
-                categories=state["categories"], parent_id=category.get("parentId"), currency=category.get("currency", "USD"),
+                categories=state["categories"], groups=state.get("categoryGroups", ()), parent_id=category.get("parentId"), currency=category.get("currency", "USD"),
             )
             return identifier
 

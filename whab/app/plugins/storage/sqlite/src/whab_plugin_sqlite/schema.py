@@ -43,7 +43,7 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
             "category_agent": "TEXT",
         },
         "categories": {"currency": "TEXT NOT NULL DEFAULT 'USD'"},
-        "meta": {"budget_start_month": "TEXT"},
+        "meta": {"budget_start_month": "TEXT", "category_groups": "TEXT"},
         "items": {"provider": "TEXT NOT NULL DEFAULT 'plaid'", "sync_settings": "TEXT", "closed_account_cursors": "TEXT"},
     }
     for table, columns in migrations.items():
