@@ -1067,3 +1067,8 @@ receive money; missing parents, child-as-parent/deeper nesting and duplicate
 siblings at a move destination are rejected. CLI creation also refuses unintended
 duplicate names under a parent while guarding the observed revision. There is no
 manual category ordering contract; moves retain ledger order.
+
+The category-management capability includes all three methods together. Before
+admitting either hierarchy write, the host requires the `category_tree` read
+contract as well as its mutation method; an older native worker does not opt in
+merely because a generic proxy exposes a write wrapper.

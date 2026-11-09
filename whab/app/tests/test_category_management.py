@@ -213,7 +213,12 @@ def test_malformed_saved_groups_are_rejected(groups):
 def test_older_storage_can_read_derived_groups_but_cannot_mutate_them():
     from types import SimpleNamespace
 
+    def unsupported_write(*args):
+        pytest.fail("Unsupported storage must be rejected before a mutation intent")
+
     store = SimpleNamespace(
+        add_category_group=unsupported_write,
+        move_category=unsupported_write,
         categories=lambda workspace: [
             {"id": "child", "name": "Child", "group": "Legacy", "target": 0}
         ]

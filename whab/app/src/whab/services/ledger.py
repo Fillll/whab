@@ -361,6 +361,11 @@ class LedgerService:
         _identifier(request_id)
         _identifier(expected_revision)
         payload = self._validate(operation, payload)
+        if operation in {'add_category_group', 'move_category'} and (
+            not callable(getattr(self._store, 'category_tree', None))
+            or not callable(getattr(self._store, operation, None))
+        ):
+            raise StoreError('Update the storage plugin to manage category groups and moves.')
         if 'closed' in payload and (operation == 'update_account' or operation == 'add_account' and payload['closed']):
             supported = getattr(self._store, 'supports_account_lifecycle', None)
             if not callable(supported) or supported() is not True:
@@ -417,9 +422,7 @@ class LedgerService:
                 elif operation in {"add_account", "add_category", "add_transaction"}:
                     data = getattr(self._store, operation)(workspace, payload)
                 elif operation in {"add_category_group", "move_category"}:
-                    mutate = getattr(self._store, operation, None)
-                    if not callable(mutate):
-                        raise StoreError("Update the storage plugin to manage category groups and moves.")
+                    mutate = getattr(self._store, operation)
                     data = (mutate(workspace, payload["name"]) if operation == "add_category_group"
                             else mutate(workspace, payload["categoryId"], payload["parentId"]))
                 elif operation == "update_account":
