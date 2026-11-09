@@ -25,6 +25,8 @@
 .plaid-schedule-controls {display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin: 14px 0 8px;}
 .plaid-background {border-top: 1px solid var(--line); margin-top: 15px; padding: 12px 0 8px;}
 .plaid-background strong {font-size: 14px;}
+.plaid-setup {scroll-margin-top: 6px;}
+[data-bank-provider="plaid"] [data-plaid-account-choices] > p {margin: 8px 0 12px;}
 .plaid-setup > header {margin: 12px 0 5px;}
 [data-bank-provider="plaid"] .plaid-setup h3 {font-size: 21px;}
 [data-bank-provider="plaid"] .plaid-setup header p {color: var(--ink); font-weight: 600; font-size: 15px;}

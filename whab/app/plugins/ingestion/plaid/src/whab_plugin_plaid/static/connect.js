@@ -269,22 +269,23 @@ function setupField(title, control) {
   const label = setupElement('label', title); label.append(control); return label;
 }
 function destinationChoices(select, account, candidates) {
-  addOption(select, 'choose', 'Select a WHAB account', true);
+  addOption(select, '', 'Select a WHAB account', true);
   const existing = setupElement('optgroup'), unavailable = setupElement('optgroup');
   existing.label = 'Existing WHAB accounts'; unavailable.label = 'Unavailable accounts';
   let available = 0;
   for (const candidate of candidates) {
     const reason = candidate.currency !== account.currency ? candidate.currency :
       candidate.available === false ? (['unclassified', 'other'].includes(candidate.type) ? 'classify in Accounts' : 'linked to another bank') : '';
-    if (reason) addOption(unavailable, candidate.id, candidate.name + ' · ' + reason, true);
-    else {addOption(existing, candidate.id, candidate.name); available++;}
+    if (reason) addOption(unavailable, 'account:' + candidate.id, candidate.name + ' · ' + reason, true);
+    else {addOption(existing, 'account:' + candidate.id, candidate.name); available++;}
   }
   if (available) select.append(existing);
   const alternatives = setupElement('optgroup'); alternatives.label = 'Other choices';
-  addOption(alternatives, '', 'Create a new WHAB account'); addOption(alternatives, 'skip', 'Do not import');
+  addOption(alternatives, 'new', 'Create a new WHAB account'); addOption(alternatives, 'skip', 'Do not import');
   select.append(alternatives);
   if (unavailable.children.length) select.append(unavailable);
-  select.value = account.link?.accountId || 'choose';
+  select.value = account.link ? 'account:' + account.link.accountId : '';
+  if (select.selectedIndex === -1) select.value = '';
   return available;
 }
 function renderSyncSetup(form, preview) {
@@ -362,6 +363,7 @@ function bind() {
   bindSharedConnections();
   bindButtons('[data-plaid-setup]', async button => {
     if (button.disabled || linking || activeRequests) return;
+    const label = button.textContent; button.textContent = 'Loading accounts…';
     button.disabled = true; activeRequests += 1;
     try {
       const preview = await api('/plaid/sync-preview', {itemId: button.dataset.plaidSetup});
@@ -372,7 +374,7 @@ function bind() {
       form.querySelector('[data-plaid-setup-heading]').focus();
       form.scrollIntoView({block: 'start'});
     } catch (failure) {notify(failure.message);}
-    finally {button.disabled = false; activeRequests -= 1;}
+    finally {button.textContent = label; button.disabled = false; activeRequests -= 1;}
   });
   bindButtons('[data-plaid-setup-cancel]', button => {
     if (activeRequests) return;
@@ -391,12 +393,12 @@ function bind() {
       if (!rows.length) throw new Error('Choose at least one bank account to import.');
       for (const row of rows) {
         const destination = row.querySelector('[data-destination]'), history = row.querySelector('[data-history]'), since = row.querySelector('[data-since]');
-        if (destination.value === 'choose') {destination.focus(); throw new Error('Choose a WHAB destination or Do not import.');}
+        if (!destination.value) {destination.focus(); throw new Error('Choose a WHAB destination or Do not import.');}
         if (!history.value) {history.focus(); throw new Error('Choose how much transaction history to import.');}
         if (history.value === 'date' && !since.value) {since.focus(); throw new Error('Enter an import start date.');}
       }
       const accounts = rows.map(row => ({
-        bankAccountId: row.dataset.bankAccountId, accountId: row.querySelector('[data-destination]').value || null,
+        bankAccountId: row.dataset.bankAccountId, accountId: row.querySelector('[data-destination]').value === 'new' ? null : row.querySelector('[data-destination]').value.slice('account:'.length),
         since: row.querySelector('[data-history]').value === 'all' ? null : row.querySelector('[data-since]').value,
       }));
       await api('/plaid/sync-settings', {itemId: form.dataset.itemId, accounts}, 'PUT');

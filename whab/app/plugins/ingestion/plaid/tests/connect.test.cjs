@@ -481,7 +481,7 @@ test('account setup requires explicit history choices and serializes destination
   assert.equal(form.querySelector('[data-since]').parent.hidden, true);
   const destination = form.querySelector('[data-destination]'), history = form.querySelector('[data-history]'), since = form.querySelector('[data-since]');
   assert.equal(history.value, ''); assert.equal(since.value, '');
-  destination.value = 'local'; await destination.emit('change');
+  destination.value = 'account:local'; await destination.emit('change');
   assert.equal(since.value, '');  // Never infer a start date from existing history.
   await save.emit('click'); assert.equal(error.hidden, false); assert.equal(state.requests.length, 0);
   history.value = 'date'; await history.emit('change');
@@ -518,11 +518,11 @@ test('picker shows named accounts first, explains unavailable choices, and prese
     {id: 'foreign', name: 'Travel', currency: 'EUR', available: true},
     {id: 'connected', name: 'Other bank', currency: 'USD', available: false, type: 'credit'},
   ]);
-  assert.equal(count, 1); assert.equal(picker.value, 'local');
+  assert.equal(count, 1); assert.equal(picker.value, 'account:local');
   const [, existing, alternatives, unavailable] = picker.children;
   assert.equal(existing.label, 'Existing WHAB accounts');
   assert.deepEqual(existing.children.map(option => option.textContent), ['Household checking']);
-  assert.deepEqual(alternatives.children.map(option => option.value), ['', 'skip']);
+  assert.deepEqual(alternatives.children.map(option => option.value), ['new', 'skip']);
   assert.ok(unavailable.children.every(option => option.disabled));
   assert.deepEqual(unavailable.children.map(option => option.textContent), [
     'Imported savings · classify in Accounts', 'Travel · EUR', 'Other bank · linked to another bank']);

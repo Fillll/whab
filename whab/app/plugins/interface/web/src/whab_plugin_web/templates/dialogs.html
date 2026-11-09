@@ -264,10 +264,12 @@
   </section>
 </article>
 {% for plugin in visible_plugins %}
-<article data-settings-page hidden data-settings-parent="plugins-dialog" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} settings" data-plugin-id="{{ plugin.id }}"{% if plugin.category == 'storage' %} data-storage-plugin="{{ plugin.id }}" data-storage-label="{{ plugin.display_name }}" data-workspace="{{ workspace }}"{% endif %} data-plugin-active="{{ 'true' if plugin.active else 'false' }}" data-plugin-read-only="{{ 'true' if workspace=='demo' else 'false' }}">
+{% set has_bank_panel = bank_panels|selectattr('id', 'equalto', plugin.id)|list %}
+<article {% if has_bank_panel %}class="bank-settings-page" {% endif %}data-settings-page hidden data-settings-parent="plugins-dialog" id="plugin-options-{{ plugin.id }}" aria-label="{{ plugin.display_name }} settings" data-plugin-id="{{ plugin.id }}"{% if plugin.category == 'storage' %} data-storage-plugin="{{ plugin.id }}" data-storage-label="{{ plugin.display_name }}" data-workspace="{{ workspace }}"{% endif %} data-plugin-active="{{ 'true' if plugin.active else 'false' }}" data-plugin-read-only="{{ 'true' if workspace=='demo' else 'false' }}">
   <button class="settings-back" type="button" data-settings-back>{{ icon('chevron-left', 14) }}Installed plugins</button>
+  {% if has_bank_panel %}<div class="bank-settings-content">{% endif %}
   {{ heading(plugin.display_name, 'Plugin settings', false) }}
-  {% set fold_information = plugin.id == 'llm-categorization' or bank_panels|selectattr('id', 'equalto', plugin.id)|list %}
+  {% set fold_information = plugin.id == 'llm-categorization' or has_bank_panel %}
   {% if fold_information %}<details class="plugin-information"><summary>Plugin information</summary>{% endif %}
   <dl class="plugin-details">
     <div><dt>Category</dt><dd>{{ plugin_categories.get(plugin.category|default('extension'), 'Extensions') }}</dd></div>
@@ -338,6 +340,7 @@
   {% endfor %}
   <p class="settings-notice" role="status" data-plugin-settings-status></p>
   <p class="field-error" role="alert" data-plugin-settings-error hidden></p>
+  {% if has_bank_panel %}</div>{% endif %}
 </article>
 {% endfor %}
 <article data-settings-page hidden data-settings-parent="settings-home" id="about-dialog" aria-label="About WHAB">{{ heading('We Have A Budget', 'WHAB · ' ~ version, false) }}
