@@ -11,6 +11,19 @@ class LinkBody(Body):
     itemId: Id | None = None
 
 
+class LinkStartBody(LinkBody):
+    profileId: Id | None = None
+
+
+class ProfileBody(Body):
+    profileId: Id
+    config: dict[str, str] = Field(max_length=100)
+
+
+class DisconnectBody(Body):
+    budgetIds: list[Id] = Field(max_length=1000)
+
+
 FlowId = Annotated[str, StringConstraints(min_length=32, max_length=32, pattern=r"^[a-f0-9]{32}$")]
 
 

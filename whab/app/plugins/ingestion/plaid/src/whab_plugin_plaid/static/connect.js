@@ -166,8 +166,9 @@ async function connect(itemId, resumeToken) {
     }
     let token = sessionStorage.getItem('whab-link-token');
     if (!context) {
-      const scope = {formatVersion: 1, provider: 'plaid', environment: environment(), phase: 'ready'};
-      const result = await api('/plaid/link-token', itemId ? {itemId} : {});
+      const profileId = document.querySelector('[data-plaid-profile]')?.value;
+      const scope = {formatVersion: 1, provider: 'plaid', environment: environment(), phase: 'ready', ...(profileId ? {profileId} : {})};
+      const result = await api('/plaid/link-token', itemId ? {itemId} : profileId ? {profileId} : {});
       if (result && typeof result === 'object' && Object.keys(result).length === 1 && typeof result.link_token === 'string' && result.link_token.length >= 1 && result.link_token.length <= 4096) {
         context = {...scope, legacy: true};
       } else {
@@ -195,7 +196,7 @@ async function connect(itemId, resumeToken) {
         activeRequests += 1;
         let submitted = false;
         try {
-          if (!itemId) {
+          if (!itemId && (!context.profileId || context.profileId === 'default')) {
             const existing = await api('/workspace?workspace=personal');
             const duplicate = (metadata.accounts || []).some(candidate => candidate.mask && existing.accounts.some(account => !account.stale && account.source === 'plaid' && account.institution === metadata.institution?.name && account.mask === candidate.mask && account.name === candidate.name));
             if (duplicate) throw new Error('These accounts are already connected. Use Manage on the existing bank connection.');
@@ -303,6 +304,8 @@ function renderSyncSetup(form, preview) {
 }
 
 let disconnectId;
+let disconnectMode = 'disconnect';
+let affectedBudgets;
 const bound = new WeakSet();
 function bindButtons(selector, callback, eventType = 'click') {
   for (const button of document.querySelectorAll(selector)) {
@@ -313,6 +316,7 @@ function bindButtons(selector, callback, eventType = 'click') {
 }
 function bind() {
   bindInvestments();
+  bindSharedConnections();
   bindButtons('[data-plaid-setup]', async button => {
     if (button.disabled || linking || activeRequests) return;
     button.disabled = true; activeRequests += 1;
@@ -440,9 +444,27 @@ function bind() {
       button.disabled = false;
     } finally {activeRequests -= 1;}
   });
-  bindButtons('[data-plaid-disconnect]', button => {
+  bindButtons('[data-plaid-disconnect]', async button => {
+    if (activeRequests || linking) return;
     disconnectId = button.dataset.plaidDisconnect;
+    disconnectMode = 'disconnect'; affectedBudgets = undefined;
+    const shared = button.closest('[data-bank-provider]')?.querySelector('[data-plaid-existing]');
+    if (shared) {
+      button.disabled = true; activeRequests += 1;
+      try {
+        const result = await api('/plaid/connections');
+        if (result.unavailableBudgets.length) throw new Error('Some saved budgets are unavailable. Restore access before disconnecting the bank.');
+        const connection = result.connections.find(row => row.itemId === disconnectId);
+        if (!connection) throw new Error('Connection not found. Refresh settings.');
+        const affected = connection.attachments.filter(row => ['attached', 'pending'].includes(row.state));
+        affectedBudgets = affected.map(row => row.budgetId).sort();
+        document.querySelector('[data-plaid-affected-budgets]').textContent = `This disconnects every attached budget: ${affected.map(row => `${row.budgetName} (${row.budgetId})`).join(', ')}.`;
+      } catch (failure) {notify(failure.message); return;}
+      finally {button.disabled = false; activeRequests -= 1;}
+    }
     document.querySelector('#plaid-disconnect-dialog h2').textContent = `Disconnect ${button.dataset.institution}?`;
+    document.querySelector('#plaid-disconnect-dialog .modal-description').textContent = 'This stops importing for every attached budget and revokes this bank connection. Imported history stays in each budget.';
+    document.getElementById('plaid-confirm-disconnect').textContent = 'Disconnect from bank';
     document.getElementById('plaid-disconnect-dialog').hidden = false;
     document.getElementById('plaid-confirm-disconnect').focus();
   });
@@ -451,12 +473,82 @@ function bind() {
     button.disabled = true;
     activeRequests += 1;
     try {
-      await api(`/plaid/items/${encodeURIComponent(disconnectId)}`, {}, 'DELETE');
+      await api(`/plaid/${disconnectMode === 'detach' ? 'attachments' : 'items'}/${encodeURIComponent(disconnectId)}`,
+        affectedBudgets === undefined ? {} : {budgetIds: affectedBudgets}, 'DELETE');
       reloadSettings();
     } catch (failure) {
       notify(failure.message);
       button.disabled = false;
     } finally {activeRequests -= 1;}
+  });
+}
+function bindSharedConnections() {
+  for (const panel of document.querySelectorAll('[data-plaid-profiles]')) {
+    if (bound.has(panel)) continue;
+    bound.add(panel);
+    api('/plaid/profiles').then(result => {
+      const select = panel.querySelector('[data-plaid-profile]');
+      const options = result.profiles.map(profile => {const option = setupElement('option', profile.profileId); option.value = profile.profileId; return option;});
+      select.replaceChildren(...options);
+    }).catch(failure => {panel.querySelector('[data-plaid-profile-status]').textContent = failure.message;});
+  }
+  bindButtons('[data-plaid-profile-save]', async button => {
+    if (activeRequests || linking) return;
+    const panel = button.closest('[data-plaid-profiles]');
+    const name = panel.querySelector('[data-plaid-profile-name]');
+    const client = panel.querySelector('[data-plaid-client-id]'); const secret = panel.querySelector('[data-plaid-secret]');
+    button.disabled = true; activeRequests += 1;
+    try {
+      await api('/plaid/profiles', {profileId: name.value, config: {PLAID_CLIENT_ID: client.value,
+        PLAID_SECRET: secret.value, ALLOW_LIVE_PLAID: panel.dataset.liveEnabled}}, 'PUT');
+      secret.value = ''; client.value = '';
+      reloadSettings();
+    } catch (failure) {panel.querySelector('[data-plaid-profile-status]').textContent = failure.message;}
+    finally {button.disabled = false; activeRequests -= 1;}
+  });
+  bindButtons('[data-plaid-existing-back]', button => {button.closest('[data-plaid-existing-view]').hidden = true;});
+  bindButtons('[data-plaid-existing]', async button => {
+    if (activeRequests || linking) return;
+    const view = button.closest('[data-bank-provider]').querySelector('[data-plaid-existing-view]');
+    const list = view.querySelector('[data-plaid-existing-list]'); list.replaceChildren();
+    view.hidden = false; button.disabled = true; activeRequests += 1;
+    try {
+      const result = await api('/plaid/connections');
+      for (const connection of result.connections) {
+        const row = setupElement('section');
+        row.append(setupElement('h4', connection.institutionName));
+        row.append(setupElement('p', `Connection ${connection.itemId} · Plaid account ${connection.profileId} · ${connection.status}`));
+        for (const account of connection.accounts) row.append(setupElement('p', `${account.name}${account.mask ? ` · ending ${account.mask}` : ''} · ${account.currency || ''}`));
+        row.append(setupElement('p', `Budgets: ${connection.attachments.map(entry => `${entry.budgetName} (${entry.state})`).join(', ')}`));
+        const attach = setupElement('button', connection.attached ? 'Attached to this budget' : 'Use this connection');
+        attach.className = 'button secondary';
+        attach.disabled = connection.attached || ['revoking', 'disconnected'].includes(connection.status);
+        attach.addEventListener('click', async () => {
+          if (activeRequests || linking) return;
+          attach.disabled = true; activeRequests += 1;
+          try {
+            await api('/plaid/attachments', {itemId: connection.itemId});
+            reloadSettings();
+          } catch (failure) {notify(failure.message); attach.disabled = false;}
+          finally {activeRequests -= 1;}
+        });
+        row.append(attach); list.append(row);
+      }
+      view.querySelector('[data-plaid-existing-status]').textContent = result.unavailableBudgets.length
+        ? 'Some saved budgets are unavailable; their connections could not be checked. Preserve their files and restore access.'
+        : result.connections.length ? 'Choose a connection, then open Sync setup after attaching.' : 'No existing connections on this device in this environment.';
+    } catch (failure) {view.querySelector('[data-plaid-existing-status]').textContent = failure.message;}
+    finally {button.disabled = false; activeRequests -= 1;}
+  });
+  bindButtons('[data-plaid-detach]', button => {
+    if (activeRequests || linking) return;
+    disconnectId = button.dataset.plaidDetach; disconnectMode = 'detach'; affectedBudgets = undefined;
+    document.querySelector('#plaid-disconnect-dialog h2').textContent = `Detach ${button.dataset.institution} from this budget?`;
+    document.querySelector('#plaid-disconnect-dialog .modal-description').textContent = 'This stops imports into this budget. The bank connection remains available on this device.';
+    document.querySelector('[data-plaid-affected-budgets]').textContent = 'Other budgets stay connected. This budget keeps its financial history, mappings and progress. Reattach to resume.';
+    document.getElementById('plaid-confirm-disconnect').textContent = 'Detach from this budget';
+    document.getElementById('plaid-disconnect-dialog').hidden = false;
+    document.getElementById('plaid-confirm-disconnect').focus();
   });
 }
 bind();

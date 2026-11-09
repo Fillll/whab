@@ -20,7 +20,7 @@ from whab.plugins import StorageBackend
 
 
 class BankStore:
-    def __init__(self, store: StorageBackend, provider_id: str, *, suggestions_only=False):
+    def __init__(self, store: StorageBackend, provider_id: str, *, suggestions_only=False, scoped_items=lambda _item: False):
         if (
             type(provider_id) is not str
             or len(provider_id) > 64
@@ -31,6 +31,7 @@ class BankStore:
         self._store = store
         self._suggestions_only = suggestions_only
         self._provider = provider_id
+        self._scoped_items = scoped_items
 
     @staticmethod
     def _raw_id(value: str) -> str:
@@ -49,7 +50,7 @@ class BankStore:
 
     def _record_identity(self, kind: str, item_id: str, record_id: str) -> str:
         raw = self._raw_id(record_id)
-        if self._provider == "plaid":
+        if self._provider == "plaid" and not self._scoped_items(item_id):
             if raw.startswith("provider:"):
                 raise StoreError("Reserved bank identifier namespace.")
             return raw

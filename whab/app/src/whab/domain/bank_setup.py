@@ -50,6 +50,8 @@ def configure_sync(state, item_id, accounts, selection):
         if target is None and target_id != source:
             raise StoreError("Destination account not found.")
         if target is not None:
+            if target['type'] in {'other', 'unclassified'}:
+                raise StoreError('Classify this destination account before linking a bank account.')
             if target.get("currency", "USD") != bank["currency"]:
                 raise StoreError("Bank and destination account currencies must match.")
             if target["type"] != "unclassified" and is_liability(target) != is_liability(bank):

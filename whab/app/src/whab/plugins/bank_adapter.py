@@ -106,8 +106,12 @@ class BankAdapter:
     sync_interval_seconds: int | None = None
     requires_account_setup: bool = False
     supports_investments: bool = False
+    credential_identity_keys: tuple[str, ...] = ()
 
     def __post_init__(self):
+        if (type(self.credential_identity_keys) is not tuple or len(self.credential_identity_keys) > 10
+                or any(type(key) is not str or not key or len(key) > 200 for key in self.credential_identity_keys)):
+            raise ValueError('Choose bounded provider credential identity keys.')
         if type(self.requires_account_setup) is not bool:
             raise ValueError("Account setup policy must be a boolean.")
         if type(self.supports_investments) is not bool:

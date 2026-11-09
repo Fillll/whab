@@ -305,7 +305,7 @@
       ],
       "side_effects": "Read-only local saved connection metadata.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -349,7 +349,7 @@
       ],
       "side_effects": "Fetches provider data for review without importing transactions or advancing the saved cursor.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -437,7 +437,7 @@
       ],
       "side_effects": "Atomically saves links, joins an existing auto-created account when selected, retains transaction IDs/annotations and resets the cursor for idempotent replay. Does not delete old history or start synchronization.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -482,7 +482,7 @@
       ],
       "side_effects": "Imports configured accounts using saved cutoffs and advances their cursors atomically. No new external bank connection is created.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -531,9 +531,9 @@
           }
         }
       ],
-      "side_effects": "With an interval, saves this provider\u2019s budget-local update policy. Does not fetch transactions or register an OS job.",
+      "side_effects": "With an interval, saves this provider’s budget-local update policy. Does not fetch transactions or register an OS job.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -577,7 +577,7 @@
       ],
       "side_effects": "Registers or removes the existing WHAB launchd task. It can start WHAB to check due jobs in saved budgets. Other platforms use cron with python -m whab --run-jobs.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1514,6 +1514,488 @@
       ],
       "retry": "Read-only and safe to retry after addressing the fixed error. Do not create a duplicate connection or infer successful product activation. Loading again reads Plaid cached data and does not force a bank refresh.",
       "availability": "WHAB 2.60+, CLI 2.3+, and Plaid 1.7+; provider must declare BankAdapter.supports_investments. Plaid Investments must be separately enabled/consented. Investment history availability varies by institution; default window is two years."
+    },
+    {
+      "name": "bank.shared",
+      "kind": "local",
+      "summary": "List device-local connections, provider account profiles, owners, safe account metadata and every budget attachment.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "description": "Provider plugin ID."
+                },
+                "itemId": {
+                  "type": "string",
+                  "description": "Stable WHAB connection ID accepted by --item and attachment/setup/sync operations."
+                },
+                "providerItemId": {
+                  "type": "string",
+                  "description": "Original provider Item identity scoped by account profile and environment."
+                },
+                "profileId": {
+                  "type": "string",
+                  "description": "Named provider account profile; default preserves existing configured credentials."
+                },
+                "ownerBudgetId": {
+                  "type": "string",
+                  "description": "Permanent original owning budget ID; sharing does not transfer ownership."
+                },
+                "institutionName": {
+                  "type": "string",
+                  "description": "Safe institution display name."
+                },
+                "status": {
+                  "enum": [
+                    "connected",
+                    "reconnect",
+                    "error",
+                    "revoking",
+                    "disconnected"
+                  ],
+                  "description": "Shared provider connection lifecycle status."
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Safe authored connection error or null when absent."
+                },
+                "accounts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Provider account identifier from safe metadata."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Safe account display name."
+                      },
+                      "mask": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Last account digits or null when unavailable."
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "Account currency ISO code."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "Provider-reported account classification."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "description": "Safe cached account metadata without balances or financial records."
+                },
+                "attached": {
+                  "type": "boolean",
+                  "description": "Whether this budget currently uses the connection."
+                },
+                "attachments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "budgetId": {
+                        "type": "string",
+                        "description": "Permanent budget identity."
+                      },
+                      "state": {
+                        "enum": [
+                          "attached",
+                          "pending",
+                          "detached"
+                        ],
+                        "description": "Attached, pending native reference save, or detached with history retained."
+                      },
+                      "budgetName": {
+                        "type": "string",
+                        "description": "Locally registered budget display name when available."
+                      }
+                    },
+                    "required": [
+                      "budgetId",
+                      "state"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "description": "Every retained budget attachment and its state."
+                }
+              },
+              "required": [
+                "provider",
+                "itemId",
+                "providerItemId",
+                "profileId",
+                "ownerBudgetId",
+                "institutionName",
+                "status",
+                "error",
+                "accounts",
+                "attached",
+                "attachments"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Connections registered on this device for the selected provider and environment."
+          },
+          "unavailableBudgets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Saved budget IDs whose connections could not be checked; these budgets are not reset."
+          }
+        },
+        "required": [
+          "connections",
+          "unavailableBudgets"
+        ],
+        "additionalProperties": false,
+        "description": "Safe host result for bank.shared. Credentials, tokens, native references, encryption keys and provider cursors are excluded."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "connections": [],
+            "unavailableBudgets": []
+          }
+        }
+      ],
+      "side_effects": "Registers saved legacy connections using public storage without provider calls or imports. Reports unavailable budgets.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "Device-local runtime, provider account profile and production/Sandbox environment; financial records and import progress remain budget-local.",
+      "errors": [
+        "Unavailable or locked budgets are reported without being reset.",
+        "Missing/mismatched profile, environment, account classification, native recovery, invalid schema or stale affected-budget confirmation is refused."
+      ],
+      "retry": "Inspect shared connections, attachments and profile names after an uncertain response. Attach/detach can be reconciled and repeated; never repeat an uncertain provider revocation or Link exchange.",
+      "availability": "WHAB 2.63+, Plaid 1.8+ and CLI 2.8+. Local personal budgets only."
+    },
+    {
+      "name": "bank.attach",
+      "kind": "local",
+      "summary": "Explicitly attach an existing connection to this budget.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {
+          "item": {
+            "type": "string",
+            "description": "itemId from bank shared; maps to --item."
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "attached": {
+            "const": true,
+            "description": "Whether this budget currently uses the connection."
+          },
+          "itemId": {
+            "type": "string",
+            "description": "Stable WHAB connection ID accepted by --item and attachment/setup/sync operations."
+          }
+        },
+        "required": [
+          "attached",
+          "itemId"
+        ],
+        "additionalProperties": false,
+        "description": "Safe host result for bank.attach. Credentials, tokens, native references, encryption keys and provider cursors are excluded."
+      },
+      "examples": [
+        {
+          "input": {
+            "item": "fictional-item"
+          },
+          "output": {
+            "attached": true,
+            "itemId": "fictional-item"
+          }
+        }
+      ],
+      "side_effects": "Saves a nonsecret native attachment reference. No Link flow, provider request, transaction import or ledger copy.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "Device-local runtime, provider account profile and production/Sandbox environment; financial records and import progress remain budget-local.",
+      "errors": [
+        "Unavailable or locked budgets are reported without being reset.",
+        "Missing/mismatched profile, environment, account classification, native recovery, invalid schema or stale affected-budget confirmation is refused."
+      ],
+      "retry": "Inspect shared connections, attachments and profile names after an uncertain response. Attach/detach can be reconciled and repeated; never repeat an uncertain provider revocation or Link exchange.",
+      "availability": "WHAB 2.63+, Plaid 1.8+ and CLI 2.8+. Local personal budgets only."
+    },
+    {
+      "name": "bank.detach",
+      "kind": "local",
+      "summary": "Detach from this budget while other budgets keep using the bank.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {
+          "item": {
+            "type": "string",
+            "description": "Attached connection ID; maps to --item."
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "attached": {
+            "const": false,
+            "description": "Whether this budget currently uses the connection."
+          },
+          "itemId": {
+            "type": "string",
+            "description": "Stable WHAB connection ID accepted by --item and attachment/setup/sync operations."
+          }
+        },
+        "required": [
+          "attached",
+          "itemId"
+        ],
+        "additionalProperties": false,
+        "description": "Safe host result for bank.detach. Credentials, tokens, native references, encryption keys and provider cursors are excluded."
+      },
+      "examples": [
+        {
+          "input": {
+            "item": "fictional-item"
+          },
+          "output": {
+            "attached": false,
+            "itemId": "fictional-item"
+          }
+        }
+      ],
+      "side_effects": "Stops use by this budget; retains its ledger, mappings, cutoffs and cursor. Does not revoke the provider Item.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "Device-local runtime, provider account profile and production/Sandbox environment; financial records and import progress remain budget-local.",
+      "errors": [
+        "Unavailable or locked budgets are reported without being reset.",
+        "Missing/mismatched profile, environment, account classification, native recovery, invalid schema or stale affected-budget confirmation is refused."
+      ],
+      "retry": "Inspect shared connections, attachments and profile names after an uncertain response. Attach/detach can be reconciled and repeated; never repeat an uncertain provider revocation or Link exchange.",
+      "availability": "WHAB 2.63+, Plaid 1.8+ and CLI 2.8+. Local personal budgets only."
+    },
+    {
+      "name": "bank.disconnect",
+      "kind": "local",
+      "summary": "Revoke a bank connection for every attached budget after reviewing them.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {
+          "item": {
+            "type": "string",
+            "description": "Connection ID; --item."
+          },
+          "affected_budgets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Exact sorted IDs of attached/pending budgets from bank shared; --affected-budgets JSON."
+          }
+        },
+        "required": [
+          "item",
+          "affected_budgets"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "const": true,
+            "description": "True when the requested operation completed."
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false,
+        "description": "Safe host result for bank.disconnect. Credentials, tokens, native references, encryption keys and provider cursors are excluded."
+      },
+      "examples": [
+        {
+          "input": {
+            "item": "fictional-item",
+            "affected_budgets": [
+              "fictional-budget"
+            ]
+          },
+          "output": {
+            "ok": true
+          }
+        }
+      ],
+      "side_effects": "Fences every consumer before invoking provider removal once through the durable continuation. Financial history remains.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "Device-local runtime, provider account profile and production/Sandbox environment; financial records and import progress remain budget-local.",
+      "errors": [
+        "Unavailable or locked budgets are reported without being reset.",
+        "Missing/mismatched profile, environment, account classification, native recovery, invalid schema or stale affected-budget confirmation is refused."
+      ],
+      "retry": "Inspect shared connections, attachments and profile names after an uncertain response. Attach/detach can be reconciled and repeated; never repeat an uncertain provider revocation or Link exchange.",
+      "availability": "WHAB 2.63+, Plaid 1.8+ and CLI 2.8+. Local personal budgets only."
+    },
+    {
+      "name": "bank.profiles",
+      "kind": "local",
+      "summary": "List named Plaid account profiles on this device and environment.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "profileId": {
+                  "type": "string",
+                  "description": "Named provider account profile; default preserves existing configured credentials."
+                }
+              },
+              "required": [
+                "profileId"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Provider account profile names stored encrypted on this device."
+          }
+        },
+        "required": [
+          "profiles"
+        ],
+        "additionalProperties": false,
+        "description": "Safe host result for bank.profiles. Credentials, tokens, native references, encryption keys and provider cursors are excluded."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "profiles": [
+              {
+                "profileId": "default"
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Reads profile names only; no secrets, provider requests or imports.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "Device-local runtime, provider account profile and production/Sandbox environment; financial records and import progress remain budget-local.",
+      "errors": [
+        "Unavailable or locked budgets are reported without being reset.",
+        "Missing/mismatched profile, environment, account classification, native recovery, invalid schema or stale affected-budget confirmation is refused."
+      ],
+      "retry": "Inspect shared connections, attachments and profile names after an uncertain response. Attach/detach can be reconciled and repeated; never repeat an uncertain provider revocation or Link exchange.",
+      "availability": "WHAB 2.63+, Plaid 1.8+ and CLI 2.8+. Local personal budgets only."
+    },
+    {
+      "name": "bank.profile-save",
+      "kind": "local",
+      "summary": "Save an encrypted, named provider account profile from a private file or stdin.",
+      "input": {
+        "type": "object",
+        "description": "Bank-management parameters for an explicitly addressed local budget and enabled provider.",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "description": "New or same-account profile name; --profile. default is reserved."
+          },
+          "credentials_file": {
+            "type": "string",
+            "description": "Private JSON provider configuration file, or - for stdin; --credentials-file. Never put credentials in command arguments."
+          }
+        },
+        "required": [
+          "profile",
+          "credentials_file"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "description": "Named provider account profile; default preserves existing configured credentials."
+          },
+          "saved": {
+            "const": true,
+            "description": "True after the named account profile is saved."
+          }
+        },
+        "required": [
+          "profileId",
+          "saved"
+        ],
+        "additionalProperties": false,
+        "description": "Safe host result for bank.profile-save. Credentials, tokens, native references, encryption keys and provider cursors are excluded."
+      },
+      "examples": [
+        {
+          "input": {
+            "profile": "second-account",
+            "credentials_file": "/private/fictional-provider.json"
+          },
+          "output": {
+            "profileId": "second-account",
+            "saved": true
+          }
+        }
+      ],
+      "side_effects": "Encrypts credentials with host facilities on this device; no connection is created. Profile account identity is immutable; a secret can rotate for the same account.",
+      "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
+      "scope": "Device-local runtime, provider account profile and production/Sandbox environment; financial records and import progress remain budget-local.",
+      "errors": [
+        "Unavailable or locked budgets are reported without being reset.",
+        "Missing/mismatched profile, environment, account classification, native recovery, invalid schema or stale affected-budget confirmation is refused."
+      ],
+      "retry": "Inspect shared connections, attachments and profile names after an uncertain response. Attach/detach can be reconciled and repeated; never repeat an uncertain provider revocation or Link exchange.",
+      "availability": "WHAB 2.63+, Plaid 1.8+ and CLI 2.8+. Local personal budgets only."
     }
   ]
 }

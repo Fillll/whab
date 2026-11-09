@@ -150,3 +150,18 @@ def test_public_typed_factory_opens_without_http_or_host_encryption_key():
         assert 'TOKEN_ENCRYPTION_KEY' not in provider.config['missingConfig']
     finally:
         asyncio.run(provider.close())
+
+
+@pytest.mark.parametrize('profile,webhook,expected', [
+    ('default', 'https://example.test/hook?keep=yes', 'https://example.test/hook?keep=yes'),
+    ('second-account', '', ''),
+    ('second-account', 'https://example.test/hook?keep=yes&profile=old', 'https://example.test/hook?keep=yes&profile=second-account'),
+])
+def test_profile_webhooks_keep_provider_account_routing(plaid_env, plaid_client, profile, webhook, expected):
+    async def scenario():
+        config = {**context(plaid_env).config, 'WHAB_BANK_PROFILE': profile, 'PLAID_WEBHOOK_URL': webhook}
+        async with plaid_client(lambda _: pytest.fail('Profile setup does not call provider HTTP')) as client:
+            provider = PlaidProvider(BankProviderContext('synthetic-budget', 'sandbox', config), client)
+            assert provider.env.get('PLAID_WEBHOOK_URL') == expected
+            await provider.close()
+    asyncio.run(scenario())

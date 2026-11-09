@@ -27,11 +27,11 @@ function panel() {
     '[data-plaid-check-link]': [new Target()],
     '[data-plaid-cancel-link]': [new Target()],
     '[data-plaid-finish-link]': [new Target({hidden: true})],
-    '[data-plaid-disconnect]': [new Target({dataset: {plaidDisconnect: 'fictional/item', institution: 'Fictional Bank'}})],
+    '[data-plaid-disconnect]': [new Target({dataset: {plaidDisconnect: 'fictional/item', institution: 'Fictional Bank'}, closest: () => ({querySelector: () => null})})],
     '#plaid-confirm-disconnect': [new Target({focus() {this.focused = true;}})],
     '[data-plaid-close-dialog]': [new Target({closest: () => dialog})],
   };
-  return {buttons, dialog, heading: {textContent: ''}, provider: {dataset: {bankEnvironment: 'sandbox'}}, pending: {hidden: true}};
+  return {buttons, dialog, heading: {textContent: ''}, description: {textContent: ''}, affected: {textContent: ''}, provider: {dataset: {bankEnvironment: 'sandbox'}}, pending: {hidden: true}};
 }
 function harness({initialPanel = false, sdk = true, href = 'https://localhost:5173/budgets/fictional/budget/2026-10/usd', session = {}} = {}) {
   const requests = [], notices = [], redirects = [], scripts = [], timers = [], links = [];
@@ -41,7 +41,7 @@ function harness({initialPanel = false, sdk = true, href = 'https://localhost:51
     assign(value) {redirects.push(String(value));}, reload() {reloads += 1;}};
   const document = new Target({
     querySelectorAll: selector => current?.buttons[selector] || [],
-    querySelector: selector => selector === '#plaid-disconnect-dialog h2' ? current?.heading : selector === '[data-bank-provider="plaid"]' ? current?.provider : selector === '[data-plaid-continuation]' ? current?.pending : selector === '[data-plaid-finish-link]' ? current?.buttons[selector][0] : null,
+    querySelector: selector => selector === '#plaid-disconnect-dialog h2' ? current?.heading : selector === '#plaid-disconnect-dialog .modal-description' ? current?.description : selector === '[data-plaid-affected-budgets]' ? current?.affected : selector === '[data-bank-provider="plaid"]' ? current?.provider : selector === '[data-plaid-continuation]' ? current?.pending : selector === '[data-plaid-finish-link]' ? current?.buttons[selector][0] : null,
     getElementById: id => id === 'plaid-disconnect-dialog' ? current?.dialog : id === 'plaid-confirm-disconnect' ? current?.buttons['#plaid-confirm-disconnect'][0] : null,
     createElement: () => new Target({remove() {this.removed = true;}}),
     head: {appendChild: script => scripts.push(script)},
@@ -102,13 +102,15 @@ test('sync and disconnect veto navigation until all active provider requests set
   assert.equal(state.requests.length, 1);
   assert.equal(state.canNavigate(), false);
   await state.current.buttons['[data-plaid-disconnect]'][0].emit('click');
+  assert.equal(state.current.dialog.hidden, true);
+  state.requests[0].reply({error: 'Sync failed.'}, false); await syncing;
+  assert.equal(sync.disabled, false);
+  await state.current.buttons['[data-plaid-disconnect]'][0].emit('click');
   const confirm = state.current.buttons['#plaid-confirm-disconnect'][0];
   const disconnecting = confirm.emit('click'); void confirm.emit('click');
   assert.equal(state.requests.length, 2);
   assert.equal(state.requests[1].url, '/budgets/fictional/api/plaid/items/fictional%2Fitem');
   assert.equal(state.requests[1].options.method, 'DELETE');
-  state.requests[0].reply({error: 'Sync failed.'}, false); await syncing;
-  assert.equal(sync.disabled, false);
   assert.equal(state.canNavigate(), false);
   state.requests[1].reply({error: 'Disconnect failed.'}, false); await disconnecting;
   assert.equal(confirm.disabled, false);
@@ -502,4 +504,74 @@ test('reopened setup keeps previously excluded accounts out of the import select
   assert.equal(form.querySelector('[data-destination]').value, 'skip');
   assert.equal(form.querySelector('[data-history]').disabled, true);
   assert.equal(form.querySelector('[data-since]').disabled, true);
+});
+
+function sharedHarness() {
+  const state = harness({initialPanel: true});
+  state.document.createElement = tag => new SetupNode(tag);
+  const provider = new SetupNode();
+  const existing = new SetupNode('button'); existing.dataset.plaidExisting = '';
+  const view = new SetupNode(); view.dataset.plaidExistingView = ''; view.hidden = true;
+  const back = new SetupNode('button'); back.dataset.plaidExistingBack = '';
+  const list = new SetupNode(); list.dataset.plaidExistingList = '';
+  const status = new SetupNode(); status.dataset.plaidExistingStatus = '';
+  view.append(back, list, status); provider.append(existing, view);
+  const detach = new SetupNode('button'); detach.dataset = {plaidDetach: 'fictional/item', institution: 'Fictional Bank'}; provider.append(detach);
+  state.current.buttons['[data-plaid-existing]'] = [existing];
+  state.current.buttons['[data-plaid-existing-back]'] = [back];
+  state.current.buttons['[data-plaid-detach]'] = [detach];
+  state.current.buttons['[data-plaid-disconnect]'][0].closest = () => provider;
+  state.ready();
+  return {state, existing, view, list, status, detach};
+}
+const sharedConnection = {itemId: 'fictional/item', institutionName: '<img src=x>', profileId: 'second-account',
+  status: 'connected', attached: false, accounts: [{name: 'Fictional checking', mask: '1234', currency: 'USD'}],
+  attachments: [{budgetId: 'budget-b', budgetName: 'Fictional B', state: 'attached'}, {budgetId: 'budget-a', budgetName: 'Fictional A', state: 'attached'}]};
+
+test('existing connection attaches without Link, importing or copying a ledger and renders metadata as text', async () => {
+  const {state, existing, view, list} = sharedHarness();
+  const loading = existing.emit('click'); assert.equal(state.canNavigate(), false);
+  assert.equal(state.requests[0].url.endsWith('/connections'), true);
+  state.requests[0].reply({connections: [sharedConnection], unavailableBudgets: []}); await loading;
+  assert.equal(view.hidden, false); assert.equal(list.children[0].children[0].textContent, '<img src=x>');
+  const attach = list.children[0].children.at(-1);
+  const saving = attach.emit('click');
+  assert.equal(state.requests[1].url.endsWith('/attachments'), true);
+  assert.deepEqual(JSON.parse(state.requests[1].options.body), {itemId: 'fictional/item'});
+  assert.equal(state.links.length, 0); assert.equal(state.requests.length, 2);
+  state.requests[1].reply({attached: true}); await saving;
+  assert.equal(state.reloads, 1);
+});
+
+test('global disconnect reviews every budget and submits the sorted affected set', async () => {
+  const {state} = sharedHarness();
+  const opening = state.current.buttons['[data-plaid-disconnect]'][0].emit('click');
+  state.requests[0].reply({connections: [sharedConnection], unavailableBudgets: []}); await opening;
+  assert.match(state.current.affected.textContent, /Fictional A \(budget-a\)/);
+  assert.match(state.current.affected.textContent, /Fictional B \(budget-b\)/);
+  const saving = state.current.buttons['#plaid-confirm-disconnect'][0].emit('click');
+  assert.equal(state.requests[1].url.endsWith('/items/fictional%2Fitem'), true);
+  assert.deepEqual(JSON.parse(state.requests[1].options.body), {budgetIds: ['budget-a', 'budget-b']});
+  state.requests[1].reply({ok: true}); await saving;
+});
+
+test('detach confirmation leaves other budgets connected and calls only the attachment endpoint', async () => {
+  const {state, detach} = sharedHarness();
+  await detach.emit('click');
+  assert.match(state.current.description.textContent, /bank connection remains available/);
+  assert.match(state.current.affected.textContent, /Other budgets stay connected/);
+  assert.equal(state.requests.length, 0);
+  const saving = state.current.buttons['#plaid-confirm-disconnect'][0].emit('click');
+  assert.equal(state.requests[0].url.endsWith('/attachments/fictional%2Fitem'), true);
+  assert.equal(state.requests[0].options.method, 'DELETE');
+  state.requests[0].reply({attached: false}); await saving;
+});
+
+test('unavailable budgets prevent opening a global disconnect confirmation', async () => {
+  const {state} = sharedHarness();
+  const opening = state.current.buttons['[data-plaid-disconnect]'][0].emit('click');
+  state.requests[0].reply({connections: [sharedConnection], unavailableBudgets: ['locked-budget']}); await opening;
+  assert.equal(state.current.dialog.hidden, true);
+  assert.match(state.notices[0], /unavailable/);
+  assert.equal(state.requests.length, 1);
 });

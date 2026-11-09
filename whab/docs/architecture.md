@@ -217,3 +217,59 @@ Python plugins run with the server's privileges and are trusted code, not sandbo
 Change domain rules with direct domain regressions, storage behavior with isolated SQLite fixtures, provider flows with mocked HTTP, and public behavior with web tests. Keep plugin compatibility tests against the exported SDK rather than private internals. Preserve installed-wheel checks whenever packaging, assets or entry points change.
 
 Adding a bank provider requires normalization into the existing import contract and careful handling of source identity, money conversion, credentials, deduplication and atomic checkpoints. A one-time migration additionally needs a design for account matching, split transactions, transfers and budget history; it is not an insights/export hook. See the [README](../app/README.md#limits-and-data-safety) for current limitations and [contribution guide](../app/CONTRIBUTING.md#pull-requests-and-releases) for the release compatibility policy.
+
+## Shared bank connection ownership
+
+WHAB 2.63 separates device-local provider connections from budget consumption.
+The shared host/SDK owns the encrypted registry, provider account profiles,
+explicit attachment decisions and operation serialization. The provider plugin
+owns HTTP, Link, webhook verification and normalization. The financial core owns
+account compatibility and history selection. Each storage plugin owns atomic
+ledger/cursor commits through the existing public native contract.
+
+Each attachment retains an independent Transactions Sync cursor. This uses
+[Plaid's cursor replay contract](https://plaid.com/docs/api/products/transactions/):
+reading one cursor does not advance another saved cursor. It avoids a second
+transaction journal, consumer offsets and retention/compaction rules. Provider
+operations serialize across budgets; separate cursor reads are intentional and
+never force a bank refresh or activate another product. A failed/unavailable
+budget can replay its own cursor without consuming another budget's changes.
+
+The registry lives under the private runtime's `plugin-workers/bank-connections/`
+root, separated by environment and provider. Credentials are decrypted using the
+old Item associated identity and reencrypted for the shared identity. Native
+budget records retain their Item/account/transaction IDs, mappings, cutoffs and
+cursor; their token column becomes a nonsecret device-local reference. The
+registry is committed before replacing legacy ciphertext. Reopening completes
+interrupted registration without changing the original owner or recreating an
+Item. Attachment intent precedes the native reference save; reopening finalizes
+pending attachments only after finding that matching native reference. Portable
+exports still omit credentials and do not acquire shared attachments on another
+device. Back up the whole runtime and keys together.
+
+Discovery checks registered dormant budgets using maintenance lifespans and
+public storage contracts, including disabled providers. It never creates bank
+provider engines, runs jobs or performs bank HTTP. Missing, locked or unsupported
+budgets are reported; they are preserved, and global disconnection is refused
+until their attachments can be reviewed. Enabling a plugin never attaches every
+available connection. Detach retains native financial history and progress;
+reattach resumes that budget. Manual policies remain budget-local and suppress
+webhook and scheduled imports. A verified webhook routes to the attached budgets;
+unavailable destinations retain their cursor for later replay.
+
+Named provider account profiles allow several Plaid API accounts in one runtime.
+The existing configuration becomes the encrypted default profile; each connection
+pins its original profile and account-identity fingerprint. Changing default
+configuration to another account does not redirect old Items. Named profiles have
+immutable account identities; credentials may rotate for that same account.
+Connections created with a named profile use separate public and native record
+namespaces, even if another account returns identical Item/account/transaction
+IDs. New Link flows explicitly choose a profile; attachment reuses its bound
+profile. Profile credentials never enter public inspection or portable exports.
+
+Global disconnection checks the exact reviewed set of affected budgets while
+holding the provider operation lock. It durably fences every consumer before
+provider removal. The existing encrypted continuation captures the result and
+native receipt. Uncertain removal is never replayed automatically; preserve its
+continuation and inspect status. Reauthentication and provider connection errors
+are shared status; destination failures and import progress remain budget-local.

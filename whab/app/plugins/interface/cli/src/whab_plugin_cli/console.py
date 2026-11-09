@@ -18,7 +18,7 @@ from . import client
 from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import selection_error
-from .help import AGENT_WORKFLOW, account_classification, describe, overview
+from .help import AGENT_WORKFLOW, account_classification, bank_help, describe, overview
 from .history_commands import add_history_parser, execute_history
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 from .transaction_commands import add_category_parsers, execute_category
@@ -32,7 +32,7 @@ class CommandError(ValueError):
     """A controlled diagnostic safe to show without transport/private values."""
 
 
-def parser(options):
+def parser(options, argv=()):
     catalog = installed_catalog()
     check_identifiers(catalog)
     root = argparse.ArgumentParser(prog="whab", parents=[options],
@@ -60,7 +60,7 @@ def parser(options):
         epilog="Example: whab empty-budget plugin enable ynab-zip-importer\nChanges apply live where supported; otherwise restart_required is returned. CLI is an installed management tool, not a budget toggle. Required storage cannot be disabled. Web is optional and can be disabled.")
     plugins.add_argument("action", choices=("list", "status", "enable", "disable"), help="list/status read selections; enable/disable save an explicit plugin choice")
     plugins.add_argument("plugin", nargs="?", help="Identifier from whab plugin list; required for enable/disable")
-    add_bank_parser(commands)
+    add_bank_parser(commands, documentation=bank_help(argv, catalog))
     add_history_parser(commands)
     imports = commands.add_parser("import", help="Preview or commit a ZIP import into this empty budget",
         epilog="Enable an importer first: whab BUDGET plugin enable ynab-zip-importer\nThen: whab BUDGET import ynab-zip-importer preview --help",
@@ -248,7 +248,7 @@ def main(argv=None):
             return client.main([*forwarded, *remaining[1:]])
         if remaining and remaining[0] not in ROOT_COMMANDS and not remaining[0].startswith("-"):
             remaining.insert(0, "BUDGET")
-        args = parser(options).parse_args(remaining, namespace=global_args)
+        args = parser(options, remaining).parse_args(remaining, namespace=global_args)
         if args.scope == "plugin":
             result = describe(installed_catalog())
         else:

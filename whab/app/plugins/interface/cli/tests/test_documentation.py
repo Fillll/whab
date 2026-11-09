@@ -268,3 +268,41 @@ def test_invalid_nonempty_budget_ids_fail_before_network(monkeypatch, budget, ca
     monkeypatch.setenv("WHAB_CLI_TOKEN", "fictional-access-" + "x" * 32)
     assert client.main(["--url", "https://localhost", "--budget", budget, "query", "accounts"]) == 1
     assert "error" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('main,prefix', [(console.main, ['Fictional budget']), (client.main, [])])
+@pytest.mark.parametrize('action,meaning', [
+    ('shared', 'unavailableBudgets'), ('profiles', 'profileId'),
+    ('profile-save', 'credentials_file'), ('attach', 'No Link flow'),
+    ('detach', 'Does not revoke'), ('disconnect', 'affected_budgets'),
+    ('connections', 'account destinations'), ('preview', 'itemId'),
+    ('configure', 'since'), ('sync', 'cursor'), ('schedule', 'interval_seconds'),
+    ('background', 'enabled'), ('investments', 'cost basis'),
+])
+def test_bank_action_help_explains_the_selected_plugin_offline(main, prefix, action, meaning, monkeypatch, capsys):
+    monkeypatch.setattr(console, 'configuration', lambda args: pytest.fail('Help must not read a runtime profile'))
+    monkeypatch.setattr(console, 'local_connection', lambda *a, **k: pytest.fail('Help must not acquire a host'))
+    monkeypatch.setattr(client, '_local', lambda args: pytest.fail('Help must not acquire a host'))
+    monkeypatch.setattr(client.httpx, 'Client', lambda **kwargs: pytest.fail('Help must not contact a provider'))
+    with pytest.raises(SystemExit) as result:
+        main([*prefix, 'bank', action, 'plaid', '--help'])
+    assert result.value.code == 0
+    output = capsys.readouterr().out
+    assert 'local bank.' + action in output and meaning.lower() in output.lower()
+    assert 'whab BUDGET bank ' + action + ' plaid' in output
+    assert 'whab-cli CONFIG bank ' + action + ' plaid' in output
+    for section in ['Scope:', 'Access:', 'Side effects:', 'Retry:', 'Errors:', 'Examples:']:
+        assert section in output
+
+
+def test_bank_help_reports_an_unknown_provider_without_invoking_it():
+    catalog = sample_catalog()
+    assert 'No installed operation documentation' in help_module.bank_help(['bank', 'attach', 'missing'], catalog)
+    assert 'No installed operation documentation' in help_module.bank_help(['bank', 'attach', 'cli'], {'plugins': [{'id': 'cli', 'documentation': {'operations': []}}]})
+    assert help_module.bank_help(['bank', '--help'], catalog) is None
+
+
+def test_cli_documentation_uses_a_provider_placeholder_for_delegated_bank_operations(capsys):
+    with pytest.raises(SystemExit):
+        client.main(['describe', '--plugin', 'cli', '--operation', 'bank.attach', '--help'])
+    assert 'whab BUDGET bank attach PROVIDER --item CONNECTION_ID' in capsys.readouterr().out

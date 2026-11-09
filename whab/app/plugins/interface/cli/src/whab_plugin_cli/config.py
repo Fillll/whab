@@ -5,7 +5,7 @@ import shlex
 from pathlib import Path
 
 CONFIG_LIMIT = 64 * 1024
-COMMANDS = frozenset({"query", "command", "feature-query", "feature-command", "describe", "plugins", "sync", "jobs"})
+COMMANDS = frozenset({"query", "command", "feature-query", "feature-command", "describe", "plugins", "sync", "jobs", "bank"})
 OPTIONS = {"--url": "url", "--budget": "budget", "--ca": "ca",
            "--workspace": "workspace", "--token-env": "token_env", "--home": "home", "--environment": "environment"}
 

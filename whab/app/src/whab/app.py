@@ -249,7 +249,7 @@ def storage_config(settings, session, plugin):
 
 
 @managed_plugin_startup
-def create_app(store=None, settings=None, plugins=None, bank_services=None, *, budget_session=None, budget_host=None, _child=False):
+def create_app(store=None, settings=None, plugins=None, bank_services=None, *, budget_session=None, budget_host=None, _child=False, _bank_maintenance=False):
     settings = settings or Settings.load()
     if plugins is not None:
         validate_interface_owners(plugins.descriptors())
@@ -451,6 +451,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 suggestions_only=lambda: bool(service.categorization and service.categorization.enabled()),
                 allow_banks=not remote_authority)
             startup.own(bank_lifecycle, bank_lifecycle.release_journals)
+            bank_lifecycle.shared_event = lambda provider, item, sync, reconnect: budget_host.bank_event(
+                service.budget_id, provider, item, sync, reconnect)
     except BaseException as error:
         startup.close(error)
         raise
@@ -588,7 +590,7 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
             try:
                 # Startup owns these immutable descriptors while unresolved
                 # native evidence can keep ordinary runtime admission gated.
-                for plugin in plugins.bank_plugins():
+                for plugin in (() if _bank_maintenance else plugins.bank_plugins()):
                     bank = await run_in_threadpool(bank_lifecycle.create, plugin, runtime.status()["generation"],
                                                    (bank_services or {}).get(plugin.id))
                     banks[plugin.id] = bank
@@ -597,9 +599,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                     bank_lifecycle.resources[id(bank)] = resource
                 if not _child:
                     await budget_host.remember_current()
-                await replicas.start()
+                if not _bank_maintenance:
+                    await replicas.start()
                 from whab.hosting import current_owner
-                if current_owner() is not None:
+                if current_owner() is not None and not _bank_maintenance:
                     await bank_jobs.start()
                 yield
             finally:
@@ -643,9 +646,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         def webhook_paths(path):
             active = runtime._active.services["banks"]
             if path == "/api/plaid/webhook":
-                return "plaid" in active
+                return "plaid" in active or budget_host.active_bank('plaid') is not None
             parts = path.split("/")
-            return len(parts) == 5 and parts[1:3] == ["api", "banks"] and parts[4] == "webhook" and parts[3] in active
+            return len(parts) == 5 and parts[1:3] == ["api", "banks"] and parts[4] == "webhook" and (
+                parts[3] in active or budget_host.active_bank(parts[3]) is not None)
         install_middleware(
             app,
             settings.port,
@@ -688,8 +692,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         app.include_router(file_imports_router(
             store, registry, budget_host, budget_session.id if budget_session else "default",
         ))
-        app.include_router(banks_router(None, leased_banks, bank_stores, jobs=bank_jobs, settings=settings))
-        app.include_router(banks_router("plaid", leased_banks, bank_lifecycle.bank_store("plaid"), prefix="/api/plaid", jobs=bank_jobs, settings=settings))
+        app.include_router(banks_router(None, leased_banks, bank_stores, jobs=bank_jobs, settings=settings, host=budget_host))
+        app.include_router(banks_router("plaid", leased_banks, bank_stores, prefix="/api/plaid", jobs=bank_jobs, settings=settings, host=budget_host))
         app.include_router(plugins_router(store, registry, plugin_manager))
         app.include_router(
             pages_router(

@@ -532,3 +532,43 @@ whab api --budget BUDGET_ID query history_preview --parameters '{"action":"undo"
 
 `--parameters` accepts a JSON object or `-` for stdin, at most 1 MiB. Do not combine
 it with `--month`; put an operation's supported fields in the JSON object.
+
+## Shared bank connections and provider account profiles
+
+CLI 2.8 with WHAB 2.63 adds `bank shared PROVIDER` (device connections, safe account
+metadata, owning/profile IDs and all budget attachments), `bank attach PROVIDER
+--item ID` and `bank detach PROVIDER --item ID`. Attachment makes no provider
+request, creates no Item and imports no transactions. Configure destinations and
+explicit dates separately, then sync. Detach retains this budget's financial
+history and cursor; other attached budgets remain connected. `bank connections`
+continues to list only this budget's attachments.
+
+`bank profiles PROVIDER` lists account profile names. `bank profile-save PROVIDER
+--profile NAME --credentials-file PRIVATE_JSON_FILE` stores a named provider
+account encrypted with the host key. Use `-` for stdin; credentials never belong
+in command arguments. Different Plaid accounts use different profiles. Existing
+connections retain their original profile; enabling a provider attaches nothing.
+See [Plaid profiles and complete examples](../../ingestion/plaid/README.md#shared-connections-and-several-plaid-accounts).
+
+`bank disconnect PROVIDER --item ID --affected-budgets '["budget-a","budget-b"]'`
+revokes the Item for every attached budget. Review `bank shared` first and supply
+the exact sorted affected IDs. This differs from detaching one budget. Missing or
+unavailable budgets and changed attachment sets refuse revocation. The same
+commands work through `whab-cli PROFILE bank ...`; `describe --plugin plaid
+--operation bank.attach` and operation-specific help document inputs, effects and
+recovery. Profiles/attachments are device-local and environment-isolated; bank
+consent and reauthentication remain interactive Web operations.
+
+All bank actions support provider-specific offline help, for example:
+
+```sh
+whab BUDGET bank attach plaid --help
+whab BUDGET bank profile-save plaid --help
+whab-cli bank disconnect plaid --help
+whab api describe --plugin plaid --help
+whab api describe --plugin plaid --operation bank.configure --help
+```
+
+Selected-action help includes Plaid's packaged inputs/outputs, runnable commands
+for both entry points, permissions, scope, examples, side effects and recovery.
+No runtime profile, credentials, enabled plugin or provider request is needed.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.63.0 — 2026-11-08
+
+PR: [#171](https://github.com/Fillll/whab/pull/171)
+
+- Add device-local shared bank connections, encrypted provider account profiles, recoverable legacy registration, explicit budget attachments and independently committed import progress. Preserve ownership and history on detach; require affected-budget review for global revocation.
+
 ## 2.62.0 — 2026-11-08
 
 PR: [#169](https://github.com/Fillll/whab/pull/169)
