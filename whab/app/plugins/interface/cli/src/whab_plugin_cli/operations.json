@@ -3987,6 +3987,15 @@
             "description": "New unique parent name.",
             "minLength": 1,
             "maxLength": 200
+          },
+          "format": {
+            "type": "string",
+            "description": "Output presentation; JSON retains complete saved fields.",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json"
           }
         },
         "required": [
@@ -4040,13 +4049,23 @@
           "currency": {
             "type": "string",
             "description": "Supported ISO currency.",
-            "default": "USD"
+            "default": "USD",
+            "pattern": "^[A-Z]{3}$"
           },
           "target": {
             "type": "integer",
             "description": "Nonnegative currency minor units.",
             "minimum": 0,
             "default": 0
+          },
+          "format": {
+            "type": "string",
+            "description": "Output presentation; JSON retains complete saved fields.",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json"
           }
         },
         "required": [
@@ -4098,6 +4117,15 @@
             "description": "Existing parent name or ID.",
             "minLength": 1,
             "maxLength": 200
+          },
+          "format": {
+            "type": "string",
+            "description": "Output presentation; JSON retains complete saved fields.",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json"
           }
         },
         "required": [
