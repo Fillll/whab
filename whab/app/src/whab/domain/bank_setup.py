@@ -151,7 +151,11 @@ def reconcile_account_closed(state, account_id, before, closed):
         if closed:
             checkpoints.setdefault(account_id, item.get('cursor'))
         elif account_id in checkpoints:
-            item['cursor'] = checkpoints.pop(account_id)
+            cursor = checkpoints.pop(account_id)
+            # Provider cursors are opaque. With overlapping pauses, or an
+            # already-pending full replay, no later reopen may advance past an
+            # earlier account's resume point. Saved import cutoffs still apply.
+            item['cursor'] = None if checkpoints or item.get('cursor') is None else cursor
         if checkpoints:
             item['closedAccountCursors'] = checkpoints
         else:

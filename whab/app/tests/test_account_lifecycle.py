@@ -164,6 +164,23 @@ def test_closed_destinations_keep_existing_mapping_but_reject_new_links(lifecycl
     assert store.commit_evidence() == evidence
 
 
+def test_overlapping_archives_reopen_without_skipping_an_earlier_resume_point(lifecycle_store):
+    store,_ = lifecycle_store
+    store.save_item('item','fictional-encrypted-token','Fictional bank')
+    records = [account(),account('peer')]
+    store.apply_sync('item',delta(),'cursor-1',records)
+    store.update_account('personal','cd',{'closed':True})
+    store.apply_sync('item',delta(),'cursor-2',records)
+    store.update_account('personal','peer',{'closed':True})
+    store.update_account('personal','cd',{'closed':False})
+    assert store.get_item('item')['cursor'] is None
+    store.update_account('personal','peer',{'closed':False})
+    assert store.get_item('item')['cursor'] is None
+    assert 'closedAccountCursors' not in store.get_item('item')
+    store.apply_sync('item',delta(added=[transaction('during-first-pause'),transaction('during-second-pause','peer')]),'cursor-3',records)
+    assert {row['id'] for row in store.transactions('personal')} == {'during-first-pause','during-second-pause'}
+
+
 def test_history_preview_does_not_reopen_or_mutate_resume_cursor(lifecycle_store):
     store,_=lifecycle_store
     store.save_item('item','fictional-private-token','Fictional bank')

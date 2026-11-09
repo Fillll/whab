@@ -211,6 +211,8 @@ Reopening rewinds this budget's cursor to that checkpoint so the next separately
 requested/due sync catches up under the original mappings and inclusive start
 choices. Stable provider IDs make replay of open peers idempotent. Neither action
 initiates sync or changes its schedule. Provider availability still limits catch-up.
+Overlapping account pauses use a full replay under the saved import cutoffs,
+because opaque provider cursors cannot be ordered safely across resume points.
 Changing bank setup explicitly resets the checkpoint to the reviewed beginning.
 Undo/redo preserve archive state and reconcile these native checkpoints; previews
 do not mutate them. Native copies/recovery retain checkpoints, while sanitized
