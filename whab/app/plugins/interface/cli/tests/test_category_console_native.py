@@ -6,7 +6,10 @@ import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
+
+from whab.plugins.local import local_connection
 
 
 def test_real_console_creates_groups_moves_preserving_history_and_isolates_budgets(
@@ -38,101 +41,103 @@ def test_real_console_creates_groups_moves_preserving_history_and_isolates_budge
     def run(*args, ok=True):
         return cli("--environment", "sandbox", *args, ok=ok)
 
-    budget = run("budget", "create", "Fictional категории")["id"]
-    other = run("budget", "create", "Fictional isolated")["id"]
-    pristine = run(other, "category", "list")["data"]
-    finance = run(budget, "category", "group", "create", "Fictional finance")["data"]
-    studio = cli(
-        "Fictional категории",
-        "category",
-        "create",
-        "🧰 工作室",
-        "--parent",
-        finance["id"],
-        "--target",
-        "1234",
-        "--home",
-        str(home),
-        "--environment",
-        "sandbox",
-    )["data"]
-
-    def advanced(operation, payload):
-        observed = run(budget, "category", "list")
-        return run(
-            "api",
-            "--budget",
-            budget,
-            "command",
-            operation,
-            "--parameters",
-            json.dumps(payload),
-            "--revision",
-            observed["revision"],
-            "--request-id",
-            uuid4().hex,
+    # Hold the fictional host across independently scheduled console processes.
+    with patch.dict(os.environ, env, clear=True), local_connection(home, 'sandbox'):
+        budget = run("budget", "create", "Fictional категории")["id"]
+        other = run("budget", "create", "Fictional isolated")["id"]
+        pristine = run(other, "category", "list")["data"]
+        finance = run(budget, "category", "group", "create", "Fictional finance")["data"]
+        studio = cli(
+            "Fictional категории",
+            "category",
+            "create",
+            "🧰 工作室",
+            "--parent",
+            finance["id"],
+            "--target",
+            "1234",
+            "--home",
+            str(home),
+            "--environment",
+            "sandbox",
         )["data"]
 
-    cash = advanced(
-        "add_account", {"name": "Fictional checking", "type": "depository", "balance": 100000}
-    )
-    advanced(
-        "add_transaction",
-        {
-            "accountId": cash,
-            "date": month + "-01",
-            "merchant": "Fictional invoice",
-            "amount": 100,
-            "categoryId": studio["id"],
-            "note": "Keep note",
-        },
-    )
-    advanced("assign", {"categoryId": studio["id"], "month": month, "assigned": 900})
-    advanced("assign", {"categoryId": studio["id"], "month": next_month, "assigned": 700})
-    before = run("api", "--budget", budget, "query", "portable")["data"]
-    projects = run("Fictional категории", "category", "group", "create", "Fictional проекты")[
-        "data"
-    ]
-    assert projects["children"] == []
-    profile = tmp_path / "fictional.budget"
-    profile.write_text(json.dumps({"home": str(home), "environment": "sandbox"}))
-    moved = cli(
-        "--profile",
-        str(profile),
-        budget,
-        "category",
-        "move",
-        "Fictional finance / 🧰 工作室",
-        "--parent",
-        "Fictional проекты",
-        "--ca",
-        str(home / "tls/ca.crt"),
-    )["data"]
-    assert moved == {**studio, "group": "Fictional проекты", "parentId": projects["id"]}
-    added = run(budget, "category", "create", "Fictional venture", "--parent", projects["id"])[
-        "data"
-    ]
-    assert added["target"] == 0 and added["currency"] == "USD"
-    assert (
-        "already exists"
-        in run(
-            budget, "category", "create", "fictional VENTURE", "--parent", projects["id"], ok=False
-        )["error"]
-    )
-    listed = run(budget, "category", "list", "--parent", "Fictional проекты")["data"][0]
-    assert {row["id"] for row in listed["children"]} == {studio["id"], added["id"]}
-    assert run(budget, "category", "list", "--parent", finance["id"])["data"][0]["children"] == []
-    after = run("api", "--budget", budget, "query", "portable")["data"]
-    for key in ["transactions", "assignments", "accounts"]:
-        assert after[key] == before[key]
-    assert (
-        after["history"]["entries"][: len(before["history"]["entries"])]
-        == before["history"]["entries"]
-    )
-    assert run(other, "category", "list")["data"] == pristine
-    # Repeated independent console entry points observe the same persisted IDs.
-    assert run(budget, "category", "list", "--parent", projects["id"])["data"][0] == listed
-    assert (
-        "Candidates"
-        in run(budget, "category", "move", studio["id"], "--parent", added["id"], ok=False)["error"]
-    )
+        def advanced(operation, payload):
+            observed = run(budget, "category", "list")
+            return run(
+                "api",
+                "--budget",
+                budget,
+                "command",
+                operation,
+                "--parameters",
+                json.dumps(payload),
+                "--revision",
+                observed["revision"],
+                "--request-id",
+                uuid4().hex,
+            )["data"]
+
+        cash = advanced(
+            "add_account", {"name": "Fictional checking", "type": "depository", "balance": 100000}
+        )
+        advanced(
+            "add_transaction",
+            {
+                "accountId": cash,
+                "date": month + "-01",
+                "merchant": "Fictional invoice",
+                "amount": 100,
+                "categoryId": studio["id"],
+                "note": "Keep note",
+            },
+        )
+        advanced("assign", {"categoryId": studio["id"], "month": month, "assigned": 900})
+        advanced("assign", {"categoryId": studio["id"], "month": next_month, "assigned": 700})
+        before = run("api", "--budget", budget, "query", "portable")["data"]
+        projects = run("Fictional категории", "category", "group", "create", "Fictional проекты")[
+            "data"
+        ]
+        assert projects["children"] == []
+        profile = tmp_path / "fictional.budget"
+        profile.write_text(json.dumps({"home": str(home), "environment": "sandbox"}))
+        moved = cli(
+            "--profile",
+            str(profile),
+            budget,
+            "category",
+            "move",
+            "Fictional finance / 🧰 工作室",
+            "--parent",
+            "Fictional проекты",
+            "--ca",
+            str(home / "tls/ca.crt"),
+        )["data"]
+        assert moved == {**studio, "group": "Fictional проекты", "parentId": projects["id"]}
+        added = run(budget, "category", "create", "Fictional venture", "--parent", projects["id"])[
+            "data"
+        ]
+        assert added["target"] == 0 and added["currency"] == "USD"
+        assert (
+            "already exists"
+            in run(
+                budget, "category", "create", "fictional VENTURE", "--parent", projects["id"], ok=False
+            )["error"]
+        )
+        listed = run(budget, "category", "list", "--parent", "Fictional проекты")["data"][0]
+        assert {row["id"] for row in listed["children"]} == {studio["id"], added["id"]}
+        assert run(budget, "category", "list", "--parent", finance["id"])["data"][0]["children"] == []
+        after = run("api", "--budget", budget, "query", "portable")["data"]
+        for key in ["transactions", "assignments", "accounts"]:
+            assert after[key] == before[key]
+        assert (
+            after["history"]["entries"][: len(before["history"]["entries"])]
+            == before["history"]["entries"]
+        )
+        assert run(other, "category", "list")["data"] == pristine
+        # Repeated independent console entry points observe the same persisted IDs.
+        assert run(budget, "category", "list", "--parent", projects["id"])["data"][0] == listed
+        assert (
+            "Candidates"
+            in run(budget, "category", "move", studio["id"], "--parent", added["id"], ok=False)["error"]
+        )
