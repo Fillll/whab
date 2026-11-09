@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.9.1 — 2026-11-08
+
+PR: [#174](https://github.com/Fillll/whab/pull/174)
+
+- Render importer-owned packaged workflow topics in import/preview/commit help and discover them from generic import help. Keep offline plugin discovery and SDK callbacks accurately labeled, prefer the simple account commands in classification help, and document simple name-addressed workflows with detailed help as a contribution requirement.
+
 ## 2.9.0 — 2026-11-08
 
 PR: [#173](https://github.com/Fillll/whab/pull/173)

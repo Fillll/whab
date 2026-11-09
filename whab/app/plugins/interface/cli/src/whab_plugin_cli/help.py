@@ -29,6 +29,7 @@ Discovery:
   whab BUDGET --help                     name-addressed local commands
   whab BUDGET account --help             inspect/classify by unique name or ID
   whab BUDGET bank --help                mappings, schedules and investments
+  whab BUDGET import --help              importer-owned migration workflows
   whab BUDGET history --help             checkpoints and previewed undo/redo
   whab api command edit_transaction --help
   whab api describe --offline --json     installed schemas; no connection needed
@@ -164,10 +165,11 @@ def account_classification(catalog):
         "  type: " + fields["type"]["description"],
         "  onBudget: " + fields["onBudget"]["description"],
         "  balance: " + fields["balance"]["description"],
-        "Inspect current values: whab-cli CONFIG query accounts (or whab api query accounts).",
-        "Review edit fields/examples offline: whab-cli command update_account --help",
+        "Inspect current values: whab BUDGET account list or account show ACCOUNT_NAME_OR_ID.",
+        "Classify by unique name/ID: whab BUDGET account classify --help (no JSON/revision/request ID needed).",
+        "Advanced edit fields/examples: whab-cli command update_account --help",
         "  or whab api command update_account --help.",
-        "Account reads return the stable account ID and revision needed for an explicit edit.",
+        "Advanced account edits retain their explicit stable-ID/revision/request-ID contract.",
     ])
 
 
@@ -217,3 +219,22 @@ def bank_help(argv, catalog):
             row = operation(document, 'local', 'bank.' + argv[index + 1]) if document else None
             return render_operation(row, plugin) if row else 'No installed operation documentation for this provider; use whab api describe --help.'
     return None
+
+
+def import_help(argv, catalog):
+    """Render importer-owned data-only workflows without loading parser hooks."""
+    workflows = {}
+    for plugin in catalog['plugins']:
+        document = plugin['documentation']
+        row = operation(document, 'local', 'import.workflow') if document else None
+        if row:
+            workflows[plugin['id']] = row['summary']
+    for index, token in enumerate(argv):
+        if token == 'import' and index + 1 < len(argv):
+            selected = workflows.get(host_id(argv[index + 1]))
+            if selected:
+                return selected
+    if workflows:
+        return 'Installed import workflows (offline; review one stage at a time):\n' + '\n'.join(
+            f'  whab BUDGET import {cli_id(identifier)} --help' for identifier in workflows)
+    return 'No installed importer workflow documentation. Use whab api describe --offline --json to inspect installed contracts.'

@@ -19,7 +19,7 @@ from .account_commands import account_table, add_account_parser, execute_account
 from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import selection_error
-from .help import AGENT_WORKFLOW, account_classification, bank_help, describe, overview
+from .help import AGENT_WORKFLOW, account_classification, bank_help, describe, import_help, overview
 from .history_commands import add_history_parser, execute_history
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 from .transaction_commands import add_category_parsers, execute_category
@@ -64,14 +64,15 @@ def parser(options, argv=()):
     add_bank_parser(commands, documentation=bank_help(argv, catalog))
     add_history_parser(commands)
     add_account_parser(commands, catalog)
+    workflow = import_help(argv, catalog)
     imports = commands.add_parser("import", help="Preview or commit a ZIP import into this empty budget",
-        epilog="Enable an importer first: whab BUDGET plugin enable ynab-zip-importer\nThen: whab BUDGET import ynab-zip-importer preview --help",
+        epilog="Enable an importer first: whab BUDGET plugin enable ynab-zip-importer\nThen: whab BUDGET import ynab-zip-importer preview --help\n\n" + workflow,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     imports.add_argument("plugin", help="Enabled file importer, for example ynab-zip-importer (ynab is also accepted)")
     stages = imports.add_subparsers(dest="stage", required=True)
     for stage in ("preview", "commit"):
         operation = stages.add_parser(stage, help="Read counts and warnings without changing financial data" if stage == "preview" else "Import the reviewed archive atomically into an empty budget",
-            epilog="Example:\n  whab empty-budget import ynab-zip-importer preview '~/Downloads/export.zip' --currency USD\n  whab empty-budget import ynab-zip-importer commit '~/Downloads/export.zip' --currency USD --fingerprint SHA256_FROM_PREVIEW\n\nCommit verifies the reviewed fingerprint, previews again and echoes that parser's identity in the same host lease. Nonempty budgets and changed files/parsers are refused. No automatic retries; after an uncertain commit, preview the same file to inspect alreadyImported before retrying that fingerprint. Imported accounts require classification; exported balances remain unverified estimates.",
+            epilog="Example:\n  whab empty-budget import ynab-zip-importer preview '~/Downloads/export.zip' --currency USD\n  whab empty-budget import ynab-zip-importer commit '~/Downloads/export.zip' --currency USD --fingerprint SHA256_FROM_PREVIEW\n\nCommit verifies the reviewed fingerprint, previews again and echoes that parser's identity in the same host lease. Nonempty budgets and changed files/parsers are refused. No automatic retries; after an uncertain commit, preview the same file to inspect alreadyImported before retrying that fingerprint. Imported accounts require classification; exported balances remain unverified estimates.\n\n" + workflow,
             formatter_class=argparse.RawDescriptionHelpFormatter)
         operation.add_argument("file", help="Local ZIP export, at most 10 MiB; quoted ~ expands")
         operation.add_argument("--currency", required=True, help="Confirm the export currency explicitly (USD for YNAB)")
