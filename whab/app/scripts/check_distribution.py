@@ -66,6 +66,7 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
              ["fictional", "insights", "summary", "--help"],
              ["fictional", "trnx", "non-reviewed", "--help"],
              ["fictional", "trnx", "uncategorized", "--help"],
+             ["fictional", "trnx", "list", "--help"],
              ["fictional", "category", "--help"],
              ["fictional", "category", "list", "--help"],
              ["fictional", "category", "group", "--help"],
@@ -78,6 +79,8 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
         except SystemExit as exit:
             assert exit.code == 0
     assert "usage:" in output.getvalue()
+    if args[1:3] == ["trnx", "list"]:
+        assert "complete=true" in output.getvalue() and "16 MiB" in output.getvalue()
 assert any(entry.name == "whab" for entry in metadata.distribution("whab_plugin_cli").entry_points)
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]
