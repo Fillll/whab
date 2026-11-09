@@ -3164,6 +3164,417 @@
       ],
       "retry": "Inspect shared connections, attachments and profile names after an uncertain response. Attach/detach can be reconciled and repeated; never repeat an uncertain provider revocation or Link exchange.",
       "availability": "WHAB 2.63+, Plaid 1.8+ and CLI 2.8+. Local personal budgets only."
+    },
+    {
+      "name": "account.list",
+      "kind": "local",
+      "summary": "List account names, IDs, types, subtypes, scope and unclassified status.",
+      "input": {
+        "type": "object",
+        "description": "Local account command arguments under a name/ID-resolved BUDGET. Global --home/--environment/--profile/--ca work before or after subcommands.",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json",
+            "description": "Output format; JSON retains complete public fields."
+          },
+          "unclassified": {
+            "type": "boolean",
+            "default": false,
+            "description": "Only type=other; independent of imported balance verification."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "JSON success envelope; --format table presents the same classification for humans.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent budget ID."
+          },
+          "budget": {
+            "type": "string",
+            "description": "The supplied budget name or ID."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Observed opaque ledger revision."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Complete public account, with unclassified derived from type=other; other public fields remain present.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable account ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Full display name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Financial type, separate from budget scope."
+                },
+                "onBudget": {
+                  "type": "boolean",
+                  "description": "Saved monthly-envelope scope."
+                },
+                "unclassified": {
+                  "type": "boolean",
+                  "description": "True exactly when type is other."
+                },
+                "subtype": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Saved domain subtype, or null."
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "type",
+                "subtype",
+                "onBudget",
+                "unclassified"
+              ]
+            },
+            "description": "Matching public accounts."
+          }
+        },
+        "required": [
+          "budgetId",
+          "budget",
+          "revision",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "budgetId": "fictional-budget",
+            "budget": "My budget",
+            "revision": "saved-revision",
+            "data": [
+              {
+                "id": "fictional-account",
+                "name": "🍏Example Card",
+                "type": "credit",
+                "subtype": "credit_card",
+                "onBudget": true,
+                "unclassified": false
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read-only; no classification, balance verification or bank synchronization.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One existing name/ID-resolved budget and selected environment. Production is the CLI default; choose --environment sandbox for fictional fixtures. Type and budget scope are separate.",
+      "errors": [
+        "Missing/ambiguous budget fails without fallback. Missing/ambiguous account fails with up to 20 candidates; IDs take precedence, no fuzzy matching.",
+        "Domain-invalid type/subtype/scope fails without mutation. Stale revisions conflict. Wrong-budget, changed verification or uncertain responses fail without automatic mutation replay."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.9+; whab BUDGET account list --help. Packaged documentation: whab api describe --offline --plugin cli --operation account.list --json. Delegates to core accounts/update_account; no new shared API."
+    },
+    {
+      "name": "account.show",
+      "kind": "local",
+      "summary": "Read one account by unique name or stable ID.",
+      "input": {
+        "type": "object",
+        "description": "Local account command arguments under a name/ID-resolved BUDGET. Global --home/--environment/--profile/--ca work before or after subcommands.",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json",
+            "description": "Output format; JSON retains complete public fields."
+          },
+          "account": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exact stable ID or unique case-insensitive name after trimming outer whitespace; no fuzzy match."
+          }
+        },
+        "required": [
+          "account"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "JSON success envelope; --format table presents the same classification for humans.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent budget ID."
+          },
+          "budget": {
+            "type": "string",
+            "description": "The supplied budget name or ID."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Observed opaque ledger revision."
+          },
+          "data": {
+            "type": "object",
+            "description": "Complete public account, with unclassified derived from type=other; other public fields remain present.",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Stable account ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Full display name."
+              },
+              "type": {
+                "type": "string",
+                "description": "Financial type, separate from budget scope."
+              },
+              "onBudget": {
+                "type": "boolean",
+                "description": "Saved monthly-envelope scope."
+              },
+              "unclassified": {
+                "type": "boolean",
+                "description": "True exactly when type is other."
+              },
+              "subtype": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Saved domain subtype, or null."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "type",
+              "subtype",
+              "onBudget",
+              "unclassified"
+            ]
+          }
+        },
+        "required": [
+          "budgetId",
+          "budget",
+          "revision",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "account": "🍏Example Card"
+          },
+          "output": {
+            "budgetId": "fictional-budget",
+            "budget": "My budget",
+            "revision": "saved-revision",
+            "data": {
+              "id": "fictional-account",
+              "name": "🍏Example Card",
+              "type": "credit",
+              "subtype": "credit_card",
+              "onBudget": true,
+              "unclassified": false
+            }
+          }
+        }
+      ],
+      "side_effects": "Read-only; no classification, balance verification or bank synchronization.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One existing name/ID-resolved budget and selected environment. Production is the CLI default; choose --environment sandbox for fictional fixtures. Type and budget scope are separate.",
+      "errors": [
+        "Missing/ambiguous budget fails without fallback. Missing/ambiguous account fails with up to 20 candidates; IDs take precedence, no fuzzy matching.",
+        "Domain-invalid type/subtype/scope fails without mutation. Stale revisions conflict. Wrong-budget, changed verification or uncertain responses fail without automatic mutation replay."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.9+; whab BUDGET account show --help. Packaged documentation: whab api describe --offline --plugin cli --operation account.show --json. Delegates to core accounts/update_account; no new shared API."
+    },
+    {
+      "name": "account.classify",
+      "kind": "local",
+      "summary": "Classify one named account with automatic revision/request identity and verified saved results.",
+      "input": {
+        "type": "object",
+        "description": "Local account command arguments under a name/ID-resolved BUDGET. Global --home/--environment/--profile/--ca work before or after subcommands.",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json",
+            "description": "Output format; JSON retains complete public fields."
+          },
+          "account": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exact stable ID or unique case-insensitive name after trimming outer whitespace; no fuzzy match."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "depository",
+              "credit",
+              "investment",
+              "retirement",
+              "property",
+              "loan",
+              "other"
+            ],
+            "description": "Required existing public financial classification; core owns validation."
+          },
+          "subtype": {
+            "type": "string",
+            "description": "Optional domain subtype valid for this type. Omitted: preserved for same type, cleared for new type."
+          },
+          "onBudget": {
+            "type": "boolean",
+            "description": "--on-budget=true or --off-budget=false, mutually exclusive. Omitted: preserve current scope; incompatible combinations fail."
+          }
+        },
+        "required": [
+          "account",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "JSON success envelope; --format table presents the same classification for humans.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent budget ID."
+          },
+          "budget": {
+            "type": "string",
+            "description": "The supplied budget name or ID."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Observed opaque ledger revision."
+          },
+          "data": {
+            "type": "object",
+            "description": "Complete public account, with unclassified derived from type=other; other public fields remain present.",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Stable account ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Full display name."
+              },
+              "type": {
+                "type": "string",
+                "description": "Financial type, separate from budget scope."
+              },
+              "onBudget": {
+                "type": "boolean",
+                "description": "Saved monthly-envelope scope."
+              },
+              "unclassified": {
+                "type": "boolean",
+                "description": "True exactly when type is other."
+              },
+              "subtype": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Saved domain subtype, or null."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "type",
+              "subtype",
+              "onBudget",
+              "unclassified"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Generated unique intent ID."
+          },
+          "expectedRevision": {
+            "type": "string",
+            "description": "Original account-read revision used for the guarded write."
+          }
+        },
+        "required": [
+          "budgetId",
+          "budget",
+          "revision",
+          "data",
+          "requestId",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "account": "🍏Example Card",
+            "type": "credit",
+            "subtype": "credit_card",
+            "onBudget": true
+          },
+          "output": {
+            "budgetId": "fictional-budget",
+            "budget": "My budget",
+            "revision": "saved-revision",
+            "data": {
+              "id": "fictional-account",
+              "name": "🍏Example Card",
+              "type": "credit",
+              "subtype": "credit_card",
+              "onBudget": true,
+              "unclassified": false
+            },
+            "requestId": "fictional-intent",
+            "expectedRevision": "read-revision"
+          }
+        }
+      ],
+      "side_effects": "One guarded core update_account write, followed by verification. Preserves identity, transactions, notes, categories, reviews, bank mappings and prior history; appends normal history. Imported balance estimates remain unverified. No bank sync is requested.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One existing name/ID-resolved budget and selected environment. Production is the CLI default; choose --environment sandbox for fictional fixtures. Type and budget scope are separate.",
+      "errors": [
+        "Missing/ambiguous budget fails without fallback. Missing/ambiguous account fails with up to 20 candidates; IDs take precedence, no fuzzy matching.",
+        "Domain-invalid type/subtype/scope fails without mutation. Stale revisions conflict. Wrong-budget, changed verification or uncertain responses fail without automatic mutation replay."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.9+; whab BUDGET account classify --help. Packaged documentation: whab api describe --offline --plugin cli --operation account.classify --json. Delegates to core accounts/update_account; no new shared API."
     }
   ]
 }

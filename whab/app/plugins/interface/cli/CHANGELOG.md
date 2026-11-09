@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.9.0 — 2026-11-08
+
+PR: [#173](https://github.com/Fillll/whab/pull/173)
+
+- Add name-addressed account list/show/classify commands with exact ID/unique Unicode name resolution, unclassified filtering, JSON/table output, explicit or preserved budget scope, domain subtype validation and detailed offline help. Reuse guarded public ledger updates, generate intent/revision metadata automatically and verify saved results without replaying stale or uncertain mutations. Preserve imported balance uncertainty and financial history; never request bank synchronization.
+
 ## 2.8.0 — 2026-11-08
 
 PR: [#171](https://github.com/Fillll/whab/pull/171)
