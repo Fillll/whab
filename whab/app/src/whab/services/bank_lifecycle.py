@@ -94,6 +94,7 @@ class BankLifecycle:
             self.cipher = None
         self.connections = BankConnections(settings.home, settings.plaid_env, self.cipher) if self.cipher and allow_banks else None
         self.shared_providers = set()
+        self._connection_scopes = {}
         self.profile_keys = {}
         directory = home / 'plugin-workers' / 'bank-continuations' / settings.plaid_env
         try:
@@ -120,8 +121,18 @@ class BankLifecycle:
 
     def bank_store(self, owner):
         store = BankStore(self.tracked, owner, suggestions_only=self.suggestions_only,
-            scoped_items=lambda item: owner in self.shared_providers and self.connections.get(owner, item)['profileId'] != 'default')
+            scoped_items=lambda item: self.scoped_connection(owner, item))
         return AttachedBankStore(store, self.connections, self.budget_id) if owner in self.shared_providers else store
+
+    def scoped_connection(self, owner, item):
+        if owner not in self.shared_providers:
+            return False
+        key = owner, item
+        if key not in self._connection_scopes:
+            # Profile identity is immutable. Read it once per connection rather
+            # than rereading/decrypting the registry for every transaction ID.
+            self._connection_scopes[key] = self.connections.get(owner, item)['profileId'] != 'default'
+        return self._connection_scopes[key]
 
     def migrate_connections(self, owner, identity_keys=()):
         """No provider calls; retain native cursor/settings and recovery evidence."""
