@@ -8,11 +8,12 @@ import shlex
 import pytest
 from whab_plugin_cli import client, console
 from whab_plugin_cli import help as help_module
+from whab_plugin_cli.bank_commands import bank_request
 
 from whab.plugins.documentation import installed_catalog
 
 
-def test_all_packaged_operations_render_and_public_templates_parse():
+def test_all_packaged_operations_render_and_public_templates_parse(tmp_path):
     catalog = installed_catalog()
     documents = [catalog['core'], *[p['documentation'] for p in catalog['plugins'] if p['documented']]]
     covered = set()
@@ -26,6 +27,22 @@ def test_all_packaged_operations_render_and_public_templates_parse():
                 assert 'not a generic CLI operation' in template
                 continue
             argv = shlex.split(template.splitlines()[1])
+            if argv[:2] == ['whab', 'BUDGET']:
+                assert row['kind'] == 'local' and row['name'].startswith('bank.')
+                args = console.parser(console.options_parser()).parse_args(['BUDGET', 'Fictional budget', *argv[2:]])
+                advanced = shlex.split(template.splitlines()[2])
+                assert advanced[:2] == ['whab-cli', 'CONFIG']
+                other = client.parser(advanced[2:]).parse_args(advanced[2:])
+                if args.action == 'profile-save':
+                    credentials = tmp_path / 'fictional-provider.json'
+                    credentials.write_text('{"PLAID_CLIENT_ID":"fictional","PLAID_SECRET":"fictional"}')
+                    args.credentials_file = other.credentials_file = str(credentials)
+                intent = bank_request(args, 'fictional-budget')
+                assert bank_request(other, 'fictional-budget') == intent
+                assert intent[0] in {'GET', 'POST', 'PUT', 'DELETE'}
+                assert intent[1].startswith('/budgets/fictional-budget/api/banks/')
+                covered.add('local')
+                continue
             assert argv[:2] == ['whab', 'api']
             # Parse and build each complete intent without a runtime or credentials.
             args = client.parser(argv[2:]).parse_args(argv[2:])
@@ -38,7 +55,7 @@ def test_all_packaged_operations_render_and_public_templates_parse():
             if row['name'].startswith('categorization.'):
                 assert body['json']['operation'] == 'categorization'
                 assert body['json']['payload']['action'] == row['name'].split('.')[1]
-    assert covered == {'query', 'command', 'feature-query', 'feature-command'}
+    assert covered == {'query', 'command', 'feature-query', 'feature-command', 'local'}
     # Unknown plugin commands must never acquire an invented core route.
     row = dict(catalog['core']['operations'][0], kind='command', name='unknown')
     assert 'not a generic CLI operation' in help_module.invocation(row, 'third-party')
