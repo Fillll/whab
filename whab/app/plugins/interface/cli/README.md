@@ -391,6 +391,14 @@ Neither the CLI nor the scheduler reads or writes a database directly.
 
 CLI 2.1 adds preview and commit commands for enabled file importers. Start with
 `whab BUDGET import --help` and `whab BUDGET import ynab-zip-importer preview --help`.
+For the complete ordered YNAB migration, including classification, optional shared
+Plaid setup and six-hour updates, use
+`whab BUDGET import ynab-zip-importer --help` or
+`whab api describe --plugin ynab-zip-importer --operation import.workflow --help`.
+Importer/preview/commit help renders the same importer-owned packaged workflow;
+other importers may supply their own `local import.workflow` topic. The topic is
+documentation, not an executable operation; SDK parser callbacks stay SDK-only.
+See the [owning guide](../../ingestion/ynab/README.md#ordered-cli-migration-guide).
 For a new empty budget:
 
 ```sh

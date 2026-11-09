@@ -10,7 +10,39 @@ Enable **YNAB ZIP importer** through Settings → Plugins, save, and restart. Op
 
 The destination is a new empty SQLite budget, so the current budget can already contain accounts or imported data. Existing financial data is never replaced or merged. Preview only reads and validates the ZIP; it creates no budget or financial records. Commit reparses and validates the same SHA-256 fingerprint, and SQLite saves the complete import and receipt in one transaction. Once creation starts, the name stays locked for retries. A failed request can be retried with the same import operation to open the same budget without duplicates or overwriting subsequent edits. Starting a new preview and import creates another separate budget, even for the same archive. Source account records, bank connections, credentials and plugin settings are not copied. The older API for importing directly into a pristine personal budget remains available to integrations.
 
-For terminal operation, CLI 2.1 supports `whab BUDGET import ynab-zip-importer preview FILE --currency USD` and an explicit `commit` with the reviewed fingerprint. This imports into the named empty budget through the existing guarded API. See [CLI file imports](../../interface/cli/README.md#file-imports) for commands, retries and empty-budget requirements.
+## Ordered CLI migration guide
+
+Start with either offline entry point:
+
+```sh
+whab migration-example import ynab-zip-importer --help
+whab api describe --plugin ynab-zip-importer --operation import.workflow --help
+```
+
+`migration-example` is fictional; substitute the permanent destination budget.
+The eight-stage guide covers creation/selection, reviewed USD preview/commit,
+confirmed account classification, optional existing Plaid attachment, explicit
+per-account destinations and inclusive history choices, reviewed sync, financial
+verification/limits and a six-hour update policy. Optional background wakeups
+have their own runtime/environment scope. Resume an existing migration from its
+actual stage instead of recreating or reimporting it.
+
+The maintained guide is the `local import.workflow` documentation topic in
+[operations.json](src/whab_plugin_ynab/operations.json). CLI 2.9.1+ renders that
+same packaged text in plugin discovery and importer/preview/commit help without
+executing plugin code or opening a host. It is guidance, not a callable command;
+`FileImport.parse` remains a correctly labeled SDK callback. JSON discovery:
+
+```sh
+whab api describe --offline --plugin ynab-zip-importer --operation import.workflow --json
+```
+
+Commands use configured local defaults. Production is the CLI default; use an
+explicit isolated home and Sandbox environment for fictional development checks.
+No bank consent, attachments, classifications or schedules change from reading
+help. Each write in the guide requires its stated review and user decision.
+See [CLI file imports](../../interface/cli/README.md#file-imports) for the command
+contract; the packaged guide owns the ordered migration workflow.
 
 ## Live parser lifecycle
 

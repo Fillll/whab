@@ -18,6 +18,32 @@ Clarity and simplicity are the primary product and development priorities. Choos
 
 Agents and contributors must apply these rules during implementation and review, together with the owning area’s correctness and acceptance checks.
 
+## Simple CLI workflows and discoverable help
+
+Normal product workflows should, as far as possible, be executable through simple
+name-addressed `whab BUDGET ...` commands. Prefer these commands in product and
+agent guidance. Hide routine permanent-ID lookup, revision guards, request IDs
+and JSON construction behind the owning CLI adapter where feasible; preserve the
+underlying public contracts and safe concurrency/retry behavior. Keep `whab api`
+available for exceptional or advanced use. When IDs or JSON remain necessary,
+document how to discover the exact IDs and provide complete, safely quoted syntax;
+never invent unsupported shortcuts.
+
+Every user-facing workflow and command needs detailed, discoverable `--help`
+with concrete fictional examples, input requirements, results to inspect, effects,
+verification, limitations and safe recovery. Ordered workflows need review and
+user-decision points, plus an entry point from relevant command/plugin help.
+Keep one maintained source in the owning plugin's packaged operation documentation
+where practical; CLI presents public documentation without importing another
+plugin's private implementation or running hooks. Label documentation topics and
+SDK callbacks accurately; neither becomes an executable command by being listed.
+
+Examples should use configured local defaults without routinely repeating
+`--home` or `--environment production`. Explicit overrides remain available for
+deliberately different runtimes/environments. Development validation must select
+an isolated fictional runtime and Sandbox explicitly; this convention does not
+authorize production bank actions or treating household data as fixtures.
+
 ## Development environment
 
 WHAB supports Python 3.14 and newer; CI exercises Python 3.14 and 3.15. Run all application commands below from the application directory (`whab/app/`):

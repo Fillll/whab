@@ -896,7 +896,7 @@
         "Import HTTP 400/409/413 responses retain bounded authored validation messages. Other statuses, malformed responses and transport failures retain sanitized diagnostics."
       ],
       "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
-      "availability": "whab BUDGET import PLUGIN preview FILE --currency USD; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints."
+      "availability": "whab BUDGET import PLUGIN preview FILE --currency USD; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer’s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
     },
     {
       "name": "import.commit",
@@ -1032,7 +1032,7 @@
         "Import HTTP 400/409/413 responses retain bounded authored validation messages. Other statuses, malformed responses and transport failures retain sanitized diagnostics."
       ],
       "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
-      "availability": "whab BUDGET import PLUGIN commit FILE --currency USD --fingerprint SHA256_FROM_PREVIEW; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints."
+      "availability": "whab BUDGET import PLUGIN commit FILE --currency USD --fingerprint SHA256_FROM_PREVIEW; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer’s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
     },
     {
       "name": "bank.connections",
