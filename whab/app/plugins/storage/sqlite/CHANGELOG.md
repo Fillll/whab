@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.18.0 — 2026-11-08
+
+PR: [#176](https://github.com/Fillll/whab/pull/176)
+
+- Persist real empty category parents in additive metadata and apply core-validated child moves atomically, preserving references, assignments, targets and history through native/portable copies and reopening.
+
 ## 1.17.0 — 2026-11-08
 
 PR: [#175](https://github.com/Fillll/whab/pull/175)

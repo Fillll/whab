@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.65.0 — 2026-11-08
+
+PR: [#176](https://github.com/Fillll/whab/pull/176)
+
+- Add guarded public category-tree, empty-parent creation and identity-preserving child moves, optional category-management storage contracts, and compatible parent metadata across history, native copies and portable snapshots.
+
 ## 2.64.0 — 2026-11-08
 
 PR: [#175](https://github.com/Fillll/whab/pull/175)
