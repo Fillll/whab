@@ -119,18 +119,20 @@ class BankLifecycle:
         return self.journals[owner]
 
     def bank_store(self, owner):
-        store = BankStore(self.tracked, owner, suggestions_only=self.suggestions_only)
+        store = BankStore(self.tracked, owner, suggestions_only=self.suggestions_only,
+            scoped_items=lambda item: owner in self.shared_providers and self.connections.get(owner, item)['profileId'] != 'default')
         return AttachedBankStore(store, self.connections, self.budget_id) if owner in self.shared_providers else store
 
     def migrate_connections(self, owner, identity_keys=()):
         """No provider calls; retain native cursor/settings and recovery evidence."""
+        from whab.hosting import process_lock
         if self.connections is None:
             return
         store = BankStore(self.tracked, owner)
         profiles = self.account_profiles(owner, identity_keys) if identity_keys else None
         principal = (profiles.principal(profiles.config('default'))
             if profiles and any(row['profileId'] == 'default' for row in profiles.public()) else None)
-        with self.tracked.lock:
+        with process_lock(self.connections.directory / (owner + '-operations.lock')), self.tracked.lock:
             for summary in store.items():
                 item = store.get_item(summary['id'])
                 self.connections.register(owner, {**item, 'storedIdentity': store.item_identity(item['id'])},

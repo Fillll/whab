@@ -551,7 +551,7 @@ class BankCoordinator:
             source = self.bank_store._record_identity('account', item_id, row['bankAccountId'])
             if source in scoped:
                 raise BankError('Select each bank account once.')
-            scoped[source] = {'accountId': row['accountId'] or source, 'since': row['since']}
+            scoped[source] = {'accountId': source if row['accountId'] is None else row['accountId'], 'since': row['since']}
         payload = {'itemId': payload['itemId'], 'accounts': payload['accounts'], 'selection': scoped}
         return read_storage_json(self._command(item_id, 'configure_bank_sync', payload).result)
 

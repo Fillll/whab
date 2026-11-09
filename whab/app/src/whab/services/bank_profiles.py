@@ -46,6 +46,8 @@ class BankProfiles:
             yield records
             if json.dumps(records, sort_keys=True) != before:
                 atomic_write(self.path, json.dumps(records).encode())
+                from whab.budgets.session import _flush_source_home
+                _flush_source_home(self.connections.home, self.connections.directory)
 
     def principal(self, config):
         if not all(type(config.get(key)) is str and config[key] for key in self.identity_keys):

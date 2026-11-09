@@ -26,7 +26,8 @@ class BankConnections:
     def __init__(self, home, environment, cipher):
         if environment not in {'sandbox', 'production'} or not isinstance(cipher, BankCipher):
             raise BankError('Shared bank connections require a configured local encryption key.')
-        self.directory = Path(home) / 'plugin-workers' / 'bank-connections' / environment
+        self.home = Path(home).resolve()
+        self.directory = self.home / 'plugin-workers' / 'bank-connections' / environment
         self.path = self.directory / 'connections.json'
         self.environment, self.cipher, self.lock = environment, cipher, RLock()
 
@@ -70,7 +71,7 @@ class BankConnections:
                 atomic_write(self.path, json.dumps(records, ensure_ascii=False).encode())
                 # Replacement and directory entry must survive a power loss.
                 from whab.budgets.session import _flush_source_home
-                _flush_source_home(self.directory, self.directory)
+                _flush_source_home(self.home, self.directory)
 
     def register(self, provider, item, budget_id, accounts=(), *, profile_id='default', provider_item_id=None, profile_principal=None):
         """Register before replacing legacy ciphertext; retries retain ownership."""
