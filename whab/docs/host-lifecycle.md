@@ -13,6 +13,13 @@ homes retain their saved selections and legacy defaults. Enabling a visual
 interface keeps the host running independently of open browser tabs. Explicit `python -m whab` service operation also keeps it running. Otherwise CLI requests and scheduled jobs
 acquire temporary host leases; the host exits after its clients and work finish.
 
+Idle accounting begins when the server becomes ready, excluding worker and ASGI
+lifespan startup. A fresh transient host allows up to the CLI's 90-second startup
+window to acquire its first authenticated lease; this also bounds an abandoned
+startup. After accepting a client, the usual three-second idle window applies
+when no clients or persistent interfaces remain. A slow startup or first TLS
+connection must not preemptively mark the host stopping before lease admission.
+
 A private runtime-home rendezvous file publishes the local endpoint, verified CA
 and an ephemeral credential. A process lock serializes host startup, and existing
 storage authority locks remain the final writer fence. A CLI reuses a live host;

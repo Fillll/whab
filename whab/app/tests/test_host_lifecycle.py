@@ -144,9 +144,122 @@ def test_owner_reaps_dead_clients_and_preserves_visual_or_explicit_service(tmp_p
         application.state.ui_plugin = None
         application.state.budget_runtime = SimpleNamespace(_active=SimpleNamespace(services={"interfaces": SimpleNamespace(enabled=lambda: False)}))
         owner.acquire(2147483647)
-        owner.server = SimpleNamespace(should_exit=False)
+        owner.server = SimpleNamespace(should_exit=False, started=True)
         await owner.monitor()
         assert owner.stopping and not owner.clients
         with pytest.raises(ValueError):
             owner.acquire(os.getpid())
     asyncio.run(run())
+
+
+def test_starting_host_cannot_idle_out_before_its_first_lease(tmp_path, monkeypatch):
+    async def run():
+        owner = HostOwner(SimpleNamespace(home=tmp_path, plaid_env='sandbox'), idle_seconds=0)
+        owner.server = SimpleNamespace(should_exit=False, started=False)
+        owner.required = lambda: False
+        ticks = []
+        async def tick(interval):
+            ticks.append(interval)
+            if len(ticks) == 2:
+                assert not owner.stopping and not owner.server.should_exit
+                owner.server.started = True
+                lease = owner.acquire(os.getpid())
+                owner.release(lease)
+        monkeypatch.setattr(asyncio, 'sleep', tick)
+        await owner.monitor()
+        assert len(ticks) == 2 and owner.stopping and owner.server.should_exit
+    asyncio.run(run())
+
+
+def test_first_ready_tick_resets_a_stale_startup_timestamp(tmp_path, monkeypatch):
+    async def run():
+        clock = [0]
+        monkeypatch.setattr('whab.hosting.monotonic', lambda: clock[0])
+        owner = HostOwner(SimpleNamespace(home=tmp_path, plaid_env='sandbox'))
+        owner.server = SimpleNamespace(should_exit=False, started=True)
+        owner.required = lambda: False
+        ticks = []
+        async def tick(interval):
+            ticks.append(interval)
+            if len(ticks) == 1:
+                clock[0] = 100  # Blocking construction/startup exceeded the idle window.
+            else:
+                assert not owner.stopping and owner.last_active == 100
+                lease = owner.acquire(os.getpid())
+                owner.release(lease)
+                clock[0] = 104  # Normal ready-state idle expiry is still enforced.
+        monkeypatch.setattr(asyncio, 'sleep', tick)
+        await owner.monitor()
+        assert len(ticks) == 2 and owner.stopping
+    asyncio.run(run())
+
+
+def test_ready_host_without_a_client_has_bounded_startup_grace(tmp_path, monkeypatch):
+    async def run():
+        clock = [0]
+        monkeypatch.setattr('whab.hosting.monotonic', lambda: clock[0])
+        owner = HostOwner(SimpleNamespace(home=tmp_path, plaid_env='sandbox'))
+        owner.server = SimpleNamespace(should_exit=False, started=True)
+        owner.required = lambda: False
+        ticks = []
+        async def tick(interval):
+            ticks.append(interval)
+            if len(ticks) == 1:
+                clock[0] = 100
+            elif len(ticks) == 2:
+                clock[0] = 104
+            else:
+                assert not owner.stopping and owner.last_active == 100
+                clock[0] = 191
+        monkeypatch.setattr(asyncio, 'sleep', tick)
+        await owner.monitor()
+        assert len(ticks) == 3 and owner.stopping and not owner.clients
+    asyncio.run(run())
+
+
+def test_real_slow_startup_admits_lease_then_exits_when_idle(tmp_path, monkeypatch):
+    home = tmp_path / 'fictional slow startup'
+    env = {**clean_environment(), 'WHAB_HOME': str(home), 'WHAB_UI': '', 'WHAB_PLUGINS': '',
+           'WHAB_STORAGE': 'sqlite', 'WHAB_ENV': 'sandbox', 'ALLOW_LIVE_PLAID': 'false'}
+    for name in set(os.environ) - set(clean_environment()):
+        monkeypatch.delenv(name)
+    code = '''
+import asyncio
+from contextlib import asynccontextmanager
+from whab.config import Settings
+from whab.hosting import run_host
+from whab.initialization import initialize_home
+initialize_home(__import__('os').environ['WHAB_HOME'])
+def wrap(app):
+    original = app.router.lifespan_context
+    @asynccontextmanager
+    async def slow(current):
+        async with original(current):
+            await asyncio.sleep(4)
+            yield
+    app.router.lifespan_context = slow
+    return app
+run_host(Settings.load(), transient=True, wrapper=wrap)
+'''
+    process = subprocess.Popen([sys.executable, '-I', '-c', code], env=env,
+                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    directory = runtime_directory(home, 'sandbox')
+    try:
+        deadline = monotonic() + 45
+        while not (directory / 'host.json').exists():
+            assert process.poll() is None and monotonic() < deadline
+            sleep(.05)
+        with local_connection(home, 'sandbox', timeout=45) as connection:
+            response = connection.get('/budgets/default/api/local/v1/queries/accounts', params={'workspace': 'personal'})
+            assert response.status_code == 200 and response.json()['data'] == []
+            assert read_endpoint(directory)['pid'] == process.pid
+        assert process.wait(timeout=20) == 0
+        assert not (directory / 'host.json').exists()
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=10)
