@@ -10,9 +10,9 @@ from tests.storage.test_bank_boundaries import account, changes, transaction
 from whab.budgets.session import TrackedStorage
 from whab.config import Settings
 from whab.plugins import BankError, BudgetContext, StorageContext, load_plugins
-from whab.plugins.storage import open_storage
 from whab.plugins.bank_adapter import ProviderFailure, ProviderWebhook
 from whab.plugins.bank_crypto import BankCipher
+from whab.plugins.storage import open_storage
 from whab.services.bank_lifecycle import BankLifecycle
 from whab.services.bank_runtime import BankCoordinator
 
@@ -210,3 +210,127 @@ def test_missing_and_wrong_home_key_cannot_adopt_a_reference(shared, tmp_path):
     wrong_key = BankConnections(shared.settings.home, 'sandbox', BankCipher('22' * 32))
     with pytest.raises(BankError, match='unlocked'):
         wrong_key.access('plaid', 'item', 'owner')
+
+
+def test_multiple_provider_accounts_pin_credentials_and_namespace_identical_item_ids(shared):
+    from whab.services.bank_profiles import BankProfiles
+    owner, consumer = shared.owner, shared.consumer
+    profiles = BankProfiles(owner.lifecycle.connections, 'plaid', 'owner', ('CLIENT_ID',),
+        {'CLIENT_ID': 'fictional-client-one', 'SECRET': 'fictional-secret-one'})
+    profiles.save('second-account', {'CLIENT_ID': 'fictional-client-two', 'SECRET': 'fictional-secret-two'})
+    original = profiles.path.read_bytes()
+    BankProfiles(owner.lifecycle.connections, 'plaid', 'owner', ('CLIENT_ID',),
+        {'CLIENT_ID': 'fictional-client-one', 'SECRET': 'fictional-secret-one'})
+    assert profiles.path.read_bytes() == original
+    selected = []
+    def call_with_config(config, command, **values):
+        selected.append((config['CLIENT_ID'], command, values.get('item_id')))
+        if command == 'exchange_token':
+            return {'item_id': 'item', 'access_token': 'fictional-second-account-token'}
+        return owner.provider.call(command, **values)
+    owner.provider.call_with_config = call_with_config
+    owner.service.profiles = profiles
+    flow = run(owner.service.begin_link(None, 'second-account'))
+    run(owner.service.complete_link(flow['flow_id'], 'fictional-public-token', 'Fictional bank'))
+    connections = run(owner.service.shared_connections())['connections']
+    second = next(row for row in connections if row['profileId'] == 'second-account')
+    assert second['itemId'] != 'item' and second['providerItemId'] == 'item'
+    assert second['ownerBudgetId'] == 'owner' and len(connections) == 2
+    assert owner.service._access('item') == 'fictional-access-token'
+    assert owner.service._access(second['itemId']) == 'fictional-second-account-token'
+    run(owner.service.configure_sync(second['itemId'], [{'bankAccountId': 'account', 'accountId': None, 'since': None}]))
+    run(owner.service.sync(second['itemId']))
+    assert {row['id'] for row in owner.native.transactions('personal')} != {'old', 'new'}
+    assert all(client == 'fictional-client-two' for client, _, _ in selected)
+    assert all(item_id in (None, 'item') for _, _, item_id in selected)
+    consumer.service.profiles = profiles
+    consumer.provider.call_with_config = call_with_config
+    run(consumer.service.attach(second['itemId']))
+    assert consumer.service._access(second['itemId']) == 'fictional-second-account-token'
+    run(consumer.service.sync_preview(second['itemId']))
+    assert selected[-1][0] == 'fictional-client-two'
+    public = json.dumps(run(owner.service.list_profiles()))
+    assert 'SECRET' not in public and 'fictional-client' not in public
+    raw = profiles.path.read_bytes()
+    assert b'fictional-client' not in raw and b'fictional-secret' not in raw
+    with pytest.raises(BankError, match='another provider account'):
+        profiles.save('second-account', {'CLIENT_ID': 'different-account', 'SECRET': 'fictional'})
+    with pytest.raises(BankError, match='already has a profile'):
+        profiles.save('duplicate', {'CLIENT_ID': 'fictional-client-two', 'SECRET': 'fictional'})
+    # Replacing .env with another account never redirects the old default's Items.
+    changed = BankProfiles(owner.lifecycle.connections, 'plaid', 'owner', ('CLIENT_ID',),
+        {'CLIENT_ID': 'different-default', 'SECRET': 'fictional-new-secret'})
+    assert changed.config('default')['CLIENT_ID'] == 'fictional-client-one'
+
+
+def test_pending_attachment_recovers_after_native_commit_and_reopen(shared, monkeypatch):
+    value = shared.consumer
+    original = value.lifecycle.connections.attachment
+    def interrupted(provider, item_id, budget_id, state):
+        if state == 'attached':
+            raise OSError('fictional lost reply after native commit')
+        return original(provider, item_id, budget_id, state)
+    monkeypatch.setattr(value.lifecycle.connections, 'attachment', interrupted)
+    with pytest.raises(OSError):
+        run(value.service.attach('item'))
+    assert value.native.get_item('item')['token'].startswith('shared-bank-v1:')
+    assert value.lifecycle.connections.get('plaid', 'item')['attachments']['consumer'] == 'pending'
+    value.lifecycle.migrate_connections('plaid')
+    assert run(value.service.shared_connections())['connections'][0]['attached']
+    assert value.provider.calls == [] and value.native.transactions('personal') == []
+
+
+def test_failed_destination_save_retains_both_cursors_and_allows_replay(shared, monkeypatch):
+    owner, consumer = shared.owner, shared.consumer
+    run(consumer.service.attach('item'))
+    configure(owner, None)
+    configure(consumer, None)
+    original = consumer.tracked.execute_operation
+    def interrupted(operation):
+        if operation.name == 'apply_sync':
+            raise OSError('fictional disk failure')
+        return original(operation)
+    monkeypatch.setattr(consumer.tracked, 'execute_operation', interrupted)
+    with pytest.raises(OSError):
+        run(consumer.service.sync('item'))
+    assert consumer.native.get_item('item')['cursor'] is None and consumer.native.transactions('personal') == []
+    run(owner.service.sync('item'))
+    assert consumer.native.get_item('item')['cursor'] is None
+    monkeypatch.setattr(consumer.tracked, 'execute_operation', original)
+    run(consumer.service.sync('item'))
+    run(consumer.service.sync('item'))
+    assert len(consumer.native.transactions('personal')) == 2
+
+
+def test_discovery_migrates_dormant_disabled_budget_without_provider_work(tmp_path):
+    from whab.app import create_app
+    from whab.budgets.host import BudgetHost
+    from whab.budgets.session import BudgetSession
+    settings = Settings(tmp_path, 5173, 'sandbox', '', '', '11' * 32, False, '', '', (), ui='')
+    host = BudgetHost(settings)
+    session = BudgetSession.create(tmp_path, 'sandbox', 'Dormant fictional budget', (), storage='sqlite')
+    native = open_storage(load_plugins(('sqlite',)).storage_plugin('sqlite'),
+        StorageContext(session.backend_home, 'sandbox', {}, budget=session.context('sqlite')))
+    session.bind(native)
+    native.save_item('dormant-item', BankCipher('11' * 32).encrypt_token('fictional-dormant-access', 'dormant-item'), 'Fictional bank')
+    native.apply_sync('dormant-item', changes([transaction()]), 'saved-cursor', [account(item_id='dormant-item')])
+    session.checkpoint()
+    native.close()
+    host._remember(session)
+    app = create_app(settings=settings, budget_host=host)
+    async def scenario():
+        async with app.router.lifespan_context(app):
+            assert await host.discover_connections('plaid') == []
+            rows = app.state.bank_lifecycle.connections.public('plaid', 'default')
+            assert rows[0]['ownerBudgetId'] == session.id and rows[0]['attachments'] == [{'budgetId': session.id, 'state': 'attached'}]
+            assert session.id not in host.applications
+            assert await host.discover_connections('plaid') == []
+    run(scenario())
+    native = open_storage(load_plugins(('sqlite',)).storage_plugin('sqlite'),
+        StorageContext(session.backend_home, 'sandbox', {}, budget=session.context('sqlite')))
+    try:
+        assert native.get_item('dormant-item')['cursor'] == 'saved-cursor'
+        assert native.get_item('dormant-item')['token'].startswith('shared-bank-v1:')
+        assert len(native.transactions('personal')) == 1
+    finally:
+        native.close()

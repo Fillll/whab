@@ -64,6 +64,8 @@ class WorkerBankProvider:
         if type(context) is not BankProviderContext:
             raise EffectError('invalid_effect')
         self.worker, self.owns_worker = worker, owns_worker
+        self.context = context
+        self._active_config = dict(context.config)
         self.closed = False
         try:
             self.config = worker.provider('open', {'budget_id': context.budget_id,
@@ -90,6 +92,16 @@ class WorkerBankProvider:
             self.worker.close()
         elif self.worker.healthy:
             self.worker.provider('close', {})
+
+    def call_with_config(self, config, command, **values):
+        if self.closed:
+            raise EffectError('effect_unavailable')
+        if config != self._active_config:
+            self.worker.provider('close', {})
+            self.worker.provider('open', {'budget_id': self.context.budget_id,
+                'environment': self.context.environment, 'config': dict(config)})
+            self._active_config = dict(config)
+        return self.call(command, **values)
 
 
 class OnDemandBankProvider:
@@ -123,6 +135,16 @@ class OnDemandBankProvider:
         with self.lock:
             self.closed = True
 
+    def call_with_config(self, config, command, **values):
+        with self.lock:
+            if self.closed:
+                raise EffectError('effect_unavailable')
+            provider = self.factory(config)
+            try:
+                return provider.call(command, **values)
+            finally:
+                self.release(provider)
+
 
 class BankCoordinator:
     """One selected provider engine, with a retained host-private journal owner.
@@ -136,7 +158,7 @@ class BankCoordinator:
                  generation, home=None, encryption_key=None, journal=None, cipher=None,
                  code_identity='installed', background_scope=None, clock=None,
                  requires_account_setup=False, supports_investments=False, automatic_sync=lambda: True, connections=None,
-                 shared_event=None):
+                 shared_event=None, profiles=None):
         self.provider, self.tracked, self.bank_store = provider, tracked, bank_store
         self.scope = ContinuationScope(budget_id, environment, provider_id, generation)
         self.code_identity = code_identity
@@ -145,6 +167,9 @@ class BankCoordinator:
         self.config = deepcopy(dict(provider.config))
         self.connections = connections
         self.shared_event = shared_event
+        self.profiles = profiles
+        if profiles is not None and profiles.public():
+            self.config.update(configured=True, missingConfig=[])
         if connections is not None:
             self.config['sharedConnections'] = True
         self.requires_account_setup, self.automatic_sync = requires_account_setup, automatic_sync
@@ -171,6 +196,21 @@ class BankCoordinator:
         if not self.config.get('configured'):
             raise ProviderFailure('not_configured')
         self.broker.admit()
+
+    def _provider_call(self, command, *, profile_id=None, **values):
+        if self.profiles is None:
+            return self.provider.call(command, **values)
+        item_id = values.get('item_id')
+        record = None
+        if item_id is not None:
+            record = self.connections.get(self.scope.provider_id, item_id)
+            profile_id = record['profileId']
+            values['item_id'] = record['providerItemId']
+        config = self.profiles.config(profile_id or 'default')
+        if record is not None and record['profilePrincipal'] not in (None, self.profiles.principal(config)):
+            raise BankError('The bank connection belongs to another provider account. Restore its original profile.')
+        config['WHAB_BANK_PROFILE'] = profile_id or 'default'
+        return self.provider.call_with_config(config, command, **values)
 
     async def _operation(self, callback, *args):
         def run():
@@ -211,33 +251,40 @@ class BankCoordinator:
     def _access(self, item_id):
         item = self._item(item_id)
         if self.connections is not None:
+            record = self.connections.get(self.scope.provider_id, item_id)
+            if self.profiles is not None and record['profilePrincipal'] not in (None,
+                    self.profiles.principal(self.profiles.config(record['profileId']))):
+                raise BankError('The bank connection belongs to another provider account. Restore its original profile.')
             return self.connections.access(self.scope.provider_id, item_id, self.scope.budget_id)
         return self.cipher.decrypt_token(item['token'], self.bank_store.item_identity(item_id))
 
-    def _begin(self, item_id):
+    def _begin(self, item_id, profile_id='default'):
         self._ready()
         if item_id is not None:
             self._item(item_id)
         action = 'update' if item_id is not None else 'link'
+        if self.profiles is not None:
+            profile_id = self.connections.get(self.scope.provider_id, item_id)['profileId'] if item_id else profile_id
+            self.profiles.config(profile_id)
         for previous in self.journal.statuses():
             scope, previous = self._original(previous.identifier)
             if previous.stage in _TERMINAL:
                 continue
             if previous.stage == 'ready':
                 request = self._request(scope, previous)
-                if (request['action'], request['item_id'], request['code_identity']) == (action, item_id, self.code_identity):
+                if (request['action'], request['item_id'], request['code_identity'], request.get('profile_id', 'default')) == (action, item_id, self.code_identity, profile_id):
                     return {**_status(previous), 'link_token': request['link_token']}
             raise EffectError('continuation_busy')
-        token = self.provider.call('connection_token', item_id=item_id,
+        token = self._provider_call('connection_token', profile_id=profile_id, item_id=item_id,
                                    access_token=self._access(item_id) if item_id is not None else None)
         secret = canonical_storage_json({'action': action, 'item_id': item_id, 'code_identity': self.code_identity,
-                                         'link_token': token})
+                                         'link_token': token, 'profile_id': profile_id})
         status = self.journal.begin(self.scope, action, secret=secret)
         return {**_status(status), 'link_token': token}
 
-    async def begin_link(self, item_id=None):
+    async def begin_link(self, item_id=None, profile_id='default'):
         async with self._serial:
-            return await self._operation(self._begin, item_id)
+            return await self._operation(self._begin, item_id, profile_id)
 
     def _capture(self, scope, status, public_token, institution_name):
         request = self._request(scope, status)
@@ -270,9 +317,14 @@ class BankCoordinator:
 
         def send(_raw):
             if action == 'link':
-                response = self.provider.call('exchange_token', public_token=request['public_token'])
+                response = self._provider_call('exchange_token', profile_id=request.get('profile_id', 'default'), public_token=request['public_token'])
+                if self.connections is not None:
+                    raw_id = response['item_id']
+                    response = {**response, 'item_id': self.connections.connection_id(self.scope.provider_id,
+                        request.get('profile_id', 'default'), raw_id), 'provider_item_id': raw_id}
             elif action == 'disconnect':
-                self.provider.call('remove_token', access_token=request['access_token'])
+                profile_id = self.connections.get(self.scope.provider_id, request['item_id'])['profileId'] if self.connections else None
+                self._provider_call('remove_token', profile_id=profile_id, access_token=request['access_token'])
                 response = {'item_id': request['item_id'], 'disconnected': True}
             else:
                 # Link update changes the existing provider Item in place. There
@@ -295,14 +347,16 @@ class BankCoordinator:
         action, item_id = request['action'], response['item_id']
         stored_id = self.bank_store.item_identity(item_id)
         if action == 'link':
-            if response.keys() != {'item_id', 'access_token'}:
+            if response.keys() not in ({'item_id', 'access_token'}, {'item_id', 'access_token', 'provider_item_id'}):
                 raise EffectError('invalid_effect')
             payload = {'itemId': stored_id, 'encryptedToken': self.cipher.encrypt_token(response['access_token'], stored_id),
                        'institutionName': request['institution_name'], 'providerId': self.scope.provider_id}
             if self.connections is not None:
                 self.connections.register(self.scope.provider_id, {'id': item_id, 'storedIdentity': stored_id,
                     'token': payload['encryptedToken'], 'institutionName': request['institution_name'],
-                    'status': 'connected', 'error': None}, self.scope.budget_id)
+                    'status': 'connected', 'error': None}, self.scope.budget_id,
+                    profile_id=request.get('profile_id', 'default'), provider_item_id=response.get('provider_item_id', item_id),
+                    profile_principal=self.profiles.principal(self.profiles.config(request.get('profile_id', 'default'))) if self.profiles else None)
                 payload['encryptedToken'] = self.connections.reference(self.scope.provider_id, item_id)
             name = 'save_item'
         elif action == 'update':
@@ -365,6 +419,10 @@ class BankCoordinator:
                         self.journal.apply(scope, flow_id, native_fingerprint=fingerprint,
                             lookup=lambda *_: evidence, commit=lambda *_: (_ for _ in ()).throw(EffectError('apply_uncertain')))
                 status = self.journal.status(scope, flow_id)
+        if self.connections is not None and status.stage == 'complete':
+            request = self._request(scope, status)
+            if request['action'] == 'disconnect':
+                self.connections.update(self.scope.provider_id, request['item_id'], status='disconnected')
         return _status(status)
 
     async def continuation_status(self, flow_id):
@@ -387,7 +445,7 @@ class BankCoordinator:
         if self.requires_account_setup and item.get('syncSettings') is None and item.get('lastSynced') is None:
             raise BankError('Choose destination accounts and an import start date in Sync setup first.')
         try:
-            response = self.provider.call('read_sync', item_id=item_id, access_token=self._access(item_id),
+            response = self._provider_call('read_sync', item_id=item_id, access_token=self._access(item_id),
                 cursor=item['cursor'], institution_name=item['institutionName'])
         except ProviderFailure as error:
             if self.connections is not None:
@@ -417,7 +475,7 @@ class BankCoordinator:
     def _sync_preview(self, item_id):
         self._ready()
         item = self._item(item_id)
-        response = self.provider.call('read_sync', item_id=item_id, access_token=self._access(item_id),
+        response = self._provider_call('read_sync', item_id=item_id, access_token=self._access(item_id),
             cursor=item['cursor'], institution_name=item['institutionName'])
         if self.connections is not None:
             self.connections.update(self.scope.provider_id, item_id, accounts=response['accounts'])
@@ -467,7 +525,7 @@ class BankCoordinator:
             raise BankError('Investment history start must not follow its end.')
         if account_id is not None:
             self.bank_store._raw_id(account_id)
-        snapshot = self.provider.call('read_investments', item_id=item_id, access_token=self._access(item_id),
+        snapshot = self._provider_call('read_investments', item_id=item_id, access_token=self._access(item_id),
                                       start_date=start_date, end_date=end_date, account_id=account_id)
         if snapshot['startDate'] != start_date or snapshot['endDate'] != end_date:
             raise BankError('The investment provider returned a different history window.')
@@ -506,8 +564,21 @@ class BankCoordinator:
             raise BankError('Shared bank connections are unavailable for this provider.')
         return {'connections': await _blocking(self.connections.public, self.scope.provider_id, self.scope.budget_id)}
 
+    async def list_profiles(self):
+        if self.profiles is None:
+            raise BankError('Named account profiles are unavailable for this provider.')
+        return {'profiles': await _blocking(self.profiles.public)}
+
+    async def save_profile(self, identifier, config):
+        if self.profiles is None:
+            raise BankError('Named account profiles are unavailable for this provider.')
+        async with self._serial:
+            result = await self._operation(self.profiles.save, identifier, config)
+            self.config.update(configured=True, missingConfig=[])
+            return result
+
     def _attach(self, item_id):
-        self._ready()
+        self.broker.admit()
         if self.connections is None:
             raise BankError('Shared bank connections are unavailable for this provider.')
         record = self.connections.get(self.scope.provider_id, item_id)
@@ -570,10 +641,13 @@ class BankCoordinator:
         async with self._serial:
             return await self._operation(self._disconnect, item_id, affected_budgets)
 
-    async def webhook(self, raw, headers):
+    async def webhook(self, raw, headers, profile_id='default'):
         from whab.plugins import WebhookResult
         async with self._serial:
-            result = await _blocking(self.provider.call, 'webhook_event', raw=raw, headers=dict(headers))
+            result = await _blocking(self._provider_call, 'webhook_event', profile_id=profile_id, raw=raw, headers=dict(headers))
+            if self.connections is not None and result.item_id is not None:
+                from dataclasses import replace
+                result = replace(result, item_id=self.connections.connection_id(self.scope.provider_id, profile_id, result.item_id))
             if self.connections is not None and result.item_id is not None:
                 known = any(row['itemId'] == result.item_id for row in self.connections.public(self.scope.provider_id, self.scope.budget_id))
                 if known and self.shared_event is not None:
@@ -669,7 +743,7 @@ class LeasedBanks(Mapping):
 class _BankHandle:
     _METHODS = frozenset({'begin_link', 'complete_link', 'continuation_status', 'cancel_link',
                           'link_token', 'exchange', 'sync', 'sync_preview', 'configure_sync', 'investments',
-                          'shared_connections', 'attach', 'detach', 'notify_sync', 'disconnect', 'webhook', 'close'})
+                          'shared_connections', 'list_profiles', 'save_profile', 'attach', 'detach', 'notify_sync', 'disconnect', 'webhook', 'close'})
 
     def __init__(self, runtime, owner):
         self.runtime, self.owner = runtime, owner

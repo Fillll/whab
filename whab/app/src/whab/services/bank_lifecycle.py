@@ -20,6 +20,7 @@ from whab.plugins.sdk import valid_plugin_name
 from whab.storage.bank import BankStore
 
 from .bank_connections import REFERENCE, AttachedBankStore, BankConnections
+from .bank_profiles import BankProfiles
 from .bank_runtime import BankCoordinator, OnDemandBankProvider
 
 
@@ -93,6 +94,7 @@ class BankLifecycle:
             self.cipher = None
         self.connections = BankConnections(settings.home, settings.plaid_env, self.cipher) if self.cipher and allow_banks else None
         self.shared_providers = set()
+        self.profile_keys = {}
         directory = home / 'plugin-workers' / 'bank-continuations' / settings.plaid_env
         try:
             if directory.exists():
@@ -120,21 +122,30 @@ class BankLifecycle:
         store = BankStore(self.tracked, owner, suggestions_only=self.suggestions_only)
         return AttachedBankStore(store, self.connections, self.budget_id) if owner in self.shared_providers else store
 
-    def migrate_connections(self, owner):
+    def migrate_connections(self, owner, identity_keys=()):
         """No provider calls; retain native cursor/settings and recovery evidence."""
         if self.connections is None:
             return
         store = BankStore(self.tracked, owner)
+        profiles = self.account_profiles(owner, identity_keys) if identity_keys else None
+        principal = (profiles.principal(profiles.config('default'))
+            if profiles and any(row['profileId'] == 'default' for row in profiles.public()) else None)
         with self.tracked.lock:
             for summary in store.items():
                 item = store.get_item(summary['id'])
                 self.connections.register(owner, {**item, 'storedIdentity': store.item_identity(item['id'])},
                     self.budget_id, [row for row in self.tracked.accounts('personal')
-                                     if row.get('itemId') == store.item_identity(item['id'])])
+                                     if row.get('itemId') == store.item_identity(item['id'])],
+                    profile_principal=principal if not item['id'].startswith('shared:') else None)
                 if not item['token'].startswith(REFERENCE):
                     store.save_item(item['id'], self.connections.reference(owner, item['id']), item['institutionName'])
                     store.set_item_status(item['id'], item['status'], item.get('error'))
         self.shared_providers.add(owner)
+
+    def account_profiles(self, owner, identity_keys):
+        config = {key: value for key, value in self.settings.bank_configuration(owner).items()
+            if key.casefold() not in {'token_encryption_key', 'whab_encryption_key', 'encryption_key'}}
+        return BankProfiles(self.connections, owner, self.budget_id, identity_keys, config)
 
     def _provider(self, plugin):
         # Validate the bounded config before acquiring an installed child.
@@ -152,11 +163,12 @@ class BankLifecycle:
                 raise EffectError('effect_unavailable')
             distribution, version = entry.dist.metadata['Name'], entry.dist.version
 
-            def acquire():
+            def acquire(config_override=None):
                 worker = ReportWorker(plugin.id, expected_distribution=distribution, expected_version=version,
                                       on_create=self._workers.add)
                 self._workers.add(worker)
-                return WorkerBankFactory(worker, owns_worker=True)(context)
+                scoped = BankProviderContext(self.budget_id, self.settings.plaid_env, config_override) if config_override is not None else context
+                return WorkerBankFactory(worker, owns_worker=True)(scoped)
 
             def release(provider):
                 try:
@@ -174,20 +186,22 @@ class BankLifecycle:
             if injected is not None:
                 service = injected
             elif type(plugin.bank) is BankAdapter:
+                self.profile_keys[plugin.id] = plugin.bank.credential_identity_keys
                 if not live_bank(plugin):
                     raise EffectError('effect_unavailable')
                 provider, identity = self._provider(plugin)
                 if self.cipher is None:
                     service = UnconfiguredBank(provider)
                 else:
-                    self.migrate_connections(plugin.id)
+                    profiles = self.account_profiles(plugin.id, plugin.bank.credential_identity_keys) if plugin.bank.credential_identity_keys else None
+                    self.migrate_connections(plugin.id, plugin.bank.credential_identity_keys)
                     service = BankCoordinator(provider, self.tracked, self.bank_store(plugin.id),
                         budget_id=self.budget_id, environment=self.settings.plaid_env, provider_id=plugin.id,
                         generation=generation, journal=self._journal(plugin.id), cipher=self.cipher,
                         code_identity=identity, background_scope=self.background_scope,
                         requires_account_setup=plugin.bank.requires_account_setup, supports_investments=plugin.bank.supports_investments,
                         automatic_sync=lambda: self.automatic_sync(plugin.id), connections=self.connections,
-                        shared_event=self.shared_event)
+                        shared_event=self.shared_event, profiles=profiles)
             else:
                 service = plugin.bank(BankContext(self.bank_store(plugin.id), self.settings.bank_configuration(plugin.id),
                     self.settings.plaid_env, self.settings.encryption_key,

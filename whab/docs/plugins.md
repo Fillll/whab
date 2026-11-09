@@ -989,3 +989,38 @@ only actor, actorKind and batchId and participates in intent fingerprints. Ordin
 commands keep their previous envelope when no explicit history metadata is needed.
 Local Web routes are GET `/api/history`, POST `/api/history/preview` and POST
 `/api/history/apply`, with ordinary budget, workspace, HTTPS and Host/origin guards.
+
+### Shared connection host facade (WHAB 2.63+)
+
+Typed bank adapters may declare `credential_identity_keys: tuple[str, ...]`,
+nonsecret provider configuration keys that identify an API account (Plaid uses
+`PLAID_CLIENT_ID`). The host owns encrypted named profiles, pins their immutable
+account identity to Items, and supplies only the selected profile configuration
+through `BankProviderContext`. The optional `WHAB_BANK_PROFILE` configuration
+value is host-assigned routing context; providers can retain it in webhook return
+URLs. Provider workers still receive neither the host encryption key nor storage.
+
+The host-owned coordinator adds local `shared_connections()`, `attach(item_id)`,
+`detach(item_id)`, `list_profiles()` and `save_profile(profile_id, config)` methods.
+`begin_link(item_id=None, profile_id='default')` chooses an account profile for new
+connections; an existing connection retains its profile. Legacy adapters remain
+on their original ABI and cannot claim this facade. Shared metadata includes
+`itemId`, `providerItemId`, `profileId`, `ownerBudgetId`, institution/status,
+safe account names/masks/currencies/types and attachment budget IDs/states. No
+credential, native token reference, encryption key or cursor is public.
+
+Local guarded routes add GET `/api/banks/{provider}/connections`, POST
+`/attachments` with `{itemId}`, DELETE `/attachments/{item_id}`, and GET/PUT
+`/profiles` (PUT takes `{profileId, config}`). Shared disconnection accepts
+`{budgetIds: [...]}` at DELETE `/items/{item_id}`; multiple attachments require
+an exact sorted reviewed set, checked under the provider operation lock.
+Legacy single-budget disconnection remains compatible. Signed webhook URLs can
+carry `?profile=PROFILE_ID`; this selects the account profile before signature
+verification and does not bypass verification. All local access, personal/demo,
+HTTPS, body-size and enablement guards still apply. These methods are not exposed
+through remote ledger operations.
+
+The [ownership and recovery decision](architecture.md#shared-bank-connection-ownership)
+uses public backend operations and independent atomic cursors rather than a
+shared transaction feed. Portable exports remain credential-free; full runtime
+backups must include the existing `plugin-workers` root and encryption keys.

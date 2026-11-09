@@ -191,12 +191,14 @@ class BudgetHost:
         from whab.app import create_app
 
         unavailable = []
+        identity_keys = next((app.state.bank_lifecycle.profile_keys[provider]
+            for app, _ in self.applications.values() if app.state.bank_lifecycle.profile_keys.get(provider)), ())
         async with self._connection_lock, self._open_lock:
             for identifier in sorted(set(self.recent) | set(self.applications) | {'default'}):
                 try:
                     current = self.applications.get(identifier)
                     if current is not None:
-                        await run_in_threadpool(current[0].state.bank_lifecycle.migrate_connections, provider)
+                        await run_in_threadpool(current[0].state.bank_lifecycle.migrate_connections, provider, identity_keys)
                         continue
                     session = None
                     if identifier != 'default':
@@ -209,7 +211,7 @@ class BudgetHost:
                         budget_host=self, _child=True, _bank_maintenance=True)
                     async with app.router.lifespan_context(app):
                         if app.state.bank_lifecycle.allow_banks:
-                            await run_in_threadpool(app.state.bank_lifecycle.migrate_connections, provider)
+                            await run_in_threadpool(app.state.bank_lifecycle.migrate_connections, provider, identity_keys)
                 except Exception:
                     unavailable.append(identifier)
         return unavailable
@@ -228,6 +230,7 @@ class BudgetHost:
         for identifier, state in record['attachments'].items():
             if identifier == source_budget or state != 'attached':
                 continue
+
             try:
                 await self.activate(identifier)
                 app = self.applications[identifier][0]
@@ -238,6 +241,10 @@ class BudgetHost:
                 # An unavailable budget retains its cursor; its next scheduled or
                 # explicit sync replays all updates from that cursor.
                 continue
+
+    def active_bank(self, provider):
+        return next((app.state.banks[provider] for app, _ in self.applications.values()
+                     if provider in app.state.banks), None)
 
     async def close(self):
         async with self._open_lock:

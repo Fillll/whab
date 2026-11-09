@@ -37,7 +37,15 @@ class PlaidProvider(PlaidService):
     _requires_encryption = False
 
     def __init__(self, context, client=None):
-        super().__init__(_SyncData(), {**context.config, 'PLAID_ENV': context.environment}, client)
+        config = {**context.config, 'PLAID_ENV': context.environment}
+        profile = config.get('WHAB_BANK_PROFILE', 'default')
+        webhook = config.get('PLAID_WEBHOOK_URL')
+        if profile != 'default' and webhook:
+            from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+            url = urlsplit(webhook)
+            query = [(key, value) for key, value in parse_qsl(url.query) if key != 'profile']
+            config['PLAID_WEBHOOK_URL'] = urlunsplit(url._replace(query=urlencode([*query, ('profile', profile)])))
+        super().__init__(_SyncData(), config, client)
         self.config = {**{key: value for key, value in self.config.items() if key != 'plaidConfigured'},
                        'configured': self.config['plaidConfigured']}
         self._access_token = None

@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.8.0 — 2026-11-08
+
+PR: [#171](https://github.com/Fillll/whab/pull/171)
+
+- Add Use existing connection, separate Plaid account profiles, independent account/history setup, detach and affected-budget global disconnect controls. Keep provider HTTP bound to the Item’s original account profile.
+
 ## 1.7.0 — 2026-11-07
 
 PR: [#164](https://github.com/Fillll/whab/pull/164)

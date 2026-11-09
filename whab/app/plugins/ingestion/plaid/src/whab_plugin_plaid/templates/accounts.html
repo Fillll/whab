@@ -1,6 +1,19 @@
 {% if bank_asset_prefix is defined %}<link rel="stylesheet" href="{{ bank_asset_prefix }}/investments.css">{% endif %}
 <section class="bank-provider" data-bank-provider="plaid" data-bank-environment="{{ status.environment }}" data-sync-setup="{{ 'true' if status.requiresAccountSetup else 'false' }}">
   <div data-plaid-connections-view>
+  {% if status.sharedConnections %}
+  <section data-plaid-profiles data-live-enabled="{{ 'true' if status.liveEnabled else 'false' }}">
+    <label>Plaid account for new connections<select data-plaid-profile aria-label="Plaid account profile"><option value="default">Default account</option></select></label>
+    <details><summary>Add a separate Plaid account</summary>
+      <p>Use a named profile for separate Plaid API credentials. Existing connections keep their original account profile. Profiles and credentials stay encrypted on this computer.</p>
+      <label>Profile name<input data-plaid-profile-name autocomplete="off" placeholder="second-account"></label>
+      <label>Client ID<input data-plaid-client-id autocomplete="off"></label>
+      <label>Secret<input type="password" data-plaid-secret autocomplete="new-password"></label>
+      <button class="button secondary" data-plaid-profile-save>Save account profile</button>
+    </details>
+    <p data-plaid-profile-status role="status"></p>
+  </section>
+  {% endif %}
   <div class="section-title">
     <h2>Plaid connections</h2>
     <button class="button primary" data-plaid-connect {% if not status.configured %}disabled{% endif %}>{{ icon('link', 16) if icon is defined else '' }}Connect account</button>
@@ -61,7 +74,7 @@
       <div class="connection-row">
         <div>
           <strong>{{ item.institutionName }}</strong>
-          {% if status.sharedConnections %}<p>Connection <code>{{ item.id }}</code> · {{ item.status }} · Owner budget <code>{{ item.ownerBudgetId }}</code></p>{% endif %}
+          {% if status.sharedConnections %}<p>Connection <code>{{ item.id }}</code> · Plaid account {{ item.profileId }} · {{ item.status }} · Owner budget <code>{{ item.ownerBudgetId }}</code></p>{% endif %}
           <p>
           {% if item.lastSynced %}Last sync <time data-local-time
        datetime="{{ item.lastSynced }}">{{ item.lastSynced }}</time>

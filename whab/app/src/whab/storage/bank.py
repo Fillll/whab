@@ -49,7 +49,7 @@ class BankStore:
 
     def _record_identity(self, kind: str, item_id: str, record_id: str) -> str:
         raw = self._raw_id(record_id)
-        if self._provider == "plaid":
+        if self._provider == "plaid" and not item_id.startswith('shared:'):
             if raw.startswith("provider:"):
                 raise StoreError("Reserved bank identifier namespace.")
             return raw

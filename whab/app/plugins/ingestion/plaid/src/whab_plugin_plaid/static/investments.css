@@ -14,3 +14,9 @@
 .bank-provider .investment-loss { color: var(--danger, #b22); }
 .bank-provider .investment-gain { color: var(--ink, #222); }
 .bank-provider .investment-empty { padding: 24px 0; color: var(--muted, #666); }
+.bank-provider .connection-row > div { min-width: 0; }
+.bank-provider code { overflow-wrap: anywhere; }
+.bank-provider .connection-actions { flex-wrap: wrap; justify-content: flex-end; }
+.bank-provider [data-plaid-profiles] label { display: grid; gap: 6px; margin: 12px 0; }
+.bank-provider [data-plaid-profiles] input, .bank-provider [data-plaid-profiles] select { width: 100%; max-width: 360px; }
+.bank-provider [data-plaid-existing-list] > section { border-bottom: 1px solid var(--line, #ddd); padding: 14px 0; overflow-wrap: anywhere; }

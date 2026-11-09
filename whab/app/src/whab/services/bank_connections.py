@@ -53,7 +53,7 @@ class BankConnections:
                     raise ValueError
                 for key, row in records.items():
                     if (type(row) is not dict or row.keys() != {'provider', 'itemId', 'ownerBudgetId', 'institutionName',
-                            'token', 'status', 'error', 'accounts', 'attachments'}
+                            'token', 'status', 'error', 'accounts', 'attachments', 'profileId', 'profilePrincipal', 'providerItemId'}
                             or key != self.identity(row['provider'], row['itemId'])
                             or row['status'] not in {'connected', 'reconnect', 'error', 'revoking', 'disconnected'}
                             or type(row['attachments']) is not dict
@@ -72,7 +72,7 @@ class BankConnections:
                 from whab.budgets.session import _flush_source_home
                 _flush_source_home(self.directory, self.directory)
 
-    def register(self, provider, item, budget_id, accounts=()):
+    def register(self, provider, item, budget_id, accounts=(), *, profile_id='default', provider_item_id=None, profile_principal=None):
         """Register before replacing legacy ciphertext; retries retain ownership."""
         key = self.identity(provider, item['id'])
         with self.records() as records:
@@ -84,6 +84,7 @@ class BankConnections:
                     raise BankError('This bank attachment is missing its device-local connection. Restore the matching runtime backup.')
                 token = self.cipher.decrypt_token(item['token'], item['storedIdentity'])
                 record = records[key] = {'provider': provider, 'itemId': item['id'], 'ownerBudgetId': budget_id,
+                    'profileId': profile_id, 'profilePrincipal': profile_principal, 'providerItemId': provider_item_id or item['id'],
                     'institutionName': item['institutionName'],
                     'token': self.cipher.encrypt_token(token, self._aad(provider, item['id'])),
                     'status': item['status'], 'error': item.get('error'), 'accounts': [], 'attachments': {}}
@@ -92,6 +93,10 @@ class BankConnections:
                 if old != self.cipher.decrypt_token(record['token'], self._aad(provider, item['id'])):
                     raise BankError('Conflicting bank credentials require recovery before this connection can be shared.')
             record['attachments'].setdefault(budget_id, 'attached')
+            if profile_principal is not None and record['profileId'] == profile_id:
+                if record['profilePrincipal'] not in (None, profile_principal):
+                    raise BankError('The bank connection belongs to another provider account. Restore the matching profile.')
+                record['profilePrincipal'] = profile_principal
             if record['attachments'][budget_id] == 'pending':
                 record['attachments'][budget_id] = 'attached'
             if accounts and not record['accounts']:
@@ -111,10 +116,15 @@ class BankConnections:
     def public(self, provider, budget_id):
         with self.records() as records:
             return [{key: deepcopy(row[key]) for key in ('provider', 'itemId', 'ownerBudgetId',
-                        'institutionName', 'status', 'error', 'accounts')}
+                        'institutionName', 'status', 'error', 'accounts', 'profileId', 'providerItemId')}
                     | {'attached': row['attachments'].get(budget_id) == 'attached',
                        'attachments': [{'budgetId': key, 'state': value} for key, value in row['attachments'].items()]}
                     for row in records.values() if row['provider'] == provider]
+
+    def connection_id(self, provider, profile_id, item_id):
+        if profile_id == 'default':
+            return item_id
+        return 'shared:' + hashlib.sha256(json.dumps([provider, profile_id, item_id]).encode()).hexdigest()
 
     def access(self, provider, item_id, budget_id, *, revocation=False):
         record = self.get(provider, item_id)
@@ -161,5 +171,5 @@ class AttachedBankStore:
             record = self.connections.get(self.store._provider, item['id'])
             if record['attachments'].get(self.budget_id) == 'attached':
                 result.append({**item, 'status': record['status'], 'error': record['error'],
-                               'ownerBudgetId': record['ownerBudgetId']})
+                               'ownerBudgetId': record['ownerBudgetId'], 'profileId': record['profileId']})
         return result

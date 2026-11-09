@@ -10,6 +10,10 @@ from whab_plugin_cli.bank_commands import bank_request
 @pytest.mark.parametrize('entry', ['advanced', 'console'])
 @pytest.mark.parametrize('arguments,method,suffix,payload', [
     (['connections', 'plaid'], 'GET', '/items', None),
+    (['shared', 'plaid'], 'GET', '/connections', None),
+    (['attach', 'plaid', '--item', 'item'], 'POST', '/attachments', {'itemId': 'item'}),
+    (['detach', 'plaid', '--item', 'item'], 'DELETE', '/attachments/item', {}),
+    (['disconnect', 'plaid', '--item', 'item', '--affected-budgets', '["a","b"]'], 'DELETE', '/items/item', {'budgetIds': ['a', 'b']}),
     (['preview', 'plaid', '--item', 'fictional-item'], 'POST', '/sync-preview', {'itemId': 'fictional-item'}),
     (['configure', 'plaid', '--item', 'fictional-item', '--accounts', '[{"bankAccountId":"remote","accountId":"local","since":"2026-10-01"}]'], 'PUT', '/sync-settings', {'itemId': 'fictional-item', 'accounts': [{'bankAccountId': 'remote', 'accountId': 'local', 'since': '2026-10-01'}]}),
     (['sync', 'plaid'], 'POST', '/sync', {'itemId': None}),
@@ -34,7 +38,10 @@ def test_bank_intents_match_between_consoles(entry, arguments, method, suffix, p
     ['configure', 'plaid', '--item', 'item', '--accounts', '{}'],
     ['configure', 'plaid', '--item', 'item', '--accounts', 'invalid'],
     ['configure', 'plaid', '--item', 'item', '--accounts', 'x' * (128 * 1024 + 1)],
-    ['background', 'plaid'],
+    ['background', 'plaid'], ['attach', 'plaid'], ['detach', 'plaid'], ['disconnect', 'plaid'],
+    ['disconnect', 'plaid', '--item', 'item'],
+    *[['disconnect', 'plaid', '--item', 'item', '--affected-budgets', value]
+      for value in ['{}', '[1]', '["b","a"]', '["a","a"]', 'invalid', 'x' * (128 * 1024 + 1)]],
 ])
 def test_incomplete_bank_intents_are_rejected_before_network(arguments):
     args = client.parser().parse_args(['bank', *arguments])
@@ -116,3 +123,41 @@ def test_investment_read_requires_an_explicit_connection_before_network():
     args = client.parser().parse_args(['bank', 'investments', 'plaid'])
     with pytest.raises(ValueError, match='connection ID'):
         bank_request(args, 'fictional')
+
+
+@pytest.mark.parametrize('entry', ['advanced', 'console'])
+def test_profile_save_reads_private_file_without_putting_credentials_in_arguments(entry, tmp_path):
+    path = tmp_path / 'private.json'
+    path.write_text('{"PLAID_CLIENT_ID":"fictional-client","PLAID_SECRET":"fictional-secret"}')
+    argv = ['profile-save', 'plaid', '--profile', 'second-account', '--credentials-file', str(path)]
+    args = client.parser().parse_args(['bank', *argv]) if entry == 'advanced' else console.parser(console.options_parser()).parse_args(['BUDGET', 'Fictional', 'bank', *argv])
+    method, route, kwargs = bank_request(args, 'fictional-budget')
+    assert method == 'PUT' and route.endswith('/profiles')
+    assert kwargs['json'] == {'profileId': 'second-account', 'config': {'PLAID_CLIENT_ID': 'fictional-client', 'PLAID_SECRET': 'fictional-secret'}}
+    assert 'fictional-secret' not in str(argv)
+
+
+@pytest.mark.parametrize('content', ['invalid', '[]', '{"key":1}', 'x' * (128 * 1024 + 1)])
+def test_profile_save_refuses_invalid_or_overlarge_private_input(tmp_path, content):
+    path = tmp_path / 'private.json'
+    path.write_text(content)
+    args = client.parser().parse_args(['bank', 'profile-save', 'plaid', '--profile', 'second', '--credentials-file', str(path)])
+    with pytest.raises(ValueError, match='bounded JSON'):
+        bank_request(args, 'fictional')
+
+
+def test_profile_save_stdin_and_missing_inputs(monkeypatch, tmp_path):
+    import io
+    from types import SimpleNamespace
+    monkeypatch.setattr('whab_plugin_cli.bank_commands.sys.stdin', SimpleNamespace(buffer=io.BytesIO(b'{"PLAID_CLIENT_ID":"fictional","PLAID_SECRET":"fictional"}')))
+    args = client.parser().parse_args(['bank', 'profile-save', 'plaid', '--profile', 'second', '--credentials-file', '-'])
+    assert bank_request(args, 'fictional')[2]['json']['profileId'] == 'second'
+    for argv in [[], ['--profile', 'second'], ['--credentials-file', '-'], ['--profile', 'second', '--credentials-file', str(tmp_path / 'missing')]]:
+        args = client.parser().parse_args(['bank', 'profile-save', 'plaid', *argv])
+        with pytest.raises(ValueError):
+            bank_request(args, 'fictional')
+
+
+def test_profile_list_reads_without_credentials():
+    args = client.parser().parse_args(['bank', 'profiles', 'plaid'])
+    assert bank_request(args, 'fictional') == ('GET', '/budgets/fictional/api/banks/plaid/profiles', {})

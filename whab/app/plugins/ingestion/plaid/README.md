@@ -168,3 +168,67 @@ whab Household bank background plaid --enable
 ```
 
 Use JSON `null` for a new destination account or an explicitly chosen all-history cutoff. Omit bank accounts you do not want to import. The advanced form is `whab-cli default.budget bank ...`; read `bank --help` or `describe --plugin plaid --operation bank.configure` offline. These are local host controls, not remote ledger commands; connecting a bank still requires its interactive consent flow.
+
+## Shared connections and several Plaid accounts
+
+Plaid 1.8 requires WHAB 2.63+. **Use existing connection** lists connections on
+this device in the selected environment, their provider account profile, stable
+connection ID, safe account names/masks, owner and budget attachments. Choose
+**Use this connection**, then **Sync setup** to select this budget's destinations
+and an explicit inclusive date or **All available history**. Attachment performs
+no Link flow, import or ledger copy. Classify unclassified YNAB destinations
+first; WHAB never infers account types from names. Overlapping YNAB and Plaid
+transactions are not automatically reconciled.
+
+Each budget saves its own mappings, dates, cursor and manual/periodic policy.
+Syncing one does not consume another's updates. **Detach from this budget** keeps
+history, mappings and progress and leaves the bank and other budgets connected.
+**Disconnect from bank for all budgets** lists the affected budgets and revokes
+the underlying Item. Disabled plugins retain attachments; disabling never removes
+the provider Item. Separate connections at the same institution remain distinct.
+
+Several Plaid API accounts can coexist as named profiles. The existing credentials
+remain the **default** profile; add a separate account in the same settings page,
+then select its profile before **Connect account**. Existing connections always
+use their saved profile. Profile names identify accounts, not Sandbox versus
+production; environments remain separate. A profile's account identity cannot be
+changed in place; add a new profile for a different Plaid account. Saving credentials
+creates no bank Item. Bank consent and reauthentication still use interactive Link.
+A consumer Plaid Portal login alone does not supply API credentials for WHAB;
+profiles represent API-enabled Plaid accounts in either supported environment.
+
+CLI equivalents:
+
+```sh
+whab BUDGET bank profiles plaid
+whab BUDGET bank profile-save plaid --profile second-account --credentials-file /private/plaid-account.json
+whab BUDGET bank shared plaid
+whab BUDGET bank attach plaid --item CONNECTION_ID
+whab BUDGET bank preview plaid --item CONNECTION_ID
+whab BUDGET bank configure plaid --item CONNECTION_ID --accounts '[{"bankAccountId":"PROVIDER_ACCOUNT_ID","accountId":"CLASSIFIED_WHAB_ACCOUNT_ID","since":"2026-11-01"}]'
+whab BUDGET bank sync plaid --item CONNECTION_ID
+whab BUDGET bank detach plaid --item CONNECTION_ID
+```
+
+The private profile file is a JSON object of provider configuration strings,
+including `PLAID_CLIENT_ID`, `PLAID_SECRET` and, for deliberate live access,
+`ALLOW_LIVE_PLAID`. Use `--credentials-file -` for stdin. Never put secrets directly
+in command arguments or commit that file. Optional `PLAID_WEBHOOK_URL` and
+`PLAID_REDIRECT_URI` configure that profile's interactive flow. Named-profile
+webhook URLs automatically retain a `profile` query parameter; signature
+verification still precedes all effects. Profiles and Item tokens are encrypted
+with the existing host key and are not exported in portable budgets.
+
+After reviewing `bank shared`, global revocation requires its exact sorted set of
+attached/pending budget IDs, for example with fictional IDs:
+
+```sh
+whab BUDGET bank disconnect plaid --item CONNECTION_ID --affected-budgets '["budget-a","budget-b"]'
+```
+
+Unavailable saved budgets are listed and block global revocation until their
+attachments can be checked. A failed or uncertain revocation requires inspecting
+the existing continuation; do not reconnect or repeat provider removal. Back up
+all runtime data and keys together. Reopening retries only recoverable local
+registration/attachment writes; original connection ownership and native progress
+are retained. See the [ownership decision](../../../../docs/architecture.md#shared-bank-connection-ownership).

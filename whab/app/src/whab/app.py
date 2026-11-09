@@ -646,9 +646,10 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
         def webhook_paths(path):
             active = runtime._active.services["banks"]
             if path == "/api/plaid/webhook":
-                return "plaid" in active
+                return "plaid" in active or budget_host.active_bank('plaid') is not None
             parts = path.split("/")
-            return len(parts) == 5 and parts[1:3] == ["api", "banks"] and parts[4] == "webhook" and parts[3] in active
+            return len(parts) == 5 and parts[1:3] == ["api", "banks"] and parts[4] == "webhook" and (
+                parts[3] in active or budget_host.active_bank(parts[3]) is not None)
         install_middleware(
             app,
             settings.port,
