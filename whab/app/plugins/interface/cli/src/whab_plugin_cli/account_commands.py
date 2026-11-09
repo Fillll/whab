@@ -86,7 +86,7 @@ def execute_account(connection, identifier, prefix, args, exchange, error):
         saved = checked(exchange(connection, 'POST', prefix + '/commands', json=intent), identifier, error)
         verified = read()
         actual = resolve_account(verified['data'], row['id'], error)
-        if verified['revision'] != saved['revision'] or any(actual.get(key) != payload[key] for key in ('type', 'onBudget', 'subtype')):
+        if actual['id'] != row['id'] or verified['revision'] != saved['revision'] or any(actual.get(key) != payload[key] for key in ('type', 'onBudget', 'subtype')):
             raise error('Account changed during verification.')
     except (ValueError, OSError, RuntimeError, KeyError, TypeError, httpx.HTTPError) as failure:
         raise error('Classification was not confirmed; it may have been saved. No automatic retry. Inspect account show and history; do not rerun classify as a retry. Retain budgetId ' + identifier + ' and the exact original intent: ' + json.dumps(intent) + '.') from failure
