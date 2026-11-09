@@ -323,6 +323,16 @@ class RemoteStore:
     def move_category(self, workspace, category_id, parent_id):
         return self._command("move_category", workspace, {"categoryId": category_id, "parentId": parent_id})
 
+    def supports_category_deletion(self):
+        """The addressed authority enforces deletion and audit support."""
+        return True
+
+    def delete_category(self, workspace, category_id):
+        return self._command('delete_category', workspace, {'categoryId': category_id})
+
+    def delete_category_group(self, workspace, parent_id):
+        return self._command('delete_category_group', workspace, {'parentId': parent_id})
+
     def add_category(self, workspace, category):
         return self._command("add_category", workspace, category)
 

@@ -66,6 +66,13 @@ def category_transport(monkeypatch, tmp_path):
                         "currency": p["currency"],
                     }
                 )
+            elif body['operation'] == 'delete_category_group':
+                groups.remove(next(row for row in groups if row['id'] == p['parentId']))
+            elif body['operation'] == 'delete_category':
+                if state['failure'] == 'referenced':
+                    return httpx.Response(400, json={'error': 'Cannot delete referenced category'})
+                source = next(group for group in groups if any(row['id'] == p['categoryId'] for row in group['children']))
+                source['children'] = [row for row in source['children'] if row['id'] != p['categoryId']]
             else:
                 source = next(
                     group
@@ -97,6 +104,8 @@ def category_transport(monkeypatch, tmp_path):
             raise httpx.ReadError("private transport details")
         if state["posted"] and state["failure"] == "changed-result":
             groups[-1]["children"][-1]["target"] = 999
+        if state['posted'] and state['failure'] == 'changed-delete-result':
+            groups[-1]['name'] = 'Unexpected concurrent change'
         return httpx.Response(
             200,
             json={
@@ -270,7 +279,7 @@ def test_invalid_identity_is_a_controlled_error():
 
 
 @pytest.mark.parametrize(
-    "arguments", [[], ["list"], ["group"], ["group", "create"], ["create"], ["move"]]
+    "arguments", [[], ["list"], ["group"], ["group", "create"], ["create"], ["move"], ['delete'], ['group', 'delete']]
 )
 def test_detailed_offline_help_without_profile_or_host(monkeypatch, tmp_path, capsys, arguments):
     monkeypatch.setattr(console.Path, "home", lambda: tmp_path)
@@ -300,6 +309,67 @@ def test_detailed_offline_help_without_profile_or_host(monkeypatch, tmp_path, ca
         "no manual reorder",
     ]:
         assert phrase in help_text
+
+
+@pytest.mark.parametrize('arguments,operation,payload', [
+    (['delete', 'finance / example 项目'], 'delete_category', {'categoryId': 'a'}),
+    (['delete', 'a', '--format', 'table'], 'delete_category', {'categoryId': 'a'}),
+    (['group', 'delete', '🧰 проекты'], 'delete_category_group', {'parentId': 'projects'}),
+    (['group', 'delete', 'projects', '--format', 'table'], 'delete_category_group', {'parentId': 'projects'}),
+])
+def test_deletions_resolve_exact_names_ids_and_verify_complete_hierarchy(category_transport, capsys, arguments, operation, payload):
+    assert run(*arguments) == 0
+    output = capsys.readouterr().out
+    if '--format' in arguments:
+        assert 'Deleted and verified absent' in output
+    else:
+        result = json.loads(output)
+        assert result['data']['deleted'] is True and result['revision'] == 'r2'
+        assert result['data']['id'] == next(iter(payload.values()))
+    posts = [request for request in category_transport[1] if request.method == 'POST']
+    assert len(posts) == 1
+    intent = json.loads(posts[0].content)
+    assert intent['operation'] == operation and intent['payload'] == payload
+    assert intent['expected_revision'] == 'r1' and len(intent['request_id']) == 36
+
+
+@pytest.mark.parametrize('arguments', [
+    ['delete', 'Same'], ['delete', 'missing'], ['delete', 'projects'],
+    ['group', 'delete', 'a'], ['group', 'delete', 'finance'],
+])
+def test_missing_ambiguous_wrong_kind_or_nonempty_group_deletion_does_not_write(category_transport, capsys, arguments):
+    assert run(*arguments) == 1
+    message = capsys.readouterr().err
+    assert 'Candidates' in message or 'children' in message
+    assert not any(request.method == 'POST' for request in category_transport[1])
+
+
+@pytest.mark.parametrize('failure', ['stale', 'lost', 'wrong-write', 'changed-revision', 'lost-verification', 'missing-id', 'changed-delete-result', 'referenced'])
+@pytest.mark.parametrize('group', [False, True])
+def test_deletion_never_replays_uncertain_or_unverified_intents(category_transport, capsys, failure, group):
+    state, calls = category_transport
+    if group and failure == 'referenced':
+        state['groups'][-1]['children'] = [state['groups'][0]['children'][0]]
+        assert run('group', 'delete', 'projects') == 1
+        assert not any(request.method == 'POST' for request in calls)
+    else:
+        state['failure'] = failure
+        assert run(*(['group', 'delete', 'projects'] if group else ['delete', 'a'])) == 1
+        message = capsys.readouterr().err
+        assert 'No automatic retry' in message and 'request_id' in message and 'expected_revision' in message
+        assert 'private transport details' not in message
+        assert len([request for request in calls if request.method == 'POST']) == 1
+
+
+def test_delete_help_explains_refusal_history_and_recovery_offline(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(console.Path, 'home', lambda: tmp_path)
+    for arguments in [['delete'], ['group', 'delete']]:
+        with pytest.raises(SystemExit) as stop:
+            console.main(['--profile', '/missing/fictional-profile', 'Fictional budget', 'category', *arguments, '--help'])
+        assert stop.value.code == 0
+        text = capsys.readouterr().out
+        for phrase in ['including zero-valued rows', 'deleted', 'NO children', 'audit', 'verified', 'undo/redo', 'No fuzzy', '--force', 'uncertain', 'request ID']:
+            assert phrase.lower() in text.lower()
 
 
 def test_qualified_names_normalize_legacy_outer_whitespace():

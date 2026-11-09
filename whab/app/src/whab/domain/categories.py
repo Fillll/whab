@@ -189,3 +189,25 @@ def ensure_child_category(categories: Mapping[str, dict], category_id: str) -> d
     if category["id"] != category_id:
         raise StoreError("Invalid child category identifier.")
     return category
+
+
+def delete_category(state, category_id):
+    """Remove one unreferenced leaf, retaining its parent and all financial data."""
+    ensure_child_category(state['categories'], category_id)
+    if any(row.get('categoryId') == category_id for row in state['transactions'].values()):
+        raise StoreError('Cannot delete category: transactions still reference it, including any pending or deleted records. No records were removed.')
+    if any(category_id in rows for rows in state['budget'].values()):
+        raise StoreError('Cannot delete category: monthly assignments still reference it, including zero-valued rows. No assignments were removed.')
+    groups = category_groups(state['categories'], state.get('categoryGroups', ()))
+    state['categoryGroups'] = groups
+    del state['categories'][category_id]
+
+
+def delete_category_group(state, parent_id):
+    """Remove an explicit empty parent only; never cascade to its children."""
+    groups = category_groups(state['categories'], state.get('categoryGroups', ()))
+    if not any(row['id'] == parent_id for row in groups):
+        raise StoreError('Parent category group not found.')
+    if any(category_group_id(row['group']) == parent_id for row in state['categories'].values()):
+        raise StoreError('Cannot delete category group: it still has children. Delete or move each child explicitly first.')
+    state['categoryGroups'] = [row for row in groups if row['id'] != parent_id]

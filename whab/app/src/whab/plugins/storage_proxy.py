@@ -32,6 +32,8 @@ _MUTATIONS = {
     "add_category": (("workspace", "category"), {}),
     "add_category_group": (("workspace", "name"), {}),
     "move_category": (("workspace", "category_id", "parent_id"), {}),
+    "delete_category": (("workspace", "category_id"), {}),
+    "delete_category_group": (("workspace", "parent_id"), {}),
     "add_transaction": (("workspace", "transaction"), {"source": "manual"}),
     "edit_transaction_details": (("workspace", "transaction_id", "changes"), {}),
     "edit_transaction": (("workspace", "transaction_id"), {"category_id": UNSET, "reviewed": None, "note": UNSET}),

@@ -282,6 +282,14 @@ class CategoryManagement(Protocol):
     def move_category(self, workspace: str, category_id: str, parent_id: str) -> None: ...
 
 
+class CategoryDeletion(Protocol):
+    """Optional atomic, audited deletion of unreferenced children/empty parents."""
+
+    def supports_category_deletion(self) -> bool: ...
+    def delete_category(self, workspace: str, category_id: str) -> None: ...
+    def delete_category_group(self, workspace: str, parent_id: str) -> None: ...
+
+
 class AccountLifecycleStorage(Protocol):
     """Optional durable archive state, including paused account synchronization."""
 

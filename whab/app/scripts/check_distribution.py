@@ -40,7 +40,7 @@ from fastapi.testclient import TestClient
 target = Path(sys.argv[1]).resolve()
 with patch.object(metadata.EntryPoint, "load", side_effect=AssertionError("Documentation must not load hooks")):
     operation_catalog = installed_catalog()
-assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 26
+assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 28
 assert {row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] == "local"} == {
     "bank.connections", "bank.preview", "bank.configure", "bank.sync", "bank.schedule", "bank.background", "bank.investments",
 }
@@ -72,7 +72,9 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
              ["fictional", "category", "group", "--help"],
              ["fictional", "category", "group", "create", "--help"],
              ["fictional", "category", "create", "--help"],
-             ["fictional", "category", "move", "--help"]):
+             ["fictional", "category", "move", "--help"],
+             ["fictional", "category", "delete", "--help"],
+             ["fictional", "category", "group", "delete", "--help"]):
     with redirect_stdout(StringIO()) as output:
         try:
             console_main(args)
@@ -109,19 +111,23 @@ for identifier, record in expected.items():
     assert Path(module.__file__).resolve().is_relative_to(target), identifier
 for row in catalog_snapshot()["plugins"]:
     descriptor = load_descriptors((row["id"],))[0]
-    contract = contract_for(descriptor)
-    assert row["display_name"] == descriptor.display_name
-    assert row["api_version"] == descriptor.api_version
-    assert row["capabilities"] == sorted((asdict(value) for value in contract.provides), key=lambda value: value["name"])
-    assert row["requires"] == [
-        {key: value for key, value in asdict(requirement).items() if value is not None}
-        for requirement in contract.requires
-    ]
-    assert row["conflicts"] == list(contract.conflicts)
-    assert row["lifecycle"] == contract.lifecycle and row["authority"] == contract.authority
-    assert row["state_version"] == contract.state_version
-    assert row["state_upgrades"] == [list(edge) for edge in contract.state_upgrades]
-    assert row["legacy"] == (descriptor.contract is None)
+    try:
+        contract = contract_for(descriptor)
+        assert row["display_name"] == descriptor.display_name
+        assert row["api_version"] == descriptor.api_version
+        assert row["capabilities"] == sorted((asdict(value) for value in contract.provides), key=lambda value: value["name"])
+        assert row["requires"] == [
+            {key: value for key, value in asdict(requirement).items() if value is not None}
+            for requirement in contract.requires
+        ]
+        assert row["conflicts"] == list(contract.conflicts)
+        assert row["lifecycle"] == contract.lifecycle and row["authority"] == contract.authority
+        assert row["state_version"] == contract.state_version
+        assert row["state_upgrades"] == [list(edge) for edge in contract.state_upgrades]
+        assert row["legacy"] == (descriptor.contract is None)
+    finally:
+        # Discovery checks own their children; do not retain every worker until exit.
+        descriptor._process.close()
 # Shared credential dependencies compose with both independent consumers.
 ai_registry = load_plugins(("ai-credentials", "llm-categorization", "subscriptions"))
 assert {p.id for p in ai_registry.describe()} == {"ai-credentials", "llm-categorization", "subscriptions"}

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.13.0 — 2026-11-09
+
+PR: [#179](https://github.com/Fillll/whab/pull/179)
+
+- Add exact name/ID-addressed category delete and category group delete, with qualified Unicode child paths, internally guarded single intents, whole-hierarchy saved-result verification, clear deleted JSON/table output and detailed offline help. Refuse ambiguous/wrong-kind/nonempty targets and never replay uncertain writes.
+
 ## 2.12.0 — 2026-11-09
 
 PR: [#178](https://github.com/Fillll/whab/pull/178)

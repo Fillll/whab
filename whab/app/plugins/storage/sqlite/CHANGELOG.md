@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.19.0 — 2026-11-09
+
+PR: [#179](https://github.com/Fillll/whab/pull/179)
+
+- Implement optional CategoryDeletion using core reference guards and an exact workspace/ID deletion inside the native transaction. Preserve financial references, empty parents, protected state and audit history; commit history and receipts atomically and support guarded undo/redo without a schema migration.
+
 ## 1.18.1 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

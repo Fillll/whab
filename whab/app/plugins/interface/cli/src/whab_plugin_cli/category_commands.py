@@ -17,7 +17,7 @@ def add_category_parser(commands, catalog):
     guide = operation(document, "local", "category.workflow")["summary"]
     group = commands.add_parser(
         "category",
-        help="List, create and move categories by name or ID",
+        help="List, create, move and safely delete categories by name or ID",
         description="Manage the two-level category hierarchy in one explicitly addressed budget.",
         epilog=guide,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -50,6 +50,16 @@ def add_category_parser(commands, catalog):
     parent_create.add_argument(
         "name", help="New unique group name; quote spaces, emoji and non-Latin names"
     )
+    parent_delete = parent_actions.add_parser(
+        "delete", help="Delete an empty parent group; never deletes children",
+        epilog=guide, formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parent_delete.add_argument("category", help="Existing empty parent by unique exact name or stable ID")
+    delete = actions.add_parser(
+        "delete", help="Delete an unused child; refuse all transaction/assignment references",
+        epilog=guide, formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    delete.add_argument("category", help='Child stable ID, unique exact name or "Group / Name"; quote Unicode/spaces')
     create = actions.add_parser(
         "create",
         help="Create an assignable child under an existing parent",
@@ -89,7 +99,7 @@ def add_category_parser(commands, catalog):
             required=True,
             help="Existing parent group by unique exact name or stable ID; children cannot be parents",
         )
-    for parser in (listing, parent_create, create, move):
+    for parser in (listing, parent_create, create, move, delete, parent_delete):
         parser.add_argument(
             "--format",
             choices=("json", "table"),
@@ -148,6 +158,8 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
             [resolve_category(groups, args.parent, error, parent=True)] if args.parent else groups
         )
         return {**observed, "budget": args.target, "data": selected}
+    if args.category_action == "delete" or args.category_action == "group" and args.group_action == "delete":
+        return execute_delete(connection, identifier, prefix, args, exchange, error, observed, read)
     if args.category_action == "group":
         if any(row["name"].strip().casefold() == args.name.strip().casefold() for row in groups):
             raise error(
@@ -243,6 +255,33 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
     }
 
 
+def execute_delete(connection, identifier, prefix, args, exchange, error, observed, read):
+    parent = args.category_action == 'group'
+    rows = observed['data'] if parent else [row for group in observed['data'] for row in group['children']]
+    selected = resolve_category(rows, args.category, error, parent=parent)
+    if parent and selected['children']:
+        raise error('Cannot delete category group: it still has children. Inspect category list; delete or move each child explicitly first.')
+    expected = ([row for row in observed['data'] if row['id'] != selected['id']] if parent else
+                [{**group, 'children': [row for row in group['children'] if row['id'] != selected['id']]}
+                 for group in observed['data']])
+    intent = {'operation': 'delete_category_group' if parent else 'delete_category', 'workspace': 'personal',
+              'payload': {'parentId' if parent else 'categoryId': selected['id']},
+              'expected_revision': observed['revision'], 'request_id': str(uuid4())}
+    try:
+        saved = checked(exchange(connection, 'POST', prefix + '/commands', json=intent), identifier, error)
+        verified = read()
+        if saved['data'] is not None or verified['revision'] != saved['revision'] or verified['data'] != expected:
+            raise error('Saved category deletion does not match the addressed hierarchy and revision.')
+    except (ValueError, OSError, RuntimeError, KeyError, TypeError, httpx.HTTPError) as failure:
+        raise error('Category deletion was not confirmed; it may have been saved. No automatic retry. '
+                    'Deletion requires no transaction references (including deleted records), no monthly assignments '
+                    '(including zero rows), and an empty group. '
+                    'Inspect category list and history; do not rerun the write as a retry. Retain budgetId '
+                    + identifier + ' and the exact original intent: ' + json.dumps(intent) + '.') from failure
+    return {**verified, 'budget': args.target, 'data': {**selected, 'deleted': True},
+            'requestId': intent['request_id'], 'expectedRevision': observed['revision']}
+
+
 def category_table(result):
     data = result["data"]
     groups = data if isinstance(data, list) else [data]
@@ -271,6 +310,7 @@ def category_table(result):
     return "\n".join(
         [
             f"Budget: {terminal_text(result['budget'], 100)} ({terminal_text(result['budgetId'], 200)})",
+            *(["Deleted and verified absent; other groups/children are unchanged."] if isinstance(data, dict) and data.get('deleted') else []),
             *[
                 "  ".join(value.ljust(width) for value, width in zip(row, widths, strict=True))
                 for row in cells

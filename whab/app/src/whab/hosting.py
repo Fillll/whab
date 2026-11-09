@@ -24,6 +24,7 @@ import httpx
 from whab.budgets.document import atomic_write
 
 _OWNER = None
+_STARTUP_SECONDS = 90
 
 
 def current_owner():
@@ -93,6 +94,7 @@ class HostOwner:
         self.lock = RLock()
         self.last_active = monotonic()
         self.stopping = False
+        self._had_client = False
 
     def publish(self):
         atomic_write(self.directory / "host.json", json.dumps({
@@ -107,6 +109,7 @@ class HostOwner:
                 raise ValueError("The local host is stopping or the client is invalid.")
             identifier = secrets.token_hex(16)
             self.clients[identifier] = pid
+            self._had_client = True
             self.last_active = monotonic()
             return identifier
 
@@ -123,9 +126,17 @@ class HostOwner:
                    for app, _ in list(applications))
 
     async def monitor(self):
+        ready = False
         while not self.server.should_exit:
             await asyncio.sleep(0.25)
             with self.lock:
+                if not self.server.started:
+                    continue
+                if not ready:
+                    # Startup can block the loop past the original idle deadline.
+                    # Begin the idle window when readiness is first observed.
+                    self.last_active = monotonic()
+                    ready = True
                 for identifier, pid in list(self.clients.items()):
                     try:
                         os.kill(pid, 0)
@@ -133,7 +144,7 @@ class HostOwner:
                         self.release(identifier)
                 if self.clients or self.required():
                     self.last_active = monotonic()
-                elif monotonic() - self.last_active >= self.idle_seconds:
+                elif monotonic() - self.last_active >= (self.idle_seconds if self._had_client else _STARTUP_SECONDS):
                     self.stopping = True
                     self.server.should_exit = True
 
@@ -176,7 +187,7 @@ def run_host(settings, *, transient=False, persistent=False, wrapper=None):
 
 
 @contextmanager
-def local_connection(home, environment="sandbox", *, ca=None, timeout=90):
+def local_connection(home, environment="sandbox", *, ca=None, timeout=_STARTUP_SECONDS):
     """Acquire a host lease before execution; never retry an executed operation."""
     directory = runtime_directory(home, environment)
     child, client, lease = None, None, None

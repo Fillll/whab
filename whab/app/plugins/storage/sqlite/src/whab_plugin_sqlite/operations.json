@@ -1434,6 +1434,129 @@
       ],
       "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
       "availability": "Optional CategoryManagement SDK capability, WHAB 2.65+; reached through guarded public category operations, never arbitrary remote storage access."
+    },
+    {
+      "name": "CategoryDeletion.supports_category_deletion",
+      "kind": "sdk",
+      "summary": "Declare atomic safe category deletion and audit support.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True explicitly opts into CategoryDeletion with atomic history/receipts."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read-only capability declaration.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Missing/wrong-kind IDs, any referencing transaction/assignment or a parent with children are refused without mutation.",
+        "Authority/receipt/revision and uncertain-outcome protections apply."
+      ],
+      "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
+      "availability": "Optional additive CategoryDeletion SDK, WHAB 2.67+; true support also requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
+    },
+    {
+      "name": "CategoryDeletion.delete_category",
+      "kind": "sdk",
+      "summary": "Delete an unreferenced child or empty parent atomically using shared core safety rules; never cascade.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "category_id": {
+            "type": "string",
+            "description": "Existing stable child identity."
+          }
+        },
+        "required": [
+          "workspace",
+          "category_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "null",
+        "description": "Null after successful deletion. Refusal leaves financial state and history unchanged."
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "category_id": "fictional-id"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Atomically remove only the addressed record using core validation and native receipt/history boundaries. Protect all transaction references, including tombstones, every assignment row including zero values, and children. Child deletion retains its empty parent. No bank sync or financial cascade.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Missing/wrong-kind IDs, any referencing transaction/assignment or a parent with children are refused without mutation.",
+        "Authority/receipt/revision and uncertain-outcome protections apply."
+      ],
+      "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
+      "availability": "Optional additive CategoryDeletion SDK, WHAB 2.67+; true support also requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
+    },
+    {
+      "name": "CategoryDeletion.delete_category_group",
+      "kind": "sdk",
+      "summary": "Delete an unreferenced child or empty parent atomically using shared core safety rules; never cascade.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "string",
+            "description": "Existing stable organizational parent identity."
+          }
+        },
+        "required": [
+          "workspace",
+          "parent_id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "null",
+        "description": "Null after successful deletion. Refusal leaves financial state and history unchanged."
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "parent_id": "fictional-id"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Atomically remove only the addressed record using core validation and native receipt/history boundaries. Protect all transaction references, including tombstones, every assignment row including zero values, and children. Child deletion retains its empty parent. No bank sync or financial cascade.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Missing/wrong-kind IDs, any referencing transaction/assignment or a parent with children are refused without mutation.",
+        "Authority/receipt/revision and uncertain-outcome protections apply."
+      ],
+      "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
+      "availability": "Optional additive CategoryDeletion SDK, WHAB 2.67+; true support also requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
     }
   ]
 }

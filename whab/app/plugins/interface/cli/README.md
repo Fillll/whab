@@ -762,3 +762,40 @@ the default; `--format table` is for readable inspection. Unsupported storage fa
 explicitly for group creation/moves; older adapters may still read derived parents.
 Detailed offline help for every command renders one maintained workflow from
 packaged `category.workflow` documentation; the topic itself is not executable.
+
+CLI 2.13 with WHAB 2.67 adds safe deletion through the same exact names and IDs:
+
+```sh
+whab "My budget" category delete --help
+whab "My budget" category group delete --help
+whab "My budget" category list --parent "Fictional maintenance" --format table
+whab "My budget" category delete "Fictional maintenance / Example home"
+whab "My budget" category list --parent "Fictional maintenance"
+whab "My budget" category group delete "Fictional maintenance"
+whab "My budget" category list --format table
+whab "My budget" history list
+```
+
+Confirm the unused child and its parent before deleting. Child deletion refuses
+**every current transaction reference**, including reviewed, pending and deleted
+records, and **every monthly assignment row**, including zero values. Groups with
+children cannot be deleted. There is no cascade, force flag or automatic financial
+reassignment. Deleting an unused child removes its target metadata and retains the
+empty parent; delete that parent in a separate command. All unrelated identities,
+transactions, notes, review flags, assignments, financial fields, bank mappings
+and prior audit history remain intact. No bank synchronization starts.
+
+The CLI obtains the revision and one request ID internally, invokes a public
+guarded operation and verifies the complete same-revision hierarchy against the
+expected removal. JSON reports the removed record with `deleted: true`, budget,
+stable ID and original intent identifiers. Tables label it deleted and verified
+absent. Successful deletes are audited atomically; history list/show can inspect
+the entry, and history undo/redo use the existing preview/fingerprint guards.
+An undo may be refused after incompatible later changes; inspect its preview.
+Missing/ambiguous/wrong-kind names never select a fuzzy target. Stale writes fail;
+uncertain responses or failed verification must not be blindly replayed. Inspect
+category list/history and retain the entire original intent as reported.
+
+Deletion requires SQLite 1.19+, JSON 1.11+ or another backend explicitly implementing
+the additive `CategoryDeletion` contract with atomic audit history and receipts.
+Older adapters fail safely before mutation. Detailed help remains offline.
