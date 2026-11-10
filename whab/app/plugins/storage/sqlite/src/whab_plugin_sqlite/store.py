@@ -759,6 +759,11 @@ class Store(Authority):
     def supports_category_deletion(self):
         return True
 
+    def category_deletion_status(self, workspace, category_id):
+        from whab.domain.categories import category_deletion_status
+        with self._snapshot():
+            return category_deletion_status(self.state(workspace), category_id)
+
     def delete_category(self, workspace, category_id):
         def operation(state):
             delete_category(state, category_id)

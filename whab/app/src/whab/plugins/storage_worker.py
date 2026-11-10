@@ -75,6 +75,13 @@ def _deny(*_):
     raise StoreError("Storage workers do not own host plugin namespaces.")
 
 
+class StorageRejection(PluginError, StoreError):
+    """An authored native refusal, proven nonmutating by the worker."""
+
+    def __init__(self, detail, plugin_id):
+        super().__init__(detail, code='storage_worker_rejected', plugin_id=plugin_id)
+
+
 def _context(value):
     if type(value) is not dict or value.keys() != {"home", "environment", "config", "budget_id", "initial_role", "read_only", "expected_instance_id"}:
         raise WireError()
@@ -197,7 +204,7 @@ def serve(plugin_id, source, target):
                     if owner is not None:
                         owner.snapshot()
                 send({"id": identifier, "kind": "result", "data": result})
-            except Exception:
+            except Exception as error:
                 code = "rejected"
                 if mutating:
                     # This is evidence after the completed synchronous call on
@@ -207,7 +214,13 @@ def serve(plugin_id, source, target):
                             code = "unknown"
                     except Exception:
                         code = "unknown"
-                send({"id": identifier, "kind": "error", "code": code})
+                # StoreError is the SDK's explicitly authored, user-safe error.
+                # Never transmit arbitrary exceptions or an uncertain write's cause.
+                detail = str(error) if code == 'rejected' and isinstance(error, StoreError) else None
+                if detail and len(detail) <= 1000:
+                    send({"id": identifier, "kind": "error", "code": code, "detail": detail})
+                else:
+                    send({"id": identifier, "kind": "error", "code": code})
     finally:
         try:
             if backend is not None:
@@ -327,10 +340,14 @@ class StorageWorker:
                     raise storage_error(self.plugin_id, "storage_write_unknown")
                 if result == {"id": identifier, "kind": "error", "code": "rejected"}:
                     raise storage_error(self.plugin_id, "storage_worker_rejected")
+                if (result.keys() == {'id', 'kind', 'code', 'detail'} and result['kind'] == 'error'
+                        and result['code'] == 'rejected' and type(result['detail']) is str
+                        and 0 < len(result['detail']) <= 1000):
+                    raise StorageRejection(result['detail'], self.plugin_id)
                 if result.keys() != {"id", "kind", "data"} or result["kind"] != "result":
                     raise WireError()
                 return result["data"]
-            except PluginError:
+            except (PluginError, StorageRejection):
                 raise
             except BaseException as error:
                 if mutating:

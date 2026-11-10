@@ -33,6 +33,10 @@ def add_category_parser(commands, catalog):
     listing.add_argument(
         "--parent", help="Only this parent group, by exact unique name or stable ID"
     )
+    showing = actions.add_parser('show', help='Inspect one child and all deletion blockers without writing',
+        description='Read live/deleted transaction counts and every assignment month, including zero rows.',
+        epilog=guide, formatter_class=argparse.RawDescriptionHelpFormatter)
+    showing.add_argument('category', help='Child ID, unique exact name or "Group / Name"')
     parents = actions.add_parser(
         "group",
         help="Manage nonassignable parent groups",
@@ -99,7 +103,7 @@ def add_category_parser(commands, catalog):
             required=True,
             help="Existing parent group by unique exact name or stable ID; children cannot be parents",
         )
-    for parser in (listing, parent_create, create, move, delete, parent_delete):
+    for parser in (listing, showing, parent_create, create, move, delete, parent_delete):
         parser.add_argument(
             "--format",
             choices=("json", "table"),
@@ -158,6 +162,14 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
             [resolve_category(groups, args.parent, error, parent=True)] if args.parent else groups
         )
         return {**observed, "budget": args.target, "data": selected}
+    if args.category_action == 'show':
+        selected = resolve_category(children, args.category, error)
+        status = checked(exchange(connection, 'POST', prefix + '/queries', ledger_errors=True,
+            json={'operation': 'category_deletion_status', 'workspace': 'personal',
+                  'parameters': {'categoryId': selected['id']}}), identifier, error)
+        if status['revision'] != observed['revision'] or status['data']['categoryId'] != selected['id']:
+            raise error('Category changed during inspection. Read category show again before deciding.')
+        return {**status, 'budget': args.target, 'data': {**selected, 'deletion': status['data']}}
     if args.category_action == "delete" or args.category_action == "group" and args.group_action == "delete":
         return execute_delete(connection, identifier, prefix, args, exchange, error, observed, read)
     if args.category_action == "group":
@@ -268,14 +280,19 @@ def execute_delete(connection, identifier, prefix, args, exchange, error, observ
               'payload': {'parentId' if parent else 'categoryId': selected['id']},
               'expected_revision': observed['revision'], 'request_id': str(uuid4())}
     try:
-        saved = checked(exchange(connection, 'POST', prefix + '/commands', json=intent), identifier, error)
+        saved = checked(exchange(connection, 'POST', prefix + '/commands', ledger_errors=True, json=intent), identifier, error)
         verified = read()
         if saved['data'] is not None or verified['revision'] != saved['revision'] or verified['data'] != expected:
             raise error('Saved category deletion does not match the addressed hierarchy and revision.')
     except (ValueError, OSError, RuntimeError, KeyError, TypeError, httpx.HTTPError) as failure:
+        if getattr(failure, 'status_code', None) in {400, 409}:
+            raise error('Category deletion refused; no deletion was saved. ' + str(failure)
+                        + '. Inspect category show for child blockers or category list for group children. '
+                        'No automatic retry. Retain the original intent: ' + json.dumps(intent) + '.') from failure
         raise error('Category deletion was not confirmed; it may have been saved. No automatic retry. '
-                    'Deletion requires no transaction references (including deleted records), no monthly assignments '
-                    '(including zero rows), and an empty group. '
+                    + ('A parent group must have no children. ' if parent else
+                       'A child must have no live/deleted transaction references or monthly assignment rows, including zeros. ')
+                    + (str(failure) + '. ' if getattr(failure, 'status_code', None) else '') +
                     'Inspect category list and history; do not rerun the write as a retry. Retain budgetId '
                     + identifier + ' and the exact original intent: ' + json.dumps(intent) + '.') from failure
     return {**verified, 'budget': args.target, 'data': {**selected, 'deleted': True},
@@ -311,6 +328,8 @@ def category_table(result):
         [
             f"Budget: {terminal_text(result['budget'], 100)} ({terminal_text(result['budgetId'], 200)})",
             *(["Deleted and verified absent; other groups/children are unchanged."] if isinstance(data, dict) and data.get('deleted') else []),
+            *(["Deletion inspection: " + json.dumps(data['deletion'], ensure_ascii=True)]
+              if isinstance(data, dict) and 'deletion' in data else []),
             *[
                 "  ".join(value.ljust(width) for value, width in zip(row, widths, strict=True))
                 for row in cells

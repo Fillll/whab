@@ -161,3 +161,13 @@ AI credentials 1.1 declares `AI_CREDENTIALS_DIR` and the legacy
 `LLM_CATEGORIZATION_CREDENTIALS_DIR`. Existing credential files, selected paths
 and budget-local opaque references remain in place. No credential files are
 copied into source, portable budgets or plugin messages.
+
+### Authored storage refusals
+
+A native worker may return the bounded user-safe text of an SDK `StoreError`
+for a read refusal or a mutation whose completed synchronous call and unchanged
+commit evidence prove noncommit. The host preserves the same error as a domain
+refusal only after its retained intent is reconciled against that evidence.
+Unexpected exceptions never cross as raw text. Missing evidence, changed evidence,
+publication failure or missing replies preserve uncertain-write fencing and the
+original intent. The private protocol continues accepting older generic refusals.

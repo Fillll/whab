@@ -172,6 +172,15 @@ def test_oversized_response_is_not_replayed():
     assert len(calls) == 1
 
 
+@pytest.mark.parametrize('content', [b'not-json', b'[]', b'{"detail":{}}', b'{"detail":"Authored refusal"}', b'{"error":"Authored refusal"}', b'{"detail":""}', json.dumps({'detail':'x'*1001}).encode()])
+def test_ledger_error_keeps_status_and_only_bounded_authored_text(content):
+    with httpx.Client(base_url='https://localhost', transport=httpx.MockTransport(lambda _: httpx.Response(400, content=content))) as connection:
+        with pytest.raises(console.CommandError) as error:
+            console.exchange(connection, 'POST', '/queries', ledger_errors=True)
+    assert error.value.status_code == 400
+    assert ('Authored refusal' in str(error.value)) == (b'Authored refusal' in content)
+
+
 def test_reserved_importer_collision_cannot_target_another_plugin(transport, monkeypatch, capsys):
     monkeypatch.setattr(console, "installed_catalog", lambda: {"plugins": [{"id": "ynab-zip-importer"}]})
     assert console.main(["Empty Budget", "plugin", "enable", "ynab-zip-importer"]) == 1

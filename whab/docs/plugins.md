@@ -1094,3 +1094,15 @@ ledgers. All other financial/provider data and existing history are preserved.
 Native adapters commit the deletion, audit entry and receipt together. Existing
 guarded history previews/undo/redo retain deleted identities and metadata and
 refuse incompatible changes. No schema migration or bank sync is required.
+
+### Category deletion inspection
+
+WHAB 2.68 adds the optional public `CategoryDeletionInspection` SDK read
+`category_deletion_status(workspace, category_id)` and ledger query
+`category_deletion_status` with `parameters.categoryId`. It reports only the
+addressed child's `deletable` flag, live/deleted/total transaction references and
+assignment count/months/zeroMonths. All months are included; amounts and unrelated
+records are excluded. The read changes no revision or history and cannot authorize
+a later deletion. Native deletion rechecks the same core guard atomically.
+SQLite 1.20 and JSON 1.12 implement it; remote storage forwards the public query.
+Older adapters refuse inspection explicitly while their existing reads remain valid.

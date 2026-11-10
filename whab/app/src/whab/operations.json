@@ -3164,6 +3164,139 @@
       ],
       "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
       "availability": "WHAB 2.67+; optional CategoryDeletion, CategoryManagement tree read and BudgetHistoryStorage support. SQLite 1.19+, JSON 1.11+ or compatible adapters. Remote authorities enforce the same guards."
+    },
+    {
+      "name": "category_deletion_status",
+      "kind": "query",
+      "summary": "Inspect complete deletion blockers for one child without changing financial data or history.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "One stable child category ID."
+          }
+        },
+        "required": [
+          "categoryId"
+        ],
+        "additionalProperties": false,
+        "description": "Operation input fields."
+      },
+      "output": {
+        "type": "object",
+        "description": "Deletion safety for the one addressed child; no unrelated transactions or assignment amounts.",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Addressed stable child ID."
+          },
+          "deletable": {
+            "type": "boolean",
+            "description": "True only when no transaction references or assignment rows remain."
+          },
+          "transactions": {
+            "type": "object",
+            "description": "All current references, including deleted tombstones.",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "All references."
+              },
+              "live": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Nondeleted references, including pending/refunds."
+              },
+              "deleted": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Deleted record references."
+              }
+            },
+            "required": [
+              "total",
+              "live",
+              "deleted"
+            ],
+            "additionalProperties": false
+          },
+          "assignments": {
+            "type": "object",
+            "description": "Every monthly row, including zero-valued rows.",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of assignment rows."
+              },
+              "months": {
+                "type": "array",
+                "description": "All referenced months in ascending order.",
+                "items": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                }
+              },
+              "zeroMonths": {
+                "type": "array",
+                "description": "Referenced months whose saved value is zero.",
+                "items": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                }
+              }
+            },
+            "required": [
+              "count",
+              "months",
+              "zeroMonths"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "categoryId",
+          "deletable",
+          "transactions",
+          "assignments"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "categoryId": "fictional-home"
+          },
+          "output": {
+            "categoryId": "fictional-home",
+            "deletable": false,
+            "transactions": {
+              "total": 1,
+              "live": 0,
+              "deleted": 1
+            },
+            "assignments": {
+              "count": 1,
+              "months": [
+                "2026-08"
+              ],
+              "zeroMonths": [
+                "2026-08"
+              ]
+            }
+          }
+        }
+      ],
+      "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Missing or invalid category ID; unsupported storage inspection capability."
+      ],
+      "retry": "Read-only; repeat after concurrent changes. This is inspection, not permission to replay an uncertain mutation.",
+      "availability": "WHAB 2.68+, SQLite 1.20+/JSON 1.12+ or CategoryDeletionInspection."
     }
   ]
 }

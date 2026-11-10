@@ -282,6 +282,12 @@ class CategoryManagement(Protocol):
     def move_category(self, workspace: str, category_id: str, parent_id: str) -> None: ...
 
 
+class CategoryDeletionInspection(Protocol):
+    """Optional read-only counts/months for one child's deletion blockers."""
+
+    def category_deletion_status(self, workspace: str, category_id: str) -> dict: ...
+
+
 class CategoryDeletion(Protocol):
     """Optional atomic, audited deletion of unreferenced children/empty parents."""
 
