@@ -574,7 +574,7 @@
     {
       "name": "portable",
       "kind": "query",
-      "summary": "Read a sanitized portable ledger snapshot; excludes provider credentials.",
+      "summary": "Read a sanitized portable ledger snapshot; excludes provider credentials. Legacy empty original-field maps from imported agent annotations are readable without rewriting historical snapshots or hashes; unknown original-field keys remain rejected.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -2716,7 +2716,7 @@
       "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
       "name": "history",
       "kind": "query",
-      "summary": "Read permanent financial history.",
+      "summary": "Read permanent financial history. Legacy empty original-field maps from imported agent annotations are readable without rewriting historical snapshots or hashes; unknown original-field keys remain rejected.",
       "input": {
         "type": "object",
         "description": "Explicit budget/workspace history parameters.",

@@ -172,7 +172,10 @@ def validate_portable_budget(data: object) -> dict:
         money(transaction["amount"], account["currency"])
         if "original" in transaction:
             original = transaction["original"]
-            if type(original) is not dict or not original or original.keys() - {"accountId", "date", "merchant", "amount"}:
+            # Earlier agent-only classification wrote {} on imported rows.
+            # It means no original-field overrides; retain its exact shape so
+            # historical snapshot/entry hashes remain valid without rewriting.
+            if type(original) is not dict or original.keys() - {"accountId", "date", "merchant", "amount"}:
                 raise StoreError("Invalid original transaction fields.")
             if "accountId" in original:
                 _text(original["accountId"])

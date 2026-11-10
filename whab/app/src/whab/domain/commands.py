@@ -214,10 +214,14 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
         for balance in balances.values():
             cents(balance)
     else:
-        candidate["original"] = {
+        original = {
             **{key: transaction[key] for key in ("accountId", "date", "merchant", "amount") if key in changes},
             **transaction.get("original", {}),
         }
+        if original:
+            candidate['original'] = original
+        else:
+            candidate.pop('original', None)
     state["transactions"][transaction_id] = candidate
     for identifier, balance in balances.items():
         state["accounts"][identifier]["balance"] = balance
