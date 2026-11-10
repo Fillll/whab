@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.20.0 — 2026-11-09
+
+PR: [#180](https://github.com/Fillll/whab/pull/180)
+
+- Expose shared core category deletion safety counts and months through an atomic read-only native callback. Keep all transaction, assignment and audit safeguards.
+
 ## 1.19.0 — 2026-11-09
 
 PR: [#179](https://github.com/Fillll/whab/pull/179)

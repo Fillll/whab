@@ -44,7 +44,7 @@ def test_deletion_status_counts_tombstones_and_all_months_without_mutating(delet
     from whab.domain.categories import category_deletion_status
     from whab.domain.ledger_state import initial_state
     state = initial_state('personal', '2026-08')
-    state['categories'][identifier] = store.categories('personal')[-1]
+    state['categories'][identifier] = next(row for row in store.categories('personal') if row['id'] == identifier)
     state['transactions'] = {'live':{'categoryId':identifier}, 'deleted':{'categoryId':identifier,'deleted':True}, 'unrelated':{'categoryId':None}}
     state['budget'] = {'2026-09':{identifier:0},'2026-08':{identifier:123}}
     status = category_deletion_status(state, identifier)
