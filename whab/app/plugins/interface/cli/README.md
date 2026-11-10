@@ -799,3 +799,30 @@ category list/history and retain the entire original intent as reported.
 Deletion requires SQLite 1.19+, JSON 1.11+ or another backend explicitly implementing
 the additive `CategoryDeletion` contract with atomic audit history and receipts.
 Older adapters fail safely before mutation. Detailed help remains offline.
+
+### Inspect category deletion blockers
+
+```sh
+whab "My budget" category show "Fictional maintenance / Example home" --format table
+whab "My budget" category show CHILD_ID
+```
+
+This read reports the exact child and revision, live and deleted transaction
+reference counts, all monthly assignment months, and zero-valued assignment months.
+JSON is complete; the table retains the full blocker report. It excludes amounts
+and unrelated transaction details. Names/IDs resolve exactly as for deletion.
+The read never writes, syncs, appends history or grants permission to replay a write.
+
+An authored HTTP 400 refusal or HTTP 409 revision/intent conflict is definitive;
+CLI reports its reason and retains the original intent. A timeout, HTTP 5xx,
+lost response or failed verification remains uncertain. Inspect the category and
+history; do not replay with a new request ID. A child needs no transaction or
+assignment references; only a parent group requires no children. Native authored
+refusals preserve their reasons through the host/storage process boundary.
+Unexpected failures remain sanitized and uncertain mutations remain fenced.
+
+Moving transactions does not remove assignment history. Zero rows still block
+deletion. This command offers no financial erasure, archive/merge or
+assignment-preserving migration. Retain blocked categories until a separately
+authorized supported workflow can preserve that history. Both `category show
+--help` and deletion help work offline from packaged operation documentation.

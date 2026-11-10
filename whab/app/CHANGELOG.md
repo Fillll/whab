@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.68.0 — 2026-11-09
+
+PR: [#180](https://github.com/Fillll/whab/pull/180)
+
+- Add read-only category deletion inspection and preserve authored native refusals through proven noncommit evidence and the public interface. Distinguish domain/stale refusals from uncertain writes without weakening financial guards.
+
 ## 2.67.0 — 2026-11-09
 
 PR: [#179](https://github.com/Fillll/whab/pull/179)

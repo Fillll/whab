@@ -118,7 +118,7 @@ def configuration(args):
     return str(Path(home).expanduser().resolve()), environment, args.ca or defaults.get("ca")
 
 
-def exchange(connection, method, path, *, import_errors=False, plugin_errors=False, bank_errors=False, **kwargs):
+def exchange(connection, method, path, *, import_errors=False, plugin_errors=False, bank_errors=False, ledger_errors=False, **kwargs):
     with connection.stream(method, path, **kwargs) as response:
         raw = bytearray()
         for chunk in response.iter_bytes():
@@ -126,6 +126,18 @@ def exchange(connection, method, path, *, import_errors=False, plugin_errors=Fal
             if len(raw) > 16 * 1024 * 1024:
                 raise CommandError("WHAB response exceeds 16 MiB.")
         if response.status_code != 200:
+            if ledger_errors:
+                try:
+                    body = json.loads(raw)
+                    detail = body.get('detail', body.get('error')) if type(body) is dict else None
+                except ValueError:
+                    detail = None
+                message = f'WHAB returned HTTP {response.status_code}'
+                if type(detail) is str and 0 < len(detail) <= 1000:
+                    message += ': ' + detail
+                failure = CommandError(message)
+                failure.status_code = response.status_code
+                raise failure
             if bank_errors and response.status_code in {400, 409}:
                 message = bank_error(raw)
                 if message:

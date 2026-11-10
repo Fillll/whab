@@ -330,6 +330,9 @@ class RemoteStore:
     def delete_category(self, workspace, category_id):
         return self._command('delete_category', workspace, {'categoryId': category_id})
 
+    def category_deletion_status(self, workspace, category_id):
+        return self._query('category_deletion_status', workspace, parameters={'categoryId': category_id})
+
     def delete_category_group(self, workspace, parent_id):
         return self._command('delete_category_group', workspace, {'parentId': parent_id})
 

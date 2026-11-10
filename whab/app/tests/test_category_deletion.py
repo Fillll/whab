@@ -34,6 +34,31 @@ def child(service, name='Fictional 🏡 home', group='Fictional maintenance'):
     return command(service, 'add_category', {'name': name, 'group': group, 'target': 1234, 'currency': 'USD'})['data']
 
 
+def test_deletion_status_counts_tombstones_and_all_months_without_mutating(deletion_store):
+    store, _, _, _ = deletion_store
+    service = LedgerService(store)
+    identifier = child(service)
+    account = command(service, 'add_account', {'name':'Fictional', 'type':'depository','balance':10000})['data']
+    command(service, 'add_transaction', {'accountId':account,'date':'2026-08-01','merchant':'Fictional','amount':100,'categoryId':identifier})
+    snapshot = store.export_budget()
+    from whab.domain.categories import category_deletion_status
+    from whab.domain.ledger_state import initial_state
+    state = initial_state('personal', '2026-08')
+    state['categories'][identifier] = next(row for row in store.categories('personal') if row['id'] == identifier)
+    state['transactions'] = {'live':{'categoryId':identifier}, 'deleted':{'categoryId':identifier,'deleted':True}, 'unrelated':{'categoryId':None}}
+    state['budget'] = {'2026-09':{identifier:0},'2026-08':{identifier:123}}
+    status = category_deletion_status(state, identifier)
+    assert status == {'categoryId':identifier,'deletable':False,'transactions':{'total':2,'live':1,'deleted':1},
+                      'assignments':{'count':2,'months':['2026-08','2026-09'],'zeroMonths':['2026-09']}}
+    assert service.query('category_deletion_status','personal',parameters={'categoryId':identifier})['data']['transactions']['live'] == 1
+    assert store.export_budget() == snapshot
+    for parameters in [{}, {'categoryId':identifier,'extra':1}, {'categoryId':None}]:
+        with pytest.raises(StoreError):
+            service.query('category_deletion_status','personal',parameters=parameters)
+    with pytest.raises(StoreError, match='Update the storage'):
+        LedgerService(SimpleNamespace()).query('category_deletion_status','personal',parameters={'categoryId':identifier})
+
+
 def test_delete_audit_replay_undo_redo_reopen_and_portable_files(deletion_store, tmp_path):
     store, factory, path, handles = deletion_store
     assert store.supports_category_deletion() is True
@@ -100,7 +125,7 @@ def test_every_current_transaction_reference_blocks_deletion_without_mutation(de
     target.restore_budget('personal', snapshot)
     selected = LedgerService(target)
     before, evidence, revision = target.export_budget(), target.commit_evidence(), selected.revision
-    with pytest.raises(StoreError, match='transactions still reference'):
+    with pytest.raises(StoreError, match='transactions reference'):
         command(selected, 'delete_category', {'categoryId': identifier})
     assert target.export_budget() == before and target.commit_evidence() == evidence and selected.revision == revision
 

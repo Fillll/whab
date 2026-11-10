@@ -70,3 +70,22 @@ def test_client_server_commands_export_and_concurrent_conflict(store):
     assert {row["name"] for row in client.accounts("personal")} == {"Cash", "Other"}
     client.close()
     server.close()
+
+
+@pytest.mark.parametrize('failure', ['domain', 'conflict'])
+def test_postcommit_authored_failure_is_uncertain_not_a_definitive_refusal(store, failure):
+    from whab.services.ledger import RevisionConflict
+    error = StoreError if failure == 'domain' else RevisionConflict
+    def fail():
+        raise error('Fictional acknowledgement failure')
+    service = LedgerService(store, budget_id='fictional', on_commit=fail)
+    binding = BoundRemoteInterface(server_plugin.interface.adapter, SimpleNamespace(
+        config={'SERVER_TOKEN':'x'*40}, service=service, budget_id='fictional'))
+    app = FastAPI()
+    app.include_router(create_remote_router(lambda: binding))
+    with TestClient(app,base_url='https://testserver') as client:
+        response = client.post('/remote/v1/budgets/fictional/commands', headers={'Authorization':'Bearer '+'x'*40},
+            json={'operation':'add_account','workspace':'personal','payload':{'name':'Fictional','type':'depository','balance':100},
+                  'request_id':'fictional-once','expected_revision':service.revision})
+        assert response.status_code == 503 and 'uncertain' in response.json()['detail']
+        assert len(service.accounts('personal')) == 1

@@ -88,13 +88,18 @@ class BoundRemoteInterface:
         self.check_budget(identifier)
         if not self.adapter.commands:
             raise HTTPException(405, "Remote commands are disabled by this interface.")
+        revision = self.context.service.revision
         try:
             result = self.context.service.command(body.operation, body.workspace, body.payload,
                 request_id=body.request_id, expected_revision=body.expected_revision,
                 **({"history": body.history} if body.history is not None else {}))
         except (RevisionConflict, RequestConflict) as error:
+            if self.context.service.revision != revision:
+                raise HTTPException(503, 'Command outcome is uncertain. Inspect saved state and retain the original intent.') from None
             raise HTTPException(409, str(error)) from None
         except StoreError as error:
+            if self.context.service.revision != revision:
+                raise HTTPException(503, 'Command outcome is uncertain. Inspect saved state and retain the original intent.') from None
             raise HTTPException(400, str(error)) from None
         except Exception:
             raise HTTPException(503, "Budget storage is unavailable. Retry the same request.") from None

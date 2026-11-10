@@ -61,11 +61,16 @@ def test_real_console_safe_deletion_history_and_reopen(tmp_path, storage):
                                     'amount': 100, 'categoryId': protected['id'], 'note': 'Preserve annotation'})
         assigned = run('default', 'category', 'create', 'Fictional assigned', '--parent', 'Goals')['data']
         advanced('assign', {'categoryId': assigned['id'], 'month': '2026-11', 'assigned': 0})
+        status = run('My budget', 'category', 'show', assigned['id'])['data']['deletion']
+        assert status == {'categoryId': assigned['id'], 'deletable': False,
+                          'transactions': {'total': 0, 'live': 0, 'deleted': 0},
+                          'assignments': {'count': 1, 'months': ['2026-11'], 'zeroMonths': ['2026-11']}}
         before = run('api', '--budget', 'default', 'query', 'portable')['data']
         assert 'children' in run('My budget', 'category', 'group', 'delete', parent['id'], ok=False)['error']
         for record in [protected, assigned]:
             error = run('default', 'category', 'delete', record['id'], ok=False)['error']
             assert 'No automatic retry' in error and 'monthly assignments' in error
+            assert 'refused; no deletion was saved' in error and 'may have been saved' not in error
         assert run('api', '--budget', 'default', 'query', 'portable')['data'] == before
         profile = tmp_path / 'fictional.budget'
         profile.write_text(json.dumps({'home': str(home), 'environment': 'sandbox'}))

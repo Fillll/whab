@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.12.0 — 2026-11-09
+
+PR: [#180](https://github.com/Fillll/whab/pull/180)
+
+- Expose the shared core category deletion safety report through a locked read-only native callback. Preserve all financial data, audit history and deletion guards.
+
 ## 1.11.0 — 2026-11-09
 
 PR: [#179](https://github.com/Fillll/whab/pull/179)

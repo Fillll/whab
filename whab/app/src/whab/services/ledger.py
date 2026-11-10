@@ -185,8 +185,17 @@ class LedgerService:
         if month is not None:
             _month(month)
         with self._lock:
-            if parameters is not None and operation not in {"feature", "history", "history_preview"}:
+            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status"}:
                 raise StoreError("Only feature queries accept parameters.")
+            if operation == 'category_deletion_status':
+                values = parameters or {}
+                if type(values) is not dict or values.keys() != {'categoryId'}:
+                    raise StoreError('Choose one categoryId for deletion inspection.')
+                _identifier(values['categoryId'])
+                callback = getattr(self._store, 'category_deletion_status', None)
+                if not callable(callback):
+                    raise StoreError('Update the storage plugin to inspect category deletion blockers.')
+                return {'revision': self._revision, 'data': _public(callback(workspace, values['categoryId']))}
             if operation in {'history', 'history_preview'}:
                 from whab.domain.history import label
                 values = parameters or {}

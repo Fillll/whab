@@ -40,7 +40,7 @@ def add_history_parser(commands):
 
 def execute_history(connection, identifier, prefix, args, exchange, error):
     def query(operation, parameters):
-        return checked(exchange(connection, 'POST', prefix + '/queries', json={
+        return checked(exchange(connection, 'POST', prefix + '/queries', ledger_errors=True, json={
             'operation': operation, 'workspace': 'personal', 'parameters': parameters}), identifier, error)
     action = args.history_action
     if action == 'list':

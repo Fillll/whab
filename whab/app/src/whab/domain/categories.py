@@ -191,13 +191,26 @@ def ensure_child_category(categories: Mapping[str, dict], category_id: str) -> d
     return category
 
 
+def category_deletion_status(state, category_id):
+    """Explain only the addressed child's references, without exposing peers."""
+    ensure_child_category(state['categories'], category_id)
+    references = [row for row in state['transactions'].values() if row.get('categoryId') == category_id]
+    deleted = sum(bool(row.get('deleted', False)) for row in references)
+    months = sorted(month for month, rows in state['budget'].items() if category_id in rows)
+    zero = [month for month in months if state['budget'][month][category_id] == 0]
+    return {'categoryId': category_id, 'deletable': not references and not months,
+            'transactions': {'total': len(references), 'live': len(references) - deleted, 'deleted': deleted},
+            'assignments': {'count': len(months), 'months': months, 'zeroMonths': zero}}
+
+
 def delete_category(state, category_id):
     """Remove one unreferenced leaf, retaining its parent and all financial data."""
-    ensure_child_category(state['categories'], category_id)
-    if any(row.get('categoryId') == category_id for row in state['transactions'].values()):
-        raise StoreError('Cannot delete category: transactions still reference it, including any pending or deleted records. No records were removed.')
-    if any(category_id in rows for rows in state['budget'].values()):
-        raise StoreError('Cannot delete category: monthly assignments still reference it, including zero-valued rows. No assignments were removed.')
+    status = category_deletion_status(state, category_id)
+    if not status['deletable']:
+        t, a = status['transactions'], status['assignments']
+        raise StoreError(f"Cannot delete category: {t['live']} live and {t['deleted']} deleted transactions reference it; "
+                         f"{a['count']} monthly assignments reference it ({len(a['zeroMonths'])} zero-valued rows). "
+                         'No records or assignments were removed. Inspect category show for all relevant months.')
     groups = category_groups(state['categories'], state.get('categoryGroups', ()))
     state['categoryGroups'] = groups
     del state['categories'][category_id]

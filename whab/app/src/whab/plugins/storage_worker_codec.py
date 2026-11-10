@@ -35,6 +35,7 @@ _RECORDS = {record.__name__: record for record in (
 # (required positional names, optional names/defaults). No arbitrary attribute
 # lookup, kwargs, database handle or implementation-specific state is exposed.
 METHODS = {
+    "category_deletion_status": (("workspace", "category_id"), {}),
     "budget_history": (("workspace",), {"limit": 50, "before": None, "target": None, "snapshot": False}),
     "history_preview": (("workspace", "action"), {"target": None}),
     "supports_category_agent": ((), {}),

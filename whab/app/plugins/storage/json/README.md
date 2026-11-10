@@ -252,7 +252,7 @@ See [the core semantics](../../../../docs/architecture.md#account-lifecycle-and-
 
 ## Category management
 
-This version requires WHAB 2.67+ for optional SDK `CategoryManagement`.
+This version requires WHAB 2.68+ for optional SDK `CategoryManagement`.
 `category_tree(workspace)` includes real empty parents; `add_category_group(workspace,
 name)` creates one; `move_category(workspace, category_id, parent_id)` preserves the
 child ID, target, currency, transaction references and all monthly assignments.
@@ -263,3 +263,8 @@ nullable `meta.category_groups` column; JSON stores the optional neutral
 and protected native copies retain explicit parents, including emptied sources.
 There is no manual reorder operation; moves retain the existing ledger order.
 Use the [simple CLI workflow](../../interface/cli/README.md#category-management).
+
+Read-only `CategoryDeletionInspection.category_deletion_status` returns only the
+addressed child's live/deleted reference counts and every assignment month, including
+zero rows. It uses the same core safety report as atomic deletion; it never erases
+financial records or history. See the CLI `category show` workflow.

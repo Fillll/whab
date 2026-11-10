@@ -47,6 +47,16 @@ def category_transport(monkeypatch, tmp_path):
                 200, json={"budgets": [{"id": "fictional-id", "name": "Fictional бюджет"}]}
             )
         if request.method == "POST":
+            if request.url.path.endswith('/queries'):
+                body = json.loads(request.content)
+                assert body['operation'] == 'category_deletion_status'
+                if state['failure'] == 'status-error':
+                    return httpx.Response(400, json={'detail': 'Inspection unsupported'})
+                return httpx.Response(200, json={'budgetId': 'fictional-id',
+                    'revision': 'changed' if state['failure'] == 'status-stale' else state['revision'],
+                    'data': {'categoryId': 'wrong' if state['failure'] == 'status-id' else body['parameters']['categoryId'],
+                             'deletable': False, 'transactions': {'total': 1, 'live': 0, 'deleted': 1},
+                             'assignments': {'count': 1, 'months': ['2026-08'], 'zeroMonths': ['2026-08']}}})
             state["posted"] = True
             if state["failure"] == "stale":
                 return httpx.Response(409, json={"error": "stale"})
@@ -375,3 +385,34 @@ def test_delete_help_explains_refusal_history_and_recovery_offline(monkeypatch, 
 def test_qualified_names_normalize_legacy_outer_whitespace():
     row = {"id": "fictional", "name": " 工作室 ", "group": " Finance "}
     assert resolve_category([row], " finance / 工作室 ", ValueError) == row
+
+
+@pytest.mark.parametrize('failure', [None, 'status-stale', 'status-id', 'status-error'])
+@pytest.mark.parametrize('format', ['json', 'table'])
+def test_category_show_inspects_only_target_and_never_writes(category_transport, capsys, failure, format):
+    state, calls = category_transport
+    state['failure'] = failure
+    assert run('show', 'finance / example 项目', '--format', format) == (1 if failure else 0)
+    text = capsys.readouterr()
+    if not failure:
+        assert 'zeroMonths' in text.out and '2026-08' in text.out
+    assert not state['posted']
+    posts = [request for request in calls if request.method == 'POST']
+    assert len(posts) == 1 and posts[0].url.path.endswith('/queries')
+
+
+@pytest.mark.parametrize('status', [400, 409, 503])
+def test_deletion_definitive_errors_and_uncertain_server_failure_are_distinct(category_transport, monkeypatch, capsys, status):
+    real = console.exchange
+    def exchange(connection, method, path, **kwargs):
+        if path.endswith('/commands'):
+            failure = console.CommandError(f'WHAB returned HTTP {status}: Fictional authored reason')
+            failure.status_code = status
+            raise failure
+        return real(connection, method, path, **kwargs)
+    monkeypatch.setattr(console, 'exchange', exchange)
+    assert run('delete', 'a') == 1
+    message = capsys.readouterr().err
+    assert 'Fictional authored reason' in message and 'request_id' in message
+    assert ('no deletion was saved' in message) == (status in {400, 409})
+    assert ('may have been saved' in message) == (status == 503)
