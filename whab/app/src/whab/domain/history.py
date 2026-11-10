@@ -130,7 +130,7 @@ def _change(change):
                                 or row.keys() - required - optional
                                 or [row[k] for k in _COLLECTIONS[path[0]]] != path[1:]):
             raise StoreError('Invalid history record fields.')
-        if row is not None and 'original' in row and (type(row['original']) is not dict or not row['original'] or row['original'].keys() - {'accountId', 'date', 'merchant', 'amount'}):
+        if row is not None and 'original' in row and (type(row['original']) is not dict or row['original'].keys() - {'accountId', 'date', 'merchant', 'amount'}):
             raise StoreError('Invalid original history fields.')
 
 

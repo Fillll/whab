@@ -999,6 +999,14 @@ Checksums detect accidental corruption; they do not authenticate actor claims or
 protect against an owner rewriting the entire file. Preserve the complete journal
 in native transfers/copies; do not silently prune it or infer history from imports.
 
+WHAB 2.68.1 preserves legacy `original: {}` transaction metadata when validating
+portable snapshots and audit history. Earlier imported agent-only categorization
+could create this empty map without a financial-field correction. It means no
+original-field override. Reads preserve its exact representation and existing
+baseline/entry hashes; they perform no migration or history rewrite. New annotation
+edits omit empty maps. Non-map values and unknown/private keys remain rejected,
+and nonempty original values retain all existing field/reference validation.
+
 HTTPS queries `history`, `history_preview` and command `history_apply` share the
 existing ledger protocol. The optional command-envelope `history` object accepts
 only actor, actorKind and batchId and participates in intent fingerprints. Ordinary
