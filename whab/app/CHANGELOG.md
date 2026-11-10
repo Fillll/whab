@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.68.1 — 2026-11-09
+
+PR: [#181](https://github.com/Fillll/whab/pull/181)
+
+- Read legacy empty original-field maps created by imported agent-only annotations without rewriting snapshots, audit entries or hashes. Prevent new empty maps while retaining financial/reference validation and all deletion safeguards.
+
 ## 2.68.0 — 2026-11-09
 
 PR: [#180](https://github.com/Fillll/whab/pull/180)
