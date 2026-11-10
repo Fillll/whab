@@ -762,11 +762,11 @@ class Store(Authority):
     def category_deletion_status(self, workspace, category_id):
         from whab.domain.categories import category_deletion_status
         with self._snapshot():
-            return category_deletion_status(self.state(workspace), category_id)
+            return category_deletion_status(self.state(workspace), category_id, remove_zero_assignments=True)
 
     def delete_category(self, workspace, category_id):
         def operation(state):
-            delete_category(state, category_id)
+            delete_category(state, category_id, remove_zero_assignments=True)
             self.db.execute('DELETE FROM budget WHERE workspace=? AND category_id=? AND assigned=0', (workspace, category_id))
             self.db.execute('DELETE FROM categories WHERE workspace=? AND id=?', (workspace, category_id))
         return self._mutate(workspace, operation)

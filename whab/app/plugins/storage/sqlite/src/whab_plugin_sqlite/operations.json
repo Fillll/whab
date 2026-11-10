@@ -1593,7 +1593,7 @@
           },
           "deletable": {
             "type": "boolean",
-            "description": "True only with no live/deleted transaction references and no nonzero assignments. Zero-only rows are removed atomically with the child and retained in history."
+            "description": "True only with no live/deleted transaction references and no nonzero assignments, and storage support for removing any zero-only rows atomically with the child and retaining them in history."
           },
           "transactions": {
             "type": "object",

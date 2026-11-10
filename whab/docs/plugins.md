@@ -1099,7 +1099,11 @@ reference blocks child deletion. From WHAB 2.69 with SQLite 1.21/JSON 1.13, zero
 rows are removed with the unused child in the same guarded native transaction.
 Permanent history retains every exact row; compatible undo restores category
 identity, metadata, parent relationship and all zero rows, and redo revalidates
-conflicts. A mixed zero/nonzero category refuses without partial removal. Monthly
+conflicts. A mixed zero/nonzero category refuses without partial removal. Native adapters opt in to the core helpers with
+`remove_zero_assignments=True` only when their native persistence removes those
+rows with the child in the same audited transaction. The default helper call
+retains the previous strict refusal, so an older adapter cannot accidentally
+commit orphan zero rows when used with a newer core. Monthly
 monetary projections and rollover semantics remain unchanged. A parent with any child is protected. There
 is no cascade, force flag or financial reassignment. An unused child's target
 metadata is removed; its parent remains explicitly present, including on legacy

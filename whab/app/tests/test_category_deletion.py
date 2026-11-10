@@ -60,6 +60,21 @@ def test_deletion_status_counts_tombstones_and_all_months_without_mutating(delet
         LedgerService(SimpleNamespace()).query('category_deletion_status','personal',parameters={'categoryId':identifier})
 
 
+def test_old_adapter_call_shape_keeps_zero_rows_protected_until_atomic_opt_in():
+    from whab.domain.categories import category_deletion_status, delete_category
+    from whab.domain.ledger_state import initial_state
+    state = initial_state('personal','2026-08')
+    state['budget'] = {'2026-08':{'groceries':0}}
+    before = deepcopy(state)
+    assert not category_deletion_status(state,'groceries')['deletable']
+    with pytest.raises(StoreError,match='Update the storage adapter'):
+        delete_category(state,'groceries')
+    assert state == before
+    assert category_deletion_status(state,'groceries',remove_zero_assignments=True)['deletable']
+    delete_category(state,'groceries',remove_zero_assignments=True)
+    assert 'groceries' not in state['categories'] and state['budget'] == {}
+
+
 def test_delete_audit_replay_undo_redo_reopen_and_portable_files(deletion_store, tmp_path):
     store, factory, path, handles = deletion_store
     assert store.supports_category_deletion() is True

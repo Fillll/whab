@@ -283,10 +283,10 @@ class Store(Authority):
     def category_deletion_status(self, workspace, category_id):
         from whab.domain.categories import category_deletion_status
         with self._lock:
-            return category_deletion_status(self._data['workspaces'][workspace], category_id)
+            return category_deletion_status(self._data['workspaces'][workspace], category_id, remove_zero_assignments=True)
 
     def delete_category(self, workspace, category_id):
-        return self._mutate(workspace, lambda state: delete_category(state, category_id))
+        return self._mutate(workspace, lambda state: delete_category(state, category_id, remove_zero_assignments=True))
 
     def delete_category_group(self, workspace, parent_id):
         return self._mutate(workspace, lambda state: delete_category_group(state, parent_id))
