@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.15.0 — 2026-11-09
+
+PR: [#182](https://github.com/Fillll/whab/pull/182)
+
+- Document zero-only row deletion and expose consistent deletable status with nonzero blocker counts/months. Refresh detailed offline help, version requirements and guarded workflow examples.
+
 ## 2.14.0 — 2026-11-09
 
 PR: [#180](https://github.com/Fillll/whab/pull/180)

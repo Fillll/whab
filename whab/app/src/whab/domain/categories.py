@@ -191,28 +191,39 @@ def ensure_child_category(categories: Mapping[str, dict], category_id: str) -> d
     return category
 
 
-def category_deletion_status(state, category_id):
+def category_deletion_status(state, category_id, *, remove_zero_assignments=False):
     """Explain only the addressed child's references, without exposing peers."""
     ensure_child_category(state['categories'], category_id)
     references = [row for row in state['transactions'].values() if row.get('categoryId') == category_id]
     deleted = sum(bool(row.get('deleted', False)) for row in references)
     months = sorted(month for month, rows in state['budget'].items() if category_id in rows)
     zero = [month for month in months if state['budget'][month][category_id] == 0]
-    return {'categoryId': category_id, 'deletable': not references and not months,
+    nonzero = [month for month in months if state['budget'][month][category_id] != 0]
+    return {'categoryId': category_id, 'deletable': not references and not nonzero and (not zero or remove_zero_assignments),
             'transactions': {'total': len(references), 'live': len(references) - deleted, 'deleted': deleted},
-            'assignments': {'count': len(months), 'months': months, 'zeroMonths': zero}}
+            'assignments': {'count': len(months), 'months': months, 'zeroMonths': zero,
+                            'nonzeroCount': len(nonzero), 'nonzeroMonths': nonzero}}
 
 
-def delete_category(state, category_id):
+def delete_category(state, category_id, *, remove_zero_assignments=False):
     """Remove one unreferenced leaf, retaining its parent and all financial data."""
-    status = category_deletion_status(state, category_id)
+    # Older persistence adapters only remove the category row. They must remain
+    # conservative until they explicitly persist assignment removals atomically.
+    status = category_deletion_status(state, category_id, remove_zero_assignments=remove_zero_assignments)
     if not status['deletable']:
         t, a = status['transactions'], status['assignments']
+        if not t['total'] and not a['nonzeroCount']:
+            raise StoreError('Update the storage adapter to delete zero-only assignment rows atomically with the category. No rows were removed.')
         raise StoreError(f"Cannot delete category: {t['live']} live and {t['deleted']} deleted transactions reference it; "
-                         f"{a['count']} monthly assignments reference it ({len(a['zeroMonths'])} zero-valued rows). "
+                         f"{a['nonzeroCount']} nonzero monthly assignments block deletion "
+                         f"({len(a['zeroMonths'])} zero-valued rows remain unchanged). "
                          'No records or assignments were removed. Inspect category show for all relevant months.')
     groups = category_groups(state['categories'], state.get('categoryGroups', ()))
     state['categoryGroups'] = groups
+    for month in status['assignments']['zeroMonths']:
+        del state['budget'][month][category_id]
+        if not state['budget'][month]:
+            del state['budget'][month]
     del state['categories'][category_id]
 
 

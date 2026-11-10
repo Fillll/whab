@@ -33,7 +33,7 @@ def test_real_console_safe_deletion_history_and_reopen(tmp_path, storage):
     for args in [('delete',), ('group', 'delete')]:
         result = subprocess.run([str(executable), '--profile', '/missing/fictional-profile', 'My budget', 'category', *args, '--help'],
                                 env=env, capture_output=True, text=True, timeout=30)
-        assert result.returncode == 0 and 'including zero-valued rows' in result.stdout and not home.exists()
+        assert result.returncode == 0 and 'zero-valued rows' in result.stdout and not home.exists()
 
     def wait_closed():
         endpoint = home / 'run/sandbox/host.json'
@@ -60,11 +60,16 @@ def test_real_console_safe_deletion_history_and_reopen(tmp_path, storage):
         advanced('add_transaction', {'accountId': cash, 'date': '2026-08-01', 'merchant': 'Fictional invoice',
                                     'amount': 100, 'categoryId': protected['id'], 'note': 'Preserve annotation'})
         assigned = run('default', 'category', 'create', 'Fictional assigned', '--parent', 'Goals')['data']
-        advanced('assign', {'categoryId': assigned['id'], 'month': '2026-11', 'assigned': 0})
+        advanced('assign', {'categoryId': assigned['id'], 'month': '2026-11', 'assigned': 100})
+        advanced('assign', {'categoryId': assigned['id'], 'month': '2026-12', 'assigned': 0})
+        for month in ['2026-11','2026-12','2027-01']:
+            advanced('assign', {'categoryId': leaf['id'], 'month': month, 'assigned': 0})
         status = run('My budget', 'category', 'show', assigned['id'])['data']['deletion']
         assert status == {'categoryId': assigned['id'], 'deletable': False,
                           'transactions': {'total': 0, 'live': 0, 'deleted': 0},
-                          'assignments': {'count': 1, 'months': ['2026-11'], 'zeroMonths': ['2026-11']}}
+                          'assignments': {'count': 2, 'months': ['2026-11','2026-12'], 'zeroMonths': ['2026-12'],
+                                          'nonzeroCount':1,'nonzeroMonths':['2026-11']}}
+        assert run('default','category','show',leaf['id'])['data']['deletion']['deletable'] is True
         before = run('api', '--budget', 'default', 'query', 'portable')['data']
         assert 'children' in run('My budget', 'category', 'group', 'delete', parent['id'], ok=False)['error']
         for record in [protected, assigned]:
@@ -80,9 +85,14 @@ def test_real_console_safe_deletion_history_and_reopen(tmp_path, storage):
         assert run('default', 'category', 'list', '--parent', parent['id'])['data'][0]['children'] == []
         entry = run('default', 'history', 'list')['data']['entries'][0]
         assert entry['operation'] == 'delete_category' and entry['requestId'] == deleted['requestId']
+        detail = run('default','history','show',entry['id'])['data']['entries'][0]
+        removed = [row for row in detail['changes'] if row['path'][0] == 'assignments']
+        assert len(removed) == 3 and all(row['before']['assigned'] == 0 and row['after'] is None for row in removed)
         preview = run('default', 'history', 'undo', entry['id'])
         run('default', 'history', 'undo', entry['id'], '--apply', preview['data']['fingerprint'])
         assert any(row['id'] == leaf['id'] for group in run('default', 'category', 'list')['data'] for row in group['children'])
+        restored = run('api','--budget','default','query','portable')['data']
+        assert sorted(restored['assignments'],key=lambda row:(row['month'],row['categoryId'])) == sorted(before['assignments'],key=lambda row:(row['month'],row['categoryId']))
         preview = run('default', 'history', 'redo', entry['id'])
         run('default', 'history', 'redo', entry['id'], '--apply', preview['data']['fingerprint'])
         removed_parent = run('My budget', 'category', 'group', 'delete', parent['id'])
@@ -94,8 +104,9 @@ def test_real_console_safe_deletion_history_and_reopen(tmp_path, storage):
         disposable = run('default', 'category', 'create', 'Fictional last child', '--parent', 'Goals')['data']
         run('default', 'category', 'delete', disposable['id'])
         after = run('api', '--budget', 'default', 'query', 'portable')['data']
-        for key in ['transactions', 'assignments', 'accounts']:
+        for key in ['transactions', 'accounts']:
             assert after[key] == before[key]
+        assert sorted(after['assignments'],key=lambda row:(row['month'],row['categoryId'])) == sorted([row for row in before['assignments'] if row['categoryId'] != leaf['id']],key=lambda row:(row['month'],row['categoryId']))
         assert after['history']['entries'][:len(before['history']['entries'])] == before['history']['entries']
         assert run(other, 'category', 'list')['data'] == pristine
         tree = run('default', 'category', 'list')['data']

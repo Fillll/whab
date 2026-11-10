@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.21.0 — 2026-11-09
+
+PR: [#182](https://github.com/Fillll/whab/pull/182)
+
+- Remove the exact child and its zero-only assignment rows inside one native guarded transaction after core validation. Commit exact reversible audit history and receipts atomically; preserve nonzero/unrelated data and rollback all removals on failure.
+
 ## 1.20.0 — 2026-11-09
 
 PR: [#180](https://github.com/Fillll/whab/pull/180)

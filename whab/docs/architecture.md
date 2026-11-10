@@ -323,9 +323,13 @@ are shared status; destination failures and import progress remain budget-local.
 
 WHAB 2.67 adds public `delete_category` and `delete_category_group`, with optional
 `CategoryDeletion` storage support. Deletion safety belongs to core: every current
-transaction reference (including deleted/pending/reviewed rows), every assignment
-row in any month (including zero values), and every child of a group are protected.
-No deletion cascades or reassigns financial records. Removing an unused child
+transaction reference (including deleted/pending/reviewed rows), every nonzero
+assignment row in any month, and every child of a group are protected. From WHAB
+2.69, zero-only assignment rows are removed atomically with the unused child and
+retained exactly in permanent history. Any blocker refuses all removal, including
+zero rows. Native undo/redo restores/reapplies the category metadata, parent
+relationship and all zero rows. Monthly monetary results and rollover rules are
+preserved. No deletion cascades to children or reassigns financial records. Removing an unused child
 retains its empty parent until a separate explicit group deletion. Native adapters
 commit the removal with audit history and receipts; the CLI resolves exact names
 or IDs, guards the observed revision and verifies the full saved hierarchy. Existing

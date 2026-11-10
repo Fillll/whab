@@ -778,7 +778,9 @@ whab "My budget" history list
 
 Confirm the unused child and its parent before deleting. Child deletion refuses
 **every current transaction reference**, including reviewed, pending and deleted
-records, and **every monthly assignment row**, including zero values. Groups with
+records, and **every nonzero monthly assignment row**. Zero-only assignment rows
+are removed atomically with the unused child and retained exactly in audit history.
+Groups with
 children cannot be deleted. There is no cascade, force flag or automatic financial
 reassignment. Deleting an unused child removes its target metadata and retains the
 empty parent; delete that parent in a separate command. All unrelated identities,
@@ -796,7 +798,7 @@ Missing/ambiguous/wrong-kind names never select a fuzzy target. Stale writes fai
 uncertain responses or failed verification must not be blindly replayed. Inspect
 category list/history and retain the entire original intent as reported.
 
-Deletion requires SQLite 1.19+, JSON 1.11+ or another backend explicitly implementing
+Zero-only row removal requires WHAB 2.69+, CLI 2.15+, SQLite 1.21+, JSON 1.13+ or another backend explicitly implementing
 the additive `CategoryDeletion` contract with atomic audit history and receipts.
 Older adapters fail safely before mutation. Detailed help remains offline.
 
@@ -808,7 +810,9 @@ whab "My budget" category show CHILD_ID
 ```
 
 This read reports the exact child and revision, live and deleted transaction
-reference counts, all monthly assignment months, and zero-valued assignment months.
+reference counts, all monthly assignment months, zero-valued assignment months,
+and nonzeroCount/nonzeroMonths. An otherwise unused child with only zero rows has
+`deletable: true`; its zero rows will be removed by the atomic deletion.
 JSON is complete; the table retains the full blocker report. It excludes amounts
 and unrelated transaction details. Names/IDs resolve exactly as for deletion.
 The read never writes, syncs, appends history or grants permission to replay a write.
@@ -817,12 +821,14 @@ An authored HTTP 400 refusal or HTTP 409 revision/intent conflict is definitive;
 CLI reports its reason and retains the original intent. A timeout, HTTP 5xx,
 lost response or failed verification remains uncertain. Inspect the category and
 history; do not replay with a new request ID. A child needs no transaction or
-assignment references; only a parent group requires no children. Native authored
+nonzero assignment references; only a parent group requires no children. Native authored
 refusals preserve their reasons through the host/storage process boundary.
 Unexpected failures remain sanitized and uncertain mutations remain fenced.
 
-Moving transactions does not remove assignment history. Zero rows still block
-deletion. This command offers no financial erasure, archive/merge or
-assignment-preserving migration. Retain blocked categories until a separately
-authorized supported workflow can preserve that history. Both `category show
+Moving transactions does not remove assignment history. Deletion removes zero-only
+rows with the child; audit history retains every exact row for guarded undo/redo.
+Any nonzero row or transaction refuses the whole operation without removing zero
+rows. Undo restores identity, target, parent relationship and every removed row;
+redo revalidates later conflicts. Monthly monetary results and rollover semantics
+are preserved. There is no nonzero funding erasure or category merge/archive. Both `category show
 --help` and deletion help work offline from packaged operation documentation.

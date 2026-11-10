@@ -60,7 +60,7 @@ def add_category_parser(commands, catalog):
     )
     parent_delete.add_argument("category", help="Existing empty parent by unique exact name or stable ID")
     delete = actions.add_parser(
-        "delete", help="Delete an unused child; refuse all transaction/assignment references",
+        "delete", help="Delete an unused child and its zero-only assignment rows",
         epilog=guide, formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     delete.add_argument("category", help='Child stable ID, unique exact name or "Group / Name"; quote Unicode/spaces')
@@ -291,7 +291,8 @@ def execute_delete(connection, identifier, prefix, args, exchange, error, observ
                         'No automatic retry. Retain the original intent: ' + json.dumps(intent) + '.') from failure
         raise error('Category deletion was not confirmed; it may have been saved. No automatic retry. '
                     + ('A parent group must have no children. ' if parent else
-                       'A child must have no live/deleted transaction references or monthly assignment rows, including zeros. ')
+                       'A child must have no live/deleted transaction references or nonzero monthly assignments. '
+                       'Zero-only assignment rows are removed atomically with the child and retained in history. ')
                     + (str(failure) + '. ' if getattr(failure, 'status_code', None) else '') +
                     'Inspect category list and history; do not rerun the write as a retry. Retain budgetId '
                     + identifier + ' and the exact original intent: ' + json.dumps(intent) + '.') from failure

@@ -49,7 +49,8 @@ def test_deletion_status_counts_tombstones_and_all_months_without_mutating(delet
     state['budget'] = {'2026-09':{identifier:0},'2026-08':{identifier:123}}
     status = category_deletion_status(state, identifier)
     assert status == {'categoryId':identifier,'deletable':False,'transactions':{'total':2,'live':1,'deleted':1},
-                      'assignments':{'count':2,'months':['2026-08','2026-09'],'zeroMonths':['2026-09']}}
+                      'assignments':{'count':2,'months':['2026-08','2026-09'],'zeroMonths':['2026-09'],
+                                     'nonzeroCount':1,'nonzeroMonths':['2026-08']}}
     assert service.query('category_deletion_status','personal',parameters={'categoryId':identifier})['data']['transactions']['live'] == 1
     assert store.export_budget() == snapshot
     for parameters in [{}, {'categoryId':identifier,'extra':1}, {'categoryId':None}]:
@@ -57,6 +58,21 @@ def test_deletion_status_counts_tombstones_and_all_months_without_mutating(delet
             service.query('category_deletion_status','personal',parameters=parameters)
     with pytest.raises(StoreError, match='Update the storage'):
         LedgerService(SimpleNamespace()).query('category_deletion_status','personal',parameters={'categoryId':identifier})
+
+
+def test_old_adapter_call_shape_keeps_zero_rows_protected_until_atomic_opt_in():
+    from whab.domain.categories import category_deletion_status, delete_category
+    from whab.domain.ledger_state import initial_state
+    state = initial_state('personal','2026-08')
+    state['budget'] = {'2026-08':{'groceries':0}}
+    before = deepcopy(state)
+    assert not category_deletion_status(state,'groceries')['deletable']
+    with pytest.raises(StoreError,match='Update the storage adapter'):
+        delete_category(state,'groceries')
+    assert state == before
+    assert category_deletion_status(state,'groceries',remove_zero_assignments=True)['deletable']
+    delete_category(state,'groceries',remove_zero_assignments=True)
+    assert 'groceries' not in state['categories'] and state['budget'] == {}
 
 
 def test_delete_audit_replay_undo_redo_reopen_and_portable_files(deletion_store, tmp_path):
@@ -116,6 +132,7 @@ def test_every_current_transaction_reference_blocks_deletion_without_mutation(de
     cash = command(service, 'add_account', {'name': 'Fictional checking', 'type': 'depository', 'balance': 10000})['data']
     command(service, 'add_transaction', {'accountId': cash, 'date': '2026-08-01', 'merchant': 'Fictional transaction',
             'amount': 100, 'categoryId': identifier, 'note': 'Preserve annotation'})
+    command(service,'assign',{'categoryId':identifier,'month':'2026-08','assigned':0})
     snapshot = store.export_budget()
     snapshot['transactions'][0].update(changes)
     # Restore a public fictional fixture into a separate pristine backend; no SQL/private writes.
@@ -130,17 +147,89 @@ def test_every_current_transaction_reference_blocks_deletion_without_mutation(de
     assert target.export_budget() == before and target.commit_evidence() == evidence and selected.revision == revision
 
 
-@pytest.mark.parametrize('month,amount', [('2026-08', 0), ('2026-08', 100), ('2026-09', 50)])
-def test_assignment_rows_in_any_month_block_deletion_including_zero(deletion_store, month, amount):
+@pytest.mark.parametrize('month,amount', [('2026-08', 100), ('2026-09', 50)])
+def test_nonzero_assignment_in_any_month_blocks_mixed_zero_rows_without_partial_change(deletion_store, month, amount):
     store, _, _, _ = deletion_store
     service = LedgerService(store)
     identifier = child(service)
     command(service, 'add_account', {'name': 'Fictional cash', 'type': 'depository', 'balance': 10000})
+    command(service, 'assign', {'categoryId': identifier, 'month': month, 'assigned': 0})
+    command(service, 'assign', {'categoryId': identifier, 'month': '2026-10', 'assigned': 0})
+    command(service, 'assign', {'categoryId': identifier, 'month': '2026-11', 'assigned': 0})
+    assert service.query('category_deletion_status','personal',parameters={'categoryId':identifier})['data']['deletable']
+    observed = service.revision
     command(service, 'assign', {'categoryId': identifier, 'month': month, 'assigned': amount})
     before, revision, evidence = store.export_budget(), service.revision, store.commit_evidence()
+    with pytest.raises(RevisionConflict):
+        command(service,'delete_category',{'categoryId':identifier},revision=observed)
     with pytest.raises(StoreError, match='monthly assignments'):
         command(service, 'delete_category', {'categoryId': identifier})
     assert store.export_budget() == before and service.revision == revision and store.commit_evidence() == evidence
+
+
+def test_many_zero_rows_delete_atomically_restore_exactly_and_preserve_monthly_results(deletion_store, tmp_path):
+    from whab.domain.dates import shift_month
+    from whab.domain.history import financial
+    store, factory, path, handles = deletion_store
+    service = LedgerService(store)
+    identifier = child(service)
+    parent = category_group_id('Fictional maintenance')
+    cash = command(service,'add_account',{'name':'Fictional cash','type':'depository','balance':100000})['data']
+    euro = command(service,'add_account',{'name':'Fictional euro','type':'depository','currency':'EUR','balance':20000})['data']
+    euro_category = command(service,'add_category',{'name':'Fictional euro plan','group':'Fictional peers','target':0,'currency':'EUR'})['data']
+    command(service,'assign',{'categoryId':euro_category,'month':'2026-08','assigned':200})
+    command(service,'add_transaction',{'accountId':euro,'date':'2026-08-02','merchant':'Fictional euro shop','amount':10,'categoryId':euro_category})
+    command(service,'assign',{'categoryId':'groceries','month':'2026-08','assigned':1000})
+    command(service,'add_transaction',{'accountId':cash,'date':'2026-08-01','merchant':'Fictional shop','amount':100,'categoryId':'groceries'})
+    command(service,'assign_next_month',{'month':'2026-08','currency':'USD','assigned':200})
+    command(service,'set_rollover_mode',{'month':'2026-09','currency':'USD','mode':'balance'})
+    command(service,'set_rollover_mode',{'month':'2026-11','currency':'USD','mode':'category'})
+    months = [shift_month('2026-08', offset) for offset in range(59)]
+    for month in months:
+        command(service,'assign',{'categoryId':identifier,'month':month,'assigned':0})
+    before = store.export_budget()
+    demo = store.export_budget('demo')
+    def results():
+        return {month:{key:projection[key] for key in ['summariesByCurrency','rolloverModesByCurrency','incomingRolloverModesByCurrency']}
+                for month in [shift_month('2026-08',-1),*months,shift_month(months[-1],1)]
+                for projection in [service.workspace('personal',month)]}
+    monthly = results()
+    status = service.query('category_deletion_status','personal',parameters={'categoryId':identifier})['data']
+    assert status['deletable'] and status['assignments'] == {'count':59,'months':months,'zeroMonths':months,'nonzeroCount':0,'nonzeroMonths':[]}
+    command(service,'delete_category',{'categoryId':identifier})
+    after = store.export_budget()
+    assert not any(row['categoryId']==identifier for row in after['assignments'])
+    assert results() == monthly and store.export_budget('demo') == demo
+    assert next(row for row in store.category_tree('personal') if row['id']==parent)['children'] == []
+    entry = store.budget_history('personal')['entries'][0]
+    detail = store.budget_history('personal',target=entry['id'])['entries'][0]
+    removed = [row for row in detail['changes'] if row['path'][0]=='assignments']
+    assert removed == [{'path':['assignments',month,identifier],
+                        'before':{'month':month,'categoryId':identifier,'assigned':0},'after':None} for month in months]
+    for action, expected in [('undo',before),('redo',after)]:
+        preview = service.query('history_preview','personal',parameters={'action':action,'target':entry['id']})
+        command(service,'history_apply',{k:v for k,v in preview['data'].items() if k!='changes'})
+        assert financial(store.export_budget()) == financial(expected)
+        assert results() == monthly
+    assert store.export_budget()['history']['entries'][:len(before['history']['entries'])] == before['history']['entries']
+    command(service,'delete_category_group',{'parentId':parent})
+    final = store.export_budget()
+    with pytest.raises(StoreError,match='Later financial changes'):
+        service.query('history_preview','personal',parameters={'action':'undo','target':entry['id']})
+    assert store.export_budget()==final
+    for section in ['accounts','transactions']:
+        assert sorted(final[section],key=lambda row:row['id']) == sorted(before[section],key=lambda row:row['id'])
+    assert final['futureFunding']==before['futureFunding'] and final['rolloverModes']==before['rolloverModes']
+    assert all(row['id']!=parent for row in store.category_tree('personal'))
+    images = store.export_budget_files()
+    store.close()
+    reopened = factory(path,month='2026-08')
+    handles.append(reopened)
+    assert reopened.export_budget()==final
+    restored = factory(tmp_path/'fictional-zero-copy',month='2026-08')
+    handles.append(restored)
+    restored.restore_budget_files('personal',images)
+    assert restored.export_budget()==final
 
 
 def test_missing_wrong_kind_nonempty_and_stale_deletes_leave_state_unchanged(deletion_store):
@@ -193,6 +282,7 @@ def test_native_write_failure_rolls_back_deletion_and_history(deletion_store, mo
     store, _, _, _ = deletion_store
     service = LedgerService(store)
     identifier = child(service)
+    command(service, 'assign', {'categoryId': identifier, 'month': '2026-08', 'assigned': 0})
     before, revision, evidence = store.export_budget(), service.revision, store.commit_evidence()
     def fail(*args, **kwargs):
         raise OSError('Fictional disk failure')

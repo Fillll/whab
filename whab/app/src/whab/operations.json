@@ -3080,7 +3080,7 @@
     {
       "name": "delete_category",
       "kind": "command",
-      "summary": "Delete one unused child category; refuse every transaction reference and monthly assignment.",
+      "summary": "Delete one unused child and all of its zero-only monthly assignment rows in one guarded, audited operation.",
       "input": {
         "type": "object",
         "properties": {
@@ -3109,17 +3109,17 @@
           "output": null
         }
       ],
-      "side_effects": "Atomically deletes only the addressed unused child or empty parent, with permanent audit history and the existing guarded receipt. Child deletion retains its parent, including a formerly derived legacy parent. Refuses all current transaction references (including pending, reviewed and deleted tombstones) and all monthly assignment rows (including zero values). Removes the deleted child target metadata only; preserves all other identities, transactions, annotations, assignments, balances, history and bank mappings. No cascade, force option, reassignment or sync.",
+      "side_effects": "Atomically delete the addressed unused child and its zero-only assignment rows, with permanent history and a guarded receipt; retain its empty parent. A separate group deletion removes only an empty parent. Any live/deleted transaction or any nonzero assignment refuses the entire child deletion, leaving all zero rows unchanged. Preserve every removed zero row and category/parent metadata in audit history for exact guarded undo/redo. Preserve unrelated assignments, money, monthly results, rollover rules, transactions, annotations, bank mappings and all prior history. No force, child cascade, nonzero funding removal, reassignment or sync.",
       "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
       "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
       "errors": [
         "Missing/wrong-kind category/group IDs are refused. A group with children cannot be deleted.",
-        "Any referencing transaction, including tombstones, or monthly assignment row, including zero values, blocks child deletion without mutation.",
+        "Any live/deleted transaction reference or any nonzero assignment in any month blocks child deletion without mutation; groups with children are refused.",
         "Storage must explicitly support CategoryDeletion with atomic audit history; older adapters fail before a mutation.",
         "Stale revisions conflict; an uncertain write must retain its exact original parameters/revision/request ID and must not be replayed with a new intent."
       ],
       "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
-      "availability": "WHAB 2.67+; optional CategoryDeletion, CategoryManagement tree read and BudgetHistoryStorage support. SQLite 1.19+, JSON 1.11+ or compatible adapters. Remote authorities enforce the same guards."
+      "availability": "WHAB 2.69+, SQLite 1.21+/JSON 1.13+ or an adapter implementing this policy with atomic audit history."
     },
     {
       "name": "delete_category_group",
@@ -3153,17 +3153,17 @@
           "output": null
         }
       ],
-      "side_effects": "Atomically deletes only the addressed unused child or empty parent, with permanent audit history and the existing guarded receipt. Child deletion retains its parent, including a formerly derived legacy parent. Refuses all current transaction references (including pending, reviewed and deleted tombstones) and all monthly assignment rows (including zero values). Removes the deleted child target metadata only; preserves all other identities, transactions, annotations, assignments, balances, history and bank mappings. No cascade, force option, reassignment or sync.",
+      "side_effects": "Atomically delete the addressed unused child and its zero-only assignment rows, with permanent history and a guarded receipt; retain its empty parent. A separate group deletion removes only an empty parent. Any live/deleted transaction or any nonzero assignment refuses the entire child deletion, leaving all zero rows unchanged. Preserve every removed zero row and category/parent metadata in audit history for exact guarded undo/redo. Preserve unrelated assignments, money, monthly results, rollover rules, transactions, annotations, bank mappings and all prior history. No force, child cascade, nonzero funding removal, reassignment or sync.",
       "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
       "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
       "errors": [
         "Missing/wrong-kind category/group IDs are refused. A group with children cannot be deleted.",
-        "Any referencing transaction, including tombstones, or monthly assignment row, including zero values, blocks child deletion without mutation.",
+        "Any live/deleted transaction reference or any nonzero assignment in any month blocks child deletion without mutation; groups with children are refused.",
         "Storage must explicitly support CategoryDeletion with atomic audit history; older adapters fail before a mutation.",
         "Stale revisions conflict; an uncertain write must retain its exact original parameters/revision/request ID and must not be replayed with a new intent."
       ],
       "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
-      "availability": "WHAB 2.67+; optional CategoryDeletion, CategoryManagement tree read and BudgetHistoryStorage support. SQLite 1.19+, JSON 1.11+ or compatible adapters. Remote authorities enforce the same guards."
+      "availability": "WHAB 2.69+, SQLite 1.21+/JSON 1.13+ or an adapter implementing this policy with atomic audit history."
     },
     {
       "name": "category_deletion_status",
@@ -3193,7 +3193,7 @@
           },
           "deletable": {
             "type": "boolean",
-            "description": "True only when no transaction references or assignment rows remain."
+            "description": "True only with no live/deleted transaction references and no nonzero assignments, and storage support for removing any zero-only rows atomically with the child and retaining them in history."
           },
           "transactions": {
             "type": "object",
@@ -3246,12 +3246,27 @@
                   "type": "string",
                   "pattern": "^\\d{4}-\\d{2}$"
                 }
+              },
+              "nonzeroCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of nonzero assignment rows, which block deletion."
+              },
+              "nonzeroMonths": {
+                "type": "array",
+                "description": "All nonzero assignment months in ascending order; any one blocks deletion.",
+                "items": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                }
               }
             },
             "required": [
               "count",
               "months",
-              "zeroMonths"
+              "zeroMonths",
+              "nonzeroCount",
+              "nonzeroMonths"
             ],
             "additionalProperties": false
           }
@@ -3284,7 +3299,9 @@
               ],
               "zeroMonths": [
                 "2026-08"
-              ]
+              ],
+              "nonzeroCount": 0,
+              "nonzeroMonths": []
             }
           }
         }
@@ -3296,7 +3313,7 @@
         "Missing or invalid category ID; unsupported storage inspection capability."
       ],
       "retry": "Read-only; repeat after concurrent changes. This is inspection, not permission to replay an uncertain mutation.",
-      "availability": "WHAB 2.68+, SQLite 1.20+/JSON 1.12+ or CategoryDeletionInspection."
+      "availability": "WHAB 2.69+, SQLite 1.21+/JSON 1.13+ for zero-only assignment deletion policy."
     }
   ]
 }

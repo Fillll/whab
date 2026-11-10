@@ -403,17 +403,18 @@ def test_history_actor_batch_and_reversal_survive_native_process_and_restart(pro
 
 def test_authored_native_refusal_remains_definitive_and_history_readable(proxy):
     service = LedgerService(proxy)
+    service.add_account('personal', {'name':'Fictional cash','type':'depository','balance':1000})
     identifier = service.command('add_category','personal',{'name':'Fictional protected','group':'Goals','target':0},
         request_id='protected-child',expected_revision=service.revision)['data']
-    service.command('assign','personal',{'categoryId':identifier,'month':'2026-11','assigned':0},
+    service.command('assign','personal',{'categoryId':identifier,'month':'2026-11','assigned':100},
         request_id='zero-row',expected_revision=service.revision)
     before = proxy.commit_evidence()
-    with pytest.raises(StoreError, match='1 monthly assignments.*1 zero-valued'):
+    with pytest.raises(StoreError, match='1 nonzero monthly assignments.*0 zero-valued'):
         service.command('delete_category','personal',{'categoryId':identifier},request_id='refused-delete',expected_revision=service.revision)
     assert proxy.commit_evidence() == before and not proxy.uncertain
     assert proxy.intents.snapshot()['pending'] is None
-    assert service.query('history','personal',parameters={'limit':5})['data']['total'] == 2
+    assert service.query('history','personal',parameters={'limit':5})['data']['total'] == 3
     with pytest.raises(StoreError, match='History cursor not found'):
         service.query('history','personal',parameters={'before':'fictional-missing'})
-    assert proxy.budget_history('personal',limit=1)['total'] == 2
-    assert proxy.category_deletion_status('personal',identifier)['assignments']['zeroMonths'] == ['2026-11']
+    assert proxy.budget_history('personal',limit=1)['total'] == 3
+    assert proxy.category_deletion_status('personal',identifier)['assignments']['nonzeroMonths'] == ['2026-11']
