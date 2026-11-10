@@ -534,7 +534,7 @@
     {
       "name": "StorageBackend.items",
       "kind": "sdk",
-      "summary": "StorageBackend.items public SDK callback.",
+      "summary": "List active bank connection summaries from native connection rows, without loading financial history; omit tokens and cursors.",
       "input": {
         "type": "object",
         "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
@@ -556,7 +556,15 @@
       "examples": [
         {
           "input": {},
-          "output": null
+          "output": [
+            {
+              "id": "fictional",
+              "institutionName": "Fictional bank",
+              "status": "connected",
+              "lastSynced": null,
+              "error": null
+            }
+          ]
         }
       ],
       "side_effects": "Read the scoped public/privileged SDK projection described by this method; never an unrestricted remote method.",
@@ -572,7 +580,7 @@
     {
       "name": "StorageBackend.get_item",
       "kind": "sdk",
-      "summary": "StorageBackend.get_item public SDK callback.",
+      "summary": "Read one complete privileged connection record by exact ID, without loading financial history; return null when absent. Tokens remain host-only.",
       "input": {
         "type": "object",
         "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",

@@ -87,3 +87,36 @@ def test_web_frequency_and_manual_checks_use_shared_due_policy(bank_app):
     for interval in (True, 7200, -1):
         assert client.put('/api/plaid/schedule', json={'interval_seconds': interval}).status_code == 400
     assert client.put('/api/plaid/schedule', json={'interval_seconds': None}, headers={'origin': 'https://foreign.example'}).status_code == 403
+
+
+def test_page_reuses_bank_items_only_within_each_request(bank_app, monkeypatch):
+    from whab.storage.bank import BankStore
+
+    client = bank_app.client
+    flow = client.post('/api/plaid/link-token', json={}).json()
+    assert client.post('/api/plaid/exchange', json={
+        'flowId': flow['flow_id'], 'publicToken': 'fictional-public-token',
+        'institutionName': 'Fictional bank',
+    }).status_code == 200
+    original = BankStore.items
+    reads = []
+
+    def counted_items(self):
+        result = original(self)
+        reads.append(result)
+        return result
+
+    monkeypatch.setattr(BankStore, 'items', counted_items)
+    page = '/budgets/home/transactions/2026-10/usd'
+    first = client.get(page)
+    assert first.status_code == 200 and 'Fictional bank' in first.text
+    assert len(reads) == 1 and reads[-1][0]['status'] == 'connected'
+    bank_app.store.set_item_status('item', 'error', 'Fictional connection needs attention')
+    second = client.get(page, headers={'X-WHAB-Page-Fragment': '1'})
+    assert second.status_code == 200
+    assert len(reads) == 2 and reads[-1][0]['status'] == 'error'
+    assert reads[-1][0]['error'] == 'Fictional connection needs attention'
+    status = client.get('/api/status')
+    assert status.status_code == 200 and status.json()['connectedItems'] == 1
+    assert len(reads) == 3
+    assert bank_app.provider.calls == ['connection_token', 'exchange_token']

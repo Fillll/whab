@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.69.1 — 2026-11-09
+
+PR: [#183](https://github.com/Fillll/whab/pull/183)
+
+- Share each provider’s bank connection listing within a page request so the status summary and bank panel agree without duplicate reads. Keep later page/status requests fresh; no financial rules, UI layout or CLI contracts change.
+
 ## 2.69.0 — 2026-11-09
 
 PR: [#182](https://github.com/Fillll/whab/pull/182)
