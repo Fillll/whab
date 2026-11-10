@@ -1460,16 +1460,16 @@
       "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [
-        "Missing/wrong-kind IDs, any referencing transaction/assignment or a parent with children are refused without mutation.",
+        "Missing/wrong-kind IDs, any live/deleted transaction reference, any nonzero assignment or a parent with children are refused without mutation; zero-only rows are removed atomically with the child and retained in history.",
         "Authority/receipt/revision and uncertain-outcome protections apply."
       ],
       "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
-      "availability": "Optional additive CategoryDeletion SDK, WHAB 2.67+; true support also requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
+      "availability": "Optional CategoryDeletion SDK; WHAB 2.69+ with current SQLite/JSON for zero-only row removal. True support requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
     },
     {
       "name": "CategoryDeletion.delete_category",
       "kind": "sdk",
-      "summary": "Delete an unreferenced child or empty parent atomically using shared core safety rules; never cascade.",
+      "summary": "Native atomic audited deletion: remove an unused child and zero-only assignment rows, or a separately addressed empty parent.",
       "input": {
         "type": "object",
         "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
@@ -1502,20 +1502,19 @@
           "output": null
         }
       ],
-      "side_effects": "Atomically remove only the addressed record using core validation and native receipt/history boundaries. Protect all transaction references, including tombstones, every assignment row including zero values, and children. Child deletion retains its empty parent. No bank sync or financial cascade.",
+      "side_effects": "Validate all live/deleted transaction references and all nonzero assignments before mutation. Atomically remove only the addressed child and its zero-only assignment rows, retaining its parent and every removed row in reversible history; group deletion requires no children. Native history and receipts commit together. Preserve unrelated records, monthly monetary results, rollover settings and prior history; no bank sync.",
       "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [
-        "Missing/wrong-kind IDs, any referencing transaction/assignment or a parent with children are refused without mutation.",
-        "Authority/receipt/revision and uncertain-outcome protections apply."
+        "Any live/deleted transaction reference, any nonzero assignment, nonempty group, stale evidence or native write failure refuses the whole operation. No partial zero-row deletion."
       ],
       "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
-      "availability": "Optional additive CategoryDeletion SDK, WHAB 2.67+; true support also requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
+      "availability": "WHAB 2.69+ with SQLite 1.21+/JSON 1.13+."
     },
     {
       "name": "CategoryDeletion.delete_category_group",
       "kind": "sdk",
-      "summary": "Delete an unreferenced child or empty parent atomically using shared core safety rules; never cascade.",
+      "summary": "Native atomic audited deletion: remove an unused child and zero-only assignment rows, or a separately addressed empty parent.",
       "input": {
         "type": "object",
         "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
@@ -1548,15 +1547,14 @@
           "output": null
         }
       ],
-      "side_effects": "Atomically remove only the addressed record using core validation and native receipt/history boundaries. Protect all transaction references, including tombstones, every assignment row including zero values, and children. Child deletion retains its empty parent. No bank sync or financial cascade.",
+      "side_effects": "Validate all live/deleted transaction references and all nonzero assignments before mutation. Atomically remove only the addressed child and its zero-only assignment rows, retaining its parent and every removed row in reversible history; group deletion requires no children. Native history and receipts commit together. Preserve unrelated records, monthly monetary results, rollover settings and prior history; no bank sync.",
       "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [
-        "Missing/wrong-kind IDs, any referencing transaction/assignment or a parent with children are refused without mutation.",
-        "Authority/receipt/revision and uncertain-outcome protections apply."
+        "Any live/deleted transaction reference, any nonzero assignment, nonempty group, stale evidence or native write failure refuses the whole operation. No partial zero-row deletion."
       ],
       "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
-      "availability": "Optional additive CategoryDeletion SDK, WHAB 2.67+; true support also requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
+      "availability": "WHAB 2.69+ with SQLite 1.21+/JSON 1.13+."
     },
     {
       "name": "CategoryDeletionInspection.category_deletion_status",
@@ -1595,7 +1593,7 @@
           },
           "deletable": {
             "type": "boolean",
-            "description": "True only when no transaction references or assignment rows remain."
+            "description": "True only with no live/deleted transaction references and no nonzero assignments. Zero-only rows are removed atomically with the child and retained in history."
           },
           "transactions": {
             "type": "object",
@@ -1648,12 +1646,27 @@
                   "type": "string",
                   "pattern": "^\\d{4}-\\d{2}$"
                 }
+              },
+              "nonzeroCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of nonzero assignment rows, which block deletion."
+              },
+              "nonzeroMonths": {
+                "type": "array",
+                "description": "All nonzero assignment months in ascending order; any one blocks deletion.",
+                "items": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                }
               }
             },
             "required": [
               "count",
               "months",
-              "zeroMonths"
+              "zeroMonths",
+              "nonzeroCount",
+              "nonzeroMonths"
             ],
             "additionalProperties": false
           }
@@ -1687,7 +1700,9 @@
               ],
               "zeroMonths": [
                 "2026-08"
-              ]
+              ],
+              "nonzeroCount": 0,
+              "nonzeroMonths": []
             }
           }
         }
@@ -1699,7 +1714,7 @@
         "Missing or invalid category ID; unsupported storage inspection capability."
       ],
       "retry": "Read-only; repeat after concurrent changes. This is inspection, not permission to replay an uncertain mutation.",
-      "availability": "WHAB 2.68+, SQLite 1.20+/JSON 1.12+ or CategoryDeletionInspection."
+      "availability": "WHAB 2.69+, SQLite 1.21+/JSON 1.13+ for zero-only assignment deletion policy."
     }
   ]
 }

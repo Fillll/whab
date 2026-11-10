@@ -6,7 +6,7 @@ personal and fictional demo workspaces in one versioned JSON data file at
 different files. It uses no database driver or other storage implementation.
 The host supplies financial commands, currency rules and workspace projections.
 
-Install its wheel with a compatible host (WHAB 2.67+ within major 2), then select
+Install its wheel with a compatible host (WHAB 2.69+ within major 2), then select
 `WHAB_STORAGE=json` for a new original runtime or initial CLI budget creation.
 An opened budget chooses its backend through its manifest. Selecting JSON does
 not migrate an existing ledger. JSON belongs to the supported bundled set;
@@ -14,10 +14,12 @@ installation does not select it. SQLite remains the original-runtime default.
 
 ## Commits, locking and recovery
 
-Version 1.11 with WHAB 2.67 implements optional `CategoryDeletion`. The shared core
-refuses every referencing transaction (including tombstones), every assignment row
-(including zeros), and any group with children. An unused child deletion retains
-its empty parent; a separate empty-group deletion removes only that parent. The
+Version 1.13 with WHAB 2.69 implements optional `CategoryDeletion`. The shared core
+refuses every referencing transaction (including tombstones), every nonzero
+assignment, and any group with children. An unused child and its zero-only rows
+are removed from one detached candidate, preserving exact removed rows in audit
+history for guarded undo/redo. Any blocker leaves all zero rows unchanged. Monthly
+monetary results and rollover rules are preserved. Deletion retains its empty parent; a separate empty-group deletion removes only that parent. The
 validated candidate, audit history and native receipt commit together through the
 normal atomic replacement. All other financial/provider data and previous history
 are retained. No schema migration, cascade or bank sync is introduced.
@@ -252,7 +254,7 @@ See [the core semantics](../../../../docs/architecture.md#account-lifecycle-and-
 
 ## Category management
 
-This version requires WHAB 2.68+ for optional SDK `CategoryManagement`.
+This version requires WHAB 2.69+ for optional SDK `CategoryManagement`.
 `category_tree(workspace)` includes real empty parents; `add_category_group(workspace,
 name)` creates one; `move_category(workspace, category_id, parent_id)` preserves the
 child ID, target, currency, transaction references and all monthly assignments.
@@ -266,5 +268,7 @@ Use the [simple CLI workflow](../../interface/cli/README.md#category-management)
 
 Read-only `CategoryDeletionInspection.category_deletion_status` returns only the
 addressed child's live/deleted reference counts and every assignment month, including
-zero rows. It uses the same core safety report as atomic deletion; it never erases
-financial records or history. See the CLI `category show` workflow.
+zero rows, plus nonzeroCount/nonzeroMonths. Zero-only rows permit deletion and are
+removed atomically with the child while retained exactly in history. Nonzero rows
+or transaction references block the entire operation. The read itself never erases
+records or history. See the CLI `category show` workflow.

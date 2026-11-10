@@ -1094,8 +1094,13 @@ same validation and audit requirement.
 The public commands accept `{categoryId}` and `{parentId}` respectively. These are
 actual missing operations: creation and reparenting cannot remove obsolete records.
 Core validates all current transaction references, including deleted tombstones,
-pending and reviewed rows, and all monthly assignment rows including zero values.
-Any reference blocks child deletion. A parent with any child is protected. There
+pending and reviewed rows, and all nonzero monthly assignment rows. Any such
+reference blocks child deletion. From WHAB 2.69 with SQLite 1.21/JSON 1.13, zero-only
+rows are removed with the unused child in the same guarded native transaction.
+Permanent history retains every exact row; compatible undo restores category
+identity, metadata, parent relationship and all zero rows, and redo revalidates
+conflicts. A mixed zero/nonzero category refuses without partial removal. Monthly
+monetary projections and rollover semantics remain unchanged. A parent with any child is protected. There
 is no cascade, force flag or financial reassignment. An unused child's target
 metadata is removed; its parent remains explicitly present, including on legacy
 ledgers. All other financial/provider data and existing history are preserved.
@@ -1109,7 +1114,10 @@ WHAB 2.68 adds the optional public `CategoryDeletionInspection` SDK read
 `category_deletion_status(workspace, category_id)` and ledger query
 `category_deletion_status` with `parameters.categoryId`. It reports only the
 addressed child's `deletable` flag, live/deleted/total transaction references and
-assignment count/months/zeroMonths. All months are included; amounts and unrelated
+assignment count/months/zeroMonths and, from WHAB 2.69, nonzeroCount/nonzeroMonths.
+Zero-only rows permit deletion when there are no transaction references; zeroMonths
+identifies exact rows the atomic delete will remove and preserve in history.
+All months are included; amounts and unrelated
 records are excluded. The read changes no revision or history and cannot authorize
 a later deletion. Native deletion rechecks the same core guard atomically.
 SQLite 1.20 and JSON 1.12 implement it; remote storage forwards the public query.

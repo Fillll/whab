@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.68 or newer for the public local-authority and
+This version requires WHAB 2.69 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -10,10 +10,13 @@ Distributed independently as `whab_plugin_sqlite`. Its version and dependency co
 
 ## Reads and atomic mutations
 
-Version 1.19 with WHAB 2.67 implements optional `CategoryDeletion`: core rejects
-all current transaction references (including tombstones), assignment rows
-(including zeros), and groups with children. An approved unused child is deleted
-by its exact workspace/ID inside the native transaction; its empty parent is kept.
+Version 1.21 with WHAB 2.69 implements optional `CategoryDeletion`: core rejects
+all current transaction references (including tombstones), nonzero assignment rows,
+and groups with children. After all guards pass, the exact workspace/child and its
+zero-only assignment rows are deleted inside the same native transaction; its
+empty parent is kept. Any blocker preserves all zero rows. History retains every
+exact removed zero row, restoring it with the category/parent metadata on guarded
+undo and reapplying on redo. Monthly monetary results and rollover rules stay intact.
 Empty parent deletion changes only parent metadata. Financial state, audit history
 and native receipts commit atomically; write failures roll back the deletion. No
 schema migration, financial cascade, bank-mapping change or sync is performed.
@@ -177,7 +180,7 @@ See [the core semantics](../../../../docs/architecture.md#account-lifecycle-and-
 
 ## Category management
 
-This version requires WHAB 2.68+ for optional SDK `CategoryManagement`.
+This version requires WHAB 2.69+ for optional SDK `CategoryManagement`.
 `category_tree(workspace)` includes real empty parents; `add_category_group(workspace,
 name)` creates one; `move_category(workspace, category_id, parent_id)` preserves the
 child ID, target, currency, transaction references and all monthly assignments.
@@ -191,5 +194,7 @@ Use the [simple CLI workflow](../../interface/cli/README.md#category-management)
 
 Read-only `CategoryDeletionInspection.category_deletion_status` returns only the
 addressed child's live/deleted reference counts and every assignment month, including
-zero rows. It uses the same core safety report as atomic deletion; it never erases
-financial records or history. See the CLI `category show` workflow.
+zero rows, plus nonzeroCount/nonzeroMonths. Zero-only rows permit deletion and are
+removed atomically with the child while retained exactly in history. Nonzero rows
+or transaction references block the entire operation. The read itself never erases
+records or history. See the CLI `category show` workflow.

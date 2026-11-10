@@ -767,6 +767,7 @@ class Store(Authority):
     def delete_category(self, workspace, category_id):
         def operation(state):
             delete_category(state, category_id)
+            self.db.execute('DELETE FROM budget WHERE workspace=? AND category_id=? AND assigned=0', (workspace, category_id))
             self.db.execute('DELETE FROM categories WHERE workspace=? AND id=?', (workspace, category_id))
         return self._mutate(workspace, operation)
 
