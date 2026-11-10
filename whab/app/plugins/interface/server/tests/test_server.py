@@ -67,6 +67,7 @@ def test_command_success_replay_conflict_and_validation(store):
 
 def test_storage_failures_are_sanitized():
     class Failed:
+        revision = 'fictional-unchanged'
         def query(self, *args):
             raise RuntimeError("private-server-details")
 
