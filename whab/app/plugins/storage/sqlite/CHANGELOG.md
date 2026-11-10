@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.21.1 — 2026-11-09
+
+PR: [#183](https://github.com/Fillll/whab/pull/183)
+
+- Read connection summaries and individual Items directly under a native read snapshot instead of reconstructing complete financial history. Preserve output shapes, disconnected filtering, protected settings/cursors, read-only compatibility and all saved financial/audit state without a schema change or bank sync.
+
 ## 1.21.0 — 2026-11-09
 
 PR: [#182](https://github.com/Fillll/whab/pull/182)
