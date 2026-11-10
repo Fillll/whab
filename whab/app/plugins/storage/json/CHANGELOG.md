@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.0 — 2026-11-09
+
+PR: [#182](https://github.com/Fillll/whab/pull/182)
+
+- Require core 2.69 and apply zero-only assignment deletion through the existing detached atomic candidate and shared core policy. Preserve exact rows in reversible history and refuse mixed/nonzero or transaction-referenced categories without partial changes.
+
 ## 1.12.0 — 2026-11-09
 
 PR: [#180](https://github.com/Fillll/whab/pull/180)

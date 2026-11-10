@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.69.0 — 2026-11-09
+
+PR: [#182](https://github.com/Fillll/whab/pull/182)
+
+- Allow audited deletion of an unused child with zero-only assignment rows. Preserve every exact removed row in permanent history for compatible undo/redo, while protecting every nonzero assignment and live/deleted transaction reference. Keep monthly monetary results and rollover semantics unchanged.
+
 ## 2.68.1 — 2026-11-09
 
 PR: [#181](https://github.com/Fillll/whab/pull/181)
