@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.14.0 — 2026-11-09
+
+PR: [#180](https://github.com/Fillll/whab/pull/180)
+
+- Add exact name/ID category show with complete deletion blocker counts/months and updated offline help. Report definitive authored refusals separately from uncertain writes, and surface history query errors.
+
 ## 2.13.0 — 2026-11-09
 
 PR: [#179](https://github.com/Fillll/whab/pull/179)

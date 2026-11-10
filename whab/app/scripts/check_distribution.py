@@ -73,6 +73,7 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
              ["fictional", "category", "group", "create", "--help"],
              ["fictional", "category", "create", "--help"],
              ["fictional", "category", "move", "--help"],
+             ["fictional", "category", "show", "--help"],
              ["fictional", "category", "delete", "--help"],
              ["fictional", "category", "group", "delete", "--help"]):
     with redirect_stdout(StringIO()) as output:
