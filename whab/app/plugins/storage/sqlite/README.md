@@ -21,6 +21,13 @@ Empty parent deletion changes only parent metadata. Financial state, audit histo
 and native receipts commit atomically; write failures roll back the deletion. No
 schema migration, financial cascade, bank-mapping change or sync is performed.
 
+Bank connection summaries and single-connection lookups read only the native
+`items` table and workspace metadata under a read snapshot. They do not reconstruct
+transactions, assignments or audit history. Summary results still omit encrypted
+tokens and cursors; the privileged host-only lookup preserves the complete saved
+connection record, including optional sync settings. Disconnected connections stay
+out of summaries. No schema, mutation, synchronization or persistence behavior changes.
+
 Optional bounded register reads count and select under one snapshot, with Unicode casefold search and stable date/ID ordering; additive indexes support paging and account-history checks. Account overview/settings queries read metadata and counts without exporting history. A batch workspace query reads one ledger snapshot for consecutive months. Transaction annotation edits invoke the existing core command and update only the addressed row inside one transaction, preserving receipts, balances, synchronization fields and rollback on error. No persistent financial-page cache is used; later reads see committed changes.
 
 Batch projections share a request-local core index of dated activity instead of preparing full history for each month. Portable exports read allowlisted ledger columns directly and validate them before rebuilding their fresh sanitized database; they omit the three optional register/history indexes from the portable image. Opening that image restores the usual runtime indexes. The saved financial data, receipts, atomic save behavior and compatible legacy exports remain unchanged.

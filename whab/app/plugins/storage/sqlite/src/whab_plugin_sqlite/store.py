@@ -239,18 +239,7 @@ class Store(Authority):
                 state["rolloverModes"].setdefault(row["month"], {})[row["currency"]] = row["mode"]
         if workspace == "personal":
             for row in self.db.execute("SELECT * FROM items"):
-                state["items"][row["id"]] = {
-                    "id": row["id"],
-                    "token": row["token"],
-                    "institutionName": row["institution_name"],
-                    "status": row["status"],
-                    "lastSynced": row["last_synced"],
-                    "error": row["error"],
-                    "cursor": row["cursor"],
-                    "provider": row["provider"],
-                    **({"syncSettings": json.loads(row["sync_settings"])} if "sync_settings" in row.keys() and row["sync_settings"] is not None else {}),
-                    **({"closedAccountCursors": json.loads(row["closed_account_cursors"])} if "closed_account_cursors" in row.keys() and row["closed_account_cursors"] is not None else {}),
-                }
+                state["items"][row["id"]] = self._item_record(row)
         if self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='budget_history'").fetchone():
             row = self.db.execute("SELECT record FROM budget_history WHERE workspace=?", (workspace,)).fetchone()
             if row is not None:
@@ -852,17 +841,30 @@ class Store(Authority):
         )
 
     def items(self) -> list[dict]:
-        return [
-            {
-                key: item.get(key)
-                for key in ("id", "institutionName", "status", "lastSynced", "error")
-            }
-            for item in self.state("personal")["items"].values()
-            if item.get("token")
-        ]
+        with self._snapshot():
+            self._require_workspace("personal")
+            return [
+                {key: row[key] for key in ("id", "institutionName", "status", "lastSynced", "error")}
+                for row in self.db.execute(
+                    'SELECT id,token,institution_name AS institutionName,status,last_synced AS lastSynced,error FROM items ORDER BY rowid'
+                ) if row["token"]
+            ]
+
+    @staticmethod
+    def _item_record(row):
+        return {
+            "id": row["id"], "token": row["token"], "institutionName": row["institution_name"],
+            "status": row["status"], "lastSynced": row["last_synced"], "error": row["error"],
+            "cursor": row["cursor"], "provider": row["provider"],
+            **({"syncSettings": json.loads(row["sync_settings"])} if "sync_settings" in row.keys() and row["sync_settings"] is not None else {}),
+            **({"closedAccountCursors": json.loads(row["closed_account_cursors"])} if "closed_account_cursors" in row.keys() and row["closed_account_cursors"] is not None else {}),
+        }
 
     def get_item(self, item_id: str) -> dict | None:
-        return self.state("personal")["items"].get(item_id)
+        with self._snapshot():
+            self._require_workspace("personal")
+            row = self.db.execute('SELECT * FROM items WHERE id=?', (item_id,)).fetchone()
+            return self._item_record(row) if row is not None else None
 
     def save_item(
         self,

@@ -24,12 +24,17 @@ def create_router(
 ):
     router = APIRouter()
 
-    def public_status():
+    def bank_items(owner, cache):
+        if owner not in cache:
+            cache[owner] = bank_stores[owner].items()
+        return cache[owner]
+
+    def public_status(items_cache=None):
         # Preserve the original status response without constructing a disabled plugin.
         from whab.web.bank_status import public_bank_status
 
         bank = banks.get("plaid")
-        items = bank_stores["plaid"].items() if bank else []
+        items = bank_items("plaid", {} if items_cache is None else items_cache) if bank else []
         status = public_bank_status(bank, environment)
         return {**status, "plaidConfigured": status["configured"], "connectedItems": len(items)}
 
@@ -172,7 +177,8 @@ def create_router(
         if page == "transactions" and selected_ids is None:
             selected_ids = [selected_account["id"]] if selected_account else []
         category_suggestions = service.category_suggestions(workspace, data.get("transactions")) if page == "transactions" else {}
-        status = public_status()
+        request_bank_items = {}
+        status = public_status(request_bank_items)
         try:
             context = ui.build_context(
                 data,
@@ -264,7 +270,7 @@ def create_router(
                 "template": f"banks/{p.id}/{plugins.bank_identity(p.id)}/accounts.html",
                 "asset_prefix": f"{asset_prefix}/banks/{p.id}/{plugins.bank_identity(p.id)}/static",
                 "status": public_bank_status(banks[p.id], environment),
-                "items": bank_stores[p.id].items() if workspace == "personal" else [],
+                "items": bank_items(p.id, request_bank_items) if workspace == "personal" else [],
             }
             for p in plugins.bank_plugins()
             if p.bank_ui and p.id in banks and workspace == "personal"
