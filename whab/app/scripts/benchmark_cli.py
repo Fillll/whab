@@ -9,8 +9,10 @@ import argparse
 import json
 import math
 import os
+import platform
 import subprocess
 import sys
+from importlib.metadata import version
 from pathlib import Path
 from statistics import median
 from tempfile import TemporaryDirectory
@@ -37,11 +39,14 @@ def main():
         env.update(HOME=directory, WHAB_HOME=str(home), WHAB_ENV='sandbox', WHAB_UI='',
                    WHAB_PLUGINS='', WHAB_STORAGE='sqlite', ALLOW_LIVE_PLAID='false')
 
-        def cli(*command, label=None, allow_oversized=False):
+        def cli(*command, label=None, allow_oversized=False, expected_error=None):
             started = perf_counter()
             process = subprocess.run([executable, '--home', str(home), '--environment', 'sandbox', *command],
                                      env=env, capture_output=True, timeout=120)
             elapsed = (perf_counter() - started) * 1000
+            if expected_error is not None:
+                assert process.returncode and expected_error in process.stderr, process.stderr.decode()
+                return None
             if process.returncode and allow_oversized and b'16 MiB' in process.stderr:
                 samples.setdefault(label, []).append(elapsed)
                 return None
@@ -126,13 +131,28 @@ def main():
                             rows.extend(result['data'])
                     assert len(rows) == len({row['id'] for row in rows}) == args.transactions
                     return sorted(rows, key=lambda row: (row['date'], row['id']), reverse=True)
+                def read_history():
+                    entries, cursor = [], None
+                    while True:
+                        page = run(target, 'history', 'list', '--limit', '100',
+                                   *(['--before', cursor] if cursor else []))['data']
+                        entries.extend(page['entries'])
+                        if page['next'] is None:
+                            assert len(entries) == page['total']
+                            return entries
+                        cursor = page['next']
                 transactions = read_all()
+                monthly_ids = {row['id'] for row in transactions if row['date'].startswith('2026-05')}
+                merchant_ids = {row['id'] for row in transactions if 'fixture payee 1001' in row['merchant'].casefold()}
                 for i in range(args.runs):
                     cli(target, 'trnx', 'list', '--help', label='help')
-                    run(target, 'trnx', 'list', '--month', '2026-05', label='monthly list')
+                    monthly = run(target, 'trnx', 'list', '--month', '2026-05', label='monthly list')
+                    assert {row['id'] for row in monthly['data']} == monthly_ids
                     selected = run(target, 'trnx', 'list', '--merchant', 'Fixture payee 1001', label='merchant search')
-                    assert selected['complete']
-                    run(target, 'trnx', 'uncategorized', '--limit', '10', label='uncategorized sample')
+                    assert selected['complete'] and {row['id'] for row in selected['data']} == merchant_ids
+                    uncategorized = run(target, 'trnx', 'uncategorized', '--limit', '10', label='uncategorized sample')
+                    assert uncategorized['total'] == args.transactions - i
+                    assert uncategorized['returned'] == min(10, uncategorized['total'])
                     transaction = transactions[i]
                     change = run(target, 'trnx', 'categorize', transaction['id'], '--category', 'Fixture / Group 56', '--agent', 'Benchmark', label='categorize')
                     run(target, 'account', 'classify', f'Account {i}', '--type', 'depository', '--on-budget', label='classify')
@@ -142,22 +162,31 @@ def main():
                         retry = run(target, 'trnx', 'categorize', transaction['id'], '--category', 'Fixture / Group 56', '--agent', 'Benchmark',
                                     '--revision', change['expectedRevision'], '--request-id', change['requestId'])
                         assert retry == change
+                        first_change, first_transaction = change, transaction
+                        cli(target, 'trnx', 'categorize', transaction['id'], '--clear',
+                            '--revision', change['expectedRevision'], '--request-id', 'fictional-stale-intent',
+                            expected_error=b'Categorization was not confirmed')
                 saved = read_all()
                 by_id = {row['id']: row for row in saved}
                 assert all(by_id[row['id']]['categoryAgent'] == 'Benchmark' for row in transactions[:args.runs])
-                history = run(target, 'history', 'list')['data']
-                assert history['total'] >= 2 * args.runs
+                history = read_history()
+                assert len(history) == 2 * args.runs
                 budget_path = Path(created['path'])
             endpoint = home / 'run/sandbox/host.json'
             deadline = monotonic() + 20
             while endpoint.exists() and monotonic() < deadline:
                 sleep(.1)
             assert not endpoint.exists(), 'Fictional host must stop before reopen'
-            reopened = read_all()
-            assert reopened == saved and budget_path.is_file()
-            classifications = {row['name']: row for row in run(target, 'account', 'list')['data']}
-            assert all(classifications[f'Account {i}']['type'] == 'depository'
-                       and classifications[f'Account {i}']['onBudget'] is True for i in range(args.runs))
+            with local_connection(home, 'sandbox'):
+                reopened = read_all()
+                assert reopened == saved and budget_path.is_file()
+                assert read_history() == history
+                retry = run(target, 'trnx', 'categorize', first_transaction['id'], '--category', 'Fixture / Group 56', '--agent', 'Benchmark',
+                            '--revision', first_change['expectedRevision'], '--request-id', first_change['requestId'])
+                assert retry == first_change
+                classifications = {row['name']: row for row in run(target, 'account', 'list')['data']}
+                assert all(classifications[f'Account {i}']['type'] == 'depository'
+                           and classifications[f'Account {i}']['onBudget'] is True for i in range(args.runs))
             deadline = monotonic() + 20
             while endpoint.exists() and monotonic() < deadline:
                 sleep(.1)
@@ -165,8 +194,12 @@ def main():
             saved_file_bytes = budget_path.stat().st_size
     report = {name: {'n': len(times), 'median_ms': round(median(times), 2),
                      'p95_ms': round(sorted(times)[math.ceil(.95 * len(times)) - 1], 2),
+                     'max_ms': round(max(times), 2),
+                     'samples_ms': [round(value, 2) for value in times],
                      'total_ms': round(sum(times), 2)} for name, times in samples.items()}
-    print(json.dumps({'transactions': args.transactions, 'accounts': accounts, 'runs': args.runs,
+    print(json.dumps({'python': platform.python_version(), 'platform': platform.platform(),
+                      'versions': {name: version(name) for name in ('whab', 'whab_plugin_cli', 'whab_plugin_sqlite')},
+                      'transactions': args.transactions, 'accounts': accounts, 'runs': args.runs,
                       'saved_result_verified': True, 'saved_container_bytes': saved_file_bytes, 'commands': report}, indent=2))
 
 
