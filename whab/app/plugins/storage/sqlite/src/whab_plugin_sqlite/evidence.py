@@ -47,13 +47,13 @@ class SnapshotEncoder:
         key = (self.scope, path)
         cached = self.arrays.get(key)
         if self.selection is None or cached is None or cached['length'] != len(rows):
-            positions = {row['id']: i // 512 for i, row in enumerate(rows)}
-            chunks = [b','.join(self._record(row) for row in rows[i:i + 512]) for i in range(0, len(rows), 512)]
+            positions = {row['id']: i // 64 for i, row in enumerate(rows)}
+            chunks = [b','.join(self._record(row) for row in rows[i:i + 64]) for i in range(0, len(rows), 64)]
         else:
             positions, chunks = cached['positions'], list(cached['chunks'])
             changed = {positions[identifier] for identifier in self.selection if identifier in positions}
             for index in changed:
-                chunks[index] = b','.join(self._record(row) for row in rows[index * 512:(index + 1) * 512])
+                chunks[index] = b','.join(self._record(row) for row in rows[index * 64:(index + 1) * 64])
         self.arrays[key] = {'positions': positions, 'chunks': chunks, 'length': len(rows)}
         parts = [b'[']
         for i, chunk in enumerate(chunks):

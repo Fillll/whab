@@ -484,14 +484,16 @@ class BudgetSession:
                 generated = {prefix + name for name in self.storage_payload_paths}
                 files = {key: value for key, value in self.files.items()
                          if key not in generated and (self.storage_payload_paths or not key.startswith(prefix))}
+                prepared = None
                 export_changes = getattr(self.store, "export_budget_file_changes", None)
                 if callable(export_changes):
-                    from .file_changes import apply_file_changes
+                    from .file_changes import prepare_file_changes
                     previous = {key[len(prefix):]: value for key, value in self.files.items() if key.startswith(prefix)}
                     def payload_digest(name, raw):
                         return self._payload_digest(prefix + name, raw)
                     changes = export_changes("personal", {name: payload_digest(name, raw) for name, raw in previous.items()})
-                    payload = apply_file_changes(previous, changes, digest_file=payload_digest)
+                    prepared = prepare_file_changes(previous, changes, digest_file=payload_digest)
+                    payload = prepared.files
                 else:
                     payload = export_files("personal")
                 if type(payload) is not dict:
@@ -506,7 +508,20 @@ class BudgetSession:
                     profile = {key: value for key, value in self.storage_config.items()
                                if key in {"CLIENT_URL", "CLIENT_TOKEN", "CLIENT_BUDGET_ID"}}
                     blob = encrypt_credentials(self.id, {plugin_id: profile}, password)
-                raw = encode_container(self.manifest, files, credential_blob=blob, compression_cache=self._compression_cache)
+                def encode():
+                    return encode_container(self.manifest, files, credential_blob=blob, compression_cache=self._compression_cache)
+                if prepared is not None and prepared.pending:
+                    from concurrent.futures import ThreadPoolExecutor
+                    # Encoding consumes only bounded opaque bytes in memory. Never
+                    # publish the archive or advance session state before SHA verifies.
+                    with ThreadPoolExecutor(max_workers=1) as executor:
+                        verified = executor.submit(prepared.verify)
+                        try:
+                            raw = encode()
+                        finally:
+                            verified.result()
+                else:
+                    raw = encode()
                 self._validated_bundle = (raw, BudgetContainer(validate_manifest(self.manifest), files, credential_blob=blob))
                 self.files = files
                 self._payload_hashes = {name: value for name, value in self._payload_hashes.items() if name in files}

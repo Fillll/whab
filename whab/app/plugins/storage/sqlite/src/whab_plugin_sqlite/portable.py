@@ -42,6 +42,16 @@ def _incremental_image(store, workspace, cached):
     if getattr(store, '_history_stamp', None) != current_stamp or workspace not in heads:
         return None
     journal = heads[workspace].get('history')
+    result = _build_image(raw, previous, journal, getattr(store, '_portable_history_positions', {}).get(workspace, {}))
+    if result is None:
+        return None
+    raw, hints = result
+    store._portable_history_positions[workspace] = hints
+    return raw
+
+
+def _build_image(raw, previous, journal, hints):
+    """Pure preparation from an already sanitized image and immutable audit rows."""
     entries = journal.get('entries', []) if journal else []
     positions = [i for i, entry in enumerate(entries) if entry['hash'] == previous]
     if len(positions) != 1:
@@ -68,25 +78,85 @@ def _incremental_image(store, workspace, cached):
         from types import SimpleNamespace
 
         from .history_writes import save_history
-        holder = SimpleNamespace(db=clean, _history_blob_positions=getattr(store, '_portable_history_positions', {}).get(workspace, {}))
+        holder = SimpleNamespace(db=clean, _history_blob_positions=dict(hints))
         previous = {**journal, 'entries': entries[:positions[0] + 1]}
         save_history(holder, 'personal', journal, previous, cache_valid=True)
-        store._portable_history_positions[workspace] = holder._history_blob_positions
         clean.commit()
         raw = clean.serialize()
         if len(raw) > MAX_DATABASE_BYTES:
             clean.execute("VACUUM")
             raw = clean.serialize()
-            hint = store._portable_history_positions[workspace]['personal']
+            hint = holder._history_blob_positions['personal']
             rowid = clean.execute("SELECT rowid FROM budget_history WHERE workspace='personal'").fetchone()[0]
-            store._portable_history_positions[workspace]['personal'] = (rowid, *hint[1:])
-        return raw
+            holder._history_blob_positions['personal'] = (rowid, *hint[1:])
+        return raw, holder._history_blob_positions
     finally:
         clean.close()
 
 
+def _prepared_delta(cached, journal, hints, cached_digest):
+    from hashlib import sha256
+    result = _build_image(cached[1], cached[2], journal, hints)
+    if result is None or len(result[0]) > MAX_DATABASE_BYTES:
+        return None
+    raw, hints = result
+    base = cached_digest[1] if cached_digest is not None and cached_digest[0] is cached[1] else sha256(cached[1]).hexdigest()
+    value = sha256(raw).hexdigest()
+    patch = {'name': _FILENAME, 'base': base, 'digest': value, 'size': len(raw),
+             'chunks': _changed_pages(cached[1], raw)}
+    return raw, hints, patch
+
+
+def _changed_pages(previous, raw):
+    if previous is raw:
+        return []
+    return [[offset, raw[offset:offset + 4096]] for offset in range(0, len(raw), 4096)
+            if raw[offset:offset + 4096] != previous[offset:offset + 4096]]
+
+
+def evidence_with_prepared_image(store, metadata, transaction):
+    """Overlap independent SHA work without accessing the source DB in a thread."""
+    selected = transaction.get('selected')
+    workspace = selected[0] if selected is not None else None
+    cached = getattr(store, '_portable_images', {}).get(workspace)
+    journal = transaction['history_after'].get(workspace, {}).get('history')
+    if cached is None or cached[0] != transaction['before_stamp'] or journal is None:
+        return store._current_evidence(metadata)
+    from concurrent.futures import ThreadPoolExecutor
+    hints = dict(getattr(store, '_portable_history_positions', {}).get(workspace, {}))
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        pending = executor.submit(_prepared_delta, cached, journal, hints, getattr(store, '_portable_file_digest', None))
+        evidence = store._current_evidence(metadata)
+        try:
+            prepared = pending.result()
+        except Exception:
+            # This disposable optimization cannot change native commit behavior.
+            prepared = None
+    if prepared is not None:
+        transaction['prepared_portable'] = (workspace, prepared)
+    return evidence
+
+
+def promote_prepared_image(store, transaction, stamp):
+    prepared = transaction.get('prepared_portable')
+    if prepared is None or stamp[1] != transaction['before_stamp'][1]:
+        return
+    workspace, (raw, hints, patch) = prepared
+    head = transaction['history_after'][workspace]['history']['entries'][-1]['hash']
+    store._portable_images[workspace] = (stamp, raw, head)
+    store._portable_history_positions[workspace] = hints
+    store._portable_file_digest = (raw, patch['digest'])
+    store._prepared_portable_changes = (workspace, stamp, patch)
+
+
 def export_file_changes(store, workspace, previous):
     from hashlib import sha256
+    with store._snapshot():
+        stamp = (store.db.total_changes, store.db.execute("PRAGMA data_version").fetchone()[0])
+        prepared = getattr(store, '_prepared_portable_changes', None)
+        if (prepared is not None and prepared[:2] == (workspace, stamp) and type(previous) is dict
+                and previous == {_FILENAME: prepared[2]['base']}):
+            return {'patches': [prepared[2]]}
     old = getattr(store, '_portable_images', {}).get(workspace)
     cached_digest = getattr(store, '_portable_file_digest', None)
     if old is not None and (cached_digest is None or cached_digest[0] is not old[1]):
@@ -98,8 +168,7 @@ def export_file_changes(store, workspace, previous):
     if (type(previous) is not dict or previous.keys() != {_FILENAME} or old is None
             or previous[_FILENAME] != cached_digest[1]):
         return {'files': files}
-    chunks = [[offset, raw[offset:offset + 4096]] for offset in range(0, len(raw), 4096)
-              if raw[offset:offset + 4096] != old[1][offset:offset + 4096]]
+    chunks = _changed_pages(old[1], raw)
     return {'patches': [{'name': _FILENAME, 'base': previous[_FILENAME], 'digest': current_digest,
                          'size': len(raw), 'chunks': chunks}]}
 

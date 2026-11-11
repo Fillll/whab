@@ -362,8 +362,9 @@ class Authority:
                                     empty=False)
                     if transaction["operation"] is not None:
                         operation = transaction["operation"]
+                        from .portable import evidence_with_prepared_image
                         receipt = OperationReceipt(operation.operation_id, operation.fingerprint,
-                                                   canonical_storage_json(transaction["result"]), self._current_evidence(metadata))
+                                                   canonical_storage_json(transaction["result"]), evidence_with_prepared_image(self, metadata, transaction))
                         self.db.execute("INSERT INTO storage_operations(operation_id,generation,record) VALUES(?,?,?)",
                                         (receipt.operation_id, metadata["generation"], canonical_storage_json(receipt_record(receipt))))
                         self.db.execute("DELETE FROM storage_operations WHERE operation_id IN (SELECT operation_id FROM storage_operations ORDER BY generation DESC,operation_id DESC LIMIT -1 OFFSET ?)", (MAX_OPERATION_RECEIPTS,))
@@ -381,6 +382,8 @@ class Authority:
                 if digest_current and committed_stamp[1] == next_history_stamp[1]:
                     self._evidence_stamp = committed_stamp
                     self._native_state_stamp = committed_stamp
+                from .portable import promote_prepared_image
+                promote_prepared_image(self, transaction, committed_stamp)
                 from .merchant_index import promote
                 bounded = transaction.get('selected')
                 if bounded is None and workspace in {'personal', 'demo'} and selected is not None:
@@ -395,6 +398,8 @@ class Authority:
                 self._evidence_stamp = None
                 self._native_state_stamp = None
                 self._history_blob_positions = {}
+                if hasattr(self, '_history_encoder'):
+                    del self._history_encoder
                 if self.db.in_transaction:
                     self.db.execute("ROLLBACK")
                 elif attempted and transaction is not None:

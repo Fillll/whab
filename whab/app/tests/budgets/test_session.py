@@ -1032,3 +1032,57 @@ def test_tracked_storage_retains_noncallable_optional_capabilities_and_invalidat
     with pytest.raises(StoreError):
         tracked.add_account("personal", {"name": "Bad", "type": "unsupported", "balance": 1})
     assert calls == ["committed"]
+
+
+def test_corrupt_patch_never_publishes_encoded_archive_or_session_files(opened, monkeypatch):
+    from hashlib import sha256
+    session, store = opened
+    previous = dict(session.files)
+    bundle = session.path.read_bytes()
+    validated = session._validated_bundle
+    base = previous['plugins/sqlite/budget.sqlite']
+    changes = {'patches': [{'name': 'budget.sqlite', 'base': sha256(base).hexdigest(),
+                            'digest': '0' * 64, 'size': len(base), 'chunks': [[0, b'changed']]}]}
+    monkeypatch.setattr(store, 'export_budget_file_changes', lambda *args: changes)
+    encodings = []
+    encode = module.encode_container
+    def encoded(*args, **kwargs):
+        raw = encode(*args, **kwargs)
+        encodings.append(raw)
+        return raw
+    monkeypatch.setattr(module, 'encode_container', encoded)
+    with pytest.raises(StoreError, match='digest does not match'):
+        session.bundle()
+    assert len(encodings) == 1
+    assert session.files == previous
+    assert session._validated_bundle is validated
+    assert session.path.read_bytes() == bundle
+
+
+def test_failed_encoding_joins_patch_verification_before_return(opened, monkeypatch):
+    from hashlib import sha256
+    from threading import Event
+    session, store = opened
+    base = session.files['plugins/sqlite/budget.sqlite']
+    raw = b'x' + base[1:]
+    changes = {'patches': [{'name': 'budget.sqlite', 'base': sha256(base).hexdigest(),
+                            'digest': sha256(raw).hexdigest(), 'size': len(raw), 'chunks': [[0, b'x']]}]}
+    monkeypatch.setattr(store, 'export_budget_file_changes', lambda *args: changes)
+    encoding_failed, verified = Event(), Event()
+    original_digest = session._payload_digest
+    def digest_file(name, value):
+        if value == raw:
+            assert encoding_failed.wait(5)
+            result = original_digest(name, value)
+            verified.set()
+            return result
+        return original_digest(name, value)
+    def failed_encoding(*args, **kwargs):
+        encoding_failed.set()
+        raise OSError('fictional encoding failure')
+    monkeypatch.setattr(session, '_payload_digest', digest_file)
+    monkeypatch.setattr(module, 'encode_container', failed_encoding)
+    with pytest.raises(OSError, match='fictional encoding failure'):
+        session.bundle()
+    assert verified.is_set()
+    assert session.files['plugins/sqlite/budget.sqlite'] is base

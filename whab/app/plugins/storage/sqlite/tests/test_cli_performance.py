@@ -326,11 +326,10 @@ def test_merchant_index_without_fts_keeps_complete_unicode_results(monkeypatch):
     monkeypatch.setattr(merchant_index, 'connect', lambda *a, **kw: sqlite3.connect(*a, factory=NoFTS, **kw))
     cached = merchant_index.MerchantIndex([('personal', 'one', 'Straße'), ('demo', 'two', 'Straße')], (0, 0))
     try:
-        import json
-        assert json.loads(cached.identifiers('personal', ['STRASSE'])) == ['one']
+        assert cached.identifiers('personal', ['STRASSE']) == ['one']
         cached.update('personal', ['one', 'three'], [('three', 'New 家庭')])
-        assert json.loads(cached.identifiers('personal', ['Straße'])) == []
-        assert json.loads(cached.identifiers('personal', ['家庭'])) == ['three']
+        assert cached.identifiers('personal', ['Straße']) == []
+        assert cached.identifiers('personal', ['家庭']) == ['three']
     finally:
         cached.close()
 
@@ -348,18 +347,17 @@ def test_merchant_index_initialization_propagates_other_sqlite_failures(monkeypa
 
 
 def test_merchant_index_updates_and_deletes_external_content_rows():
-    import json
 
     from whab_plugin_sqlite.merchant_index import MerchantIndex
     cached = MerchantIndex([('personal', 'one', 'Fictional shop')], (0, 0))
     try:
         cached.update('personal', ['one', 'two'], [('one', 'Changed merchant'), ('two', 'Added merchant')])
-        assert set(json.loads(cached.identifiers('personal', ['merchant']))) == {'one', 'two'}
+        assert set(cached.identifiers('personal', ['merchant'])) == {'one', 'two'}
         cached.update('personal', ['one'], [])
-        assert json.loads(cached.identifiers('personal', ['Changed'])) == []
-        assert json.loads(cached.identifiers('personal', ['Added'])) == ['two']
+        assert cached.identifiers('personal', ['Changed']) == []
+        assert cached.identifiers('personal', ['Added']) == ['two']
         cached.update('personal', ['absent'], [])
-        assert json.loads(cached.identifiers('personal', ['Added'])) == ['two']
+        assert cached.identifiers('personal', ['Added']) == ['two']
     finally:
         cached.close()
 
@@ -384,6 +382,7 @@ def test_external_commit_between_native_commit_and_cache_publication_invalidates
     row = store.transactions('personal')[0]
     store.search_transactions('personal', {'merchant': ['shop']})
     cached = store._merchant_index
+    store.export_budget_files()
     original = store.db
     class ExternalCommit:
         armed = True
@@ -402,6 +401,7 @@ def test_external_commit_between_native_commit_and_cache_publication_invalidates
         assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
         assert store.search_transactions('personal', {'merchant': ['Concurrent fictional']})['data'][0]['id'] == row['id']
         assert store._merchant_index is not cached
+        assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
     finally:
         store.db = original
 
@@ -433,7 +433,6 @@ def test_unchanged_legacy_annotation_without_history_keeps_exact_native_evidence
 
 
 def test_trigram_candidates_match_python_casefold_for_unicode_substrings():
-    import json
     import random
 
     from whab_plugin_sqlite.merchant_index import MerchantIndex
@@ -446,7 +445,7 @@ def test_trigram_candidates_match_python_casefold_for_unicode_substrings():
             start = rng.randrange(10)
             for width in (1, 2, 3, 6):
                 needle = merchant[start:start + width]
-                actual = set(json.loads(cached.identifiers('personal', [needle])))
+                actual = set(cached.identifiers('personal', [needle]))
                 expected = {identifier for workspace, identifier, text in rows if workspace == 'personal' and needle.casefold() in text.casefold()}
                 assert actual == expected
     finally:
@@ -467,6 +466,18 @@ def test_sparse_uncategorized_samples_do_not_scan_categorized_history():
         assert result['total'] == result['returned'] == 1
         assert result['data'][0]['merchant'] == 'Only uncategorized'
         assert len(steps) < 50, 'A limited sample must avoid walking categorized rows'
+        store.search_transactions('personal', {'merchant': ['Only uncategorized']})
+        steps.clear()
+        store.db.set_progress_handler(lambda: steps.append(1) or 0, 100)
+        result = store.search_transactions('personal', {'merchant': ['Only uncategorized']})
+        store.db.set_progress_handler(None, 0)
+        assert result['total'] == 1
+        assert result['data'][0]['merchant'] == 'Only uncategorized'
+        assert len(steps) < 50, 'A selective merchant query must avoid walking unrelated rows'
+        broad = store.search_transactions('personal', {'merchant': ['Already categorized']})
+        assert broad['total'] == len(broad['data']) == 5000
+        sample = store.search_transactions('personal', {'merchant': ['Only uncategorized'], 'uncategorized': True, 'limit': 1})
+        assert sample['total'] == sample['returned'] == 1
     finally:
         store.close()
 
@@ -493,3 +504,50 @@ def test_uncategorized_sample_keeps_read_compatibility_without_the_new_runtime_i
     expected = store.search_transactions('personal', {'uncategorized': True, 'limit': 1})
     store.db.execute('DROP INDEX tx_uncategorized_recent')
     assert store.search_transactions('personal', {'uncategorized': True, 'limit': 1}) == expected
+
+
+def test_failed_optional_image_preparation_falls_back_without_affecting_commit(ledger, monkeypatch):
+    store, _ = ledger
+    store.export_budget_files()
+    row = store.transactions('personal')[0]
+    def failed(*args):
+        raise RuntimeError('Fictional preparation failure')
+    with monkeypatch.context() as patch:
+        patch.setattr(portable, '_prepared_delta', failed)
+        execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Still durable'}, 'failed-preparation')
+    assert store.operation_receipt('failed-preparation') is not None
+    assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
+
+
+def test_prepared_image_is_not_promoted_when_native_commit_rolls_back(ledger, monkeypatch):
+    store, _ = ledger
+    old = store.export_budget_files()
+    cached = store._portable_images['personal']
+    row = store.transactions('personal')[0]
+    def fail(*args, **kwargs):
+        raise sqlite3.OperationalError('Fictional metadata failure')
+    with monkeypatch.context() as patch:
+        patch.setattr(store, '_save_authority', fail)
+        with pytest.raises(sqlite3.OperationalError, match='Fictional metadata failure'):
+            execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Rolled back'}, 'rolled-back-preparation')
+    assert store._portable_images['personal'] is cached
+    assert store.operation_receipt('rolled-back-preparation') is None
+    assert portable.read_files(old) == store.export_budget('personal')
+    assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
+    other = next(item for item in store.transactions('personal') if item['id'] != row['id'])
+    execute(store, 'edit_transaction', {'transactionId': other['id'], 'note': 'After rollback'}, 'after-rolled-back-preparation')
+    assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
+
+
+def test_preparation_discards_unchanged_and_oversized_images(ledger, monkeypatch):
+    store, _ = ledger
+    row = store.transactions('personal')[0]
+    store.export_budget_files()
+    execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': ''}, 'unchanged-preparation')
+    assert getattr(store, '_prepared_portable_changes', None) is None
+    store.export_budget_files()
+    with monkeypatch.context() as patch:
+        patch.setattr(portable, 'MAX_DATABASE_BYTES', 1)
+        execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Bounded preparation'}, 'oversized-preparation')
+    assert getattr(store, '_prepared_portable_changes', None) is None
+    assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')

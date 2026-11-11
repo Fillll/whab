@@ -245,7 +245,12 @@ exports reuse a previously sanitized image for supported account/transaction
 edits, apply exact audited changes and update its journal. Unsupported changes or
 unverified source stamps rebuild a fresh validated image. The live database,
 connections and credentials are never copied into a portable image. Checkpoints
-still finish synchronously before the CLI returns.
+still finish synchronously before the CLI returns. For a verified bounded edit,
+a worker prepares the sanitized image from immutable audit rows while the native
+state is hashed. It never reads or writes the live database from that thread.
+Prepared bytes and patches become reusable only after the native commit succeeds
+and its database generation remains current. Rollbacks and outside writes discard
+the preparation.
 
 Audit records remain compatible JSON TEXT. An adaptive whitespace reserve,
 capped at 1 MiB, lets SQLite append entries transactionally through incremental
@@ -258,5 +263,7 @@ blocks for unchanged payload ranges. Files remain ordinary DEFLATE ZIP entries;
 standard ZIP readers and earlier hosts can decompress them. Dictionary resets
 may increase archive size slightly compared with one continuous compression
 stream. The cache is bounded by the current container's expanded size. Checkpoints
-reuse their encoder's validated in-memory container; opening files and checking
+verify the final patched-file SHA while encoding bounded opaque bytes in memory;
+neither the archive nor session state is published until verification finishes.
+They reuse their encoder's validated in-memory container; opening files and checking
 external revisions continue through full container parsing and validation.

@@ -22,10 +22,12 @@ def search_transactions(store, workspace, filters):
             conditions.extend(['date>=?', 'date<?'])
             values.extend([filters['month'] + '-01', filters['month'] + '-32'])
         merchants = filters.get('merchant', [])
+        candidates = None
         if merchants:
             from .merchant_index import selection
             conditions.append('id IN (SELECT value FROM json_each(?))')
-            values.append(selection(store, workspace, merchants))
+            candidates = selection(store, workspace, merchants)
+            values.append(json.dumps(candidates, separators=(',', ':')))
         uncategorized = filters.get('uncategorized', False)
         if uncategorized:
             conditions.append('category_id IS NULL')
@@ -34,11 +36,19 @@ def search_transactions(store, workspace, filters):
         if filters.get('excludeTransfers'):
             conditions.extend(['is_transfer=0', 'inferred_transfer=0'])
         scope = ' WHERE ' + ' AND '.join(conditions)
+        table = 'transactions'
+        if candidates is not None and len(candidates) <= 512:
+            # The date-order index can otherwise walk the entire register before
+            # finding an old merchant. Bound lookup work by the candidate set.
+            table += ' INDEXED BY sqlite_autoindex_transactions_1'
+        elif uncategorized and not merchants and store.db.execute("SELECT 1 FROM sqlite_schema WHERE type='index' AND name='tx_uncategorized_recent'").fetchone():
+            table += ' INDEXED BY tx_uncategorized_recent'
         counts = Counter()
         by_source = Counter()
         by_currency = Counter()
         if uncategorized:
-            for row in store.db.execute('SELECT account_id,source,pending,is_transfer,inferred_transfer,COUNT(*) AS count FROM transactions' + scope + ' GROUP BY account_id,source,pending,is_transfer,inferred_transfer', values):
+            count_table = table if candidates is not None else 'transactions'
+            for row in store.db.execute('SELECT account_id,source,pending,is_transfer,inferred_transfer,COUNT(*) AS count FROM ' + count_table + scope + ' GROUP BY account_id,source,pending,is_transfer,inferred_transfer', values):
                 count = row['count']
                 transfer = bool(row['is_transfer'] or row['inferred_transfer'])
                 counts['total'] += count
@@ -51,9 +61,6 @@ def search_transactions(store, workspace, filters):
         tail = ' ORDER BY date DESC,id DESC' + (' LIMIT ?' if limit is not None else '')
         rows = []
         response_bytes = len(json.dumps(filters, ensure_ascii=False).encode()) + 512
-        table = 'transactions'
-        if uncategorized and not merchants and store.db.execute("SELECT 1 FROM sqlite_schema WHERE type='index' AND name='tx_uncategorized_recent'").fetchone():
-            table += ' INDEXED BY tx_uncategorized_recent'
         for row in store.db.execute('SELECT * FROM ' + table + scope + tail, [*values, *([limit] if limit is not None else [])]):
             account = accounts[row['account_id']]
             category = categories.get(row['category_id'], {})

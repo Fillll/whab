@@ -1,6 +1,5 @@
 """Disposable, revision-bound Unicode merchant index outside the native ledger."""
 
-import json
 from sqlite3 import Error, OperationalError, connect
 from weakref import finalize
 
@@ -40,7 +39,7 @@ class MerchantIndex:
             else:
                 rows = self.db.execute('SELECT transaction_id FROM merchants WHERE workspace=? AND instr(folded,?)>0', (workspace, needle))
             identifiers.update(row[0] for row in rows)
-        return json.dumps(list(identifiers), separators=(',', ':'))
+        return list(identifiers)
 
     def update(self, workspace, identifiers, rows):
         replacements = {identifier: merchant.casefold() for identifier, merchant in rows}

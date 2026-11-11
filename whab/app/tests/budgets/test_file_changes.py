@@ -37,3 +37,12 @@ def test_stale_or_corrupt_patches_fail(update):
     changes['patches'][0].update(update)
     with pytest.raises(StoreError):
         apply_file_changes({'fictional.bin': b'abc'}, changes)
+
+
+def test_patch_segments_zero_fill_growth_and_preserve_identity():
+    base = b'abcdefgh'
+    updated = b'aXcdefgh\0\0Z\0'
+    changes = patch(base, updated, [[1, b'X'], [10, b'Z']])
+    assert apply_file_changes({'fictional.bin': base}, changes)['fictional.bin'] == updated
+    unchanged = patch(base, base, [])
+    assert apply_file_changes({'fictional.bin': base}, unchanged)['fictional.bin'] is base
