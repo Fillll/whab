@@ -479,3 +479,22 @@ def test_archived_only_bank_item_makes_no_provider_request_and_mixed_item_keeps_
     saved=value.tracked.accounts('personal')
     assert next(account for account in saved if account['id']==row['id'])==frozen
     assert next(account for account in saved if account['id']!=row['id'])['balance']==30000
+
+
+def test_metadata_only_setup_never_reads_sync_or_local_transaction_history(setup, monkeypatch):
+    value = setup
+    complete(value, begin(value))
+    value.coordinator.supports_account_metadata = True
+    original = value.provider.call
+    commands = []
+    def call(command, **parameters):
+        commands.append(command)
+        if command == 'read_accounts':
+            return []
+        assert command != 'read_sync'
+        return original(command, **parameters)
+    monkeypatch.setattr(value.provider, 'call', call)
+    # Configuration only needs the account metadata and the explicit selection.
+    monkeypatch.setattr(value.tracked, 'transactions', lambda *_: pytest.fail('Configuration loaded history'))
+    assert run(value.coordinator.configure_sync('fictional-item', []))['configured']
+    assert commands == ['read_accounts']

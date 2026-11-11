@@ -162,8 +162,9 @@ class Authority:
                               metadata["authorityEpoch"], metadata["generation"], metadata["operationId"],
                               metadata["role"], digest)
 
-    def _local_states(self):
-        states = {name: self._read_state(name) for name in ("personal", "demo")}
+    def _local_states(self, selected=None):
+        states = {name: self._read_state(name, transaction_ids=selected[1] if selected is not None and selected[0] == name else None)
+                  for name in ("personal", "demo")}
         for name, state in states.items():
             for row in self.db.execute("SELECT id,item_id,mask FROM accounts WHERE workspace=?", (name,)):
                 state["accounts"][row[0]].update(itemId=row[1], mask=row[2])
@@ -194,8 +195,31 @@ class Authority:
             return False
 
     def _current_evidence(self, metadata=None):
-        financial, protected = encode_local_state(self._local_states(), validate=False)
-        return self._metadata_evidence(metadata or self._authority_metadata(), local_state_digest(financial, protected))
+        stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+        if getattr(self, '_evidence_stamp', None) != stamp:
+            from .evidence import SnapshotEncoder
+            transaction = self._writing
+            selected = transaction.get('selected') if transaction is not None else None
+            reusable = selected is not None and getattr(self, '_native_state_stamp', None) == transaction['before_stamp']
+            states = self._local_states(selected if reusable else None)
+            if reusable:
+                name, identifiers = selected
+                states[name]['transactions'] = {**self._native_states[name]['transactions'], **states[name]['transactions']}
+                # The journal was assembled from immutable snapshots in this transaction.
+                if name in transaction.get('history_after', {}):
+                    journal = transaction['history_after'][name].get('history')
+                    if journal is not None:
+                        states[name]['history'] = journal
+            if not reusable or not hasattr(self, '_snapshot_encoder'):
+                self._snapshot_encoder = SnapshotEncoder()
+            self._snapshot_encoder.begin()
+            financial, protected = encode_local_state(states, validate=False, encoder=self._snapshot_encoder.encode)
+            self._snapshot_encoder.finish()
+            self._native_states = states
+            self._native_state_stamp = stamp
+            self._evidence_digest = local_state_digest(financial, protected)
+            self._evidence_stamp = stamp
+        return self._metadata_evidence(metadata or self._authority_metadata(), self._evidence_digest)
 
     @contextmanager
     def _authority_write(self, *, financial=True, workspace=None, transaction_ids=None):
@@ -217,6 +241,8 @@ class Authority:
                 return
             self._check_authority()
             if self._writing is not None:
+                if workspace in {'personal', 'demo'} and transaction_ids is not None and not self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='trigger' LIMIT 1").fetchone():
+                    self._writing['selected'] = (workspace, tuple(transaction_ids))
                 yield self._writing
                 return
             self.db.execute("BEGIN IMMEDIATE")
@@ -231,11 +257,12 @@ class Authority:
                 self._writing = transaction
                 from .export_reads import snapshot
                 stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+                transaction['before_stamp'] = stamp
                 cached = getattr(self, '_history_heads', {}) if getattr(self, '_history_stamp', None) == stamp else {}
                 names = (workspace,) if type(workspace) is str and workspace in {'personal', 'demo'} else ('personal', 'demo')
                 history_before = {name: cached[name] if name in cached else snapshot(self, name) for name in names if self.db.execute("SELECT 1 FROM meta WHERE workspace=?", (name,)).fetchone()} if financial else {}
                 history_after = dict(cached) if financial else {}
-                selected = (tuple(transaction_ids) if type(transaction_ids) in {tuple, list} and 0 < len(transaction_ids) <= 100 and all(type(key) is str for key in transaction_ids) else None)
+                selected = (tuple(transaction_ids) if type(transaction_ids) in {tuple, list} and 0 <= len(transaction_ids) <= 100 and all(type(key) is str for key in transaction_ids) else None)
                 # User/legacy SQL triggers can touch additional rows; do not use
                 # bounded reads in their presence. Data-version/total-change
                 # checks invalidate cached heads after writes outside this scope.
@@ -243,6 +270,8 @@ class Authority:
                     selected = None
                 yield transaction
                 if transaction["dirty"]:
+                    if transaction.get('selected') is not None:
+                        workspace, selected = transaction['selected']
                     from whab.domain.history import record_financial
                     operation = transaction["operation"]
                     info = getattr(self, '_history_context', None)
@@ -262,12 +291,23 @@ class Authority:
                             new = snapshot(self, name)
                         if not transaction.get("history_restore"):
                             original_journal = new.get("history") or old.get("history")
-                            journal = record_financial(original_journal, old, new, info)
+                            from hashlib import sha256
+
+                            from .evidence import SnapshotEncoder
+                            if not hasattr(self, '_history_encoder') or name not in cached:
+                                self._history_encoder = SnapshotEncoder(ensure_ascii=True)
+                            self._history_encoder.begin()
+                            def digest_snapshot(value):
+                                from whab.plugins.storage_transfer import MAX_LOCAL_TRANSFER_BYTES
+                                return sha256(self._history_encoder.encode(value, limit=MAX_LOCAL_TRANSFER_BYTES)).hexdigest()
+                            journal = record_financial(original_journal, old, new, info, digest_snapshot=digest_snapshot)
+                            self._history_encoder.finish()
                             if journal is not None:
                                 new["history"] = journal
                                 if journal is not original_journal:
                                     self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (name, json.dumps(journal)))
                         history_after[name] = new
+                    transaction['history_after'] = history_after
                     metadata.update(generation=metadata["generation"] + 1,
                                     operationId=transaction["operation"].operation_id if transaction["operation"] is not None else str(uuid4()),
                                     empty=False)
@@ -283,10 +323,19 @@ class Authority:
                     self._save_authority(metadata)
                 attempted = True
                 next_history_stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+                digest_current = getattr(self, '_evidence_stamp', None) == (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+                # Authority metadata and receipts are outside the logical state digest.
+                if transaction["dirty"] and transaction["receipt"] is not None and not self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='trigger' LIMIT 1").fetchone():
+                    digest_current = True
                 self.db.execute("COMMIT")
+                if digest_current:
+                    self._evidence_stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+                    self._native_state_stamp = self._evidence_stamp
                 self._history_heads = history_after
                 self._history_stamp = next_history_stamp
             except BaseException as error:
+                self._evidence_stamp = None
+                self._native_state_stamp = None
                 if self.db.in_transaction:
                     self.db.execute("ROLLBACK")
                 elif attempted and transaction is not None:

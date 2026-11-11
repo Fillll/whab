@@ -6,6 +6,23 @@ from collections import Counter
 from whab.plugins import format_money
 
 
+def optimized_read(connection, identifier, prefix, params, exchange, error):
+    try:
+        result = exchange(connection, "GET", prefix + "/transaction-search", params=params, ledger_errors=True)
+    except error as failure:
+        if getattr(failure, "status_code", None) == 404:
+            return None
+        raise
+    if type(result) is not dict or result.get("budgetId") != identifier or not result.get("revision") or type(result.get("data")) is not list:
+        raise error("WHAB returned another budget or an invalid response.")
+    total, returned = result.get("total"), result.get("returned")
+    if type(total) is not int or type(returned) is not int or total < returned or returned != len(result["data"]):
+        raise error("WHAB returned incomplete transaction counts.")
+    if params.get("uncategorized") != "true" and (result.get("complete") is not True or total != returned):
+        raise error("WHAB returned incomplete transaction matches.")
+    return result
+
+
 def positive_limit(value):
     count = int(value)
     if count < 1:

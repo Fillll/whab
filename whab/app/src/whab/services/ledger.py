@@ -180,6 +180,15 @@ class LedgerService:
         if type(workspace) is not str or workspace not in {"demo", "personal"}:
             raise StoreError("Invalid workspace.")
 
+    def search_transactions(self, workspace, filters):
+        self._workspace(workspace)
+        with self._lock:
+            callback = getattr(self._store, "search_transactions", None)
+            if not callable(callback):
+                return None
+            return {"budgetId": self.budget_id, "revision": self._revision,
+                    **_public(callback(workspace, filters))}
+
     def query(self, operation: str, workspace: str, month: str | None = None, *, parameters=None) -> dict:
         self._workspace(workspace)
         if month is not None:

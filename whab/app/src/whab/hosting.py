@@ -4,7 +4,6 @@ This module manages processes, never financial data. A failed command is never
 replayed. The existing storage authority remains the final budget writer fence.
 """
 
-import asyncio
 import json
 import os
 import secrets
@@ -18,10 +17,11 @@ from pathlib import Path
 from threading import RLock
 from time import monotonic
 from urllib.parse import urlsplit
+lazy import asyncio
 
 import httpx
 
-from whab.budgets.document import atomic_write
+lazy from whab.budgets.document import atomic_write
 
 _OWNER = None
 _STARTUP_SECONDS = 90

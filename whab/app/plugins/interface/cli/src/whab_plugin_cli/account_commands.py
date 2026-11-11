@@ -4,7 +4,7 @@ import argparse
 import json
 from uuid import uuid4
 
-import httpx
+lazy import httpx
 
 from whab.plugins import ACCOUNT_SUBTYPES, ACCOUNT_TYPES, StoreError, normalize_account
 from whab.plugins.documentation import operation

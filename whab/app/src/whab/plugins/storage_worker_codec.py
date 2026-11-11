@@ -44,6 +44,8 @@ METHODS = {
     "prepare_existing": (("workspace", "files"), {}),
     "category_tree": (("workspace",), {}),
     "accounts": (("workspace",), {}), "categories": (("workspace",), {}),
+    "account_latest_dates": (("workspace",), {}),
+    "search_transactions": (("workspace", "filters"), {}),
     "transactions": (("workspace",), {"month": None}),
     "workspace": (("workspace",), {"month": None}),
     "workspace_periods": (("workspace", "month", "count"), {}),

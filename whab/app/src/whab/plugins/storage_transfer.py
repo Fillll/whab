@@ -607,7 +607,7 @@ def decode_local_state(financial, protected):
     return states
 
 
-def encode_local_state(states, *, validate=True):
+def encode_local_state(states, *, validate=True, encoder=canonical_storage_json):
     """Canonical complete payloads from plain adapter state.
 
     ``validate=False`` is exclusively for native evidence over already-trusted
@@ -630,7 +630,7 @@ def encode_local_state(states, *, validate=True):
                 for account in state["accounts"].values()
             ], key=lambda row: row["accountId"]),
         }
-    bodies = tuple(canonical_storage_json({"formatVersion": 1, "workspaces": value},
+    bodies = tuple(encoder({"formatVersion": 1, "workspaces": value},
                                          limit=MAX_LOCAL_TRANSFER_BYTES)
                    for value in (financial, protected))
     if sum(map(len, bodies)) > MAX_LOCAL_TRANSFER_BYTES:

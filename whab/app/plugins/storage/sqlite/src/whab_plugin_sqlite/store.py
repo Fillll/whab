@@ -43,7 +43,6 @@ from whab.domain.transactions import (
     UNSET,
     category_agent_fields,
     public_transaction,
-    transaction_rows,
 )
 from whab.domain.validation import validate_label
 
@@ -177,7 +176,7 @@ class Store(Authority):
         with self._snapshot():
             return self._read_state(workspace)
 
-    def _read_state(self, workspace: str) -> dict:
+    def _read_state(self, workspace: str, *, transaction_ids=None) -> dict:
         meta = self.db.execute("SELECT * FROM meta WHERE workspace=?", (workspace,)).fetchone()
         if not meta:
             raise StoreError("Workspace not found.")
@@ -206,7 +205,7 @@ class Store(Authority):
                 "currency": row["currency"],
             }
         for row in self.db.execute(
-            "SELECT * FROM transactions WHERE workspace=? ORDER BY rowid", (workspace,)
+            "SELECT * FROM transactions WHERE workspace=? " + ("AND id IN (" + ",".join("?" for _ in transaction_ids) + ") " if transaction_ids is not None else "") + "ORDER BY rowid", (workspace, *(transaction_ids or ()))
         ):
             state["transactions"][row["id"]] = {
                 "id": row["id"],
@@ -723,8 +722,18 @@ class Store(Authority):
             transaction.update(workspace=workspace, history_operation="delete_receipt")
             transaction["dirty"] = True
 
+    def account_latest_dates(self, workspace):
+        with self._snapshot():
+            self._require_workspace(workspace)
+            return {row[0]: row[1] for row in self.db.execute(
+                "SELECT account_id,MAX(date) FROM transactions WHERE workspace=? AND deleted=0 GROUP BY account_id", (workspace,))}
+
+    def search_transactions(self, workspace, filters):
+        from .search import search_transactions
+        return search_transactions(self, workspace, filters)
+
     def transactions(self, workspace: str, month: str | None = None) -> list[dict]:
-        return transaction_rows(self.state(workspace), month)
+        return [public_transaction(row) for row in self.search_transactions(workspace, {"month": month})["data"]]
 
     def workspace(self, workspace: str, month: str | None = None) -> dict:
         from .projection_reads import snapshot
@@ -743,7 +752,16 @@ class Store(Authority):
         return self._mutate(workspace, lambda state: commands.add_account(state, account_id, account))
 
     def update_account(self, workspace: str, account_id: str, changes: dict) -> None:
-        self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
+        if type(changes) is not dict or changes.keys() & {"currency", "closed"}:
+            self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
+            return
+        with self._authority_write(workspace=workspace, transaction_ids=()) as write:
+            state = {"accounts": {row["id"]: row for row in self._read_accounts(workspace)}, "transactions": {}}
+            commands.update_account(state, account_id, changes)
+            row = state["accounts"][account_id]
+            self.db.execute("UPDATE accounts SET name=?,type=?,on_budget=?,subtype=?,bank_website=?,name_overridden=? WHERE workspace=? AND id=?",
+                            (row["name"], row["type"], int(row["onBudget"]), row["subtype"], row.get("bankWebsite"), int(row.get("nameOverridden", False)), workspace, account_id))
+            write.update(dirty=True, workspace=workspace, history_operation="update_account")
 
     def supports_category_deletion(self):
         return True

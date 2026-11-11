@@ -1,5 +1,6 @@
 """SQLite-owned portable images, rebuilt from validated ledger data only."""
 
+import json
 import sqlite3
 from collections.abc import Mapping
 from itertools import combinations
@@ -33,9 +34,59 @@ def _without_additive_columns(schema):
             else row for row in schema]
 
 
+def _incremental_image(store, workspace, cached):
+    stamp, raw, previous = cached
+    heads = getattr(store, '_history_heads', {})
+    current_stamp = (store.db.total_changes, store.db.execute("PRAGMA data_version").fetchone()[0])
+    if stamp == current_stamp:
+        return raw
+    if getattr(store, '_history_stamp', None) != current_stamp or workspace not in heads:
+        return None
+    journal = heads[workspace].get('history')
+    entries = journal.get('entries', []) if journal else []
+    positions = [i for i, entry in enumerate(entries) if entry['hash'] == previous]
+    if len(positions) != 1:
+        return None
+    changes = entries[positions[0] + 1:]
+    if not changes or any(entry['operation'] not in {'edit_transaction', 'edit_transaction_details', 'update_account'}
+                          or any(change['path'][0] not in {'accounts', 'transactions'} or change['before'] is None or change['after'] is None
+                                 for change in entry['changes']) for entry in changes):
+        return None
+    # Deserialize only an image previously built from allowlisted, validated data.
+    # The private source database is never copied into a portable image.
+    clean = sqlite3.connect(':memory:')
+    try:
+        clean.deserialize(raw)
+        for entry in changes:
+            for change in entry['changes']:
+                row = change['after']
+                if change['path'][0] == 'accounts':
+                    clean.execute("UPDATE accounts SET name=?,type=?,balance=?,currency=?,on_budget=?,subtype=?,bank_website=?,name_overridden=?,closed=? WHERE workspace=? AND id=?",
+                                  (row['name'], row['type'], row['balance'], row['currency'], int(row['onBudget']), row['subtype'], row.get('bankWebsite'), int(row.get('nameOverridden', False)), int(row.get('closed', False)), workspace, row['id']))
+                else:
+                    clean.execute("UPDATE transactions SET account_id=?,date=?,merchant=?,merchant_logo=?,amount=?,category_id=?,pending=?,reviewed=?,source=?,note=?,is_transfer=?,inferred_transfer=?,category_edited=?,deleted=?,original_details=?,category_agent=? WHERE workspace=? AND id=?",
+                                  (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), workspace, row['id']))
+        clean.execute("UPDATE budget_history SET record=? WHERE workspace=?", (json.dumps(journal), workspace))
+        clean.commit()
+        return clean.serialize()
+    finally:
+        clean.close()
+
+
 def export_files(store, workspace):
     """Serialize a fresh database that has never contained connection credentials."""
     with store._snapshot():
+        stamp = (store.db.total_changes, store.db.execute("PRAGMA data_version").fetchone()[0])
+        cached = getattr(store, '_portable_images', {}).get(workspace)
+        if cached is not None:
+            raw = _incremental_image(store, workspace, cached)
+            if raw is not None:
+                if len(raw) > MAX_DATABASE_BYTES:
+                    raise StoreError("This SQLite budget exceeds the portable database size limit.")
+                journal = getattr(store, '_history_heads', {}).get(workspace, {}).get('history')
+                head = journal['entries'][-1]['hash'] if journal and journal['entries'] else cached[2]
+                store._portable_images[workspace] = (stamp, raw, head)
+                return {_FILENAME: raw}
         snapshot = store.export_budget(workspace)
         images = [(transaction_id, store.get_receipt(workspace, transaction_id)) for transaction_id in store.receipt_ids(workspace)]
     clean = Store(":memory:", month=snapshot["budgetStartMonth"], _authority=False)
@@ -63,6 +114,11 @@ def export_files(store, workspace):
         raw = clean.db.serialize()
         if len(raw) > MAX_DATABASE_BYTES:
             raise StoreError("This SQLite budget exceeds the portable database size limit.")
+        journal = snapshot.get('history')
+        head = journal['entries'][-1]['hash'] if journal and journal['entries'] else None
+        if not hasattr(store, '_portable_images'):
+            store._portable_images = {}
+        store._portable_images[workspace] = (stamp, raw, head)
         return {_FILENAME: raw}
     finally:
         clean.close()

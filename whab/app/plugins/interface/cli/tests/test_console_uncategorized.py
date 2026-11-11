@@ -32,6 +32,8 @@ def uncategorized_transport(monkeypatch, tmp_path):
              'transaction_budget': 'budget-a', 'transaction_revision': 'revision-one'}
 
     def respond(request):
+        if request.url.path.endswith("/transaction-search"):
+            return httpx.Response(404)
         calls.append(request)
         assert request.method == 'GET'
         if request.url.path.endswith('/budgets'):

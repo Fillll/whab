@@ -114,6 +114,36 @@ def create_router(app):
         current_owner().release(identifier)
         return {"ok": True}
 
+    @router.get("/transaction-search")
+    async def transaction_search(request: Request, workspace: Literal["personal", "demo"] = "personal"):
+        from whab.domain.errors import StoreError
+        from whab.domain.validation import validate_date, validate_month
+        values = request.query_params
+        filters = {name: values.get(name) for name in ("since", "until", "month")}
+        filters["merchant"] = values.getlist("merchant")
+        try:
+            for name in ("since", "until"):
+                if filters[name] is not None:
+                    validate_date(filters[name])
+            if filters["month"] is not None:
+                validate_month(filters["month"])
+            if filters["since"] and filters["until"] and filters["since"] > filters["until"]:
+                raise ValueError("Invalid date range.")
+            if len(filters["merchant"]) > 100 or any(not text.strip() or len(text) > 1000 for text in filters["merchant"]):
+                raise ValueError("Invalid merchant selection.")
+            for name in ("uncategorized", "posted", "excludeTransfers"):
+                if values.get(name, "false") not in {"true", "false"}:
+                    raise ValueError("Invalid transaction filter.")
+                filters[name] = values.get(name) == "true"
+            filters["limit"] = int(values["limit"]) if "limit" in values else None
+            if filters["limit"] is not None and (filters["limit"] < 1 or not filters["uncategorized"]):
+                raise ValueError("Invalid transaction limit.")
+        except (ValueError, StoreError) as error:
+            raise HTTPException(400, str(error)) from None
+        async with app.state.budget_runtime.request():
+            selected = binding()
+            return await run_in_threadpool(selected.search_transactions, selected.context.budget_id, workspace, filters)
+
     @router.get("/queries/{operation}")
     async def query(operation: str, workspace: Literal["personal", "demo"] = "personal", month: str | None = None):
         async with app.state.budget_runtime.request():

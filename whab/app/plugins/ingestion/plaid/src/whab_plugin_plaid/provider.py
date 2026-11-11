@@ -76,6 +76,15 @@ class PlaidProvider(PlaidService):
         except (PlaidRemoteError, KeyError):
             raise ProviderFailure('transport') from None
 
+    async def read_accounts(self, item_id, access_token, institution_name):
+        from .mapping import normalize_account
+        self.require_configured()
+        try:
+            result = await self._call('/accounts/get', {'access_token': access_token})
+            return [normalize_account(account, item_id, institution_name) for account in result['accounts']]
+        except (PlaidRemoteError, KeyError):
+            raise ProviderFailure('transport') from None
+
     async def read_sync(self, item_id, access_token, cursor, institution_name):
         self.store, self._access_token = _SyncData(item_id, cursor, institution_name), access_token
         try:

@@ -67,6 +67,13 @@ class BoundRemoteInterface:
         if identifier != self.context.budget_id:
             raise HTTPException(404, "Budget not found.")
 
+    def search_transactions(self, identifier, workspace, filters):
+        self.check_budget(identifier)
+        result = self.context.service.search_transactions(workspace, filters)
+        if result is None:
+            raise HTTPException(404, "Filtered transaction reads are unavailable.")
+        return result
+
     def query(self, identifier, operation, workspace, month, parameters=None):
         from whab.domain.errors import StoreError
 

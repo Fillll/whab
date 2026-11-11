@@ -36,6 +36,8 @@ def search_transport(monkeypatch, tmp_path):
     calls = []
 
     def respond(request):
+        if request.url.path.endswith("/transaction-search"):
+            return httpx.Response(404)
         calls.append(request)
         assert request.method == "GET", "Search may not mutate or sync"
         if request.url.path.endswith("/budgets"):
@@ -199,3 +201,24 @@ def test_help_and_packaged_search_schema_are_offline(search_transport, capsys, m
     for text in ["inclusive", "literal substring", "OR", "reviewed and", "refunds", "complete=true", "16 MiB", "--month",
                  "No fuzzy", "Never combine currencies", "categorize TRANSACTION_ID", "persistent future categorization rule", "Help is offline"]:
         assert text.lower() in output.lower()
+
+
+@pytest.mark.parametrize('bad', [None, [], {'budgetId': 'foreign', 'revision': 'one', 'data': []},
+                              {'budgetId': 'budget-a', 'revision': None, 'data': []}])
+def test_optimized_read_rejects_foreign_or_malformed_envelopes(monkeypatch, bad):
+    from whab_plugin_cli.transaction_reads import optimized_read
+    with pytest.raises(console.CommandError):
+        optimized_read(None, 'budget-a', '/fixture', {}, lambda *a, **kw: bad, console.CommandError)
+
+
+def test_optimized_selection_is_one_coherent_read(monkeypatch, tmp_path, capsys):
+    from whab_plugin_cli.transaction_reads import optimized_read
+    expected = {'budgetId': 'budget-a', 'revision': 'one', 'complete': True, 'total': 1, 'returned': 1,
+                'data': [transaction('selected')], 'filters': {}}
+    assert optimized_read(None, 'budget-a', '/fixture', {}, lambda *a, **kw: expected, console.CommandError) == expected
+    def fail(*a, **kw):
+        error = console.CommandError('Provider unavailable')
+        error.status_code = 503
+        raise error
+    with pytest.raises(console.CommandError, match='unavailable'):
+        optimized_read(None, 'budget-a', '/fixture', {}, fail, console.CommandError)

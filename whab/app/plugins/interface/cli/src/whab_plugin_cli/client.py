@@ -8,7 +8,7 @@ import sys
 from copy import copy
 from urllib.parse import quote, urlsplit
 
-import httpx
+lazy import httpx
 
 from whab.plugins import validate_category_agent
 from whab.plugins.documentation import core_document, installed_catalog

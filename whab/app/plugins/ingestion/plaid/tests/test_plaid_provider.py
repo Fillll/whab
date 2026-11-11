@@ -165,3 +165,31 @@ def test_profile_webhooks_keep_provider_account_routing(plaid_env, plaid_client,
             assert provider.env.get('PLAID_WEBHOOK_URL') == expected
             await provider.close()
     asyncio.run(scenario())
+
+
+def test_account_metadata_never_fetches_transaction_history(plaid_env, plaid_client, bank_account):
+    calls = []
+    def transport(request):
+        calls.append(request.url.path)
+        assert request.url.path == '/accounts/get'
+        return httpx.Response(200, json={'accounts': [bank_account()]})
+    async def scenario():
+        async with plaid_client(transport) as client:
+            provider = PlaidProvider(context(plaid_env), client)
+            rows = await provider.read_accounts('item', 'fictional-access', 'Fictional bank')
+            assert rows[0]['itemId'] == 'item' and rows[0]['source'] == 'plaid'
+            assert provider._access_token is None
+            await provider.close()
+    asyncio.run(scenario())
+    assert calls == ['/accounts/get']
+
+
+@pytest.mark.parametrize('response', [httpx.Response(503, json={}), httpx.Response(200, json={})])
+def test_account_metadata_transport_and_missing_fields_are_bounded(plaid_env, plaid_client, response):
+    async def scenario():
+        async with plaid_client(lambda _: response) as client:
+            provider = PlaidProvider(context(plaid_env), client)
+            with pytest.raises(ProviderFailure, match=''):
+                await provider.read_accounts('item', 'fictional-access', 'Fictional bank')
+            await provider.close()
+    asyncio.run(scenario())

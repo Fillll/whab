@@ -9,12 +9,11 @@ import sys
 from pathlib import Path
 from urllib.parse import quote
 
-import httpx
+lazy import httpx
 
 from whab.plugins.documentation import installed_catalog
-from whab.plugins.local import local_connection
+lazy from whab.plugins.local import local_connection
 
-from . import client
 from .account_commands import account_table, add_account_parser, execute_account
 from .bank_commands import add_bank_parser, bank_error, bank_request
 from .category_commands import add_category_parser, category_table, execute_categories
@@ -24,8 +23,14 @@ from .help import AGENT_WORKFLOW, account_classification, bank_help, describe, i
 from .history_commands import add_history_parser, execute_history
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 from .transaction_commands import add_category_parsers, execute_category
-from .transaction_reads import add_uncategorized_parser, transaction_table, uncategorized_report
+from .transaction_reads import (
+    add_uncategorized_parser,
+    optimized_read,
+    transaction_table,
+    uncategorized_report,
+)
 from .transaction_search import add_search_parser, execute_search, search_table, validate_search
+lazy from . import client
 
 PREFIX = "/api/local/v1"
 ROOT_COMMANDS = {"budget", "plugin", "api", "BUDGET"}
@@ -36,7 +41,8 @@ class CommandError(ValueError):
 
 
 def parser(options, argv=()):
-    catalog = installed_catalog()
+    selected = None if any(token in argv for token in ("bank", "import", "plugin")) else {"cli"}
+    catalog = installed_catalog(document_plugins=selected)
     check_identifiers(catalog)
     root = argparse.ArgumentParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
@@ -221,6 +227,13 @@ def execute(args, home, environment, ca):
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
         if args.command in {"transactions", "trnx"} and args.filter == "list":
             return execute_search(connection, identifier, prefix, args, exchange, CommandError)
+        if args.command in {"transactions", "trnx"} and args.filter in {"uncategorized", "uncategorised"}:
+            params = {"workspace": "personal", "uncategorized": "true",
+                      "posted": str(args.posted).lower(), "excludeTransfers": str(args.exclude_transfers).lower(),
+                      **({"month": args.month} if args.month else {}), **({"limit": args.limit} if args.limit else {})}
+            selected = optimized_read(connection, identifier, prefix, params, exchange, CommandError)
+            if selected is not None:
+                return selected
         if args.command in {"transactions", "trnx"} and args.filter in {"categories", "categorize", "categorise"}:
             return execute_category(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "category":
@@ -286,6 +299,8 @@ def main(argv=None):
         else:
             print(json.dumps(result, allow_nan=False))
         return 0
+    except SystemExit:
+        raise
     except (CommandError, ConfigError) as error:
         print(json.dumps({"error": str(error)}), file=sys.stderr)
         return 1

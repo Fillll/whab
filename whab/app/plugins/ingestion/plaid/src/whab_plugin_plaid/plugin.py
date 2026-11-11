@@ -31,7 +31,7 @@ assets = Path(__file__).parent
 plugin = Plugin(
     id="plaid",
     display_name="Plaid",
-    bank=BankAdapter(create_provider, sync_interval_seconds=3600, requires_account_setup=True, supports_investments=True,
+    bank=BankAdapter(create_provider, sync_interval_seconds=3600, requires_account_setup=True, supports_investments=True, supports_account_metadata=True,
                      credential_identity_keys=('PLAID_CLIENT_ID',)),
     bank_ui=BankUI(templates=assets / "templates", static=assets / "static"),
     merchant_logos=MerchantLogos(fetch=fetch),

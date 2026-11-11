@@ -179,7 +179,7 @@ def validate_history(value):
     return {'formatVersion': 1, 'baseline': baseline, 'entries': deepcopy(value['entries'])}
 
 
-def append(journal, before, after, metadata=None, *, trusted=False, before_digest=None):
+def append(journal, before, after, metadata=None, *, trusted=False, before_digest=None, after_digest=None):
     if not trusted:
         before, after = financial(before), financial(after)
     changes = difference(before, after)
@@ -189,7 +189,7 @@ def append(journal, before, after, metadata=None, *, trusted=False, before_diges
     journal = {**journal, 'entries': list(journal['entries'])} if journal else {'formatVersion': 1, 'baseline': deepcopy(before), 'entries': []}
     before_digest = before_digest or digest(before)
     entry = {'id': str(uuid4()), 'time': datetime.now(timezone.utc).isoformat(), **info,
-             'changes': changes, 'beforeDigest': before_digest, 'afterDigest': digest(after),
+             'changes': changes, 'beforeDigest': before_digest, 'afterDigest': after_digest or digest(after),
              'reversible': info['operation'] in REVERSIBLE,
              'previousHash': journal['entries'][-1]['hash'] if journal['entries'] else before_digest}
     if info['action'] == 'snapshot' or (len(journal['entries']) + 1) % 1000 == 0:
@@ -330,7 +330,7 @@ def apply_to_state(state, wanted):
         state['categoryGroups'] = candidate['categoryGroups']
 
 
-def record_financial(journal, before, after, metadata=None):
+def record_financial(journal, before, after, metadata=None, *, digest_snapshot=digest):
     """Commit adapters supply detached allowlisted snapshots from one native transaction."""
     info = context(metadata)
     old, new = financial(before, trusted=True), financial(after, trusted=True)
@@ -342,11 +342,11 @@ def record_financial(journal, before, after, metadata=None):
     if journal:
         last = journal['entries'][-1] if journal['entries'] else None
         expected = last['afterDigest'] if last else digest(journal['baseline'])
-        old_digest = digest(old)
+        old_digest = digest_snapshot(old)
         if old_digest != expected:
             previous = snapshot_at(journal, last['id'] if last else 'baseline')
             journal = append(journal, previous, old, {'actor': 'System', 'actorKind': 'system', 'operation': 'import_workspace'})
-    return append(journal, old, new, info, trusted=True, before_digest=old_digest)
+    return append(journal, old, new, info, trusted=True, before_digest=old_digest, after_digest=digest_snapshot(new))
 
 
 def record_states(before, after, metadata=None):
