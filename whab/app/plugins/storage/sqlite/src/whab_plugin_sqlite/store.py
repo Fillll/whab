@@ -114,6 +114,9 @@ class Store(Authority):
         self.db.row_factory = sqlite3.Row
         if self.database_path != ":memory:":
             os.chmod(self.database_path, 0o600)
+            # Retain overflow pages of the audited baseline between bounded edits.
+            # This is a per-connection RAM recommendation, never a durability mode.
+            self.db.execute("PRAGMA cache_size=-65536")
         selected_month = month or current_month()
         initialize_schema(self.db, selected_month)
         for workspace in ("demo", "personal"):

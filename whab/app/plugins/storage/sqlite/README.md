@@ -253,6 +253,11 @@ Prepared bytes and patches become reusable only after the native commit succeeds
 and its database generation remains current. Rollbacks and outside writes discard
 the preparation.
 
+Writable native file connections recommend a 64 MiB SQLite page cache, allocated
+on demand, so repeated audit appends can reuse overflow pages. This uses more
+process memory on populated budgets without changing journal or sync guarantees.
+In-memory portable builders and read-only connections retain their prior setting.
+
 Audit records remain compatible JSON TEXT. An adaptive whitespace reserve,
 capped at 1 MiB, lets SQLite append entries transactionally through incremental
 blob writes without repeatedly reallocating a large immutable baseline. Larger
