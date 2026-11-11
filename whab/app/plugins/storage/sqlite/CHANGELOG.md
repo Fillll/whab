@@ -6,6 +6,8 @@ PR: [#184](https://github.com/Fillll/whab/pull/184)
 
 - Select transaction matches/counts in SQLite and aggregate account history dates. Reuse generation-verified evidence and immutable canonical records, update classifications directly and append audit JSON transactionally without rewriting its baseline. Incrementally update sanitized portable images and send verified file patches, with full rebuilds after unsupported or external changes.
 
+- Reuse canonical native views and transaction positions for bounded edits, preserving exact evidence/audit digests. Index Unicode merchant text in a disposable revision-bound in-memory index; rebuild after untracked writes and retain a non-FTS fallback.
+
 ## 1.21.1 — 2026-11-09
 
 PR: [#183](https://github.com/Fillll/whab/pull/183)

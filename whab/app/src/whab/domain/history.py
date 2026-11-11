@@ -77,14 +77,14 @@ def context(value=None, *, operation='change'):
     return result
 
 
-def financial(snapshot, *, trusted=False):
+def financial(snapshot, *, trusted=False, transactions_sorted=False):
     if type(snapshot) is not dict:
         raise StoreError('Invalid financial snapshot.')
     result = {k: v if trusted else deepcopy(v) for k, v in snapshot.items() if k != 'history'}
     if not trusted:
         result = validate_portable_budget(result)
     for section, fields in _COLLECTIONS.items():
-        if section in result:
+        if section in result and not (trusted and transactions_sorted and section == 'transactions'):
             result[section].sort(key=itemgetter(*fields))
     return result
 
@@ -330,11 +330,12 @@ def apply_to_state(state, wanted):
         state['categoryGroups'] = candidate['categoryGroups']
 
 
-def record_financial(journal, before, after, metadata=None, *, digest_snapshot=digest, changes=None):
+def record_financial(journal, before, after, metadata=None, *, digest_snapshot=digest, changes=None, transactions_sorted=False):
     """Commit adapters supply detached allowlisted snapshots from one native transaction."""
     info = context(metadata)
-    old, new = financial(before, trusted=True), financial(after, trusted=True)
-    if old == new and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
+    old, new = (financial(value, trusted=True, transactions_sorted=transactions_sorted) for value in (before, after))
+    unchanged = not changes if changes is not None else old == new
+    if unchanged and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
         return journal
     # Pristine restores preserve their incoming journal. Reconcile any deliberate
     # provider detachment or external edit when the first new change is made.

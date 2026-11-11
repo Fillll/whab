@@ -199,3 +199,16 @@ def test_planning_reversal_cannot_overcommit_funds_used_by_later_allocations(act
     assert s == before
     apply(s,'restore',original)
     assert s['budget']['2026-11'] == {'groceries':10000}
+
+
+def test_sorted_native_change_hints_keep_exact_history_digests_and_noop_semantics():
+    before = history.financial(portable_snapshot(state()))
+    after = deepcopy(before)
+    after['transactions'][0]['note'] = 'Fictional bounded edit'
+    changes = history.difference(before, after)
+    journal = history.record_financial(None, before, after, {'operation': 'edit_transaction'},
+                                       changes=changes, transactions_sorted=True)
+    assert journal['entries'][0]['beforeDigest'] == history.digest(before)
+    assert journal['entries'][0]['afterDigest'] == history.digest(after)
+    history.validate_history(journal)
+    assert history.record_financial(journal, after, after, changes=[], transactions_sorted=True) is journal

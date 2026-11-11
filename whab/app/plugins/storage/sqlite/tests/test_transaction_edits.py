@@ -147,7 +147,8 @@ def test_edit_uses_one_scoped_update_without_loading_full_state(store, annotated
     assert sum(query.startswith("UPDATE transactions") for query in queries) == 1
     assert not any(query.startswith(("INSERT", "DELETE")) and "budget_history" not in query for query in queries)
     assert sum("FROM transactions" in query for query in queries) == 2
-    assert queries[0] == "BEGIN IMMEDIATE" and queries[-1] == "COMMIT"
+    financial_sql = [sql for sql in queries if not sql.startswith('PRAGMA ')]
+    assert financial_sql[0] == "BEGIN IMMEDIATE" and financial_sql[-1] == "COMMIT"
 
 
 def test_history_head_cache_invalidates_external_writes_and_accounts_for_sql_triggers(store, annotated_transaction):

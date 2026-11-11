@@ -639,8 +639,18 @@ def native_state_digest(states, *, chunks):
     Native adapters supply a canonical byte-chunk encoder for immutable records.
     Untrusted transfers continue through encode/decode_local_state validation.
     """
-    bodies = [tuple(chunks(value, limit=MAX_LOCAL_TRANSFER_BYTES))
-              for value in _local_state_records(states, validate=False)]
+    return native_records_digest(_local_state_records(states, validate=False), chunks=chunks)
+
+
+def native_records_digest(records, *, chunks):
+    """Hash complete canonical record views retained by a trusted native adapter.
+
+    Records use the exact two envelopes supplied to native_state_digest's chunk
+    encoder. Adapters must invalidate retained views after untracked writes.
+    """
+    if type(records) not in {list, tuple} or len(records) != 2:
+        _invalid()
+    bodies = [tuple(chunks(value, limit=MAX_LOCAL_TRANSFER_BYTES)) for value in records]
     if any(type(raw) is not bytes for body in bodies for raw in body):
         _invalid()
     lengths = [sum(map(len, body)) for body in bodies]

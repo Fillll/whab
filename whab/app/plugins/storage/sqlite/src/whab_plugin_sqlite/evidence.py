@@ -37,7 +37,7 @@ class SnapshotEncoder:
         cached = self.previous.get(id(value))
         if cached is None:
             raw = canonical_storage_json(value, limit=MAX_LOCAL_TRANSFER_BYTES)
-            if self.ensure_ascii:
+            if self.ensure_ascii and not raw.isascii():
                 raw = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(',', ':'), allow_nan=False).encode()
             cached = (value, raw)
         self.current[id(value)] = cached

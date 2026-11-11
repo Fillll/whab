@@ -245,3 +245,209 @@ def test_incremental_personal_and_demo_exports_keep_separate_images_and_audit_of
         store.edit_transaction(workspace, row['id'], note=f'Isolated {workspace} {index}')
         files = store.export_budget_files(workspace)
         assert portable.read_files(files) == store.export_budget(workspace)
+
+
+def test_cached_native_views_include_details_balances_protected_fields_and_noop(ledger):
+    store, account = ledger
+    store.db.execute('UPDATE accounts SET mask=? WHERE id=?', ('9012', account))
+    row = store.transactions('personal')[0]
+    for index, changes in enumerate(({'merchant': 'Fictional 家庭', 'amount': 150}, {'merchant': 'Fictional 家庭', 'amount': 150}, {'date': '2026-09-30'})):
+        execute(store, 'edit_transaction_details', {'transactionId': row['id'], 'changes': changes}, f'details-{index}')
+        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+    assert store._native_records[1]['workspaces']['personal']['associations'][0]['mask'] == '9012'
+
+
+def test_unknown_bounded_native_command_rebuilds_protected_evidence(ledger):
+    store, account = ledger
+    row = store.transactions('personal')[0]
+    current = store.commit_evidence()
+    with store._authority_write(workspace='personal', transaction_ids=[row['id']]) as transaction:
+        store.db.execute('UPDATE accounts SET mask=? WHERE id=?', ('4821', account))
+        store.db.execute('UPDATE transactions SET note=? WHERE id=?', ('Custom native command', row['id']))
+        transaction.update(dirty=True, workspace='personal', result=None,
+                           operation=StorageOperation('custom-bounded', current.authority_epoch, current.generation,
+                                                      'personal', 'edit_transaction', canonical_storage_json({'transactionId': row['id'], 'note': 'Custom native command'})))
+    assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+
+
+def test_merchant_index_preserves_literals_and_does_not_change_commit_evidence(ledger):
+    store, account = ledger
+    for merchant in ('Fictional "quote" 100%_', 'CAFÉ 家庭👩‍💻', 'Straße ﬃ', 'Other'):
+        store.add_transaction('personal', {'accountId': account, 'date': '2026-10-05', 'merchant': merchant, 'amount': 100})
+    rows = store.transactions('personal')
+    evidence = store.commit_evidence()
+    changes = store.db.total_changes
+    for needle in ('STRASSE', 'ffi', 'CAFÉ', '家庭', '👩‍💻', '"quote"', '100%_', '"qu', 'x', 'No match'):
+        result = store.search_transactions('personal', {'merchant': [needle]})
+        assert {row['id'] for row in result['data']} == {row['id'] for row in rows if needle.casefold() in row['merchant'].casefold()}
+    assert store.db.total_changes == changes and store.commit_evidence() == evidence
+    assert not store.db.execute("SELECT 1 FROM sqlite_schema WHERE name IN ('merchants','terms')").fetchall()
+
+
+def test_merchant_index_tracks_native_commits_and_external_connections(ledger):
+    store, account = ledger
+    row = store.transactions('personal')[0]
+    store.search_transactions('personal', {'merchant': ['shop']})
+    cached = store._merchant_index
+    execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Annotation only'}, 'indexed-note')
+    execute(store, 'update_account', {'accountId': account, 'type': 'credit'}, 'indexed-account')
+    assert store._merchant_index is cached
+    execute(store, 'edit_transaction_details', {'transactionId': row['id'], 'changes': {'merchant': 'New native merchant'}}, 'indexed-merchant')
+    assert store._merchant_index is cached
+    assert store.search_transactions('personal', {'merchant': ['New native']})['data'][0]['id'] == row['id']
+    with sqlite3.connect(store.database_path) as other:
+        other.execute('UPDATE transactions SET merchant=? WHERE id=?', ('Changed externally', row['id']))
+    assert store.search_transactions('personal', {'merchant': ['externally']})['data'][0]['id'] == row['id']
+    assert store._merchant_index is not cached
+    cached = store._merchant_index
+    store.db.execute('UPDATE transactions SET merchant=? WHERE id=?', ('Same connection', row['id']))
+    assert store.search_transactions('personal', {'merchant': ['Same connection']})['total'] == 1
+    assert store._merchant_index is not cached
+
+
+def test_index_failure_after_commit_cannot_fail_or_lose_the_financial_edit(ledger):
+    store, _ = ledger
+    row = store.transactions('personal')[0]
+    store.search_transactions('personal', {'merchant': ['shop']})
+    store._merchant_index.close()
+    execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Durable despite index failure'}, 'index-failure')
+    assert store._merchant_index is None
+    assert next(tx for tx in store.transactions('personal') if tx['id'] == row['id'])['note'] == 'Durable despite index failure'
+    assert store.search_transactions('personal', {'merchant': ['shop']})['total'] == 2
+
+
+def test_merchant_index_without_fts_keeps_complete_unicode_results(monkeypatch):
+    from whab_plugin_sqlite import merchant_index
+    class NoFTS(sqlite3.Connection):
+        def execute(self, sql, *args):
+            if sql.startswith('CREATE VIRTUAL TABLE'):
+                raise sqlite3.OperationalError('no such module: fts5')
+            return super().execute(sql, *args)
+    monkeypatch.setattr(merchant_index, 'connect', lambda *a, **kw: sqlite3.connect(*a, factory=NoFTS, **kw))
+    cached = merchant_index.MerchantIndex([('personal', 'one', 'Straße'), ('demo', 'two', 'Straße')], (0, 0))
+    try:
+        import json
+        assert json.loads(cached.identifiers('personal', ['STRASSE'])) == ['one']
+        cached.update('personal', ['one', 'three'], [('three', 'New 家庭')])
+        assert json.loads(cached.identifiers('personal', ['Straße'])) == []
+        assert json.loads(cached.identifiers('personal', ['家庭'])) == ['three']
+    finally:
+        cached.close()
+
+
+def test_merchant_index_initialization_propagates_other_sqlite_failures(monkeypatch):
+    from whab_plugin_sqlite import merchant_index
+    class Broken(sqlite3.Connection):
+        def execute(self, sql, *args):
+            if sql.startswith('CREATE VIRTUAL TABLE'):
+                raise sqlite3.OperationalError('Fictional index initialization failure')
+            return super().execute(sql, *args)
+    monkeypatch.setattr(merchant_index, 'connect', lambda *a, **kw: sqlite3.connect(*a, factory=Broken, **kw))
+    with pytest.raises(sqlite3.OperationalError, match='Fictional index'):
+        merchant_index.MerchantIndex([], (0, 0))
+
+
+def test_merchant_index_updates_and_deletes_external_content_rows():
+    import json
+
+    from whab_plugin_sqlite.merchant_index import MerchantIndex
+    cached = MerchantIndex([('personal', 'one', 'Fictional shop')], (0, 0))
+    try:
+        cached.update('personal', ['one', 'two'], [('one', 'Changed merchant'), ('two', 'Added merchant')])
+        assert set(json.loads(cached.identifiers('personal', ['merchant']))) == {'one', 'two'}
+        cached.update('personal', ['one'], [])
+        assert json.loads(cached.identifiers('personal', ['Changed'])) == []
+        assert json.loads(cached.identifiers('personal', ['Added'])) == ['two']
+        cached.update('personal', ['absent'], [])
+        assert json.loads(cached.identifiers('personal', ['Added'])) == ['two']
+    finally:
+        cached.close()
+
+
+def test_unknown_native_identity_changes_fall_back_to_complete_evidence(ledger):
+    store, _ = ledger
+    row = store.transactions('personal')[0]
+    execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Prime native heads'}, 'prime-identities')
+    for selected in ([row['id']], ['missing-before']):
+        with store._authority_write(workspace='personal', transaction_ids=selected) as transaction:
+            if selected == [row['id']]:
+                store.db.execute('DELETE FROM transactions WHERE id=?', (row['id'],))
+            else:
+                store.db.execute("INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,source) VALUES(?,?,?,?,?,?,?)",
+                                 ('missing-before', 'personal', row['accountId'], '2026-10-05', 'Fictional insert', 100, 'manual'))
+            transaction.update(dirty=True, workspace='personal')
+        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+
+
+def test_external_commit_between_native_commit_and_cache_publication_invalidates_indexes(ledger):
+    store, _ = ledger
+    row = store.transactions('personal')[0]
+    store.search_transactions('personal', {'merchant': ['shop']})
+    cached = store._merchant_index
+    original = store.db
+    class ExternalCommit:
+        armed = True
+        def __getattr__(self, name):
+            return getattr(original, name)
+        def execute(self, sql, *args):
+            result = original.execute(sql, *args)
+            if sql == 'COMMIT' and self.armed and store._writing is not None and store._writing.get('dirty'):
+                self.armed = False
+                with sqlite3.connect(store.database_path) as other:
+                    other.execute('UPDATE transactions SET merchant=? WHERE id=?', ('Concurrent fictional merchant', row['id']))
+            return result
+    store.db = ExternalCommit()
+    try:
+        execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Native edit'}, 'concurrent-publication')
+        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+        assert store.search_transactions('personal', {'merchant': ['Concurrent fictional']})['data'][0]['id'] == row['id']
+        assert store._merchant_index is not cached
+    finally:
+        store.db = original
+
+
+def test_unbounded_and_untracked_changes_rebuild_the_merchant_index(ledger):
+    store, account = ledger
+    row = store.transactions('personal')[0]
+    store.search_transactions('personal', {'merchant': ['shop']})
+    cached = store._merchant_index
+    store.add_transaction('personal', {'accountId': account, 'date': '2026-10-05', 'merchant': 'Unbounded new merchant', 'amount': 100})
+    assert store.search_transactions('personal', {'merchant': ['Unbounded new']})['total'] == 1
+    assert store._merchant_index is not cached
+    cached = store._merchant_index
+    store.db.execute('UPDATE transactions SET merchant=? WHERE id=?', ('Untracked merchant', row['id']))
+    execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Native edit after untracked write'}, 'untracked-edit')
+    assert store.search_transactions('personal', {'merchant': ['Untracked']})['total'] == 1
+    assert store._merchant_index is not cached
+
+
+def test_unchanged_legacy_annotation_without_history_keeps_exact_native_evidence(ledger):
+    store, _ = ledger
+    row = store.transactions('personal')[0]
+    store.db.execute("DELETE FROM budget_history WHERE workspace='personal'")
+    before = store.commit_evidence()
+    execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': ''}, 'legacy-unchanged')
+    assert store.commit_evidence().state_digest == before.state_digest
+    assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+    assert not store.db.execute("SELECT 1 FROM budget_history WHERE workspace='personal'").fetchall()
+
+
+def test_trigram_candidates_match_python_casefold_for_unicode_substrings():
+    import json
+    import random
+
+    from whab_plugin_sqlite.merchant_index import MerchantIndex
+    rng = random.Random(184)
+    alphabet = 'aAßﬃé́家庭👩‍💻" %_[]:*+-'
+    rows = [('personal' if i % 2 else 'demo', str(i), ''.join(rng.choices(alphabet, k=24))) for i in range(100)]
+    cached = MerchantIndex(rows, (0, 0))
+    try:
+        for _, _, merchant in rows:
+            start = rng.randrange(10)
+            for width in (1, 2, 3, 6):
+                needle = merchant[start:start + width]
+                actual = set(json.loads(cached.identifiers('personal', [needle])))
+                expected = {identifier for workspace, identifier, text in rows if workspace == 'personal' and needle.casefold() in text.casefold()}
+                assert actual == expected
+    finally:
+        cached.close()

@@ -6,18 +6,18 @@ replayed. The existing storage authority remains the final budget writer fence.
 
 import json
 import os
-import secrets
 import socket
 import ssl
-import subprocess
 import sys
 from contextlib import contextmanager
-from dataclasses import replace
 from pathlib import Path
-from threading import RLock
 from time import monotonic
 from urllib.parse import urlsplit
 lazy import asyncio
+lazy import secrets
+lazy import subprocess
+lazy from dataclasses import replace
+lazy from threading import RLock
 
 lazy import httpx
 

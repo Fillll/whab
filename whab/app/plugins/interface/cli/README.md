@@ -860,3 +860,18 @@ The full-history refusal is measured separately when output exceeds 16 MiB.
 The ZIP timing uses a separate 100-row import fixture. Latency goals are p95
 below 100 ms for help and 250 ms for selective reads and durable individual edits.
 The report provides measured values for comparison with those goals.
+
+For size comparisons on macOS/Linux, run
+`.venv/bin/python scripts/benchmark_cli_matrix.py --runs 100`. It interleaves
+1,000-, 14,550- and 100,000-row budgets on the same host in a reproducible random
+order. Every size returns 300 monthly rows, 13 merchant matches and ten
+uncategorized samples. It records fresh-process wall time, client CPU time and
+system load, with separate help-only samples before and after the workflow.
+Activation and initial merchant-index construction are reported separately.
+Each size receives distinct real edits, stale-intent checks and exact retries;
+the saved files and audit entries are verified after restart and by independent
+restoration into empty stores. `--sizes` accepts a comma-separated list up to the
+existing row bound; fixture images must still fit the existing 50 MiB limit.
+The 250 ms p95 goal concerns warm bounded reads and edits on measured hardware.
+Complete unbounded output, cold activation and provider latency require separate
+measurements; their work grows with output, stored state or external services.

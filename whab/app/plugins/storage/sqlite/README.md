@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.69 or newer for the public local-authority and
+This version requires WHAB 2.70 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -214,11 +214,26 @@ It preserves Unicode casefold literal matching, descending date/ID order and
 integer currency amounts. `account_latest_dates(workspace)` reads active-history
 MAX dates grouped by account for provider previews.
 
+Merchant selections use a disposable in-memory index of Python-casefolded text.
+SQLite's [FTS5 trigram index](https://www.sqlite.org/fts5.html#the_trigram_tokenizer)
+finds candidates for substrings of three or more code points; exact literal
+matching verifies candidates. Shorter searches and SQLite builds without FTS5
+use the same folded-text table without a Python callback per stored row. The
+index is outside the authoritative database and portable image. Its generation
+stamp is updated only after known bounded commits; external writes, unbounded
+changes and triggers require rebuilding it under the next read snapshot. Failed
+index maintenance discards the cache and cannot fail an already-committed edit.
+
 Native evidence is reused only while SQLite total-change and data-version stamps
 agree. Bounded edits replace detached snapshot records and reuse canonical bytes
 of immutable rows and journal baselines. External SQL, triggers and failed writes
 invalidate these optimizations. Native evidence and history hashes retain their
 existing canonical representation and remain independently reproducible.
+Bounded writes retain sorted transaction positions and reuse complete canonical
+native record views, avoiding whole-ledger dictionaries and repeated sorting.
+Only their changed metadata and records are replaced; complete canonical hashes
+are still computed with the original algorithm. Unknown scopes and identity
+changes retain the full reconstruction path.
 
 Classifications that affect account metadata update one row using core rules.
 Currency and lifecycle changes retain their complete-history validation. Portable

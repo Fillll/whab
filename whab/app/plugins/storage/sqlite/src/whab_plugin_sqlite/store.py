@@ -137,6 +137,10 @@ class Store(Authority):
 
     def close(self) -> None:
         with self._lock:
+            cached = getattr(self, '_merchant_index', None)
+            if cached is not None:
+                cached.close()
+                self._merchant_index = None
             self.db.close()
 
     @contextmanager

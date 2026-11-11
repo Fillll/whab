@@ -223,7 +223,10 @@ def test_batch_reads_metadata_and_targets_once_and_updates_only_reviewed(review_
     assert sum("FROM categories" in sql for sql in statements) == 2
     assert sum("FROM transactions" in sql for sql in statements) == 2
     assert sum(sql.startswith("UPDATE transactions SET reviewed=") for sql in statements) == 1
-    assert statements[0] == "BEGIN IMMEDIATE" and statements[-1] == "COMMIT"
+    # Post-commit data-version reads guard cache publication; all financial SQL
+    # remains inside the one native transaction.
+    financial_sql = [sql for sql in statements if not sql.startswith('PRAGMA ')]
+    assert financial_sql[0] == "BEGIN IMMEDIATE" and financial_sql[-1] == "COMMIT"
     assert [tuple(row) for row in review_ledger.db.execute("SELECT name,sql FROM sqlite_schema WHERE type='index' ORDER BY name")] == indexes
 
 

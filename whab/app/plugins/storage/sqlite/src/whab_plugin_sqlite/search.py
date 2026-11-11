@@ -23,9 +23,9 @@ def search_transactions(store, workspace, filters):
             values.extend([filters['month'] + '-01', filters['month'] + '-32'])
         merchants = filters.get('merchant', [])
         if merchants:
-            store.db.create_function('whab_casefold', 1, str.casefold, deterministic=True)
-            conditions.append('(' + ' OR '.join('instr(whab_casefold(merchant),?)>0' for _ in merchants) + ')')
-            values.extend(text.casefold() for text in merchants)
+            from .merchant_index import selection
+            conditions.append('id IN (SELECT value FROM json_each(?))')
+            values.append(selection(store, workspace, merchants))
         uncategorized = filters.get('uncategorized', False)
         if uncategorized:
             conditions.append('category_id IS NULL')

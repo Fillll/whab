@@ -314,3 +314,10 @@ def test_native_chunk_digest_matches_complete_canonical_payloads_and_bounds(monk
     monkeypatch.setattr(storage_transfer, 'MAX_LOCAL_TRANSFER_BYTES', 10)
     with pytest.raises(StoreError):
         storage_transfer.native_state_digest(data, chunks=lambda value, **kw: (b'x' * 6,))
+
+
+@pytest.mark.parametrize('records', [None, (), [1], [1, 2, 3]])
+def test_native_record_views_require_both_canonical_envelopes(records):
+    from whab.plugins.storage_transfer import native_records_digest
+    with pytest.raises(StoreError):
+        native_records_digest(records, chunks=lambda value, **kw: ())

@@ -1156,8 +1156,14 @@ handling. `native_state_digest(states, chunks=encoder)` hashes the same native
 records from bounded canonical byte chunks, avoiding full-payload copies. It
 uses the identical financial-length prefix and SHA-256 digest as
 `local_state_digest(*encode_local_state(states, validate=False))`. Its encoder
-must preserve canonical chunk order and return immutable bytes. Untrusted
-transfer decoding and full validation remain required at external boundaries.
+must preserve canonical chunk order and return immutable bytes.
+`native_records_digest(records, chunks=encoder)` accepts the two complete
+canonical envelopes previously supplied to that callback. A native adapter may
+retain those views and replace verified changed records instead of reconstructing
+all transaction collections. Their order, financial/protected partition, bounds
+and digest must remain identical. Untracked writes invalidate retained views.
+Untrusted transfer decoding and full validation remain required at external
+boundaries.
 
 Optional `export_budget_file_changes(workspace, previous)` reduces local worker
 transport for repeated checkpoints. `previous` maps relative storage file names
