@@ -505,6 +505,7 @@ class BudgetSession:
                     blob = encrypt_credentials(self.id, {plugin_id: profile}, password)
                 raw = encode_container(self.manifest, files, credential_blob=blob)
                 self.files = files
+                self._payload_hashes = {name: value for name, value in self._payload_hashes.items() if name in files}
                 return raw
         export = getattr(self.store, "export_budget", None)
         if not callable(export):

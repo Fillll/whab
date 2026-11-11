@@ -231,3 +231,8 @@ def test_optimized_read_never_accepts_partial_counts(counts):
     response = {'budgetId': 'budget-a', 'revision': 'one', 'data': [], 'complete': True, **counts}
     with pytest.raises(console.CommandError, match='incomplete'):
         optimized_read(None, 'budget-a', '/fixture', {}, lambda *a, **kw: response, console.CommandError)
+
+
+def test_long_merchant_selection_retains_legacy_complete_read(search_transport, capsys):
+    result = read(capsys, '--merchant', 'Fictional' * 3000)
+    assert result['complete'] and result['total'] == 0

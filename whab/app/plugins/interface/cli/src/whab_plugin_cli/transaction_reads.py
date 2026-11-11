@@ -2,11 +2,16 @@
 
 import argparse
 from collections import Counter
+from urllib.parse import urlencode
 
 from whab.plugins import format_money
 
 
 def optimized_read(connection, identifier, prefix, params, exchange, error):
+    # Retain the public-query path for long legacy selections instead of relying
+    # on a server's request-line limit.
+    if len(urlencode(params, doseq=True)) > 8192:
+        return None
     try:
         result = exchange(connection, "GET", prefix + "/transaction-search", params=params, ledger_errors=True)
     except error as failure:

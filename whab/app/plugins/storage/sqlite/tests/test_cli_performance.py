@@ -200,6 +200,7 @@ def test_portable_images_near_the_size_bound_drop_the_append_reserve(ledger, mon
 
 def test_first_saved_ledger_and_direct_export_remain_compatible_with_file_patches():
     from hashlib import sha256
+
     from whab.budgets.file_changes import apply_file_changes
     store = Store(':memory:', month='2026-10')
     try:
@@ -215,3 +216,9 @@ def test_first_saved_ledger_and_direct_export_remain_compatible_with_file_patche
         assert store.search_transactions('personal', {'maxBytes': 1000000})['total'] == 1
     finally:
         store.close()
+
+
+def test_large_positive_sample_limits_keep_all_matches(ledger):
+    store, _ = ledger
+    result = store.search_transactions('personal', {'uncategorized': True, 'limit': 10**100})
+    assert result['returned'] == result['total'] == 3

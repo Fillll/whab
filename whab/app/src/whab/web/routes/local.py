@@ -130,15 +130,17 @@ def create_router(app):
                 validate_month(filters["month"])
             if filters["since"] and filters["until"] and filters["since"] > filters["until"]:
                 raise ValueError("Invalid date range.")
-            if len(filters["merchant"]) > 100 or any(not text.strip() or len(text) > 1000 for text in filters["merchant"]):
+            if any(not text.strip() for text in filters["merchant"]):
                 raise ValueError("Invalid merchant selection.")
             for name in ("uncategorized", "posted", "excludeTransfers"):
                 if values.get(name, "false") not in {"true", "false"}:
                     raise ValueError("Invalid transaction filter.")
                 filters[name] = values.get(name) == "true"
             filters["limit"] = int(values["limit"]) if "limit" in values else None
-            if filters["limit"] is not None and (filters["limit"] < 1 or not filters["uncategorized"]):
-                raise ValueError("Invalid transaction limit.")
+            if filters["limit"] is not None:
+                if filters["limit"] < 1 or not filters["uncategorized"]:
+                    raise ValueError("Invalid transaction limit.")
+                filters["limit"] = min(filters["limit"], 2**53 - 1)
         except (ValueError, StoreError) as error:
             raise HTTPException(400, str(error)) from None
         async with app.state.budget_runtime.request():

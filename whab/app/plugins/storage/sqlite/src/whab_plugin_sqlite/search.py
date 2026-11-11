@@ -47,7 +47,7 @@ def search_transactions(store, workspace, filters):
                 counts['postedNonTransfer'] += count * (not row['pending'] and not transfer)
                 by_source[row['source']] += count
                 by_currency[accounts[row['account_id']]['currency']] += count
-        limit = filters.get('limit')
+        limit = min(filters['limit'], 2**63 - 1) if filters.get('limit') is not None else None
         tail = ' ORDER BY date DESC,id DESC' + (' LIMIT ?' if limit is not None else '')
         rows = []
         response_bytes = len(json.dumps(filters, ensure_ascii=False).encode()) + 512
