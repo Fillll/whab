@@ -837,9 +837,11 @@ are preserved. There is no nonzero funding erasure or category merge/archive. Bo
 
 Command parsing loads the selected command subtree and reads packaged operation
 resources offline. Validation results are cached privately by document content,
-plugin identity, validator implementation and JSON Schema library version. A
+plugin identity, validator implementation and installed JSON Schema library metadata. A
 changed resource is validated again. Read-only cache locations retain validation.
-Python 3.15 lazy imports defer SDK and transport modules until they are used.
+Parser construction defers unused distribution-version reads; explicit discovery
+still reports installed plugin versions. Python 3.15 lazy imports defer SDK and
+transport modules until they are used.
 
 Current local hosts expose a coherent filtered transaction read. `trnx list`
 selects complete date/merchant matches in storage and returns names with the same

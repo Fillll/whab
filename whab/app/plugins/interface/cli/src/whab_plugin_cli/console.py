@@ -58,7 +58,7 @@ def parser(options, argv=()):
     if requested not in {"account", "category", "plugin", "bank", "history", "import", "insights", "transactions", "trnx"}:
         requested = None
     selected = None if any(token in argv for token in ("bank", "import", "plugin")) else {"cli"}
-    catalog = installed_catalog(document_plugins=selected)
+    catalog = installed_catalog(document_plugins=selected, include_versions=False)
     check_identifiers(catalog)
     root = CommandParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",

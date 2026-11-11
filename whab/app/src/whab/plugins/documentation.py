@@ -14,7 +14,9 @@ def _validated_document(raw, identifier):
     document = json.loads(raw)
     # The marker attests to the exact bytes and validator, never cached document content.
     validator = Path(__file__).with_name("operation_schema.py").read_bytes()
-    key = sha256(raw + identifier.encode() + validator + metadata.version("jsonschema").encode()).hexdigest()
+    library = metadata.distribution("jsonschema")
+    identity = library.read_text("METADATA") or library.read_text("PKG-INFO") or library.version
+    key = sha256(raw + identifier.encode() + validator + identity.encode()).hexdigest()
     cache = Path.home() / ".cache" / "whab" / "operation-validation"
     marker = cache / key
     try:
@@ -79,8 +81,8 @@ def plugin_document(plugin_id):
     return installed_document(matches[0])
 
 
-def installed_catalog(enabled=None, *, document_plugins=None):
-    """Descriptions contain authored examples, never live settings or credentials."""
+def installed_catalog(enabled=None, *, document_plugins=None, include_versions=True):
+    """Static discovery; parser-only callers may defer unused package versions."""
     from .registration import management_tool
 
     plugins = []
@@ -88,7 +90,7 @@ def installed_catalog(enabled=None, *, document_plugins=None):
     for entry in entries:
         document = installed_document(entry) if document_plugins is None or entry.name in document_plugins else None
         tool = management_tool(entry.name, [row for row in entries if row.name == entry.name])
-        plugins.append({"id": entry.name, "version": entry.dist.version,
+        plugins.append({"id": entry.name, "version": entry.dist.version if include_versions else None,
                         "enabled": None if enabled is None or tool else entry.name in enabled,
                         **({"selection_control": "management"} if tool else {}),
                         "documented": document is not None, "documentation": document})

@@ -64,7 +64,7 @@ class SnapshotEncoder:
 
     def _chunks(self, value, path=()):
         # Detached rows, append-only entries and the journal baseline are immutable.
-        if type(value) is dict and 'id' in value:
+        if type(value) is dict and ('id' in value or path[-2:] == ('history', 'entries')):
             yield self._record(value)
         elif type(value) is dict:
             yield b'{'

@@ -235,7 +235,8 @@ invalidate these optimizations. Native evidence and history hashes retain their
 existing canonical representation and remain independently reproducible.
 Bounded writes retain sorted transaction positions and reuse complete canonical
 native record views, avoiding whole-ledger dictionaries and repeated sorting.
-Only their changed metadata and records are replaced; complete canonical hashes
+Immutable prior audit entries also retain their canonical bytes.
+Only changed metadata and records are replaced; complete canonical hashes
 are still computed with the original algorithm. Unknown scopes and identity
 changes retain the full reconstruction path.
 

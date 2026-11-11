@@ -232,3 +232,19 @@ def test_source_check_rejects_omitted_and_unshipped_resources(tmp_path):
     assert "Registered feature" in " ".join(module.check(root)[1])
     (package / "plugin.py").write_text('"""No additional actions."""\n')
     assert not module.check(root)[1]
+
+
+def test_parser_catalog_can_defer_versions_without_hiding_external_discovery(monkeypatch):
+    versions = []
+    class Distribution:
+        @property
+        def version(self):
+            versions.append('read')
+            return '1.2.3'
+    entry = SimpleNamespace(name='fictional-external', value='fictional:plugin', dist=Distribution())
+    monkeypatch.setattr(docs.metadata, 'entry_points', lambda **kwargs: [entry])
+    light = docs.installed_catalog(document_plugins=set(), include_versions=False)
+    assert light['plugins'][0]['id'] == 'fictional-external'
+    assert light['plugins'][0]['version'] is None and versions == []
+    full = docs.installed_catalog(document_plugins=set())
+    assert full['plugins'][0]['version'] == '1.2.3' and versions == ['read']
