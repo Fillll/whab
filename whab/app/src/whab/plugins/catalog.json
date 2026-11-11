@@ -105,7 +105,7 @@
       "maintainer": "Fillll",
       "repository": "https://github.com/Fillll/whab",
       "requires": [],
-      "requires_host": "whab>=2.69,<3",
+      "requires_host": "whab>=2.70,<3",
       "requires_python": ">=3.15,<3.16",
       "security": "https://github.com/Fillll/whab/security/advisories/new",
       "source": "whab/app/plugins/interface/cli",
