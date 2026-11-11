@@ -155,6 +155,9 @@ def main():
             assert not endpoint.exists(), 'Fictional host must stop before reopen'
             reopened = read_all()
             assert reopened == saved and budget_path.is_file()
+            classifications = {row['name']: row for row in run(target, 'account', 'list')['data']}
+            assert all(classifications[f'Account {i}']['type'] == 'depository'
+                       and classifications[f'Account {i}']['onBudget'] is True for i in range(args.runs))
             deadline = monotonic() + 20
             while endpoint.exists() and monotonic() < deadline:
                 sleep(.1)
