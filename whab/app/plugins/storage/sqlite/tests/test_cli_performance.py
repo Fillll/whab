@@ -103,3 +103,41 @@ def test_snapshot_encoder_is_canonical_and_bounded():
         assert encoder.encode(value, limit=1000) == first
         with pytest.raises(StoreError):
             encoder.encode(value, limit=1)
+
+
+def test_portable_deltas_roundtrip_after_bounded_edits_and_reject_unknown_bases(ledger):
+    from hashlib import sha256
+
+    from whab.budgets.file_changes import apply_file_changes
+    store, account = ledger
+    first = store.export_budget_file_changes('personal', {})
+    assert first.keys() == {'files'}
+    files = first['files']
+    row = store.transactions('personal')[0]
+    for i in range(3):
+        execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': f'Delta {i}'}, f'delta-{i}')
+        changes = store.export_budget_file_changes('personal', {key: sha256(raw).hexdigest() for key, raw in files.items()})
+        files = apply_file_changes(files, changes)
+        assert portable.read_files(files) == store.export_budget('personal')
+    assert store.export_budget_file_changes('personal', {'budget.sqlite': 'wrong'}).keys() == {'files'}
+    assert store.export_budget_file_changes('personal', [])['files'] == files
+
+
+def test_long_audit_append_grows_reserved_space_and_reopens_ordinary_json(ledger):
+    import json
+    store, _ = ledger
+    row = store.transactions('personal')[0]
+    for i in range(90):
+        execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': f'{i} ' + 'x' * 980}, f'growth-{i}')
+    record, kind = store.db.execute("SELECT record,typeof(record) FROM budget_history WHERE workspace='personal'").fetchone()
+    assert kind == 'text'
+    assert len(json.loads(record)['entries']) >= 90
+    assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+    assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
+
+
+def test_bounded_local_selection_refuses_oversized_complete_results(ledger):
+    store, _ = ledger
+    with pytest.raises(StoreError, match='16 MiB'):
+        store.search_transactions('personal', {'maxBytes': 513})
+    assert len(store.search_transactions('personal', {})['data']) == 3

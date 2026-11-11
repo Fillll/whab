@@ -832,3 +832,23 @@ rows. Undo restores identity, target, parent relationship and every removed row;
 redo revalidates later conflicts. Monthly monetary results and rollover semantics
 are preserved. There is no nonzero funding erasure or category merge/archive. Both `category show
 --help` and deletion help work offline from packaged operation documentation.
+
+## Command performance
+
+Command parsing loads the selected command subtree and reads packaged operation
+resources offline. Validation results are cached privately by document content,
+plugin identity, validator implementation and JSON Schema library version. A
+changed resource is validated again. Read-only cache locations retain validation.
+Python 3.15 lazy imports defer SDK and transport modules until they are used.
+
+Current local hosts expose a coherent filtered transaction read. `trnx list`
+selects complete date/merchant matches in storage and returns names with the same
+revision. `trnx uncategorized --limit` computes full-match counts while selecting
+only the requested sample. Older hosts/backends retain the public-query path.
+Unicode literal matching, completeness, default filters and output fields follow
+the command contracts above.
+
+Run `.venv/bin/python scripts/benchmark_cli.py --runs 100` from the application
+checkout to measure fresh processes with fictional data. It includes process
+startup, verified HTTPS, JSON output and synchronous saves, then reopens the saved
+budget. Cold host startup, full-history output and ZIP import have separate rows.

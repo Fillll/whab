@@ -1723,6 +1723,169 @@
       ],
       "retry": "Read-only; repeat after concurrent changes. This is inspection, not permission to replay an uncertain mutation.",
       "availability": "WHAB 2.69+, SQLite 1.21+/JSON 1.13+ for zero-only assignment deletion policy."
+    },
+    {
+      "name": "Storage.search_transactions",
+      "kind": "sdk",
+      "summary": "Select complete CLI transaction matches or uncategorized counts and a bounded sample with account/category names.",
+      "input": {
+        "type": "object",
+        "description": "Storage-owned SDK arguments for one workspace.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "Isolated workspace."
+          },
+          "filters": {
+            "type": "object",
+            "description": "Inclusive since/until/month, merchant OR terms, uncategorized/posted/excludeTransfers booleans and optional sample limit.",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "workspace",
+          "filters"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Complete matches with counts, or uncategorized aggregate counts and the requested sample.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "filters": {
+              "merchant": [
+                "Fictional"
+              ]
+            }
+          },
+          "output": {
+            "complete": true,
+            "total": 0,
+            "returned": 0,
+            "data": []
+          }
+        }
+      ],
+      "side_effects": "Reads one coherent native snapshot without changing financial state.",
+      "permissions": "Privileged host storage SDK, unavailable as an arbitrary remote command.",
+      "scope": "One addressed budget, environment and workspace.",
+      "errors": [
+        "Invalid workspace, filters, source identity or payload bounds."
+      ],
+      "retry": "Read again after a concurrent change; storage does not replay financial writes.",
+      "availability": "Optional SQLite capability from version 1.22 with WHAB 2.70."
+    },
+    {
+      "name": "Storage.account_latest_dates",
+      "kind": "sdk",
+      "summary": "Read latest nondeleted transaction dates by account without materializing public history.",
+      "input": {
+        "type": "object",
+        "description": "Storage-owned SDK arguments for one workspace.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "Isolated workspace."
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Account ID to ISO date mapping.",
+        "additionalProperties": {
+          "type": "string",
+          "description": "Latest date in that account."
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "Reads one coherent native snapshot without changing financial state.",
+      "permissions": "Privileged host storage SDK, unavailable as an arbitrary remote command.",
+      "scope": "One addressed budget, environment and workspace.",
+      "errors": [
+        "Invalid workspace, filters, source identity or payload bounds."
+      ],
+      "retry": "Read again after a concurrent change; storage does not replay financial writes.",
+      "availability": "Optional SQLite capability from version 1.22 with WHAB 2.70."
+    },
+    {
+      "name": "Storage.export_budget_file_changes",
+      "kind": "sdk",
+      "summary": "Return complete sanitized files or bounded offset patches bound to exact previous and resulting SHA-256 hashes.",
+      "input": {
+        "type": "object",
+        "description": "Storage-owned SDK arguments for one workspace.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "Isolated workspace."
+          },
+          "previous": {
+            "type": "object",
+            "description": "Relative storage payload names mapped to their previous SHA-256 digests.",
+            "additionalProperties": {
+              "type": "string",
+              "description": "SHA-256 digest."
+            }
+          }
+        },
+        "required": [
+          "workspace",
+          "previous"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Either files containing opaque SDK byte values, or patches with name/base/digest/size/chunks. JSON examples use empty results.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "previous": {}
+          },
+          "output": {
+            "files": {}
+          }
+        }
+      ],
+      "side_effects": "Reads one coherent native snapshot without changing financial state.",
+      "permissions": "Privileged host storage SDK, unavailable as an arbitrary remote command.",
+      "scope": "One addressed budget, environment and workspace.",
+      "errors": [
+        "Invalid workspace, filters, source identity or payload bounds."
+      ],
+      "retry": "Read again after a concurrent change; storage does not replay financial writes.",
+      "availability": "Optional SQLite capability from version 1.22 with WHAB 2.70."
     }
   ]
 }

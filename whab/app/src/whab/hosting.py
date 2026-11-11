@@ -19,7 +19,7 @@ from time import monotonic
 from urllib.parse import urlsplit
 lazy import asyncio
 
-import httpx
+lazy import httpx
 
 lazy from whab.budgets.document import atomic_write
 
@@ -187,7 +187,7 @@ def run_host(settings, *, transient=False, persistent=False, wrapper=None):
 
 
 @contextmanager
-def local_connection(home, environment="sandbox", *, ca=None, timeout=_STARTUP_SECONDS):
+def local_connection(home, environment="sandbox", *, ca=None, timeout=_STARTUP_SECONDS, client_factory=None):
     """Acquire a host lease before execution; never retry an executed operation."""
     directory = runtime_directory(home, environment)
     child, client, lease = None, None, None
@@ -209,7 +209,8 @@ def local_connection(home, environment="sandbox", *, ca=None, timeout=_STARTUP_S
             if endpoint is not None:
                 if client is not None:
                     client.close()
-                client = httpx.Client(base_url=endpoint["url"], verify=ssl.create_default_context(cafile=ca or endpoint["ca"]),
+                factory = client_factory or httpx.Client
+                client = factory(base_url=endpoint["url"], verify=ssl.create_default_context(cafile=ca or endpoint["ca"]),
                     headers={"Authorization": "Bearer " + endpoint["token"]},
                     trust_env=False, follow_redirects=False, timeout=60)
                 try:

@@ -490,11 +490,12 @@ def test_metadata_only_setup_never_reads_sync_or_local_transaction_history(setup
     def call(command, **parameters):
         commands.append(command)
         if command == 'read_accounts':
-            return []
+            return [{'id': 'bank-account', 'name': 'Fictional checking', 'institution': 'Fictional bank',
+                     'type': 'depository', 'balance': 100, 'currency': 'USD', 'source': 'fictional-bank', 'itemId': 'fictional-item'}]
         assert command != 'read_sync'
         return original(command, **parameters)
     monkeypatch.setattr(value.provider, 'call', call)
     # Configuration only needs the account metadata and the explicit selection.
     monkeypatch.setattr(value.tracked, 'transactions', lambda *_: pytest.fail('Configuration loaded history'))
-    assert run(value.coordinator.configure_sync('fictional-item', []))['configured']
+    assert run(value.coordinator.configure_sync('fictional-item', [{'bankAccountId': 'bank-account', 'accountId': None, 'since': '2026-10-01'}]))['configured']
     assert commands == ['read_accounts']

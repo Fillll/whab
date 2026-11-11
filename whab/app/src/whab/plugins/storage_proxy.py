@@ -173,13 +173,16 @@ class StorageWorkerProxy:
         if self.uncertain:
             raise storage_error(self.worker.plugin_id, "storage_write_unknown")
 
-    def execute_operation(self, operation):
+    def execute_operation(self, operation, *, current=None):
         with self.lock:
             self._check_write()
             if type(operation) is not StorageOperation:
                 raise StoreError("Durable storage requires a validated operation.")
-            current = self._call("commit_evidence")
-            previous = self._call("operation_receipt", operation.operation_id)
+            if current is None:
+                current = self._call("commit_evidence")
+                previous = self._call("operation_receipt", operation.operation_id)
+            else:
+                previous = None
             replay = check_storage_operation(current, operation, previous)
             if replay is not None:
                 return replay
@@ -229,7 +232,7 @@ class StorageWorkerProxy:
                 payload = canonical_storage_json({'operation': name, 'parameters': read_storage_json(payload, limit=operation_limit(name)), 'context': info}, limit=operation_limit(name))
                 name = 'recorded_command'
             operation = StorageOperation(str(uuid4()), current.authority_epoch, current.generation, workspace, name, payload)
-            result = self.execute_operation(operation)
+            result = self.execute_operation(operation, current=current)
             return read_storage_json(result.receipt.result)
 
     def __getattr__(self, name):

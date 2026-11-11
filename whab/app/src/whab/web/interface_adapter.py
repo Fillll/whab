@@ -69,7 +69,11 @@ class BoundRemoteInterface:
 
     def search_transactions(self, identifier, workspace, filters):
         self.check_budget(identifier)
-        result = self.context.service.search_transactions(workspace, filters)
+        from whab.domain.errors import StoreError
+        try:
+            result = self.context.service.search_transactions(workspace, filters)
+        except StoreError as error:
+            raise HTTPException(400, str(error)) from None
         if result is None:
             raise HTTPException(404, "Filtered transaction reads are unavailable.")
         return result

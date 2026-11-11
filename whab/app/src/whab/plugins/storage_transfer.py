@@ -111,7 +111,7 @@ def _integer(value):
 
 
 def _plain(value, depth=0):
-    if depth > 24:
+    if depth > 24 or depth == 24 and type(value) in {dict, list}:
         _invalid()
     if value is None or type(value) is bool:
         return
@@ -150,24 +150,6 @@ def read_storage_json(raw, *, limit=MAX_OPERATION_BYTES):
     """Read plain bounded JSON with duplicate-field and nesting rejection."""
     if type(raw) is not bytes or not raw or len(raw) > limit:
         _invalid()
-    depth, quoted, escaped = 0, False, False
-    for char in raw:
-        if quoted:
-            if escaped:
-                escaped = False
-            elif char == 92:
-                escaped = True
-            elif char == 34:
-                quoted = False
-        elif char == 34:
-            quoted = True
-        elif char in (91, 123):
-            depth += 1
-            if depth > 24:
-                _invalid()
-        elif char in (93, 125):
-            depth -= 1
-
     def unique(pairs):
         result = {}
         for key, value in pairs:

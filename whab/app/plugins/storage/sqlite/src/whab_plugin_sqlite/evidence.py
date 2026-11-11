@@ -25,20 +25,23 @@ class SnapshotEncoder:
             raise StoreError('Native storage state exceeds the supported bounds.')
         return raw
 
+    def _record(self, value):
+        cached = self.previous.get(id(value))
+        if cached is None:
+            raw = canonical_storage_json(value, limit=MAX_LOCAL_TRANSFER_BYTES)
+            if self.ensure_ascii:
+                raw = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(',', ':'), allow_nan=False).encode()
+            cached = (value, raw)
+        self.current[id(value)] = cached
+        return cached[1]
+
     def _encode(self, value):
-        # These dictionaries are detached rows or append-only history entries.
-        # Changed records are replaced, and external SQL invalidates all snapshots.
+        # Detached rows, append-only entries and the journal baseline are immutable.
         if type(value) is dict and 'id' in value:
-            cached = self.previous.get(id(value))
-            if cached is None or cached[0] is not value:
-                raw = canonical_storage_json(value, limit=MAX_LOCAL_TRANSFER_BYTES)
-                if self.ensure_ascii:
-                    raw = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(',', ':'), allow_nan=False).encode()
-                cached = (value, raw)
-            self.current[id(value)] = cached
-            return cached[1]
+            return self._record(value)
         if type(value) is dict:
-            return b'{' + b','.join(self._encode(key) + b':' + self._encode(value[key]) for key in sorted(value)) + b'}'
+            return b'{' + b','.join(self._encode(key) + b':' + (self._record(value[key]) if key == 'baseline' else self._encode(value[key]))
+                                    for key in sorted(value)) + b'}'
         if type(value) is list:
             return b'[' + b','.join(self._encode(row) for row in value) + b']'
         return json.dumps(value, ensure_ascii=self.ensure_ascii, separators=(',', ':'), allow_nan=False).encode('utf-8')

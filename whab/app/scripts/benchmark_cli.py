@@ -24,7 +24,7 @@ from whab.plugins.local import local_connection
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runs', type=int, default=100)
-    parser.add_argument('--transactions', type=int, default=14550)
+    parser.add_argument('--transactions', type=int, default=100000)
     args = parser.parse_args()
     if not 1 <= args.runs <= 1000 or not args.runs <= args.transactions <= 100000:
         parser.error('Use 1–1000 runs and runs–100000 transactions.')
@@ -37,11 +37,14 @@ def main():
         env.update(HOME=directory, WHAB_HOME=str(home), WHAB_ENV='sandbox', WHAB_UI='',
                    WHAB_PLUGINS='', WHAB_STORAGE='sqlite', ALLOW_LIVE_PLAID='false')
 
-        def cli(*command, label=None):
+        def cli(*command, label=None, allow_oversized=False):
             started = perf_counter()
             process = subprocess.run([executable, '--home', str(home), '--environment', 'sandbox', *command],
                                      env=env, capture_output=True, timeout=120)
             elapsed = (perf_counter() - started) * 1000
+            if process.returncode and allow_oversized and b'16 MiB' in process.stderr:
+                samples.setdefault(label, []).append(elapsed)
+                return None
             if process.returncode:
                 raise RuntimeError(f'Fictional command {command[:3]} failed: {process.stderr.decode()}')
             if label:
@@ -57,21 +60,73 @@ def main():
             export.writestr('Budget.csv', 'Month,Category Group/Category,Category Group,Category,Assigned,Activity,Available\n' + ''.join(
                 f'Oct 2026,Fixture: Group {i},Fixture,Group {i},$100.00,-$12.34,$87.66\n' for i in range(57)))
             rows = ['Account,Flag,Date,Payee,Category Group/Category,Category Group,Category,Memo,Outflow,Inflow,Cleared\n']
-            for i in range(args.transactions):
+            for i in range(min(args.transactions, 100)):
                 category = f'Fixture: Group {i % 57},Fixture,Group {i % 57}' if i % 9 else ',,'
                 rows.append(f'Account {i % accounts},,202{4 + (i // 336) % 3}-{1 + (i // 28) % 12:02}-{1 + i % 28:02},Fixture payee {i % 1103},{category},Synthetic memo {i},$12.34,$0.00,Cleared\n')
             export.writestr('Register.csv', ''.join(rows))
         target = 'Fictional performance'
+        # Seed the fictional portable file through the owning storage/container
+        # APIs. A 100k-row import DTO can exceed provider-worker response limits.
+        from whab_plugin_sqlite import Store
+
+        from whab.budgets.container import encode_container
+        from whab.budgets.document import atomic_write, new_manifest
+        from whab.domain.accounts import normalize_account
+        from whab.domain.history import financial
+        from whab.domain.portable import ACCOUNT_FIELDS
+        manifest = new_manifest(target, storage='sqlite')
+        fixture_path = root / 'fictional-performance.whab'
         with patch.dict(os.environ, env, clear=True):
-            run('budget', 'list', label='cold new host')
+            from whab.initialization import initialize_home
+            initialize_home(home)
+            store = Store(':memory:', month='2026-10', _authority=False)
+            try:
+                snapshot = store.export_budget('personal')
+                snapshot['accounts'] = []
+                for i in range(accounts):
+                    row = normalize_account({'id': f'account-{i}', 'name': f'Account {i}', 'type': 'other',
+                        'onBudget': False, 'balance': 100000, 'currency': 'USD', 'institution': 'Fictional',
+                        'source': 'manual', 'stale': False, 'balanceUnknown': False})
+                    snapshot['accounts'].append({key: row[key] for key in ACCOUNT_FIELDS})
+                snapshot['transactions'] = [{
+                    'id': f'tx-{i:06}', 'accountId': f'account-{i % accounts}',
+                    'date': f'202{4 + (i // 336) % 3}-{1 + (i // 28) % 12:02}-{1 + i % 28:02}',
+                    'merchant': f'Fixture payee {i % 1103}', 'merchantLogo': None, 'amount': 100,
+                    'categoryId': None, 'pending': False, 'reviewed': False, 'source': 'manual',
+                    'note': '', 'isTransfer': False, 'inferredTransfer': False,
+                    'categoryEdited': False, 'deleted': False,
+                } for i in range(args.transactions)]
+                snapshot['categories'] = [{'id': f'category-{i}', 'name': f'Group {i}', 'group': 'Fixture',
+                                           'target': 0, 'currency': 'USD'} for i in range(57)]
+                snapshot['history'] = {'formatVersion': 1, 'baseline': financial(snapshot), 'entries': []}
+                store.restore_budget('personal', snapshot)
+                files = {'plugins/sqlite/' + key: raw for key, raw in store.export_budget_files().items()}
+                atomic_write(fixture_path, encode_container(manifest, files))
+            finally:
+                store.close()
+            atomic_write(home / 'budgets/index-sandbox.json', json.dumps([
+                {'id': manifest['id'], 'name': target, 'path': str(fixture_path)}]).encode())
+            run('budget', 'list', label='cold host')
             with local_connection(home, 'sandbox'):
-                created = run('budget', 'create', target)
-                run(target, 'plugin', 'enable', 'ynab-zip-importer', label='plugin enable')
-                preview = run(target, 'import', 'ynab', 'preview', str(archive), '--currency', 'USD', label='import preview')
-                assert preview['canImport'] and preview['transactions'] == args.transactions
-                run(target, 'import', 'ynab', 'commit', str(archive), '--currency', 'USD', '--fingerprint', preview['fingerprint'], label='import commit')
-                transactions = run(target, 'trnx', 'list', label='full history output')['data']
-                assert len(transactions) == args.transactions
+                created = {'path': str(fixture_path)}
+                import_target = 'Fictional import'
+                run('budget', 'create', import_target)
+                run(import_target, 'plugin', 'enable', 'ynab-zip-importer', label='plugin enable')
+                preview = run(import_target, 'import', 'ynab', 'preview', str(archive), '--currency', 'USD', label='small import preview')
+                assert preview['canImport'] and preview['transactions'] == min(args.transactions, 100)
+                run(import_target, 'import', 'ynab', 'commit', str(archive), '--currency', 'USD', '--fingerprint', preview['fingerprint'], label='small import commit')
+                # The full output limit is measured independently from setup and verification.
+                cli(target, 'trnx', 'list', label='full history output or limit refusal', allow_oversized=True)
+                def read_all():
+                    rows = []
+                    for year in range(2024, 2027):
+                        for month in range(1, 13):
+                            result = run(target, 'trnx', 'list', '--month', f'{year}-{month:02}')
+                            assert result['complete'] and result['returned'] == result['total']
+                            rows.extend(result['data'])
+                    assert len(rows) == len({row['id'] for row in rows}) == args.transactions
+                    return sorted(rows, key=lambda row: (row['date'], row['id']), reverse=True)
+                transactions = read_all()
                 for i in range(args.runs):
                     cli(target, 'trnx', 'list', '--help', label='help')
                     run(target, 'trnx', 'list', '--month', '2026-05', label='monthly list')
@@ -87,7 +142,7 @@ def main():
                         retry = run(target, 'trnx', 'categorize', transaction['id'], '--category', 'Fixture / Group 56', '--agent', 'Benchmark',
                                     '--revision', change['expectedRevision'], '--request-id', change['requestId'])
                         assert retry == change
-                saved = run(target, 'trnx', 'list')['data']
+                saved = read_all()
                 by_id = {row['id']: row for row in saved}
                 assert all(by_id[row['id']]['categoryAgent'] == 'Benchmark' for row in transactions[:args.runs])
                 history = run(target, 'history', 'list')['data']
@@ -98,7 +153,7 @@ def main():
             while endpoint.exists() and monotonic() < deadline:
                 sleep(.1)
             assert not endpoint.exists(), 'Fictional host must stop before reopen'
-            reopened = run(target, 'trnx', 'list')['data']
+            reopened = read_all()
             assert reopened == saved and budget_path.is_file()
             deadline = monotonic() + 20
             while endpoint.exists() and monotonic() < deadline:

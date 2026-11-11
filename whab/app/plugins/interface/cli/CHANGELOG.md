@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.16.0 — 2026-11-10
+
+PR: [#184](https://github.com/Fillll/whab/pull/184)
+
+- Build only the requested command subtree, defer transport imports and use coherent storage-filtered searches and uncategorized samples. Retain complete output, Unicode matching and compatible public-query fallback. Add an isolated fresh-process performance benchmark that independently reopens saved edits.
+
 ## 2.15.0 — 2026-11-09
 
 PR: [#182](https://github.com/Fillll/whab/pull/182)

@@ -104,12 +104,13 @@ class StorageIntents:
         return body
 
     def request(self, request_id, fingerprint):
-        for row in self.snapshot()["completed"]:
+        body = self.snapshot()
+        for row in body["completed"]:
             if row["request"] is not None and row["request"]["id"] == request_id:
                 if row["request"]["fingerprint"] != fingerprint:
                     raise StoreError("This request ID was already used for a different command.")
                 return row
-        pending = self.snapshot()["pending"]
+        pending = body["pending"]
         if pending is not None:
             if pending["request"] is not None and pending["request"]["id"] == request_id and pending["request"]["fingerprint"] != fingerprint:
                 raise StoreError("This request ID was already used for a different command.")

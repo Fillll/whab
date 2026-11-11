@@ -1,6 +1,5 @@
 """SQLite-owned authority, atomic command receipts and protected local transfer."""
 
-import json
 from contextlib import contextmanager
 from dataclasses import replace
 from uuid import uuid4
@@ -163,7 +162,8 @@ class Authority:
                               metadata["role"], digest)
 
     def _local_states(self, selected=None):
-        states = {name: self._read_state(name, transaction_ids=selected[1] if selected is not None and selected[0] == name else None)
+        states = {name: self._read_state(name, transaction_ids=selected[1] if selected is not None and selected[0] == name else None,
+                                         include_history=selected is None or selected[0] != name)
                   for name in ("personal", "demo")}
         for name, state in states.items():
             for row in self.db.execute("SELECT id,item_id,mask FROM accounts WHERE workspace=?", (name,)):
@@ -305,7 +305,8 @@ class Authority:
                             if journal is not None:
                                 new["history"] = journal
                                 if journal is not original_journal:
-                                    self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (name, json.dumps(journal)))
+                                    from .history_writes import save_history
+                                    save_history(self, name, journal, original_journal, cache_valid=name in cached and selected is not None and info['operation'] in {'edit_transaction', 'edit_transaction_details', 'update_account'})
                         history_after[name] = new
                     transaction['history_after'] = history_after
                     metadata.update(generation=metadata["generation"] + 1,
@@ -336,6 +337,7 @@ class Authority:
             except BaseException as error:
                 self._evidence_stamp = None
                 self._native_state_stamp = None
+                self._history_blob_positions = {}
                 if self.db.in_transaction:
                     self.db.execute("ROLLBACK")
                 elif attempted and transaction is not None:

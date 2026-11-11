@@ -66,11 +66,31 @@ def _incremental_image(store, workspace, cached):
                 else:
                     clean.execute("UPDATE transactions SET account_id=?,date=?,merchant=?,merchant_logo=?,amount=?,category_id=?,pending=?,reviewed=?,source=?,note=?,is_transfer=?,inferred_transfer=?,category_edited=?,deleted=?,original_details=?,category_agent=? WHERE workspace=? AND id=?",
                                   (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), workspace, row['id']))
-        clean.execute("UPDATE budget_history SET record=? WHERE workspace=?", (json.dumps(journal), workspace))
+        from types import SimpleNamespace
+
+        from .history_writes import save_history
+        holder = SimpleNamespace(db=clean, _history_blob_positions=getattr(store, '_portable_history_positions', {}))
+        previous = {**journal, 'entries': entries[:positions[0] + 1]}
+        save_history(holder, workspace, journal, previous, cache_valid=True)
+        store._portable_history_positions = holder._history_blob_positions
         clean.commit()
         return clean.serialize()
     finally:
         clean.close()
+
+
+def export_file_changes(store, workspace, previous):
+    from hashlib import sha256
+    old = getattr(store, '_portable_images', {}).get(workspace)
+    files = export_files(store, workspace)
+    raw = files[_FILENAME]
+    if (type(previous) is not dict or previous.keys() != {_FILENAME} or old is None
+            or previous[_FILENAME] != sha256(old[1]).hexdigest()):
+        return {'files': files}
+    chunks = [[offset, raw[offset:offset + 4096]] for offset in range(0, len(raw), 4096)
+              if raw[offset:offset + 4096] != old[1][offset:offset + 4096]]
+    return {'patches': [{'name': _FILENAME, 'base': previous[_FILENAME], 'digest': sha256(raw).hexdigest(),
+                         'size': len(raw), 'chunks': chunks}]}
 
 
 def export_files(store, workspace):
@@ -80,9 +100,9 @@ def export_files(store, workspace):
         cached = getattr(store, '_portable_images', {}).get(workspace)
         if cached is not None:
             raw = _incremental_image(store, workspace, cached)
+            if raw is not None and len(raw) > MAX_DATABASE_BYTES:
+                raw = None
             if raw is not None:
-                if len(raw) > MAX_DATABASE_BYTES:
-                    raise StoreError("This SQLite budget exceeds the portable database size limit.")
                 journal = getattr(store, '_history_heads', {}).get(workspace, {}).get('history')
                 head = journal['entries'][-1]['hash'] if journal and journal['entries'] else cached[2]
                 store._portable_images[workspace] = (stamp, raw, head)
@@ -119,6 +139,7 @@ def export_files(store, workspace):
         if not hasattr(store, '_portable_images'):
             store._portable_images = {}
         store._portable_images[workspace] = (stamp, raw, head)
+        store._portable_history_positions = {}
         return {_FILENAME: raw}
     finally:
         clean.close()

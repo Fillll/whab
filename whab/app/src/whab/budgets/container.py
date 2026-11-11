@@ -181,8 +181,12 @@ def encode_container(manifest, files, credential_blob=None):
         payloads["credentials.enc"] = credential_blob
     if len(payloads) > MAX_CONTAINER_FILES or sum(map(len, payloads.values())) > MAX_BUNDLE_BYTES:
         raise StoreError("This budget exceeds the container size or file count limit.")
+    # Stored payloads avoid recompressing a complete storage image after each
+    # durable edit. Retain compression when ZIP overhead would exceed the bound.
+    stored_size = sum(map(len, payloads.values())) + sum(2 * len(name.encode('utf-8')) + 100 for name in payloads) + 22
+    compression = zipfile.ZIP_STORED if stored_size <= MAX_BUNDLE_BYTES else zipfile.ZIP_DEFLATED
     output = io.BytesIO()
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as archive:
+    with zipfile.ZipFile(output, "w", compression=compression) as archive:
         for name in sorted(payloads):
             archive.writestr(name, payloads[name])
     raw = output.getvalue()

@@ -60,6 +60,7 @@ METHODS = {
     "get_receipt": (("workspace", "transaction_id"), {}),
     "items": ((), {}), "get_item": (("item_id",), {}),
     "export_budget": ((), {"workspace": "personal"}),
+    "export_budget_file_changes": (("workspace", "previous"), {}),
     "export_budget_files": ((), {"workspace": "personal"}),
     "preview_workspace_import": (("workspace", "plugin_id", "fingerprint"), {}),
     "commit_evidence": ((), {}), "operation_receipt": (("operation_id",), {}),

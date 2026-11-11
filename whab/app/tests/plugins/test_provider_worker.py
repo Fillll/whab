@@ -135,3 +135,19 @@ def test_provider_factory_failure_and_async_factory_close_resources():
     finally:
         dispatcher.close()
     assert Provider.instances[-1].closed
+
+
+def test_optional_account_metadata_is_validated_without_sync():
+    class AccountsProvider(Provider):
+        async def read_accounts(self, item_id, access_token, institution_name):
+            return []
+    descriptor = Plugin('fictional-bank', 'Fictional bank', bank=BankAdapter(AccountsProvider, supports_account_metadata=True),
+                        contract=PluginContract(lifecycle='live', provides=(Capability('lifecycle.background'),)))
+    dispatcher = ProviderDispatcher(descriptor)
+    try:
+        opened(dispatcher)
+        assert call(dispatcher, 'read_accounts', {'item_id': 'item', 'access_token': 'fictional-access', 'institution_name': 'Fictional'}) == []
+        with pytest.raises(WireError):
+            call(dispatcher, 'read_accounts', {'item_id': 'item'})
+    finally:
+        dispatcher.close()

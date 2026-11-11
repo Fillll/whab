@@ -176,7 +176,7 @@ class Store(Authority):
         with self._snapshot():
             return self._read_state(workspace)
 
-    def _read_state(self, workspace: str, *, transaction_ids=None) -> dict:
+    def _read_state(self, workspace: str, *, transaction_ids=None, include_history=True) -> dict:
         meta = self.db.execute("SELECT * FROM meta WHERE workspace=?", (workspace,)).fetchone()
         if not meta:
             raise StoreError("Workspace not found.")
@@ -239,7 +239,7 @@ class Store(Authority):
         if workspace == "personal":
             for row in self.db.execute("SELECT * FROM items"):
                 state["items"][row["id"]] = self._item_record(row)
-        if self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='budget_history'").fetchone():
+        if include_history and self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='budget_history'").fetchone():
             row = self.db.execute("SELECT record FROM budget_history WHERE workspace=?", (workspace,)).fetchone()
             if row is not None:
                 state["history"] = json.loads(row[0])
@@ -569,6 +569,11 @@ class Store(Authority):
                 "INSERT INTO transaction_receipts(workspace,transaction_id,image) VALUES(?,?,?)",
                 (workspace, transaction_id, image),
             )
+
+    def export_budget_file_changes(self, workspace, previous):
+        from .portable import export_file_changes
+        with self._snapshot():
+            return export_file_changes(self, workspace, previous)
 
     def export_budget_files(self, workspace: str = "personal") -> dict[str, bytes]:
         """Return the SQLite-owned data payload for a plugin budget container."""

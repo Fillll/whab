@@ -471,7 +471,14 @@ class BudgetSession:
                 generated = {prefix + name for name in self.storage_payload_paths}
                 files = {key: value for key, value in self.files.items()
                          if key not in generated and (self.storage_payload_paths or not key.startswith(prefix))}
-                payload = export_files("personal")
+                export_changes = getattr(self.store, "export_budget_file_changes", None)
+                if callable(export_changes):
+                    from .file_changes import apply_file_changes
+                    previous = {key[len(prefix):]: value for key, value in self.files.items() if key.startswith(prefix)}
+                    changes = export_changes("personal", {name: digest(raw) for name, raw in previous.items()})
+                    payload = apply_file_changes(previous, changes)
+                else:
+                    payload = export_files("personal")
                 if type(payload) is not dict:
                     raise StoreError("This storage plugin returned invalid budget files.")
                 if self.storage_payload_paths and payload.keys() != set(self.storage_payload_paths):

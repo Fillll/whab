@@ -1,7 +1,9 @@
 """Complete public CLI selections and counts from one SQLite snapshot."""
 
+import json
 from collections import Counter
 
+from whab.domain.errors import StoreError
 from whab.domain.transactions import public_transaction
 
 
@@ -17,8 +19,8 @@ def search_transactions(store, workspace, filters):
                 conditions.append(f'{field}{operator}?')
                 values.append(value)
         if filters.get('month'):
-            conditions.append('substr(date,1,7)=?')
-            values.append(filters['month'])
+            conditions.extend(['date>=?', 'date<?'])
+            values.extend([filters['month'] + '-01', filters['month'] + '-32'])
         merchants = filters.get('merchant', [])
         if merchants:
             store.db.create_function('whab_casefold', 1, str.casefold, deterministic=True)
@@ -48,6 +50,7 @@ def search_transactions(store, workspace, filters):
         limit = filters.get('limit')
         tail = ' ORDER BY date DESC,id DESC' + (' LIMIT ?' if limit is not None else '')
         rows = []
+        response_bytes = len(json.dumps(filters, ensure_ascii=False).encode()) + 512
         for row in store.db.execute('SELECT *' + scope + tail, [*values, *([limit] if limit is not None else [])]):
             account = accounts[row['account_id']]
             category = categories.get(row['category_id'], {})
@@ -62,6 +65,10 @@ def search_transactions(store, workspace, filters):
             transaction['accountName'] = account['name']
             if not uncategorized:
                 transaction.update(categoryName=category.get('name'), categoryGroup=category.get('group'))
+            if filters.get('maxBytes') is not None:
+                response_bytes += len(json.dumps(transaction, ensure_ascii=False, separators=(',', ':')).encode()) + 1
+                if response_bytes > filters['maxBytes']:
+                    raise StoreError('Transaction results exceed 16 MiB. Restrict dates or merchant selection.')
             rows.append(transaction)
         if uncategorized:
             return {**{name: counts[name] for name in ('total', 'pending', 'transferFlagged', 'postedNonTransfer')},

@@ -205,3 +205,34 @@ zero rows, plus nonzeroCount/nonzeroMonths. Zero-only rows permit deletion and a
 removed atomically with the child while retained exactly in history. Nonzero rows
 or transaction references block the entire operation. The read itself never erases
 records or history. See the CLI `category show` workflow.
+
+## CLI read and save performance
+
+Optional `search_transactions(workspace, filters)` selects complete date/merchant
+matches, or uncategorized counts and a requested sample, under one read snapshot.
+It preserves Unicode casefold literal matching, descending date/ID order and
+integer currency amounts. `account_latest_dates(workspace)` reads active-history
+MAX dates grouped by account for provider previews.
+
+Native evidence is reused only while SQLite total-change and data-version stamps
+agree. Bounded edits replace detached snapshot records and reuse canonical bytes
+of immutable rows and journal baselines. External SQL, triggers and failed writes
+invalidate these optimizations. Native evidence and history hashes retain their
+existing canonical representation and remain independently reproducible.
+
+Classifications that affect account metadata update one row using core rules.
+Currency and lifecycle changes retain their complete-history validation. Portable
+exports reuse a previously sanitized image for supported account/transaction
+edits, apply exact audited changes and update its journal. Unsupported changes or
+unverified source stamps rebuild a fresh validated image. The live database,
+connections and credentials are never copied into a portable image. Checkpoints
+still finish synchronously before the CLI returns.
+
+Audit records remain compatible JSON TEXT. A small whitespace reserve lets
+SQLite append entries transactionally through incremental blob writes. Larger
+entries, unverified records and triggers retain full JSON replacement. The
+portable storage capability may return SHA-256-bound file patches so unchanged
+image pages stay in the host. WHAB still publishes a complete `.whab` container.
+For lower checkpoint latency, containers use stored ZIP entries when the complete
+archive fits its existing bound, with compression retained near the bound. Saved
+containers can be larger than earlier compressed exports.

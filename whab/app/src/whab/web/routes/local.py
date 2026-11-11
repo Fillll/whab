@@ -121,6 +121,7 @@ def create_router(app):
         values = request.query_params
         filters = {name: values.get(name) for name in ("since", "until", "month")}
         filters["merchant"] = values.getlist("merchant")
+        filters["maxBytes"] = 16 * 1024 * 1024
         try:
             for name in ("since", "until"):
                 if filters[name] is not None:

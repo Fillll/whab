@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.70.0 — 2026-11-10
+
+PR: [#184](https://github.com/Fillll/whab/pull/184)
+
+- Speed up CLI discovery with Python 3.15 lazy imports and content-bound operation-validation caching. Add coherent local transaction selection, optional account-only bank setup and verified storage-file patches. Preserve native receipts and synchronous durable saves while avoiding repeated full-image compression and oversized private-journal serialization.
+
 ## 2.69.1 — 2026-11-09
 
 PR: [#183](https://github.com/Fillll/whab/pull/183)
