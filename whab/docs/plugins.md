@@ -1165,3 +1165,10 @@ digest before constructing the ordinary portable container. Initial or mismatche
 bases receive complete files. Old backends continue through
 `export_budget_files()`. This capability changes transport volume while every
 checkpoint still publishes the complete saved container synchronously.
+
+Storage may additionally supply `search_transactions_json(workspace, filters)`
+with the same selection as bounded UTF-8 JSON bytes. The host validates those
+bytes and applies the same public-field filtering. This avoids expanding every
+primitive into a typed worker frame for large selections. The dictionary method
+remains supported. Local searches enforce their response bound before worker
+transport, returning an explicit error when complete matches exceed 16 MiB.

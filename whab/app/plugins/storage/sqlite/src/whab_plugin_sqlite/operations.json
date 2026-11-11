@@ -1886,6 +1886,60 @@
       ],
       "retry": "Read again after a concurrent change; storage does not replay financial writes.",
       "availability": "Optional SQLite capability from version 1.22 with WHAB 2.70."
+    },
+    {
+      "name": "Storage.search_transactions_json",
+      "kind": "sdk",
+      "summary": "Return the same coherent transaction selection as bounded UTF-8 JSON bytes for efficient local worker transport.",
+      "input": {
+        "type": "object",
+        "description": "Storage-owned SDK arguments for one workspace.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "Isolated workspace."
+          },
+          "filters": {
+            "type": "object",
+            "description": "Inclusive since/until/month, merchant OR terms, uncategorized/posted/excludeTransfers booleans and optional sample limit.",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "workspace",
+          "filters"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "string",
+        "description": "UTF-8 JSON bytes in the SDK, represented as text in documentation examples."
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "filters": {
+              "merchant": [
+                "Fictional"
+              ]
+            }
+          },
+          "output": "{\"complete\":true,\"total\":0,\"returned\":0,\"data\":[]}"
+        }
+      ],
+      "side_effects": "Reads one coherent native snapshot without changing financial state.",
+      "permissions": "Privileged host storage SDK, unavailable as an arbitrary remote command.",
+      "scope": "One addressed budget, environment and workspace.",
+      "errors": [
+        "Invalid workspace, filters, source identity or payload bounds."
+      ],
+      "retry": "Read again after a concurrent change; storage does not replay financial writes.",
+      "availability": "Optional SQLite capability from version 1.22 with WHAB 2.70."
     }
   ]
 }

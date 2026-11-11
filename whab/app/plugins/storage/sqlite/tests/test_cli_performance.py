@@ -141,3 +141,24 @@ def test_bounded_local_selection_refuses_oversized_complete_results(ledger):
     with pytest.raises(StoreError, match='16 MiB'):
         store.search_transactions('personal', {'maxBytes': 513})
     assert len(store.search_transactions('personal', {})['data']) == 3
+
+
+def test_empty_uncategorized_counts_and_serialized_selection_match(ledger):
+    import json
+    store, _ = ledger
+    filters = {'uncategorized': True, 'merchant': ['No fictional match']}
+    result = store.search_transactions('personal', filters)
+    assert result['total'] == result['returned'] == 0
+    assert result['bySource'] == result['byCurrency'] == result['data'] == []
+    assert json.loads(store.search_transactions_json('personal', filters)) == result
+
+
+def test_evidence_during_nested_native_scope_keeps_the_existing_journal(ledger):
+    store, _ = ledger
+    row = store.transactions('personal')[0]
+    store.commit_evidence()
+    with store._authority_write() as transaction:
+        with store._authority_write(workspace='personal', transaction_ids=[row['id']]):
+            store.db.execute('UPDATE transactions SET note=? WHERE id=?', ('Inside fictional transaction', row['id']))
+            transaction.update(dirty=True, workspace='personal')
+            assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))

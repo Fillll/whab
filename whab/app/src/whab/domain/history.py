@@ -179,10 +179,10 @@ def validate_history(value):
     return {'formatVersion': 1, 'baseline': baseline, 'entries': deepcopy(value['entries'])}
 
 
-def append(journal, before, after, metadata=None, *, trusted=False, before_digest=None, after_digest=None):
+def append(journal, before, after, metadata=None, *, trusted=False, before_digest=None, after_digest=None, changes=None):
     if not trusted:
         before, after = financial(before), financial(after)
-    changes = difference(before, after)
+    changes = difference(before, after) if changes is None else changes
     info = context(metadata)
     if not changes and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
         return journal
@@ -330,7 +330,7 @@ def apply_to_state(state, wanted):
         state['categoryGroups'] = candidate['categoryGroups']
 
 
-def record_financial(journal, before, after, metadata=None, *, digest_snapshot=digest):
+def record_financial(journal, before, after, metadata=None, *, digest_snapshot=digest, changes=None):
     """Commit adapters supply detached allowlisted snapshots from one native transaction."""
     info = context(metadata)
     old, new = financial(before, trusted=True), financial(after, trusted=True)
@@ -346,7 +346,7 @@ def record_financial(journal, before, after, metadata=None, *, digest_snapshot=d
         if old_digest != expected:
             previous = snapshot_at(journal, last['id'] if last else 'baseline')
             journal = append(journal, previous, old, {'actor': 'System', 'actorKind': 'system', 'operation': 'import_workspace'})
-    return append(journal, old, new, info, trusted=True, before_digest=old_digest, after_digest=digest_snapshot(new))
+    return append(journal, old, new, info, trusted=True, before_digest=old_digest, after_digest=digest_snapshot(new), changes=changes)
 
 
 def record_states(before, after, metadata=None):

@@ -32,17 +32,18 @@ from .document import (
 MAX_SOURCE_BYTES = MAX_MANIFEST_BYTES + 1024
 
 
-def content_digest(manifest, ledger, credential_blob=None):
+def content_digest(manifest, ledger, credential_blob=None, *, file_digest=None):
     if type(ledger) is dict and all(type(value) is bytes for value in ledger.values()):
-        ledger = {name: digest(value) for name, value in sorted(ledger.items())}
+        ledger = {name: file_digest(name, value) if file_digest is not None else digest(value)
+                  for name, value in sorted(ledger.items())}
     content = [manifest, ledger]
     if credential_blob is not None:
         content.append({"credential": digest(credential_blob)})
     return digest(json.dumps(content, sort_keys=True, separators=(",", ":")).encode())
 
 
-def container_digest(container):
-    return content_digest(container.manifest, container.legacy_ledger if container.legacy_ledger is not None else container.files, container.credential_blob)
+def container_digest(container, *, file_digest=None):
+    return content_digest(container.manifest, container.legacy_ledger if container.legacy_ledger is not None else container.files, container.credential_blob, file_digest=file_digest)
 
 
 def _read_bytes(path, limit=MAX_BUNDLE_BYTES):
@@ -136,6 +137,7 @@ class BudgetSession:
         self.path = Path(path).expanduser().resolve() if path else None
         self.ledger = ledger
         self.files = dict(files or {})
+        self._payload_hashes = {}
         self.credentials = credentials or {}
         self.credential_blob = credential_blob
         self.password = password
@@ -462,6 +464,14 @@ class BudgetSession:
             return self._bundle(include_credentials=include_credentials, password=password,
                                 preserve_credentials=preserve_credentials)
 
+    def _payload_digest(self, name, raw):
+        cached = self._payload_hashes.get(name)
+        if cached is not None and (cached[0] is raw or cached[0] == raw):
+            return cached[1]
+        value = digest(raw)
+        self._payload_hashes[name] = (raw, value)
+        return value
+
     def _bundle(self, *, include_credentials=False, password=None, preserve_credentials=False):
         export_files = getattr(self.store, "export_budget_files", None)
         if callable(export_files):
@@ -475,8 +485,10 @@ class BudgetSession:
                 if callable(export_changes):
                     from .file_changes import apply_file_changes
                     previous = {key[len(prefix):]: value for key, value in self.files.items() if key.startswith(prefix)}
-                    changes = export_changes("personal", {name: digest(raw) for name, raw in previous.items()})
-                    payload = apply_file_changes(previous, changes)
+                    def payload_digest(name, raw):
+                        return self._payload_digest(prefix + name, raw)
+                    changes = export_changes("personal", {name: payload_digest(name, raw) for name, raw in previous.items()})
+                    payload = apply_file_changes(previous, changes, digest_file=payload_digest)
                 else:
                     payload = export_files("personal")
                 if type(payload) is not dict:
@@ -543,7 +555,7 @@ class BudgetSession:
             try:
                 raw = self.bundle(preserve_credentials=True)
                 container = decode_container(raw, password=self.password)
-                candidate = container_digest(container)
+                candidate = container_digest(container, file_digest=self._payload_digest)
                 atomic_write(self.storage_home / "manifest.json", json.dumps(self.manifest).encode())
                 if container.legacy_ledger is None:
                     # The ordinary archive is already validated and contains no

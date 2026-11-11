@@ -733,6 +733,10 @@ class Store(Authority):
             return {row[0]: row[1] for row in self.db.execute(
                 "SELECT account_id,MAX(date) FROM transactions WHERE workspace=? AND deleted=0 GROUP BY account_id", (workspace,))}
 
+    def search_transactions_json(self, workspace, filters):
+        result = self.search_transactions(workspace, filters)
+        return json.dumps(result, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+
     def search_transactions(self, workspace, filters):
         from .search import search_transactions
         return search_transactions(self, workspace, filters)

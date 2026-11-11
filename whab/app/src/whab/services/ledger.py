@@ -183,11 +183,16 @@ class LedgerService:
     def search_transactions(self, workspace, filters):
         self._workspace(workspace)
         with self._lock:
-            callback = getattr(self._store, "search_transactions", None)
-            if not callable(callback):
-                return None
-            return {"budgetId": self.budget_id, "revision": self._revision,
-                    **_public(callback(workspace, filters))}
+            serialized = getattr(self._store, "search_transactions_json", None)
+            if callable(serialized):
+                from whab.plugins.storage_transfer import read_storage_json
+                data = read_storage_json(serialized(workspace, filters), limit=16 * 1024 * 1024)
+            else:
+                callback = getattr(self._store, "search_transactions", None)
+                if not callable(callback):
+                    return None
+                data = callback(workspace, filters)
+            return {"budgetId": self.budget_id, "revision": self._revision, **_public(data)}
 
     def query(self, operation: str, workspace: str, month: str | None = None, *, parameters=None) -> dict:
         self._workspace(workspace)

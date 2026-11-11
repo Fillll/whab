@@ -74,7 +74,15 @@ def _incremental_image(store, workspace, cached):
         save_history(holder, workspace, journal, previous, cache_valid=True)
         store._portable_history_positions = holder._history_blob_positions
         clean.commit()
-        return clean.serialize()
+        raw = clean.serialize()
+        if len(raw) > MAX_DATABASE_BYTES:
+            clean.execute("VACUUM")
+            raw = clean.serialize()
+            hint = store._portable_history_positions.get(workspace)
+            if hint is not None:
+                rowid = clean.execute('SELECT rowid FROM budget_history WHERE workspace=?', (workspace,)).fetchone()[0]
+                store._portable_history_positions[workspace] = (rowid, *hint[1:])
+        return raw
     finally:
         clean.close()
 
@@ -82,14 +90,19 @@ def _incremental_image(store, workspace, cached):
 def export_file_changes(store, workspace, previous):
     from hashlib import sha256
     old = getattr(store, '_portable_images', {}).get(workspace)
+    cached_digest = getattr(store, '_portable_file_digest', None)
+    if old is not None and (cached_digest is None or cached_digest[0] is not old[1]):
+        cached_digest = (old[1], sha256(old[1]).hexdigest())
     files = export_files(store, workspace)
     raw = files[_FILENAME]
+    current_digest = cached_digest[1] if cached_digest is not None and cached_digest[0] is raw else sha256(raw).hexdigest()
+    store._portable_file_digest = (raw, current_digest)
     if (type(previous) is not dict or previous.keys() != {_FILENAME} or old is None
-            or previous[_FILENAME] != sha256(old[1]).hexdigest()):
+            or previous[_FILENAME] != cached_digest[1]):
         return {'files': files}
     chunks = [[offset, raw[offset:offset + 4096]] for offset in range(0, len(raw), 4096)
               if raw[offset:offset + 4096] != old[1][offset:offset + 4096]]
-    return {'patches': [{'name': _FILENAME, 'base': previous[_FILENAME], 'digest': sha256(raw).hexdigest(),
+    return {'patches': [{'name': _FILENAME, 'base': previous[_FILENAME], 'digest': current_digest,
                          'size': len(raw), 'chunks': chunks}]}
 
 
@@ -129,9 +142,17 @@ def export_files(store, workspace):
         # New portable images retain the schema used before bank sync setup.
         clean.db.execute("ALTER TABLE items DROP COLUMN sync_settings")
         clean.db.execute("ALTER TABLE items DROP COLUMN closed_account_cursors")
+        if snapshot.get('history'):
+            from .history_writes import save_history
+            save_history(clean, 'personal', snapshot['history'], None, cache_valid=False)
         clean.db.execute("VACUUM")
         clean.db.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
         raw = clean.db.serialize()
+        if len(raw) > MAX_DATABASE_BYTES and snapshot.get('history'):
+            clean.db.execute("UPDATE budget_history SET record=? WHERE workspace='personal'", (json.dumps(snapshot['history'], separators=(',', ':')),))
+            clean.db.execute("VACUUM")
+            raw = clean.db.serialize()
+            clean._history_blob_positions = {}
         if len(raw) > MAX_DATABASE_BYTES:
             raise StoreError("This SQLite budget exceeds the portable database size limit.")
         journal = snapshot.get('history')
@@ -139,7 +160,12 @@ def export_files(store, workspace):
         if not hasattr(store, '_portable_images'):
             store._portable_images = {}
         store._portable_images[workspace] = (stamp, raw, head)
-        store._portable_history_positions = {}
+        hints = getattr(clean, '_history_blob_positions', {})
+        if 'personal' in hints:
+            rowid = clean.db.execute("SELECT rowid FROM budget_history WHERE workspace='personal'").fetchone()[0]
+            hint = hints['personal']
+            hints['personal'] = (rowid, *hint[1:])
+        store._portable_history_positions = hints
         return {_FILENAME: raw}
     finally:
         clean.close()

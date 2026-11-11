@@ -45,6 +45,7 @@ METHODS = {
     "category_tree": (("workspace",), {}),
     "accounts": (("workspace",), {}), "categories": (("workspace",), {}),
     "account_latest_dates": (("workspace",), {}),
+    "search_transactions_json": (("workspace", "filters"), {}),
     "search_transactions": (("workspace", "filters"), {}),
     "transactions": (("workspace",), {"month": None}),
     "workspace": (("workspace",), {"month": None}),

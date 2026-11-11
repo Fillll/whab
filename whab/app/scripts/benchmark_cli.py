@@ -159,11 +159,12 @@ def main():
             while endpoint.exists() and monotonic() < deadline:
                 sleep(.1)
             assert not endpoint.exists()
+            saved_file_bytes = budget_path.stat().st_size
     report = {name: {'n': len(times), 'median_ms': round(median(times), 2),
                      'p95_ms': round(sorted(times)[math.ceil(.95 * len(times)) - 1], 2),
                      'total_ms': round(sum(times), 2)} for name, times in samples.items()}
     print(json.dumps({'transactions': args.transactions, 'accounts': accounts, 'runs': args.runs,
-                      'saved_result_verified': True, 'commands': report}, indent=2))
+                      'saved_result_verified': True, 'saved_container_bytes': saved_file_bytes, 'commands': report}, indent=2))
 
 
 if __name__ == '__main__':

@@ -222,3 +222,12 @@ def test_optimized_selection_is_one_coherent_read(monkeypatch, tmp_path, capsys)
         raise error
     with pytest.raises(console.CommandError, match='unavailable'):
         optimized_read(None, 'budget-a', '/fixture', {}, fail, console.CommandError)
+
+
+@pytest.mark.parametrize('counts', [dict(total=0, returned=1), dict(total=1, returned=0),
+                                    dict(total=0, returned=0, complete=False)])
+def test_optimized_read_never_accepts_partial_counts(counts):
+    from whab_plugin_cli.transaction_reads import optimized_read
+    response = {'budgetId': 'budget-a', 'revision': 'one', 'data': [], 'complete': True, **counts}
+    with pytest.raises(console.CommandError, match='incomplete'):
+        optimized_read(None, 'budget-a', '/fixture', {}, lambda *a, **kw: response, console.CommandError)

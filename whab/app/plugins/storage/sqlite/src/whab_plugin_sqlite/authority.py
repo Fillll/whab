@@ -200,19 +200,17 @@ class Authority:
             from .evidence import SnapshotEncoder
             transaction = self._writing
             selected = transaction.get('selected') if transaction is not None else None
-            reusable = selected is not None and getattr(self, '_native_state_stamp', None) == transaction['before_stamp']
+            reusable = (selected is not None and selected[0] in transaction.get('history_after', {})
+                        and getattr(self, '_native_state_stamp', None) == transaction['before_stamp'])
             states = self._local_states(selected if reusable else None)
             if reusable:
                 name, identifiers = selected
                 states[name]['transactions'] = {**self._native_states[name]['transactions'], **states[name]['transactions']}
                 # The journal was assembled from immutable snapshots in this transaction.
-                if name in transaction.get('history_after', {}):
-                    journal = transaction['history_after'][name].get('history')
-                    if journal is not None:
-                        states[name]['history'] = journal
+                states[name].update({key: value for key, value in transaction['history_after'][name].items() if key == 'history'})
             if not reusable or not hasattr(self, '_snapshot_encoder'):
                 self._snapshot_encoder = SnapshotEncoder()
-            self._snapshot_encoder.begin()
+            self._snapshot_encoder.begin(transaction_ids=selected[1] if reusable else None)
             financial, protected = encode_local_state(states, validate=False, encoder=self._snapshot_encoder.encode)
             self._snapshot_encoder.finish()
             self._native_states = states
@@ -296,11 +294,25 @@ class Authority:
                             from .evidence import SnapshotEncoder
                             if not hasattr(self, '_history_encoder') or name not in cached:
                                 self._history_encoder = SnapshotEncoder(ensure_ascii=True)
-                            self._history_encoder.begin()
+                            self._history_encoder.begin(transaction_ids=selected if name in cached else None, scope=name)
+                            previous_digest = getattr(self, '_history_digest_heads', {}).get(name) if name in cached else None
                             def digest_snapshot(value):
                                 from whab.plugins.storage_transfer import MAX_LOCAL_TRANSFER_BYTES
-                                return sha256(self._history_encoder.encode(value, limit=MAX_LOCAL_TRANSFER_BYTES)).hexdigest()
-                            journal = record_financial(original_journal, old, new, info, digest_snapshot=digest_snapshot)
+                                if previous_digest is not None and value.keys() == previous_digest[0].keys() and all(
+                                    value[key] is previous_digest[0][key] if type(value[key]) in {list, dict} else value[key] == previous_digest[0][key]
+                                    for key in value
+                                ):
+                                    return previous_digest[1]
+                                result = sha256(self._history_encoder.encode(value, limit=MAX_LOCAL_TRANSFER_BYTES)).hexdigest()
+                                transaction.setdefault('history_digests', {})[name] = (value, result)
+                                return result
+                            bounded_changes = None
+                            if selected is not None:
+                                from whab.domain.history import difference
+                                selected_ids = set(selected)
+                                old_rows = [row for row in old['transactions'] if row['id'] in selected_ids] if selected_ids else []
+                                bounded_changes = difference({**old, 'transactions': old_rows}, {**new, 'transactions': list(changed.values())})
+                            journal = record_financial(original_journal, old, new, info, digest_snapshot=digest_snapshot, changes=bounded_changes)
                             self._history_encoder.finish()
                             if journal is not None:
                                 new["history"] = journal
@@ -334,6 +346,9 @@ class Authority:
                     self._native_state_stamp = self._evidence_stamp
                 self._history_heads = history_after
                 self._history_stamp = next_history_stamp
+                if not hasattr(self, '_history_digest_heads'):
+                    self._history_digest_heads = {}
+                self._history_digest_heads.update(transaction.get('history_digests', {}))
             except BaseException as error:
                 self._evidence_stamp = None
                 self._native_state_stamp = None

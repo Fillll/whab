@@ -852,3 +852,11 @@ Run `.venv/bin/python scripts/benchmark_cli.py --runs 100` from the application
 checkout to measure fresh processes with fictional data. It includes process
 startup, verified HTTPS, JSON output and synchronous saves, then reopens the saved
 budget. Cold host startup, full-history output and ZIP import have separate rows.
+
+The benchmark defaults to 100,000 fictional transactions, 100 repetitions,
+100 accounts and 57 categories. It creates its disposable portable fixture using
+storage/container APIs and verifies the complete ledger through monthly reads.
+The full-history refusal is measured separately when output exceeds 16 MiB.
+The ZIP timing uses a separate 100-row import fixture. Latency goals are p95
+below 100 ms for help and 250 ms for selective reads and durable individual edits.
+The report provides measured values for comparison with those goals.
