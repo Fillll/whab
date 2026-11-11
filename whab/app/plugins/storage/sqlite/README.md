@@ -233,6 +233,10 @@ SQLite append entries transactionally through incremental blob writes. Larger
 entries, unverified records and triggers retain full JSON replacement. The
 portable storage capability may return SHA-256-bound file patches so unchanged
 image pages stay in the host. WHAB still publishes a complete `.whab` container.
-For lower checkpoint latency, containers use stored ZIP entries when the complete
-archive fits its existing bound, with compression retained near the bound. Saved
-containers can be larger than earlier compressed exports.
+For lower checkpoint latency, sessions reuse independently compressed 64 KiB
+blocks for unchanged payload ranges. Files remain ordinary DEFLATE ZIP entries;
+standard ZIP readers and earlier hosts can decompress them. Dictionary resets
+may increase archive size slightly compared with one continuous compression
+stream. The cache is bounded by the current container's expanded size. Checkpoints
+reuse their encoder's validated in-memory container; opening files and checking
+external revisions continue through full container parsing and validation.

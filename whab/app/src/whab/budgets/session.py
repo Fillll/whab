@@ -14,7 +14,8 @@ from whab.domain.errors import StoreError
 from whab.plugins import API_VERSION, BudgetContext
 from whab.plugins.sdk import valid_plugin_name
 
-from .container import decode_container, encode_container, validate_file_name
+from .compression import DeflateCache
+from .container import BudgetContainer, decode_container, encode_container, validate_file_name
 from .credentials import encrypt_credentials
 from .document import (
     MAX_BUNDLE_BYTES,
@@ -138,6 +139,8 @@ class BudgetSession:
         self.ledger = ledger
         self.files = dict(files or {})
         self._payload_hashes = {}
+        self._compression_cache = DeflateCache()
+        self._validated_bundle = None
         self.credentials = credentials or {}
         self.credential_blob = credential_blob
         self.password = password
@@ -503,7 +506,8 @@ class BudgetSession:
                     profile = {key: value for key, value in self.storage_config.items()
                                if key in {"CLIENT_URL", "CLIENT_TOKEN", "CLIENT_BUDGET_ID"}}
                     blob = encrypt_credentials(self.id, {plugin_id: profile}, password)
-                raw = encode_container(self.manifest, files, credential_blob=blob)
+                raw = encode_container(self.manifest, files, credential_blob=blob, compression_cache=self._compression_cache)
+                self._validated_bundle = (raw, BudgetContainer(validate_manifest(self.manifest), files, credential_blob=blob))
                 self.files = files
                 self._payload_hashes = {name: value for name, value in self._payload_hashes.items() if name in files}
                 return raw
@@ -512,6 +516,7 @@ class BudgetSession:
             raise StoreError("This storage plugin cannot export a portable budget.")
         if include_credentials or self.files:
             raise StoreError("This storage plugin does not support plugin-owned budget files.")
+        self._validated_bundle = None
         return encode_bundle(self.manifest, export("personal"))
 
     @contextmanager
@@ -555,7 +560,9 @@ class BudgetSession:
                 return
             try:
                 raw = self.bundle(preserve_credentials=True)
-                container = decode_container(raw, password=self.password)
+                verified = self._validated_bundle
+                container = verified[1] if verified is not None and verified[0] is raw else decode_container(raw, password=self.password)
+                self._validated_bundle = None
                 candidate = container_digest(container, file_digest=self._payload_digest)
                 atomic_write(self.storage_home / "manifest.json", json.dumps(self.manifest).encode())
                 if container.legacy_ledger is None:
