@@ -24,11 +24,14 @@ class SnapshotEncoder:
         self.current = {}
 
     def encode(self, value, *, limit):
+        return b''.join(self.chunks(value, limit=limit))
+
+    def chunks(self, value, *, limit):
         from whab.domain.errors import StoreError
-        raw = self._encode(value)
-        if len(raw) > limit:
+        chunks = tuple(self._chunks(value))
+        if sum(map(len, chunks)) > limit:
             raise StoreError('Native storage state exceeds the supported bounds.')
-        return raw
+        return chunks
 
     def _record(self, value):
         cached = self.previous.get(id(value))
@@ -49,29 +52,39 @@ class SnapshotEncoder:
         else:
             positions, chunks = cached['positions'], list(cached['chunks'])
             changed = {positions[identifier] for identifier in self.selection if identifier in positions}
-            if not changed:
-                return cached['raw']
             for index in changed:
                 chunks[index] = b','.join(self._record(row) for row in rows[index * 512:(index + 1) * 512])
-        raw = b'[' + b','.join(chunks) + b']'
-        self.arrays[key] = {'positions': positions, 'chunks': chunks, 'raw': raw, 'length': len(rows)}
-        return raw
+        self.arrays[key] = {'positions': positions, 'chunks': chunks, 'length': len(rows)}
+        parts = [b'[']
+        for i, chunk in enumerate(chunks):
+            if i:
+                parts.append(b',')
+            parts.append(chunk)
+        return (*parts, b']')
 
-    def _encode(self, value, path=()):
+    def _chunks(self, value, path=()):
         # Detached rows, append-only entries and the journal baseline are immutable.
         if type(value) is dict and 'id' in value:
-            return self._record(value)
-        if type(value) is dict:
-            parts = []
-            for key in sorted(value):
+            yield self._record(value)
+        elif type(value) is dict:
+            yield b'{'
+            for i, key in enumerate(sorted(value)):
+                if i:
+                    yield b','
+                yield json.dumps(key, ensure_ascii=self.ensure_ascii).encode('utf-8') + b':'
                 if key == 'baseline':
-                    raw = self._record(value[key])
+                    yield self._record(value[key])
                 elif key == 'transactions' and type(value[key]) is list:
-                    raw = self._transactions(value[key], path + (key,))
+                    yield from self._transactions(value[key], path + (key,))
                 else:
-                    raw = self._encode(value[key], path + (key,))
-                parts.append(self._encode(key) + b':' + raw)
-            return b'{' + b','.join(parts) + b'}'
-        if type(value) is list:
-            return b'[' + b','.join(self._encode(row, path) for row in value) + b']'
-        return json.dumps(value, ensure_ascii=self.ensure_ascii, separators=(',', ':'), allow_nan=False).encode('utf-8')
+                    yield from self._chunks(value[key], path + (key,))
+            yield b'}'
+        elif type(value) is list:
+            yield b'['
+            for i, row in enumerate(value):
+                if i:
+                    yield b','
+                yield from self._chunks(row, path)
+            yield b']'
+        else:
+            yield json.dumps(value, ensure_ascii=self.ensure_ascii, separators=(',', ':'), allow_nan=False).encode('utf-8')

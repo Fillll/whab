@@ -589,12 +589,7 @@ def decode_local_state(financial, protected):
     return states
 
 
-def encode_local_state(states, *, validate=True, encoder=canonical_storage_json):
-    """Canonical complete payloads from plain adapter state.
-
-    ``validate=False`` is exclusively for native evidence over already-trusted
-    state beyond portable limits. LocalTransferSnapshot always validates fully.
-    """
+def _local_state_records(states, *, validate):
     if type(states) is not dict or states.keys() != {"personal", "demo"}:
         _invalid()
     financial, protected = {}, {}
@@ -612,9 +607,17 @@ def encode_local_state(states, *, validate=True, encoder=canonical_storage_json)
                 for account in state["accounts"].values()
             ], key=lambda row: row["accountId"]),
         }
-    bodies = tuple(encoder({"formatVersion": 1, "workspaces": value},
-                                         limit=MAX_LOCAL_TRANSFER_BYTES)
-                   for value in (financial, protected))
+    return tuple({"formatVersion": 1, "workspaces": value} for value in (financial, protected))
+
+
+def encode_local_state(states, *, validate=True, encoder=canonical_storage_json):
+    """Canonical complete payloads from plain adapter state.
+
+    ``validate=False`` is exclusively for native evidence over already-trusted
+    state beyond portable limits. LocalTransferSnapshot always validates fully.
+    """
+    bodies = tuple(encoder(value, limit=MAX_LOCAL_TRANSFER_BYTES)
+                   for value in _local_state_records(states, validate=validate))
     if sum(map(len, bodies)) > MAX_LOCAL_TRANSFER_BYTES:
         _invalid()
     if validate:
@@ -624,7 +627,30 @@ def encode_local_state(states, *, validate=True, encoder=canonical_storage_json)
 
 def local_state_digest(financial, protected):
     """Logical content only, excluding authority/operation-receipt metadata."""
-    return sha256(len(financial).to_bytes(8, "big") + financial + protected).hexdigest()
+    result = sha256(len(financial).to_bytes(8, "big"))
+    result.update(financial)
+    result.update(protected)
+    return result.hexdigest()
+
+
+def native_state_digest(states, *, chunks):
+    """Hash trusted native records without copying complete canonical payloads.
+
+    Native adapters supply a canonical byte-chunk encoder for immutable records.
+    Untrusted transfers continue through encode/decode_local_state validation.
+    """
+    bodies = [tuple(chunks(value, limit=MAX_LOCAL_TRANSFER_BYTES))
+              for value in _local_state_records(states, validate=False)]
+    if any(type(raw) is not bytes for body in bodies for raw in body):
+        _invalid()
+    lengths = [sum(map(len, body)) for body in bodies]
+    if sum(lengths) > MAX_LOCAL_TRANSFER_BYTES:
+        _invalid()
+    result = sha256(lengths[0].to_bytes(8, "big"))
+    for body in bodies:
+        for raw in body:
+            result.update(raw)
+    return result.hexdigest()
 
 
 @dataclass(frozen=True, slots=True)

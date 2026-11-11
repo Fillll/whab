@@ -1152,8 +1152,12 @@ capability require `whab>=2.70,<3`.
 Trusted native storage may pass a canonical `encoder` to
 `encode_local_state(..., validate=False)` to reuse immutable record bytes. Its
 output must match `canonical_storage_json` exactly, including bounds and Unicode
-handling. Untrusted transfer decoding and full validation remain required at
-external boundaries.
+handling. `native_state_digest(states, chunks=encoder)` hashes the same native
+records from bounded canonical byte chunks, avoiding full-payload copies. It
+uses the identical financial-length prefix and SHA-256 digest as
+`local_state_digest(*encode_local_state(states, validate=False))`. Its encoder
+must preserve canonical chunk order and return immutable bytes. Untrusted
+transfer decoding and full validation remain required at external boundaries.
 
 Optional `export_budget_file_changes(workspace, previous)` reduces local worker
 transport for repeated checkpoints. `previous` maps relative storage file names

@@ -222,3 +222,15 @@ def test_large_positive_sample_limits_keep_all_matches(ledger):
     store, _ = ledger
     result = store.search_transactions('personal', {'uncategorized': True, 'limit': 10**100})
     assert result['returned'] == result['total'] == 3
+
+
+def test_canonical_transaction_chunks_keep_separators_and_selected_replacements():
+    encoder = SnapshotEncoder()
+    rows = [{'id': str(i), 'note': 'Fictional 家庭'} for i in range(1100)]
+    for selection in (None, ['512'], []):
+        encoder.begin(transaction_ids=selection)
+        if selection:
+            rows[512] = {**rows[512], 'note': 'Changed'}
+        value = {'transactions': rows, 'empty': [], 'flags': [True, False]}
+        assert b''.join(encoder.chunks(value, limit=100000)) == canonical_storage_json(value)
+        encoder.finish()

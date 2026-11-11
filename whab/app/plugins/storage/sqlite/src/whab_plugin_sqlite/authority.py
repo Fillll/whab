@@ -27,7 +27,7 @@ from whab.plugins.storage_transfer import (
     dispatch_storage_operation,
     encode_local_state,
     evidence_record,
-    local_state_digest,
+    native_state_digest,
     operation_limit,
     read_evidence,
     read_operation_receipt,
@@ -211,11 +211,10 @@ class Authority:
             if not reusable or not hasattr(self, '_snapshot_encoder'):
                 self._snapshot_encoder = SnapshotEncoder()
             self._snapshot_encoder.begin(transaction_ids=selected[1] if reusable else None)
-            financial, protected = encode_local_state(states, validate=False, encoder=self._snapshot_encoder.encode)
+            self._evidence_digest = native_state_digest(states, chunks=self._snapshot_encoder.chunks)
             self._snapshot_encoder.finish()
             self._native_states = states
             self._native_state_stamp = stamp
-            self._evidence_digest = local_state_digest(financial, protected)
             self._evidence_stamp = stamp
         return self._metadata_evidence(metadata or self._authority_metadata(), self._evidence_digest)
 
@@ -303,7 +302,10 @@ class Authority:
                                     for key in value
                                 ):
                                     return previous_digest[1]
-                                result = sha256(self._history_encoder.encode(value, limit=MAX_LOCAL_TRANSFER_BYTES)).hexdigest()
+                                digest = sha256()
+                                for raw in self._history_encoder.chunks(value, limit=MAX_LOCAL_TRANSFER_BYTES):
+                                    digest.update(raw)
+                                result = digest.hexdigest()
                                 transaction.setdefault('history_digests', {})[name] = (value, result)
                                 return result
                             bounded_changes = None
