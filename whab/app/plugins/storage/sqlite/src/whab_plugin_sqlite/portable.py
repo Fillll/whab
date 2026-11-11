@@ -12,7 +12,7 @@ from .store import Store
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
 _FORMAT_VERSION = 1
-_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history")
+_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized")
 _ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000, "budget_history": 1}
 
 
@@ -78,10 +78,9 @@ def _incremental_image(store, workspace, cached):
         if len(raw) > MAX_DATABASE_BYTES:
             clean.execute("VACUUM")
             raw = clean.serialize()
-            hint = store._portable_history_positions.get(workspace)
-            if hint is not None:
-                rowid = clean.execute('SELECT rowid FROM budget_history WHERE workspace=?', (workspace,)).fetchone()[0]
-                store._portable_history_positions[workspace] = (rowid, *hint[1:])
+            hint = store._portable_history_positions[workspace]
+            rowid = clean.execute('SELECT rowid FROM budget_history WHERE workspace=?', (workspace,)).fetchone()[0]
+            store._portable_history_positions[workspace] = (rowid, *hint[1:])
         return raw
     finally:
         clean.close()

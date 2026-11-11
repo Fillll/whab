@@ -64,6 +64,7 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
                     db.execute("ROLLBACK TO migrate_column")
                     db.execute("RELEASE migrate_column")
                     raise
+    db.execute("CREATE INDEX IF NOT EXISTS tx_uncategorized ON transactions(workspace,account_id,source,pending,is_transfer,inferred_transfer,date) WHERE deleted=0 AND category_id IS NULL")
     validate_month(selected_month)
     db.execute(
         "UPDATE meta SET budget_start_month=CASE WHEN workspace='demo' THEN COALESCE((SELECT MIN(substr(date,1,7)) FROM transactions WHERE workspace='demo'),?) ELSE COALESCE((SELECT MIN(month) FROM budget WHERE workspace='personal'),?) END WHERE budget_start_month IS NULL",

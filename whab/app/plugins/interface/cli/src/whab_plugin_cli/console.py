@@ -16,7 +16,15 @@ lazy from whab.plugins.local import local_connection
 
 from .config import ConfigError, connection_defaults
 from .errors import selection_error
-from .help import AGENT_WORKFLOW, account_classification, bank_help, describe, import_help, overview
+from .help import (
+    AGENT_WORKFLOW,
+    CommandParser,
+    account_classification,
+    bank_help,
+    describe,
+    import_help,
+    overview,
+)
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 lazy from . import client
 lazy from .account_commands import account_table, add_account_parser, execute_account
@@ -52,7 +60,7 @@ def parser(options, argv=()):
     selected = None if any(token in argv for token in ("bank", "import", "plugin")) else {"cli"}
     catalog = installed_catalog(document_plugins=selected)
     check_identifiers(catalog)
-    root = argparse.ArgumentParser(prog="whab", parents=[options],
+    root = CommandParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
         epilog=AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -121,7 +129,7 @@ def parser(options, argv=()):
 
 
 def options_parser():
-    options = argparse.ArgumentParser(add_help=False)
+    options = CommandParser(add_help=False)
     options.add_argument("--home", help="Runtime home; defaults to WHAB_HOME, profile home, then ~/.whab")
     options.add_argument("--environment", choices=("production", "sandbox"), help="Runtime environment (default: explicit profile environment, otherwise production)")
     options.add_argument("--profile", help="Local JSON {home, environment?, ca?}; default: ~/.config/whab/default.budget. Relative home/CA paths resolve beside the profile")

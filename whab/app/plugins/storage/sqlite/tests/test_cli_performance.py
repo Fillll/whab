@@ -162,3 +162,56 @@ def test_evidence_during_nested_native_scope_keeps_the_existing_journal(ledger):
             store.db.execute('UPDATE transactions SET note=? WHERE id=?', ('Inside fictional transaction', row['id']))
             transaction.update(dirty=True, workspace='personal')
             assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+
+
+def test_cached_transaction_chunks_handle_growth_scope_and_bounded_replacements():
+    from copy import deepcopy
+    encoder = SnapshotEncoder()
+    value = {'workspaces': {'personal': {'transactions': [{'id': 'same-id', 'note': 'personal'}]},
+                            'demo': {'transactions': [{'id': 'same-id', 'note': 'demo'}]}}}
+    encoder.begin()
+    assert encoder.encode(value, limit=10000) == canonical_storage_json(value)
+    encoder.finish()
+    updated = deepcopy(value)
+    updated['workspaces']['personal']['transactions'].append({'id': 'second', 'note': 'new'})
+    encoder.begin(transaction_ids=['second'])
+    assert encoder.encode(updated, limit=10000) == canonical_storage_json(updated)
+    encoder.finish()
+    updated = deepcopy(updated)
+    updated['workspaces']['personal']['transactions'][0]['note'] = 'changed'
+    encoder.begin(transaction_ids=['same-id'])
+    assert encoder.encode(updated, limit=10000) == canonical_storage_json(updated)
+    encoder.finish()
+    encoder.begin(transaction_ids=[])
+    assert encoder.encode(updated, limit=10000) == canonical_storage_json(updated)
+    assert encoder.encode({'transactions': None}, limit=10000) == canonical_storage_json({'transactions': None})
+
+
+def test_portable_images_near_the_size_bound_drop_the_append_reserve(ledger, monkeypatch):
+    store, _ = ledger
+    original = store.export_budget_files()['budget.sqlite']
+    row = store.transactions('personal')[0]
+    execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Bounded export'}, 'bounded-export')
+    monkeypatch.setattr(portable, 'MAX_DATABASE_BYTES', len(original) - 4096)
+    image = store.export_budget_files()['budget.sqlite']
+    assert len(image) <= len(original) - 4096
+    assert portable.read_files({'budget.sqlite': image}) == store.export_budget('personal')
+
+
+def test_first_saved_ledger_and_direct_export_remain_compatible_with_file_patches():
+    from hashlib import sha256
+    from whab.budgets.file_changes import apply_file_changes
+    store = Store(':memory:', month='2026-10')
+    try:
+        files = store.export_budget_files()
+        store.add_account('personal', {'name': 'Fictional first account', 'type': 'depository', 'balance': 1000})
+        changes = store.export_budget_file_changes('personal', {name: sha256(raw).hexdigest() for name, raw in files.items()})
+        files = apply_file_changes(files, changes)
+        assert portable.read_files(files) == store.export_budget('personal')
+        store.add_transaction('personal', {'accountId': store.accounts('personal')[0]['id'], 'date': '2026-10-01', 'merchant': 'Fictional', 'amount': 100})
+        files = store.export_budget_files()
+        changes = store.export_budget_file_changes('personal', {name: sha256(raw).hexdigest() for name, raw in files.items()})
+        assert apply_file_changes(files, changes) == files
+        assert store.search_transactions('personal', {'maxBytes': 1000000})['total'] == 1
+    finally:
+        store.close()

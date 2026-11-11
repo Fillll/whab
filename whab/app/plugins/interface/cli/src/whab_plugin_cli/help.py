@@ -1,12 +1,21 @@
 """Human-readable and machine-readable help from packaged operation contracts."""
 
+import argparse
 import json
 import shlex
+import sys
 
 from whab.plugins.documentation import installed_catalog, operation
 
 from .bank_commands import BANK_FLAGS
 from .identifiers import catalog_identifiers, cli_id, host_id
+
+
+class CommandParser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('color', sys.stdout.isatty())
+        super().__init__(*args, **kwargs)
+
 
 AGENT_WORKFLOW = """Agent workflow (examples use fictional names/IDs):
   whab budget list

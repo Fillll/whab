@@ -16,14 +16,22 @@ from whab.plugins.documentation import core_document, installed_catalog
 from .bank_commands import add_bank_parser, bank_error, bank_request
 from .config import ConfigError, connection_defaults
 from .errors import PluginSelectionError, selection_error
-from .help import AGENT_WORKFLOW, bank_help, contextual_help, describe, overview, render_catalog
+from .help import (
+    AGENT_WORKFLOW,
+    CommandParser,
+    bank_help,
+    contextual_help,
+    describe,
+    overview,
+    render_catalog,
+)
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 
 
 def parser(argv=(), *, defaults=None):
     catalog = installed_catalog()
     check_identifiers(catalog)
-    root = argparse.ArgumentParser(description="Read and change an explicitly addressed WHAB budget.",
+    root = CommandParser(description="Read and change an explicitly addressed WHAB budget.",
         usage="%(prog)s [CONFIG] [OPTIONS] {query,command,feature-query,feature-command,describe,plugins,sync,jobs,bank} ...",
         epilog='Optional CONFIG is a JSON object. Local fields: home, budget, environment, ca, workspace. Remote fields: url, budget, ca, workspace, token_env. Choose home or url. Command-line options override the file. Relative home/CA paths use the config directory.\nLocal example: {"home": "runtime", "budget": "default", "environment": "sandbox"}\nRemote example: {"url": "https://localhost:5173", "budget": "default", "ca": "tls/ca.crt"}\nUsage: whab-cli default.budget --help\n\n' + AGENT_WORKFLOW + '\n\n' + overview(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)

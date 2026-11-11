@@ -31,9 +31,10 @@ def save_history(store, workspace, journal, previous, *, cache_valid):
     end = len(raw.encode()) - 2
     # The record remains ordinary JSON TEXT for old readers. Whitespace reserves
     # space for SQLite's transactional incremental blob writes, with no schema change.
-    padded = raw + ' ' * _RESERVE_BYTES
+    reserve = min(_RESERVE_BYTES, max(4096, (end + 2) // 16))
+    padded = raw + ' ' * reserve
     store.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record",
                      (workspace, padded))
     rowid = store.db.execute('SELECT rowid FROM budget_history WHERE workspace=?', (workspace,)).fetchone()[0]
-    hints[workspace] = (rowid, end, end + 2 + _RESERVE_BYTES, entries[-1]['hash'] if entries else None)
+    hints[workspace] = (rowid, end, end + 2 + reserve, entries[-1]['hash'] if entries else None)
     store._history_blob_positions = hints
