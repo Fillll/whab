@@ -205,7 +205,8 @@ class Authority:
             states = self._local_states(selected if reusable else None)
             if reusable:
                 name, identifiers = selected
-                states[name]['transactions'] = {**self._native_states[name]['transactions'], **states[name]['transactions']}
+                previous_rows = self._native_states[name]['transactions']
+                states[name]['transactions'] = {**previous_rows, **states[name]['transactions']} if identifiers else previous_rows
                 # The journal was assembled from immutable snapshots in this transaction.
                 states[name].update({key: value for key, value in transaction['history_after'][name].items() if key == 'history'})
             if not reusable or not hasattr(self, '_snapshot_encoder'):
@@ -281,7 +282,7 @@ class Authority:
                         if selected is not None:
                             new = snapshot(self, name, transaction_ids=selected, include_history=False)
                             changed = {row['id']: row for row in new['transactions']}
-                            new['transactions'] = [changed.get(row['id'], row) for row in old['transactions']]
+                            new['transactions'] = [changed.get(row['id'], row) for row in old['transactions']] if selected else old['transactions']
                             if 'history' in old:
                                 new['history'] = old['history']
                         else:
