@@ -1126,3 +1126,42 @@ records are excluded. The read changes no revision or history and cannot authori
 a later deletion. Native deletion rechecks the same core guard atomically.
 SQLite 1.20 and JSON 1.12 implement it; remote storage forwards the public query.
 Older adapters refuse inspection explicitly while their existing reads remain valid.
+
+### Optional CLI transaction selection and account metadata
+
+WHAB 2.70 supports optional storage
+`search_transactions(workspace, filters) -> dict` and
+`account_latest_dates(workspace) -> dict[str, str]`. Both return coherent reads.
+Search accepts inclusive `since`/`until`, `month`, repeated literal `merchant`
+terms, and uncategorized/posted/transfer selection with an optional sample limit.
+It returns complete list matches or complete uncategorized counts plus the
+explicitly requested sample. The local authenticated `GET
+/api/local/v1/transaction-search` endpoint returns the permanent budget identity
+and one revision with that result. Backends without this capability return 404
+and the CLI retains its ordinary public-query fallback. This adds no method to
+the required `StorageBackend` protocol or remote ledger query set.
+
+`BankAdapter(..., supports_account_metadata=True)` declares optional
+`read_accounts(item_id, access_token, institution_name) -> list[ImportedAccount]`.
+The typed provider worker validates the same account IDs, ownership, currencies
+and bounds as synchronization. The method returns account metadata only. Setup
+uses it without fetching transaction changes. Providers with the default false
+retain their existing synchronization-based preview. Plugins using the new
+capability require `whab>=2.70,<3`.
+
+Trusted native storage may pass a canonical `encoder` to
+`encode_local_state(..., validate=False)` to reuse immutable record bytes. Its
+output must match `canonical_storage_json` exactly, including bounds and Unicode
+handling. Untrusted transfer decoding and full validation remain required at
+external boundaries.
+
+Optional `export_budget_file_changes(workspace, previous)` reduces local worker
+transport for repeated checkpoints. `previous` maps relative storage file names
+to SHA-256 digests. Return either `{"files": {name: bytes}}` for a complete
+replacement, or `{"patches": [...]}`. Each patch has `name`, `base` and resulting
+`digest` SHA-256 strings, final byte `size`, and ordered nonoverlapping `chunks`
+of `[offset, bytes]`. The host checks base ownership, offsets, sizes and the final
+digest before constructing the ordinary portable container. Initial or mismatched
+bases receive complete files. Old backends continue through
+`export_budget_files()`. This capability changes transport volume while every
+checkpoint still publishes the complete saved container synchronously.
