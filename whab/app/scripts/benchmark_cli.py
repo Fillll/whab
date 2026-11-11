@@ -23,6 +23,30 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from whab.plugins.local import local_connection
 
 
+def verify_portable_file(path, *, transaction_ids, accounts, total):
+    """Reopen the saved file into an empty store, independently of native caches."""
+    from whab_plugin_sqlite import Store
+
+    from whab.budgets.container import decode_container
+    container = decode_container(path.read_bytes())
+    prefix = 'plugins/sqlite/'
+    files = {name.removeprefix(prefix): raw for name, raw in container.files.items() if name.startswith(prefix)}
+    reader = Store(':memory:', month='2026-10', _authority=False)
+    try:
+        reader.restore_budget_files('personal', files)
+        snapshot = reader.export_budget('personal')
+        rows = {row['id']: row for row in snapshot['transactions']}
+        assert len(rows) == total
+        assert all(rows[key]['categoryAgent'] == 'Benchmark' and rows[key]['categoryId'] == 'category-56' for key in transaction_ids)
+        assert sum(row['categoryId'] is not None for row in rows.values()) == len(transaction_ids)
+        classified = {row['name']: row for row in snapshot['accounts']}
+        assert all(classified[f'Account {i}']['type'] == 'depository'
+                   and classified[f'Account {i}']['onBudget'] is True for i in range(accounts))
+        assert len(snapshot['history']['entries']) == len(transaction_ids) + accounts
+    finally:
+        reader.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runs', type=int, default=100)
@@ -191,6 +215,8 @@ def main():
             while endpoint.exists() and monotonic() < deadline:
                 sleep(.1)
             assert not endpoint.exists()
+            verify_portable_file(budget_path, transaction_ids=[row['id'] for row in transactions[:args.runs]],
+                                 accounts=args.runs, total=args.transactions)
             saved_file_bytes = budget_path.stat().st_size
     report = {name: {'n': len(times), 'median_ms': round(median(times), 2),
                      'p95_ms': round(sorted(times)[math.ceil(.95 * len(times)) - 1], 2),
@@ -200,7 +226,7 @@ def main():
     print(json.dumps({'python': platform.python_version(), 'platform': platform.platform(),
                       'versions': {name: version(name) for name in ('whab', 'whab_plugin_cli', 'whab_plugin_sqlite')},
                       'transactions': args.transactions, 'accounts': accounts, 'runs': args.runs,
-                      'saved_result_verified': True, 'saved_container_bytes': saved_file_bytes, 'commands': report}, indent=2))
+                      'saved_result_verified': True, 'portable_file_independently_verified': True, 'saved_container_bytes': saved_file_bytes, 'commands': report}, indent=2))
 
 
 if __name__ == '__main__':
