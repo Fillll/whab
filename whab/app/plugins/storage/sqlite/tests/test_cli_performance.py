@@ -234,3 +234,14 @@ def test_canonical_transaction_chunks_keep_separators_and_selected_replacements(
         value = {'transactions': rows, 'empty': [], 'flags': [True, False]}
         assert b''.join(encoder.chunks(value, limit=100000)) == canonical_storage_json(value)
         encoder.finish()
+
+
+def test_incremental_personal_and_demo_exports_keep_separate_images_and_audit_offsets(ledger):
+    store, _ = ledger
+    for workspace in ('personal', 'demo'):
+        store.export_budget_files(workspace)
+    for index, workspace in enumerate(('demo', 'personal', 'demo', 'personal')):
+        row = store.transactions(workspace)[0]
+        store.edit_transaction(workspace, row['id'], note=f'Isolated {workspace} {index}')
+        files = store.export_budget_files(workspace)
+        assert portable.read_files(files) == store.export_budget(workspace)

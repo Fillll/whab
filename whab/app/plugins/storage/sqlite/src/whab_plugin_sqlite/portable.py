@@ -62,25 +62,25 @@ def _incremental_image(store, workspace, cached):
                 row = change['after']
                 if change['path'][0] == 'accounts':
                     clean.execute("UPDATE accounts SET name=?,type=?,balance=?,currency=?,on_budget=?,subtype=?,bank_website=?,name_overridden=?,closed=? WHERE workspace=? AND id=?",
-                                  (row['name'], row['type'], row['balance'], row['currency'], int(row['onBudget']), row['subtype'], row.get('bankWebsite'), int(row.get('nameOverridden', False)), int(row.get('closed', False)), workspace, row['id']))
+                                  (row['name'], row['type'], row['balance'], row['currency'], int(row['onBudget']), row['subtype'], row.get('bankWebsite'), int(row.get('nameOverridden', False)), int(row.get('closed', False)), 'personal', row['id']))
                 else:
                     clean.execute("UPDATE transactions SET account_id=?,date=?,merchant=?,merchant_logo=?,amount=?,category_id=?,pending=?,reviewed=?,source=?,note=?,is_transfer=?,inferred_transfer=?,category_edited=?,deleted=?,original_details=?,category_agent=? WHERE workspace=? AND id=?",
-                                  (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), workspace, row['id']))
+                                  (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), 'personal', row['id']))
         from types import SimpleNamespace
 
         from .history_writes import save_history
-        holder = SimpleNamespace(db=clean, _history_blob_positions=getattr(store, '_portable_history_positions', {}))
+        holder = SimpleNamespace(db=clean, _history_blob_positions=getattr(store, '_portable_history_positions', {}).get(workspace, {}))
         previous = {**journal, 'entries': entries[:positions[0] + 1]}
-        save_history(holder, workspace, journal, previous, cache_valid=True)
-        store._portable_history_positions = holder._history_blob_positions
+        save_history(holder, 'personal', journal, previous, cache_valid=True)
+        store._portable_history_positions[workspace] = holder._history_blob_positions
         clean.commit()
         raw = clean.serialize()
         if len(raw) > MAX_DATABASE_BYTES:
             clean.execute("VACUUM")
             raw = clean.serialize()
-            hint = store._portable_history_positions[workspace]
-            rowid = clean.execute('SELECT rowid FROM budget_history WHERE workspace=?', (workspace,)).fetchone()[0]
-            store._portable_history_positions[workspace] = (rowid, *hint[1:])
+            hint = store._portable_history_positions[workspace]['personal']
+            rowid = clean.execute("SELECT rowid FROM budget_history WHERE workspace='personal'").fetchone()[0]
+            store._portable_history_positions[workspace]['personal'] = (rowid, *hint[1:])
         return raw
     finally:
         clean.close()
@@ -164,7 +164,9 @@ def export_files(store, workspace):
             rowid = clean.db.execute("SELECT rowid FROM budget_history WHERE workspace='personal'").fetchone()[0]
             hint = hints['personal']
             hints['personal'] = (rowid, *hint[1:])
-        store._portable_history_positions = hints
+        if not hasattr(store, '_portable_history_positions'):
+            store._portable_history_positions = {}
+        store._portable_history_positions[workspace] = hints
         return {_FILENAME: raw}
     finally:
         clean.close()
