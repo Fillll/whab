@@ -451,3 +451,45 @@ def test_trigram_candidates_match_python_casefold_for_unicode_substrings():
                 assert actual == expected
     finally:
         cached.close()
+
+
+def test_sparse_uncategorized_samples_do_not_scan_categorized_history():
+    store = Store(':memory:', month='2026-10', _authority=False)
+    try:
+        account = store.add_account('personal', {'name': 'Fictional', 'type': 'depository', 'balance': 10000})
+        store.add_transaction('personal', {'accountId': account, 'date': '2025-01-01', 'merchant': 'Only uncategorized', 'amount': 100})
+        store.db.executemany("INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,source,category_id) VALUES(?,'personal',?,'2026-10-01','Already categorized',100,'manual','groceries')",
+                             [(f'categorized-{i}', account) for i in range(5000)])
+        steps = []
+        store.db.set_progress_handler(lambda: steps.append(1) or 0, 100)
+        result = store.search_transactions('personal', {'uncategorized': True, 'limit': 1})
+        store.db.set_progress_handler(None, 0)
+        assert result['total'] == result['returned'] == 1
+        assert result['data'][0]['merchant'] == 'Only uncategorized'
+        assert len(steps) < 50, 'A limited sample must avoid walking categorized rows'
+    finally:
+        store.close()
+
+
+def test_optional_runtime_index_definitions_are_checked_without_schema_combinations(ledger):
+    store, _ = ledger
+    image = store.export_budget_files()['budget.sqlite']
+    sql = store.db.execute("SELECT sql FROM sqlite_schema WHERE name='tx_uncategorized_recent'").fetchone()[0]
+    clean = sqlite3.connect(':memory:')
+    try:
+        clean.deserialize(image)
+        clean.execute(sql)
+        assert portable.read_files({'budget.sqlite': clean.serialize()}) == store.export_budget('personal')
+        clean.execute('DROP INDEX tx_uncategorized_recent')
+        clean.execute('CREATE INDEX tx_uncategorized_recent ON transactions(merchant)')
+        with pytest.raises(StoreError, match='unsupported database schema'):
+            portable.read_files({'budget.sqlite': clean.serialize()})
+    finally:
+        clean.close()
+
+
+def test_uncategorized_sample_keeps_read_compatibility_without_the_new_runtime_index(ledger):
+    store, _ = ledger
+    expected = store.search_transactions('personal', {'uncategorized': True, 'limit': 1})
+    store.db.execute('DROP INDEX tx_uncategorized_recent')
+    assert store.search_transactions('personal', {'uncategorized': True, 'limit': 1}) == expected

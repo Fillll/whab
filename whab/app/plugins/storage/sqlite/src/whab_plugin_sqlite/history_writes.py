@@ -2,7 +2,7 @@
 
 import json
 
-_RESERVE_BYTES = 64 * 1024
+_RESERVE_BYTES = 1024 * 1024
 
 
 def save_history(store, workspace, journal, previous, *, cache_valid):

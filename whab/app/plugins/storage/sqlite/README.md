@@ -212,7 +212,11 @@ Optional `search_transactions(workspace, filters)` selects complete date/merchan
 matches, or uncategorized counts and a requested sample, under one read snapshot.
 It preserves Unicode casefold literal matching, descending date/ID order and
 integer currency amounts. `account_latest_dates(workspace)` reads active-history
-MAX dates grouped by account for provider previews.
+MAX dates grouped by account for provider previews. A partial date/ID index
+keeps limited uncategorized samples from walking categorized history; readers of
+older native stores retain the ordinary query fallback. Portable schema validation
+checks each optional runtime index's exact definition once, without enumerating
+every combination of omitted indexes.
 
 Merchant selections use a disposable in-memory index of Python-casefolded text.
 SQLite's [FTS5 trigram index](https://www.sqlite.org/fts5.html#the_trigram_tokenizer)
@@ -243,8 +247,9 @@ unverified source stamps rebuild a fresh validated image. The live database,
 connections and credentials are never copied into a portable image. Checkpoints
 still finish synchronously before the CLI returns.
 
-Audit records remain compatible JSON TEXT. A small whitespace reserve lets
-SQLite append entries transactionally through incremental blob writes. Larger
+Audit records remain compatible JSON TEXT. An adaptive whitespace reserve,
+capped at 1 MiB, lets SQLite append entries transactionally through incremental
+blob writes without repeatedly reallocating a large immutable baseline. Larger
 entries, unverified records and triggers retain full JSON replacement. The
 portable storage capability may return SHA-256-bound file patches so unchanged
 image pages stay in the host. WHAB still publishes a complete `.whab` container.

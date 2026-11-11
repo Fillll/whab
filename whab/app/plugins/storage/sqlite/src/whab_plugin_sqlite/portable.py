@@ -3,7 +3,6 @@
 import json
 import sqlite3
 from collections.abc import Mapping
-from itertools import combinations
 
 from whab.plugins import StoreError, receipt_media_type
 
@@ -12,7 +11,7 @@ from .store import Store
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
 _FORMAT_VERSION = 1
-_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized")
+_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent")
 _ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000, "budget_history": 1}
 
 
@@ -218,6 +217,8 @@ def read_files(files, *, with_receipts=False):
     reader = Store(":memory:", month="2026-10", _authority=False)
     try:
         expected_schema = _without_additive_columns(_schema(reader.db))
+        optional_indexes = {row[1]: row for row in expected_schema if row[1] in _ADDITIVE_INDEXES}
+        expected_schema = [row for row in expected_schema if row[1] not in optional_indexes]
         # Earlier format-1 images predate account scope. Keep their exact trusted
         # schema allowlisted and infer defaults while reading their data only.
         legacy_schema = [
@@ -229,7 +230,7 @@ def read_files(files, *, with_receipts=False):
         # Each planning table is additive. Preserve the exact prior schemas for
         # every combination without executing any stored SQL or migrations.
         compatible_schemas = [
-            [row for row in schema if row[2] not in omitted and row[1] not in omitted_indexes]
+            [row for row in schema if row[2] not in omitted]
             for schema in (expected_schema, legacy_schema)
             # Bank setup metadata is native-only; older credential-free images
             # retain their exact earlier items schema, including an empty table.
@@ -254,19 +255,20 @@ def read_files(files, *, with_receipts=False):
             for omitted in ((), ("future_funding",), ("rollover_modes",), ("future_funding", "rollover_modes"))
             for omitted in (omitted, (*omitted, "transaction_receipts"))
             for omitted in (omitted, (*omitted, "budget_history"))
-            # These exact indexes are optional optimizations. Every present
-            # object, including its index SQL, must still match the allowlist.
-            for count in range(len(_ADDITIVE_INDEXES) + 1)
-            for omitted_indexes in combinations(_ADDITIVE_INDEXES, count)
         ]
         reader.db.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
         reader.db.execute("PRAGMA trusted_schema=OFF")
         reader.db.execute("PRAGMA query_only=ON")
         reader.db.deserialize(raw)
         actual_schema = _schema(reader.db)
+        # Optional indexes may be absent. Validate every present definition once
+        # instead of expanding all combinations of runtime-only indexes.
+        if any(row[1] in optional_indexes and row != optional_indexes[row[1]] for row in actual_schema):
+            raise StoreError("This SQLite budget has an unsupported database schema.")
+        normalized_schema = [row for row in actual_schema if row[1] not in optional_indexes]
         if (
             reader.db.execute("PRAGMA user_version").fetchone()[0] != _FORMAT_VERSION
-            or _without_additive_columns(actual_schema) not in compatible_schemas
+            or _without_additive_columns(normalized_schema) not in compatible_schemas
         ):
             raise StoreError("This SQLite budget has an unsupported database schema.")
         if [row[0] for row in reader.db.execute("PRAGMA quick_check")] != ["ok"]:

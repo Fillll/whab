@@ -43,6 +43,8 @@ def verify_portable_file(path, *, transaction_ids, accounts, total):
         assert all(classified[f'Account {i}']['type'] == 'depository'
                    and classified[f'Account {i}']['onBudget'] is True for i in range(accounts))
         assert len(snapshot['history']['entries']) == len(transaction_ids) + accounts
+        return {'transactions': len(rows), 'edits': len(transaction_ids) + accounts,
+                'saved_container_bytes': path.stat().st_size, 'portable_payload_bytes': sum(map(len, files.values()))}
     finally:
         reader.close()
 

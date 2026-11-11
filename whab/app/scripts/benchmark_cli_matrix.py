@@ -13,7 +13,6 @@ import math
 import os
 import platform
 import random
-import resource
 import subprocess
 import sys
 from importlib.metadata import version
@@ -32,6 +31,17 @@ from whab.domain.history import financial
 from whab.domain.portable import ACCOUNT_FIELDS
 from whab.initialization import initialize_home
 from whab.plugins.local import local_connection
+
+
+class MeasuredProcess(subprocess.Popen):
+    """Collect only this CLI child's CPU, excluding separately reaped hosts."""
+    usage = None
+
+    def _try_wait(self, flags):
+        pid, status, usage = os.wait4(self.pid, flags)
+        if pid:
+            self.usage = usage
+        return pid, status
 
 
 def fixture(root, total, accounts):
@@ -84,21 +94,28 @@ def main():
                    WHAB_PLUGINS='', WHAB_STORAGE='sqlite', ALLOW_LIVE_PLAID='false')
 
         def cli(*command, sample=None, expected_error=None, plain=False):
-            usage = resource.getrusage(resource.RUSAGE_CHILDREN)
             load = os.getloadavg()
             started = perf_counter()
-            result = subprocess.run([executable, '--home', str(home), '--environment', 'sandbox', *command],
-                                    env=env, capture_output=True, timeout=120)
+            with MeasuredProcess([executable, '--home', str(home), '--environment', 'sandbox', *command],
+                                 env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+                try:
+                    stdout, stderr = process.communicate(timeout=120)
+                except BaseException:
+                    process.kill()
+                    process.communicate()
+                    raise
             elapsed = (perf_counter() - started) * 1000
-            after = resource.getrusage(resource.RUSAGE_CHILDREN)
+            result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+            usage = process.usage
+            assert usage is not None, 'Per-child CPU accounting must be available'
             if expected_error is not None:
                 assert result.returncode and expected_error in result.stderr, result.stderr.decode()
                 return None
             assert result.returncode == 0, result.stderr.decode()
             if sample:
                 samples.setdefault(sample, []).append({'wall_ms': elapsed,
-                    'client_user_ms': (after.ru_utime - usage.ru_utime) * 1000,
-                    'client_system_ms': (after.ru_stime - usage.ru_stime) * 1000,
+                    'client_user_ms': usage.ru_utime * 1000,
+                    'client_system_ms': usage.ru_stime * 1000,
                     'load_average': load, 'output_bytes': len(result.stdout)})
             return result.stdout if plain else json.loads(result.stdout)
 
@@ -174,8 +191,9 @@ def main():
                 sleep(.1)
             assert not endpoint.exists()
             for budget in budgets:
-                verify_portable_file(Path(budget['path']), transaction_ids=[f'tx-{i:06}' for i in range(args.runs)],
-                                     accounts=args.runs, total=budget['transactions'])
+                cold[budget['name']]['saved_file'] = verify_portable_file(
+                    Path(budget['path']), transaction_ids=[f'tx-{i:06}' for i in range(args.runs)],
+                    accounts=args.runs, total=budget['transactions'])
             for _ in range(args.runs):
                 cli('Missing fictional budget', 'trnx', 'list', '--help', plain=True, sample='help_after')
     report = {}
@@ -184,7 +202,8 @@ def main():
         report[key] = {'n': len(rows), 'median_ms': round(median(times), 2),
                        'p95_ms': round(times[math.ceil(.95 * len(times)) - 1], 2),
                        'max_ms': round(max(times), 2), 'samples': rows}
-    print(json.dumps({'python': platform.python_version(), 'platform': platform.platform(), 'logical_cpus': os.cpu_count(),
+    source_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    print(json.dumps({'source_commit': source_commit, 'python': platform.python_version(), 'platform': platform.platform(), 'logical_cpus': os.cpu_count(),
                       'versions': {name: version(name) for name in ('whab', 'whab_plugin_cli', 'whab_plugin_sqlite')},
                       'transactions': sizes, 'accounts': max(100, args.runs), 'categories': 57, 'runs': args.runs,
                       'seed': 20261110, 'cold': cold, 'saved_results_verified': True, 'commands': report}, indent=2))

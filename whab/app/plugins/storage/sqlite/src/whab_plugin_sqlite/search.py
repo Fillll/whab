@@ -33,12 +33,12 @@ def search_transactions(store, workspace, filters):
             conditions.append('pending=0')
         if filters.get('excludeTransfers'):
             conditions.extend(['is_transfer=0', 'inferred_transfer=0'])
-        scope = ' FROM transactions WHERE ' + ' AND '.join(conditions)
+        scope = ' WHERE ' + ' AND '.join(conditions)
         counts = Counter()
         by_source = Counter()
         by_currency = Counter()
         if uncategorized:
-            for row in store.db.execute('SELECT account_id,source,pending,is_transfer,inferred_transfer,COUNT(*) AS count' + scope + ' GROUP BY account_id,source,pending,is_transfer,inferred_transfer', values):
+            for row in store.db.execute('SELECT account_id,source,pending,is_transfer,inferred_transfer,COUNT(*) AS count FROM transactions' + scope + ' GROUP BY account_id,source,pending,is_transfer,inferred_transfer', values):
                 count = row['count']
                 transfer = bool(row['is_transfer'] or row['inferred_transfer'])
                 counts['total'] += count
@@ -51,7 +51,10 @@ def search_transactions(store, workspace, filters):
         tail = ' ORDER BY date DESC,id DESC' + (' LIMIT ?' if limit is not None else '')
         rows = []
         response_bytes = len(json.dumps(filters, ensure_ascii=False).encode()) + 512
-        for row in store.db.execute('SELECT *' + scope + tail, [*values, *([limit] if limit is not None else [])]):
+        table = 'transactions'
+        if uncategorized and not merchants and store.db.execute("SELECT 1 FROM sqlite_schema WHERE type='index' AND name='tx_uncategorized_recent'").fetchone():
+            table += ' INDEXED BY tx_uncategorized_recent'
+        for row in store.db.execute('SELECT * FROM ' + table + scope + tail, [*values, *([limit] if limit is not None else [])]):
             account = accounts[row['account_id']]
             category = categories.get(row['category_id'], {})
             transaction = public_transaction({
