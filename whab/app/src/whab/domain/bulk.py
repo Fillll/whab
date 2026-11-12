@@ -33,6 +33,14 @@ def validate_edits(operation, edits):
         if value in seen:
             raise StoreError(f'Item {index}: duplicate {identity} {value!r}; nothing was changed.')
         seen.add(value)
+        for text in edit.values():
+            if type(text) is str:
+                try:
+                    text.encode('utf-8')
+                    if '\x00' in text:
+                        raise UnicodeError()
+                except UnicodeError:
+                    raise StoreError(f'Item {index}: text must be valid UTF-8 without NUL.') from None
         if 'reviewed' in edit and type(edit['reviewed']) is not bool:
             raise StoreError(f'Item {index}: reviewed must be true or false, not null.')
         if 'onBudget' in edit and type(edit['onBudget']) is not bool:

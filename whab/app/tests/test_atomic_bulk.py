@@ -261,3 +261,91 @@ def test_unsupported_and_invalid_preview_fail_before_backend_access():
     state = {"accounts": {}, "categories": {}, "transactions": {"x": {"id": "x", "note": None}}}
     with pytest.raises(StoreError, match="memo is invalid"):
         bulk_changes(state, "edit_transactions", [{"transactionId": "x", "appendNote": "x"}])
+
+
+def test_process_crashes_leave_old_or_complete_batch_and_replay_once(native, tmp_path):
+    import json
+    import os
+    import subprocess
+    import sys
+
+    store, _, (_, _, _, transactions), factory, path = native
+    # Each crash stage uses a new native file restored through the public contract.
+    files = store.export_budget_files("personal")
+    for stage in ("before", "after"):
+        target = path.with_name(stage + path.suffix)
+        reader = factory(target, month="2026-11")
+        reader.restore_budget_files("personal", files)
+        evidence = reader.commit_evidence()
+        edits = [{"transactionId": key, "appendNote": "crash-safe"} for key in transactions]
+        operation = StorageOperation(
+            uuid4().hex,
+            evidence.authority_epoch,
+            evidence.generation,
+            "personal",
+            "edit_transactions",
+            canonical_storage_json({"edits": edits}),
+        )
+        before = reader.export_budget("personal")
+        reader.close()
+        script = """
+import json,sys,os
+from whab_plugin_sqlite import Store as SQL
+from whab_plugin_json import Store as JSON
+from whab.plugins.storage_transfer import StorageOperation,canonical_storage_json
+value=json.load(sys.stdin)
+store=(SQL if value['backend']=='sqlite' else JSON)(value['path'],month='2026-11')
+if value['stage']=='before':
+    if value['backend']=='sqlite':
+        original=store._save_authority
+        def crash(*args,**kwargs):
+            original(*args,**kwargs)
+            os._exit(31)
+        store._save_authority=crash
+    else:
+        store._commit=lambda *_:os._exit(31)
+operation=StorageOperation(value['id'],value['epoch'],value['generation'],'personal','edit_transactions',canonical_storage_json({'edits':value['edits']}))
+store.execute_operation(operation)
+os._exit(32)
+"""
+        env = {
+            key: os.environ[key]
+            for key in ("PATH", "TMPDIR", "LANG", "LC_ALL")
+            if key in os.environ
+        }
+        process = subprocess.run(
+            [sys.executable, "-c", script],
+            input=json.dumps(
+                {
+                    "backend": "sqlite" if factory is SqliteStore else "json",
+                    "path": str(target),
+                    "stage": stage,
+                    "id": operation.operation_id,
+                    "epoch": evidence.authority_epoch,
+                    "generation": evidence.generation,
+                    "edits": edits,
+                }
+            ),
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=30,
+        )
+        assert process.returncode == (31 if stage == "before" else 32), process.stderr
+        reopened = factory(target, month="2026-11")
+        try:
+            if stage == "before":
+                assert reopened.export_budget("personal") == before
+                assert reopened.commit_evidence().generation == evidence.generation
+            else:
+                replay = reopened.execute_operation(operation)
+                assert (
+                    replay.replayed
+                    and reopened.commit_evidence().generation == evidence.generation + 1
+                )
+                assert all(
+                    row["note"].count("crash-safe") == 1
+                    for row in reopened.transactions("personal")
+                )
+        finally:
+            reopened.close()

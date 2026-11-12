@@ -83,7 +83,7 @@ def execute_bulk(connection, identifier, prefix, args, exchange, error, operatio
     except StoreError as failure:
         raise error(str(failure)) from None
     recovering = args.revision is not None and args.revision != revision and not args.dry_run
-    preview = None if recovering else checked(exchange(connection, 'POST', prefix + '/queries', json={
+    preview = None if recovering else checked(exchange(connection, 'POST', prefix + '/queries', ledger_errors=True, json={
         'operation': 'preview_bulk_edits', 'workspace': 'personal',
         'parameters': {'operation': operation, 'edits': edits},
     }), identifier, error)

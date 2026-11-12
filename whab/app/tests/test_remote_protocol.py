@@ -89,3 +89,55 @@ def test_postcommit_authored_failure_is_uncertain_not_a_definitive_refusal(store
                   'request_id':'fictional-once','expected_revision':service.revision})
         assert response.status_code == 503 and 'uncertain' in response.json()['detail']
         assert len(service.accounts('personal')) == 1
+
+
+def test_atomic_bulk_preview_and_commands_through_https_authority(store):
+    token = "fictional-bulk-token-" + "x" * 32
+    service = LedgerService(store, budget_id="fictional-bulk")
+    binding = BoundRemoteInterface(
+        server_plugin.interface.adapter,
+        SimpleNamespace(
+            config={"SERVER_TOKEN": token}, service=service, budget_id="fictional-bulk"
+        ),
+    )
+    app = FastAPI()
+    app.include_router(create_remote_router(lambda: binding))
+    with TestClient(app, base_url="https://budget.example") as server:
+
+        def forward(request):
+            return server.request(
+                request.method, str(request.url), headers=request.headers, content=request.content
+            )
+
+        client = RemoteStore(
+            "https://budget.example",
+            token,
+            "fictional-bulk",
+            transport=httpx.MockTransport(forward),
+        )
+        try:
+            account = client.add_account(
+                "personal",
+                {"name": "Fictional", "type": "other", "onBudget": False, "balance": 1000},
+            )
+            transaction = client.add_transaction(
+                "personal",
+                {
+                    "accountId": account,
+                    "date": "2026-11-01",
+                    "merchant": "Fictional",
+                    "amount": 100,
+                    "categoryId": None,
+                },
+            )
+            edits = [{"transactionId": transaction, "appendNote": "one", "reviewed": True}]
+            assert client.supports_atomic_bulk_edits()
+            plan = client.preview_bulk_edits("personal", "edit_transactions", edits)
+            assert client.transactions("personal")[0]["note"] == ""
+            assert client.edit_transactions("personal", edits) == plan
+            result = client.classify_accounts(
+                "personal", [{"accountId": account, "type": "credit"}]
+            )
+            assert result["changes"][0]["after"]["onBudget"] is False
+        finally:
+            client.close()

@@ -87,7 +87,7 @@ def verify(path, total, expected, history_count):
         reader.close()
 
 
-def case(command, size, args):
+def case_segment(command, size, args):
     executable = str(Path(sys.executable).parent / "whab")
     samples, separate, cold, expected = [], [], {}, {}
     with TemporaryDirectory(prefix="whab-atomic-benchmark-") as directory:
@@ -306,7 +306,7 @@ def case(command, size, args):
                 process.wait(timeout=60)
                 log.close()
         summary = summarize([row["wall_ms"] for row in samples])
-        baseline = summarize([row["wall_ms"] for row in separate])
+        baseline = summarize([row["wall_ms"] for row in separate]) if separate else {"p50_ms": 0, "p95_ms": 0}
         return {
             "command": command,
             "batch_size": size,
@@ -316,7 +316,7 @@ def case(command, size, args):
             "per_record_p50_ms": summary["p50_ms"] / size,
             "separate": baseline,
             "workflow_saved_p50_ms": baseline["p50_ms"] - summary["p50_ms"],
-            "workflow_saved_p50_percent": 100 * (1 - summary["p50_ms"] / baseline["p50_ms"]),
+            "workflow_saved_p50_percent": 100 * (1 - summary["p50_ms"] / baseline["p50_ms"]) if separate else None,
             "target_p95_ms": 250,
             "target_met": summary["p95_ms"] < 250,
             "cold": cold,
@@ -324,6 +324,34 @@ def case(command, size, args):
             "bulk_samples": samples,
             "separate_samples": separate,
         }
+
+
+def case(command, size, args):
+    # Bound audit growth without pruning history or weakening portable limits.
+    # Each segment starts from the same 100k fixture, warms once, then samples
+    # fresh processes. Separate workflows use the first identical segment.
+    from copy import copy
+    segment_runs = min(args.runs, max(10, 2000 // size))
+    segments = []
+    remaining = args.runs
+    while remaining:
+        selected = copy(args)
+        selected.runs = min(segment_runs, remaining)
+        selected.separate_runs = args.separate_runs if not segments else 0
+        segment = case_segment(command, size, selected)
+        segments.append(segment)
+        remaining -= selected.runs
+    samples = [sample for segment in segments for sample in segment['bulk_samples']]
+    separate = [sample for segment in segments for sample in segment['separate_samples']]
+    summary = summarize([sample['wall_ms'] for sample in samples])
+    baseline = summarize([sample['wall_ms'] for sample in separate])
+    return {**segments[0], 'bulk_runs':len(samples), 'separate_workflow_runs':len(separate),
+        'bulk':summary,'separate':baseline,'per_record_p50_ms':summary['p50_ms']/size, 'per_record_p95_ms':summary['p95_ms']/size,
+        'workflow_saved_p50_ms':baseline['p50_ms']-summary['p50_ms'],
+        'workflow_saved_p50_percent':100*(1-summary['p50_ms']/baseline['p50_ms']),
+        'target_met':summary['p95_ms']<250,'cold':[segment['cold'] for segment in segments],
+        'saved_verification':[segment['saved_verification'] for segment in segments],
+        'bulk_samples':samples,'separate_samples':separate,'fresh_fixture_segments':len(segments)}
 
 
 def main():

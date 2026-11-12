@@ -223,3 +223,10 @@ def test_file_stdin_and_resolution(endpoint, tmp_path, monkeypatch):
     assert bulk.execute_accounts(
         None, "budget", "/budget", options, exchange, console.CommandError
     )["data"]["changes"][0]["after"]["onBudget"]
+
+
+def test_offline_parser_discovery():
+    for parts in ([], ['Fictional','trnx'], ['Fictional','account'], ['Fictional','trnx','categorize'], ['Fictional','trnx','edit-many'], ['Fictional','account','classify']):
+        with pytest.raises(SystemExit) as result:
+            console.main([*parts,'--help'])
+        assert result.value.code == 0

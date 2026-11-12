@@ -2415,6 +2415,38 @@
       ],
       "retry": "Exact original operation/workspace/resolved edits/revision/request ID/history returns its original durable receipt without changes/history/save, including after restart. Never retry an uncertain mutation with fresh intent. Bounded receipt expiry rejects stale requests. Preview is read-only and does not reserve its revision.",
       "availability": "WHAB 2.72+, optional AtomicBulkEdits; SQLite 1.23+ and JSON 1.15+; remote authority must support it."
+    },
+    {
+      "name": "AtomicBulkEdits.supports_atomic_bulk_edits",
+      "kind": "sdk",
+      "summary": "Explicitly advertise bounded native atomic edits, permanent history and durable receipts.",
+      "input": {
+        "type": "object",
+        "description": "No arguments.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True opts into the complete AtomicBulkEdits contract; absence/false is unsupported."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read-only validation: no mutation, revision advance, history or checkpoint.",
+      "permissions": "Host-scoped optional SDK callback; never arbitrary native storage access through HTTP.",
+      "scope": "Exactly one addressed budget/environment/workspace. IDs do not select another budget.",
+      "errors": [
+        "1–100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
+        "Core category currency, account type/subtype/scope and annotation bounds apply. Unsupported backends fail before mutation.",
+        "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
+      ],
+      "retry": "Exact original operation/workspace/resolved edits/revision/request ID/history returns its original durable receipt without changes/history/save, including after restart. Never retry an uncertain mutation with fresh intent. Bounded receipt expiry rejects stale requests. Preview is read-only and does not reserve its revision.",
+      "availability": "WHAB 2.72+, optional AtomicBulkEdits; SQLite 1.23+ and JSON 1.15+; remote authority must support it."
     }
   ]
 }

@@ -265,7 +265,7 @@ def execute(args, home, environment, ca):
                 return selected
         if args.command in {"transactions", "trnx"} and args.filter in {"categories", "categorize", "categorise"}:
             if args.filter != 'categories':
-                if len(args.transaction_id) > 1 or args.dry_run or args.atomic:
+                if len(args.transaction_id) > 1 or args.dry_run or args.atomic or args.format == "table":
                     return execute_transactions(connection, identifier, prefix, args, exchange, CommandError)
                 args.transaction_id = args.transaction_id[0]
             return execute_category(connection, identifier, prefix, args, exchange, CommandError)

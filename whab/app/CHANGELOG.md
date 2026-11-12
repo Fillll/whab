@@ -2,9 +2,11 @@
 
 ## 2.72.0 — 2026-11-11
 
-PR: [#184](https://github.com/Fillll/whab/pull/184)
+PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)
 
-- Integrate verified CLI discovery, coherent selection and synchronous durable-save optimizations from PR #184 without changing financial rules or weakening recovery.
+- Integrate verified CLI discovery, coherent selection and synchronous durable-save optimizations from PR #184 without changing financial rules or weakening recovery. [#184](https://github.com/Fillll/whab/pull/184)
+
+- Add optional AtomicBulkEdits, guarded mixed transaction and account batches, read-only exact previews and permanent whole-batch undo/redo. Validate all 1–100 targets before one native commit, receipt, revision and durable checkpoint; preserve unrelated fields, scope, identity and exact replay across restart. Repair explicit-parent native digest ordering and portable tracking when integrating performance work. [#188](https://github.com/Fillll/whab/pull/188)
 
 ## 2.71.0 — 2026-11-11
 

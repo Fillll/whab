@@ -55,7 +55,7 @@ def test_bulk_real_console_preservation_restart_and_saved_restore(tmp_path, stor
                     "note": "[YNAB]  ",
                 },
             )
-            for _ in range(3)
+            for _ in range(100)
         ]
         snapshot = seed.export_budget("personal")
     finally:
@@ -103,7 +103,7 @@ def test_bulk_real_console_preservation_restart_and_saved_restore(tmp_path, stor
             "Codex",
             "--dry-run",
         )
-        assert plan["dryRun"] and plan["data"]["count"] == 3 and rows() == before
+        assert plan["dryRun"] and plan["data"]["count"] == 100 and rows() == before
         saved = run(
             "My budget",
             "trnx",
@@ -116,9 +116,9 @@ def test_bulk_real_console_preservation_restart_and_saved_restore(tmp_path, stor
             "--revision",
             plan["revision"],
         )
-        assert saved["data"] == plan["data"] and len(saved["data"]["changes"]) == 3
+        assert saved["data"] == plan["data"] and len(saved["data"]["changes"]) == 100
         history = run("default", "history", "list")["data"]["entries"]
-        assert history[0]["operation"] == "edit_transactions" and history[0]["changeCount"] == 3
+        assert history[0]["operation"] == "edit_transactions" and history[0]["changeCount"] == 100
         assert history[0]["actor"] == "Codex"
         after = rows()
         for row in after.values():
@@ -185,6 +185,11 @@ def test_bulk_real_console_preservation_restart_and_saved_restore(tmp_path, stor
                 ok=False,
             )["error"]
         )
+        unicode_edits = {'edits': [({'transactionId':key,'reviewed':True} if index < 3 else {'transactionId':key,'note':'🍏'*1000}) for index,key in enumerate(ids)]}
+        large = run('default','trnx','edit-many','--file','-',stdin=json.dumps(unicode_edits))
+        assert large['data']['count'] == 100
+        after = rows()
+        assert all(after[key]['note'] == '🍏'*1000 for key in ids[3:])
         account_plan = run(
             "default", "account", "classify", "🍏旅行 card", b, "--type", "credit", "--dry-run"
         )
@@ -206,6 +211,9 @@ def test_bulk_real_console_preservation_restart_and_saved_restore(tmp_path, stor
         assert account_saved["data"]["count"] == 2 and all(
             row["after"]["onBudget"] for row in account_saved["data"]["changes"]
         )
+        single = run('default','account','classify',a,'--type','depository','--agent','Codex','--batch','single',
+            '--revision',account_saved['revision'],'--request-id','fictional-single-classification')
+        assert single['data']['id'] == a and single['data']['type'] == 'depository'
         assert rows() == after
         assert (
             "duplicate"

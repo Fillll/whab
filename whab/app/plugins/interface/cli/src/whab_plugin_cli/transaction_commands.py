@@ -56,8 +56,8 @@ def execute_category(connection, identifier, prefix, args, exchange, error):
         payload['categoryAgent'] = args.agent
     if args.needs_review:
         payload['reviewed'] = False
-    revision = args.revision or categories['revision']
-    intent = args.request_id or str(uuid4())
+    revision = categories['revision'] if args.revision is None else args.revision
+    intent = str(uuid4()) if args.request_id is None else args.request_id
     history = {'batchId': args.batch} if args.batch else None
     try:
         result = checked(exchange(connection, 'POST', prefix + '/commands',
