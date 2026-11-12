@@ -62,3 +62,31 @@ def test_sorted_rendering_labels_and_canonical_address(client, store):
     assert 'sort=date%3Aasc&sort=amount%3Adesc' in text or 'sort=date:asc&sort=amount:desc' in text
     assert re.search(r'href="[^"]*sort=amount%3Adesc[^"]*"', text)
     assert client.get('/budgets/home/transactions/2026-11/usd?sort=date:sideways').status_code == 400
+
+
+def test_actual_visual_worker_retains_native_origin_and_paging(store, tmp_path):
+    from fastapi.testclient import TestClient
+
+    from whab.app import create_app
+    from whab.config import Settings
+    from whab.plugins import load_plugins
+
+    account = store.add_account('personal', {'name': 'Fictional checking', 'type': 'depository', 'balance': 10000})
+    for index in range(101):
+        store.add_transaction('personal', {'accountId': account, 'merchant': f'Fictional item {index:03}',
+                                           'date': '2026-11-01', 'amount': 100, 'categoryId': None})
+    settings = Settings(tmp_path, 5551, 'sandbox', '', '', '', False, '', '', (), ui='web')
+    app = create_app(settings=settings, store=store, plugins=load_plugins(('web',)))
+    with TestClient(app, base_url='https://localhost:5551') as browser:
+        response = browser.get('/budgets/home/transactions/2026-11/usd?sort=merchant:asc&sort=amount:desc')
+        assert response.status_code == 200
+        text = unescape(response.text)
+        for href in re.findall(r'<a[^>]*(?:data-transaction-sort="[^"]+"|data-transaction-month)[^>]*href="([^"]+)"', text):
+            assert href.startswith('/budgets/'), href
+        next_page = re.search(r'data-stream-next="([^"]+)"', text)[1]
+        assert next_page.startswith('/budgets/')
+        assert parse_qs(urlsplit(next_page).query)['sort'] == ['merchant:asc', 'amount:desc']
+        following = browser.get(next_page, headers={'X-WHAB-Transactions-Fragment': '1'})
+        assert following.status_code == 200
+        assert 'Fictional item 100' in following.text
+        assert following.text.count('class="transaction-row"') == 1
