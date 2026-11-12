@@ -24,6 +24,7 @@ from whab.domain.categories import (
     delete_category_group,
     move_category,
     public_categories,
+    rename_category,
 )
 from whab.domain.dates import current_month
 from whab.domain.errors import StoreError
@@ -293,6 +294,12 @@ class Store(Authority):
 
     def add_category_group(self, workspace, name):
         return self._mutate(workspace, lambda state: add_category_group(state, name))
+
+    def supports_category_renaming(self):
+        return True
+
+    def rename_category(self, workspace, category_id, name):
+        return self._mutate(workspace, lambda state: rename_category(state, category_id, name))
 
     def move_category(self, workspace, category_id, parent_id):
         return self._mutate(workspace, lambda state: move_category(state, category_id, parent_id))

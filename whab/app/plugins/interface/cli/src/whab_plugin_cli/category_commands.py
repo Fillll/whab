@@ -17,12 +17,14 @@ def add_category_parser(commands, catalog):
     guide = operation(document, "local", "category.workflow")["summary"]
     group = commands.add_parser(
         "category",
-        help="List, create, move and safely delete categories by name or ID",
+        help="List, create, rename, move and safely delete categories by name or ID",
         description="Manage the two-level category hierarchy in one explicitly addressed budget.",
         epilog=guide,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     actions = group.add_subparsers(dest="category_action", required=True)
+    from .record_edits import add_rename_parser
+    add_rename_parser(actions)
     listing = actions.add_parser(
         "list",
         help="Read parent groups and child categories, including empty groups",
@@ -157,6 +159,10 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
     observed = read()
     groups = observed["data"]
     children = [row for group in groups for row in group["children"]]
+    if args.category_action == "rename":
+        from .record_edits import execute_rename
+        return execute_rename(connection, identifier, prefix, args, exchange, error, observed, read,
+                              resolve_category(children, args.category, error))
     if args.category_action == "list":
         selected = (
             [resolve_category(groups, args.parent, error, parent=True)] if args.parent else groups

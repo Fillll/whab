@@ -282,6 +282,13 @@ class CategoryManagement(Protocol):
     def move_category(self, workspace: str, category_id: str, parent_id: str) -> None: ...
 
 
+class CategoryRenaming(Protocol):
+    """Optional identity-preserving child rename with native audit/receipt support."""
+
+    def supports_category_renaming(self) -> bool: ...
+    def rename_category(self, workspace: str, category_id: str, name: str) -> None: ...
+
+
 class CategoryDeletionInspection(Protocol):
     """Optional read-only counts/months for one child's deletion blockers."""
 

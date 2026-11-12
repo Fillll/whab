@@ -32,7 +32,7 @@ MAX_BULK_OPERATION_BYTES = 72 * 1024 * 1024
 MAX_OPERATION_RECEIPTS = 4096
 STORAGE_ROLES = frozenset({"primary", "staged", "copy", "fenced", "retired"})
 STORAGE_OPERATIONS = frozenset({
-    "delete_category", "delete_category_group",
+    "delete_category", "delete_category_group", "rename_category",
     "add_category_group", "move_category", "add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details", "recorded_command", "history_apply",
     "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "save_item",
     "set_item_status", "disconnect_item", "configure_bank_sync", "apply_sync", "import_workspace", "restore_budget",
@@ -47,6 +47,7 @@ _OPERATION_FIELDS = {
     "add_category": ({"name", "target"}, {"group", "parentId", "currency"}),
     "add_category_group": ({"name"}, set()),
     "move_category": ({"categoryId", "parentId"}, set()),
+    "rename_category": ({"categoryId", "name"}, set()),
     "delete_category": ({"categoryId"}, set()),
     "delete_category_group": ({"parentId"}, set()),
     "add_transaction": ({"accountId", "date", "merchant", "amount", "categoryId"}, {"note", "source", "id"}),
@@ -391,6 +392,8 @@ def dispatch_storage_operation(backend, operation):
         return backend.history_apply(workspace, payload['action'], payload['target'], payload['fingerprint'])
     if name == "add_category_group":
         return backend.add_category_group(workspace, payload["name"])
+    if name == "rename_category":
+        return backend.rename_category(workspace, payload["categoryId"], payload["name"])
     if name == "move_category":
         return backend.move_category(workspace, payload["categoryId"], payload["parentId"])
     if name in {'delete_category', 'delete_category_group'}:

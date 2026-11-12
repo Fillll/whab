@@ -1179,7 +1179,7 @@
           "output": null
         }
       ],
-      "side_effects": "Applies the explicit metadata edit while preserving transaction IDs, notes, categories and review state. Classification can change envelope/net-worth treatment but does not verify an imported balance, link a bank connection, match duplicate transactions or change their source. Lifecycle is independent: closing freezes bank application and rejects new manual entries without zeroing/verifying balances, changing scope or disconnecting Items. Open peers keep syncing. Reopen restores this budget’s native account checkpoint for the next normal sync; no synchronization starts here.",
+      "side_effects": "Applies the explicit metadata edit while preserving transaction IDs, notes, categories and review state. Classification can change envelope/net-worth treatment but does not verify an imported balance, link a bank connection, match duplicate transactions or change their source. Lifecycle is independent: closing freezes bank application and rejects new manual entries without zeroing/verifying balances, changing scope or disconnecting Items. Open peers keep syncing. Reopen restores this budget\u2019s native account checkpoint for the next normal sync; no synchronization starts here.",
       "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
       "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
       "errors": [
@@ -1405,7 +1405,7 @@
               "string",
               "null"
             ],
-            "description": "Explicit self-declared categorizing agent label (1–80 printable characters); not an authenticated identity. Omit on a category edit for normal manual attribution, which clears an earlier agent label. Review-only, memo-only and detail-only edits preserve it. Requires categoryId in the same command. Agent attribution does not change review status.",
+            "description": "Explicit self-declared categorizing agent label (1\u201380 printable characters); not an authenticated identity. Omit on a category edit for normal manual attribution, which clears an earlier agent label. Review-only, memo-only and detail-only edits preserve it. Requires categoryId in the same command. Agent attribution does not change review status.",
             "minLength": 1,
             "maxLength": 80
           }
@@ -1868,7 +1868,7 @@
       ],
       "side_effects": "Read-only local saved connection metadata.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1912,7 +1912,7 @@
       ],
       "side_effects": "Fetches provider data for review without importing transactions or advancing the saved cursor.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -2000,7 +2000,7 @@
       ],
       "side_effects": "Atomically saves links, joins an existing auto-created account when selected, retains transaction IDs/annotations and resets the cursor for idempotent replay. Does not delete old history or start synchronization.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -2056,7 +2056,7 @@
       ],
       "side_effects": "Imports configured open accounts using saved cutoffs and advances their cursors atomically. Archived balances and transactions are unchanged; all-closed connections are skipped before provider access. Shared open destinations may still fetch the connection. No new external bank connection is created.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -2105,9 +2105,9 @@
           }
         }
       ],
-      "side_effects": "With an interval, saves this provider’s budget-local update policy. Does not fetch transactions or register an OS job.",
+      "side_effects": "With an interval, saves this provider\u2019s budget-local update policy. Does not fetch transactions or register an OS job.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -2151,7 +2151,7 @@
       ],
       "side_effects": "Registers or removes the existing WHAB launchd task. It can start WHAB to check due jobs in saved budgets. Other platforms use cron with python -m whab --run-jobs.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -2723,7 +2723,7 @@
         "properties": {
           "limit": {
             "type": "integer",
-            "description": "Page size, 1–100.",
+            "description": "Page size, 1\u2013100.",
             "minimum": 1,
             "maximum": 100,
             "default": 50
@@ -3314,6 +3314,116 @@
       ],
       "retry": "Read-only; repeat after concurrent changes. This is inspection, not permission to replay an uncertain mutation.",
       "availability": "WHAB 2.69+, SQLite 1.21+/JSON 1.13+ for zero-only assignment deletion policy."
+    },
+    {
+      "name": "rename_category",
+      "kind": "command",
+      "summary": "Rename one existing child in place, preserving identity, parent, currency, target, transactions, assignments and audit history.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "New child name; trimmed, duplicate sibling names refused ignoring case and outer whitespace."
+          }
+        },
+        "required": [
+          "categoryId",
+          "name"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit category-management operation parameters."
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "categoryId": "fictional-rent",
+            "name": "Main Residence"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Saves only explicit hierarchy metadata and records financial history atomically. Existing parent groups, child identities, targets, balances, assignments and transaction references remain intact. No bank sync is started.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict.",
+        "Duplicate group names or destination siblings are refused. Missing parents, child-as-parent and deeper hierarchies are invalid.",
+        "Stale state fails; uncertain writes must not be replayed with a new request identity.",
+        "Parent groups cannot be renamed by this child-only operation."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.71+ and CategoryRenaming support (SQLite 1.22+, JSON 1.14+)."
+    },
+    {
+      "name": "append_transaction_note",
+      "kind": "command",
+      "summary": "Append text verbatim to a saved transaction note with one added newline when nonempty; preserve every unrelated field, including merchant whitespace.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Exact text to append; final saved note including separator must fit 1000 characters. Never trimmed."
+          }
+        },
+        "required": [
+          "transactionId",
+          "text"
+        ],
+        "additionalProperties": false,
+        "description": "Append-only public memo intent; the authority reads the saved note under the guarded command lock."
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionId": "fictional-bicycle",
+            "text": "Bicycle for Alex"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Appends only to the note through the existing guarded annotation edit, with permanent history and durable request receipts. Existing note, financial fields, review state and category attribution remain unchanged. No bank sync.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Missing/deleted transactions, empty text and a final memo over 1000 characters are refused without mutation.",
+        "Stale revisions and request IDs reused with different intent conflict.",
+        "Uncertain responses require the original request, revision, payload and actor/batch metadata; never create a new intent as a retry."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.71+ with existing edit_transaction and permanent history support; no new storage callback is required."
     }
   ]
 }
