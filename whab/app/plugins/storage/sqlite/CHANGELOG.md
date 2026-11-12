@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.22.0 — 2026-11-11
+
+PR: [#187](https://github.com/Fillll/whab/pull/187)
+
+- Implement optional CategoryRenaming through the shared duplicate-sibling rule inside the existing native audited transaction. Preserve category identity, parent, currency, target, assignments, references and all previous history; keep native durable receipts and note-only annotation preservation without a schema migration.
+
 ## 1.21.1 — 2026-11-09
 
 PR: [#183](https://github.com/Fillll/whab/pull/183)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.0 — 2026-11-11
+
+PR: [#187](https://github.com/Fillll/whab/pull/187)
+
+- Implement optional CategoryRenaming through shared core validation in the detached native commit. Preserve identity, parents, financial/reference fields and previous history; commit rename and its reversible audit/receipt atomically. Existing note-only edits retain exact memo and merchant text; no data-format change.
+
 ## 1.13.0 — 2026-11-09
 
 PR: [#182](https://github.com/Fillll/whab/pull/182)

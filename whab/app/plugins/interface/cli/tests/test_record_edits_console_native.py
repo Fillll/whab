@@ -85,12 +85,12 @@ def test_real_commands_preserve_identity_notes_attribution_and_restart_replay(tm
         run('default','category','create','Main Residence','--parent','Fictional Travel')
         assert 'ambiguous' in run('default','category','rename','Main Residence','--name','New',ok=False)['error']
         first = next(row for row in query('transactions')['data'] if row['id']==transaction)
-        appended = run('My budget','trnx','note',transaction,'--append',"Oliver's matress",'--agent','Codex','--batch','fictional-cleanup')
+        appended = run('My budget','trnx','note',transaction,'--append',"Alex's matress",'--agent','Codex','--batch','fictional-cleanup')
         assert first['categoryAgent'] == 'Fictional categorizer'
-        expected_note = first['note'] + "\nOliver's matress"
+        expected_note = first['note'] + "\nAlex's matress"
         assert appended['data'] == {**first,'note':expected_note}
         assert appended['data']['merchant'] == '  Fictional merchant  '
-        replay_args = ('default','trnx','note',transaction,'--append',"Oliver's matress",'--agent','Codex',
+        replay_args = ('default','trnx','note',transaction,'--append',"Alex's matress",'--agent','Codex',
                        '--batch','fictional-cleanup','--request-id',appended['requestId'],'--revision',appended['expectedRevision'])
         assert run(*replay_args)['replayed'] is True
         assert 'refused' in run('default','trnx','note',transaction,'--append','Stale','--revision',appended['expectedRevision'],ok=False)['error']

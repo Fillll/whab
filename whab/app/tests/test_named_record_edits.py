@@ -69,11 +69,11 @@ def test_append_preserves_verbatim_text_fields_and_replays_once(ledger):
     store, service, category, transaction = ledger
     before = deepcopy(snapshot(store))
     revision, request = service.revision, uuid4().hex
-    args = {'transactionId':transaction,'text':"Oliver's matress  \n"}
+    args = {'transactionId':transaction,'text':"Alex's matress  \n"}
     first = invoke(service,'append_transaction_note',args,request_id=request,revision=revision)
     after = snapshot(store)
     expected = deepcopy(before)
-    expected['transactions'][transaction]['note'] += "\nOliver's matress  \n"
+    expected['transactions'][transaction]['note'] += "\nAlex's matress  \n"
     expected['history'] = after['history']
     assert after == expected
     assert invoke(service,'append_transaction_note',args,request_id=request,revision=revision) == first
