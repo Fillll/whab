@@ -1154,7 +1154,7 @@ Older adapters refuse inspection explicitly while their existing reads remain va
 
 ### Optional CLI transaction selection and account metadata
 
-WHAB 2.70 supports optional storage
+WHAB 2.72 supports optional storage
 `search_transactions(workspace, filters) -> dict` and
 `account_latest_dates(workspace) -> dict[str, str]`. Both return coherent reads.
 Search accepts inclusive `since`/`until`, `month`, repeated literal `merchant`
@@ -1172,7 +1172,7 @@ The typed provider worker validates the same account IDs, ownership, currencies
 and bounds as synchronization. The method returns account metadata only. Setup
 uses it without fetching transaction changes. Providers with the default false
 retain their existing synchronization-based preview. Plugins using the new
-capability require `whab>=2.70,<3`.
+capability require `whab>=2.72,<3`.
 
 Trusted native storage may pass a canonical `encoder` to
 `encode_local_state(..., validate=False)` to reuse immutable record bytes. Its

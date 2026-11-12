@@ -324,10 +324,11 @@ or refunds; currencies are never combined.
 
 All queries are read-only and revision-checked. An oversized response (16 MiB per
 public query), changed revision, foreign budget or transport/storage error fails
-explicitly without partial output. Date/merchant filtering happens after the
-history read; use `--month` and inspect every relevant month separately if the
-initial full history is too large. No shared API was added: the CLI composes the
-existing public transactions, accounts and categories queries.
+explicitly without partial output. SQLite performs coherent storage-side selection through the public bounded read
+contract. Other backends retain the complete transactions/accounts/categories
+query fallback; use `--month` and inspect every relevant month separately if that
+fallback history exceeds the response bound. The initial CLI 2.12 workflow
+composed those reads; the integrated performance contract adds native selection.
 
 Inspect **all** results and category definitions before applying a confirmed choice:
 
@@ -337,7 +338,8 @@ whab "My budget" trnx categorize TRANSACTION_ID --category "Housing / Fictional 
 whab "My budget" trnx list --since 2026-08-01 --merchant "Fictional Village" --merchant "Fictional Mortgage"
 ```
 
-Each category change is a separate existing guarded edit. It preserves review
+A single-ID categorization uses the existing guarded edit; multiple explicit IDs
+use the atomic batch described above. Categorization preserves review
 unless `--needs-review` is explicit. Re-run the identical list, compare the complete
 stable ID set/count and inspect category IDs to verify saved results. Retain the
 original revision/request ID/arguments after uncertain edits and inspect before
@@ -362,8 +364,9 @@ Name matching ignores case and outer whitespace. Ambiguous or missing names fail
 before writing. Use the categories list to disambiguate; IDs take precedence.
 Core still validates the transaction, currency and category on the addressed budget.
 
-Each invocation resolves the budget once, reads categories and their revision,
-and submits one guarded category edit. Success returns `requestId` and
+A single-ID invocation resolves the budget once, reads categories and their revision,
+and submits one guarded category edit. Multiple explicit IDs submit one atomic bulk
+operation; `--dry-run` previews its exact record changes without saving. Success returns `requestId` and
 `expectedRevision` with the public result. Agents that already observed a decision
 revision may pass `--revision`; `--request-id` retains an explicit intent identity.
 There is no automatic write retry or revision refresh. After an uncertain result,
@@ -989,3 +992,41 @@ existing row bound; fixture images must still fit the existing 50 MiB limit.
 The 250 ms p95 goal concerns warm bounded reads and edits on measured hardware.
 Complete unbounded output, cold activation and provider latency require separate
 measurements; their work grows with output, stored state or external services.
+
+
+## Atomic bulk performance evidence
+
+Reproduce the synthetic fresh-process benchmark from the application directory:
+
+```sh
+.venv/bin/python scripts/benchmark_atomic_bulk.py --storage sqlite --transactions 100000 --runs 100 --separate-runs 3 --output /tmp/whab-bulk-sqlite.json
+.venv/bin/python scripts/benchmark_atomic_bulk.py --storage json --transactions 1000 --runs 100 --separate-runs 3 --output /tmp/whab-bulk-json.json
+```
+
+The primary commands are multi-ID `trnx categorize`, mixed `trnx edit-many` and
+multi-account `account classify`, each at sizes 1, 10, 50 and 100. `--atomic` selects
+the bulk contract for the one-target same-value cases. Each command/size launches
+100 fresh CLI processes; equivalent complete separate-command workflows are measured
+three times. Their p95 is reported with that small baseline sample count, not as a
+100-run percentile estimate. Mixed single-record workflows include their revision
+read and guarded advanced edit. Every intent changes real fictional records.
+
+Measurements include startup, verified local HTTPS, output and the synchronous
+portable save. A small checkpoint-counter write and a public native evidence query
+after each successful checkpoint are included as diagnostic overhead. Provider
+latency is excluded: no provider calls or household runtime is used. Cold host/fixture
+activation and each first bulk mutation are reported separately from warm p50/p95.
+Fresh identical fixtures after at most 2,000 bulk changed records, plus at most
+300 baseline edits and one cold batch, bound audit growth;
+no history is pruned and no storage limit is raised. Each segment restores its actual
+last saved container into an empty backend and checks identities, saved decisions
+and complete retained history counts. Native generations and checkpoint counters
+must advance once per batch versus once per target for separate commands.
+
+The JSON comparison intentionally uses a smaller populated budget within its
+full-file persistence costs and limits; it is not a same-size backend speed comparison.
+The script emits raw per-process timings, total batch p50/p95, per-record costs,
+workflow savings, commit/checkpoint counts, cold timings and independent restoration
+evidence. The final measured tables, target misses and validation evidence are in
+[PR #188](https://github.com/Fillll/whab/pull/188). The 250 ms p95 is a measured target,
+not a promise for arbitrary hardware, maximum memo sizes, cold work or full-file JSON.

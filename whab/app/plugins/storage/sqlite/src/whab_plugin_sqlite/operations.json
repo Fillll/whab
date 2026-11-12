@@ -1872,7 +1872,7 @@
         "Invalid workspace, filters, source identity or payload bounds."
       ],
       "retry": "Read again after a concurrent change; storage does not replay financial writes.",
-      "availability": "Optional SQLite capability from version 1.22 with WHAB 2.70."
+      "availability": "Optional SQLite capability from version 1.23 with WHAB 2.72."
     },
     {
       "name": "Storage.account_latest_dates",
@@ -1919,7 +1919,7 @@
         "Invalid workspace, filters, source identity or payload bounds."
       ],
       "retry": "Read again after a concurrent change; storage does not replay financial writes.",
-      "availability": "Optional SQLite capability from version 1.22 with WHAB 2.70."
+      "availability": "Optional SQLite capability from version 1.23 with WHAB 2.72."
     },
     {
       "name": "Storage.export_budget_file_changes",
@@ -1975,7 +1975,7 @@
         "Invalid workspace, filters, source identity or payload bounds."
       ],
       "retry": "Read again after a concurrent change; storage does not replay financial writes.",
-      "availability": "Optional SQLite capability from version 1.22 with WHAB 2.70."
+      "availability": "Optional SQLite capability from version 1.23 with WHAB 2.72."
     },
     {
       "name": "Storage.search_transactions_json",
@@ -2029,7 +2029,7 @@
         "Invalid workspace, filters, source identity or payload bounds."
       ],
       "retry": "Read again after a concurrent change; storage does not replay financial writes.",
-      "availability": "Optional SQLite capability from version 1.22 with WHAB 2.70."
+      "availability": "Optional SQLite capability from version 1.23 with WHAB 2.72."
     },
     {
       "name": "AtomicBulkEdits.edit_transactions",

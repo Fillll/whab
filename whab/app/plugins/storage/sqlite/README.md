@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.70 or newer for the public local-authority and
+This version requires WHAB 2.72 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 

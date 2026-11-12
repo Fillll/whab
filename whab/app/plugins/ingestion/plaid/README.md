@@ -2,6 +2,9 @@
 
 Distributed independently as `whab_plugin_plaid`. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
+Version 1.9 requires WHAB 2.72+ for the account-metadata SDK flag integrated from
+PR #184. Earlier hosts must retain a compatible earlier plugin version.
+
 The live typed provider adapter in version 1.3 requires WHAB 2.38 or newer. Older hosts must retain a compatible earlier plugin version.
 
 `src/whab_plugin_plaid/` owns the descriptor, provider transport, payload normalization, signed webhook verification, templates and connection script. The host owns Item-token encryption, durable continuation capture and native command application. Legacy direct service helpers preserve their existing ciphertext format. Keep supporting modules, assets and mocked provider tests in this folder.

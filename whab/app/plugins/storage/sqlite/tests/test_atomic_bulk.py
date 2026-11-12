@@ -81,11 +81,10 @@ def test_sql_failure_after_first_row_rolls_back_all_rows_history_generation_and_
             for _ in range(2)
         ]
         # This owning-backend fault fixture fails SQL after one validated update.
-        store.db.execute(
-            "CREATE TRIGGER fictional_failure BEFORE UPDATE OF note ON transactions WHEN NEW.id='"
-            + ids[1]
-            + "' BEGIN SELECT RAISE(ABORT,'fictional disk-path fault'); END"
-        )
+        store.db.execute("CREATE TRIGGER fictional_failure BEFORE UPDATE OF note ON transactions "
+            "WHEN NEW.note='must roll back' AND (SELECT count(*) FROM transactions "
+            "WHERE workspace=NEW.workspace AND note='must roll back')=1 "
+            "BEGIN SELECT RAISE(ABORT,'fictional SQL fault'); END")
         before = store.export_budget("personal")
         evidence = store.commit_evidence()
         operation = StorageOperation(

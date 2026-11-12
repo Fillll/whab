@@ -6,7 +6,7 @@ personal and fictional demo workspaces in one versioned JSON data file at
 different files. It uses no database driver or other storage implementation.
 The host supplies financial commands, currency rules and workspace projections.
 
-Install its wheel with a compatible host (WHAB 2.69+ within major 2), then select
+Install its wheel with a compatible host (WHAB 2.72+ within major 2), then select
 `WHAB_STORAGE=json` for a new original runtime or initial CLI budget creation.
 An opened budget chooses its backend through its manifest. Selecting JSON does
 not migrate an existing ledger. JSON belongs to the supported bundled set;
