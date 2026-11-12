@@ -75,6 +75,50 @@ Operational failures print JSON to stderr and exit 1; argument usage errors exit
 Keep access tokens in the named environment variable, and preserve HTTPS certificate
 verification. Read the sections below for profile precedence and remote access.
 
+## Rename categories and append memos
+
+```sh
+whab "My budget" category rename "House / Rent" --name "Main Residence"
+whab "My budget" trnx note TRANSACTION_ID --append "Bicycle for Alex"
+whab "My budget" category rename --help
+whab "My budget" trnx note --help
+```
+
+Rename accepts an exact stable child ID, unique case-insensitive name, or
+`Group / Category`; ambiguous names include candidates and never select a fuzzy
+match. It changes only the existing child's name, keeping its ID, parent, currency,
+target, transaction references, monthly assignments and permanent history. New
+names are trimmed and duplicate siblings are refused by the shared domain rule.
+Use the returned stable ID for recovery after the old name/path stops identifying it.
+
+Memo append accepts a stable nondeleted transaction ID and nonempty text. It keeps
+the existing memo exactly, adds one newline when that memo is nonempty, then adds
+the supplied text verbatim. An existing trailing newline stays in place, so this
+can produce consecutive newlines. Imported YNAB information, merchant whitespace,
+amount/date/account/category, review state and existing category-agent attribution
+remain unchanged. The final memo must fit the existing 1000-character limit;
+overflow is refused without mutation. There is no content-based deduplication.
+
+Both commands read the current revision, create one request ID, use public guarded
+commands and verify the saved record. `--format json` (default) retains complete
+fields; `--format table` is readable. `--agent LABEL` labels audit history only;
+`--batch ID` groups related entries without combining separate writes into one
+transaction. Unlabelled commands retain manual User attribution. Neither command
+starts bank sync or installs a future categorization rule.
+
+They never retry automatically. The result includes `requestId`, `expectedRevision`,
+`savedRevision` and `replayed`. For an exact retry use the same stable record ID,
+original name/text, `--revision`, `--request-id`, agent and batch. A successful
+append request replay cannot add the text twice, including after a host restart.
+Receipts are bounded; an unknown/expired request with its stale original revision
+is refused safely. A new request is a new user intent and can deliberately append
+the same text again. After an uncertain response inspect `trnx list`/`category list`
+and `history list`; retain the complete reported intent rather than using new IDs.
+
+Requires CLI 2.16 / WHAB 2.71; native rename support is SQLite 1.22 or JSON 1.14.
+Existing public note-only edits supply memo persistence; no new note storage API
+or migration is introduced. Unsupported storage reports an update requirement.
+
 ## Simple console
 
 `whab` provides name-addressed local commands. **Production is the default** for

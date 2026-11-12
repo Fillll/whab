@@ -272,3 +272,15 @@ zero rows, plus nonzeroCount/nonzeroMonths. Zero-only rows permit deletion and a
 removed atomically with the child while retained exactly in history. Nonzero rows
 or transaction references block the entire operation. The read itself never erases
 records or history. See the CLI `category show` workflow.
+
+
+## Identity-preserving category rename
+
+With WHAB 2.71 this plugin implements optional `CategoryRenaming`, explicitly
+advertising support and delegating a name-only child edit to shared core validation.
+Duplicate siblings are refused atomically. The category ID, parent, currency, target,
+transactions, assignments, protected state and previous history stay intact. The
+native mutation, reversible audit entry and durable receipt commit together using
+the existing format; no migration is needed. The host's append-memo command reuses
+this plugin's existing note-only edit, preserving merchant whitespace and every
+unrelated transaction field. Exact public intent replays do not append twice.

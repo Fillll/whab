@@ -23,6 +23,7 @@ from .errors import selection_error
 from .help import AGENT_WORKFLOW, account_classification, bank_help, describe, import_help, overview
 from .history_commands import add_history_parser, execute_history
 from .identifiers import check_identifiers, host_id, plugin_identifiers
+from .record_edits import add_note_parser, execute_note, note_table
 from .transaction_commands import add_category_parsers, execute_category
 from .transaction_reads import add_uncategorized_parser, transaction_table, uncategorized_report
 from .transaction_search import add_search_parser, execute_search, search_table, validate_search
@@ -87,7 +88,7 @@ def parser(options, argv=()):
         epilog="Example: whab empty-budget insights summary --month 2026-11 --currency USD\nAmounts are integer currency minor units. No AI or bank sync is started.")
     summary.add_argument("--month", help="YYYY-MM; default: current month")
     summary.add_argument("--currency", default="USD", help="ISO currency code (default: USD); currencies are never combined")
-    transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read and categorize transactions (trnx is an alias)")
+    transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read, categorize and append transaction memos (trnx is an alias)")
     reads = transactions.add_subparsers(dest="filter", required=True)
     unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
         epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
@@ -95,6 +96,7 @@ def parser(options, argv=()):
     add_uncategorized_parser(reads)
     add_search_parser(reads, catalog)
     add_category_parsers(reads)
+    add_note_parser(reads)
     groups.add_parser("api", help="Advanced local operations; use whab api --help")
     return root
 
@@ -223,6 +225,8 @@ def execute(args, home, environment, ca):
             return execute_search(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter in {"categories", "categorize", "categorise"}:
             return execute_category(connection, identifier, prefix, args, exchange, CommandError)
+        if args.command in {"transactions", "trnx"} and args.filter == "note":
+            return execute_note(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "category":
             return execute_categories(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "account":
@@ -282,7 +286,7 @@ def main(argv=None):
             result = execute(args, *configuration(args))
         if getattr(args, "format", None) == "table":
             print(account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
-                  else search_table(result) if args.filter == "list" else transaction_table(result))
+                  else note_table(result) if args.filter == "note" else search_table(result) if args.filter == "list" else transaction_table(result))
         else:
             print(json.dumps(result, allow_nan=False))
         return 0

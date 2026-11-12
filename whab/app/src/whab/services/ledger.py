@@ -343,6 +343,8 @@ class LedgerService:
                 raise StoreError("Transaction date must be between 1900-01-01 and 2200-12-31.")
             if "amount" in payload and not payload["amount"]:
                 raise StoreError("Amount must not be zero.")
+        if operation == 'append_transaction_note' and (type(payload['text']) is not str or not 1 <= len(payload['text']) <= 1000):
+            raise StoreError('Appended text must contain 1–1000 characters; the saved memo must fit 1000 characters.')
         if operation == "edit_transaction":
             if 'categoryAgent' in payload:
                 from whab.domain.transactions import validate_category_agent
@@ -376,6 +378,14 @@ class LedgerService:
                     or not all(callable(getattr(self._store, name, None)) for name in
                                ('delete_category', 'delete_category_group', 'category_tree', 'budget_history', 'history_scope'))):
                 raise StoreError('Update the storage plugin to support safe category deletion with audit history.')
+        if operation in {'rename_category', 'append_transaction_note'} and not all(
+            callable(getattr(self._store, name, None)) for name in ('history_scope', 'budget_history')
+        ):
+            raise StoreError('Update the storage plugin to retain permanent audit history for this edit.')
+        if operation == 'rename_category':
+            supported = getattr(self._store, 'supports_category_renaming', None)
+            if not callable(supported) or supported() is not True or not callable(getattr(self._store, 'rename_category', None)):
+                raise StoreError('Update the storage plugin to rename categories with identity and audit history preserved.')
         if operation in {'add_category_group', 'move_category'} and (
             not callable(getattr(self._store, 'category_tree', None))
             or not callable(getattr(self._store, operation, None))
@@ -443,6 +453,19 @@ class LedgerService:
                 elif operation in {'delete_category', 'delete_category_group'}:
                     data = getattr(self._store, operation)(
                         workspace, payload['categoryId'] if operation == 'delete_category' else payload['parentId'])
+                elif operation == "rename_category":
+                    data = self._store.rename_category(workspace, payload["categoryId"], payload["name"])
+                elif operation == "append_transaction_note":
+                    transaction = next((row for row in self._store.transactions(workspace) if row['id'] == payload['transactionId']), None)
+                    if transaction is None:
+                        raise StoreError('Transaction not found.')
+                    previous = transaction['note']
+                    if type(previous) is not str:
+                        raise StoreError('The saved transaction memo is invalid; no text was appended.')
+                    note = previous + ('\n' if previous else '') + payload['text']
+                    if len(note) > 1000:
+                        raise StoreError('Appended memo exceeds the 1000-character limit; no text was appended.')
+                    data = self._store.edit_transaction(workspace, payload['transactionId'], note=note)
                 elif operation == "update_account":
                     update = getattr(self._store, "update_account", None)
                     if not callable(update):

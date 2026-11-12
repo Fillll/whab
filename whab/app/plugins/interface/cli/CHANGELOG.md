@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.16.0 — 2026-11-11
+
+PR: [#187](https://github.com/Fillll/whab/pull/187)
+
+- Add name/ID/path-addressed category rename and stable-ID transaction memo append, with automatic revisions/request IDs, agent/batch audit labels, verified saved records, JSON/table output and detailed offline help. Preserve imported notes and merchant whitespace; recover exact successful intents after host restart without appending twice. Refuse ambiguous/duplicate names, stale or invalid edits, and never replay uncertain writes with a new intent.
+
 ## 2.15.0 — 2026-11-09
 
 PR: [#182](https://github.com/Fillll/whab/pull/182)

@@ -41,6 +41,7 @@ METHODS = {
     "supports_category_agent": ((), {}),
     "supports_account_lifecycle": ((), {}),
     "supports_category_deletion": ((), {}),
+    "supports_category_renaming": ((), {}),
     "prepare_existing": (("workspace", "files"), {}),
     "category_tree": (("workspace",), {}),
     "accounts": (("workspace",), {}), "categories": (("workspace",), {}),

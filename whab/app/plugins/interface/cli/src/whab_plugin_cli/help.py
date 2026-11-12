@@ -15,6 +15,8 @@ AGENT_WORKFLOW = """Agent workflow (examples use fictional names/IDs):
   whab "My budget" trnx uncategorized --month 2026-11 --format table
   whab "My budget" trnx categories
   whab "My budget" trnx categorize TRANSACTION_ID --category "Food / Groceries" --agent Codex --needs-review --batch UNIQUE_RUN_ID
+  whab "My budget" category rename "House / Rent" --name "Main Residence"
+  whab "My budget" trnx note TRANSACTION_ID --append "Bicycle for Alex"
   whab "My budget" history list
 
 Read transactions and categories before deciding; leave ambiguous payees uncategorized.

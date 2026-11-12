@@ -163,6 +163,19 @@ def add_category_group(state, name):
     return identifier
 
 
+def rename_category(state, category_id, name):
+    """Change only one existing child's label; retain all financial references."""
+    ensure_child_category(state['categories'], category_id)
+    child = state['categories'][category_id]
+    name = _label(name)
+    if any(row['id'] != category_id
+           and category_group_id(row['group']) == category_group_id(child['group'])
+           and row['name'].strip().casefold() == name.casefold()
+           for row in state['categories'].values()):
+        raise StoreError('A category with this name already exists under this parent.')
+    child['name'] = name
+
+
 def move_category(state, category_id, parent_id):
     """Reparent one leaf without replacing its identity, money or references."""
     child = ensure_child_category(state['categories'], category_id)

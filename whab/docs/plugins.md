@@ -1049,6 +1049,31 @@ uses public backend operations and independent atomic cursors rather than a
 shared transaction feed. Portable exports remain credential-free; full runtime
 backups must include the existing `plugin-workers` root and encryption keys.
 
+## Category renaming and appended memos
+
+WHAB 2.71 adds optional `CategoryRenaming` with
+`supports_category_renaming() -> bool` and
+`rename_category(workspace, category_id, name) -> None`. Public guarded command
+`rename_category` accepts `{categoryId, name}`. This is an actual missing storage
+contract: existing create/move/delete operations cannot rename a saved child while
+preserving its identity and references. The host requires the explicit support flag
+and permanent history; older generic proxies do not accidentally opt in. SQLite
+1.22 and JSON 1.14 apply the domain's duplicate-sibling guard inside their existing
+native commit, with no new schema. Parent, currency, target, assignments, transactions,
+protected state and old audit entries remain intact. Remote authority forwarding
+uses the same public command, never unrestricted storage access.
+
+Public command `append_transaction_note` accepts `{transactionId, text}`. The host
+validates a guarded append intent, reads the current memo under its command lock,
+adds exactly one newline when nonempty and delegates to existing note-only
+`edit_transaction`. No new note storage contract is needed. It never sends unrelated
+transaction details through their normalizers, preserving merchant whitespace and
+all financial/review/category fields. Agent and batch use the existing audit context.
+Both operations are reversible permanent history changes. Durable request receipts
+are checked before stale-revision validation or memo composition, so an exact
+successful replay cannot append twice; expired receipts with stale revisions fail.
+The original revision, request ID, payload and history context define the intent.
+
 ## Category management and explicit parents
 
 WHAB 2.65 adds optional `CategoryManagement` with

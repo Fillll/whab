@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.71.0 — 2026-11-11
+
+PR: [#187](https://github.com/Fillll/whab/pull/187)
+
+- Add identity-preserving guarded category rename, optional native CategoryRenaming support and validated worker/remote forwarding. Add an idempotent append-memo public intent using the existing note-only storage edit; check durable receipts before composition, retain permanent reversible actor/batch history and preserve all unrelated fields verbatim.
+
 ## 2.70.0 — 2026-11-11
 
 PR: [#185](https://github.com/Fillll/whab/pull/185)

@@ -896,7 +896,7 @@
         "Import HTTP 400/409/413 responses retain bounded authored validation messages. Other statuses, malformed responses and transport failures retain sanitized diagnostics."
       ],
       "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
-      "availability": "whab BUDGET import PLUGIN preview FILE --currency USD; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer’s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
+      "availability": "whab BUDGET import PLUGIN preview FILE --currency USD; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer\u2019s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
     },
     {
       "name": "import.commit",
@@ -1032,7 +1032,7 @@
         "Import HTTP 400/409/413 responses retain bounded authored validation messages. Other statuses, malformed responses and transport failures retain sanitized diagnostics."
       ],
       "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
-      "availability": "whab BUDGET import PLUGIN commit FILE --currency USD --fingerprint SHA256_FROM_PREVIEW; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer’s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
+      "availability": "whab BUDGET import PLUGIN commit FILE --currency USD --fingerprint SHA256_FROM_PREVIEW; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer\u2019s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
     },
     {
       "name": "bank.connections",
@@ -1060,7 +1060,7 @@
       ],
       "side_effects": "Read-only local saved connection metadata.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1104,7 +1104,7 @@
       ],
       "side_effects": "Fetches provider data for review without importing transactions or advancing the saved cursor.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1192,7 +1192,7 @@
       ],
       "side_effects": "Atomically saves links, joins an existing auto-created account when selected, retains transaction IDs/annotations and resets the cursor for idempotent replay. Does not delete old history or start synchronization.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1237,7 +1237,7 @@
       ],
       "side_effects": "Imports configured accounts using saved cutoffs and advances their cursors atomically. No new external bank connection is created.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1286,9 +1286,9 @@
           }
         }
       ],
-      "side_effects": "With an interval, saves this provider’s budget-local update policy. Does not fetch transactions or register an OS job.",
+      "side_effects": "With an interval, saves this provider\u2019s budget-local update policy. Does not fetch transactions or register an OS job.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1332,7 +1332,7 @@
       ],
       "side_effects": "Registers or removes the existing WHAB launchd task. It can start WHAB to check due jobs in saved budgets. Other platforms use cron with python -m whab --run-jobs.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -3609,7 +3609,7 @@
             "data": [
               {
                 "id": "fictional-account",
-                "name": "🍏Example Card",
+                "name": "\ud83c\udf4fExample Card",
                 "type": "credit",
                 "subtype": "credit_card",
                 "onBudget": true,
@@ -3732,7 +3732,7 @@
       "examples": [
         {
           "input": {
-            "account": "🍏Example Card"
+            "account": "\ud83c\udf4fExample Card"
           },
           "output": {
             "budgetId": "fictional-budget",
@@ -3740,7 +3740,7 @@
             "revision": "saved-revision",
             "data": {
               "id": "fictional-account",
-              "name": "🍏Example Card",
+              "name": "\ud83c\udf4fExample Card",
               "type": "credit",
               "subtype": "credit_card",
               "onBudget": true,
@@ -3897,7 +3897,7 @@
       "examples": [
         {
           "input": {
-            "account": "🍏Example Card",
+            "account": "\ud83c\udf4fExample Card",
             "type": "credit",
             "subtype": "credit_card",
             "onBudget": true
@@ -3908,7 +3908,7 @@
             "revision": "saved-revision",
             "data": {
               "id": "fictional-account",
-              "name": "🍏Example Card",
+              "name": "\ud83c\udf4fExample Card",
               "type": "credit",
               "subtype": "credit_card",
               "onBudget": true,
@@ -4042,7 +4042,7 @@
       "examples": [
         {
           "input": {
-            "account": "🍏Example Card"
+            "account": "\ud83c\udf4fExample Card"
           },
           "output": {
             "budgetId": "fictional-budget",
@@ -4050,7 +4050,7 @@
             "revision": "saved-revision",
             "data": {
               "id": "fictional-account",
-              "name": "🍏Example Card",
+              "name": "\ud83c\udf4fExample Card",
               "type": "deposit",
               "subtype": "cd",
               "onBudget": false,
@@ -4184,7 +4184,7 @@
       "examples": [
         {
           "input": {
-            "account": "🍏Example Card"
+            "account": "\ud83c\udf4fExample Card"
           },
           "output": {
             "budgetId": "fictional-budget",
@@ -4192,7 +4192,7 @@
             "revision": "saved-revision",
             "data": {
               "id": "fictional-account",
-              "name": "🍏Example Card",
+              "name": "\ud83c\udf4fExample Card",
               "type": "deposit",
               "subtype": "cd",
               "onBudget": false,
@@ -4217,7 +4217,7 @@
     {
       "name": "category.workflow",
       "kind": "local",
-      "summary": "Category workflow (fictional budget; no wizard):\n  whab \"My budget\" category list --format table\n  whab \"My budget\" category group create \"Projects\"\n  whab \"My budget\" category move \"Finance / Example studio\" --parent \"Projects\"\n  whab \"My budget\" category create \"Example venture\" --parent \"Projects\"\n  whab \"My budget\" category list --parent \"Projects\" --format table\n  whab \"My budget\" category delete --help\n  whab \"My budget\" category group delete --help\n  whab \"My budget\" history list\n\nRead the hierarchy, confirm the intended parent and child with the user, apply one\nconfirmed choice, then inspect the verified result before continuing. All commands\naddress the budget by its existing unique name or stable ID. Groups accept an exact\nunique name or stable ID; children also accept \"Group / Name\". Names ignore case\nand outer whitespace; spaces, emoji and non-Latin text work when quoted. No fuzzy\nmatch is selected. Missing/ambiguous names show candidate names and IDs.\n\nGroups are real nonassignable parents and may be empty. Only children can receive\ntransactions, targets or monthly assignments; deeper nesting is refused. Child\ncreation requires an existing --parent, defaults to --currency USD and --target 0,\nand refuses duplicate sibling names. Target is a nonnegative integer in currency\nminor units (USD 1234 = $12.34). No currency conversion is performed. Moves preserve\nchild identity, currency, targets, transaction references, every month's assignments\nand prior history. Unrelated children and the original parent remain intact, even\nwhen the original parent becomes empty. Existing ledger order is preserved on move;\nthere is currently no manual reorder operation or requested-order guarantee.\n\nJSON is the default and retains full IDs/fields; --format table is for readable\ninspection. Successful writes report the addressed budget and verified saved group\nor child. Revisions and unique request IDs are handled internally. Each command is\none atomic change; the sequence is not one transaction. Stale state is refused.\nNo bank synchronization is started. After an uncertain response, inspect category\nlist and history and retain the complete reported original intent (budget, payload,\nrevision and request ID). Never automatically rerun a write with a new intent.\n\nHelp works offline without a profile or running host. The category management\ncommands require WHAB 2.65+; saving empty groups and moving children require native\nSQLite 1.18+, JSON 1.10+ or another adapter implementing CategoryManagement. Older\nstorage can still provide derived nonempty groups for reads; unsupported writes\nfail explicitly. Use whab BUDGET category ACTION --help for each command.\n\nSafe deletion (CLI 2.15+, WHAB 2.69+, SQLite 1.21+/JSON 1.13+):\n  whab \"My budget\" category show \"Fictional maintenance / Example home\" --format table\n  whab \"My budget\" category delete \"Fictional maintenance / Example home\"\n  whab \"My budget\" category list --parent \"Fictional maintenance\"\n  whab \"My budget\" category group delete \"Fictional maintenance\"\n  whab \"My budget\" category list --format table\n  whab \"My budget\" history list\n\nRead category show, confirm the intended child, then issue one guarded delete.\nChildren require NO transaction references, including live, pending, reviewed,\nrefund and deleted records, and NO nonzero monthly assignments in any month.\nZero-only assignment rows do NOT block deletion: the operation removes them and\nthat unused child atomically. Any nonzero row or transaction refuses the ENTIRE\noperation; no zero rows are removed on refusal. All unrelated rows and financial\nfields, monthly monetary results and rollover settings remain unchanged.\nDeleting a child retains its empty parent; groups must have NO children. Delete\nan empty parent with the separate group command. There is no cascade or --force.\n\ncategory show accepts exact names/IDs or child \"Group / Name\", never fuzzy matches.\nJSON is complete; --format table is readable. deletion.deletable is true when only\nzero rows remain and no transactions refer to the child. assignments.count/months\ninclude EVERY row; zeroMonths lists rows deletion will remove; nonzeroCount and\nnonzeroMonths identify blocking rows. No amounts or unrelated transactions are\nexposed. Show is read-only and never changes revision/history, syncs, or authorizes\na later write. A concurrent revision change refuses a mixed inspection result.\n\nEach successful delete commits permanent audit history, category metadata and\nEXACT removed zero rows together, including zero-valued rows in every month.\nUse history list/show to inspect it. Guarded undo/redo previews restore/reapply\ncategory identity, target, parent relationship and every zero row when compatible.\nLater conflicting changes refuse the whole reversal. Prior audit entries/hashes\nare preserved. Success reports deleted=true and a verified same-revision hierarchy\nwith all other groups/children unchanged. Request IDs/revisions are internal.\n\nHTTP 400 domain refusals and HTTP 409 stale/conflicting intents report the actual\nreason; no automatic retry. Timeouts, HTTP 5xx or failed verification remain\nuncertain, not proof of rollback. Inspect category list and history; retain the\nCOMPLETE original budget/payload/revision/request ID. Never rerun deletion with a\nnew request ID to retry. No bank synchronization is started. No nonzero funding,\ntransaction or unrelated assignment is erased. This is not category merge/archive.\nOlder adapters may conservatively refuse zero rows; update to the required versions\nfor this policy. Help and packaged operation documentation work offline.\n",
+      "summary": "Category workflow (fictional budget; no wizard):\n  whab \"My budget\" category list --format table\n  whab \"My budget\" category group create \"Projects\"\n  whab \"My budget\" category move \"Finance / Example studio\" --parent \"Projects\"\n  whab \"My budget\" category create \"Example venture\" --parent \"Projects\"\n  whab \"My budget\" category list --parent \"Projects\" --format table\n  whab \"My budget\" category delete --help\n  whab \"My budget\" category group delete --help\n  whab \"My budget\" history list\n\nRead the hierarchy, confirm the intended parent and child with the user, apply one\nconfirmed choice, then inspect the verified result before continuing. All commands\naddress the budget by its existing unique name or stable ID. Groups accept an exact\nunique name or stable ID; children also accept \"Group / Name\". Names ignore case\nand outer whitespace; spaces, emoji and non-Latin text work when quoted. No fuzzy\nmatch is selected. Missing/ambiguous names show candidate names and IDs.\n\nGroups are real nonassignable parents and may be empty. Only children can receive\ntransactions, targets or monthly assignments; deeper nesting is refused. Child\ncreation requires an existing --parent, defaults to --currency USD and --target 0,\nand refuses duplicate sibling names. Target is a nonnegative integer in currency\nminor units (USD 1234 = $12.34). No currency conversion is performed. Moves preserve\nchild identity, currency, targets, transaction references, every month's assignments\nand prior history. Unrelated children and the original parent remain intact, even\nwhen the original parent becomes empty. Existing ledger order is preserved on move;\nthere is currently no manual reorder operation or requested-order guarantee.\n\nJSON is the default and retains full IDs/fields; --format table is for readable\ninspection. Successful writes report the addressed budget and verified saved group\nor child. Revisions and unique request IDs are handled internally. Each command is\none atomic change; the sequence is not one transaction. Stale state is refused.\nNo bank synchronization is started. After an uncertain response, inspect category\nlist and history and retain the complete reported original intent (budget, payload,\nrevision and request ID). Never automatically rerun a write with a new intent.\n\nHelp works offline without a profile or running host. The category management\ncommands require WHAB 2.65+; saving empty groups and moving children require native\nSQLite 1.18+, JSON 1.10+ or another adapter implementing CategoryManagement. Older\nstorage can still provide derived nonempty groups for reads; unsupported writes\nfail explicitly. Use whab BUDGET category ACTION --help for each command.\n\nSafe deletion (CLI 2.15+, WHAB 2.69+, SQLite 1.21+/JSON 1.13+):\n  whab \"My budget\" category show \"Fictional maintenance / Example home\" --format table\n  whab \"My budget\" category delete \"Fictional maintenance / Example home\"\n  whab \"My budget\" category list --parent \"Fictional maintenance\"\n  whab \"My budget\" category group delete \"Fictional maintenance\"\n  whab \"My budget\" category list --format table\n  whab \"My budget\" history list\n\nRead category show, confirm the intended child, then issue one guarded delete.\nChildren require NO transaction references, including live, pending, reviewed,\nrefund and deleted records, and NO nonzero monthly assignments in any month.\nZero-only assignment rows do NOT block deletion: the operation removes them and\nthat unused child atomically. Any nonzero row or transaction refuses the ENTIRE\noperation; no zero rows are removed on refusal. All unrelated rows and financial\nfields, monthly monetary results and rollover settings remain unchanged.\nDeleting a child retains its empty parent; groups must have NO children. Delete\nan empty parent with the separate group command. There is no cascade or --force.\n\ncategory show accepts exact names/IDs or child \"Group / Name\", never fuzzy matches.\nJSON is complete; --format table is readable. deletion.deletable is true when only\nzero rows remain and no transactions refer to the child. assignments.count/months\ninclude EVERY row; zeroMonths lists rows deletion will remove; nonzeroCount and\nnonzeroMonths identify blocking rows. No amounts or unrelated transactions are\nexposed. Show is read-only and never changes revision/history, syncs, or authorizes\na later write. A concurrent revision change refuses a mixed inspection result.\n\nEach successful delete commits permanent audit history, category metadata and\nEXACT removed zero rows together, including zero-valued rows in every month.\nUse history list/show to inspect it. Guarded undo/redo previews restore/reapply\ncategory identity, target, parent relationship and every zero row when compatible.\nLater conflicting changes refuse the whole reversal. Prior audit entries/hashes\nare preserved. Success reports deleted=true and a verified same-revision hierarchy\nwith all other groups/children unchanged. Request IDs/revisions are internal.\n\nHTTP 400 domain refusals and HTTP 409 stale/conflicting intents report the actual\nreason; no automatic retry. Timeouts, HTTP 5xx or failed verification remain\nuncertain, not proof of rollback. Inspect category list and history; retain the\nCOMPLETE original budget/payload/revision/request ID. Never rerun deletion with a\nnew request ID to retry. No bank synchronization is started. No nonzero funding,\ntransaction or unrelated assignment is erased. This is not category merge/archive.\nOlder adapters may conservatively refuse zero rows; update to the required versions\nfor this policy. Help and packaged operation documentation work offline.\n\nRename in place: whab \"My budget\" category rename \"House / Rent\" --name \"Main Residence\" --agent Codex --batch housing-cleanup\nPreserves ID, parent, currency, target, references, assignments and history. Rejects ambiguous names and duplicate siblings. Revisions/request IDs are automatic; recovery retains the original intent.",
       "input": {
         "type": "object",
         "description": "Simple category-command arguments inside one explicitly addressed budget.",
@@ -4765,6 +4765,37 @@
       ],
       "retry": "Read-only; repeat to inspect current state. Never replay an uncertain deletion as a new intent.",
       "availability": "CLI 2.15+, WHAB 2.69+, SQLite 1.21+/JSON 1.13+."
+    },
+    {
+      "name": "transaction.note",
+      "kind": "local",
+      "summary": "Append a transaction memo (fictional): whab \"My budget\" trnx note TRANSACTION_ID --append \"Bicycle for Alex\" --agent Codex --batch memo-cleanup\nPreserve the exact existing note and add one newline if nonempty, then supplied text verbatim. Final note limit: 1000 characters. Stable IDs only. Verify the saved note and every unrelated public field. Agent labels affect audit metadata only. Revisions and request IDs are automatic; exact retries require the original revision, ID, text and history context. No automatic retries. Duplicate successful requests cannot append twice; expired receipts with a stale revision refuse safely.",
+      "input": {
+        "type": "object",
+        "description": "Simple category-command arguments inside one explicitly addressed budget.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Read-only documentation topic."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Read-only documentation topic; not an executable command.",
+      "permissions": "Device-local authenticated HTTPS public host operations. Personal workspace only; no private storage access.",
+      "scope": "One explicitly addressed budget, personal workspace; currencies never combined.",
+      "errors": [
+        "Missing/ambiguous budget fails without fallback. Missing/ambiguous account fails with up to 20 candidates; IDs take precedence, no fuzzy matching.",
+        "Domain-invalid type/subtype/scope fails without mutation. Stale revisions conflict. Wrong-budget, changed verification or uncertain responses fail without automatic mutation replay."
+      ],
+      "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
+      "availability": "CLI 2.11+, WHAB 2.65+; native category-management adapters for creation/moves. category.workflow is documentation only."
     }
   ]
 }
