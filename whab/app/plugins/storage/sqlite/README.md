@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.69 or newer for the public local-authority and
+This version requires WHAB 2.72 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -30,7 +30,7 @@ out of summaries. No schema, mutation, synchronization or persistence behavior c
 
 Optional bounded register reads count and select under one snapshot, with Unicode casefold search and stable date/ID ordering; additive indexes support paging and account-history checks. Account overview/settings queries read metadata and counts without exporting history. A batch workspace query reads one ledger snapshot for consecutive months. Transaction annotation edits invoke the existing core command and update only the addressed row inside one transaction, preserving receipts, balances, synchronization fields and rollback on error. No persistent financial-page cache is used; later reads see committed changes.
 
-Batch projections share a request-local core index of dated activity instead of preparing full history for each month. Portable exports read allowlisted ledger columns directly and validate them before rebuilding their fresh sanitized database; they omit the three optional register/history indexes from the portable image. Opening that image restores the usual runtime indexes. The saved financial data, receipts, atomic save behavior and compatible legacy exports remain unchanged.
+Batch projections share a request-local core index of dated activity instead of preparing full history for each month. Portable exports read allowlisted ledger columns directly and validate them before rebuilding their fresh sanitized database; they omit the optional runtime register/history and uncategorized-count indexes from the portable image. Opening that image restores the usual runtime indexes. The saved financial data, receipts, atomic save behavior and compatible legacy exports remain unchanged.
 
 A private projection reader supplies core with every transaction's financial and reference fields, including deleted, pending and transfer history. Only the viewed months load the additional public display fields. Metadata, history and display reads share one SQLite snapshot; core still performs all validation and budget arithmetic. Complete state, exports and mutations retain their existing record shapes. No projection input or financial result survives the request.
 
@@ -217,3 +217,89 @@ native mutation, reversible audit entry and durable receipt commit together usin
 the existing format; no migration is needed. The host's append-memo command reuses
 this plugin's existing note-only edit, preserving merchant whitespace and every
 unrelated transaction field. Exact public intent replays do not append twice.
+
+## CLI read and save performance
+
+Optional `search_transactions(workspace, filters)` selects complete date/merchant
+matches, or uncategorized counts and a requested sample, under one read snapshot.
+It preserves Unicode casefold literal matching, descending date/ID order and
+integer currency amounts. `account_latest_dates(workspace)` reads active-history
+MAX dates grouped by account for provider previews. A partial date/ID index
+keeps limited uncategorized samples from walking categorized history; readers of
+older native stores retain the ordinary query fallback. Portable schema validation
+checks each optional runtime index's exact definition once, without enumerating
+every combination of omitted indexes.
+
+Merchant selections use a disposable in-memory index of Python-casefolded text.
+SQLite's [FTS5 trigram index](https://www.sqlite.org/fts5.html#the_trigram_tokenizer)
+finds candidates for substrings of three or more code points; exact literal
+matching verifies candidates. Shorter searches and SQLite builds without FTS5
+use the same folded-text table without a Python callback per stored row. The
+index is outside the authoritative database and portable image. Its generation
+stamp is updated only after known bounded commits; external writes, unbounded
+changes and triggers require rebuilding it under the next read snapshot. Failed
+index maintenance discards the cache and cannot fail an already-committed edit.
+
+Native evidence is reused only while SQLite total-change and data-version stamps
+agree. Bounded edits replace detached snapshot records and reuse canonical bytes
+of immutable rows and journal baselines. External SQL, triggers and failed writes
+invalidate these optimizations. Native evidence and history hashes retain their
+existing canonical representation and remain independently reproducible.
+Bounded writes retain sorted transaction positions and reuse complete canonical
+native record views, avoiding whole-ledger dictionaries and repeated sorting.
+Immutable prior audit entries also retain their canonical bytes.
+Only changed metadata and records are replaced; complete canonical hashes
+are still computed with the original algorithm. Unknown scopes and identity
+changes retain the full reconstruction path.
+
+Classifications that affect account metadata update one row using core rules.
+Currency and lifecycle changes retain their complete-history validation. Portable
+exports reuse a previously sanitized image for supported account/transaction
+edits, apply exact audited changes and update its journal. Unsupported changes or
+unverified source stamps rebuild a fresh validated image. The live database,
+connections and credentials are never copied into a portable image. Checkpoints
+still finish synchronously before the CLI returns. For a verified bounded edit,
+a worker prepares the sanitized image from immutable audit rows while the native
+state is hashed. It never reads or writes the live database from that thread.
+Prepared bytes and patches become reusable only after the native commit succeeds
+and its database generation remains current. Rollbacks and outside writes discard
+the preparation.
+
+Writable native file connections recommend a 64 MiB SQLite page cache, allocated
+on demand, so repeated audit appends can reuse overflow pages. This uses more
+process memory on populated budgets without changing journal or sync guarantees.
+In-memory portable builders and read-only connections retain their prior setting.
+
+Audit records remain compatible JSON TEXT. An adaptive whitespace reserve,
+capped at 1 MiB, lets SQLite append entries transactionally through incremental
+blob writes without repeatedly reallocating a large immutable baseline. Larger
+entries, unverified records and triggers retain full JSON replacement. The
+portable storage capability may return SHA-256-bound file patches so unchanged
+image pages stay in the host. WHAB still publishes a complete `.whab` container.
+For lower checkpoint latency, sessions reuse independently compressed 64 KiB
+blocks for unchanged payload ranges. Files remain ordinary DEFLATE ZIP entries;
+standard ZIP readers and earlier hosts can decompress them. Dictionary resets
+may increase archive size slightly compared with one continuous compression
+stream. The cache is bounded by the current container's expanded size. Checkpoints
+verify the final patched-file SHA while encoding bounded opaque bytes in memory;
+neither the archive nor session state is published until verification finishes.
+They reuse their encoder's validated in-memory container; opening files and checking
+external revisions continue through full container parsing and validation.
+
+
+## Atomic bulk edits
+
+With WHAB 2.72 this backend implements optional `AtomicBulkEdits`.
+`preview_bulk_edits(workspace, operation, edits)` is read-only; `edit_transactions`
+and `classify_accounts` apply 1–100 explicit distinct targets through core validation.
+Every candidate validates before writes. SQLite performs bounded updates inside one
+native transaction; JSON validates a detached candidate and replaces its file once.
+The operation, exact before/after financial history and durable receipt commit together,
+with one generation advancement. No omitted field is normalized or overwritten.
+Existing provider mappings, receipts, financial fields, imported notes and merchant
+whitespace remain. There is no bank call or sync. Unsupported backends must refuse,
+never emulate this contract by looping public single-record methods. Exact retries
+return the original receipt before stale checks and never save twice, including after
+restart. Uncertain outcomes retain their existing authority fence and recovery identity.
+Undo/redo treats the entire coherent audit entry as one guarded operation.
+See [CLI examples, JSON fields and dry-run](../../interface/cli/README.md#atomic-bulk-edits).

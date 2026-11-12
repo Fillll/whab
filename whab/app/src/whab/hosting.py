@@ -4,24 +4,24 @@ This module manages processes, never financial data. A failed command is never
 replayed. The existing storage authority remains the final budget writer fence.
 """
 
-import asyncio
 import json
 import os
-import secrets
 import socket
 import ssl
-import subprocess
 import sys
 from contextlib import contextmanager
-from dataclasses import replace
 from pathlib import Path
-from threading import RLock
 from time import monotonic
 from urllib.parse import urlsplit
+lazy import asyncio
+lazy import secrets
+lazy import subprocess
+lazy from dataclasses import replace
+lazy from threading import RLock
 
-import httpx
+lazy import httpx
 
-from whab.budgets.document import atomic_write
+lazy from whab.budgets.document import atomic_write
 
 _OWNER = None
 _STARTUP_SECONDS = 90
@@ -187,7 +187,7 @@ def run_host(settings, *, transient=False, persistent=False, wrapper=None):
 
 
 @contextmanager
-def local_connection(home, environment="sandbox", *, ca=None, timeout=_STARTUP_SECONDS):
+def local_connection(home, environment="sandbox", *, ca=None, timeout=_STARTUP_SECONDS, client_factory=None):
     """Acquire a host lease before execution; never retry an executed operation."""
     directory = runtime_directory(home, environment)
     child, client, lease = None, None, None
@@ -209,7 +209,8 @@ def local_connection(home, environment="sandbox", *, ca=None, timeout=_STARTUP_S
             if endpoint is not None:
                 if client is not None:
                     client.close()
-                client = httpx.Client(base_url=endpoint["url"], verify=ssl.create_default_context(cafile=ca or endpoint["ca"]),
+                factory = client_factory or httpx.Client
+                client = factory(base_url=endpoint["url"], verify=ssl.create_default_context(cafile=ca or endpoint["ca"]),
                     headers={"Authorization": "Bearer " + endpoint["token"]},
                     trust_env=False, follow_redirects=False, timeout=60)
                 try:

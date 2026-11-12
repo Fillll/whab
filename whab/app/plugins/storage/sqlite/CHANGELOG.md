@@ -1,5 +1,13 @@
 # SQLite budget storage plugin changelog
 
+## 1.23.0 — 2026-11-11
+
+PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)
+
+- Integrate bounded native edits, canonical evidence reuse and verified incremental portable saves from PR #184. [#184](https://github.com/Fillll/whab/pull/184)
+
+- Implement AtomicBulkEdits with bounded selected-row native updates, whole-batch core validation, one audited generation/receipt and synchronous checkpoint. Extend verified evidence/image preparation to bulk changes, retaining canonical explicit-parent ordering; preserve durable crash/restart recovery and reversals. [#188](https://github.com/Fillll/whab/pull/188)
+
 ## 1.22.0 — 2026-11-11
 
 PR: [#187](https://github.com/Fillll/whab/pull/187)

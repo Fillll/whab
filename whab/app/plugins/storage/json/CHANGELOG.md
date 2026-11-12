@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.0 — 2026-11-11
+
+PR: [#188](https://github.com/Fillll/whab/pull/188)
+
+- Implement optional AtomicBulkEdits: validate every detached transaction annotation or account classification before publishing one candidate with reversible history and a durable receipt. Preview is read-only; one invalid item rejects all. Preserve exact raw fields, scope, identity and recovery/authority fences without a schema migration.
+
 ## 1.14.0 — 2026-11-11
 
 PR: [#187](https://github.com/Fillll/whab/pull/187)

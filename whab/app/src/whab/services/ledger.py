@@ -180,13 +180,34 @@ class LedgerService:
         if type(workspace) is not str or workspace not in {"demo", "personal"}:
             raise StoreError("Invalid workspace.")
 
+    def search_transactions(self, workspace, filters):
+        self._workspace(workspace)
+        with self._lock:
+            serialized = getattr(self._store, "search_transactions_json", None)
+            if callable(serialized):
+                from whab.plugins.storage_transfer import read_storage_json
+                data = read_storage_json(serialized(workspace, filters), limit=16 * 1024 * 1024)
+            else:
+                callback = getattr(self._store, "search_transactions", None)
+                if not callable(callback):
+                    return None
+                data = callback(workspace, filters)
+            return {"budgetId": self.budget_id, "revision": self._revision, **_public(data)}
+
     def query(self, operation: str, workspace: str, month: str | None = None, *, parameters=None) -> dict:
         self._workspace(workspace)
         if month is not None:
             _month(month)
         with self._lock:
-            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status"}:
+            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_bulk_edits"}:
                 raise StoreError("Only feature queries accept parameters.")
+            if operation == 'preview_bulk_edits':
+                if type(parameters) is not dict or parameters.keys() != {'operation', 'edits'}:
+                    raise StoreError('Preview requires operation and edits.')
+                from whab.domain.bulk import validate_edits
+                edits = validate_edits(parameters['operation'], parameters['edits'])
+                self._require_atomic_bulk()
+                return {'revision': self._revision, 'data': _public(self._store.preview_bulk_edits(workspace, parameters['operation'], edits))}
             if operation == 'category_deletion_status':
                 values = parameters or {}
                 if type(values) is not dict or values.keys() != {'categoryId'}:
@@ -272,6 +293,11 @@ class LedgerService:
         documented = documented_operation(core_document(), "command", operation) if type(operation) is str else None
         if documented is None:
             raise StoreError("Unknown ledger command.")
+        if operation in {'edit_transactions', 'classify_accounts'}:
+            from whab.domain.bulk import validate_edits
+            if type(payload) is not dict or payload.keys() != {'edits'}:
+                raise StoreError('Bulk command requires exactly edits.')
+            return {'edits': validate_edits(operation, payload['edits'])}
         schema = documented["input"]
         if (type(payload) is not dict or not set(schema["required"]) <= payload.keys()
                 or payload.keys() - schema["properties"].keys()):
@@ -364,6 +390,13 @@ class LedgerService:
         self._workspace(workspace)
         return deepcopy(self._validate(operation, payload))
 
+    def _require_atomic_bulk(self):
+        supported = getattr(self._store, 'supports_atomic_bulk_edits', None)
+        if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
+            'edit_transactions', 'classify_accounts', 'preview_bulk_edits', 'history_scope', 'budget_history',
+        )):
+            raise StoreError('Update the storage backend/authority for atomic bulk edits with history and durable receipts. No items were changed.')
+
     def command(
         self, operation: str, workspace: str, payload: dict, *,
         request_id: str, expected_revision: str, history: dict | None = None,
@@ -372,6 +405,8 @@ class LedgerService:
         _identifier(request_id)
         _identifier(expected_revision)
         payload = self._validate(operation, payload)
+        if operation in {'edit_transactions', 'classify_accounts'}:
+            self._require_atomic_bulk()
         if operation in {'delete_category', 'delete_category_group'}:
             supported = getattr(self._store, 'supports_category_deletion', None)
             if (not callable(supported) or supported() is not True
@@ -453,6 +488,8 @@ class LedgerService:
                 elif operation in {'delete_category', 'delete_category_group'}:
                     data = getattr(self._store, operation)(
                         workspace, payload['categoryId'] if operation == 'delete_category' else payload['parentId'])
+                elif operation in {'edit_transactions', 'classify_accounts'}:
+                    data = _public(getattr(self._store, operation)(workspace, payload['edits']))
                 elif operation == "rename_category":
                     data = self._store.rename_category(workspace, payload["categoryId"], payload["name"])
                 elif operation == "append_transaction_note":

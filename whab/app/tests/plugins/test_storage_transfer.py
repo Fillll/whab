@@ -299,3 +299,25 @@ def test_unattached_account_masks_are_preserved_and_bound_into_digest_for_both_w
     ]
     with pytest.raises(StoreError):
         decode_local_state(transfer.financial, canonical_storage_json(private))
+
+
+def test_native_chunk_digest_matches_complete_canonical_payloads_and_bounds(monkeypatch):
+    from whab.plugins import storage_transfer
+    data = states()
+    expected = local_state_digest(*encode_local_state(data))
+    def chunks(value, *, limit):
+        raw = canonical_storage_json(value, limit=limit)
+        return (raw[:7], raw[7:])
+    assert storage_transfer.native_state_digest(data, chunks=chunks) == expected
+    with pytest.raises(StoreError):
+        storage_transfer.native_state_digest(data, chunks=lambda value, **kw: ('invalid',))
+    monkeypatch.setattr(storage_transfer, 'MAX_LOCAL_TRANSFER_BYTES', 10)
+    with pytest.raises(StoreError):
+        storage_transfer.native_state_digest(data, chunks=lambda value, **kw: (b'x' * 6,))
+
+
+@pytest.mark.parametrize('records', [None, (), [1], [1, 2, 3]])
+def test_native_record_views_require_both_canonical_envelopes(records):
+    from whab.plugins.storage_transfer import native_records_digest
+    with pytest.raises(StoreError):
+        native_records_digest(records, chunks=lambda value, **kw: ())

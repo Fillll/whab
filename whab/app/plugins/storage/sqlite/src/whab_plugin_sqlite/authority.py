@@ -1,13 +1,12 @@
 """SQLite-owned authority, atomic command receipts and protected local transfer."""
 
-import json
 from contextlib import contextmanager
 from dataclasses import replace
 from uuid import uuid4
 
 from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
-from whab.domain.ledger_state import require_pristine
+from whab.domain.ledger_state import portable_snapshot, require_pristine
 from whab.plugins.storage_replica import (
     ReplicaWatermark,
     read_replica_watermark,
@@ -28,7 +27,8 @@ from whab.plugins.storage_transfer import (
     dispatch_storage_operation,
     encode_local_state,
     evidence_record,
-    local_state_digest,
+    native_records_digest,
+    native_state_digest,
     operation_limit,
     read_evidence,
     read_operation_receipt,
@@ -194,8 +194,55 @@ class Authority:
             return False
 
     def _current_evidence(self, metadata=None):
-        financial, protected = encode_local_state(self._local_states(), validate=False)
-        return self._metadata_evidence(metadata or self._authority_metadata(), local_state_digest(financial, protected))
+        stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+        if getattr(self, '_evidence_stamp', None) != stamp:
+            from .evidence import SnapshotEncoder
+            transaction = self._writing
+            selected = transaction.get('selected') if transaction is not None else None
+            reusable = (selected is not None and selected[0] in transaction.get('history_after', {})
+                        and getattr(self, '_native_state_stamp', None) == transaction['before_stamp'])
+            reusable = reusable and transaction.get('history_operation') in {
+                'edit_transaction', 'edit_transaction_details', 'review_transactions', 'update_account', 'edit_transactions', 'classify_accounts',
+            }
+            if reusable:
+                from whab.domain.history import financial
+                name = selected[0]
+                state = self._read_state(name, transaction_ids=(), include_history=False)
+                ledger = financial(portable_snapshot(state, validate=False), trusted=True)
+                # Native evidence historically retains explicit-parent order;
+                # financial audit snapshots sort it. Do not mix their digests.
+                if state.get('categoryGroups'):
+                    ledger['categoryGroups'] = state['categoryGroups']
+                after = transaction['history_after'][name]
+                ledger['transactions'] = after['transactions']
+                if 'history' in after:
+                    ledger['history'] = after['history']
+                financial_records, protected = self._native_records
+                workspaces = financial_records['workspaces']
+                records = ({**financial_records, 'workspaces': {**workspaces, name: {**workspaces[name], 'ledger': ledger}}}, protected)
+            else:
+                self._snapshot_encoder = SnapshotEncoder()
+                records = []
+                def capture(value, *, limit):
+                    records.append(value)
+                    return self._snapshot_encoder.chunks(value, limit=limit)
+            self._snapshot_encoder.begin(transaction_ids=selected[1] if reusable else None)
+            self._evidence_digest = (native_records_digest(records, chunks=self._snapshot_encoder.chunks) if reusable
+                                     else native_state_digest(self._local_states(), chunks=capture))
+            self._snapshot_encoder.finish()
+            self._native_records = records
+            self._native_state_stamp = stamp
+            self._evidence_stamp = stamp
+        return self._metadata_evidence(metadata or self._authority_metadata(), self._evidence_digest)
+
+    def _history_positions(self, workspace, rows):
+        positions = getattr(self, '_history_row_positions', {})
+        cached = positions.get(workspace)
+        if cached is None or cached[0] is not rows:
+            rows.sort(key=lambda row: row['id'])
+            cached = (rows, {row['id']: index for index, row in enumerate(rows)})
+        self._history_row_positions = {**positions, workspace: cached}
+        return cached[1]
 
     @contextmanager
     def _authority_write(self, *, financial=True, workspace=None, transaction_ids=None):
@@ -217,6 +264,8 @@ class Authority:
                 return
             self._check_authority()
             if self._writing is not None:
+                if workspace in {'personal', 'demo'} and transaction_ids is not None and not self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='trigger' LIMIT 1").fetchone():
+                    self._writing['selected'] = (workspace, tuple(transaction_ids))
                 yield self._writing
                 return
             self.db.execute("BEGIN IMMEDIATE")
@@ -231,11 +280,12 @@ class Authority:
                 self._writing = transaction
                 from .export_reads import snapshot
                 stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+                transaction['before_stamp'] = stamp
                 cached = getattr(self, '_history_heads', {}) if getattr(self, '_history_stamp', None) == stamp else {}
                 names = (workspace,) if type(workspace) is str and workspace in {'personal', 'demo'} else ('personal', 'demo')
                 history_before = {name: cached[name] if name in cached else snapshot(self, name) for name in names if self.db.execute("SELECT 1 FROM meta WHERE workspace=?", (name,)).fetchone()} if financial else {}
                 history_after = dict(cached) if financial else {}
-                selected = (tuple(transaction_ids) if type(transaction_ids) in {tuple, list} and 0 < len(transaction_ids) <= 100 and all(type(key) is str for key in transaction_ids) else None)
+                selected = (tuple(transaction_ids) if type(transaction_ids) in {tuple, list} and 0 <= len(transaction_ids) <= 100 and all(type(key) is str for key in transaction_ids) else None)
                 # User/legacy SQL triggers can touch additional rows; do not use
                 # bounded reads in their presence. Data-version/total-change
                 # checks invalidate cached heads after writes outside this scope.
@@ -243,6 +293,8 @@ class Authority:
                     selected = None
                 yield transaction
                 if transaction["dirty"]:
+                    if transaction.get('selected') is not None:
+                        workspace, selected = transaction['selected']
                     from whab.domain.history import record_financial
                     operation = transaction["operation"]
                     info = getattr(self, '_history_context', None)
@@ -255,26 +307,68 @@ class Authority:
                         if selected is not None:
                             new = snapshot(self, name, transaction_ids=selected, include_history=False)
                             changed = {row['id']: row for row in new['transactions']}
-                            new['transactions'] = [changed.get(row['id'], row) for row in old['transactions']]
-                            if 'history' in old:
-                                new['history'] = old['history']
+                            positions = self._history_positions(name, old['transactions'])
+                            if changed.keys() != set(selected) or any(key not in positions for key in selected):
+                                # A custom native scope inserted/deleted identities. Its
+                                # complete state needs the ordinary unbounded path.
+                                selected = None
+                                transaction['selected'] = None
+                                new = snapshot(self, name)
+                            else:
+                                old_rows = [old['transactions'][positions[key]] for key in selected]
+                                rows = old['transactions'].copy() if selected else old['transactions']
+                                for key, row in changed.items():
+                                    rows[positions[key]] = row
+                                new['transactions'] = rows
+                                if 'history' in old:
+                                    new['history'] = old['history']
                         else:
                             new = snapshot(self, name)
                         if not transaction.get("history_restore"):
                             original_journal = new.get("history") or old.get("history")
-                            journal = record_financial(original_journal, old, new, info)
+                            from hashlib import sha256
+
+                            from .evidence import SnapshotEncoder
+                            if not hasattr(self, '_history_encoder') or name not in cached:
+                                self._history_encoder = SnapshotEncoder(ensure_ascii=True)
+                            self._history_encoder.begin(transaction_ids=selected if name in cached else None, scope=name)
+                            previous_digest = getattr(self, '_history_digest_heads', {}).get(name) if name in cached else None
+                            def digest_snapshot(value):
+                                from whab.plugins.storage_transfer import MAX_LOCAL_TRANSFER_BYTES
+                                if previous_digest is not None and value.keys() == previous_digest[0].keys() and all(
+                                    value[key] is previous_digest[0][key] if type(value[key]) in {list, dict} else value[key] == previous_digest[0][key]
+                                    for key in value
+                                ):
+                                    return previous_digest[1]
+                                digest = sha256()
+                                for raw in self._history_encoder.chunks(value, limit=MAX_LOCAL_TRANSFER_BYTES):
+                                    digest.update(raw)
+                                result = digest.hexdigest()
+                                transaction.setdefault('history_digests', {})[name] = (value, result)
+                                return result
+                            bounded_changes = None
+                            if selected is not None:
+                                from whab.domain.history import difference
+                                bounded_changes = difference({**old, 'transactions': old_rows}, {**new, 'transactions': list(changed.values())})
+                            journal = record_financial(original_journal, old, new, info, digest_snapshot=digest_snapshot, changes=bounded_changes, transactions_sorted=selected is not None)
+                            self._history_encoder.finish()
                             if journal is not None:
                                 new["history"] = journal
                                 if journal is not original_journal:
-                                    self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (name, json.dumps(journal)))
+                                    from .history_writes import save_history
+                                    save_history(self, name, journal, original_journal, cache_valid=name in cached and selected is not None and info['operation'] in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts'})
+                        if selected is not None:
+                            self._history_row_positions[name] = (new['transactions'], positions)
                         history_after[name] = new
+                    transaction['history_after'] = history_after
                     metadata.update(generation=metadata["generation"] + 1,
                                     operationId=transaction["operation"].operation_id if transaction["operation"] is not None else str(uuid4()),
                                     empty=False)
                     if transaction["operation"] is not None:
                         operation = transaction["operation"]
+                        from .portable import evidence_with_prepared_image
                         receipt = OperationReceipt(operation.operation_id, operation.fingerprint,
-                                                   canonical_storage_json(transaction["result"]), self._current_evidence(metadata))
+                                                   canonical_storage_json(transaction["result"]), evidence_with_prepared_image(self, metadata, transaction))
                         self.db.execute("INSERT INTO storage_operations(operation_id,generation,record) VALUES(?,?,?)",
                                         (receipt.operation_id, metadata["generation"], canonical_storage_json(receipt_record(receipt))))
                         self.db.execute("DELETE FROM storage_operations WHERE operation_id IN (SELECT operation_id FROM storage_operations ORDER BY generation DESC,operation_id DESC LIMIT -1 OFFSET ?)", (MAX_OPERATION_RECEIPTS,))
@@ -283,10 +377,33 @@ class Authority:
                     self._save_authority(metadata)
                 attempted = True
                 next_history_stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+                digest_current = getattr(self, '_evidence_stamp', None) == (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+                # Authority metadata and receipts are outside the logical state digest.
+                if transaction["dirty"] and transaction["receipt"] is not None and not self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='trigger' LIMIT 1").fetchone():
+                    digest_current = True
                 self.db.execute("COMMIT")
+                committed_stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
+                if digest_current and committed_stamp[1] == next_history_stamp[1]:
+                    self._evidence_stamp = committed_stamp
+                    self._native_state_stamp = committed_stamp
+                from .portable import promote_prepared_image
+                promote_prepared_image(self, transaction, committed_stamp)
+                from .merchant_index import promote
+                bounded = transaction.get('selected')
+                if bounded is None and workspace in {'personal', 'demo'} and selected is not None:
+                    bounded = (workspace, selected)
+                promote(self, bounded, stamp, committed_stamp)
                 self._history_heads = history_after
                 self._history_stamp = next_history_stamp
+                if not hasattr(self, '_history_digest_heads'):
+                    self._history_digest_heads = {}
+                self._history_digest_heads.update(transaction.get('history_digests', {}))
             except BaseException as error:
+                self._evidence_stamp = None
+                self._native_state_stamp = None
+                self._history_blob_positions = {}
+                if hasattr(self, '_history_encoder'):
+                    del self._history_encoder
                 if self.db.in_transaction:
                     self.db.execute("ROLLBACK")
                 elif attempted and transaction is not None:
@@ -338,6 +455,11 @@ class Authority:
         if name == 'recorded_command':
             name, payload = payload['operation'], payload['parameters']
         selected = ([payload.get('transactionId')] if name in {'edit_transaction', 'edit_transaction_details'} else payload.get('transactionIds') if name == 'review_transactions' else None)
+        if name == 'edit_transactions':
+            from whab.domain.bulk import validate_edits
+            selected = [row['transactionId'] for row in validate_edits(name, payload['edits'])]
+        elif name == 'classify_accounts':
+            selected = ()
         with self._authority_write(workspace=operation.workspace, transaction_ids=selected) as transaction:
             current = self._current_evidence(transaction["metadata"])
             replay = check_storage_operation(current, operation, self.operation_receipt(operation.operation_id))

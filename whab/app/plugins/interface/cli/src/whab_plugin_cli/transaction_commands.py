@@ -3,19 +3,23 @@
 import argparse
 from uuid import uuid4
 
-import httpx
+lazy import httpx
 
 from whab.plugins import validate_category_agent
 
 
 def add_category_parsers(commands):
+    from .bulk_commands import bulk_options
+    from .bulk_help import BULK_HELP
     commands.add_parser('categories', help='List category IDs, names and groups for this budget')
     edit = commands.add_parser('categorize', aliases=['categorise'],
-        help='Assign a category without JSON or advanced command syntax',
-        description='Assign a category to one transaction in this budget. Review status is preserved unless --needs-review is supplied. Agent attribution is opt-in.',
+        help='Assign/clear one category or atomically categorize 2–100 explicit IDs',
+        description='Assign a category to 1–100 explicit IDs. One ID retains the existing single-record operation/output; multiple IDs commit and save once. Review status is preserved unless --needs-review is supplied. Agent attribution is opt-in.',
         epilog='Examples:\n  whab "My budget" trnx categories\n  whab "My budget" trnx categorize TRANSACTION_ID --category "Food / Groceries" --agent Codex --needs-review\n  whab "My budget" trnx categorize TRANSACTION_ID --clear\n\nCategory accepts an exact ID, unique name or "Group / Name" (case-insensitive names). Ambiguous names fail. A fresh ledger revision and unique request ID are obtained automatically; supply --revision and --request-id for an explicitly observed intent. Never automatically retries. After an uncertain result, inspect the transaction; retain the reported intent IDs and original arguments.',
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    edit.add_argument('transaction_id', help='Stable transaction ID returned by a read')
+    edit.epilog += '\n\n' + BULK_HELP
+    bulk_options(edit, attribution=False, recovery=False)
+    edit.add_argument('transaction_id', nargs='+', help='Stable transaction ID returned by a read')
     choice = edit.add_mutually_exclusive_group(required=True)
     choice.add_argument('--category', help='Category ID, unique name or Group / Name')
     choice.add_argument('--clear', action='store_true', help='Clear the assigned category')
@@ -52,8 +56,8 @@ def execute_category(connection, identifier, prefix, args, exchange, error):
         payload['categoryAgent'] = args.agent
     if args.needs_review:
         payload['reviewed'] = False
-    revision = args.revision or categories['revision']
-    intent = args.request_id or str(uuid4())
+    revision = categories['revision'] if args.revision is None else args.revision
+    intent = str(uuid4()) if args.request_id is None else args.request_id
     history = {'batchId': args.batch} if args.batch else None
     try:
         result = checked(exchange(connection, 'POST', prefix + '/commands',

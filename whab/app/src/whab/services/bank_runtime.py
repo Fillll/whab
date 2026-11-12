@@ -163,7 +163,7 @@ class BankCoordinator:
     def __init__(self, provider, tracked, bank_store, *, budget_id, environment, provider_id,
                  generation, home=None, encryption_key=None, journal=None, cipher=None,
                  code_identity='installed', background_scope=None, clock=None,
-                 requires_account_setup=False, supports_investments=False, automatic_sync=lambda: True, connections=None,
+                 requires_account_setup=False, supports_investments=False, supports_account_metadata=False, automatic_sync=lambda: True, connections=None,
                  shared_event=None, profiles=None):
         self.provider, self.tracked, self.bank_store = provider, tracked, bank_store
         self.scope = ContinuationScope(budget_id, environment, provider_id, generation)
@@ -182,6 +182,7 @@ class BankCoordinator:
         if requires_account_setup:
             self.config["requiresAccountSetup"] = True
         self.supports_investments = supports_investments
+        self.supports_account_metadata = supports_account_metadata
         if supports_investments:
             self.config["supportsInvestments"] = True
         self.cipher = cipher or BankCipher(encryption_key)
@@ -485,25 +486,34 @@ class BankCoordinator:
                                and item.get('lastSynced') is None)]
             return {name: sum(result[name] for result in results) for name in ('added', 'modified', 'removed')}
 
-    def _sync_preview(self, item_id):
+    def _account_metadata(self, item_id):
         self._ready()
         item = self._item(item_id)
-        response = self._provider_call('read_sync', item_id=item_id, access_token=self._access(item_id),
-            cursor=item['cursor'], institution_name=item['institutionName'])
-        if self.connections is not None:
-            self.connections.update(self.scope.provider_id, item_id, accounts=response['accounts'])
+        if self.supports_account_metadata:
+            return self._provider_call('read_accounts', item_id=item_id, access_token=self._access(item_id),
+                                       institution_name=item['institutionName'])
+        return self._provider_call('read_sync', item_id=item_id, access_token=self._access(item_id),
+                                   cursor=item['cursor'], institution_name=item['institutionName'])['accounts']
+
+    def _sync_preview(self, item_id):
+        provider_accounts = self._account_metadata(item_id)
+        item = self._item(item_id)
         accounts = self.tracked.accounts('personal')
-        latest = {}
-        for transaction in self.tracked.transactions('personal'):
-            if not transaction.get('deleted'):
-                key = transaction['accountId']
-                latest[key] = max(latest.get(key, ''), transaction['date'])
+        read_latest = getattr(self.tracked, 'account_latest_dates', None)
+        if callable(read_latest):
+            latest = read_latest('personal')
+        else:
+            latest = {}
+            for transaction in self.tracked.transactions('personal'):
+                if not transaction.get('deleted'):
+                    key = transaction['accountId']
+                    latest[key] = max(latest.get(key, ''), transaction['date'])
         saved = item.get('syncSettings')
-        return response['accounts'], {
+        return provider_accounts, {
             'itemId': item_id, 'institution': item['institutionName'], 'configured': saved is not None,
             'accounts': [{key: account[key] for key in ('id', 'name', 'mask', 'currency') if key in account}
                 | {'link': (saved or {}).get(self.bank_store._record_identity('account', item_id, account['id']))}
-                for account in response['accounts']],
+                for account in provider_accounts],
             'destinations': [{key: account[key] for key in ('id', 'name', 'currency', 'itemId') if key in account}
                 | {'latestDate': latest.get(account['id']), 'type': account['type'],
                    'closed': account.get('closed', False), 'available': not account.get('closed', False) and account['type'] not in {'other', 'unclassified'} and account.get('itemId') in (None, self.bank_store.item_identity(item_id))} for account in accounts],
@@ -553,7 +563,7 @@ class BankCoordinator:
             return await self._operation(self._investments, item_id, account_id, start_date, end_date)
 
     def _configure_sync(self, item_id, selection):
-        accounts, _ = self._sync_preview(item_id)
+        accounts = self._account_metadata(item_id)
         payload = self.bank_store.prepare_sync(item_id, {'added': [], 'modified': [], 'removed': []}, None, accounts)
         scoped = {}
         if type(selection) is not list or len(selection) > 500:

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.17.0 — 2026-11-11
+
+PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)
+
+- Integrate command-specific lazy startup and coherent storage-filtered reads from PR #184. [#184](https://github.com/Fillll/whab/pull/184)
+
+- Add multi-ID categorize/classify and mixed edit-many JSON/stdin workflows, exact read-only previews, optional single-target --atomic and complete prominent offline root/group/command help. Preserve default single-record output. Return original resolved intent for safe recovery; never loop, split, truncate or retry uncertain writes automatically. [#188](https://github.com/Fillll/whab/pull/188)
+
 ## 2.16.0 — 2026-11-11
 
 PR: [#187](https://github.com/Fillll/whab/pull/187)

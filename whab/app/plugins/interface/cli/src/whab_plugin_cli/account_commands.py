@@ -4,7 +4,7 @@ import argparse
 import json
 from uuid import uuid4
 
-import httpx
+lazy import httpx
 
 from whab.plugins import ACCOUNT_SUBTYPES, ACCOUNT_TYPES, StoreError, normalize_account
 from whab.plugins.documentation import operation
@@ -14,6 +14,8 @@ from .transaction_reads import terminal_text
 
 
 def add_account_parser(commands, catalog):
+    from .bulk_commands import bulk_options
+    from .bulk_help import BULK_HELP
     types = operation(catalog['core'], 'command', 'update_account')['input']['properties']['type']['enum']
     guide = '\n'.join(f'  {kind}: {ACCOUNT_TYPES[kind]}; subtypes: {", ".join(ACCOUNT_SUBTYPES.get(kind, {})) or "none"}' for kind in types)
     examples = ('Examples (fictional budget):\n'
@@ -28,6 +30,7 @@ def add_account_parser(commands, catalog):
         description='Read, classify, close or reopen accounts in one explicitly addressed budget; no interactive wizard.',
         epilog=examples + 'Names match exactly, ignoring case and outer whitespace; IDs take precedence. Missing or ambiguous names fail with candidates. Quote spaces, emoji and non-Latin names. JSON is the default; --format table is for display. No bank synchronization is requested.',
         formatter_class=argparse.RawDescriptionHelpFormatter)
+    account.epilog += '\n\n' + BULK_HELP
     actions = account.add_subparsers(dest='account_action', required=True)
     listing = actions.add_parser('list', help='List account identities and classifications',
         description='List this budget’s accounts, including name, stable ID, type, subtype, onBudget, closed lifecycle and unclassified (type=other).',
@@ -45,6 +48,8 @@ def add_account_parser(commands, catalog):
         description='Classify one existing account using the public guarded update_account operation. Reads its current revision and generates one unique request ID automatically.',
         epilog=examples + 'Types and permitted subtypes:\n' + guide + '\n\nOnly depository and credit support --on-budget. Scope omitted: preserve the existing scope, even when changing to credit. An incompatible preserved scope is rejected; choose --off-budget explicitly to move a cash/card account to a tracking type. Subtype omitted: preserve it for the same type, clear it when type changes. A certificate of deposit is --type deposit --subtype cd --off-budget. Classification preserves lifecycle state; use account close/reopen separately.\n\nClassification applies across account history without rewriting transactions, notes, categories, reviews or bank mappings. Imported balance estimates remain unverified. No bank sync is requested. Success includes the saved classification after verification. Stale revisions fail safely; no automatic retries. After an uncertain response, inspect account show and history before deciding anything else. Keep the reported original intent/revision/payload for reconciliation or an exact advanced retry; do not rerun classify to retry an uncertain write.',
         formatter_class=argparse.RawDescriptionHelpFormatter)
+    edit.epilog += '\n\n' + BULK_HELP
+    bulk_options(edit, formatting=False)
     edit.add_argument('--type', required=True, choices=types, help='Financial classification; other means unclassified, credit means card/line of credit')
     edit.add_argument('--subtype', help='Optional subtype from the type-specific list below; invalid combinations are refused')
     scope = edit.add_mutually_exclusive_group()
@@ -57,7 +62,7 @@ def add_account_parser(commands, catalog):
             epilog=examples + 'Closed is independent of type/subtype and budget scope. Every account type can close or reopen, including unknown/nonzero balances. Closing preserves balances, currency, history, notes, reviews and bank mappings; it does not settle or verify funds/debts or fabricate zero. Existing financial/historical treatment follows its saved type and scope. Archived accounts are hidden from active pickers and refuse new manual entries or sync updates. Open accounts on the same bank Item keep syncing; shared connections and other budgets are unaffected. Reopening restores the saved account cursor for provider catch-up under the original mapping/history dates. Neither command starts sync. Imported balance estimates remain unverified. Each write verifies the saved result; stale or uncertain writes are never replayed automatically. Inspect account show/history and retain the reported complete intent before any retry.',
             formatter_class=argparse.RawDescriptionHelpFormatter))
     for parser in (show, edit, *lifecycle):
-        parser.add_argument('account', help='Exact stable ID or unique account name; quote spaces/emoji/non-Latin text')
+        parser.add_argument('account', **({'nargs': '+'} if parser is edit else {}), help='Exact stable ID or unique account name; quote spaces/emoji/non-Latin text')
     for parser in (listing, show, edit, *lifecycle):
         parser.add_argument('--format', choices=('json', 'table'), default='json', help='Output format (default: json); JSON retains complete public fields')
 
@@ -97,7 +102,12 @@ def execute_account(connection, identifier, prefix, args, exchange, error):
     expected = {**{key: row.get(key) for key in ('type', 'onBudget', 'subtype')},
                 'closed': row.get('closed', False), **{key: value for key, value in payload.items() if key != 'accountId'}}
     intent = {'operation': 'update_account', 'workspace': 'personal', 'payload': payload,
-              'expected_revision': observed['revision'], 'request_id': str(uuid4())}
+              'expected_revision': observed['revision'] if getattr(args, 'revision', None) is None else args.revision, 'request_id': str(uuid4()) if getattr(args, 'request_id', None) is None else args.request_id}
+    history = {'actor': args.agent, 'actorKind': 'agent'} if getattr(args, 'agent', None) is not None else {}
+    if getattr(args, 'batch', None) is not None:
+        history['batchId'] = args.batch
+    if history:
+        intent['history'] = history
     try:
         saved = checked(exchange(connection, 'POST', prefix + '/commands', json=intent), identifier, error)
         verified = read()
@@ -107,7 +117,7 @@ def execute_account(connection, identifier, prefix, args, exchange, error):
     except (ValueError, OSError, RuntimeError, KeyError, TypeError, httpx.HTTPError) as failure:
         raise error('Account update was not confirmed; it may have been saved. No automatic retry. Inspect account show and history; do not rerun ' + args.account_action + ' as a retry. Retain budgetId ' + identifier + ' and the exact original intent: ' + json.dumps(intent) + '.') from failure
     return {**verified, 'budget': args.target, 'data': classified(actual),
-            'requestId': intent['request_id'], 'expectedRevision': observed['revision']}
+            'requestId': intent['request_id'], 'expectedRevision': intent['expected_revision']}
 
 
 def account_table(result):

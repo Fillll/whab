@@ -6,7 +6,7 @@ personal and fictional demo workspaces in one versioned JSON data file at
 different files. It uses no database driver or other storage implementation.
 The host supplies financial commands, currency rules and workspace projections.
 
-Install its wheel with a compatible host (WHAB 2.69+ within major 2), then select
+Install its wheel with a compatible host (WHAB 2.72+ within major 2), then select
 `WHAB_STORAGE=json` for a new original runtime or initial CLI budget creation.
 An opened budget chooses its backend through its manifest. Selecting JSON does
 not migrate an existing ledger. JSON belongs to the supported bundled set;
@@ -284,3 +284,21 @@ native mutation, reversible audit entry and durable receipt commit together usin
 the existing format; no migration is needed. The host's append-memo command reuses
 this plugin's existing note-only edit, preserving merchant whitespace and every
 unrelated transaction field. Exact public intent replays do not append twice.
+
+
+## Atomic bulk edits
+
+With WHAB 2.72 this backend implements optional `AtomicBulkEdits`.
+`preview_bulk_edits(workspace, operation, edits)` is read-only; `edit_transactions`
+and `classify_accounts` apply 1–100 explicit distinct targets through core validation.
+Every candidate validates before writes. SQLite performs bounded updates inside one
+native transaction; JSON validates a detached candidate and replaces its file once.
+The operation, exact before/after financial history and durable receipt commit together,
+with one generation advancement. No omitted field is normalized or overwritten.
+Existing provider mappings, receipts, financial fields, imported notes and merchant
+whitespace remain. There is no bank call or sync. Unsupported backends must refuse,
+never emulate this contract by looping public single-record methods. Exact retries
+return the original receipt before stale checks and never save twice, including after
+restart. Uncertain outcomes retain their existing authority fence and recovery identity.
+Undo/redo treats the entire coherent audit entry as one guarded operation.
+See [CLI examples, JSON fields and dry-run](../../interface/cli/README.md#atomic-bulk-edits).

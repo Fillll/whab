@@ -19,7 +19,7 @@ from .storage_transfer import storage_identifier
 from .wire import WireError
 
 MAX_PROVIDER_BYTES = 16 * 1024 * 1024
-_COMMANDS = frozenset({'open', 'connection_token', 'exchange_token', 'read_sync', 'read_investments', 'remove_token', 'webhook_event', 'close'})
+_COMMANDS = frozenset({'open', 'connection_token', 'exchange_token', 'read_sync', 'read_accounts', 'read_investments', 'remove_token', 'webhook_event', 'close'})
 
 
 def _text(value, limit=4096, *, nullable=False):
@@ -51,6 +51,10 @@ def read_provider_result(command, value, *, provider_id, environment=None, item_
             raise WireError()
         storage_identifier(value['item_id'])
         _text(value['access_token'])
+        return value
+    if command == 'read_accounts':
+        read_provider_result('read_sync', {'changes': {'added': [], 'modified': [], 'removed': []}, 'cursor': None,
+                             'accounts': value, 'historical_complete': False}, provider_id=provider_id, item_id=item_id)
         return value
     if command == 'read_sync':
         if (type(value) is not dict or value.keys() != {'changes', 'cursor', 'accounts', 'historical_complete'}
@@ -128,7 +132,9 @@ class ProviderDispatcher:
                     engine.close()
                 raise WireError()
             self.engine, self.context = engine, context
-            if any(not callable(getattr(engine, name, None)) for name in _COMMANDS - {'open', 'read_investments'}):
+            if any(not callable(getattr(engine, name, None)) for name in _COMMANDS - {'open', 'read_investments', 'read_accounts'}):
+                raise WireError()
+            if self.plugin.bank.supports_account_metadata and not callable(getattr(engine, 'read_accounts', None)):
                 raise WireError()
             if self.plugin.bank.supports_investments and not callable(getattr(engine, 'read_investments', None)):
                 raise WireError()
@@ -155,6 +161,13 @@ class ProviderDispatcher:
             _text(value['cursor'], nullable=True)
             _text(value['institution_name'], 200)
             output = self._await(self.engine.read_sync(**value))
+        elif command == 'read_accounts':
+            if not self.plugin.bank.supports_account_metadata or value.keys() != {'item_id', 'access_token', 'institution_name'}:
+                raise WireError()
+            storage_identifier(value['item_id'])
+            _text(value['access_token'])
+            _text(value['institution_name'], 200)
+            output = self._await(self.engine.read_accounts(**value))
         elif command == 'read_investments':
             from whab.domain.validation import validate_date
             if (not self.plugin.bank.supports_investments or value.keys() != {'item_id', 'access_token', 'start_date', 'end_date', 'account_id'}):

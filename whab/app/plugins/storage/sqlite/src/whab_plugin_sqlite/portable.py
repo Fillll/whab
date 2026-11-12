@@ -1,8 +1,8 @@
 """SQLite-owned portable images, rebuilt from validated ledger data only."""
 
+import json
 import sqlite3
 from collections.abc import Mapping
-from itertools import combinations
 
 from whab.plugins import StoreError, receipt_media_type
 
@@ -11,7 +11,7 @@ from .store import Store
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
 _FORMAT_VERSION = 1
-_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history")
+_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent")
 _ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000, "budget_history": 1}
 
 
@@ -33,9 +33,160 @@ def _without_additive_columns(schema):
             else row for row in schema]
 
 
+def _incremental_image(store, workspace, cached):
+    stamp, raw, previous = cached
+    heads = getattr(store, '_history_heads', {})
+    current_stamp = (store.db.total_changes, store.db.execute("PRAGMA data_version").fetchone()[0])
+    if stamp == current_stamp:
+        return raw
+    if getattr(store, '_history_stamp', None) != current_stamp or workspace not in heads:
+        return None
+    journal = heads[workspace].get('history')
+    result = _build_image(raw, previous, journal, getattr(store, '_portable_history_positions', {}).get(workspace, {}))
+    if result is None:
+        return None
+    raw, hints = result
+    store._portable_history_positions[workspace] = hints
+    return raw
+
+
+def _build_image(raw, previous, journal, hints):
+    """Pure preparation from an already sanitized image and immutable audit rows."""
+    entries = journal.get('entries', []) if journal else []
+    positions = [i for i, entry in enumerate(entries) if entry['hash'] == previous]
+    if len(positions) != 1:
+        return None
+    changes = entries[positions[0] + 1:]
+    if not changes or any(entry['operation'] not in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts'}
+                          or any(change['path'][0] not in {'accounts', 'transactions'} or change['before'] is None or change['after'] is None
+                                 for change in entry['changes']) for entry in changes):
+        return None
+    # Deserialize only an image previously built from allowlisted, validated data.
+    # The private source database is never copied into a portable image.
+    clean = sqlite3.connect(':memory:')
+    try:
+        clean.deserialize(raw)
+        for entry in changes:
+            for change in entry['changes']:
+                row = change['after']
+                if change['path'][0] == 'accounts':
+                    clean.execute("UPDATE accounts SET name=?,type=?,balance=?,currency=?,on_budget=?,subtype=?,bank_website=?,name_overridden=?,closed=? WHERE workspace=? AND id=?",
+                                  (row['name'], row['type'], row['balance'], row['currency'], int(row['onBudget']), row['subtype'], row.get('bankWebsite'), int(row.get('nameOverridden', False)), int(row.get('closed', False)), 'personal', row['id']))
+                else:
+                    clean.execute("UPDATE transactions SET account_id=?,date=?,merchant=?,merchant_logo=?,amount=?,category_id=?,pending=?,reviewed=?,source=?,note=?,is_transfer=?,inferred_transfer=?,category_edited=?,deleted=?,original_details=?,category_agent=? WHERE workspace=? AND id=?",
+                                  (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), 'personal', row['id']))
+        from types import SimpleNamespace
+
+        from .history_writes import save_history
+        holder = SimpleNamespace(db=clean, _history_blob_positions=dict(hints))
+        previous = {**journal, 'entries': entries[:positions[0] + 1]}
+        save_history(holder, 'personal', journal, previous, cache_valid=True)
+        clean.commit()
+        raw = clean.serialize()
+        if len(raw) > MAX_DATABASE_BYTES:
+            clean.execute("VACUUM")
+            raw = clean.serialize()
+            hint = holder._history_blob_positions['personal']
+            rowid = clean.execute("SELECT rowid FROM budget_history WHERE workspace='personal'").fetchone()[0]
+            holder._history_blob_positions['personal'] = (rowid, *hint[1:])
+        return raw, holder._history_blob_positions
+    finally:
+        clean.close()
+
+
+def _prepared_delta(cached, journal, hints, cached_digest):
+    from hashlib import sha256
+    result = _build_image(cached[1], cached[2], journal, hints)
+    if result is None or len(result[0]) > MAX_DATABASE_BYTES:
+        return None
+    raw, hints = result
+    base = cached_digest[1] if cached_digest is not None and cached_digest[0] is cached[1] else sha256(cached[1]).hexdigest()
+    value = sha256(raw).hexdigest()
+    patch = {'name': _FILENAME, 'base': base, 'digest': value, 'size': len(raw),
+             'chunks': _changed_pages(cached[1], raw)}
+    return raw, hints, patch
+
+
+def _changed_pages(previous, raw):
+    if previous is raw:
+        return []
+    return [[offset, raw[offset:offset + 4096]] for offset in range(0, len(raw), 4096)
+            if raw[offset:offset + 4096] != previous[offset:offset + 4096]]
+
+
+def evidence_with_prepared_image(store, metadata, transaction):
+    """Overlap independent SHA work without accessing the source DB in a thread."""
+    selected = transaction.get('selected')
+    workspace = selected[0] if selected is not None else None
+    cached = getattr(store, '_portable_images', {}).get(workspace)
+    journal = transaction['history_after'].get(workspace, {}).get('history')
+    if cached is None or cached[0] != transaction['before_stamp'] or journal is None:
+        return store._current_evidence(metadata)
+    from concurrent.futures import ThreadPoolExecutor
+    hints = dict(getattr(store, '_portable_history_positions', {}).get(workspace, {}))
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        pending = executor.submit(_prepared_delta, cached, journal, hints, getattr(store, '_portable_file_digest', None))
+        evidence = store._current_evidence(metadata)
+        try:
+            prepared = pending.result()
+        except Exception:
+            # This disposable optimization cannot change native commit behavior.
+            prepared = None
+    if prepared is not None:
+        transaction['prepared_portable'] = (workspace, prepared)
+    return evidence
+
+
+def promote_prepared_image(store, transaction, stamp):
+    prepared = transaction.get('prepared_portable')
+    if prepared is None or stamp[1] != transaction['before_stamp'][1]:
+        return
+    workspace, (raw, hints, patch) = prepared
+    head = transaction['history_after'][workspace]['history']['entries'][-1]['hash']
+    store._portable_images[workspace] = (stamp, raw, head)
+    store._portable_history_positions[workspace] = hints
+    store._portable_file_digest = (raw, patch['digest'])
+    store._prepared_portable_changes = (workspace, stamp, patch)
+
+
+def export_file_changes(store, workspace, previous):
+    from hashlib import sha256
+    with store._snapshot():
+        stamp = (store.db.total_changes, store.db.execute("PRAGMA data_version").fetchone()[0])
+        prepared = getattr(store, '_prepared_portable_changes', None)
+        if (prepared is not None and prepared[:2] == (workspace, stamp) and type(previous) is dict
+                and previous == {_FILENAME: prepared[2]['base']}):
+            return {'patches': [prepared[2]]}
+    old = getattr(store, '_portable_images', {}).get(workspace)
+    cached_digest = getattr(store, '_portable_file_digest', None)
+    if old is not None and (cached_digest is None or cached_digest[0] is not old[1]):
+        cached_digest = (old[1], sha256(old[1]).hexdigest())
+    files = export_files(store, workspace)
+    raw = files[_FILENAME]
+    current_digest = cached_digest[1] if cached_digest is not None and cached_digest[0] is raw else sha256(raw).hexdigest()
+    store._portable_file_digest = (raw, current_digest)
+    if (type(previous) is not dict or previous.keys() != {_FILENAME} or old is None
+            or previous[_FILENAME] != cached_digest[1]):
+        return {'files': files}
+    chunks = _changed_pages(old[1], raw)
+    return {'patches': [{'name': _FILENAME, 'base': previous[_FILENAME], 'digest': current_digest,
+                         'size': len(raw), 'chunks': chunks}]}
+
+
 def export_files(store, workspace):
     """Serialize a fresh database that has never contained connection credentials."""
     with store._snapshot():
+        stamp = (store.db.total_changes, store.db.execute("PRAGMA data_version").fetchone()[0])
+        cached = getattr(store, '_portable_images', {}).get(workspace)
+        if cached is not None:
+            raw = _incremental_image(store, workspace, cached)
+            if raw is not None and len(raw) > MAX_DATABASE_BYTES:
+                raw = None
+            if raw is not None:
+                journal = getattr(store, '_history_heads', {}).get(workspace, {}).get('history')
+                head = journal['entries'][-1]['hash'] if journal and journal['entries'] else cached[2]
+                store._portable_images[workspace] = (stamp, raw, head)
+                return {_FILENAME: raw}
         snapshot = store.export_budget(workspace)
         images = [(transaction_id, store.get_receipt(workspace, transaction_id)) for transaction_id in store.receipt_ids(workspace)]
     clean = Store(":memory:", month=snapshot["budgetStartMonth"], _authority=False)
@@ -58,11 +209,32 @@ def export_files(store, workspace):
         # New portable images retain the schema used before bank sync setup.
         clean.db.execute("ALTER TABLE items DROP COLUMN sync_settings")
         clean.db.execute("ALTER TABLE items DROP COLUMN closed_account_cursors")
+        if snapshot.get('history'):
+            from .history_writes import save_history
+            save_history(clean, 'personal', snapshot['history'], None, cache_valid=False)
         clean.db.execute("VACUUM")
         clean.db.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
         raw = clean.db.serialize()
+        if len(raw) > MAX_DATABASE_BYTES and snapshot.get('history'):
+            clean.db.execute("UPDATE budget_history SET record=? WHERE workspace='personal'", (json.dumps(snapshot['history'], separators=(',', ':')),))
+            clean.db.execute("VACUUM")
+            raw = clean.db.serialize()
+            clean._history_blob_positions = {}
         if len(raw) > MAX_DATABASE_BYTES:
             raise StoreError("This SQLite budget exceeds the portable database size limit.")
+        journal = snapshot.get('history')
+        head = journal['entries'][-1]['hash'] if journal and journal['entries'] else None
+        if not hasattr(store, '_portable_images'):
+            store._portable_images = {}
+        store._portable_images[workspace] = (stamp, raw, head)
+        hints = getattr(clean, '_history_blob_positions', {})
+        if 'personal' in hints:
+            rowid = clean.db.execute("SELECT rowid FROM budget_history WHERE workspace='personal'").fetchone()[0]
+            hint = hints['personal']
+            hints['personal'] = (rowid, *hint[1:])
+        if not hasattr(store, '_portable_history_positions'):
+            store._portable_history_positions = {}
+        store._portable_history_positions[workspace] = hints
         return {_FILENAME: raw}
     finally:
         clean.close()
@@ -114,6 +286,8 @@ def read_files(files, *, with_receipts=False):
     reader = Store(":memory:", month="2026-10", _authority=False)
     try:
         expected_schema = _without_additive_columns(_schema(reader.db))
+        optional_indexes = {row[1]: row for row in expected_schema if row[1] in _ADDITIVE_INDEXES}
+        expected_schema = [row for row in expected_schema if row[1] not in optional_indexes]
         # Earlier format-1 images predate account scope. Keep their exact trusted
         # schema allowlisted and infer defaults while reading their data only.
         legacy_schema = [
@@ -125,7 +299,7 @@ def read_files(files, *, with_receipts=False):
         # Each planning table is additive. Preserve the exact prior schemas for
         # every combination without executing any stored SQL or migrations.
         compatible_schemas = [
-            [row for row in schema if row[2] not in omitted and row[1] not in omitted_indexes]
+            [row for row in schema if row[2] not in omitted]
             for schema in (expected_schema, legacy_schema)
             # Bank setup metadata is native-only; older credential-free images
             # retain their exact earlier items schema, including an empty table.
@@ -150,19 +324,20 @@ def read_files(files, *, with_receipts=False):
             for omitted in ((), ("future_funding",), ("rollover_modes",), ("future_funding", "rollover_modes"))
             for omitted in (omitted, (*omitted, "transaction_receipts"))
             for omitted in (omitted, (*omitted, "budget_history"))
-            # These exact indexes are optional optimizations. Every present
-            # object, including its index SQL, must still match the allowlist.
-            for count in range(len(_ADDITIVE_INDEXES) + 1)
-            for omitted_indexes in combinations(_ADDITIVE_INDEXES, count)
         ]
         reader.db.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
         reader.db.execute("PRAGMA trusted_schema=OFF")
         reader.db.execute("PRAGMA query_only=ON")
         reader.db.deserialize(raw)
         actual_schema = _schema(reader.db)
+        # Optional indexes may be absent. Validate every present definition once
+        # instead of expanding all combinations of runtime-only indexes.
+        if any(row[1] in optional_indexes and row != optional_indexes[row[1]] for row in actual_schema):
+            raise StoreError("This SQLite budget has an unsupported database schema.")
+        normalized_schema = [row for row in actual_schema if row[1] not in optional_indexes]
         if (
             reader.db.execute("PRAGMA user_version").fetchone()[0] != _FORMAT_VERSION
-            or _without_additive_columns(actual_schema) not in compatible_schemas
+            or _without_additive_columns(normalized_schema) not in compatible_schemas
         ):
             raise StoreError("This SQLite budget has an unsupported database schema.")
         if [row[0] for row in reader.db.execute("PRAGMA quick_check")] != ["ok"]:

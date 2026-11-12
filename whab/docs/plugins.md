@@ -1151,3 +1151,106 @@ records are excluded. The read changes no revision or history and cannot authori
 a later deletion. Native deletion rechecks the same core guard atomically.
 SQLite 1.20 and JSON 1.12 implement it; remote storage forwards the public query.
 Older adapters refuse inspection explicitly while their existing reads remain valid.
+
+### Optional CLI transaction selection and account metadata
+
+WHAB 2.72 supports optional storage
+`search_transactions(workspace, filters) -> dict` and
+`account_latest_dates(workspace) -> dict[str, str]`. Both return coherent reads.
+Search accepts inclusive `since`/`until`, `month`, repeated literal `merchant`
+terms, and uncategorized/posted/transfer selection with an optional sample limit.
+It returns complete list matches or complete uncategorized counts plus the
+explicitly requested sample. The local authenticated `GET
+/api/local/v1/transaction-search` endpoint returns the permanent budget identity
+and one revision with that result. Backends without this capability return 404
+and the CLI retains its ordinary public-query fallback. This adds no method to
+the required `StorageBackend` protocol or remote ledger query set.
+
+`BankAdapter(..., supports_account_metadata=True)` declares optional
+`read_accounts(item_id, access_token, institution_name) -> list[ImportedAccount]`.
+The typed provider worker validates the same account IDs, ownership, currencies
+and bounds as synchronization. The method returns account metadata only. Setup
+uses it without fetching transaction changes. Providers with the default false
+retain their existing synchronization-based preview. Plugins using the new
+capability require `whab>=2.72,<3`.
+
+Trusted native storage may pass a canonical `encoder` to
+`encode_local_state(..., validate=False)` to reuse immutable record bytes. Its
+output must match `canonical_storage_json` exactly, including bounds and Unicode
+handling. `native_state_digest(states, chunks=encoder)` hashes the same native
+records from bounded canonical byte chunks, avoiding full-payload copies. It
+uses the identical financial-length prefix and SHA-256 digest as
+`local_state_digest(*encode_local_state(states, validate=False))`. Its encoder
+must preserve canonical chunk order and return immutable bytes.
+`native_records_digest(records, chunks=encoder)` accepts the two complete
+canonical envelopes previously supplied to that callback. A native adapter may
+retain those views and replace verified changed records instead of reconstructing
+all transaction collections. Their order, financial/protected partition, bounds
+and digest must remain identical. Untracked writes invalidate retained views.
+Untrusted transfer decoding and full validation remain required at external
+boundaries.
+
+Optional `export_budget_file_changes(workspace, previous)` reduces local worker
+transport for repeated checkpoints. `previous` maps relative storage file names
+to SHA-256 digests. Return either `{"files": {name: bytes}}` for a complete
+replacement, or `{"patches": [...]}`. Each patch has `name`, `base` and resulting
+`digest` SHA-256 strings, final byte `size`, and ordered nonoverlapping `chunks`
+of `[offset, bytes]`. The host checks base ownership, offsets, sizes and the final
+digest before constructing the ordinary portable container. Initial or mismatched
+bases receive complete files. Old backends continue through
+`export_budget_files()`. This capability changes transport volume while every
+checkpoint still publishes the complete saved container synchronously.
+
+Storage may additionally supply `search_transactions_json(workspace, filters)`
+with the same selection as bounded UTF-8 JSON bytes. The host validates those
+bytes and applies the same public-field filtering. This avoids expanding every
+primitive into a typed worker frame for large selections. The dictionary method
+remains supported. Local searches enforce their response bound before worker
+transport, returning an explicit error when complete matches exceed 16 MiB.
+
+
+## AtomicBulkEdits (optional, WHAB 2.72+)
+
+This is a necessary new public contract: repeated `edit_transaction`/`update_account`
+callbacks each own a native commit and cannot provide all-or-nothing mixed edits.
+The CLI owns exact name/path resolution, parsing and presentation; core owns bounded
+validation and annotation/classification rules; native adapters own one transaction
+and synchronous save. The required `StorageBackend` protocol remains unchanged.
+
+```python
+supports_atomic_bulk_edits() -> bool
+preview_bulk_edits(workspace: str, operation: str, edits: list[dict]) -> dict
+edit_transactions(workspace: str, edits: list[dict]) -> dict
+classify_accounts(workspace: str, edits: list[dict]) -> dict
+```
+
+Explicit `True` advertises complete native audit/receipt support. Public commands
+`edit_transactions` and `classify_accounts` accept exactly `{edits: [...]}`; public
+query `preview_bulk_edits` accepts `{operation, edits}`. The packaged core operation
+schemas own complete fields and examples. The SDK validator `validate_bulk_edits`
+validates/detaches the bounded (1–100) structure; native core planning additionally
+validates all references and combined changes before publishing any candidate.
+Transaction changes support categoryId (ID/null), categoryAgent (label/null, with
+categoryId), reviewed (boolean), note (string/empty), appendNote (nonempty string,
+exclusive with note). Omitted fields are preserved. Final notes are at most 1000
+characters. Account changes support type/subtype/onBudget using existing rules;
+omitted scope is preserved, with an incompatible combination rejected. CLI-only
+`category` aliases resolve exact unique names/paths to IDs; the public ledger uses
+stable IDs and never fuzzy matching. IDs cannot cross budget/workspace boundaries.
+
+Results contain `{count, changed, changes: [{id, before, after}]}` in caller order.
+Before/after are complete public records; permanent financial history separately
+retains exact internal rows and linked digests for guarded whole-entry undo/redo.
+No-op targets remain in results; the journal records actual differences. The preview
+uses the same domain plan under the authority read lock with no commit/save/history
+or revision advance. Its revision does not reserve state. Commands compare one
+observed revision and save one native operation/receipt/checkpoint. Native worker
+`StorageOperation` dispatch and HTTPS remote client/authority forward the same
+contract; unsupported authorities fail before mutation. There is no looping fallback.
+
+Retries preserve the full original intent and return the original receipt before
+stale-revision checks, including after restart. A replay reports its original saved
+revision/result; it is not a new read of current state. Conflicting request reuse
+fails. Receipt expiry with stale evidence fails. Uncertain native/checkpoint results
+retain the existing fences; never silently replay with fresh identity or revision.
+`--batch` still only groups history entries across otherwise independent commits.

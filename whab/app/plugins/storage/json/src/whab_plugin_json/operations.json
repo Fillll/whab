@@ -1805,6 +1805,423 @@
       ],
       "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
       "availability": "Optional CategoryDeletion SDK; WHAB 2.69+ with current SQLite/JSON for zero-only row removal. True support requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
+    },
+    {
+      "name": "AtomicBulkEdits.edit_transactions",
+      "kind": "sdk",
+      "summary": "Atomically edit mixed transaction annotations with one guarded native commit and durable save.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "Host-scoped isolated workspace."
+          },
+          "edits": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "1–100 explicit, distinct targets; at least one supported change per item. Never split.",
+            "items": {
+              "type": "object",
+              "description": "Operation parameters.",
+              "properties": {
+                "transactionId": {
+                  "type": "string",
+                  "description": "Stable active transaction ID; never a merchant/name.",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Existing child ID; null clears. Omit to preserve."
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared categorizer label (1–80 printable characters); null clears; requires categoryId."
+                },
+                "reviewed": {
+                  "type": "boolean",
+                  "description": "Explicit review status; omit to preserve."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Replace exactly; empty string clears; omit to preserve. Cannot accompany appendNote.",
+                  "maxLength": 1000
+                },
+                "appendNote": {
+                  "type": "string",
+                  "description": "Append verbatim with one newline after a nonempty existing note. Final note max 1000. Cannot accompany note.",
+                  "minLength": 1,
+                  "maxLength": 1000
+                }
+              },
+              "required": [
+                "transactionId"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "workspace",
+          "edits"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Exact native validated records, returned only after one successful commit/checkpoint, or read-only preview. count includes no-op targets; changed counts differing public records.",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Explicit targets (1–100)."
+          },
+          "changed": {
+            "type": "integer",
+            "description": "Targets whose public records differ."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every target in input order with complete public before/after records. Permanent history separately retains exact internal financial rows.",
+            "items": {
+              "type": "object",
+              "description": "Target id, before and after.",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "count",
+          "changed",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "edits": [
+              {
+                "transactionId": "fictional-id",
+                "categoryId": null,
+                "reviewed": false,
+                "appendNote": "Fictional bicycle"
+              }
+            ],
+            "workspace": "personal"
+          },
+          "output": {
+            "count": 1,
+            "changed": 0,
+            "changes": [
+              {
+                "id": "fictional-id",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One atomic native transaction, coherent reversible audit entry, durable receipt, revision advancement and synchronous durable checkpoint. Every item validates before any record is changed. No bank sync. Omitted fields preserved.",
+      "permissions": "Host-scoped optional SDK callback; never arbitrary native storage access through HTTP.",
+      "scope": "Exactly one addressed budget/environment/workspace. IDs do not select another budget.",
+      "errors": [
+        "1–100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
+        "Core category currency, account type/subtype/scope and annotation bounds apply. Unsupported backends fail before mutation.",
+        "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
+      ],
+      "retry": "Exact original operation/workspace/resolved edits/revision/request ID/history returns its original durable receipt without changes/history/save, including after restart. Never retry an uncertain mutation with fresh intent. Bounded receipt expiry rejects stale requests. Preview is read-only and does not reserve its revision.",
+      "availability": "WHAB 2.72+, optional AtomicBulkEdits; SQLite 1.23+ and JSON 1.15+; remote authority must support it."
+    },
+    {
+      "name": "AtomicBulkEdits.classify_accounts",
+      "kind": "sdk",
+      "summary": "Atomically classify accounts with one guarded native commit and durable save.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "Host-scoped isolated workspace."
+          },
+          "edits": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "1–100 explicit, distinct targets; at least one supported change per item. Never split.",
+            "items": {
+              "type": "object",
+              "description": "Operation parameters.",
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "description": "Stable account identity.",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "depository",
+                    "credit",
+                    "investment",
+                    "retirement",
+                    "property",
+                    "loan",
+                    "deposit",
+                    "other_asset",
+                    "other_liability",
+                    "other"
+                  ],
+                  "description": "Existing core account type rules apply."
+                },
+                "subtype": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Core type-specific subtype; null clears. Omitted preserves for same type; type change clears."
+                },
+                "onBudget": {
+                  "type": "boolean",
+                  "description": "Explicit scope; omit preserves saved scope. Unsupported on-budget types fail."
+                }
+              },
+              "required": [
+                "accountId"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "workspace",
+          "edits"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Exact native validated records, returned only after one successful commit/checkpoint, or read-only preview. count includes no-op targets; changed counts differing public records.",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Explicit targets (1–100)."
+          },
+          "changed": {
+            "type": "integer",
+            "description": "Targets whose public records differ."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every target in input order with complete public before/after records. Permanent history separately retains exact internal financial rows.",
+            "items": {
+              "type": "object",
+              "description": "Target id, before and after.",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "count",
+          "changed",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "edits": [
+              {
+                "accountId": "fictional-id",
+                "type": "credit",
+                "onBudget": false
+              }
+            ],
+            "workspace": "personal"
+          },
+          "output": {
+            "count": 1,
+            "changed": 0,
+            "changes": [
+              {
+                "id": "fictional-id",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One atomic native transaction, coherent reversible audit entry, durable receipt, revision advancement and synchronous durable checkpoint. Every item validates before any record is changed. No bank sync. Omitted fields preserved.",
+      "permissions": "Host-scoped optional SDK callback; never arbitrary native storage access through HTTP.",
+      "scope": "Exactly one addressed budget/environment/workspace. IDs do not select another budget.",
+      "errors": [
+        "1–100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
+        "Core category currency, account type/subtype/scope and annotation bounds apply. Unsupported backends fail before mutation.",
+        "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
+      ],
+      "retry": "Exact original operation/workspace/resolved edits/revision/request ID/history returns its original durable receipt without changes/history/save, including after restart. Never retry an uncertain mutation with fresh intent. Bounded receipt expiry rejects stale requests. Preview is read-only and does not reserve its revision.",
+      "availability": "WHAB 2.72+, optional AtomicBulkEdits; SQLite 1.23+ and JSON 1.15+; remote authority must support it."
+    },
+    {
+      "name": "AtomicBulkEdits.preview_bulk_edits",
+      "kind": "sdk",
+      "summary": "Read-only core validation and complete exact before/after plan for one atomic batch.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "Host-scoped isolated workspace."
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "edit_transactions",
+              "classify_accounts"
+            ],
+            "description": "Supported atomic operation to validate."
+          },
+          "edits": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "Same edits as selected command. Names must already be resolved by the CLI.",
+            "items": {
+              "type": "object",
+              "description": "Operation-specific edit fields.",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "workspace",
+          "operation",
+          "edits"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Exact native validated records, returned only after one successful commit/checkpoint, or read-only preview. count includes no-op targets; changed counts differing public records.",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Explicit targets (1–100)."
+          },
+          "changed": {
+            "type": "integer",
+            "description": "Targets whose public records differ."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every target in input order with complete public before/after records. Permanent history separately retains exact internal financial rows.",
+            "items": {
+              "type": "object",
+              "description": "Target id, before and after.",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "count",
+          "changed",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "operation": "edit_transactions",
+            "edits": [
+              {
+                "transactionId": "fictional-id",
+                "note": ""
+              }
+            ],
+            "workspace": "personal"
+          },
+          "output": {
+            "count": 1,
+            "changed": 0,
+            "changes": [
+              {
+                "id": "fictional-id",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read-only validation: no mutation, revision advance, history or checkpoint.",
+      "permissions": "Host-scoped optional SDK callback; never arbitrary native storage access through HTTP.",
+      "scope": "Exactly one addressed budget/environment/workspace. IDs do not select another budget.",
+      "errors": [
+        "1–100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
+        "Core category currency, account type/subtype/scope and annotation bounds apply. Unsupported backends fail before mutation.",
+        "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
+      ],
+      "retry": "Exact original operation/workspace/resolved edits/revision/request ID/history returns its original durable receipt without changes/history/save, including after restart. Never retry an uncertain mutation with fresh intent. Bounded receipt expiry rejects stale requests. Preview is read-only and does not reserve its revision.",
+      "availability": "WHAB 2.72+, optional AtomicBulkEdits; SQLite 1.23+ and JSON 1.15+; remote authority must support it."
+    },
+    {
+      "name": "AtomicBulkEdits.supports_atomic_bulk_edits",
+      "kind": "sdk",
+      "summary": "Explicitly advertise bounded native atomic edits, permanent history and durable receipts.",
+      "input": {
+        "type": "object",
+        "description": "No arguments.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True opts into the complete AtomicBulkEdits contract; absence/false is unsupported."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read-only validation: no mutation, revision advance, history or checkpoint.",
+      "permissions": "Host-scoped optional SDK callback; never arbitrary native storage access through HTTP.",
+      "scope": "Exactly one addressed budget/environment/workspace. IDs do not select another budget.",
+      "errors": [
+        "1–100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
+        "Core category currency, account type/subtype/scope and annotation bounds apply. Unsupported backends fail before mutation.",
+        "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
+      ],
+      "retry": "Exact original operation/workspace/resolved edits/revision/request ID/history returns its original durable receipt without changes/history/save, including after restart. Never retry an uncertain mutation with fresh intent. Bounded receipt expiry rejects stale requests. Preview is read-only and does not reserve its revision.",
+      "availability": "WHAB 2.72+, optional AtomicBulkEdits; SQLite 1.23+ and JSON 1.15+; remote authority must support it."
     }
   ]
 }

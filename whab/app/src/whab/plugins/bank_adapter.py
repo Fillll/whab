@@ -107,6 +107,7 @@ class BankAdapter:
     requires_account_setup: bool = False
     supports_investments: bool = False
     credential_identity_keys: tuple[str, ...] = ()
+    supports_account_metadata: bool = False
 
     def __post_init__(self):
         if (type(self.credential_identity_keys) is not tuple or len(self.credential_identity_keys) > 10
@@ -114,6 +115,8 @@ class BankAdapter:
             raise ValueError('Choose bounded provider credential identity keys.')
         if type(self.requires_account_setup) is not bool:
             raise ValueError("Account setup policy must be a boolean.")
+        if type(self.supports_account_metadata) is not bool:
+            raise ValueError('Account metadata support must be a boolean.')
         if type(self.supports_investments) is not bool:
             raise ValueError('Investment support must be a boolean.')
         if not callable(self.factory):

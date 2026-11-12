@@ -1,5 +1,13 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.9.0 — 2026-11-10
+
+PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)
+
+- Use account-only provider reads for setup preview and configuration, avoiding transaction-sync pagination. Retain explicit destination/history choices and existing synchronization checkpoints. [#184](https://github.com/Fillll/whab/pull/184)
+
+- Require WHAB 2.72, where the integrated account-metadata SDK flag actually becomes available; refuse older hosts through package metadata instead of failing descriptor construction. [#188](https://github.com/Fillll/whab/pull/188)
+
 ## 1.8.3 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

@@ -1,12 +1,21 @@
 """Human-readable and machine-readable help from packaged operation contracts."""
 
+import argparse
 import json
 import shlex
+import sys
 
 from whab.plugins.documentation import installed_catalog, operation
 
 from .bank_commands import BANK_FLAGS
 from .identifiers import catalog_identifiers, cli_id, host_id
+
+
+class CommandParser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('color', sys.stdout.isatty())
+        super().__init__(*args, **kwargs)
+
 
 AGENT_WORKFLOW = """Agent workflow (examples use fictional names/IDs):
   whab budget list
@@ -108,7 +117,7 @@ def invocation(row, plugin):
     example = row['examples'][0]['input']
     parameters = shlex.quote(json.dumps(example, separators=(',', ':')))
     arguments = f' --parameters {parameters}'
-    if kind == 'query' and name not in {'feature', 'history', 'history_preview'}:
+    if kind == 'query' and name not in {'feature', 'history', 'history_preview', 'preview_bulk_edits'}:
         arguments = f' --month {shlex.quote(example["month"])}' if 'month' in example else ''
     guard = ' --revision OBSERVED_REVISION --request-id UNIQUE_INTENT_ID' if kind in {'command', 'feature-command'} else ''
     return (f'CLI template (replace fictional IDs/values; examples are not observed state):\n'

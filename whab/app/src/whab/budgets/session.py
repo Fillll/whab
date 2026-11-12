@@ -14,7 +14,8 @@ from whab.domain.errors import StoreError
 from whab.plugins import API_VERSION, BudgetContext
 from whab.plugins.sdk import valid_plugin_name
 
-from .container import decode_container, encode_container, validate_file_name
+from .compression import DeflateCache
+from .container import BudgetContainer, decode_container, encode_container, validate_file_name
 from .credentials import encrypt_credentials
 from .document import (
     MAX_BUNDLE_BYTES,
@@ -32,17 +33,18 @@ from .document import (
 MAX_SOURCE_BYTES = MAX_MANIFEST_BYTES + 1024
 
 
-def content_digest(manifest, ledger, credential_blob=None):
+def content_digest(manifest, ledger, credential_blob=None, *, file_digest=None):
     if type(ledger) is dict and all(type(value) is bytes for value in ledger.values()):
-        ledger = {name: digest(value) for name, value in sorted(ledger.items())}
+        ledger = {name: file_digest(name, value) if file_digest is not None else digest(value)
+                  for name, value in sorted(ledger.items())}
     content = [manifest, ledger]
     if credential_blob is not None:
         content.append({"credential": digest(credential_blob)})
     return digest(json.dumps(content, sort_keys=True, separators=(",", ":")).encode())
 
 
-def container_digest(container):
-    return content_digest(container.manifest, container.legacy_ledger if container.legacy_ledger is not None else container.files, container.credential_blob)
+def container_digest(container, *, file_digest=None):
+    return content_digest(container.manifest, container.legacy_ledger if container.legacy_ledger is not None else container.files, container.credential_blob, file_digest=file_digest)
 
 
 def _read_bytes(path, limit=MAX_BUNDLE_BYTES):
@@ -136,6 +138,9 @@ class BudgetSession:
         self.path = Path(path).expanduser().resolve() if path else None
         self.ledger = ledger
         self.files = dict(files or {})
+        self._payload_hashes = {}
+        self._compression_cache = DeflateCache()
+        self._validated_bundle = None
         self.credentials = credentials or {}
         self.credential_blob = credential_blob
         self.password = password
@@ -462,6 +467,14 @@ class BudgetSession:
             return self._bundle(include_credentials=include_credentials, password=password,
                                 preserve_credentials=preserve_credentials)
 
+    def _payload_digest(self, name, raw):
+        cached = self._payload_hashes.get(name)
+        if cached is not None and (cached[0] is raw or cached[0] == raw):
+            return cached[1]
+        value = digest(raw)
+        self._payload_hashes[name] = (raw, value)
+        return value
+
     def _bundle(self, *, include_credentials=False, password=None, preserve_credentials=False):
         export_files = getattr(self.store, "export_budget_files", None)
         if callable(export_files):
@@ -471,7 +484,18 @@ class BudgetSession:
                 generated = {prefix + name for name in self.storage_payload_paths}
                 files = {key: value for key, value in self.files.items()
                          if key not in generated and (self.storage_payload_paths or not key.startswith(prefix))}
-                payload = export_files("personal")
+                prepared = None
+                export_changes = getattr(self.store, "export_budget_file_changes", None)
+                if callable(export_changes):
+                    from .file_changes import prepare_file_changes
+                    previous = {key[len(prefix):]: value for key, value in self.files.items() if key.startswith(prefix)}
+                    def payload_digest(name, raw):
+                        return self._payload_digest(prefix + name, raw)
+                    changes = export_changes("personal", {name: payload_digest(name, raw) for name, raw in previous.items()})
+                    prepared = prepare_file_changes(previous, changes, digest_file=payload_digest)
+                    payload = prepared.files
+                else:
+                    payload = export_files("personal")
                 if type(payload) is not dict:
                     raise StoreError("This storage plugin returned invalid budget files.")
                 if self.storage_payload_paths and payload.keys() != set(self.storage_payload_paths):
@@ -484,14 +508,30 @@ class BudgetSession:
                     profile = {key: value for key, value in self.storage_config.items()
                                if key in {"CLIENT_URL", "CLIENT_TOKEN", "CLIENT_BUDGET_ID"}}
                     blob = encrypt_credentials(self.id, {plugin_id: profile}, password)
-                raw = encode_container(self.manifest, files, credential_blob=blob)
+                def encode():
+                    return encode_container(self.manifest, files, credential_blob=blob, compression_cache=self._compression_cache)
+                if prepared is not None and prepared.pending:
+                    from concurrent.futures import ThreadPoolExecutor
+                    # Encoding consumes only bounded opaque bytes in memory. Never
+                    # publish the archive or advance session state before SHA verifies.
+                    with ThreadPoolExecutor(max_workers=1) as executor:
+                        verified = executor.submit(prepared.verify)
+                        try:
+                            raw = encode()
+                        finally:
+                            verified.result()
+                else:
+                    raw = encode()
+                self._validated_bundle = (raw, BudgetContainer(validate_manifest(self.manifest), files, credential_blob=blob))
                 self.files = files
+                self._payload_hashes = {name: value for name, value in self._payload_hashes.items() if name in files}
                 return raw
         export = getattr(self.store, "export_budget", None)
         if not callable(export):
             raise StoreError("This storage plugin cannot export a portable budget.")
         if include_credentials or self.files:
             raise StoreError("This storage plugin does not support plugin-owned budget files.")
+        self._validated_bundle = None
         return encode_bundle(self.manifest, export("personal"))
 
     @contextmanager
@@ -535,8 +575,10 @@ class BudgetSession:
                 return
             try:
                 raw = self.bundle(preserve_credentials=True)
-                container = decode_container(raw, password=self.password)
-                candidate = container_digest(container)
+                verified = self._validated_bundle
+                container = verified[1] if verified is not None and verified[0] is raw else decode_container(raw, password=self.password)
+                self._validated_bundle = None
+                candidate = container_digest(container, file_digest=self._payload_digest)
                 atomic_write(self.storage_home / "manifest.json", json.dumps(self.manifest).encode())
                 if container.legacy_ledger is None:
                     # The ordinary archive is already validated and contains no
@@ -668,7 +710,7 @@ class BudgetSession:
 class TrackedStorage:
     """Checkpoint portable files after committed writes, including bank synchronization."""
 
-    MUTATIONS = frozenset({"delete_category", "delete_category_group", "add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details", "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "apply_sync", "import_workspace", "save_item", "set_item_status", "disconnect_item", "save_receipt", "delete_receipt", "restore_budget", "restore_budget_files", "execute_operation", "history_apply"})
+    MUTATIONS = frozenset({"edit_transactions", "classify_accounts", "rename_category", "add_category_group", "move_category", "delete_category", "delete_category_group", "add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details", "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "apply_sync", "import_workspace", "save_item", "set_item_status", "disconnect_item", "save_receipt", "delete_receipt", "restore_budget", "restore_budget_files", "execute_operation", "history_apply"})
 
     def __init__(self, store, session=None):
         self.store = store
