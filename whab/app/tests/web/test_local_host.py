@@ -225,3 +225,17 @@ def test_local_summary_uses_core_currency_projection_and_budget_lease(store, tmp
         assert client.get("/budgets/default/api/local/v1/summary", params={"currency": "bad"}).status_code == 400
         assert client.get("/budgets/default/api/local/v1/summary", params={"month": "not-a-month"}).status_code == 400
         assert client.get("/budgets/demo/api/local/v1/summary").status_code == 403
+
+
+@pytest.mark.parametrize('query', ['since=invalid', 'until=invalid', 'month=invalid', 'since=2026-11-02&until=2026-11-01',
+                                  'merchant=%20', 'posted=invalid', 'limit=0&uncategorized=true', 'limit=2', 'limit=invalid'])
+def test_local_search_rejects_invalid_filters_before_reading(store, tmp_path, monkeypatch, query):
+    settings = Settings(tmp_path, 5173, 'sandbox', '', '', '', False, '', '', (), ui='')
+    app = create_app(store=store, settings=settings, plugins=PluginRegistry(()))
+    owner = hosting.HostOwner(settings)
+    owner.app = app
+    monkeypatch.setattr(hosting, '_OWNER', owner)
+    with TestClient(app, base_url='https://localhost:5173') as client:
+        client.headers['Authorization'] = 'Bearer ' + owner.token
+        response = client.get('/budgets/default/api/local/v1/transaction-search?' + query)
+        assert response.status_code == 400

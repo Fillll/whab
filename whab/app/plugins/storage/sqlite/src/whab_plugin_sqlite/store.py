@@ -44,7 +44,6 @@ from whab.domain.transactions import (
     UNSET,
     category_agent_fields,
     public_transaction,
-    transaction_rows,
 )
 from whab.domain.validation import validate_label
 
@@ -116,6 +115,9 @@ class Store(Authority):
         self.db.row_factory = sqlite3.Row
         if self.database_path != ":memory:":
             os.chmod(self.database_path, 0o600)
+            # Retain overflow pages of the audited baseline between bounded edits.
+            # This is a per-connection RAM recommendation, never a durability mode.
+            self.db.execute("PRAGMA cache_size=-65536")
         selected_month = month or current_month()
         initialize_schema(self.db, selected_month)
         for workspace in ("demo", "personal"):
@@ -139,6 +141,10 @@ class Store(Authority):
 
     def close(self) -> None:
         with self._lock:
+            cached = getattr(self, '_merchant_index', None)
+            if cached is not None:
+                cached.close()
+                self._merchant_index = None
             self.db.close()
 
     @contextmanager
@@ -178,7 +184,7 @@ class Store(Authority):
         with self._snapshot():
             return self._read_state(workspace)
 
-    def _read_state(self, workspace: str) -> dict:
+    def _read_state(self, workspace: str, *, transaction_ids=None, include_history=True) -> dict:
         meta = self.db.execute("SELECT * FROM meta WHERE workspace=?", (workspace,)).fetchone()
         if not meta:
             raise StoreError("Workspace not found.")
@@ -207,7 +213,7 @@ class Store(Authority):
                 "currency": row["currency"],
             }
         for row in self.db.execute(
-            "SELECT * FROM transactions WHERE workspace=? ORDER BY rowid", (workspace,)
+            "SELECT * FROM transactions WHERE workspace=? " + ("AND id IN (" + ",".join("?" for _ in transaction_ids) + ") " if transaction_ids is not None else "") + "ORDER BY rowid", (workspace, *(transaction_ids or ()))
         ):
             state["transactions"][row["id"]] = {
                 "id": row["id"],
@@ -241,7 +247,7 @@ class Store(Authority):
         if workspace == "personal":
             for row in self.db.execute("SELECT * FROM items"):
                 state["items"][row["id"]] = self._item_record(row)
-        if self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='budget_history'").fetchone():
+        if include_history and self.db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='budget_history'").fetchone():
             row = self.db.execute("SELECT record FROM budget_history WHERE workspace=?", (workspace,)).fetchone()
             if row is not None:
                 state["history"] = json.loads(row[0])
@@ -572,6 +578,11 @@ class Store(Authority):
                 (workspace, transaction_id, image),
             )
 
+    def export_budget_file_changes(self, workspace, previous):
+        from .portable import export_file_changes
+        with self._snapshot():
+            return export_file_changes(self, workspace, previous)
+
     def export_budget_files(self, workspace: str = "personal") -> dict[str, bytes]:
         """Return the SQLite-owned data payload for a plugin budget container."""
         from .portable import export_files
@@ -724,8 +735,22 @@ class Store(Authority):
             transaction.update(workspace=workspace, history_operation="delete_receipt")
             transaction["dirty"] = True
 
+    def account_latest_dates(self, workspace):
+        with self._snapshot():
+            self._require_workspace(workspace)
+            return {row[0]: row[1] for row in self.db.execute(
+                "SELECT account_id,MAX(date) FROM transactions WHERE workspace=? AND deleted=0 GROUP BY account_id", (workspace,))}
+
+    def search_transactions_json(self, workspace, filters):
+        result = self.search_transactions(workspace, filters)
+        return json.dumps(result, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+
+    def search_transactions(self, workspace, filters):
+        from .search import search_transactions
+        return search_transactions(self, workspace, filters)
+
     def transactions(self, workspace: str, month: str | None = None) -> list[dict]:
-        return transaction_rows(self.state(workspace), month)
+        return [public_transaction(row) for row in self.search_transactions(workspace, {"month": month})["data"]]
 
     def workspace(self, workspace: str, month: str | None = None) -> dict:
         from .projection_reads import snapshot
@@ -744,7 +769,16 @@ class Store(Authority):
         return self._mutate(workspace, lambda state: commands.add_account(state, account_id, account))
 
     def update_account(self, workspace: str, account_id: str, changes: dict) -> None:
-        self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
+        if type(changes) is not dict or changes.keys() & {"currency", "closed"}:
+            self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
+            return
+        with self._authority_write(workspace=workspace, transaction_ids=()) as write:
+            state = {"accounts": {row["id"]: row for row in self._read_accounts(workspace)}, "transactions": {}}
+            commands.update_account(state, account_id, changes)
+            row = state["accounts"][account_id]
+            self.db.execute("UPDATE accounts SET name=?,type=?,on_budget=?,subtype=?,bank_website=?,name_overridden=? WHERE workspace=? AND id=?",
+                            (row["name"], row["type"], int(row["onBudget"]), row["subtype"], row.get("bankWebsite"), int(row.get("nameOverridden", False)), workspace, account_id))
+            write.update(dirty=True, workspace=workspace, history_operation="update_account")
 
     def supports_category_deletion(self):
         return True
@@ -766,6 +800,21 @@ class Store(Authority):
 
     def add_category_group(self, workspace, name):
         return self._mutate(workspace, lambda state: add_category_group(state, name))
+
+    def supports_atomic_bulk_edits(self):
+        return True
+
+    def preview_bulk_edits(self, workspace, operation, edits):
+        from .bulk_edits import preview
+        return preview(self, workspace, operation, edits)
+
+    def edit_transactions(self, workspace, edits):
+        from .bulk_edits import apply
+        return apply(self, workspace, 'edit_transactions', edits)
+
+    def classify_accounts(self, workspace, edits):
+        from .bulk_edits import apply
+        return apply(self, workspace, 'classify_accounts', edits)
 
     def supports_category_renaming(self):
         return True

@@ -935,7 +935,10 @@ def test_preparation_cancellation_removes_partial_candidate_and_preserves_cancel
 def test_installer_completion_timeout_and_cancellation_stop_only_the_owned_process_group(tmp_path, monkeypatch, outcome):
     cancel = outcome == "cancel"
     marker = tmp_path / "fictional-child.pid"
-    child_program = "import os,pathlib,signal,sys,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); time.sleep(60)"
+    # Publish a complete PID before cancellation can kill the child writer.
+    child_program = ("import os,pathlib,signal,sys,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+                     "marker=pathlib.Path(sys.argv[1]); ready=marker.with_suffix('.ready'); "
+                     "ready.write_text(str(os.getpid())); ready.replace(marker); time.sleep(60)")
     installer = ("import pathlib,subprocess,sys,time\n"
                  "subprocess.Popen([sys.executable,'-I','-c',sys.argv[1],sys.argv[2]],"
                  "stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n"

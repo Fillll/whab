@@ -1,6 +1,6 @@
 """Public WHAB plugin API v1. Installed plugins are trusted, explicitly enabled code."""
 
-from whab.domain.accounts import (
+lazy from whab.domain.accounts import (
     ACCOUNT_SUBTYPES,
     ACCOUNT_TYPES,
     LIABILITY_ACCOUNT_TYPES,
@@ -10,17 +10,18 @@ from whab.domain.accounts import (
     is_on_budget,
     normalize_account,
 )
-from whab.domain.errors import StoreError
-from whab.domain.file_imports import WorkspaceImport
-from whab.domain.formatting import format_date, format_money
-from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
-from whab.domain.money import SUPPORTED_CURRENCIES, currency_code, currency_minor_units
-from whab.domain.receipts import MAX_RECEIPT_BYTES, validate_receipt_selection
-from whab.domain.transactions import UNSET, validate_category_agent, validate_review_batch
-from whab.receipts import receipt_media_type
-from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
+lazy from whab.domain.bulk import validate_edits as validate_bulk_edits
+lazy from whab.domain.errors import StoreError
+lazy from whab.domain.file_imports import WorkspaceImport
+lazy from whab.domain.formatting import format_date, format_money
+lazy from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
+lazy from whab.domain.money import SUPPORTED_CURRENCIES, currency_code, currency_minor_units
+lazy from whab.domain.receipts import MAX_RECEIPT_BYTES, validate_receipt_selection
+lazy from whab.domain.transactions import UNSET, validate_category_agent, validate_review_batch
+lazy from whab.receipts import receipt_media_type
+lazy from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
 
-from .contracts import (
+lazy from .contracts import (
     Capability,
     CapabilityError,
     PluginContract,
@@ -29,9 +30,9 @@ from .contracts import (
     resolve_plugins,
     state_upgrade_path,
 )
-from .features import FeatureOperations
-from .runtime import PluginError, PluginRegistry, copy_snapshot, load_descriptors, load_plugins
-from .sdk import (
+lazy from .features import FeatureOperations
+lazy from .runtime import PluginError, PluginRegistry, copy_snapshot, load_descriptors, load_plugins
+lazy from .sdk import (
     API_VERSION,
     ENTRYPOINT_GROUP,
     AccountLifecycleStorage,
@@ -39,6 +40,7 @@ from .sdk import (
     AccountSettings,
     AccountSnapshot,
     AgentCategoryStorage,
+    AtomicBulkEdits,
     BankAdapter,
     BankContext,
     BankContinuationService,
@@ -113,6 +115,7 @@ from .sdk import (
 )
 
 __all__ = [
+    "AtomicBulkEdits", "validate_bulk_edits",
     "BankAdapter",
     "BankContinuationService",
     "BankContinuationStatus",

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.72.0 — 2026-11-11
+
+PR: [#184](https://github.com/Fillll/whab/pull/184)
+
+- Integrate verified CLI discovery, coherent selection and synchronous durable-save optimizations from PR #184 without changing financial rules or weakening recovery.
+
 ## 2.71.0 — 2026-11-11
 
 PR: [#187](https://github.com/Fillll/whab/pull/187)

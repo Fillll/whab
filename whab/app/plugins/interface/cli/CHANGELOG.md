@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.17.0 — 2026-11-11
+
+PR: [#184](https://github.com/Fillll/whab/pull/184)
+
+- Integrate command-specific lazy startup and coherent storage-filtered reads from PR #184.
+
 ## 2.16.0 — 2026-11-11
 
 PR: [#187](https://github.com/Fillll/whab/pull/187)

@@ -39,7 +39,7 @@ _FIELDS = {
 }
 REVERSIBLE = frozenset({
     'add_account', 'update_account', 'add_category', 'add_category_group', 'move_category', 'delete_category', 'delete_category_group', 'add_transaction',
-    'edit_transaction', 'edit_transaction_details', 'review_transactions', 'rename_category', 'append_transaction_note',
+    'edit_transactions', 'classify_accounts', 'edit_transaction', 'edit_transaction_details', 'review_transactions', 'rename_category', 'append_transaction_note',
     'assign', 'assign_next_month', 'set_rollover_mode',
 })
 _ENTRY_FIELDS = {'id', 'time', 'actor', 'actorKind', 'batchId', 'operation', 'requestId',
@@ -77,14 +77,14 @@ def context(value=None, *, operation='change'):
     return result
 
 
-def financial(snapshot, *, trusted=False):
+def financial(snapshot, *, trusted=False, transactions_sorted=False):
     if type(snapshot) is not dict:
         raise StoreError('Invalid financial snapshot.')
     result = {k: v if trusted else deepcopy(v) for k, v in snapshot.items() if k != 'history'}
     if not trusted:
         result = validate_portable_budget(result)
     for section, fields in _COLLECTIONS.items():
-        if section in result:
+        if section in result and not (trusted and transactions_sorted and section == 'transactions'):
             result[section].sort(key=itemgetter(*fields))
     return result
 
@@ -179,17 +179,17 @@ def validate_history(value):
     return {'formatVersion': 1, 'baseline': baseline, 'entries': deepcopy(value['entries'])}
 
 
-def append(journal, before, after, metadata=None, *, trusted=False, before_digest=None):
+def append(journal, before, after, metadata=None, *, trusted=False, before_digest=None, after_digest=None, changes=None):
     if not trusted:
         before, after = financial(before), financial(after)
-    changes = difference(before, after)
+    changes = difference(before, after) if changes is None else changes
     info = context(metadata)
     if not changes and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
         return journal
     journal = {**journal, 'entries': list(journal['entries'])} if journal else {'formatVersion': 1, 'baseline': deepcopy(before), 'entries': []}
     before_digest = before_digest or digest(before)
     entry = {'id': str(uuid4()), 'time': datetime.now(timezone.utc).isoformat(), **info,
-             'changes': changes, 'beforeDigest': before_digest, 'afterDigest': digest(after),
+             'changes': changes, 'beforeDigest': before_digest, 'afterDigest': after_digest or digest(after),
              'reversible': info['operation'] in REVERSIBLE,
              'previousHash': journal['entries'][-1]['hash'] if journal['entries'] else before_digest}
     if info['action'] == 'snapshot' or (len(journal['entries']) + 1) % 1000 == 0:
@@ -330,11 +330,12 @@ def apply_to_state(state, wanted):
         state['categoryGroups'] = candidate['categoryGroups']
 
 
-def record_financial(journal, before, after, metadata=None):
+def record_financial(journal, before, after, metadata=None, *, digest_snapshot=digest, changes=None, transactions_sorted=False):
     """Commit adapters supply detached allowlisted snapshots from one native transaction."""
     info = context(metadata)
-    old, new = financial(before, trusted=True), financial(after, trusted=True)
-    if old == new and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
+    old, new = (financial(value, trusted=True, transactions_sorted=transactions_sorted) for value in (before, after))
+    unchanged = not changes if changes is not None else old == new
+    if unchanged and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
         return journal
     # Pristine restores preserve their incoming journal. Reconcile any deliberate
     # provider detachment or external edit when the first new change is made.
@@ -342,11 +343,11 @@ def record_financial(journal, before, after, metadata=None):
     if journal:
         last = journal['entries'][-1] if journal['entries'] else None
         expected = last['afterDigest'] if last else digest(journal['baseline'])
-        old_digest = digest(old)
+        old_digest = digest_snapshot(old)
         if old_digest != expected:
             previous = snapshot_at(journal, last['id'] if last else 'baseline')
             journal = append(journal, previous, old, {'actor': 'System', 'actorKind': 'system', 'operation': 'import_workspace'})
-    return append(journal, old, new, info, trusted=True, before_digest=old_digest)
+    return append(journal, old, new, info, trusted=True, before_digest=old_digest, after_digest=digest_snapshot(new), changes=changes)
 
 
 def record_states(before, after, metadata=None):

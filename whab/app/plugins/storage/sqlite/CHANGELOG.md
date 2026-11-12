@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.23.0 — 2026-11-11
+
+PR: [#184](https://github.com/Fillll/whab/pull/184)
+
+- Integrate bounded native edits, canonical evidence reuse and verified incremental portable saves from PR #184.
+
 ## 1.22.0 — 2026-11-11
 
 PR: [#187](https://github.com/Fillll/whab/pull/187)

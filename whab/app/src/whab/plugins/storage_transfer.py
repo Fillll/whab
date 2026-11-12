@@ -32,6 +32,7 @@ MAX_BULK_OPERATION_BYTES = 72 * 1024 * 1024
 MAX_OPERATION_RECEIPTS = 4096
 STORAGE_ROLES = frozenset({"primary", "staged", "copy", "fenced", "retired"})
 STORAGE_OPERATIONS = frozenset({
+    "edit_transactions", "classify_accounts",
     "delete_category", "delete_category_group", "rename_category",
     "add_category_group", "move_category", "add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details", "recorded_command", "history_apply",
     "review_transactions", "assign", "assign_next_month", "set_rollover_mode", "save_item",
@@ -40,6 +41,8 @@ STORAGE_OPERATIONS = frozenset({
 })
 _BULK_OPERATIONS = frozenset({"recorded_command", "restore_budget", "restore_budget_files", "prepare_budget_files", "import_workspace"})
 _OPERATION_FIELDS = {
+    "edit_transactions": ({"edits"}, set()),
+    "classify_accounts": ({"edits"}, set()),
     "recorded_command": ({"operation", "parameters", "context"}, set()),
     "history_apply": ({"action", "target", "fingerprint"}, set()),
     "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype", "closed"}),
@@ -112,7 +115,7 @@ def _integer(value):
 
 
 def _plain(value, depth=0):
-    if depth > 24:
+    if depth > 24 or depth == 24 and type(value) in {dict, list}:
         _invalid()
     if value is None or type(value) is bool:
         return
@@ -151,24 +154,6 @@ def read_storage_json(raw, *, limit=MAX_OPERATION_BYTES):
     """Read plain bounded JSON with duplicate-field and nesting rejection."""
     if type(raw) is not bytes or not raw or len(raw) > limit:
         _invalid()
-    depth, quoted, escaped = 0, False, False
-    for char in raw:
-        if quoted:
-            if escaped:
-                escaped = False
-            elif char == 92:
-                escaped = True
-            elif char == 34:
-                quoted = False
-        elif char == 34:
-            quoted = True
-        elif char in (91, 123):
-            depth += 1
-            if depth > 24:
-                _invalid()
-        elif char in (93, 125):
-            depth -= 1
-
     def unique(pairs):
         result = {}
         for key, value in pairs:
@@ -413,6 +398,8 @@ def dispatch_storage_operation(backend, operation):
         fields = {"categoryId": "category_id", "reviewed": "reviewed", "note": "note"}
         return backend.edit_transaction(workspace, identifier,
                                         **{fields[key]: value for key, value in payload.items()})
+    if name in {"edit_transactions", "classify_accounts"}:
+        return getattr(backend, name)(workspace, payload["edits"])
     if name == "review_transactions":
         return backend.review_transactions(workspace, payload["transactionIds"], payload["reviewed"])
     if name == "assign":
@@ -610,12 +597,7 @@ def decode_local_state(financial, protected):
     return states
 
 
-def encode_local_state(states, *, validate=True):
-    """Canonical complete payloads from plain adapter state.
-
-    ``validate=False`` is exclusively for native evidence over already-trusted
-    state beyond portable limits. LocalTransferSnapshot always validates fully.
-    """
+def _local_state_records(states, *, validate):
     if type(states) is not dict or states.keys() != {"personal", "demo"}:
         _invalid()
     financial, protected = {}, {}
@@ -633,9 +615,17 @@ def encode_local_state(states, *, validate=True):
                 for account in state["accounts"].values()
             ], key=lambda row: row["accountId"]),
         }
-    bodies = tuple(canonical_storage_json({"formatVersion": 1, "workspaces": value},
-                                         limit=MAX_LOCAL_TRANSFER_BYTES)
-                   for value in (financial, protected))
+    return tuple({"formatVersion": 1, "workspaces": value} for value in (financial, protected))
+
+
+def encode_local_state(states, *, validate=True, encoder=canonical_storage_json):
+    """Canonical complete payloads from plain adapter state.
+
+    ``validate=False`` is exclusively for native evidence over already-trusted
+    state beyond portable limits. LocalTransferSnapshot always validates fully.
+    """
+    bodies = tuple(encoder(value, limit=MAX_LOCAL_TRANSFER_BYTES)
+                   for value in _local_state_records(states, validate=validate))
     if sum(map(len, bodies)) > MAX_LOCAL_TRANSFER_BYTES:
         _invalid()
     if validate:
@@ -645,7 +635,40 @@ def encode_local_state(states, *, validate=True):
 
 def local_state_digest(financial, protected):
     """Logical content only, excluding authority/operation-receipt metadata."""
-    return sha256(len(financial).to_bytes(8, "big") + financial + protected).hexdigest()
+    result = sha256(len(financial).to_bytes(8, "big"))
+    result.update(financial)
+    result.update(protected)
+    return result.hexdigest()
+
+
+def native_state_digest(states, *, chunks):
+    """Hash trusted native records without copying complete canonical payloads.
+
+    Native adapters supply a canonical byte-chunk encoder for immutable records.
+    Untrusted transfers continue through encode/decode_local_state validation.
+    """
+    return native_records_digest(_local_state_records(states, validate=False), chunks=chunks)
+
+
+def native_records_digest(records, *, chunks):
+    """Hash complete canonical record views retained by a trusted native adapter.
+
+    Records use the exact two envelopes supplied to native_state_digest's chunk
+    encoder. Adapters must invalidate retained views after untracked writes.
+    """
+    if type(records) not in {list, tuple} or len(records) != 2:
+        _invalid()
+    bodies = [tuple(chunks(value, limit=MAX_LOCAL_TRANSFER_BYTES)) for value in records]
+    if any(type(raw) is not bytes for body in bodies for raw in body):
+        _invalid()
+    lengths = [sum(map(len, body)) for body in bodies]
+    if sum(lengths) > MAX_LOCAL_TRANSFER_BYTES:
+        _invalid()
+    result = sha256(lengths[0].to_bytes(8, "big"))
+    for body in bodies:
+        for raw in body:
+            result.update(raw)
+    return result.hexdigest()
 
 
 @dataclass(frozen=True, slots=True)

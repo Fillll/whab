@@ -119,6 +119,74 @@ Requires CLI 2.16 / WHAB 2.71; native rename support is SQLite 1.22 or JSON 1.14
 Existing public note-only edits supply memo persistence; no new note storage API
 or migration is introduced. Unsupported storage reports an update requirement.
 
+## Atomic bulk edits
+
+CLI 2.17 with WHAB 2.72 adds true atomic native bulk operations.
+Discover them through root, transaction/account group, `trnx categorize`,
+`trnx edit-many` and `account classify` help, all available offline.
+
+```text
+Atomic bulk changes (1–100 explicit, distinct targets; never split):
+  whab "My budget" trnx categorize TX1 TX2 --category "Food / Groceries" --agent Codex --dry-run
+  whab "My budget" trnx categorize TX1 TX2 --category "Food / Groceries" --agent Codex
+  whab "My budget" trnx edit-many --file changes.json --dry-run
+  whab "My budget" trnx edit-many --file changes.json --agent Codex --batch cleanup
+  cat changes.json | whab "My budget" trnx edit-many --file -
+  whab "My budget" account classify "🍏Example Card" "旅行カード" --type credit --on-budget --dry-run
+
+Use a single edit for one decision, multiple IDs for the same values, or edit-many
+for different annotations. One bulk operation uses ONE revision, request ID,
+atomic native commit, revision advancement and synchronous durable save. --batch
+still groups history entries; it does not combine separate commands into a commit.
+Every item is validated first. Invalid/missing/deleted/duplicate/ambiguous targets
+or disallowed currency/classification combinations reject ALL items. No fuzzy
+matching, model inference, bank synchronization or future categorization rule.
+
+Complete changes.json example (fictional; replace IDs with observed identities):
+{"edits": [
+  {"transactionId": "TX1", "category": "Food / Groceries", "categoryAgent": "Codex", "reviewed": false},
+  {"transactionId": "TX2", "categoryId": null, "categoryAgent": null, "note": ""},
+  {"transactionId": "TX3", "appendNote": "Exact user wording", "reviewed": true}
+]}
+
+File/stdin must contain exactly {"edits": [...]} (max 2 MiB). Transaction IDs
+are stable IDs only. category accepts an exact ID, unique name or Group / Name;
+categoryId accepts an ID or null to clear. Never supply both. Omitted fields stay
+unchanged. note replaces the memo verbatim; "" clears it; null is invalid.
+appendNote preserves existing text and adds one newline if nonempty; it cannot
+accompany note. Final memos are limited to 1000 characters. reviewed is boolean.
+categoryAgent needs a category change; null clears the label. A manual category
+change clears its previous label. --agent supplies audit attribution and a default
+categoryAgent for category edits; per-item categoryAgent overrides that default.
+Agent labels are self-declared, not authenticated. Review/note-only edits preserve
+category attribution. Financial-detail changes are outside edit-many.
+
+--dry-run performs the same core validation and returns full proposed before/after
+records and the observed revision, without mutation, history or save. A preview
+does not reserve that revision: use --revision PREVIEW_REVISION to guard a later
+execution. JSON is complete; --format table escapes text and shows every diff.
+
+Normal execution is noninteractive. Revisions/request IDs are automatic and are
+returned with the complete original intent. Optional --revision/--request-id are
+for an observed decision or EXACT recovery. Exact successful retries return the
+original receipt without another change/history/save, including after restart.
+Keep identical resolved IDs, payload, original revision, request ID and actor/batch
+metadata. Conflicting request-ID reuse and stale/expired receipts fail safely.
+An uncertain response may have committed: inspect records/history and retain the
+reported original intent. Never retry automatically with a new revision/ID.
+Unsupported backends/authorities fail before mutation. SQLite/JSON are supported.
+```
+
+A single `trnx categorize ID` and single `account classify ACCOUNT` retain their
+existing output and operation. `trnx edit-many` always selects the atomic batch
+contract, including one item. A successful execution returns complete `data.changes`
+with every public before/after record, `count`, `changed`, budget/revision identity
+and the exact original intent. The commit result must equal the validated preview.
+An exact replay returns the original receipt, which may describe an earlier revision
+than the current ledger; `replayed` makes that distinction explicit. No-op targets
+are included in results; history captures only actual financial changes. A successful
+new intent still commits/saves once. Missing native support never falls back to a loop.
+
 ## Simple console
 
 `whab` provides name-addressed local commands. **Production is the default** for
@@ -876,3 +944,48 @@ rows. Undo restores identity, target, parent relationship and every removed row;
 redo revalidates later conflicts. Monthly monetary results and rollover semantics
 are preserved. There is no nonzero funding erasure or category merge/archive. Both `category show
 --help` and deletion help work offline from packaged operation documentation.
+
+## Command performance
+
+Command parsing loads the selected command subtree and reads packaged operation
+resources offline. Validation results are cached privately by document content,
+plugin identity, validator implementation and installed JSON Schema library metadata. A
+changed resource is validated again. Read-only cache locations retain validation.
+Parser construction defers unused distribution-version reads; explicit discovery
+still reports installed plugin versions. Python 3.15 lazy imports defer SDK and
+transport modules until they are used.
+
+Current local hosts expose a coherent filtered transaction read. `trnx list`
+selects complete date/merchant matches in storage and returns names with the same
+revision. `trnx uncategorized --limit` computes full-match counts while selecting
+only the requested sample. Older hosts/backends retain the public-query path.
+Unicode literal matching, completeness, default filters and output fields follow
+the command contracts above.
+
+Run `.venv/bin/python scripts/benchmark_cli.py --runs 100` from the application
+checkout to measure fresh processes with fictional data. It includes process
+startup, verified HTTPS, JSON output and synchronous saves, then reopens the saved
+budget. Cold host startup, full-history output and ZIP import have separate rows.
+
+The benchmark defaults to 100,000 fictional transactions, 100 repetitions,
+100 accounts and 57 categories. It creates its disposable portable fixture using
+storage/container APIs and verifies the complete ledger through monthly reads.
+The full-history refusal is measured separately when output exceeds 16 MiB.
+The ZIP timing uses a separate 100-row import fixture. Latency goals are p95
+below 100 ms for help and 250 ms for selective reads and durable individual edits.
+The report provides measured values for comparison with those goals.
+
+For size comparisons on macOS/Linux, run
+`.venv/bin/python scripts/benchmark_cli_matrix.py --runs 100`. It interleaves
+1,000-, 14,550- and 100,000-row budgets on the same host in a reproducible random
+order. Every size returns 300 monthly rows, 13 merchant matches and ten
+uncategorized samples. It records fresh-process wall time, client CPU time and
+system load, with separate help-only samples before and after the workflow.
+Activation and initial merchant-index construction are reported separately.
+Each size receives distinct real edits, stale-intent checks and exact retries;
+the saved files and audit entries are verified after restart and by independent
+restoration into empty stores. `--sizes` accepts a comma-separated list up to the
+existing row bound; fixture images must still fit the existing 50 MiB limit.
+The 250 ms p95 goal concerns warm bounded reads and edits on measured hardware.
+Complete unbounded output, cold activation and provider latency require separate
+measurements; their work grows with output, stored state or external services.

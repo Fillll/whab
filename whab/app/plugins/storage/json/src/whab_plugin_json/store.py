@@ -295,6 +295,21 @@ class Store(Authority):
     def add_category_group(self, workspace, name):
         return self._mutate(workspace, lambda state: add_category_group(state, name))
 
+    def supports_atomic_bulk_edits(self):
+        return True
+
+    def preview_bulk_edits(self, workspace, operation, edits):
+        from whab.domain.bulk import bulk_changes
+        return bulk_changes(self._read(workspace), operation, edits)
+
+    def edit_transactions(self, workspace, edits):
+        from whab.domain.bulk import bulk_changes
+        return self._mutate(workspace, lambda state: bulk_changes(state, 'edit_transactions', edits, apply=True), history_operation='edit_transactions')
+
+    def classify_accounts(self, workspace, edits):
+        from whab.domain.bulk import bulk_changes
+        return self._mutate(workspace, lambda state: bulk_changes(state, 'classify_accounts', edits, apply=True), history_operation='classify_accounts')
+
     def supports_category_renaming(self):
         return True
 

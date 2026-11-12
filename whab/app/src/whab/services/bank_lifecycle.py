@@ -212,7 +212,7 @@ class BankLifecycle:
                         budget_id=self.budget_id, environment=self.settings.plaid_env, provider_id=plugin.id,
                         generation=generation, journal=self._journal(plugin.id), cipher=self.cipher,
                         code_identity=identity, background_scope=self.background_scope,
-                        requires_account_setup=plugin.bank.requires_account_setup, supports_investments=plugin.bank.supports_investments,
+                        requires_account_setup=plugin.bank.requires_account_setup, supports_investments=plugin.bank.supports_investments, supports_account_metadata=plugin.bank.supports_account_metadata,
                         automatic_sync=lambda: self.automatic_sync(plugin.id), connections=self.connections,
                         shared_event=self.shared_event, profiles=profiles)
             else:

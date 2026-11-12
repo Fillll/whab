@@ -151,7 +151,7 @@ def decode_container(raw, password=None):
         raise StoreError("This file is not a supported WHAB budget container.") from None
 
 
-def encode_container(manifest, files, credential_blob=None):
+def encode_container(manifest, files, credential_blob=None, *, compression_cache=None):
     """Write v2 or v3 metadata and opaque files without executable serialization."""
     manifest = validate_manifest(manifest)
     _require_storage(manifest)
@@ -183,8 +183,13 @@ def encode_container(manifest, files, credential_blob=None):
         raise StoreError("This budget exceeds the container size or file count limit.")
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        if compression_cache is not None:
+            compression_cache.retain(payloads)
         for name in sorted(payloads):
-            archive.writestr(name, payloads[name])
+            if compression_cache is None:
+                archive.writestr(name, payloads[name])
+            else:
+                compression_cache.write(archive, name, payloads[name])
     raw = output.getvalue()
     if len(raw) > MAX_BUNDLE_BYTES:
         raise StoreError("This budget exceeds the container size limit.")

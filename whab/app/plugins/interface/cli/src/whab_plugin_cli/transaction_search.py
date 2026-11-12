@@ -8,7 +8,7 @@ from whab.plugins import format_money
 from whab.plugins.documentation import operation
 
 from .transaction_commands import checked
-from .transaction_reads import terminal_text
+from .transaction_reads import optimized_read, terminal_text
 
 
 def calendar_date(value):
@@ -48,6 +48,11 @@ def validate_search(args, error):
 
 
 def execute_search(connection, identifier, prefix, args, exchange, error):
+    selection = {"workspace": "personal", "merchant": args.merchant,
+                 **{name: getattr(args, name) for name in ("since", "until", "month") if getattr(args, name) is not None}}
+    selected = optimized_read(connection, identifier, prefix, selection, exchange, error)
+    if selected is not None:
+        return selected
     params = {"workspace": "personal", **({"month": args.month} if args.month else {})}
     transactions = checked(exchange(connection, "GET", prefix + "/queries/transactions", params=params), identifier, error)
     metadata = {}

@@ -2007,6 +2007,65 @@
       ],
       "retry": "Inspect shared connections, attachments and profile names after an uncertain response. Attach/detach can be reconciled and repeated; never repeat an uncertain provider revocation or Link exchange.",
       "availability": "WHAB 2.63+, Plaid 1.8+ and CLI 2.8+. Local personal budgets only."
+    },
+    {
+      "name": "BankProvider.read_accounts",
+      "kind": "sdk",
+      "summary": "Fetch normalized account metadata for setup using /accounts/get without transaction-sync pagination.",
+      "input": {
+        "type": "object",
+        "description": "Account-only provider arguments.",
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "description": "Observed provider Item ID."
+          },
+          "access_token": {
+            "type": "string",
+            "description": "Private token supplied transiently by the host."
+          },
+          "institution_name": {
+            "type": "string",
+            "description": "Observed institution display name."
+          }
+        },
+        "required": [
+          "item_id",
+          "access_token",
+          "institution_name"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "array",
+        "description": "Normalized ImportedAccount records, validated by the typed worker.",
+        "maxItems": 500,
+        "items": {
+          "type": "object",
+          "description": "Normalized provider account.",
+          "additionalProperties": true
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "item_id": "fictional-item",
+            "access_token": "fictional-token",
+            "institution_name": "Fictional Bank"
+          },
+          "output": []
+        }
+      ],
+      "side_effects": "Reads already-active Investments provider endpoints. No ledger import, saved cursor, destination, history cutoff or schedule is changed. Does not enable a product, request consent, reconnect or force a fresh institution fetch. Existing provider product billing applies.",
+      "permissions": "Host-only typed bank worker callback. Legacy adapters need not implement it; an opted-in adapter must implement it. Worker validates the exact bounded output before the core derives returns.",
+      "scope": "One personal budget, environment, provider and existing Item. Optional filter is a provider investment account ID. Currency totals remain separate. Current holdings and selected activity history have different time semantics.",
+      "errors": [
+        "Unavailable provider/configuration, unsupported investment adapter, foreign Item/account or malformed dates fail explicitly.",
+        "Investments must already be active and consented on the Item; no product is silently enabled. Provider not-ready/reconnect conditions require their documented action.",
+        "Invalid provider DTO, unsupported currency, excessive history or inconsistent snapshot/window fails without partial results."
+      ],
+      "retry": "Read-only and safe to retry after addressing the fixed error. Do not create a duplicate connection or infer successful product activation. Loading again reads Plaid cached data and does not force a bank refresh.",
+      "availability": "WHAB 2.60+, CLI 2.3+, and Plaid 1.7+; provider must declare BankAdapter.supports_investments. Plaid Investments must be separately enabled/consented. Investment history availability varies by institution; default window is two years."
     }
   ]
 }

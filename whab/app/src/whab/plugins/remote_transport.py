@@ -323,6 +323,18 @@ class RemoteStore:
     def move_category(self, workspace, category_id, parent_id):
         return self._command("move_category", workspace, {"categoryId": category_id, "parentId": parent_id})
 
+    def supports_atomic_bulk_edits(self):
+        return True
+
+    def preview_bulk_edits(self, workspace, operation, edits):
+        return self._query('preview_bulk_edits', workspace, parameters={'operation': operation, 'edits': edits})
+
+    def edit_transactions(self, workspace, edits):
+        return self._command('edit_transactions', workspace, {'edits': edits})
+
+    def classify_accounts(self, workspace, edits):
+        return self._command('classify_accounts', workspace, {'edits': edits})
+
     def supports_category_renaming(self):
         return True
 

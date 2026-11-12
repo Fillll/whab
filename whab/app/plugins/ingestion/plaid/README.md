@@ -247,3 +247,10 @@ mappings/history choices remain. New destination pickers exclude closed accounts
 reopen before linking a new destination. Reopening replays this budget's saved
 checkpoint at the next due/explicit sync, subject to provider history availability,
 without starting sync itself or changing the connection/schedule.
+
+Plaid 1.9 uses the host's optional account-metadata provider capability for setup.
+Preview and configuration call `/accounts/get` without fetching transaction sync
+pages. Configuration validates and saves the user's explicit account mappings and
+start dates. Preview obtains local latest dates through the storage aggregate
+when available. Explicit synchronization retains its existing cursor and atomic
+import behavior.

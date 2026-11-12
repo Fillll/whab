@@ -35,6 +35,8 @@ _RECORDS = {record.__name__: record for record in (
 # (required positional names, optional names/defaults). No arbitrary attribute
 # lookup, kwargs, database handle or implementation-specific state is exposed.
 METHODS = {
+    "supports_atomic_bulk_edits": ((), {}),
+    "preview_bulk_edits": (("workspace", "operation", "edits"), {}),
     "category_deletion_status": (("workspace", "category_id"), {}),
     "budget_history": (("workspace",), {"limit": 50, "before": None, "target": None, "snapshot": False}),
     "history_preview": (("workspace", "action"), {"target": None}),
@@ -45,6 +47,9 @@ METHODS = {
     "prepare_existing": (("workspace", "files"), {}),
     "category_tree": (("workspace",), {}),
     "accounts": (("workspace",), {}), "categories": (("workspace",), {}),
+    "account_latest_dates": (("workspace",), {}),
+    "search_transactions_json": (("workspace", "filters"), {}),
+    "search_transactions": (("workspace", "filters"), {}),
     "transactions": (("workspace",), {"month": None}),
     "workspace": (("workspace",), {"month": None}),
     "workspace_periods": (("workspace", "month", "count"), {}),
@@ -59,6 +64,7 @@ METHODS = {
     "get_receipt": (("workspace", "transaction_id"), {}),
     "items": ((), {}), "get_item": (("item_id",), {}),
     "export_budget": ((), {"workspace": "personal"}),
+    "export_budget_file_changes": (("workspace", "previous"), {}),
     "export_budget_files": ((), {"workspace": "personal"}),
     "preview_workspace_import": (("workspace", "plugin_id", "fingerprint"), {}),
     "commit_evidence": ((), {}), "operation_receipt": (("operation_id",), {}),

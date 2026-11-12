@@ -23,6 +23,12 @@ def _receipt_upload(path, method):
     return method == "PUT" and path.startswith("/api/transactions/") and path.endswith("/receipt")
 
 
+def _ledger_protocol(path):
+    # Bounded bulk memos can exceed the ordinary 32 KiB form limit, including
+    # escaped Unicode. Expand only the public ledger protocol envelopes.
+    return bool(re.fullmatch(r'(?:/budgets/[^/]+)?/api/local/v1/(?:commands|queries)|/remote/v1/budgets/[^/]+/(?:commands|queries)', path))
+
+
 class RequestBodyLimit:
     """Bound chunked request bodies before Starlette/Pydantic buffer or parse them."""
 
@@ -41,7 +47,7 @@ class RequestBodyLimit:
             return
         limit = MAX_RECEIPT_BYTES if _receipt_upload(scope["path"], scope["method"]) else (
             (50 * 1024 * 1024 if scope["path"] == "/api/budget/open" else 10 * 1024 * 1024) if _file_import(scope["path"], self.file_import_paths)
-            else 128 * 1024 if _webhook(scope["path"], self.webhook_paths) else 32 * 1024
+            else 128 * 1024 if _webhook(scope["path"], self.webhook_paths) else 2 * 1024 * 1024 if _ledger_protocol(scope["path"]) else 32 * 1024
         )
         chunks = []
         size = 0
@@ -125,7 +131,7 @@ def install_middleware(app, port, webhook_paths=(), file_import_paths=(), remote
                 and (actual_type not in RECEIPT_TYPES if receipt_upload else actual_type != content_type)
             ):
                 return JSONResponse({"error": "Use a JPEG, PNG or PDF file" if receipt_upload else f"Use {content_type}"}, status_code=415)
-            limit = MAX_RECEIPT_BYTES if receipt_upload else (50 * 1024 * 1024 if request.url.path == "/api/budget/open" else 10 * 1024 * 1024) if file_import else 128 * 1024 if webhook else 32 * 1024
+            limit = MAX_RECEIPT_BYTES if receipt_upload else (50 * 1024 * 1024 if request.url.path == "/api/budget/open" else 10 * 1024 * 1024) if file_import else 128 * 1024 if webhook else 2 * 1024 * 1024 if _ledger_protocol(request.url.path) else 32 * 1024
             try:
                 if int(request.headers.get("content-length", "0")) > limit:
                     return JSONResponse({"error": "Request too large"}, status_code=413)

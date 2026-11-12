@@ -51,35 +51,32 @@ def invalid():
 
 
 def _plain(value, depth=0):
+    """Validate primitives and conservatively bound their encoded JSON bytes."""
     if depth > 40:
         invalid()
     if value is None or type(value) is bool:
-        return
+        return 5
     if type(value) is int and abs(value) <= 2**53 - 1:
-        return
+        return 20
     if type(value) is float and math.isfinite(value) and abs(value) <= 2**53 - 1:
-        return
+        return 32
     if type(value) is str:
         if "\x00" in value:
             invalid()
-        value.encode("utf-8")
-        return
+        return 6 * len(value.encode("utf-8")) + 2
     if type(value) is list and len(value) <= 10000:
-        for row in value:
-            _plain(row, depth + 1)
-        return
+        return 2 + sum(_plain(row, depth + 1) + 1 for row in value)
     if type(value) is dict and len(value) <= 10000 and all(type(key) is str for key in value):
-        for key, row in value.items():
-            _plain(key, depth + 1)
-            _plain(row, depth + 1)
-        return
+        return 2 + sum(_plain(key, depth + 1) + _plain(row, depth + 1) + 2 for key, row in value.items())
     invalid()
 
 
 def encode(value, limit):
     """Bound serialization, including Unicode and nonfinite/unsupported primitives."""
     try:
-        _plain(value)
+        upper_bound = _plain(value)
+        if upper_bound <= limit:
+            return json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         chunks, length = [], 0
         for chunk in json.JSONEncoder(ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).iterencode(value):
             raw = chunk.encode("utf-8")

@@ -33,7 +33,7 @@ _KINDS = {
     "jobs": ({"require_idle", "status", "start", "stop", "close"}, {"engine_factory"}, set()),
     "labels": ({"configure", "classify", "write", "report", "override", "label", "put"}, {"saved", "context"}, set()),
     "engine": ({"index", "select", "delete", "rename", "train", "save", "predict", "preview", "close"}, {"defaults"}, set()),
-    "provider": ({"connection_token", "exchange_token", "read_sync", "read_investments", "remove_token", "webhook_event", "close"}, {"config"}, set()),
+    "provider": ({"connection_token", "exchange_token", "read_sync", "read_accounts", "read_investments", "remove_token", "webhook_event", "close"}, {"config"}, set()),
     "bank": ({"link_token", "exchange", "sync", "disconnect", "webhook", "close"}, {"config"}, set()),
     "lock": ({"enter", "exit"}, set(), set()),
     "iterator": ({"next", "close"}, set(), set()),

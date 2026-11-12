@@ -896,7 +896,7 @@
         "Import HTTP 400/409/413 responses retain bounded authored validation messages. Other statuses, malformed responses and transport failures retain sanitized diagnostics."
       ],
       "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
-      "availability": "whab BUDGET import PLUGIN preview FILE --currency USD; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer\u2019s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
+      "availability": "whab BUDGET import PLUGIN preview FILE --currency USD; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer’s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
     },
     {
       "name": "import.commit",
@@ -1032,7 +1032,7 @@
         "Import HTTP 400/409/413 responses retain bounded authored validation messages. Other statuses, malformed responses and transport failures retain sanitized diagnostics."
       ],
       "retry": "After an uncertain commit, preview the same archive in the same budget. alreadyImported reports its durable receipt; retry only the exact same file/fingerprint. A different archive is refused after import, and later edits are preserved.",
-      "availability": "whab BUDGET import PLUGIN commit FILE --currency USD --fingerprint SHA256_FROM_PREVIEW; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer\u2019s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
+      "availability": "whab BUDGET import PLUGIN commit FILE --currency USD --fingerprint SHA256_FROM_PREVIEW; local-only, using existing budget-scoped /api/plugins/{id}/import endpoints. CLI 2.9.1+ renders the selected importer’s local import.workflow documentation from its installed operations.json in import/preview/commit --help, without hooks or host acquisition. YNAB migration: whab BUDGET import ynab-zip-importer --help; whab api describe --plugin ynab-zip-importer --operation import.workflow --help. Workflow topics and SDK callbacks are not executable commands."
     },
     {
       "name": "bank.connections",
@@ -1060,7 +1060,7 @@
       ],
       "side_effects": "Read-only local saved connection metadata.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1104,7 +1104,7 @@
       ],
       "side_effects": "Fetches provider data for review without importing transactions or advancing the saved cursor.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1192,7 +1192,7 @@
       ],
       "side_effects": "Atomically saves links, joins an existing auto-created account when selected, retains transaction IDs/annotations and resets the cursor for idempotent replay. Does not delete old history or start synchronization.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1237,7 +1237,7 @@
       ],
       "side_effects": "Imports configured accounts using saved cutoffs and advances their cursors atomically. No new external bank connection is created.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1286,9 +1286,9 @@
           }
         }
       ],
-      "side_effects": "With an interval, saves this provider\u2019s budget-local update policy. Does not fetch transactions or register an OS job.",
+      "side_effects": "With an interval, saves this provider’s budget-local update policy. Does not fetch transactions or register an OS job.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1332,7 +1332,7 @@
       ],
       "side_effects": "Registers or removes the existing WHAB launchd task. It can start WHAB to check due jobs in saved budgets. Other platforms use cron with python -m whab --run-jobs.",
       "permissions": "Local HTTPS and budget/workspace guards; CLI uses the authenticated local host. Not exposed through remote ledger operations. OS scheduling requires an explicit enable action.",
-      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget\u2019s saved due policy. Currencies cannot be mixed.",
+      "scope": "One provider in one personal budget/environment; background wakeups are device/environment-wide and honor every budget’s saved due policy. Currencies cannot be mixed.",
       "errors": [
         "Invalid account, date, currency or duplicate destination is rejected atomically.",
         "Unsupported storage, pending native recovery or unavailable provider fails explicitly.",
@@ -1925,7 +1925,7 @@
     {
       "name": "transactions.list",
       "kind": "local",
-      "summary": "Complete transaction search (read-only):\n  whab \"My budget\" trnx list --since 2026-08-01 --merchant \"Fictional Village\" --format table\n  whab \"My budget\" trnx list --since 2026-08-01 --until 2026-08-31 --merchant \"Fictional Mortgage\"\n  whab \"My budget\" trnx list --merchant \"Fictional Village\" --merchant \"Fictional Mortgage\"\n\nDefault: all available nondeleted history, all accounts/currencies, reviewed and\nunreviewed, categorized and uncategorized, pending/posted, transfers and refunds.\n--since and --until are inclusive YYYY-MM-DD bounds; either can be omitted.\n--merchant matches a case-insensitive literal substring of the merchant only.\nRepeat it for OR (ANY supplied text). Spaces/emoji/non-Latin text are supported;\nquote spaces. No fuzzy, regex, wildcard, synonym or lender inference. Different\nmortgage lenders are not aliases. Without --merchant, all merchants match.\n--month YYYY-MM optionally restricts the initial public read and intersects bounds.\n\nResults: budgetId/revision, filters, total/returned, complete=true and every matching\npublic transaction, newest date first with stable ID tie-breaker (no intraday time).\nRows retain IDs, dates, account IDs/names, merchants, integer minor-unit amounts,\ncurrencies, category IDs/names/groups, notes, agent labels and pending/review status.\nTables show stable IDs in full, separate currency and review/status columns; names\nmay be shortened. JSON is authoritative. Positive amounts are outflows, negative\namounts are inflows/refunds. Never combine currencies.\n\nCompleteness: no default limit or hidden pagination. Every successful read returns\nall matches (total=returned=len(data), complete=true). Each public response is\nbounded to 16 MiB; oversized, failed or inconsistent budget/revision reads fail\nwithout partial output. Date/merchant filters run locally after the history read;\nuse --month and inspect each month separately if the initial history is too large.\nRerun a read after a concurrent change; do not treat a stale revision as write consent.\n\nNext: inspect ALL matches and categories before deciding:\n  whab \"My budget\" trnx categories\n  whab \"My budget\" trnx categorize TRANSACTION_ID --category \"Housing / Fictional home\" --agent Codex\nRerun the identical list after edits; compare stable ID sets/counts and category IDs.\nCategorize is a separate guarded edit; review is preserved unless --needs-review.\nRetain original arguments/revision/request ID after an uncertain write, inspect the\nsaved result, and never automatically replay a new intent. This list never edits,\nreviews, syncs or creates a persistent future categorization rule. Help is offline.",
+      "summary": "Complete transaction search (read-only):\n  whab \"My budget\" trnx list --since 2026-08-01 --merchant \"Fictional Village\" --format table\n  whab \"My budget\" trnx list --since 2026-08-01 --until 2026-08-31 --merchant \"Fictional Mortgage\"\n  whab \"My budget\" trnx list --merchant \"Fictional Village\" --merchant \"Fictional Mortgage\"\n\nDefault: all available nondeleted history, all accounts/currencies, reviewed and\nunreviewed, categorized and uncategorized, pending/posted, transfers and refunds.\n--since and --until are inclusive YYYY-MM-DD bounds; either can be omitted.\n--merchant matches a case-insensitive literal substring of the merchant only.\nRepeat it for OR (ANY supplied text). Spaces/emoji/non-Latin text are supported;\nquote spaces. No fuzzy, regex, wildcard, synonym or lender inference. Different\nmortgage lenders are not aliases. Without --merchant, all merchants match.\n--month YYYY-MM optionally restricts the initial public read and intersects bounds.\n\nResults: budgetId/revision, filters, total/returned, complete=true and every matching\npublic transaction, newest date first with stable ID tie-breaker (no intraday time).\nRows retain IDs, dates, account IDs/names, merchants, integer minor-unit amounts,\ncurrencies, category IDs/names/groups, notes, agent labels and pending/review status.\nTables show stable IDs in full, separate currency and review/status columns; names\nmay be shortened. JSON is authoritative. Positive amounts are outflows, negative\namounts are inflows/refunds. Never combine currencies.\n\nCompleteness: no default limit or hidden pagination. Every successful read returns\nall matches (total=returned=len(data), complete=true). Each public response is\nbounded to 16 MiB; oversized, failed or inconsistent budget/revision reads fail\nwithout partial output. Current hosts filter dates and merchants in one coherent storage read; older hosts retain public-query filtering.\nUse --month and inspect each month separately when complete output exceeds the response limit.\nRerun a read after a concurrent change; do not treat a stale revision as write consent.\n\nNext: inspect ALL matches and categories before deciding:\n  whab \"My budget\" trnx categories\n  whab \"My budget\" trnx categorize TRANSACTION_ID --category \"Housing / Fictional home\" --agent Codex\nRerun the identical list after edits; compare stable ID sets/counts and category IDs.\nCategorize is a separate guarded edit; review is preserved unless --needs-review.\nRetain original arguments/revision/request ID after an uncertain write, inspect the\nsaved result, and never automatically replay a new intent. This list never edits,\nreviews, syncs or creates a persistent future categorization rule. Help is offline.",
       "input": {
         "type": "object",
         "description": "whab BUDGET trnx list [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--month YYYY-MM] [--merchant TEXT ...] [--format json|table]. transactions is an alias.",
@@ -3609,7 +3609,7 @@
             "data": [
               {
                 "id": "fictional-account",
-                "name": "\ud83c\udf4fExample Card",
+                "name": "🍏Example Card",
                 "type": "credit",
                 "subtype": "credit_card",
                 "onBudget": true,
@@ -3732,7 +3732,7 @@
       "examples": [
         {
           "input": {
-            "account": "\ud83c\udf4fExample Card"
+            "account": "🍏Example Card"
           },
           "output": {
             "budgetId": "fictional-budget",
@@ -3740,7 +3740,7 @@
             "revision": "saved-revision",
             "data": {
               "id": "fictional-account",
-              "name": "\ud83c\udf4fExample Card",
+              "name": "🍏Example Card",
               "type": "credit",
               "subtype": "credit_card",
               "onBudget": true,
@@ -3897,7 +3897,7 @@
       "examples": [
         {
           "input": {
-            "account": "\ud83c\udf4fExample Card",
+            "account": "🍏Example Card",
             "type": "credit",
             "subtype": "credit_card",
             "onBudget": true
@@ -3908,7 +3908,7 @@
             "revision": "saved-revision",
             "data": {
               "id": "fictional-account",
-              "name": "\ud83c\udf4fExample Card",
+              "name": "🍏Example Card",
               "type": "credit",
               "subtype": "credit_card",
               "onBudget": true,
@@ -4042,7 +4042,7 @@
       "examples": [
         {
           "input": {
-            "account": "\ud83c\udf4fExample Card"
+            "account": "🍏Example Card"
           },
           "output": {
             "budgetId": "fictional-budget",
@@ -4050,7 +4050,7 @@
             "revision": "saved-revision",
             "data": {
               "id": "fictional-account",
-              "name": "\ud83c\udf4fExample Card",
+              "name": "🍏Example Card",
               "type": "deposit",
               "subtype": "cd",
               "onBudget": false,
@@ -4184,7 +4184,7 @@
       "examples": [
         {
           "input": {
-            "account": "\ud83c\udf4fExample Card"
+            "account": "🍏Example Card"
           },
           "output": {
             "budgetId": "fictional-budget",
@@ -4192,7 +4192,7 @@
             "revision": "saved-revision",
             "data": {
               "id": "fictional-account",
-              "name": "\ud83c\udf4fExample Card",
+              "name": "🍏Example Card",
               "type": "deposit",
               "subtype": "cd",
               "onBudget": false,
@@ -4796,6 +4796,106 @@
       ],
       "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
       "availability": "CLI 2.11+, WHAB 2.65+; native category-management adapters for creation/moves. category.workflow is documentation only."
+    },
+    {
+      "name": "bulk.workflow",
+      "kind": "local",
+      "summary": "Discover atomic same-value and mixed transaction edits and account classification, with complete read-only previews.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Exact budget name or ID."
+          },
+          "edits": {
+            "type": "array",
+            "description": "1–100 explicit distinct edits. See core and CLI help for complete schemas.",
+            "items": {
+              "type": "object",
+              "description": "Transaction annotation or account classification.",
+              "additionalProperties": true
+            }
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Read-only exact before/after preview; false executes one commit/save."
+          }
+        },
+        "required": [
+          "budget",
+          "edits"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Exact native validated records, returned only after one successful commit/checkpoint, or read-only preview. count includes no-op targets; changed counts differing public records.",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Explicit targets (1–100)."
+          },
+          "changed": {
+            "type": "integer",
+            "description": "Targets whose public records differ."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every target in input order with complete public before/after records. Permanent history separately retains exact internal financial rows.",
+            "items": {
+              "type": "object",
+              "description": "Target id, before and after.",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "count",
+          "changed",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "My budget",
+            "edits": [
+              {
+                "transactionId": "fictional-id",
+                "note": "Fictional memo"
+              }
+            ],
+            "dryRun": true
+          },
+          "output": {
+            "count": 1,
+            "changed": 1,
+            "changes": [
+              {
+                "id": "fictional-id",
+                "before": {
+                  "note": ""
+                },
+                "after": {
+                  "note": "Fictional memo"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One atomic commit/save for execution; preview has no effects. --batch only groups audit entries. No bank/model calls.",
+      "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Preserve exact resolved edits, revision, request ID and history. Never automatically replay uncertain writes with fresh intent. Read complete offline command help for recovery flags.",
+      "availability": "CLI 2.17+, WHAB 2.72+, native SQLite 1.23+ or JSON 1.15+."
     }
   ]
 }
