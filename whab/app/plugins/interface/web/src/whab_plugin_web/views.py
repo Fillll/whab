@@ -287,7 +287,8 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
                 ],
             }
         )
-    transactions = sorted(data["transactions"], key=lambda t: t["date"], reverse=True)
+    transactions = (list(data["transactions"]) if page == "transactions" and "transactionPage" in data
+                    else sorted(data["transactions"], key=lambda t: t["date"], reverse=True))
     accounts_by_id = {a["id"]: a for a in data["accounts"]}
     spending = defaultdict(int)
     payees = defaultdict(int)

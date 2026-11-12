@@ -74,13 +74,17 @@ def test_actual_visual_worker_retains_native_origin_and_paging(store, tmp_path):
     account = store.add_account('personal', {'name': 'Fictional checking', 'type': 'depository', 'balance': 10000})
     for index in range(101):
         store.add_transaction('personal', {'accountId': account, 'merchant': f'Fictional item {index:03}',
-                                           'date': '2026-11-01', 'amount': 100, 'categoryId': None})
+                                           'date': f'2026-11-{1 + index % 2:02}', 'amount': 100, 'categoryId': None})
     settings = Settings(tmp_path, 5551, 'sandbox', '', '', '', False, '', '', (), ui='web')
     app = create_app(settings=settings, store=store, plugins=load_plugins(('web',)))
     with TestClient(app, base_url='https://localhost:5551') as browser:
         response = browser.get('/budgets/home/transactions/2026-11/usd?sort=merchant:asc&sort=amount:desc')
         assert response.status_code == 200
         text = unescape(response.text)
+        assert re.findall(r'data-merchant="([^"]+)"', text) == [f'Fictional item {index:03}' for index in range(100)]
+        ordered = browser.get('/budgets/home/transactions/2026-11/usd?sort=date:asc&sort=merchant:desc')
+        dates = re.findall(r'data-transaction-detail="date" value="([^"]+)"', ordered.text)
+        assert len(dates) == 100 and dates == sorted(dates)
         for href in re.findall(r'<a[^>]*(?:data-transaction-sort="[^"]+"|data-transaction-month)[^>]*href="([^"]+)"', text):
             assert href.startswith('/budgets/'), href
         next_page = re.search(r'data-stream-next="([^"]+)"', text)[1]
