@@ -117,7 +117,7 @@ def execute_account(connection, identifier, prefix, args, exchange, error):
     except (ValueError, OSError, RuntimeError, KeyError, TypeError, httpx.HTTPError) as failure:
         raise error('Account update was not confirmed; it may have been saved. No automatic retry. Inspect account show and history; do not rerun ' + args.account_action + ' as a retry. Retain budgetId ' + identifier + ' and the exact original intent: ' + json.dumps(intent) + '.') from failure
     return {**verified, 'budget': args.target, 'data': classified(actual),
-            'requestId': intent['request_id'], 'expectedRevision': observed['revision']}
+            'requestId': intent['request_id'], 'expectedRevision': intent['expected_revision']}
 
 
 def account_table(result):

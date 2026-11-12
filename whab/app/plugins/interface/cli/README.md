@@ -1000,15 +1000,20 @@ Reproduce the synthetic fresh-process benchmark from the application directory:
 
 ```sh
 .venv/bin/python scripts/benchmark_atomic_bulk.py --storage sqlite --transactions 100000 --runs 100 --separate-runs 3 --output /tmp/whab-bulk-sqlite.json
-.venv/bin/python scripts/benchmark_atomic_bulk.py --storage json --transactions 1000 --runs 100 --separate-runs 3 --output /tmp/whab-bulk-json.json
+.venv/bin/python scripts/benchmark_atomic_bulk.py --storage json --transactions 1000 --runs 25 --separate-runs 1 --output /tmp/whab-bulk-json.json
 ```
 
 The primary commands are multi-ID `trnx categorize`, mixed `trnx edit-many` and
 multi-account `account classify`, each at sizes 1, 10, 50 and 100. `--atomic` selects
-the bulk contract for the one-target same-value cases. Each command/size launches
-100 fresh CLI processes; equivalent complete separate-command workflows are measured
-three times. Their p95 is reported with that small baseline sample count, not as a
-100-run percentile estimate. Mixed single-record workflows include their revision
+the bulk contract for the one-target same-value cases.
+The primary SQLite matrix launches 100 fresh CLI processes per command/size;
+equivalent complete separate-command workflows are measured three times. The smaller
+JSON diagnostic uses at least 25 runs per size (at least 100 fresh processes per
+command over the four sizes) and one baseline workflow. Some recorded JSON cases
+have 100 runs and three baselines. Each result reports its exact sample counts.
+Baseline p95 has only the stated small sample count; with one observation p50 and
+p95 are the same observation, not a statistical percentile estimate.
+Mixed single-record workflows include their revision
 read and guarded advanced edit. Every intent changes real fictional records.
 
 Measurements include startup, verified local HTTPS, output and the synchronous

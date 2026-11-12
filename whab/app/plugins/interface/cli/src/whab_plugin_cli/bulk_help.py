@@ -32,7 +32,10 @@ accompany note. Final memos are limited to 1000 characters. reviewed is boolean.
 categoryAgent needs a category change; null clears the label. A manual category
 change clears its previous label. --agent supplies audit attribution and a default
 categoryAgent for category edits; per-item categoryAgent overrides that default.
-Agent labels are self-declared, not authenticated. Review/note-only edits preserve
+Agent labels are self-declared, not authenticated: 1–80 printable characters,
+without outer whitespace. --batch accepts 1–200 printable characters without
+outer whitespace. Stable IDs and recovery revision/request IDs are 1–200 characters;
+copy them exactly. Text must be valid UTF-8 without NUL. Review/note-only edits preserve
 category attribution. Financial-detail changes are outside edit-many.
 
 --dry-run performs the same core validation and returns full proposed before/after

@@ -161,6 +161,8 @@ def test_preview_concurrency_replay_and_receipt_validation(endpoint):
     assert "unchanged" in bulk.bulk_table(unchanged)
     assert "note:" in bulk.bulk_table(saved)
     assert "Read-only preview" in bulk.bulk_table(preview)
+    assert "exact replay" in bulk.bulk_table({**saved, "replayed":True})
+    assert saved["requestId"] in bulk.bulk_table(saved)
 
 
 @pytest.mark.parametrize(
@@ -290,6 +292,9 @@ def test_console_bulk_dispatch_tables_and_single_labelled_classification(
         )
     )
     assert result["data"]["id"] == account
+    repeated = json.loads(run('account','classify',account,'--type','depository','--on-budget','--agent','Codex','--batch','single',
+        '--revision',result['expectedRevision'],'--request-id','single-fictional'))
+    assert repeated['expectedRevision'] == result['expectedRevision']
     assert "Saved atomic batch" in run(
         "trnx", "categorize", transaction, "--clear", "--format", "table"
     )

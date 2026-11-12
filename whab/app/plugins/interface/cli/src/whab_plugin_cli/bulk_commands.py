@@ -141,7 +141,7 @@ def execute_accounts(connection, identifier, prefix, args, exchange, error):
 
 
 def bulk_table(result):
-    lines = ["Budget: " + json.dumps(result["budget"], ensure_ascii=True) + " (" + json.dumps(result["budgetId"], ensure_ascii=True) + ")", 'Read-only preview — no save' if result['dryRun'] else 'Saved atomic batch',
+    lines = ["Budget: " + json.dumps(result["budget"], ensure_ascii=True) + " (" + json.dumps(result["budgetId"], ensure_ascii=True) + ")", 'Read-only preview — no save' if result['dryRun'] else 'Original saved batch receipt (exact replay; current records may differ)' if result['replayed'] else 'Saved atomic batch',
              f"{result['data']['count']} targets; {result['data']['changed']} changed"]
     for row in result['data']['changes']:
         lines.append(json.dumps(row['id'], ensure_ascii=True))
@@ -152,4 +152,7 @@ def bulk_table(result):
         if not differences:
             lines.append('  unchanged')
     lines.append('Revision: ' + result['revision'])
+    if not result['dryRun']:
+        lines.append('Request ID: ' + json.dumps(result['requestId'], ensure_ascii=True))
+        lines.append('Original expected revision: ' + json.dumps(result['expectedRevision'], ensure_ascii=True))
     return '\n'.join(lines)
