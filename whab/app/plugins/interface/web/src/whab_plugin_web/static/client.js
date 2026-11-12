@@ -46,6 +46,7 @@ export function pageUrl(overrides = {}) {
   const clearPeriod = () => ['all_dates', 'period', 'start_date', 'end_date'].forEach(key => url.searchParams.delete(key));
   if (page !== 'transactions') {
     clearPeriod();
+    url.searchParams.delete('sort');
     url.searchParams.delete('review');
     url.searchParams.delete('q');
     url.searchParams.delete('tx_page');

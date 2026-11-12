@@ -169,3 +169,11 @@ test('register filters reset pagination while retaining the complete-history sea
     assert.equal(target.searchParams.has('tx_page'), false);
   }
 });
+
+test('compound sorting survives register filters and is cleared outside transactions', () => {
+  const navigate = navigation('https://localhost:5173/budgets/home/transactions/2026-10/usd?sort=date:asc&sort=amount:desc');
+  for (const filter of [{q: 'Train'}, {review: 'reviewed'}, {period: 'previous-month'}, {accounts: ['a', 'b']}]) {
+    assert.deepEqual(navigate(filter).searchParams.getAll('sort'), ['date:asc', 'amount:desc']);
+  }
+  assert.equal(navigate({page: 'budget'}).searchParams.has('sort'), false);
+});

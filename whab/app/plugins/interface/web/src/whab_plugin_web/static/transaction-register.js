@@ -101,6 +101,30 @@ export function hydrateTransactionCategories(select, template) {
   select.removeAttribute('data-category-options-lazy');
 }
 
+export function transactionControlUrl(base, link) {
+  const url = new URL(base);
+  if (link.hasAttribute('data-transaction-sort')) {
+    const field = link.dataset.transactionSort;
+    const ordering = url.searchParams.getAll('sort');
+    const active = ordering.find(value => value.startsWith(`${field}:`));
+    const next = !active ? `${field}:asc` : active.endsWith(':asc') ? `${field}:desc` : null;
+    const updated = active ? ordering.map(value => value === active ? next : value) : [...ordering, next];
+    url.searchParams.delete('sort');
+    for (const value of updated) if (value) url.searchParams.append('sort', value);
+  } else {
+    const target = new URL(link.href);
+    const parts = url.pathname.split('/');
+    parts[parts.length - 2] = target.pathname.split('/').at(-2);
+    url.pathname = parts.join('/');
+    for (const key of ['period', 'all_dates', 'start_date', 'end_date']) {
+      url.searchParams.delete(key);
+      for (const value of target.searchParams.getAll(key)) url.searchParams.append(key, value);
+    }
+  }
+  url.searchParams.delete('tx_page');
+  return url;
+}
+
 export function initTransactionRegister({navigate = async () => false, pendingDestination = () => null, cancelNavigation = () => {}, onMutation = () => {}} = {}) {
   const root = document.querySelector('[data-transaction-register]');
   if (!root) return {flush: async () => true, dispose() {}};
@@ -134,6 +158,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   const listeners = [];
   let disposed = false;
   let pendingFilters = {};
+  let pendingRegisterUrl = null;
   let filterNavigationPending = false, filterNavigationRevision = 0;
   let bulkBusy = false;
   let bulkPromise = null;
@@ -182,6 +207,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     selection();
   }
   async function go(url, focus = 'heading', refresh = false, summary = false) {
+    if (typeof url === 'string' || url instanceof URL) pendingRegisterUrl = url;
     stream?.cancel();
     const revision = ++filterNavigationRevision;
     filterNavigationPending = true;
@@ -194,6 +220,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     } finally {
       if (revision === filterNavigationRevision) {
         filterNavigationPending = false;
+        pendingRegisterUrl = null;
         if (refresh && refreshNeeded && refreshRetries < 1) {
           refreshRetries += 1;
           refreshAfterMutation(true);
@@ -217,7 +244,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
           !document.activeElement?.closest?.('td.grid-current') && (!draft || draft.hidden) &&
           !receiptDialog.open && !receiptBusy && !bulkBusy &&
           ![...editors.values()].some(writer => writer.dirty)) {
-        void go(new URL(location.href), false, true, !search.value && displayedReview === 'all');
+        void go(new URL(location.href), false, true, !search.value && displayedReview === 'all' && !new URL(location.href).searchParams.has('sort'));
       }
     }, 0);
   }
@@ -235,6 +262,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     }
     filterNavigationRevision += 1;
     filterNavigationPending = false;
+    pendingRegisterUrl = null;
     cancelNavigation();
   }
   function setReviewState(next) {
@@ -250,6 +278,16 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     applyFilters({accounts}, '#account-filter-toggle');
   });
   const periodPicker = initPeriodPicker(root, changes => applyFilters(changes, '#transaction-period-toggle'));
+  for (const link of root.querySelectorAll('[data-transaction-sort], [data-transaction-month]')) listen(link, 'click', event => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    clearTimeout(searchTimer);
+    searchTimer = null;
+    const url = transactionControlUrl(pendingRegisterUrl || pendingDestination() || location.href, link);
+    if (search.value) url.searchParams.set('q', search.value);
+    else url.searchParams.delete('q');
+    void go(url, link.hasAttribute('data-transaction-sort') ? `[data-transaction-sort="${link.dataset.transactionSort}"]` : 'heading');
+  });
   const categoryOptions = root.querySelector('template[data-transaction-categories]');
   const accountOptions = root.querySelector('template[data-transaction-accounts]');
   const hydrateCategory = event => {

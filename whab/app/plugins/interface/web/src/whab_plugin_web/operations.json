@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface; financial decisions use the shared ledger operations.",
+  "summary": "Visual budgeting interface with complete-selection compound register sorting, Group > Category labels and calendar-month navigation; financial decisions use the shared ledger operations.",
   "delegates": [
     "core"
   ],

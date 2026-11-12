@@ -139,6 +139,7 @@ def create_router(
                 account_ids=selected_ids, start_date=transaction_range.start, end_date=transaction_range.end,
                 search=request.query_params.get("q", ""), review=review,
                 page=requested_page, page_size=ui.transaction_page_size,
+                sort=request.query_params.getlist("sort"),
             )
         elif page == "transactions" and ui.lightweight_transactions:
             data = service.transaction_register(
@@ -219,6 +220,8 @@ def create_router(
         context["ui_asset_prefix"] = asset_prefix + "/ui/" + ui_generation if ui_generation else asset_prefix
         context["api_prefix"] = api_prefix
         canonical_filters = dict(request.query_params)
+        if request.query_params.getlist("sort"):
+            canonical_filters["sort"] = request.query_params.getlist("sort")
         canonical_filters.pop("account", None)
         canonical_filters.pop("accounts", None)
         if selected_ids and len(selected_ids) > 1:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.70.0 — 2026-11-11
+
+PR: [#185](https://github.com/Fillll/whab/pull/185)
+
+- Validate compound transaction ordering across the complete public selection before pagination, retaining stable date/ID ties, signed displayed amounts, Unicode text ordering and revision isolation. Preserve optimized native paging for the default order and existing storage/SDK contracts.
+
 ## 2.69.1 — 2026-11-09
 
 PR: [#183](https://github.com/Fillll/whab/pull/183)

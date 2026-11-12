@@ -65,6 +65,26 @@ Compatible model settings expose **Preview low-score guesses**, an explicit acti
 
 The descriptor opts into `transaction_page_size=100` and `lightweight_accounts=True`. The host supplies bounded rows and complete-selection counts, while this plugin builds filter controls, page links and labels. Older storage plugins retain public-read fallbacks. Account and merchant images begin loading near visible fallback marks, with at most two requests at once; closed account pickers wait until opened. Errors, detached rows and a ten-second load deadline release image slots. Explicit account-logo previews remain immediate.
 
+Register data headings (Date, Account, Payee, Category, Memo, Amount, Currency and R)
+cycle **ascending → descending → none**. Clicking another heading adds a secondary
+sort, preserving priority; small arrows carry priority numbers when several columns
+are active. Removing a column renumbers the remaining sorts. With none selected,
+the default newest-date/ID order returns. Sorts are kept in repeated URL parameters
+such as `sort=date:asc&sort=amount:desc`, across filters, incremental loading and
+Back/Forward. Ordering covers the entire filtered selection before pagination;
+amounts use the displayed signed value, text uses Unicode casefold, category order
+uses saved **Group > Category**, and ties retain stable date/ID order. Provisional
+suggestions do not determine saved-category ordering. Selection and Receipt headings
+remain controls rather than sort columns.
+
+The period picker has previous/next calendar-month arrows and a **This month**
+shortcut. Arrows use the displayed route month and switch to a concrete month,
+clearing year/all/custom date bounds and resetting incremental loading while keeping
+account, search, review and sort selections. **This month** resolves against the
+current household calendar on each load. At the supported calendar limits the
+unavailable arrow is disabled. Category editors and their native choices display
+**Group > Category** to disambiguate duplicate names, including newly created rows.
+
 Large transaction selections initially render at most 100 editable rows and automatically append further batches as the table scrolls. The table has no page controls; each request remains bounded to 100 rows. Payee and memo search and the review filter apply across the entire selected account/date range before rows are loaded. Loading preserves those filters and mounted editors; pending edits finish before the view changes. The `q` parameter retains search in bookmarks, and earlier `tx_page` bookmarks retain their position; search also works as a normal GET form without JavaScript. Export still contains the complete selected currency. All web module dependencies use the plugin version to load matching scripts after an update. For isolated rendering measurements with fictional data, run `.venv/bin/python scripts/benchmark_register.py --all-accounts` from the application directory; the script also accepts `--page accounts` and `--page budget`. It measures server rendering and markup size, excluding browser layout and network time.
 
 Under All with an empty search, successful review changes request only a small server-rendered summary, keeping the current rows, editors and listeners in place. Search and review-filtered views still refresh their complete visible page. Summary responses validate the addressed budget, currency, account/date filters and requested page before changing the count; canceled or superseded responses cannot replace a newer view. Use `--summary` in the benchmark to compare response size. `--profile-memory` separately measures Python request allocation peaks; it excludes SQLite/native memory and the browser.

@@ -94,6 +94,14 @@ See [CLI-first host lifecycle](host-lifecycle.md) for temporary hosts, authentic
 
 `WHAB_UI` selects an optional server-rendered visual descriptor; fresh homes default to no visual interface, while existing data homes retain the historical `web` default unless explicitly configured. `WHAB_UI=` selects headless mode: the root page and core static mount are absent, while guarded APIs remain. `UserInterface` supplies template/static directories and a `build_context` callable. The host owns Jinja transport and injects enabled plugin panels/outputs; the chosen interface owns the resulting visual layout. Trusted `Interface` factories can contribute transport routes using a scoped `InterfaceContext`; shared host access policy and cleanup still apply. The bundled `server` plugin uses this capability for the public remote command protocol. Server-rendered `UserInterface` remains independently selectable, and `WHAB_UI=` omits visual pages.
 
+Transaction register ordering is a validated host read concern; the Web plugin
+owns heading controls, arrows and URL presentation. Explicit compound sorts use
+the existing complete public register projection and sort before slicing the bounded
+response; the default order retains the optimized native paging callback. This
+adds no storage/SDK API or financial rule. Very large explicitly sorted selections
+can cost more than native default paging; financial history is never cached or
+silently limited to the loaded rows.
+
 Page composition shares each provider’s bank connection listing between its status
 summary and panel within that request. The next page or status request reads again;
 there is no cross-request financial or connection cache. Concrete backends own

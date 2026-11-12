@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.48.0 — 2026-11-11
+
+PR: [#185](https://github.com/Fillll/whab/pull/185)
+
+- Add ascending/descending/none header cycles with numbered compound-sort arrows, complete-selection URL ordering and pending-edit-safe navigation. Show Group > Category in transaction editors and native choices. Add previous/next-month arrows and This month beside the period picker, retaining other filters and supported calendar limits.
+
 ## 1.47.1 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)
