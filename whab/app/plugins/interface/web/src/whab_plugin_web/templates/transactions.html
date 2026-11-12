@@ -7,6 +7,11 @@
 {% set review_state = transaction_review_filter|default('all') %}
 {% set review_labels = {'all': 'All', 'needs-review': 'Needs review', 'reviewed': 'Reviewed'} %}
 {% set next_review_labels = {'all': 'Needs review', 'needs-review': 'Reviewed', 'reviewed': 'All'} %}
+{% macro sort_heading(field, label) %}
+  {% set sort = register.sorts[field] %}
+  <a class="transaction-sort" data-transaction-sort="{{ field }}" href="{{ sort.url }}" aria-label="{{ label }}: {{ sort.direction }}{% if sort.priority %}, priority {{ sort.priority }}{% endif %}. Sort {{ sort.next }}" title="{{ label }}: {{ sort.direction }}. Click for {{ sort.next }}">{{ 'R' if field == 'reviewed' else label }}{% if sort.direction != 'none' %}<span class="transaction-sort-indicator" aria-hidden="true">{{ '↑' if sort.direction == 'asc' else '↓' }}{% if register.sort_count > 1 %}<small>{{ sort.priority }}</small>{% endif %}</span>{% endif %}</a>
+{% endmacro %}
+{% set month_links = transaction_month_links(request, month) %}
 <section data-transaction-register data-workspace="{{ workspace }}" data-transaction-paged="true" data-transaction-page="{{ register.page }}" data-transaction-requested-page="{{ register.requested_page }}" data-stream-next="{{ register.next or '' }}" data-stream-previous="{{ register.previous or '' }}" data-stream-revision="{{ register.revision|default('') }}" data-stream-count="{{ register.count }}">
 <div class="page-title-row">
   <div>
@@ -45,6 +50,8 @@
       </div>
     </div>
   </div>
+  <div class="transaction-period-navigation">
+    {% if month_links.previous %}<a class="icon-button" data-transaction-month href="{{ month_links.previous }}" aria-label="Previous transaction month" title="Previous month">{{ icon('chevron-left', 16) }}</a>{% else %}<button class="icon-button" disabled aria-label="Previous transaction month">{{ icon('chevron-left', 16) }}</button>{% endif %}
   <div class="transaction-period-filter" data-period-picker>
     <button class="account-picker-toggle" id="transaction-period-toggle" type="button" aria-label="Transaction period: {{ period_label }}" aria-expanded="false" aria-controls="transaction-period-options"><span data-period-label>{{ period_label }}</span>{{ icon('chevron-down',14) }}</button>
     <div id="transaction-period-options" class="transaction-period-popup" data-period-popup hidden>
@@ -64,6 +71,9 @@
       </form>
     </div>
   </div>
+    {% if month_links.next %}<a class="icon-button" data-transaction-month href="{{ month_links.next }}" aria-label="Next transaction month" title="Next month">{{ icon('chevron-right', 16) }}</a>{% else %}<button class="icon-button" disabled aria-label="Next transaction month">{{ icon('chevron-right', 16) }}</button>{% endif %}
+    <a class="text-link transaction-current-month" data-transaction-month href="{{ month_links.current }}">This month</a>
+  </div>
   <button class="filter-button transaction-review-filter" id="review-filter" type="button" data-review-state="{{ review_state }}" aria-label="Review status: {{ review_labels[review_state] }}. Click for {{ next_review_labels[review_state] }}."><span class="transaction-review-letter" data-review-letter aria-hidden="true">R</span><span data-review-label>{{ review_labels[review_state] }}</span></button>
 </div>
 <div class="transaction-selection-bar" data-transaction-selection-bar hidden>
@@ -75,22 +85,22 @@
 <div class="transaction-feedback" data-transaction-feedback hidden role="status"><span data-transaction-feedback-text></span><button class="text-link" type="button" data-transaction-retry>Retry save</button></div>
 <span class="sr-only" data-transaction-save-status aria-live="polite"></span>
 <template data-transaction-accounts>{% for choice in transaction_accounts %}<option value="{{ choice.id }}"{% if choice.closed|default(false) %} data-account-closed{% endif %}>{{ choice.name }}{% if choice.closed|default(false) %} · Closed{% endif %}</option>{% endfor %}</template>
-<template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</template>
+<template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ group.name }} > {{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</template>
 <form id="transaction-create-form" data-transaction-create hidden></form>
-<p class="transaction-grid-help" id="transaction-grid-help">Click a field to edit · ↑ ↓ move between rows · Tab moves between fields · F2 keeps arrows in the editor</p>
+<p class="transaction-grid-help" id="transaction-grid-help">Headings: ascending → descending → none · Click a field to edit · ↑ ↓ move between rows · Tab moves between fields · F2 keeps arrows in the editor</p>
 <div class="table-scroll transactions-scroll" role="region" aria-labelledby="transaction-title" tabindex="0">
   <table aria-describedby="transaction-grid-help" class="transactions-table{% if show_account_column %} transactions-table-multi-account{% endif %}">
     <thead><tr>
       <th class="transaction-select-cell" scope="col"><span class="sr-only">Multi-select</span><input type="checkbox" data-select-all aria-label="Select loaded transactions" title="Multi-select"></th>
-      <th scope="col" class="date-cell">Date</th>
-      {% if show_account_column %}<th scope="col" class="account-cell">Account</th>{% endif %}
+      <th scope="col" class="date-cell" aria-sort="{{ 'ascending' if register.sorts['date'].direction == 'asc' else 'descending' if register.sorts['date'].direction == 'desc' else 'none' }}">{{ sort_heading('date', 'Date') }}</th>
+      {% if show_account_column %}<th scope="col" class="account-cell" aria-sort="{{ 'ascending' if register.sorts['account'].direction == 'asc' else 'descending' if register.sorts['account'].direction == 'desc' else 'none' }}">{{ sort_heading('account', 'Account') }}</th>{% endif %}
       <th class="transaction-receipt-cell" scope="col"><span class="sr-only">Receipt</span><span title="Receipt">{{ icon('image', 14) }}</span></th>
-      <th scope="col">Payee</th>
-      <th scope="col" class="transaction-category-cell">Category</th>
-      <th class="transaction-memo-cell" scope="col">Memo</th>
-      <th scope="col" class="amount-cell">Amount</th>
-      <th scope="col" class="transaction-currency-cell">Currency</th>
-      <th scope="col" class="transaction-review-cell"><abbr title="Reviewed">R</abbr></th>
+      <th scope="col" aria-sort="{{ 'ascending' if register.sorts['merchant'].direction == 'asc' else 'descending' if register.sorts['merchant'].direction == 'desc' else 'none' }}">{{ sort_heading('merchant', 'Payee') }}</th>
+      <th scope="col" class="transaction-category-cell" aria-sort="{{ 'ascending' if register.sorts['category'].direction == 'asc' else 'descending' if register.sorts['category'].direction == 'desc' else 'none' }}">{{ sort_heading('category', 'Category') }}</th>
+      <th class="transaction-memo-cell" scope="col" aria-sort="{{ 'ascending' if register.sorts['note'].direction == 'asc' else 'descending' if register.sorts['note'].direction == 'desc' else 'none' }}">{{ sort_heading('note', 'Memo') }}</th>
+      <th scope="col" class="amount-cell" aria-sort="{{ 'ascending' if register.sorts['amount'].direction == 'asc' else 'descending' if register.sorts['amount'].direction == 'desc' else 'none' }}">{{ sort_heading('amount', 'Amount') }}</th>
+      <th scope="col" class="transaction-currency-cell" aria-sort="{{ 'ascending' if register.sorts['currency'].direction == 'asc' else 'descending' if register.sorts['currency'].direction == 'desc' else 'none' }}">{{ sort_heading('currency', 'Currency') }}</th>
+      <th scope="col" class="transaction-review-cell">{{ sort_heading('reviewed', 'Reviewed') }}</th>
     </tr></thead>
     <tbody>
       <tr class="transaction-draft-row" data-new-transaction hidden>

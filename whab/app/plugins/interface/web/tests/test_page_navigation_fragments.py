@@ -145,7 +145,7 @@ def test_fragment_options_are_fresh_currency_scoped_and_escaped(client, store, p
     category = store.add_category("personal", {"name": category_name, "group": group_name, "target": 0})
     response, after = fragment(client, path)
     assert {(row["value"], row["text"]) for row in after.options["account"]} == {(original, account_name), (added, "New wallet")}
-    assert {"value": category, "text": category_name, "group": group_name} in after.options["category"]
+    assert {"value": category, "text": f"{group_name} > {category_name}", "group": group_name} in after.options["category"]
     assert group_name in {row["value"] for row in after.options["group"]}
     assert "Other currency category" not in response.text and "Other currency group" not in response.text
     assert "Other currency wallet" in response.text and "Original wallet" not in response.text

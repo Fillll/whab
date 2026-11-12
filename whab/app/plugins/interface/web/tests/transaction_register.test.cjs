@@ -75,13 +75,14 @@ function harness(count = 5, options = {}) {
     '#transaction-count', '[data-select-all]', '[data-transaction-save-status]', '#all-dates-filter',
     '[data-navigation="month"]', '[data-transaction-retry]'].map(selector => [selector, element()]));
   controls['#transaction-search'].value = options.search || '';
+  const controlLinks = ['sort', 'month'].map(kind => element({href: `https://localhost:5173/budgets/home/transactions/2026-10/usd?sort=date:asc`, dataset: {transactionSort: 'date'}, hasAttribute: name => name === 'data-transaction-sort' && kind === 'sort'}));
   const searchForm = element(), pageLink = element({href: 'https://localhost:5173/budgets/home/transactions/2026-10/usd?tx_page=2'});
   controls['#transaction-count'].dataset.period = 'All dates';
   const reviewLabel = element();
   controls['#review-filter'].dataset.reviewState = options.review || 'all';
   controls['#review-filter'].querySelector = () => reviewLabel;
   const root = element({dataset: {workspace, ...(options.paged ? {transactionPaged: 'true', transactionPage: '1', transactionRequestedPage: '1'} : {})},
-    querySelectorAll: selector => selector === '.transaction-row' ? rowList : selector === '[data-transaction-page]' ? [pageLink] : [],
+    querySelectorAll: selector => selector === '.transaction-row' ? rowList : selector === '[data-transaction-page]' ? [pageLink] : selector === '[data-transaction-sort], [data-transaction-month]' ? controlLinks : [],
     querySelector: selector => ({...controls, '[data-transaction-selection-bar]': selectionBar,
       '[data-transaction-feedback]': feedback, '[data-transaction-receipt-dialog]': receiptDialog,
       '[data-transaction-search-form]': searchForm, '.transactions-table tbody': body})[selector]});
@@ -95,7 +96,7 @@ function harness(count = 5, options = {}) {
   const context = {document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, queueMicrotask, URL: ReceiptURL,
     crypto: {randomUUID: () => `review-request-${++requestId}`},
     getContext: () => ({bulkReview: options.bulkReview === true, receiptIndexScoped: options.receiptIndexScoped}),
-    encodeURIComponent, location: {href: 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}},
+    encodeURIComponent, location: {href: options.href || 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
     updateContext: value => contexts.push(value),
     initAccountPicker(_, onChoose) {
@@ -142,7 +143,7 @@ function harness(count = 5, options = {}) {
     return true;
   }, ...options});
   return {register, requests, receiptRequests, makeRow, stream: streamCallbacks, imageRequests, receiptControls, objectUrls, revokedUrls,
-    rows: rowList, bulk, window, feedback, feedbackText, controls, navigations,
+    rows: rowList, controlLinks, bulk, window, feedback, feedbackText, controls, navigations,
     chooseAccount: value => pickerChoose(value), isPickerDisposed: () => pickerDisposed,
     choosePeriod: value => periodChoose(value), isPeriodDisposed: () => periodDisposed, reviewLabel, contexts, history, searchForm, pageLink, document: context.document, receiptDialog};
 }
@@ -848,4 +849,53 @@ test('a rejected category change leaves the saved agent badge intact', async () 
   state.requests[0].reject(new Error('Fictional rejected save')); await tick();
   assert.equal(controls['[data-category-agent]'].removed, false);
   state.register.dispose();
+});
+
+
+test('sort and month links wait for edits and preserve the current search draft', async () => {
+  for (const index of [0, 1]) {
+    const state = harness(1, {paged: true, href: 'https://localhost:5173/budgets/home/transactions/2026-10/usd' + (index ? '?sort=date:asc' : '')});
+    const memo = state.rows[0].controls['[data-transaction-field="note"]'];
+    memo.value = 'Saved before sorting'; memo.emit('input');
+    state.controls['#transaction-search'].value = 'Fictional train';
+    const link = state.controlLinks[index];
+    assert.equal(link.emit('click', {button: 0}).event.prevented, true);
+    assert.equal(state.navigations.length, 0);
+    state.requests[0].resolve({ok: true}); await tick();
+    const target = new URL(state.navigations[0].url);
+    assert.equal(target.searchParams.get('sort'), 'date:asc');
+    assert.equal(target.searchParams.get('q'), 'Fictional train');
+    assert.equal(state.navigations[0].details.focus, index === 0 ? '[data-transaction-sort="date"]' : 'heading');
+    const count = state.navigations.length;
+    assert.equal(link.emit('click', {button: 0, ctrlKey: true}).event.prevented, false);
+    await tick(); assert.equal(state.navigations.length, count);
+    state.register.dispose();
+    assert.equal(link.emit('click', {button: 0}).event.prevented, false);
+  }
+});
+
+test('reviewing an explicitly sorted selection refreshes the ordering rather than only its summary', async () => {
+  const state = harness(1, {paged: true, href: 'https://localhost:5173/budgets/home/transactions/2026-10/usd?sort=reviewed:asc'});
+  state.rows[0].controls['[data-transaction-reviewed]'].emit('click');
+  state.requests[0].resolve({ok: true}); await tick(); await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(state.navigations.length, 1);
+  assert.equal(state.navigations[0].details.summary, undefined);
+  state.register.dispose();
+});
+
+
+test('rapid sort choices combine priorities before the earlier navigation finishes', async () => {
+  const pending = deferred(), navigations = [];
+  const state = harness(1, {paged: true, navigate: (url) => {navigations.push(url); return pending.promise;}});
+  const link = state.controlLinks[0];
+  link.emit('click', {button: 0}); await tick();
+  link.dataset.transactionSort = 'amount';
+  link.emit('click', {button: 0}); await tick();
+  assert.deepEqual(navigations[1].searchParams.getAll('sort'), ['date:asc', 'amount:asc']);
+  link.dataset.transactionSort = 'date';
+  link.emit('click', {button: 0}); await tick();
+  assert.deepEqual(navigations[2].searchParams.getAll('sort'), ['date:desc', 'amount:asc']);
+  link.emit('click', {button: 0}); await tick();
+  assert.deepEqual(navigations[3].searchParams.getAll('sort'), ['amount:asc']);
+  pending.resolve(true); await tick(); state.register.dispose();
 });

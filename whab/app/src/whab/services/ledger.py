@@ -627,20 +627,20 @@ class LedgerService:
 
     def transaction_page(
         self, workspace, month, currency, account_id=None, *, account_ids=None,
-        start_date=None, end_date=None, search="", review="all", page=1, page_size=100,
+        start_date=None, end_date=None, search="", review="all", page=1, page_size=100, sort=(),
     ) -> dict:
         """Tag each bounded register read with the same locked ledger revision."""
         with self._lock:
             data = self._transaction_page(
                 workspace, month, currency, account_id, account_ids=account_ids,
                 start_date=start_date, end_date=end_date, search=search, review=review,
-                page=page, page_size=page_size,
+                page=page, page_size=page_size, sort=sort,
             )
             return {**data, "transactionPage": {**data["transactionPage"], "revision": self._revision}}
 
     def _transaction_page(
         self, workspace, month, currency, account_id=None, *, account_ids=None,
-        start_date=None, end_date=None, search="", review="all", page=1, page_size=100,
+        start_date=None, end_date=None, search="", review="all", page=1, page_size=100, sort=(),
     ) -> dict:
         """Read one public register page, preserving legacy storage compatibility."""
         self._workspace(workspace)
@@ -668,6 +668,9 @@ class LedgerService:
             raise StoreError("Transaction page must be a positive integer.")
         if type(page_size) is not int or not 1 <= page_size <= 1000:
             raise StoreError("Transaction page size must be an integer between 1 and 1000.")
+        from whab.services.register_sort import normalize_sort, sort_transactions
+
+        ordering = normalize_sort(sort)
         query = search.strip().casefold()
 
         def matches(row):
@@ -688,14 +691,15 @@ class LedgerService:
             }
 
         read = getattr(self._store, "transaction_register_page", None)
-        if not callable(read):
+        if ordering or not callable(read):
             data = self.transaction_register(
                 workspace, month, currency, account_id, account_ids=account_ids,
                 start_date=start_date, end_date=end_date,
             )
             scoped = data["transactions"]
-            rows = sorted((row for row in scoped if matches(row)),
-                          key=lambda row: (row["date"], row["id"]), reverse=True)
+            rows = sort_transactions(
+                [row for row in scoped if matches(row)], data["accounts"], data["categories"], ordering,
+            )
             to_review = sum(not row["reviewed"] and not row["pending"] for row in scoped)
             window = metadata(len(scoped), len(rows), to_review)
             offset = window["start"] - 1 if rows else 0

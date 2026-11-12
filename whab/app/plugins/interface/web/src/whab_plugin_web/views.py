@@ -3,7 +3,7 @@
 from collections import defaultdict
 from importlib.metadata import version as package_version
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from whab import __version__
 from whab.domain.dates import shift_month as period_shift
@@ -66,12 +66,43 @@ def transaction_window(transactions, request, projection=None):
         }
         transactions = matches[offset:offset + TRANSACTION_PAGE_SIZE]
     page, pages = projection["page"], projection["pages"]
+    ordering = params.getlist("sort")
+    sorts = {}
+    for field in ("date", "account", "merchant", "category", "note", "amount", "currency", "reviewed"):
+        active = next((item for item in ordering if item.split(":")[0] == field), None)
+        direction = active.split(":")[1] if active else "none"
+        following = f"{field}:asc" if not active else f"{field}:desc" if direction == "asc" else None
+        updated = [following if item == active else item for item in ordering] if active else [*ordering, following]
+        query = [(key, value) for key, value in params.multi_items() if key not in {"sort", "tx_page"}]
+        query.extend(("sort", value) for value in updated if value is not None)
+        sorts[field] = {"direction": direction, "priority": ordering.index(active) + 1 if active else None,
+                        "url": str(request.url.replace(query=urlencode(query))),
+                        "next": "ascending" if direction == "none" else "descending" if direction == "asc" else "none"}
+
     return {
         **projection, "rows": transactions, "requested_page": requested_page,
-        "search": search,
+        "search": search, "sorts": sorts, "sort_count": len(ordering),
         "previous": str(request.url.include_query_params(tx_page=page - 1)) if page > 1 else None,
         "next": str(request.url.include_query_params(tx_page=page + 1)) if page < pages else None,
         "search_params": [(key, value) for key, value in params.multi_items() if key not in {"q", "tx_page"}],
+    }
+
+
+def transaction_month_links(request, month):
+    """Calendar navigation keeps the selection and sorting, clearing old date bounds."""
+    def link(target):
+        parts = request.url.path.split("/")
+        parts[-2] = target
+        query = [(key, value) for key, value in request.query_params.multi_items()
+                 if key not in {"period", "all_dates", "start_date", "end_date", "tx_page"}]
+        if target == "current-month":
+            query.append(("period", "current-month"))
+        return str(request.url.replace(path="/".join(parts), query=urlencode(query)))
+
+    return {
+        "previous": link(period_shift(month, -1)) if month > "1900-01" else None,
+        "next": link(period_shift(month, 1)) if month < "2200-12" else None,
+        "current": link("current-month"),
     }
 
 
@@ -341,12 +372,13 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "period_months": [period["month"] for period in periods],
         "category_path": lambda identifier: quote(identifier, safe=""),
         "category_names": category_names,
-        "category_labels": {row["id"]: row["name"] for row in categories},
+        "category_labels": {row["id"]: f"{row['group']} > {row['name']}" if row.get("group") else row["name"] for row in categories},
         "category_parents": category_parents,
         "selected": selected,
         "selected_budget": budgets.get(selected["id"]) if selected else None,
         "transactions": transactions,
         "transaction_window": transaction_window,
+        "transaction_month_links": transaction_month_links,
         "accounts_by_id": accounts_by_id,
         "account_groups": [
             {
