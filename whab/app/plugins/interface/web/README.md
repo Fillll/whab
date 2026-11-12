@@ -71,8 +71,10 @@ sort, preserving priority; small arrows carry priority numbers when several colu
 are active. Removing a column renumbers the remaining sorts. With none selected,
 the default newest-date/ID order returns. Sorts are kept in repeated URL parameters
 such as `sort=date:asc&sort=amount:desc`, across filters, incremental loading and
-Back/Forward. Ordering covers the entire filtered selection before pagination;
-amounts use the displayed signed value, text uses Unicode casefold, category order
+Back/Forward. Sort, month and incremental-load links use relative addresses so
+worker-rendered pages retain the live HTTPS hostname and port, including native
+link navigation and non-JavaScript fallback. Ordering covers the entire filtered selection before pagination; rendering retains that order rather than reapplying a date sort.
+Amounts use the displayed signed value, text uses Unicode casefold, category order
 uses saved **Group > Category**, and ties retain stable date/ID order. Provisional
 suggestions do not determine saved-category ordering. Selection and Receipt headings
 remain controls rather than sort columns.

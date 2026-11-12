@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.48.1 — 2026-11-11
+
+PR: [#186](https://github.com/Fillll/whab/pull/186)
+
+- Preserve the host’s complete-selection paged ordering during rendering. Use relative sort, month and incremental-load links so process-owned views retain the browser’s live HTTPS hostname and port, including native fallback navigation. Verify mixed-date ordering and the final page through the real visual worker.
+
 ## 1.48.0 — 2026-11-11
 
 PR: [#185](https://github.com/Fillll/whab/pull/185)

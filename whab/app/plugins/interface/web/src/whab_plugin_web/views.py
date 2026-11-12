@@ -38,6 +38,11 @@ def module_imports(asset_prefix):
     }
 
 
+def local_link(url):
+    """Worker request origins are synthetic; browser links retain the live origin."""
+    return url.path + (f"?{url.query}" if url.query else "")
+
+
 def transaction_window(transactions, request, projection=None):
     """Bound register markup after searching the complete account/date selection."""
     params = request.query_params
@@ -76,14 +81,14 @@ def transaction_window(transactions, request, projection=None):
         query = [(key, value) for key, value in params.multi_items() if key not in {"sort", "tx_page"}]
         query.extend(("sort", value) for value in updated if value is not None)
         sorts[field] = {"direction": direction, "priority": ordering.index(active) + 1 if active else None,
-                        "url": str(request.url.replace(query=urlencode(query))),
+                        "url": local_link(request.url.replace(query=urlencode(query))),
                         "next": "ascending" if direction == "none" else "descending" if direction == "asc" else "none"}
 
     return {
         **projection, "rows": transactions, "requested_page": requested_page,
         "search": search, "sorts": sorts, "sort_count": len(ordering),
-        "previous": str(request.url.include_query_params(tx_page=page - 1)) if page > 1 else None,
-        "next": str(request.url.include_query_params(tx_page=page + 1)) if page < pages else None,
+        "previous": local_link(request.url.include_query_params(tx_page=page - 1)) if page > 1 else None,
+        "next": local_link(request.url.include_query_params(tx_page=page + 1)) if page < pages else None,
         "search_params": [(key, value) for key, value in params.multi_items() if key not in {"q", "tx_page"}],
     }
 
@@ -97,7 +102,7 @@ def transaction_month_links(request, month):
                  if key not in {"period", "all_dates", "start_date", "end_date", "tx_page"}]
         if target == "current-month":
             query.append(("period", "current-month"))
-        return str(request.url.replace(path="/".join(parts), query=urlencode(query)))
+        return local_link(request.url.replace(path="/".join(parts), query=urlencode(query)))
 
     return {
         "previous": link(period_shift(month, -1)) if month > "1900-01" else None,
@@ -282,7 +287,8 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
                 ],
             }
         )
-    transactions = sorted(data["transactions"], key=lambda t: t["date"], reverse=True)
+    transactions = (list(data["transactions"]) if page == "transactions" and "transactionPage" in data
+                    else sorted(data["transactions"], key=lambda t: t["date"], reverse=True))
     accounts_by_id = {a["id"]: a for a in data["accounts"]}
     spending = defaultdict(int)
     payees = defaultdict(int)
