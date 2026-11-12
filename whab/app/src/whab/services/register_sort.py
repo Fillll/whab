@@ -22,6 +22,9 @@ def normalize_sort(values):
 
 
 def sort_transactions(rows, accounts, categories, ordering):
+    result = sorted(rows, key=lambda row: (row["date"], row["id"]), reverse=True)
+    if not ordering:
+        return result
     account_names = {row["id"]: row["name"].casefold() for row in accounts}
     category_names = {row["id"]: f"{row.get('group', '')} > {row['name']}".casefold() for row in categories}
     currencies = {row["id"]: row.get("currency", "USD") for row in accounts}
@@ -38,7 +41,6 @@ def sort_transactions(rows, accounts, categories, ordering):
         result = row[field]
         return result.casefold() if type(result) is str else result
 
-    result = sorted(rows, key=lambda row: (row["date"], row["id"]), reverse=True)
     for field, direction in reversed(ordering):
         result.sort(key=lambda row: value(row, field), reverse=direction == "desc")
     return result
