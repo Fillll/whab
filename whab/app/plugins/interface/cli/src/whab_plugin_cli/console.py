@@ -88,7 +88,7 @@ def parser(options, argv=()):
         epilog="Example: whab empty-budget insights summary --month 2026-11 --currency USD\nAmounts are integer currency minor units. No AI or bank sync is started.")
     summary.add_argument("--month", help="YYYY-MM; default: current month")
     summary.add_argument("--currency", default="USD", help="ISO currency code (default: USD); currencies are never combined")
-    transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read and categorize transactions (trnx is an alias)")
+    transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read, categorize and append transaction memos (trnx is an alias)")
     reads = transactions.add_subparsers(dest="filter", required=True)
     unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
         epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")

@@ -117,6 +117,9 @@ def test_real_commands_preserve_identity_notes_attribution_and_restart_replay(tm
         history = run('default','history','list')['data']['entries']
         assert sum(row['requestId']==appended['requestId'] for row in history)==1
         current = query('transactions')
+        for flag in ['--revision','--request-id']:
+            run('default','trnx','note',transaction,'--append','Must not append',flag,'',ok=False)
+            assert query('transactions')==current
         rejected = run('default','trnx','note',transaction,'--append','x'*1000,ok=False)
         assert '1000' in rejected['error']
         assert query('transactions')==current

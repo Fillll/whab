@@ -57,7 +57,8 @@ def intent(args, observed, operation, payload):
     if args.batch is not None:
         history['batchId'] = args.batch
     return {'operation': operation, 'workspace': 'personal', 'payload': payload,
-            'expected_revision': args.revision or observed['revision'], 'request_id': args.request_id or str(uuid4()),
+            'expected_revision': observed['revision'] if args.revision is None else args.revision,
+            'request_id': str(uuid4()) if args.request_id is None else args.request_id,
             **({'history': history} if history else {})}
 
 
