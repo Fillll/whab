@@ -56,22 +56,31 @@ def summarize(values):
     return {"p50_ms": median(values), "p95_ms": percentile(values, 0.95)}
 
 
-def verify(path, total, expected, history_count):
+def verify(path, total, expected, history_count, storage="sqlite"):
     from whab_plugin_sqlite import Store
 
     container = decode_container(Path(path).read_bytes())
     files = {
-        name.removeprefix("plugins/sqlite/"): raw
+        name.removeprefix("plugins/" + storage + "/"): raw
         for name, raw in container.files.items()
-        if name.startswith("plugins/sqlite/")
+        if name.startswith("plugins/" + storage + "/")
     }
-    reader = Store(":memory:", _authority=False)
+    temporary = TemporaryDirectory(prefix="whab-bulk-restore-")
+    if storage == "json":
+        from whab_plugin_json import Store as JsonStore
+
+        reader = JsonStore(Path(temporary.name) / "empty.json")
+    else:
+        reader = Store(":memory:", _authority=False)
     try:
         reader.restore_budget_files("personal", files)
         saved = reader.export_budget("personal")
         assert len(saved["transactions"]) == total
-        accounts = {row['id']: row for row in saved['accounts']}
-        rows = {row['id']: {**row, 'currency': accounts[row['accountId']]['currency']} for row in saved['transactions']}
+        accounts = {row["id"]: row for row in saved["accounts"]}
+        rows = {
+            row["id"]: {**row, "currency": accounts[row["accountId"]]["currency"]}
+            for row in saved["transactions"]
+        }
         rows.update(accounts)
         for identifier, wanted in expected.items():
             assert all(rows[identifier].get(key) == value for key, value in wanted.items())
@@ -85,6 +94,37 @@ def verify(path, total, expected, history_count):
         }
     finally:
         reader.close()
+        temporary.cleanup()
+
+
+def json_fixture(root, total):
+    from whab_plugin_json import Store as JsonStore
+    from whab_plugin_sqlite import Store
+
+    from whab.budgets.container import encode_container
+    from whab.budgets.document import atomic_write, new_manifest
+
+    source = fixture(root, total, 100)
+    container = decode_container(Path(source["path"]).read_bytes())
+    sql = Store(":memory:", _authority=False)
+    try:
+        sql.restore_budget_files(
+            "personal",
+            {name.removeprefix("plugins/sqlite/"): raw for name, raw in container.files.items()},
+        )
+        snapshot = sql.export_budget("personal")
+    finally:
+        sql.close()
+    native = JsonStore(root / "fixture.json")
+    try:
+        native.restore_budget("personal", snapshot)
+        manifest = new_manifest(source["name"], storage="json")
+        files = {"plugins/json/" + name: raw for name, raw in native.export_budget_files().items()}
+        path = root / "fictional-json.whab"
+        atomic_write(path, encode_container(manifest, files))
+    finally:
+        native.close()
+    return {"id": manifest["id"], "name": source["name"], "path": str(path)}
 
 
 def case_segment(command, size, args):
@@ -105,7 +145,7 @@ def case_segment(command, size, args):
             WHAB_ENV="sandbox",
             WHAB_UI="",
             WHAB_PLUGINS="",
-            WHAB_STORAGE="sqlite",
+            WHAB_STORAGE=getattr(args, "storage", "sqlite"),
             ALLOW_LIVE_PLAID="false",
         )
 
@@ -189,7 +229,11 @@ def case_segment(command, size, args):
 
         with patch.dict(os.environ, env, clear=True):
             initialize_home(home)
-            budget = fixture(root, args.transactions, 100)
+            budget = (
+                json_fixture(root, args.transactions)
+                if getattr(args, "storage", "sqlite") == "json"
+                else fixture(root, args.transactions, 100)
+            )
             target = budget["name"]
             log = (root / "host.log").open("w")
             process = subprocess.Popen(
@@ -201,10 +245,12 @@ def case_segment(command, size, args):
             try:
                 started = perf_counter()
                 deadline = monotonic() + 120
-                while not (home / 'run/sandbox/host.json').exists():
-                    assert process.poll() is None, 'Instrumented fictional host exited before readiness'
-                    assert monotonic() < deadline, 'Instrumented host did not become ready'
-                    sleep(.05)
+                while not (home / "run/sandbox/host.json").exists():
+                    assert process.poll() is None, (
+                        "Instrumented fictional host exited before readiness"
+                    )
+                    assert monotonic() < deadline, "Instrumented host did not become ready"
+                    sleep(0.05)
                 with local_connection(home, "sandbox", timeout=120) as connection:
                     opened = connection.post(
                         "/api/budget/open",
@@ -214,10 +260,10 @@ def case_segment(command, size, args):
                     opened.raise_for_status()
                     cold["host_and_fixture_activation_ms"] = (perf_counter() - started) * 1000
                     listed, _ = cli("budget", "list")
-                    assert any(row['id'] == budget['id'] for row in listed['budgets'])
+                    assert any(row["id"] == budget["id"] for row in listed["budgets"])
                     # Host-owned upload location; inspect its actual saved artifact,
                     # never rewrite a registry or runtime metadata during setup.
-                    path = home / 'budgets' / budget['id'] / 'sandbox' / 'opened.whab' 
+                    path = home / "budgets" / budget["id"] / "sandbox" / "opened.whab"
                     # Cold native/portable cache construction is separate, never hidden.
                     result, elapsed = bulk(changes(0))
                     cold["first_mutation_ms"] = elapsed
@@ -300,13 +346,23 @@ def case_segment(command, size, args):
                         assert sample["checkpoints"] == sample["native_commits"] == size
                         separate.append(sample)
                         history_count += size
-                    restored = verify(path, args.transactions, expected, history_count)
+                    restored = verify(
+                        path,
+                        args.transactions,
+                        expected,
+                        history_count,
+                        getattr(args, "storage", "sqlite"),
+                    )
             finally:
                 process.terminate()
                 process.wait(timeout=60)
                 log.close()
         summary = summarize([row["wall_ms"] for row in samples])
-        baseline = summarize([row["wall_ms"] for row in separate]) if separate else {"p50_ms": 0, "p95_ms": 0}
+        baseline = (
+            summarize([row["wall_ms"] for row in separate])
+            if separate
+            else {"p50_ms": 0, "p95_ms": 0}
+        )
         return {
             "command": command,
             "batch_size": size,
@@ -316,7 +372,9 @@ def case_segment(command, size, args):
             "per_record_p50_ms": summary["p50_ms"] / size,
             "separate": baseline,
             "workflow_saved_p50_ms": baseline["p50_ms"] - summary["p50_ms"],
-            "workflow_saved_p50_percent": 100 * (1 - summary["p50_ms"] / baseline["p50_ms"]) if separate else None,
+            "workflow_saved_p50_percent": 100 * (1 - summary["p50_ms"] / baseline["p50_ms"])
+            if separate
+            else None,
             "target_p95_ms": 250,
             "target_met": summary["p95_ms"] < 250,
             "cold": cold,
@@ -331,6 +389,7 @@ def case(command, size, args):
     # Each segment starts from the same 100k fixture, warms once, then samples
     # fresh processes. Separate workflows use the first identical segment.
     from copy import copy
+
     segment_runs = min(args.runs, max(10, 2000 // size))
     segments = []
     remaining = args.runs
@@ -341,21 +400,37 @@ def case(command, size, args):
         segment = case_segment(command, size, selected)
         segments.append(segment)
         remaining -= selected.runs
-    samples = [sample for segment in segments for sample in segment['bulk_samples']]
-    separate = [sample for segment in segments for sample in segment['separate_samples']]
-    summary = summarize([sample['wall_ms'] for sample in samples])
-    baseline = summarize([sample['wall_ms'] for sample in separate])
-    return {**segments[0], 'bulk_runs':len(samples), 'separate_workflow_runs':len(separate),
-        'bulk':summary,'separate':baseline,'per_record_p50_ms':summary['p50_ms']/size, 'per_record_p95_ms':summary['p95_ms']/size,
-        'workflow_saved_p50_ms':baseline['p50_ms']-summary['p50_ms'],
-        'workflow_saved_p50_percent':100*(1-summary['p50_ms']/baseline['p50_ms']),
-        'target_met':summary['p95_ms']<250,'cold':[segment['cold'] for segment in segments],
-        'saved_verification':[segment['saved_verification'] for segment in segments],
-        'bulk_samples':samples,'separate_samples':separate,'fresh_fixture_segments':len(segments)}
+    samples = [sample for segment in segments for sample in segment["bulk_samples"]]
+    separate = [sample for segment in segments for sample in segment["separate_samples"]]
+    summary = summarize([sample["wall_ms"] for sample in samples])
+    baseline = summarize([sample["wall_ms"] for sample in separate])
+    return {
+        **segments[0],
+        "bulk_runs": len(samples),
+        "separate_workflow_runs": len(separate),
+        "bulk": summary,
+        "separate": baseline,
+        "per_record_p50_ms": summary["p50_ms"] / size,
+        "per_record_p95_ms": summary["p95_ms"] / size,
+        "workflow_saved_p50_ms": baseline["p50_ms"] - summary["p50_ms"],
+        "workflow_saved_p50_percent": 100 * (1 - summary["p50_ms"] / baseline["p50_ms"]),
+        "target_met": summary["p95_ms"] < 250,
+        "cold": [segment["cold"] for segment in segments],
+        "saved_verification": [segment["saved_verification"] for segment in segments],
+        "bulk_samples": samples,
+        "separate_samples": separate,
+        "fresh_fixture_segments": len(segments),
+    }
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--storage",
+        choices=("sqlite", "json"),
+        default="sqlite",
+        help="Native backend; use an explicitly smaller populated fixture for JSON",
+    )
     parser.add_argument(
         "--runs",
         type=int,
@@ -400,6 +475,7 @@ def main():
         "host": version("whab"),
         "cli": version("whab_plugin_cli"),
         "transactions": args.transactions,
+        "storage": args.storage,
         "notes": "End-to-end fresh processes, verified HTTPS and synchronous save. Native evidence query plus a small count-file write after each checkpoint are included instrumentation overhead. Provider latency excluded (no calls). Cold first mutation excluded from warm samples. Fresh fixture per command/size bounds retained history below native/portable limits. Separate p95 uses only the stated number of workflow repetitions.",
         "cases": [],
     }

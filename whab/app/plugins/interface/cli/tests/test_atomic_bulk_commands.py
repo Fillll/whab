@@ -35,6 +35,8 @@ def endpoint():
     state = {"fault": None, "posts": [], "preview_fault": None}
 
     def exchange(connection, method, path, **kwargs):
+        if method == "GET" and path.endswith("/budgets"):
+            return {"budgets": [{"id": "budget", "name": "Fictional"}]}
         if method == "GET":
             result = service.query(path.rsplit("/", 1)[1], "personal")
         else:
@@ -81,10 +83,18 @@ def endpoint():
 
 
 def args(**changes):
-    return SimpleNamespace(**{
-        'target':'Fictional', 'filter':'edit-many', 'agent':None, 'batch':None,
-        'revision':None, 'request_id':None, 'dry_run':False, **changes,
-    })
+    return SimpleNamespace(
+        **{
+            "target": "Fictional",
+            "filter": "edit-many",
+            "agent": None,
+            "batch": None,
+            "revision": None,
+            "request_id": None,
+            "dry_run": False,
+            **changes,
+        }
+    )
 
 
 def execute(endpoint, options, edits=None):
@@ -226,7 +236,60 @@ def test_file_stdin_and_resolution(endpoint, tmp_path, monkeypatch):
 
 
 def test_offline_parser_discovery():
-    for parts in ([], ['Fictional','trnx'], ['Fictional','account'], ['Fictional','trnx','categorize'], ['Fictional','trnx','edit-many'], ['Fictional','account','classify']):
+    for parts in (
+        [],
+        ["Fictional", "trnx"],
+        ["Fictional", "account"],
+        ["Fictional", "trnx", "categorize"],
+        ["Fictional", "trnx", "edit-many"],
+        ["Fictional", "account", "classify"],
+    ):
         with pytest.raises(SystemExit) as result:
-            console.main([*parts,'--help'])
+            console.main([*parts, "--help"])
         assert result.value.code == 0
+
+
+def test_console_bulk_dispatch_tables_and_single_labelled_classification(
+    endpoint, monkeypatch, tmp_path, capsys
+):
+    from contextlib import nullcontext
+
+    state, service, account, category, transaction, exchange = endpoint
+    monkeypatch.setattr(console, "local_connection", lambda *a, **kw: nullcontext(None))
+    monkeypatch.setattr(console, "exchange", exchange)
+
+    def run(*parts):
+        assert console.main(["--home", str(tmp_path), "Fictional", *parts]) == 0
+        return capsys.readouterr().out
+
+    assert "Read-only preview" in run(
+        "trnx", "categorize", transaction, "--clear", "--dry-run", "--format", "table"
+    )
+    path = tmp_path / "changes.json"
+    path.write_text(json.dumps({"edits": [{"transactionId": transaction, "note": "Console memo"}]}))
+    assert json.loads(run("trnx", "edit-many", "--file", str(path)))["data"]["count"] == 1
+    assert "Saved atomic batch" in run(
+        "account", "classify", account, "--type", "credit", "--atomic", "--format", "table"
+    )
+    result = json.loads(
+        run(
+            "account",
+            "classify",
+            account,
+            "--type",
+            "depository",
+            "--on-budget",
+            "--agent",
+            "Codex",
+            "--batch",
+            "single",
+            "--revision",
+            service.revision,
+            "--request-id",
+            "single-fictional",
+        )
+    )
+    assert result["data"]["id"] == account
+    assert "Saved atomic batch" in run(
+        "trnx", "categorize", transaction, "--clear", "--format", "table"
+    )
