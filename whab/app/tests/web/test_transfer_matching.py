@@ -31,6 +31,7 @@ def test_web_proposal_preview_confirm_unmatch_and_stale_guards(store, tmp_path):
         assert all(row.get('transferPeerId') and not row['reviewed'] for row in store.transactions('personal'))
         page = client.get('/budgets/home/transactions/2026-11').text
         assert 'Suggest transfers' in page and 'data-transfer-panel' in page and 'data-transfer-unmatch' in page
+        assert 'Unmatch this confirmed transfer before changing its category' in page and 'Transfer (excluded)' in page
         for bad in [{**payload, 'extra': True}, {**payload, 'action': 'automatic'}, {**payload, 'workspace': 'foreign'}, {**payload, 'requestId': ''}]:
             assert client.post('/api/transfers/apply', json=bad).status_code == 400
         preview = client.post('/api/transfers/query', json={**body, 'operation': 'preview_transfer_match', 'parameters': {'transactionIds': ids, 'action': 'unmatch'}}).json()

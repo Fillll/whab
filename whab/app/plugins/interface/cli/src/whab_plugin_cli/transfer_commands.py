@@ -125,6 +125,8 @@ def transfer_table(result):
     if 'candidates' not in data:
         rows = [f"{data['action']}: {result.get('budget', result.get('budgetId'))} · both need review"]
         for change in data['changes']:
+            before = change['before']
+            rows.append(f"{before['date']} | {before['accountName']} | {before['merchant']} | {before['amount']} {before['currency']} minor units | memo: {before['note']}")
             rows.append(f"{change['id']} → peer {change['after'].get('transferPeerId', 'none')} · reviewed=false")
         return '\n'.join(rows)
     rows = [f"Possible transfers: {data['total']} total · {len(data['candidates'])} shown · next offset: {data['next']}",

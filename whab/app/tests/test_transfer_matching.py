@@ -241,3 +241,37 @@ def test_native_bank_correction_keeps_or_invalidates_both_reviewed_links(bank_st
     assert all(bool(row.get('transferPeerId')) == (correction == 'unchanged') for row in rows.values())
     assert all(row['reviewed'] == (correction == 'unchanged') for row in rows.values())
     assert rows['out']['note'] == state['transactions']['out']['note']
+
+
+def test_remote_authority_exposes_same_read_preview_and_explicit_guarded_confirmation(native_store):
+    from types import SimpleNamespace
+
+    import httpx
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from whab_plugin_server.plugin import plugin
+
+    from whab.plugins.remote_transport import RemoteStore
+    from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
+
+    store, _, _ = native_store
+    token = 'fictional-transfer-authority-' + 'a' * 32
+    authority = LedgerService(store, budget_id='fictional')
+    app = FastAPI()
+    binding = BoundRemoteInterface(plugin.interface.adapter, SimpleNamespace(service=authority, config={'SERVER_TOKEN': token}, budget_id='fictional'))
+    app.include_router(create_remote_router(lambda: binding))
+    with TestClient(app, base_url='https://fictional.example') as client:
+        def dispatch(request):
+            response = client.request(request.method, str(request.url), headers=dict(request.headers), content=request.content)
+            return httpx.Response(response.status_code, json=response.json())
+        remote = RemoteStore('https://fictional.example', token, 'fictional', transport=httpx.MockTransport(dispatch))
+        try:
+            assert remote.supports_transfer_matching()
+            assert remote.transfer_candidates('personal', {})['total'] == 1
+            preview = remote.preview_transfer_match('personal', ['out', 'in'], 'match')
+            assert not any(row.get('transferPeerId') for row in store.transactions('personal'))
+            saved = remote.apply_transfer_match('personal', ['out', 'in'], 'match', preview['fingerprint'])
+            assert saved == preview
+            assert all(row.get('transferPeerId') and not row['reviewed'] for row in store.transactions('personal'))
+        finally:
+            remote.close()

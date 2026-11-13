@@ -704,6 +704,10 @@
                   "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
                   "minLength": 1,
                   "maxLength": 80
+                },
+                "transferPeerId": {
+                  "type": "string",
+                  "description": "Optional stable ID of the explicitly confirmed opposite transfer. Absent when unmatched; confirmation does not mark reviewed."
                 }
               },
               "additionalProperties": true
@@ -2155,6 +2159,10 @@
                     "null"
                   ],
                   "description": "Assigned category parent group from the same-budget/same-revision read; null if unavailable."
+                },
+                "transferPeerId": {
+                  "type": "string",
+                  "description": "Optional stable ID of the explicitly confirmed opposite transfer. Absent when unmatched; confirmation does not mark reviewed."
                 }
               },
               "additionalProperties": true
@@ -2392,6 +2400,10 @@
                   "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
                   "minLength": 1,
                   "maxLength": 80
+                },
+                "transferPeerId": {
+                  "type": "string",
+                  "description": "Optional stable ID of the explicitly confirmed opposite transfer. Absent when unmatched; confirmation does not mark reviewed."
                 }
               },
               "additionalProperties": true
