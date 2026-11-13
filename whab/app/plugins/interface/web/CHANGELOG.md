@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.49.0 — 2026-11-13
+
+PR: [#191](https://github.com/Fillll/whab/pull/191)
+
+- Add draggable, keyboard-accessible resize handles to Account, Payee, Category and Memo. Keep neighboring widths fixed during resizing, support individual reset/cancel, retain widths in browser local storage, and preserve sorting, editing and horizontal scrolling without ledger writes.
+
 ## 1.48.2 — 2026-11-12
 
 PR: [#189](https://github.com/Fillll/whab/pull/189)
