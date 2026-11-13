@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.53.0 — 2026-11-13
+
+PR: [#195](https://github.com/Fillll/whab/pull/195)
+
+- Apply category changes or clearing to all explicitly selected rows in one guarded native save, retain ordinary edited rows until explicit refresh/filter/sort navigation, and make complete sortable heading backgrounds clickable while preserving resize grips.
+
 ## 1.52.0 — 2026-11-13
 
 PR: [#194](https://github.com/Fillll/whab/pull/194)

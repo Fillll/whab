@@ -93,7 +93,7 @@
 <template data-transaction-accounts>{% for choice in transaction_accounts %}<option value="{{ choice.id }}"{% if choice.closed|default(false) %} data-account-closed{% endif %}>{{ choice.name }}{% if choice.closed|default(false) %} · Closed{% endif %}</option>{% endfor %}</template>
 <template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ group.name }} > {{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</template>
 <form id="transaction-create-form" data-transaction-create hidden></form>
-<p class="transaction-grid-help" id="transaction-grid-help">Saved edits stay visible until refresh or a filter/sort change · Headings: ascending → descending → none · Drag text column edges to resize · Click a field to edit · ↑ ↓ move between rows · Tab moves between fields · F2 keeps arrows in the editor</p>
+<p class="transaction-grid-help" id="transaction-grid-help">Edits stay until refresh · Headings: ascending → descending → none · Drag text column edges to resize · Click a field to edit · ↑ ↓ move between rows · Tab moves between fields · F2 keeps arrows in the editor</p>
 <span class="sr-only" id="transaction-resize-help">Resize with left and right arrows, Shift for larger steps. Home or double-click resets the column. Escape cancels a drag. Widths are saved in this browser.</span>
 <div class="table-scroll transactions-scroll" role="region" aria-labelledby="transaction-title" tabindex="0">
   <table aria-describedby="transaction-grid-help" class="transactions-table{% if show_account_column %} transactions-table-multi-account{% endif %}">
