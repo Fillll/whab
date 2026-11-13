@@ -51,7 +51,7 @@ def test_node_schema_and_encrypted_fixture_remain_usable(
         assert snapshot["accounts"][0]["institution"] == "Fixture Bank"
         assert snapshot["accounts"][0]["mask"] == "1234"
         assert snapshot["accounts"][0]["stale"] is False
-        assert snapshot["categories"] == [
+        assert [row for row in snapshot["categories"] if not row.get("systemKind")] == [
             {"id": "fun", "name": "Fun", "group": "Life", "target": 10000,
              "parentId": category_group_id("Life"), "currency": "USD"}
         ]

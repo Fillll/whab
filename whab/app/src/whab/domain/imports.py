@@ -164,4 +164,6 @@ def annotated_transaction(record: ImportedTransaction, annotations: dict) -> dic
         result["original"] = {key: result[key] for key in annotations["original"]}
         for key in annotations["original"]:
             result[key] = annotations[key]
+    if result["categoryId"] is None:
+        result["reviewed"] = False
     return result

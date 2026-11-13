@@ -39,6 +39,8 @@ def proxy(request, tmp_path):
 
 def test_backend_is_owned_by_child_and_reopens_same_authority(proxy):
     evidence = proxy.commit_evidence()
+    assert proxy.transaction_classification_status("personal") == {"supported": True, "pending": False}
+    assert proxy.migrate_transaction_classifications("personal") == {"changed": False}
     account = proxy.add_account("personal", {"name": "Fictional", "type": "depository", "balance": 12345})
     assert proxy.accounts("personal")[0]["id"] == account
     assert not hasattr(proxy, "db") and not hasattr(proxy, "state")

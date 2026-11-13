@@ -255,11 +255,13 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
                     for period, projection in zip(periods, period_budgets, strict=True)
                 ],
             }
-            for c in group["children"]
+            for c in group["children"] if not c.get("systemKind")
         ]
         for child in group["children"]:
             category_names[child["id"]] = f"{group['name']} / {child['name']}"
             category_parents[child["id"]] = group["name"]
+        if not rows and group["children"]:
+            continue
         groups.append(
             {
                 **group,

@@ -48,10 +48,10 @@ def test_json_factory_owns_separate_environment_files_and_metadata(tmp_path):
 def test_bulk_review_and_account_changes_are_atomic(json_store):
     account = json_store.add_account("personal", {"name": "Fictional", "type": "depository", "balance": 100000})
     first = json_store.add_transaction("personal", {
-        "accountId": account, "date": "2026-10-01", "merchant": "Fictional", "amount": 100,
+        "accountId": account, "date": "2026-10-01", "merchant": "Fictional", "amount": 100, "categoryId": "groceries",
     })
     second = json_store.add_transaction("personal", {
-        "accountId": account, "date": "2026-10-02", "merchant": "Fictional", "amount": 100,
+        "accountId": account, "date": "2026-10-02", "merchant": "Fictional", "amount": 100, "categoryId": "groceries",
     })
     before = json_store.path.read_bytes()
     with pytest.raises(StoreError):

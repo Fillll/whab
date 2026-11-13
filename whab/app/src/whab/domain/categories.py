@@ -45,7 +45,7 @@ def validate_child_category(category: dict) -> dict:
     if (
         type(category) is not dict
         or not _CHILD_FIELDS <= category.keys()
-        or category.keys() - _CHILD_FIELDS - {"parentId", "currency"}
+        or category.keys() - _CHILD_FIELDS - {"parentId", "currency", "systemKind"}
     ):
         raise StoreError("Categories must be children of one parent group.")
     _identifier(category["id"])
@@ -56,6 +56,13 @@ def validate_child_category(category: dict) -> dict:
         raise StoreError("Target cannot be negative.")
     if "parentId" in category and category["parentId"] != category_group_id(category["group"]):
         raise StoreError("Category parent does not match its group.")
+    from .system_categories import PREFIX, system_category
+    if "systemKind" in category or category["id"].startswith(PREFIX):
+        expected = system_category(category.get("systemKind"), category.get("currency", "USD"))
+        if "currency" not in category:
+            expected.pop("currency")
+        if {key: value for key, value in category.items() if key != "parentId"} != expected:
+            raise StoreError("Invalid system category identity or metadata.")
     return category.copy()
 
 
@@ -130,6 +137,9 @@ def create_category(
 ) -> dict:
     """Create an assignable child by parent label or an existing parent ID."""
     category_id = _identifier(category_id)
+    from .system_categories import PREFIX
+    if category_id.startswith(PREFIX):
+        raise StoreError("System category identities are reserved.")
     name = _label(name)
     currency = currency_code(currency)
     target = minor_units(target, currency)
@@ -167,6 +177,8 @@ def rename_category(state, category_id, name):
     """Change only one existing child's label; retain all financial references."""
     ensure_child_category(state['categories'], category_id)
     child = state['categories'][category_id]
+    from .system_categories import protect_system_category
+    protect_system_category(child)
     name = _label(name)
     if any(row['id'] != category_id
            and category_group_id(row['group']) == category_group_id(child['group'])
@@ -179,6 +191,8 @@ def rename_category(state, category_id, name):
 def move_category(state, category_id, parent_id):
     """Reparent one leaf without replacing its identity, money or references."""
     child = ensure_child_category(state['categories'], category_id)
+    from .system_categories import protect_system_category
+    protect_system_category(child)
     groups = category_groups(state['categories'], state.get('categoryGroups', ()))
     parent = next((row for row in groups if row['id'] == parent_id), None)
     if parent is None:
@@ -206,13 +220,14 @@ def ensure_child_category(categories: Mapping[str, dict], category_id: str) -> d
 
 def category_deletion_status(state, category_id, *, remove_zero_assignments=False):
     """Explain only the addressed child's references, without exposing peers."""
-    ensure_child_category(state['categories'], category_id)
+    child = ensure_child_category(state['categories'], category_id)
+    from .system_categories import system_kind
     references = [row for row in state['transactions'].values() if row.get('categoryId') == category_id]
     deleted = sum(bool(row.get('deleted', False)) for row in references)
     months = sorted(month for month, rows in state['budget'].items() if category_id in rows)
     zero = [month for month in months if state['budget'][month][category_id] == 0]
     nonzero = [month for month in months if state['budget'][month][category_id] != 0]
-    return {'categoryId': category_id, 'deletable': not references and not nonzero and (not zero or remove_zero_assignments),
+    return {'categoryId': category_id, 'deletable': not system_kind(child) and not references and not nonzero and (not zero or remove_zero_assignments),
             'transactions': {'total': len(references), 'live': len(references) - deleted, 'deleted': deleted},
             'assignments': {'count': len(months), 'months': months, 'zeroMonths': zero,
                             'nonzeroCount': len(nonzero), 'nonzeroMonths': nonzero}}
@@ -222,6 +237,8 @@ def delete_category(state, category_id, *, remove_zero_assignments=False):
     """Remove one unreferenced leaf, retaining its parent and all financial data."""
     # Older persistence adapters only remove the category row. They must remain
     # conservative until they explicitly persist assignment removals atomically.
+    from .system_categories import protect_system_category
+    protect_system_category(ensure_child_category(state['categories'], category_id))
     status = category_deletion_status(state, category_id, remove_zero_assignments=remove_zero_assignments)
     if not status['deletable']:
         t, a = status['transactions'], status['assignments']

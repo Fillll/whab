@@ -43,6 +43,8 @@ def initial_state(workspace, month):
             "amount": 6425, "categoryId": "groceries",
         }, "demo")
         commands.assign(state, "groceries", month, 85000, as_of_month=month)
+    from .system_categories import ensure_system_categories
+    ensure_system_categories(state)
     return state
 
 
@@ -90,7 +92,10 @@ def require_pristine(state):
     )):
         raise StoreError("Restoration requires an empty personal workspace.")
     template = initial_state("personal", state["budgetStartMonth"])["categories"]
-    if state["categories"] and state["categories"] != template:
+    from .system_categories import system_kind
+    existing = {key: row for key, row in state["categories"].items() if not system_kind(row)}
+    template = {key: row for key, row in template.items() if not system_kind(row)}
+    if existing and existing != template:
         raise StoreError("Restoration requires untouched template categories.")
 
 

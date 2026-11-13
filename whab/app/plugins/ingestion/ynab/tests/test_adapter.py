@@ -28,7 +28,7 @@ def test_adapter_normalizes_records_and_keeps_memo_flags_and_reconciliation():
         assert account["subtype"] is None
         assert account["stale"] is account["balanceUnknown"] is True
         assert account["source"] == "ynab"
-    category, = imported.categories
+    category, = [row for row in imported.categories if not row.get("systemKind")]
     assert {key: category[key] for key in ("name", "group", "target")} == {
         "name": "Food", "group": "Living", "target": 0,
     }
@@ -73,7 +73,9 @@ def test_income_transfers_and_split_metadata_survive_without_collapsing_rows():
         True, True, False, False, False, False, False,
     ]
     assert all(row["isTransfer"] == row["inferredTransfer"] for row in imported.transactions)
-    assert imported.transactions[2]["categoryId"] is None
+    assert imported.transactions[2]["categoryId"] == "whab-system:income:USD"
+    assert imported.transactions[0]["categoryId"] == "whab-system:transfer:USD"
+    assert imported.transactions[3]["categoryId"] is None and imported.transactions[3]["reviewed"] is False
     assert imported.transactions[2]["amount"] == -10000
     assert imported.transactions[3]["note"] == "[YNAB: cleared; split row]"
 

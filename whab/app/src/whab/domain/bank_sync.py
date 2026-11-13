@@ -74,6 +74,11 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
                 if annotations.get("categoryEdited"):
                     raise
                 normalized["categoryId"] = None
+        from .system_categories import ensure_system_categories, normalize_transaction, system_kind
+        ensure_system_categories(state)
+        if system_kind(state["categories"].get(normalized["categoryId"])) == "transfer":
+            normalized["isTransfer"] = True
+        normalize_transaction(state, normalized, classify_transfers=not normalized["categoryEdited"])
         state["transactions"][identifier] = normalized
         if pending is not None and pending["id"] != identifier:
             image = state["receipts"].pop(pending["id"], None)

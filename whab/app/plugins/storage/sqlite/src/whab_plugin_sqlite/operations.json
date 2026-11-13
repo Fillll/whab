@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "sqlite",
-  "summary": "Local SQLite ledger backend preserving validated financial rules and portable state.",
+  "summary": "Local SQLite ledger backend preserving validated financial rules and portable state.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
   "delegates": [
     "core"
   ],
@@ -94,7 +94,7 @@
     {
       "name": "StorageBackend.categories",
       "kind": "sdk",
-      "summary": "StorageBackend.categories public SDK callback.",
+      "summary": "StorageBackend.categories public SDK callback.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
@@ -404,7 +404,7 @@
     {
       "name": "StorageBackend.edit_transaction",
       "kind": "sdk",
-      "summary": "StorageBackend.edit_transaction public SDK callback.",
+      "summary": "StorageBackend.edit_transaction public SDK callback.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
@@ -791,7 +791,7 @@
     {
       "name": "StorageBackend.apply_sync",
       "kind": "sdk",
-      "summary": "StorageBackend.apply_sync public SDK callback.",
+      "summary": "StorageBackend.apply_sync public SDK callback.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
@@ -2034,7 +2034,7 @@
     {
       "name": "AtomicBulkEdits.edit_transactions",
       "kind": "sdk",
-      "summary": "Atomically edit mixed transaction annotations with one guarded native commit and durable save.",
+      "summary": "Atomically edit mixed transaction annotations with one guarded native commit and durable save.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -2311,7 +2311,7 @@
     {
       "name": "AtomicBulkEdits.preview_bulk_edits",
       "kind": "sdk",
-      "summary": "Read-only core validation and complete exact before/after plan for one atomic batch.",
+      "summary": "Read-only core validation and complete exact before/after plan for one atomic batch.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -2447,6 +2447,124 @@
       ],
       "retry": "Exact original operation/workspace/resolved edits/revision/request ID/history returns its original durable receipt without changes/history/save, including after restart. Never retry an uncertain mutation with fresh intent. Bounded receipt expiry rejects stale requests. Preview is read-only and does not reserve its revision.",
       "availability": "WHAB 2.72+, optional AtomicBulkEdits; SQLite 1.23+ and JSON 1.15+; remote authority must support it."
+    },
+    {
+      "name": "TransactionClassifications.transaction_classification_status",
+      "kind": "sdk",
+      "summary": "Read whether current-state system categories/review flags require compatible correction.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "Exactly the personal or fictional demo workspace."
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false,
+        "description": "Addressed workspace."
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "supported": {
+            "type": "boolean",
+            "description": "True only when the adapter enforces the system classification and review invariant."
+          },
+          "pending": {
+            "type": "boolean",
+            "description": "True when a compatible guarded current-state correction is required."
+          }
+        },
+        "required": [
+          "supported",
+          "pending"
+        ],
+        "additionalProperties": false,
+        "description": "Verified classification readiness or saved correction result."
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal"
+          },
+          "output": {
+            "supported": true,
+            "pending": false
+          }
+        }
+      ],
+      "side_effects": "Read-only; never upgrades or saves.",
+      "permissions": "Host-owned optional SDK callback through the fixed local storage protocol; not an arbitrary HTTP command.",
+      "scope": "Exactly one budget/environment/workspace. Disabled plugin payloads are never interpreted by another owner.",
+      "errors": [
+        "Unsupported/malformed readiness refuses correction. A fenced copy/readonly backend or unresolved intent cannot migrate.",
+        "Reserved identity collisions reject before mutation. Historical events and original receipts remain exact."
+      ],
+      "retry": "The first admitted host access checks readiness after approved worker activation and retained-intent checks. Native exact retry returns its original receipt. Reopening is idempotent; never replay an uncertain mutation with a fresh intent.",
+      "availability": "WHAB 2.73+, optional TransactionClassifications; SQLite 1.24+ and JSON 1.16+."
+    },
+    {
+      "name": "TransactionClassifications.migrate_transaction_classifications",
+      "kind": "sdk",
+      "summary": "Correct current state in one guarded native commit, retaining exact immutable prior history and receipts.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "Exactly the personal or fictional demo workspace."
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false,
+        "description": "Addressed workspace."
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "boolean",
+            "description": "Whether current records changed; old audit entries and receipts remain exact."
+          }
+        },
+        "required": [
+          "changed"
+        ],
+        "additionalProperties": false,
+        "description": "Verified classification readiness or saved correction result."
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal"
+          },
+          "output": {
+            "changed": true
+          }
+        }
+      ],
+      "side_effects": "One primary-only native transaction, generation, durable operation receipt and permanent system audit entry; the host checkpoints synchronously.",
+      "permissions": "Host-owned optional SDK callback through the fixed local storage protocol; not an arbitrary HTTP command.",
+      "scope": "Exactly one budget/environment/workspace. Disabled plugin payloads are never interpreted by another owner.",
+      "errors": [
+        "Unsupported/malformed readiness refuses correction. A fenced copy/readonly backend or unresolved intent cannot migrate.",
+        "Reserved identity collisions reject before mutation. Historical events and original receipts remain exact."
+      ],
+      "retry": "The first admitted host access checks readiness after approved worker activation and retained-intent checks. Native exact retry returns its original receipt. Reopening is idempotent; never replay an uncertain mutation with a fresh intent.",
+      "availability": "WHAB 2.73+, optional TransactionClassifications; SQLite 1.24+ and JSON 1.16+."
     }
   ]
 }

@@ -65,11 +65,11 @@ def test_import_preserves_snapshot_money_history_annotations_and_demo(store):
     assert tuple(state["accounts"].values()) == tuple(
         normalize_account({**record, "currency": data.currency}) for record in data.accounts
     )
-    assert tuple(state["categories"].values()) == tuple(
+    assert tuple(row for row in state["categories"].values() if not row.get("systemKind")) == tuple(
         {**record, "currency": data.currency} for record in data.categories
     )
     assert tuple(state["transactions"].values()) == tuple(
-        {**record, "merchantLogo": None} for record in data.transactions
+        {**record, "merchantLogo": None, "reviewed": record["reviewed"] if record["categoryId"] is not None else False} for record in data.transactions
     )
     assert state["budget"] == {"2026-09": {"food": 3000}, "2026-10": {"food": -100}}
     assert state["budgetStartMonth"] == "2026-09"
@@ -83,7 +83,7 @@ def test_import_preserves_snapshot_money_history_annotations_and_demo(store):
 def test_identical_retry_is_a_database_noop_and_keeps_original_counts(store):
     data = file_import()
     store.import_workspace("personal", "fixture", "same", data)
-    store.edit_transaction("personal", "purchase", None, True)
+    store.edit_transaction("personal", "purchase", "food", True)
     store.add_category("personal", {"name": "New category", "group": "Added", "target": 100})
     before = store.state("personal")
     assert store.preview_workspace_import("personal", "fixture", "same") == {

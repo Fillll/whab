@@ -1,6 +1,6 @@
 """Offline discovery for atomic bulk workflows."""
 
-BULK_HELP = '''Atomic bulk changes (1–100 explicit, distinct targets; never split):
+BULK_HELP = '''Reviewed requires a category. Categorizing alone never reviews; --clear also clears review.\nUse System / Transfer or System / Income for explicit system classifications,\nwhich never receive envelope assignments. Ordinary review commands:\n  whab "My budget" trnx review TX1 TX2 --agent Codex --dry-run\n  whab "My budget" trnx unreview TX1\n\nAtomic bulk changes (1–100 explicit, distinct targets; never split):
   whab "My budget" trnx categorize TX1 TX2 --category "Food / Groceries" --agent Codex --dry-run
   whab "My budget" trnx categorize TX1 TX2 --category "Food / Groceries" --agent Codex
   whab "My budget" trnx edit-many --file changes.json --dry-run

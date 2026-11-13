@@ -266,6 +266,19 @@ class RemoteStore:
     def categories(self, workspace):
         return self._query("categories", workspace)
 
+    def transaction_classification_status(self, workspace):
+        # Existing category discovery works on older authorities too; only the
+        # explicit canonical kind opts an authority into the new invariant.
+        rows = self.categories(workspace)
+        return {"supported": type(rows) is list and any(type(row) is dict and row.get("systemKind") in {"income", "transfer"} for row in rows), "pending": False}
+
+    def migrate_transaction_classifications(self, workspace):
+        # The authority migrates before returning its category discovery. Never
+        # send a second migration intent across an uncertain remote connection.
+        if not self.transaction_classification_status(workspace)["supported"]:
+            raise StoreError("Update the remote budget authority to WHAB 2.73 transaction classification support.")
+        return {"changed": False}
+
     def features(self, workspace):
         return self._query("features", workspace)
 

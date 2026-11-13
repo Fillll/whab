@@ -20,7 +20,7 @@ def test_overview_counts_selected_month_currency_without_materializing_history(s
     )):
         key = store.add_transaction("personal", {
             "accountId": account, "date": date, "merchant": f"Synthetic {index}",
-            "amount": 100, "categoryId": None,
+            "amount": 100, "categoryId": "groceries" if state == "reviewed" else None,
         })
         if state in {"pending", "reviewed", "deleted"}:
             store.db.execute(f"UPDATE transactions SET {state}=1 WHERE workspace=? AND id=?", ("personal", key))

@@ -67,7 +67,7 @@ def test_failed_household_seeding_rolls_back_then_can_be_retried(tmp_path, monke
             connection.close()
     recovered = Store(path, month="2026-10")
     try:
-        assert len(recovered.categories("personal")) == 9
+        assert len(recovered.categories("personal")) == 11
         assert len(recovered.transactions("demo")) == 55
     finally:
         recovered.close()
@@ -125,7 +125,7 @@ def test_custom_category_is_persisted_and_negative_target_is_rejected(store):
     with pytest.raises(StoreError, match="Target cannot be negative"):
         store.add_category("personal", {"name": "Invalid", "group": "Family", "target": -1})
     assert store.categories("personal") == before
-    assert len(store.categories("demo")) == 9
+    assert len(store.categories("demo")) == 11
 
 
 @pytest.mark.parametrize("note", [None, "x" * 1001])

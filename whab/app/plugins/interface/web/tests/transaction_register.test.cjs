@@ -46,6 +46,7 @@ function harness(count = 5, options = {}) {
       '[data-transaction-field="categoryId"]', '[data-transaction-reviewed]', '[data-transaction-receipt]']
       .map(selector => [selector, element()]));
     if (options.agentLabel) controls['[data-category-agent]'] = element({removed: false, remove() {this.removed = true;}});
+    controls['[data-transaction-field="categoryId"]'].value = options.category === undefined ? 'groceries' : options.category;
     controls['[data-select-transaction]'].checked = true;
     controls['[data-transaction-reviewed]'].setAttribute('aria-pressed', 'false');
     controls['[data-transaction-receipt]'].disabled = true;
@@ -635,7 +636,7 @@ test('navigation waits for every wave of a bulk review and retains a later failu
   state.register.dispose();
 });
 
-test('category edits update the uncategorized indicator immediately while transfers stay neutral', async () => {
+test('category clearing makes ordinary and transfer classifications unfinished and non-reviewed', async () => {
   const state = harness(2);
   const category = state.rows[0].controls['[data-transaction-field="categoryId"]'];
   category.classList.toggle('uncategorized', true);
@@ -648,14 +649,14 @@ test('category edits update the uncategorized indicator immediately while transf
   category.value = '';
   category.emit('change');
   assert.equal(category.classList.contains('uncategorized'), true);
-  assert.deepEqual(state.requests[1].body, {workspace: 'personal', categoryId: null});
+  assert.deepEqual(state.requests[1].body, {workspace: 'personal', categoryId: null, reviewed: false});
   state.requests[1].resolve({ok: true});
   const transfer = state.rows[1];
   transfer.dataset.transfer = 'true';
   const transferCategory = transfer.controls['[data-transaction-field="categoryId"]'];
   transferCategory.value = '';
   transferCategory.emit('change');
-  assert.equal(transferCategory.classList.contains('uncategorized'), false);
+  assert.equal(transferCategory.classList.contains('uncategorized'), true);
   state.requests[2].resolve({ok: true});
   assert.equal(await state.register.flush(), true);
   state.register.dispose();
@@ -898,4 +899,14 @@ test('rapid sort choices combine priorities before the earlier navigation finish
   link.emit('click', {button: 0}); await tick();
   assert.deepEqual(navigations[3].searchParams.getAll('sort'), ['amount:asc']);
   pending.resolve(true); await tick(); state.register.dispose();
+});
+
+
+test('an uncategorized review click explains the required category without a write', async () => {
+  const state = harness(1, {category: ''});
+  const review = state.rows[0].controls['[data-transaction-reviewed]'];
+  await review.emit('click').completed;
+  assert.equal(state.requests.length, 0);
+  assert.equal(review.getAttribute('aria-pressed'), 'false');
+  state.register.dispose();
 });

@@ -69,6 +69,7 @@ class YnabTransaction:
     is_transfer: bool
     transfer_account_id: str | None
     is_split: bool
+    is_income: bool = False
 
 
 @dataclass(frozen=True)
@@ -284,6 +285,7 @@ def parse_dump(data: bytes) -> YnabDump:
                 _identifier("transaction", *values, str(duplicates[values])), account_id,
                 _date(row["Date"]), amount, payee, memo, category_id, cleared, flag, is_transfer,
                 _identifier("account", target) if target else None, is_split,
+                row["Category Group/Category"] in {"Inflow: Ready to Assign", "Inflow: To be Budgeted"},
             ))
         accounts = tuple(
             YnabAccount(account_ids[name], name, balances[name]) for name in sorted(account_ids)

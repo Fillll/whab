@@ -119,7 +119,7 @@ def parser(options, argv=()):
         summary.add_argument("--month", help="YYYY-MM; default: current month")
         summary.add_argument("--currency", default="USD", help="ISO currency code (default: USD); currencies are never combined")
     if requested in (None, "transactions", "trnx"):
-        transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit transactions; atomic categorize/edit-many for up to 100 IDs", epilog=BULK_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
+        transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit/review transactions; atomic categorize/review/edit-many for up to 100 IDs", epilog=BULK_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
         reads = transactions.add_subparsers(dest="filter", required=True)
         unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
             epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
@@ -129,6 +129,8 @@ def parser(options, argv=()):
         add_category_parsers(reads)
         add_note_parser(reads)
         add_edit_many(reads)
+        from .bulk_commands import add_review_parsers
+        add_review_parsers(reads)
     groups.add_parser("api", help="Advanced local operations; use whab api --help")
     return root
 
@@ -271,7 +273,7 @@ def execute(args, home, environment, ca):
             return execute_category(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter == "note":
             return execute_note(connection, identifier, prefix, args, exchange, CommandError)
-        if args.command in {"transactions", "trnx"} and args.filter == "edit-many":
+        if args.command in {"transactions", "trnx"} and args.filter in {"edit-many", "review", "unreview"}:
             return execute_transactions(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "category":
             return execute_categories(connection, identifier, prefix, args, exchange, CommandError)

@@ -3,6 +3,8 @@
 from whab.domain import commands
 from whab.plugins import validate_review_batch
 
+from .categories import category_record
+
 
 def review_transactions(store, workspace, transaction_ids, reviewed):
     with store._authority_write(workspace=workspace, transaction_ids=transaction_ids) as transaction:
@@ -12,10 +14,7 @@ def review_transactions(store, workspace, transaction_ids, reviewed):
             state = {
                 "accounts": {row["id"]: row for row in store._read_accounts(workspace)},
                 "categories": {
-                    row["id"]: {
-                        "id": row["id"], "name": row["name"], "group": row["group_name"],
-                        "target": row["target"], "currency": row["currency"],
-                    }
+                    row["id"]: category_record(row)
                     for row in store.db.execute("SELECT * FROM categories WHERE workspace=?", (workspace,))
                 },
                 "transactions": {},

@@ -14,7 +14,7 @@ def add_category_parsers(commands):
     commands.add_parser('categories', help='List category IDs, names and groups for this budget')
     edit = commands.add_parser('categorize', aliases=['categorise'],
         help='Assign/clear one category or atomically categorize 2–100 explicit IDs',
-        description='Assign a category to 1–100 explicit IDs. One ID retains the existing single-record operation/output; multiple IDs commit and save once. Review status is preserved unless --needs-review is supplied. Agent attribution is opt-in.',
+        description='Assign a category to 1–100 explicit IDs. One ID retains the existing single-record operation/output; multiple IDs commit and save once. Category assignment alone never marks reviewed. Clearing a category also makes it non-reviewed; otherwise review status is preserved unless --needs-review is supplied. Transfer and Income are protected system classifications under System. Agent attribution is opt-in.',
         epilog='Examples:\n  whab "My budget" trnx categories\n  whab "My budget" trnx categorize TRANSACTION_ID --category "Food / Groceries" --agent Codex --needs-review\n  whab "My budget" trnx categorize TRANSACTION_ID --clear\n\nCategory accepts an exact ID, unique name or "Group / Name" (case-insensitive names). Ambiguous names fail. A fresh ledger revision and unique request ID are obtained automatically; supply --revision and --request-id for an explicitly observed intent. Never automatically retries. After an uncertain result, inspect the transaction; retain the reported intent IDs and original arguments.',
         formatter_class=argparse.RawDescriptionHelpFormatter)
     edit.epilog += '\n\n' + BULK_HELP

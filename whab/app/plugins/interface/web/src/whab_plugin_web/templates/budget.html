@@ -46,7 +46,7 @@
           <colgroup data-budget-key="columns"><col class="budget-category-col" data-budget-key="category">{% for period in periods %}{% if period.show_carryover %}<col data-budget-key="{{ period.month }}:carryover">{% endif %}<col data-budget-key="{{ period.month }}:assigned"><col data-budget-key="{{ period.month }}:activity"><col data-budget-key="{{ period.month }}:available">{% endfor %}</colgroup>
           <thead data-budget-key="heading">
             <tr class="budget-summaries" data-budget-key="summaries">
-              <th class="budget-intro" data-budget-key="intro"><h1>Budget</h1><p>{{ data.categories|length }} categories<br>All amounts in {{ currency }}</p></th>
+              <th class="budget-intro" data-budget-key="intro"><h1>Budget</h1><p>{{ data.categories|rejectattr("systemKind")|list|length }} spending categories<br>All amounts in {{ currency }}</p></th>
               {% for period in periods %}
                 <th colspan="{{ period.column_count }}" scope="colgroup" class="budget-month-summary-cell" data-budget-key="{{ period.month }}">
                   <section class="budget-month-summary{% if period.month==month %} is-selected{% endif %}" aria-label="{{ month_label(period.month) }} summary">

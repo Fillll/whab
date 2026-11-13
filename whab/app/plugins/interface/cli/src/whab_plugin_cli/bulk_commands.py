@@ -36,6 +36,16 @@ def add_edit_many(commands):
     bulk_options(edit)
 
 
+def add_review_parsers(commands):
+    for name in ("review", "unreview"):
+        edit = commands.add_parser(name, help="Atomically mark 1–100 categorized transactions reviewed" if name == "review" else "Atomically mark 1–100 transactions non-reviewed",
+            description="Reviewed requires a valid category (including System / Transfer or System / Income). No category always means non-reviewed. Categorizing alone never marks reviewed; imported clearing is not human-review provenance.",
+            epilog="Examples:\n  whab \"My budget\" trnx review TX1 TX2 --agent Codex --dry-run\n  whab \"My budget\" trnx review TX1 TX2 --agent Codex\n  whab \"My budget\" trnx unreview TX1\n  whab \"My budget\" trnx list --since 2026-11-01\n\nAll targets validate before one native commit and durable save. JSON includes verified before/after records, budget, revision and original intent. No financial fields or category attribution change. --agent labels audit provenance, not a human identity. Invalid/missing/uncategorized targets reject the entire review batch. Preserve the exact reported intent after an uncertain response; inspect transactions/history before deliberately retrying with the original request ID and revision. Never retry with a new intent automatically.\n\n" + BULK_HELP,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
+        edit.add_argument("transaction_id", nargs="+", help="1–100 distinct stable transaction IDs from trnx list; never fuzzy matched")
+        bulk_options(edit)
+
+
 def read_edits(filename, error):
     def unique(pairs):
         result = {}
@@ -62,6 +72,8 @@ def read_edits(filename, error):
 
 def resolve_categories(connection, identifier, prefix, edits, args, exchange, error):
     result = checked(exchange(connection, 'GET', prefix + '/queries/categories', params={'workspace': 'personal'}), identifier, error)
+    if args.filter in {'review', 'unreview'} and not any(row.get('systemKind') for row in result['data']):
+        raise error('Update the budget host/storage to WHAB 2.73 system-classification support before using review commands.')
     resolved = []
     for index, row in enumerate(edits, 1):
         if type(row) is not dict:
@@ -116,7 +128,9 @@ def execute_bulk(connection, identifier, prefix, args, exchange, error, operatio
 
 
 def execute_transactions(connection, identifier, prefix, args, exchange, error):
-    if args.filter == 'edit-many':
+    if args.filter in {'review', 'unreview'}:
+        edits = [{'transactionId': value, 'reviewed': args.filter == 'review'} for value in args.transaction_id]
+    elif args.filter == 'edit-many':
         edits = read_edits(args.file, error)
     else:
         edits = [{'transactionId': value, 'categoryId': None} if args.clear else {'transactionId': value, 'category': args.category} for value in args.transaction_id]

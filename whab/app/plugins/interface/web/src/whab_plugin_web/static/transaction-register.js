@@ -379,13 +379,18 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     const prepareReview = patch => row.dataset.suggestionId && patch.reviewed === true ?
       {...patch, categoryId: category.value || null, suggestionId: row.dataset.suggestionId} : patch;
     const writer = createTransactionWriter(patch => {
+      if ('categoryId' in patch && patch.categoryId === null) patch.reviewed = false;
       const prepared = prepareReview(patch);
       return saveReview ? saveReview(row.dataset.transactionId, prepared, bulkBusy) : saveOne(row.dataset.transactionId, prepared);
     }, {
       saved(patch) {
         Object.assign(committed, patch);
         if ('categoryId' in patch || patch.reviewed === true && row.dataset.suggestionId) row.querySelector('[data-category-agent]')?.remove();
-        if ('reviewed' in patch) row.dataset.reviewed = String(patch.reviewed);
+        if ('reviewed' in patch) {
+          row.dataset.reviewed = String(patch.reviewed);
+          reviewed.setAttribute('aria-pressed', String(patch.reviewed));
+          reviewed.title = patch.reviewed ? 'Reviewed' : 'Not reviewed';
+        }
         if (patch.reviewed === true && row.dataset.suggestionId) {
           delete row.dataset.suggestionId;
           row.querySelector('.ml-suggestion')?.remove();
@@ -450,7 +455,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     listen(row.querySelector('[data-select-transaction]'), 'change', selection);
     listen(category, 'change', () => {
       editStarted();
-      category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
+      category.classList.toggle('uncategorized', !category.value);
       if (!row.dataset.suggestionId) void writer.push({categoryId: category.value || null});
     });
     if (row.dataset.suggestionId) listen(row.querySelector('[data-dismiss-suggestion]'), 'click', async () => {
@@ -480,6 +485,10 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       }
     });
     listen(reviewed, 'click', () => {
+      if (!category.value && !row.dataset.suggestionId && reviewed.getAttribute('aria-pressed') !== 'true') {
+        notify('Choose a category before marking this transaction reviewed.', 'error');
+        return;
+      }
       editStarted();
       const value = reviewed.getAttribute('aria-pressed') !== 'true';
       reviewed.setAttribute('aria-pressed', String(value));

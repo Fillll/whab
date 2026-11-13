@@ -17,6 +17,8 @@ from whab.domain.errors import StoreError
 from whab.domain.transactions import category_agent_fields
 from whab.domain.validation import validate_month
 
+from .categories import category_record
+
 
 def snapshot(store, workspace: str, month: str, count: int = 1) -> dict:
     """Read coherent projection inputs without copying historical display text."""
@@ -36,10 +38,7 @@ def snapshot(store, workspace: str, month: str, count: int = 1) -> dict:
         if "category_groups" in meta.keys() and meta["category_groups"] is not None:
             state["categoryGroups"] = json.loads(meta["category_groups"])
         for row in store.db.execute("SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,)):
-            state["categories"][row["id"]] = {
-                "id": row["id"], "name": row["name"], "group": row["group_name"],
-                "target": row["target"], "currency": row["currency"],
-            }
+            state["categories"][row["id"]] = category_record(row)
         for row in store.db.execute(
             "SELECT id,account_id,date,amount,category_id,pending,is_transfer,deleted "
             "FROM transactions WHERE workspace=? ORDER BY rowid", (workspace,),

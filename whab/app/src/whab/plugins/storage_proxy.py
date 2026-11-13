@@ -26,6 +26,7 @@ from .storage_worker import StorageWorker, storage_error
 from .storage_worker_codec import CONTROL_WRITES, METHODS
 
 _MUTATIONS = {
+    "migrate_transaction_classifications": (("workspace",), {}),
     "edit_transactions": (("workspace", "edits"), {}),
     "classify_accounts": (("workspace", "edits"), {}),
     "history_apply": (("workspace", "action", "target", "fingerprint"), {}),

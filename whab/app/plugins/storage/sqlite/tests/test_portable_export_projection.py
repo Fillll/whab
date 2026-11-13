@@ -27,7 +27,7 @@ def previous_snapshot(store, workspace):
              **{key: row[key] for key in ("bankWebsite", "nameOverridden") if key in row}}
             for row in state["accounts"].values()
         ],
-        "categories": [{key: row[key] for key in CATEGORY_FIELDS} for row in state["categories"].values()],
+        "categories": [{**{key: row[key] for key in CATEGORY_FIELDS}, **({"systemKind": row["systemKind"]} if "systemKind" in row else {})} for row in state["categories"].values()],
         "transactions": [{key: row[key] for key in TRANSACTION_FIELDS} for row in state["transactions"].values()],
         "assignments": [{"month": month, "categoryId": key, "assigned": amount}
                         for month, rows in state["budget"].items() for key, amount in rows.items()],

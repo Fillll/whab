@@ -11,8 +11,8 @@ from whab.domain.errors import StoreError
     [
         ({}, None),
         ({"primary": "UNRECOGNIZED"}, None),
-        ({"primary": "INCOME"}, None),
-        ({"primary": "TRANSFER_IN"}, None),
+        ({"primary": "INCOME"}, "whab-system:income:USD"),
+        ({"primary": "TRANSFER_IN"}, "whab-system:transfer:USD"),
         ({"primary": "FOOD_AND_DRINK"}, "dining"),
         ({"detailed": "RENT"}, "rent"),
         ({"primary": "UTILITIES"}, "utilities"),
@@ -23,14 +23,14 @@ from whab.domain.errors import StoreError
         ({"primary": "GENERAL_MERCHANDISE"}, "shopping"),
     ],
 )
-def test_category_suggestions_leave_unknown_income_and_transfers_uncategorized(category, expected):
+def test_category_suggestions_keep_unknown_unclassified_and_use_explicit_system_kinds(category, expected):
     assert suggest_category({"personal_finance_category": category}) == expected
 
 
 def test_credit_card_payments_are_inferred_transfers():
     transaction = {"personal_finance_category": {"detailed": "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT"}}
     assert transfer_category(transaction) is True
-    assert suggest_category(transaction) is None
+    assert suggest_category(transaction) == "whab-system:transfer:USD"
 
 
 def test_depository_accounts_use_available_when_current_balance_is_missing():

@@ -32,7 +32,7 @@ def populate(store):
             "id": f"bulk-{index}", "accountId": accounts[index % 3],
             "date": "2020-01-01" if index == 6 else "2026-10-01",
             "merchant": "Synthetic café", "amount": 50,
-            "categoryId": None if index == 6 else categories[("USD", "EUR", "JPY")[index % 3]],
+            "categoryId": categories[("USD", "EUR", "JPY")[index % 3]],
             "note": f"Retain memo {index}",
         })
     store.db.execute("UPDATE transactions SET pending=1 WHERE workspace='personal' AND id='bulk-2'")
@@ -234,8 +234,8 @@ def test_hundred_distinct_ids_are_supported_without_touching_unselected_rows(rev
     account = review_ledger.accounts("personal")[0]["id"]
     selected = [f"boundary-{index}" for index in range(100)]
     review_ledger.db.executemany(
-        "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,source) "
-        "VALUES(?,'personal',?,'2026-10-01','Synthetic boundary',1,'manual')",
+        "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,source,category_id) "
+        "VALUES(?,'personal',?,'2026-10-01','Synthetic boundary',1,'manual','groceries')",
         [(key, account) for key in selected],
     )
     before = review_ledger.state("personal")

@@ -31,9 +31,9 @@ def build_snapshot(workspace, data):
                 id=c["id"],
                 name=c["name"],
                 group=c["group"],
-                assigned_cents=budget[c["id"]]["assigned"],
-                activity_cents=budget[c["id"]]["spent"],
-                available_cents=budget[c["id"]]["available"],
+                assigned_cents=budget.get(c["id"], {}).get("assigned", 0),
+                activity_cents=budget.get(c["id"], {}).get("spent", 0),
+                available_cents=budget.get(c["id"], {}).get("available", 0),
             )
             for c in data["categories"]
         ),

@@ -135,6 +135,11 @@ class CategorySnapshot:
     available_cents: int
 
     @property
+    def system_kind(self) -> str | None:
+        from whab.domain.system_categories import PREFIX
+        return self.id.split(':')[1] if self.id.startswith(PREFIX) else None
+
+    @property
     def parent_id(self) -> str:
         return category_group_id(self.group)
 
@@ -145,7 +150,15 @@ class CategorySnapshot:
         _integer(self.assigned_cents, "Category assignment")
         _integer(self.activity_cents, "Category activity")
         _integer(self.available_cents, "Category availability")
-        validate_child_category({"id": self.id, "name": self.name, "group": self.group, "target": 0})
+        category = {"id": self.id, "name": self.name, "group": self.group, "target": 0}
+        if self.system_kind is not None:
+            parts = self.id.split(':')
+            if len(parts) != 3:
+                raise ValueError("Invalid system category identity.")
+            category.update(systemKind=self.system_kind, currency=parts[2])
+            if any((self.assigned_cents, self.activity_cents, self.available_cents)):
+                raise ValueError("System classifications have no expense envelope balances.")
+        validate_child_category(category)
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +293,13 @@ class CategoryManagement(Protocol):
     def category_tree(self, workspace: str) -> list[dict]: ...
     def add_category_group(self, workspace: str, name: str) -> str: ...
     def move_category(self, workspace: str, category_id: str, parent_id: str) -> None: ...
+
+
+class TransactionClassifications(Protocol):
+    """Optional guarded current-state migration and invariant-ready storage."""
+
+    def transaction_classification_status(self, workspace: str) -> dict: ...
+    def migrate_transaction_classifications(self, workspace: str) -> dict: ...
 
 
 class CategoryRenaming(Protocol):

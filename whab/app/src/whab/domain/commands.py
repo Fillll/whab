@@ -24,6 +24,7 @@ from .categories import ensure_child_category
 from .dates import shift_month
 from .errors import StoreError
 from .money import cents, currency_code, minor_units
+from .system_categories import ensure_system_categories, system_kind, validate_review
 from .transactions import UNSET
 from .validation import validate_date, validate_label, validate_month
 
@@ -44,6 +45,7 @@ def add_account(state: dict, account_id: str, account: dict) -> str:
         "source": "manual",
         "stale": False,
     })
+    ensure_system_categories(state)
     return account_id
 
 
@@ -114,10 +116,10 @@ def add_transaction(
         "amount": amount,
         "categoryId": category,
         "pending": False,
-        "reviewed": source == "demo",
+        "reviewed": source == "demo" and category is not None,
         "source": source,
         "note": note,
-        "isTransfer": False,
+        "isTransfer": system_kind(state["categories"].get(category)) == "transfer",
         "inferredTransfer": False,
         "categoryEdited": source == "manual",
         "deleted": False,
@@ -148,6 +150,8 @@ def edit_transaction(
         validate_category_agent(category_agent)
         if category_id is UNSET:
             raise StoreError('An agent label requires an explicit category change.')
+    resulting_category = transaction.get("categoryId") if category_id is UNSET else category_id
+    validate_review(resulting_category, reviewed)
     if category_id is not UNSET:
         if category_agent is UNSET or category_agent is None:
             transaction.pop('categoryAgent', None)
@@ -156,12 +160,14 @@ def edit_transaction(
         transaction.update(
             categoryId=category_id,
             categoryEdited=True,
-            isTransfer=False
+            isTransfer=system_kind(state["categories"].get(category_id)) == "transfer"
             if category_id is not None
             else transaction.get("inferredTransfer", False),
         )
     if reviewed is not None:
         transaction["reviewed"] = reviewed
+    if resulting_category is None:
+        transaction["reviewed"] = False
     if note is not UNSET:
         transaction["note"] = note
 
@@ -182,7 +188,8 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
     validate_date(candidate["date"])
     if not "1900-01-01" <= candidate["date"] <= "2200-12-31":
         raise StoreError("Invalid transaction date.")
-    candidate["merchant"] = validate_label(candidate["merchant"])
+    if "merchant" in changes:
+        candidate["merchant"] = validate_label(candidate["merchant"])
     amount = cents(candidate["amount"])
     if not amount:
         raise StoreError("Amount must not be zero.")

@@ -62,8 +62,8 @@ asset URLs, preventing an old page from loading a newer incompatible client.
 
 - Accounts and category groups/categories, including categories found only in the register.
 - Every register row, including identical duplicates and exported split lines, with dates, payees, inflows/outflows, category, memo and clearing status. Payees longer than the 200-character display limit remain in full in the note. Positive WHAB cents mean outflow; negative cents mean inflow. USD confirmation is required because `$` alone is ambiguous.
-- Uncategorized `Transfer : ` rows remain transfers. Categorized transfers retain spending/refund behavior. Ready to Assign / To be Budgeted inflows have no expense category.
-- Flags and clearing status remain in transaction notes. Cleared/reconciled rows are reviewed. Uncleared rows are unreviewed posted transactions, since YNAB clearing is different from a bank authorization hold.
+- Authoritative uncategorized `Transfer : ` rows use System / Transfer. Categorized transfers retain spending/refund behavior. Ready to Assign / To be Budgeted rows use System / Income, which has no expense envelope. Blank inflows remain uncategorized.
+- Flags and clearing status remain in transaction notes. Cleared/reconciled rows with a valid category retain reviewed status; clearing is source metadata, not evidence of a named human reviewer. Uncategorized rows are never reviewed. Uncleared rows are unreviewed posted transactions, since YNAB clearing is different from a bank authorization hold.
 - Payees longer than 200 characters use a shortened display label; their full original text remains in the transaction note.
 - Monthly assigned amounts, including negative reallocations, and the earliest imported month as budget start. WHAB recomputes activity and availability from its ledger.
 
@@ -99,3 +99,7 @@ After creation, the importer selects the new budget for this browser before open
 ## Operation documentation
 
 The packaged [operations.json](src/whab_plugin_ynab/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin ynab-zip-importer`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.
+
+## Review and system classifications
+
+Reviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.

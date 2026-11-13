@@ -17,6 +17,7 @@ lazy from whab.domain.formatting import format_date, format_money
 lazy from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
 lazy from whab.domain.money import SUPPORTED_CURRENCIES, currency_code, currency_minor_units
 lazy from whab.domain.receipts import MAX_RECEIPT_BYTES, validate_receipt_selection
+lazy from whab.domain.system_categories import system_category
 lazy from whab.domain.transactions import UNSET, validate_category_agent, validate_review_batch
 lazy from whab.receipts import receipt_media_type
 lazy from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
@@ -102,6 +103,7 @@ lazy from .sdk import (
     StorageFactory,
     StorageOperation,
     StorageReplica,
+    TransactionClassifications,
     TransactionRegister,
     TransactionRegisterFiltered,
     TransactionRegisterPage,
@@ -115,7 +117,7 @@ lazy from .sdk import (
 )
 
 __all__ = [
-    "AtomicBulkEdits", "validate_bulk_edits",
+    "TransactionClassifications", "AtomicBulkEdits", "validate_bulk_edits",
     "BankAdapter",
     "BankContinuationService",
     "BankContinuationStatus",
@@ -158,6 +160,7 @@ __all__ = [
     "BudgetHistoryStorage",
     "ENTRYPOINT_GROUP",
     "UNSET",
+    "system_category",
     "validate_review_batch",
     "validate_category_agent",
     "validate_receipt_selection",

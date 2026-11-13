@@ -92,6 +92,8 @@ def test_bulk_real_console_preservation_restart_and_saved_restore(tmp_path, stor
 
     with patch.dict(os.environ, env, clear=True), local_connection(home, "sandbox"):
         before = rows()
+        refused = run("default", "trnx", "review", ids[0], "--agent", "Codex", ok=False)
+        assert "Categorize" in refused["error"] and rows() == before
         plan = run(
             "My budget",
             "trnx",
@@ -120,6 +122,12 @@ def test_bulk_real_console_preservation_restart_and_saved_restore(tmp_path, stor
         history = run("default", "history", "list")["data"]["entries"]
         assert history[0]["operation"] == "edit_transactions" and history[0]["changeCount"] == 100
         assert history[0]["actor"] == "Codex"
+        review_plan = run("default", "trnx", "review", *ids[:2], "--dry-run")
+        assert review_plan["dryRun"] and review_plan["data"]["changed"] == 2
+        reviewed = run("default", "trnx", "review", *ids[:2], "--agent", "Codex", "--revision", review_plan["revision"])
+        assert all(row["after"]["reviewed"] for row in reviewed["data"]["changes"])
+        run("default", "trnx", "unreview", *ids[:2])
+        assert not any(row["reviewed"] for row in rows().values())
         after = rows()
         for row in after.values():
             assert row["merchant"] == "  Fictional merchant  " and row["categoryAgent"] == "Codex"
@@ -185,7 +193,7 @@ def test_bulk_real_console_preservation_restart_and_saved_restore(tmp_path, stor
                 ok=False,
             )["error"]
         )
-        unicode_edits = {'edits': [({'transactionId':key,'reviewed':True} if index < 3 else {'transactionId':key,'note':'🍏'*1000}) for index,key in enumerate(ids)]}
+        unicode_edits = {'edits': [({'transactionId':key,'reviewed':False} if index < 3 else {'transactionId':key,'note':'🍏'*1000}) for index,key in enumerate(ids)]}
         large = run('default','trnx','edit-many','--file','-',stdin=json.dumps(unicode_edits))
         assert large['data']['count'] == 100
         after = rows()

@@ -48,6 +48,7 @@ from whab.domain.transactions import (
 from whab.domain.validation import validate_label
 
 from .authority import Authority
+from .categories import category_record
 from .schema import initialize_schema
 from .seeding import build_initial_state
 
@@ -57,7 +58,7 @@ __all__ = ["Store"]
 class Store(Authority):
     def __init__(
         self, database_path: str | Path = "data/whab-sandbox.sqlite", *, month: str | None = None,
-        budget_id="default", environment=None, initial_role="primary", _authority=True, read_only=False,
+        budget_id="default", environment=None, initial_role="primary", _authority=True, read_only=False, migrate=True,
     ):
         if type(initial_role) is not str or initial_role not in {"primary", "staged", "copy"}:
             raise StoreError("New storage requires a primary, staged or copy role.")
@@ -135,9 +136,39 @@ class Store(Authority):
         if _authority:
             try:
                 self._authority_initialize(budget_id, environment, initial_role, existing=existing)
+                if migrate:
+                    self._migrate_classifications()
             except BaseException:
                 self.db.close()
                 raise
+
+    def transaction_classification_status(self, workspace):
+        from whab.domain.system_categories import classification_migration_required
+        with self._snapshot():
+            self._require_workspace(workspace)
+            state = {"accounts": {row["id"]: row for row in self._read_accounts(workspace)},
+                     "categories": {row["id"]: category_record(row) for row in self.db.execute("SELECT * FROM categories WHERE workspace=?", (workspace,))},
+                     "transactions": {row["id"]: {"categoryId": row["category_id"], "reviewed": bool(row["reviewed"]), "isTransfer": bool(row["is_transfer"])}
+                                      for row in self.db.execute("SELECT id,category_id,reviewed,is_transfer FROM transactions WHERE workspace=? AND deleted=0 AND ((category_id IS NULL AND reviewed=1) OR (category_id LIKE 'whab-system:transfer:%' AND is_transfer=0))", (workspace,))}}
+            return {"supported": True, "pending": classification_migration_required(state)}
+
+    def migrate_transaction_classifications(self, workspace):
+        from whab.domain.system_categories import migrate_classifications
+        return self._mutate(workspace, lambda state: {"changed": migrate_classifications(state)},
+                            write_if=lambda result: result["changed"], history_operation="migrate_system_categories")
+
+    def _migrate_classifications(self):
+        from whab.domain.system_categories import migrate_classifications
+        for workspace in ("personal", "demo"):
+            state = self._read_state(workspace)
+            if migrate_classifications(state):
+                with self._authority_write(workspace=workspace) as write:
+                    # Re-read under the native write lock; interrupted opens replay
+                    # only the missing correction, retaining immutable old history.
+                    state = self._read_state(workspace)
+                    if migrate_classifications(state):
+                        self._write_state(state)
+                        write.update(dirty=True, workspace=workspace, history_operation="migrate_system_categories")
 
     def close(self) -> None:
         with self._lock:
@@ -205,13 +236,7 @@ class Store(Authority):
         for row in self.db.execute(
             "SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,)
         ):
-            state["categories"][row["id"]] = {
-                "id": row["id"],
-                "name": row["name"],
-                "group": row["group_name"],
-                "target": row["target"],
-                "currency": row["currency"],
-            }
+            state["categories"][row["id"]] = category_record(row)
         for row in self.db.execute(
             "SELECT * FROM transactions WHERE workspace=? " + ("AND id IN (" + ",".join("?" for _ in transaction_ids) + ") " if transaction_ids is not None else "") + "ORDER BY rowid", (workspace, *(transaction_ids or ()))
         ):
@@ -289,9 +314,9 @@ class Store(Authority):
             ],
         )
         self.db.executemany(
-            "INSERT INTO categories(id,workspace,name,group_name,target,currency) VALUES(?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,group_name=excluded.group_name,target=excluded.target,currency=excluded.currency",
+            "INSERT INTO categories(id,workspace,name,group_name,target,currency,system_kind) VALUES(?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,group_name=excluded.group_name,target=excluded.target,currency=excluded.currency,system_kind=excluded.system_kind",
             [
-                (c["id"], workspace, c["name"], c["group"], c["target"], c.get("currency", "USD"))
+                (c["id"], workspace, c["name"], c["group"], c["target"], c.get("currency", "USD"), c.get("systemKind"))
                 for c in state["categories"].values()
             ],
         )
@@ -373,12 +398,23 @@ class Store(Authority):
         operation: Callable[[dict], Any],
         *,
         write_if: Callable[[Any], bool] | None = None,
+        history_operation=None,
     ) -> Any:
         with self._authority_write(workspace=workspace) as transaction:
             transaction["workspace"] = workspace
+            if history_operation is not None:
+                transaction["history_operation"] = history_operation
             state = self.state(workspace)
             result = operation(state)
             if write_if is None or write_if(result):
+                from copy import deepcopy
+
+                from whab.domain.system_categories import migrate_classifications
+                restored = deepcopy(state) if transaction.get("history_restore") else None
+                corrected = migrate_classifications(state)
+                if corrected and restored is not None:
+                    from whab.domain.history import record_states
+                    record_states(restored, state, {"actor": "System", "actorKind": "system", "operation": "migrate_system_categories"})
                 self._write_state(state)
                 transaction["dirty"] = True
             return result
@@ -625,10 +661,7 @@ class Store(Authority):
         with self._snapshot():
             self._require_workspace(workspace)
             return public_categories({
-                row["id"]: {
-                    "id": row["id"], "name": row["name"], "group": row["group_name"],
-                    "target": row["target"], "currency": row["currency"],
-                }
+                row["id"]: category_record(row)
                 for row in self.db.execute(
                     "SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,),
                 )
@@ -1054,6 +1087,15 @@ class Store(Authority):
                         # A provider suggestion is optional and cannot cross currencies
                         # or introduce a parent/dangling category reference.
                         normalized_transaction["categoryId"] = None
+                from whab.domain.system_categories import (
+                    ensure_system_categories,
+                    normalize_transaction,
+                    system_kind,
+                )
+                ensure_system_categories(state)
+                if system_kind(state["categories"].get(normalized_transaction["categoryId"])) == "transfer":
+                    normalized_transaction["isTransfer"] = True
+                normalize_transaction(state, normalized_transaction, classify_transfers=not normalized_transaction["categoryEdited"])
                 state["transactions"][transaction_id] = normalized_transaction
                 if pending is not None and pending["id"] != transaction_id:
                     # Keep the user's picture when a provider replaces a pending

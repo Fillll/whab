@@ -6,6 +6,8 @@ from whab.domain import commands
 from whab.domain.transactions import category_agent_fields
 from whab.plugins import UNSET, StoreError
 
+from .categories import category_record
+
 
 def edit_transaction(
     store, workspace: str, transaction_id: str, category_id=UNSET,
@@ -20,10 +22,7 @@ def edit_transaction(
             state = {
                 "accounts": {row["id"]: row for row in store._read_accounts(workspace)},
                 "categories": {
-                    row["id"]: {
-                        "id": row["id"], "name": row["name"], "group": row["group_name"],
-                        "target": row["target"], "currency": row["currency"],
-                    }
+                    row["id"]: category_record(row)
                     for row in store.db.execute("SELECT * FROM categories WHERE workspace=?", (workspace,))
                 },
                 "transactions": {},

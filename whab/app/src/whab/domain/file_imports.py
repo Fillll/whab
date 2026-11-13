@@ -82,7 +82,7 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
         optional=frozenset({"onBudget", "subtype", "closed"}),
     )
     accounts = tuple(normalize_account(account) for account in accounts)
-    categories = _records(data.categories, {"id", "name", "group", "target"}, 10000)
+    categories = _records(data.categories, {"id", "name", "group", "target"}, 10000, optional=frozenset({"systemKind"}))
     transactions = _records(
         data.transactions,
         {

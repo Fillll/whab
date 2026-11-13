@@ -40,6 +40,8 @@ def build_initial_state(workspace: str, month: str, *, as_of_date=None) -> dict:
         }
         for name, group, target in CATEGORY_TEMPLATE
     }
+    from whab.domain.system_categories import ensure_system_categories, system_category
+    ensure_system_categories(state)
     if workspace != "demo":
         return state
     for account_id, name, kind, balance, mask in [
@@ -94,7 +96,7 @@ def build_initial_state(workspace: str, month: str, *, as_of_date=None) -> dict:
                 "merchant": merchant,
                 "merchantLogo": None,
                 "amount": amount,
-                "categoryId": category,
+                "categoryId": category if category is not None else system_category("income")["id"],
                 "pending": False,
                 "reviewed": True,
                 "source": "demo",

@@ -66,7 +66,7 @@ def test_mixed_one_commit_preview_replay_history_and_undo(native):
     commits = []
     service._on_commit = lambda: commits.append(True)
     edits = [
-        {"transactionId": t[0], "categoryId": None, "categoryAgent": None, "reviewed": True},
+        {"transactionId": t[0], "categoryId": None, "categoryAgent": None, "reviewed": False},
         {
             "transactionId": t[1],
             "categoryId": c,

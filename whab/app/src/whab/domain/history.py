@@ -30,7 +30,7 @@ _COLLECTIONS = {
 }
 _FIELDS = {
     'accounts': (ACCOUNT_FIELDS, {'bankWebsite', 'nameOverridden', 'closed'}),
-    'categories': (CATEGORY_FIELDS, set()),
+    'categories': (CATEGORY_FIELDS, {'systemKind'}),
     'transactions': (TRANSACTION_FIELDS, {'categoryAgent', 'original'}),
     'assignments': (ASSIGNMENT_FIELDS, set()),
     'futureFunding': (FUTURE_FUNDING_FIELDS, set()),
@@ -294,6 +294,12 @@ def preview(journal, current, action, target):
         wanted = unflatten(rows)
     else:
         raise StoreError('Choose undo, redo, restore or snapshot.')
+    from .ledger_state import portable_snapshot, restore_snapshot
+    from .system_categories import migrate_classifications
+    candidate = {}
+    restore_snapshot(candidate, wanted, mark_external_stale=False)
+    migrate_classifications(candidate)
+    wanted = financial(portable_snapshot(candidate, validate=False))
     changes = difference(current, wanted)
     return {'action': action, 'target': target, 'changes': changes,
             'fingerprint': digest([digest(current), action, target, changes]), 'state': wanted}

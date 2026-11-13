@@ -1,12 +1,12 @@
 [project]
 name = "whab_plugin_ynab"
-version = "1.4.7"
+version = "1.5.0"
 description = "Local YNAB ZIP import plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.15,<3.16"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.31,<3"]
+dependencies = ["whab>=2.73,<3"]
 
 [project.entry-points."whab.plugins"]
 ynab = "whab_plugin_ynab.plugin:plugin"

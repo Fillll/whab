@@ -267,3 +267,7 @@ bounds. This changes the visible shortcut, not financial or storage rules.
 See the [budget history workflow](../../../../docs/usage.md#budget-history).
 This version requires WHAB 2.62+. History is saved atomically with financial
 changes and retained across reopen and exports. Earlier changes are not backfilled.
+
+## Review and system classifications
+
+Reviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.

@@ -65,7 +65,7 @@ class Store(Authority):
     Synchronous methods must be called on the host's existing blocking-I/O pool.
     """
 
-    def __init__(self, path, *, month=None, commit_hook=None, budget_id="default", environment="sandbox", initial_role="primary", read_only=False):
+    def __init__(self, path, *, month=None, commit_hook=None, budget_id="default", environment="sandbox", initial_role="primary", read_only=False, migrate=True):
         if type(initial_role) is not str or initial_role not in {"primary", "staged", "copy"}:
             raise StoreError("New storage requires a primary, staged or copy role.")
         self.path = Path(path).absolute()
@@ -116,6 +116,12 @@ class Store(Authority):
                     },
                 }
                 self._commit(self._data)
+            if not read_only and migrate:
+                from whab.domain.system_categories import migrate_classifications
+                for name in ("personal", "demo"):
+                    candidate = copy.deepcopy(self._data["workspaces"][name])
+                    if migrate_classifications(candidate):
+                        self._mutate(name, migrate_classifications, history_operation="migrate_system_categories")
         except BaseException:
             if self._writer is not None:
                 self._writer.close()
@@ -234,9 +240,23 @@ class Store(Authority):
             if self._pending is not None:
                 if not record_history:
                     self._pending["historyRestore"] = workspace
-                return operation(self._pending["workspaces"][workspace])
+                result = operation(self._pending["workspaces"][workspace])
+                from whab.domain.system_categories import migrate_classifications
+                state = self._pending["workspaces"][workspace]
+                restored = copy.deepcopy(state) if not record_history else None
+                corrected = migrate_classifications(state)
+                if corrected and not record_history:
+                    from whab.domain.history import record_states
+                    record_states(restored, state, {"actor": "System", "actorKind": "system", "operation": "migrate_system_categories"})
+                return result
             candidate = copy.deepcopy(self._data)
             result = operation(candidate["workspaces"][workspace])
+            from whab.domain.system_categories import migrate_classifications
+            restored = copy.deepcopy(candidate["workspaces"][workspace]) if not record_history else None
+            corrected = migrate_classifications(candidate["workspaces"][workspace])
+            if corrected and not record_history:
+                from whab.domain.history import record_states
+                record_states(restored, candidate["workspaces"][workspace], {"actor": "System", "actorKind": "system", "operation": "migrate_system_categories"})
             if write_if is None or write_if(result):
                 from whab.domain.history import record_states
                 if record_history:
@@ -246,6 +266,18 @@ class Store(Authority):
                 candidate["authority"]["empty"] = False
                 self._commit(candidate)
             return result
+
+    def transaction_classification_status(self, workspace):
+        from whab.domain.system_categories import classification_migration_required
+        self._workspace_name(workspace)
+        with self._lock:
+            self._check_current()
+            return {"supported": True, "pending": classification_migration_required(self._data["workspaces"][workspace])}
+
+    def migrate_transaction_classifications(self, workspace):
+        from whab.domain.system_categories import migrate_classifications
+        return self._mutate(workspace, lambda state: {"changed": migrate_classifications(state)},
+                            write_if=lambda result: result["changed"], history_operation="migrate_system_categories")
 
     def accounts(self, workspace):
         return [normalize_account({"balanceUnknown": False, "stale": False, **record})

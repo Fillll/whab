@@ -6,6 +6,8 @@ from whab.domain.portable import ACCOUNT_FIELDS
 from whab.domain.transactions import category_agent_fields
 from whab.plugins import StoreError
 
+from .categories import category_record
+
 
 def snapshot(store, workspace, *, transaction_ids=None, include_history=True):
     """Read only public columns atomically; the caller must validate the result."""
@@ -20,9 +22,8 @@ def snapshot(store, workspace, *, transaction_ids=None, include_history=True):
              **{key: record[key] for key in ("bankWebsite", "nameOverridden", "closed") if key in record and (key != "closed" or record[key])}}
             for record in store._read_accounts(workspace)
         ]
-        categories = [dict(row) for row in store.db.execute(
-            'SELECT id,name,group_name AS "group",target,currency FROM categories WHERE workspace=? ORDER BY rowid',
-            (workspace,),
+        categories = [category_record(row) for row in store.db.execute(
+            'SELECT * FROM categories WHERE workspace=? ORDER BY rowid', (workspace,),
         )]
         transactions = []
         original_column = "original_details" in {row["name"] for row in store.db.execute("PRAGMA table_info(transactions)")}

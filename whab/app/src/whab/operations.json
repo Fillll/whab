@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "core",
-  "summary": "Public budgeting operations shared by interfaces. Money is integer minor units; revision and request ID are required for mutations. Query results are wrapped in budgetId/revision/data.",
+  "summary": "Public budgeting operations shared by interfaces. Money is integer minor units; revision and request ID are required for mutations. Query results are wrapped in budgetId/revision/data.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
   "delegates": [],
   "operations": [
     {
@@ -112,7 +112,7 @@
     {
       "name": "categories",
       "kind": "query",
-      "summary": "List assignable budget categories and currency/group metadata.",
+      "summary": "List assignable budget categories and currency/group metadata.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -1259,7 +1259,7 @@
     {
       "name": "add_transaction",
       "kind": "command",
-      "summary": "Create a manual transaction. Amount must be nonzero and category currency must match the account.",
+      "summary": "Create a manual transaction. Amount must be nonzero and category currency must match the account.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -1348,7 +1348,7 @@
     {
       "name": "edit_transaction",
       "kind": "command",
-      "summary": "Edit a transaction category, note, review flag or supported details. At least one editable field is required.",
+      "summary": "Edit a transaction category, note, review flag or supported details. At least one editable field is required.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -1453,7 +1453,7 @@
     {
       "name": "review_transactions",
       "kind": "command",
-      "summary": "Set review status for a bounded transaction selection.",
+      "summary": "Set review status for a bounded transaction selection.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -1513,7 +1513,7 @@
     {
       "name": "assign",
       "kind": "command",
-      "summary": "Set an envelope assignment, preserving funding-capacity and currency rules.",
+      "summary": "Set an envelope assignment, preserving funding-capacity and currency rules.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -2830,7 +2830,7 @@
       "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
       "name": "history_apply",
       "kind": "command",
-      "summary": "Commit the reviewed history action atomically as a new append-only history event.",
+      "summary": "Commit the reviewed history action atomically as a new append-only history event.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Explicit budget/workspace history parameters.",
@@ -2892,7 +2892,7 @@
     {
       "name": "category_tree",
       "kind": "query",
-      "summary": "Read real parent groups and assignable children, including saved empty groups.",
+      "summary": "Read real parent groups and assignable children, including saved empty groups.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -3025,7 +3025,7 @@
     {
       "name": "move_category",
       "kind": "command",
-      "summary": "Move an existing child to an existing parent without changing its ID, currency, target, transactions or monthly assignments.",
+      "summary": "Move an existing child to an existing parent without changing its ID, currency, target, transactions or monthly assignments.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "properties": {
@@ -3080,7 +3080,7 @@
     {
       "name": "delete_category",
       "kind": "command",
-      "summary": "Delete one unused child and all of its zero-only monthly assignment rows in one guarded, audited operation.",
+      "summary": "Delete one unused child and all of its zero-only monthly assignment rows in one guarded, audited operation.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "properties": {
@@ -3318,7 +3318,7 @@
     {
       "name": "rename_category",
       "kind": "command",
-      "summary": "Rename one existing child in place, preserving identity, parent, currency, target, transactions, assignments and audit history.",
+      "summary": "Rename one existing child in place, preserving identity, parent, currency, target, transactions, assignments and audit history.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "properties": {
@@ -3428,7 +3428,7 @@
     {
       "name": "edit_transactions",
       "kind": "command",
-      "summary": "Atomically edit mixed transaction annotations with one guarded native commit and durable save.",
+      "summary": "Atomically edit mixed transaction annotations with one guarded native commit and durable save.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -3685,7 +3685,7 @@
     {
       "name": "preview_bulk_edits",
       "kind": "query",
-      "summary": "Read-only core validation and complete exact before/after plan for one atomic batch.",
+      "summary": "Read-only core validation and complete exact before/after plan for one atomic batch.\n\nReviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",

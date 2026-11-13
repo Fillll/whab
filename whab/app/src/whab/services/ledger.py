@@ -144,9 +144,42 @@ class LedgerService:
                 raise StoreError("Feature parameters do not match its documented input fields. Read operation help.") from None
         return callback(workspace, payload["action"], deepcopy(payload["parameters"]))
 
+    def _ensure_classifications(self):
+        # Readiness/code handover must remain read-only. The first admitted public
+        # access commits corrections through the same durable intent/checkpoint
+        # path as other native writes. Unresolved writes fence this operation.
+        backend = getattr(self._store, 'store', self._store)
+        if getattr(self, '_classifying', False) or getattr(self, '_classifications_ready_for', None) is backend:
+            return
+        status = getattr(self._store, 'transaction_classification_status', None)
+        migrate = getattr(self._store, 'migrate_transaction_classifications', None)
+        if not callable(status) or not callable(migrate):
+            self._classifications_supported = False
+            return
+        self._classifying = True
+        try:
+            for workspace in ('personal', 'demo'):
+                readiness = status(workspace)
+                if type(readiness) is not dict or readiness.keys() != {'supported', 'pending'} or type(readiness['supported']) is not bool or type(readiness['pending']) is not bool:
+                    raise StoreError('Update the storage plugin to provide transaction classification readiness.')
+                if not readiness['supported']:
+                    self._classifications_supported = False
+                    self._classifications_ready_for = backend
+                    return
+                if readiness['pending']:
+                    migrate(workspace)
+                    self._revision = str(uuid4())
+                    if self._on_commit is not None:
+                        self._on_commit()
+            self._classifications_supported = True
+            self._classifications_ready_for = backend
+        finally:
+            self._classifying = False
+
     @property
     def revision(self) -> str:
         with self._lock:
+            self._ensure_classifications()
             return self._revision
 
     @property
@@ -169,6 +202,7 @@ class LedgerService:
         capabilities never become public command names or remote methods.
         """
         with self._lock:
+            self._ensure_classifications()
             result = operation()
             self._revision = str(uuid4())
             if self._on_commit is not None:
@@ -183,6 +217,7 @@ class LedgerService:
     def search_transactions(self, workspace, filters):
         self._workspace(workspace)
         with self._lock:
+            self._ensure_classifications()
             serialized = getattr(self._store, "search_transactions_json", None)
             if callable(serialized):
                 from whab.plugins.storage_transfer import read_storage_json
@@ -199,6 +234,7 @@ class LedgerService:
         if month is not None:
             _month(month)
         with self._lock:
+            self._ensure_classifications()
             if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_bulk_edits"}:
                 raise StoreError("Only feature queries accept parameters.")
             if operation == 'preview_bulk_edits':
@@ -443,6 +479,7 @@ class LedgerService:
             intent, sort_keys=True,
         ).encode()).hexdigest()
         with self._lock:
+            self._ensure_classifications()
             if request_id in self._receipts:
                 previous, response, _ = self._receipts[request_id]
                 if previous != fingerprint:
@@ -453,6 +490,8 @@ class LedgerService:
                 replayed = durable_replay(request_id, fingerprint)
                 if replayed is not None:
                     return deepcopy(replayed)
+            if operation in {'add_transaction', 'edit_transaction', 'edit_transactions', 'review_transactions', 'append_transaction_note', 'history_apply'} and not getattr(self, '_classifications_supported', False):
+                raise StoreError('Update the budget host/storage to WHAB 2.73 transaction classification support before editing transactions or applying history.')
             if expected_revision != self._revision:
                 raise RevisionConflict("Budget changed. Refresh before making this change.")
             response_revision = str(uuid4())
@@ -588,6 +627,7 @@ class LedgerService:
         _month(month)
         currency = currency_code(currency)
         with self._lock:
+            self._ensure_classifications()
             read = getattr(self._store, "account_overview", None)
             data = _public(read(workspace, month, currency) if callable(read)
                            else self._store.workspace(workspace, month))
@@ -642,6 +682,7 @@ class LedgerService:
         if start_date is not None and end_date is not None and start_date > end_date:
             raise StoreError("Start date must not be after end date.")
         with self._lock:
+            self._ensure_classifications()
             read = getattr(self._store, "transaction_register", None)
             filtered_read = getattr(self._store, "transaction_register_filtered", None)
             if callable(filtered_read) and (account_ids is not None or start_date is not None or end_date is not None):
@@ -691,6 +732,7 @@ class LedgerService:
     ) -> dict:
         """Tag each bounded register read with the same locked ledger revision."""
         with self._lock:
+            self._ensure_classifications()
             data = self._transaction_page(
                 workspace, month, currency, account_id, account_ids=account_ids,
                 start_date=start_date, end_date=end_date, search=search, review=review,
@@ -851,6 +893,7 @@ class LedgerService:
         remaining = (2200 - year) * 12 + (12 - number) + 1
         count = min(count, remaining)
         with self._lock:
+            self._ensure_classifications()
             read = getattr(self._store, "workspace_periods", None)
             if callable(read):
                 return _public(read(workspace, month, count))
@@ -861,6 +904,7 @@ class LedgerService:
 
     def _local_command(self, operation, workspace, payload):
         with self._lock:
+            self._ensure_classifications()
             return self.command(
                 operation, workspace, payload, request_id=str(uuid4()),
                 expected_revision=self._revision,
@@ -877,6 +921,7 @@ class LedgerService:
         self._workspace(workspace)
         _identifier(account_id)
         with self._lock:
+            self._ensure_classifications()
             read = getattr(self._store, "account_settings", None)
             if callable(read):
                 result = _public(read(workspace, account_id))
@@ -909,6 +954,7 @@ class LedgerService:
         self._workspace(workspace)
         _identifier(request_id)
         with self._lock:
+            self._ensure_classifications()
             previous = self._receipts.get(request_id)
             revision = previous[2] if previous is not None else self._revision
             return self.command("add_transaction", workspace, transaction,
@@ -955,6 +1001,7 @@ class LedgerService:
         self._workspace(workspace)
         _identifier(request_id)
         with self._lock:
+            self._ensure_classifications()
             previous = self._receipts.get(request_id)
             revision = previous[2] if previous is not None else self._revision
             return self.command(

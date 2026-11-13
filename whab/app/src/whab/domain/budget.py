@@ -11,6 +11,7 @@ from .categories import category_tree, ensure_child_category, public_categories
 from .dates import shift_month
 from .errors import StoreError
 from .money import MAX_SAFE_INTEGER, currency_code, currency_minor_units, minor_units
+from .system_categories import protect_system_category, system_kind
 from .transactions import public_transaction
 from .validation import validate_month
 
@@ -105,10 +106,14 @@ def _currency_history(state: dict) -> dict:
         transactions[source].append(row)
         if not row["pending"]:
             posted[source][row["accountId"]] += row["amount"]
-        if row.get("pending") or row.get("isTransfer") or row["accountId"] not in on_budget:
+        if row.get("pending") or row.get("isTransfer") or system_kind(state["categories"].get(row.get("categoryId"))) == "transfer" or row["accountId"] not in on_budget:
             continue
         category = row.get("categoryId")
         amount = row["amount"]
+        if system_kind(state["categories"].get(category)) == "income":
+            if state["accounts"][row["accountId"]].get("type") != "credit":
+                income[source] -= amount
+            continue
         spending[source][category] += amount
         if amount < 0 and category is None and state["accounts"][row["accountId"]].get("type") != "credit":
             income[source] -= amount
@@ -151,6 +156,8 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         )
     budget = []
     for category in state["categories"].values():
+        if system_kind(category):
+            continue
         category_id = category["id"]
         assigned = state["budget"].get(month, {}).get(category_id, 0) if month >= start else 0
         carryover = prior_assignments[category_id] - prior_spending[category_id]
@@ -222,6 +229,7 @@ def ensure_assignment_allowed(
     state: dict, category_id: str, month: str, assigned: int, as_of_month: str
 ) -> None:
     category = ensure_child_category(state["categories"], category_id)
+    protect_system_category(category)
     currency = category.get("currency", "USD")
     if month < state["budgetStartMonth"]:
         raise StoreError(
@@ -388,7 +396,7 @@ def _prepare_workspace(state: dict) -> dict:
     )
     for rows in state["budget"].values():
         for category_id in rows:
-            _known_child_category(categories, category_id)
+            protect_system_category(_known_child_category(categories, category_id))
     transactions = defaultdict(dict)
     for key, row in state["transactions"].items():
         account = accounts.get(row["accountId"])

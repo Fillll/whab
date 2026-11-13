@@ -1254,3 +1254,11 @@ revision/result; it is not a new read of current state. Conflicting request reus
 fails. Receipt expiry with stale evidence fails. Uncertain native/checkpoint results
 retain the existing fences; never silently replay with fresh identity or revision.
 `--batch` still only groups history entries across otherwise independent commits.
+
+## Transaction classification and review contract
+
+Reviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.
+
+Public `system_category(kind, currency="USD")` constructs a canonical `income` or `transfer` category record with `systemKind`. Persist that optional field exactly in categories, snapshots and audit records. Existing category IDs and shapes remain valid. A storage adapter implementing financial writes must enforce this core invariant for manual, bank, bulk and recovery paths; it must not treat system categories as envelopes. Unsupported adapters must refuse these classifications before writing rather than discard their kind. The current bundled adapters require WHAB 2.73; provider-supplied categories never cause review automatically.
+
+The optional `TransactionClassifications.transaction_classification_status(workspace)` returns `{supported: true, pending: bool}`. `migrate_transaction_classifications(workspace)` returns `{changed: bool}` and uses the fixed local storage operation contract. It is not an advanced HTTP command. Current `CategorySnapshot.system_kind` derives from validated canonical identity without changing its wire fields; system snapshot envelope amounts are zero.

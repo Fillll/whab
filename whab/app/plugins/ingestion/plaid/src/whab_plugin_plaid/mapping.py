@@ -4,6 +4,7 @@ from whab.domain.errors import StoreError
 from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
 from whab.domain.money import dollars_to_cents
 from whab.domain.validation import validate_date
+from whab.plugins import system_category
 
 from .logos import logo_key
 
@@ -47,8 +48,10 @@ def transfer_category(transaction: dict) -> bool:
 def suggest_category(transaction: dict) -> str | None:
     category = transaction.get("personal_finance_category") or {}
     primary, detailed = category.get("primary", ""), category.get("detailed", "")
-    if transfer_category(transaction) or primary == "INCOME":
-        return None
+    if transfer_category(transaction):
+        return system_category("transfer")["id"]
+    if primary == "INCOME":
+        return system_category("income")["id"]
     for keyword, result in [
         ("GROCERIES", "groceries"),
         ("FOOD_AND_DRINK", "dining"),

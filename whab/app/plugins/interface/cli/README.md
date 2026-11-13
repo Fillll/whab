@@ -1035,3 +1035,24 @@ workflow savings, commit/checkpoint counts, cold timings and independent restora
 evidence. The final measured tables, target misses and validation evidence are in
 [PR #188](https://github.com/Fillll/whab/pull/188). The 250 ms p95 is a measured target,
 not a promise for arbitrary hardware, maximum memo sizes, cold work or full-file JSON.
+
+## Review and system classifications
+
+Reviewed transactions require a valid category. No category means uncategorized and non-reviewed. Assigning a category alone never marks reviewed; clearing it also clears review. Explicit reviewed=true without a category rejects the entire operation before mutation. Transfer and Income are protected system categories with stable currency-scoped IDs (whab-system:transfer:USD and whab-system:income:USD), canonical systemKind metadata and target zero; they are selectable transaction classifications, not assignable expense envelopes. User categories with the same display names keep their own identities; ambiguous names require an exact ID or full path. Amount signs alone never classify Income. Imported clearing and category-agent labels do not establish a human reviewer's identity.
+
+```sh
+whab "My budget" category list --format table
+whab "My budget" trnx categorize TX1 --category "System / Transfer" --agent Codex
+whab "My budget" trnx categorize TX2 --category "System / Income" --agent Codex
+whab "My budget" trnx review TX1 TX2 --agent Codex --dry-run
+whab "My budget" trnx review TX1 TX2 --agent Codex --revision PREVIEW_REVISION
+whab "My budget" trnx unreview TX1
+whab "My budget" trnx categorize TX2 --clear
+whab "My budget" trnx list --since 2026-11-01 --format table
+whab "My budget" history list
+```
+
+Use exact IDs from discovery when several currencies or user display names collide.
+`--agent` labels audit metadata for review; it does not replace category attribution.
+The dry-run is read-only and execution remains noninteractive. Preserve the exact
+returned intent after uncertainty; do not replay with a new revision/request ID.

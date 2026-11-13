@@ -30,6 +30,7 @@ def _without_additive_columns(schema):
     return [(*row[:3], row[3].replace(", closed INTEGER NOT NULL DEFAULT 0", "")) if row[1] == 'accounts'
             else (*row[:3], row[3].replace(", closed_account_cursors TEXT", "")) if row[1] == 'items'
             else (*row[:3], row[3].replace(", category_groups TEXT", "")) if row[1] == "meta"
+            else (*row[:3], row[3].replace(", system_kind TEXT", "")) if row[1] == "categories"
             else row for row in schema]
 
 
