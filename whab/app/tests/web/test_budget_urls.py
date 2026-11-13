@@ -235,7 +235,7 @@ def test_lowercase_filter_encoding_preserves_case_sensitive_identifiers():
     category = "Mixed CASE/£"
     address = page_url("home", "transactions", "2026-10", "USD", category=category)
     assert address == address.lower()
-    assert urlsplit(address).path == "/budgets/home/transactions/2026-10/usd"
+    assert urlsplit(address).path == "/budgets/home/transactions/2026-10"
     assert parse_qs(urlsplit(address).query) == {"category": [category]}
 
 

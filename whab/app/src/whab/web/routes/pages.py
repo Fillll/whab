@@ -70,13 +70,27 @@ def create_router(
             )
         return RedirectResponse(target, status_code=303)
 
+    @router.get("/budgets/{key}/{account_slug}/transactions/{month_token}", response_class=HTMLResponse)
+    @router.get("/budgets/{key}/{account_slug}/transactions/{month_token}/{currency}", response_class=HTMLResponse)
+    def account_index(
+        request: Request, key: str, account_slug: str, month_token: str, currency: str = "USD",
+        category: str | None = None, account: str | None = None, all_dates: bool = False,
+        accounts: list[str] | None = Query(default=None), period: str | None = None,
+        start_date: str | None = None, end_date: str | None = None,
+        review: Literal["all", "needs-review", "reviewed"] = "all",
+    ):
+        return index(request, key, "transactions", month_token, currency,
+                     category=category, account=account, all_dates=all_dates, accounts=accounts,
+                     period=period, start_date=start_date, end_date=end_date, review=review)
+
+    @router.get("/budgets/{key}/transactions/{month_token}", response_class=HTMLResponse)
     @router.get("/budgets/{key}/{page}/{month_token}/{currency}", response_class=HTMLResponse)
     def index(
         request: Request,
         key: str,
-        page: str,
-        month_token: str,
-        currency: str,
+        page: str = "transactions",
+        month_token: str = "current-month",
+        currency: str = "USD",
         category: str | None = None,
         account: str | None = None,
         all_dates: bool = False,
@@ -353,17 +367,5 @@ def create_router(
             raise PluginError(
                 "The selected user interface could not render this page.", code="ui_render_failed"
             ) from None
-
-    @router.get("/budgets/{key}/{account_slug}/transactions/{month_token}/{currency}", response_class=HTMLResponse)
-    def account_index(
-        request: Request, key: str, account_slug: str, month_token: str, currency: str,
-        category: str | None = None, account: str | None = None, all_dates: bool = False,
-        accounts: list[str] | None = Query(default=None), period: str | None = None,
-        start_date: str | None = None, end_date: str | None = None,
-        review: Literal["all", "needs-review", "reviewed"] = "all",
-    ):
-        return index(request, key, "transactions", month_token, currency,
-                     category=category, account=account, all_dates=all_dates, accounts=accounts,
-                     period=period, start_date=start_date, end_date=end_date, review=review)
 
     return router

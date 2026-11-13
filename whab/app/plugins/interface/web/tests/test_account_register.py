@@ -31,7 +31,7 @@ def test_sidebar_accounts_open_all_dates_and_keep_account_management_separate(cl
     account_links = re.findall(r'<a class="sidebar-account" href="([^"]+)"', management)
     assert len(account_links) == 2
     address = urlsplit(unescape(account_links[0]))
-    assert address.path == "/budgets/my-budget/first-wallet/transactions/2026-10/usd"
+    assert address.path == "/budgets/my-budget/first-wallet/transactions/2026-10"
     assert parse_qs(address.query) == {"all_dates": ["true"]}
     assert 'href="/budgets/my-budget/accounts/2026-10/usd"' in management
     register = client.get(unescape(account_links[0])).text
@@ -44,7 +44,7 @@ def test_sidebar_accounts_open_all_dates_and_keep_account_management_separate(cl
     assert f'<option value="{first}" selected>First wallet</option>' in register
     assert 'id="transaction-period-toggle"' in register and 'data-period-label>All</span>' in register
     assert '2 transactions · All dates' in register
-    assert re.search(r'<a class="sidebar-account"[^>]*href="[^"]*/first-wallet/transactions/2026-10/usd\?all_dates=true"[^>]*aria-current="page"', register)
+    assert re.search(r'<a class="sidebar-account"[^>]*href="[^"]*/first-wallet/transactions/2026-10\?all_dates=true"[^>]*aria-current="page"', register)
     monthly = client.get(f"/budgets/home/transactions/2026-10/usd?account={first}").text
     assert len(register_rows(monthly)) == 1
     assert "Earlier first purchase" not in monthly

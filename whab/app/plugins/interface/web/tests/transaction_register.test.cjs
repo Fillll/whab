@@ -132,6 +132,8 @@ function harness(count = 5, options = {}) {
       const pending = deferred(); imageRequests.push({path, details, ...pending}); return pending.promise;
     },
   };
+  const routeSource = fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/client.js'), 'utf8');
+  vm.runInNewContext(routeSource.slice(routeSource.indexOf('export function parsePageRoute'), routeSource.indexOf('export function apiUrl')).replaceAll('export function ', 'function '), context);
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/transaction-grid.js'), 'utf8').replaceAll('export function ', 'function '), context);
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/transaction-stream.js'), 'utf8').replaceAll('export function ', 'function '), context);
   vm.runInNewContext(source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function '), context);

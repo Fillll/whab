@@ -60,18 +60,20 @@ Browser addresses identify the saved budget and selected view:
 
 ```text
 /budgets/<budget-slug>/<page>/<month>/<currency>
-/budgets/<budget-slug>/<account-slug>/transactions/<month>/<currency>
+/budgets/<budget-slug>/transactions/<month>
+/budgets/<budget-slug>/<account-slug>/transactions/<month>
 ```
 
-Every segment is lowercase, including the currency code. Visible budget names and ISO currency labels keep their ordinary capitalization. API payloads and stored currencies continue to use uppercase ISO codes such as `USD`; lowercase is the browser address policy.
+USD Transactions addresses omit the currency suffix; absence means USD. Non-USD registers keep an explicit suffix (for example `/eur`), and other workspace pages retain their currency suffix. Existing `/usd` transaction bookmarks remain supported and the browser replaces them with the shorter address. Every segment is lowercase, including an explicit currency code. Visible budget names and ISO currency labels keep their ordinary capitalization. API payloads and stored currencies continue to use uppercase ISO codes such as `USD`; lowercase is the browser address policy.
 
 | View | Address |
 | --- | --- |
 | Original budget, current month | `/budgets/my-budget/budget/current-month/usd` |
+| Original budget, current register | `/budgets/my-budget/transactions/current-month` |
 | Original budget, fixed month | `/budgets/my-budget/transactions/2026-10/eur` |
 | Fictional sample budget | `/budgets/demo/accounts/current-month/usd` |
 | Named budget | `/budgets/family-budget/budget/current-month/usd` |
-| Account register | `/budgets/family-budget/daily-checking/transactions/current-month/usd?all_dates=true` |
+| Account register | `/budgets/family-budget/daily-checking/transactions/current-month?all_dates=true` |
 
 Budget and account names produce readable lowercase aliases. Accented Latin names are normalized, Cyrillic names are transliterated, and punctuation becomes hyphens. Duplicate names get short numeric suffixes; IDs provide a fallback when a name cannot produce a slug. The permanent IDs remain financial identities. The device-local `WHAB_HOME/budgets/routes-<environment>.json` registry retains previous aliases so a rename does not break bookmarks or let a duplicate name capture them. That registry is separate from portable `.whab` files. Legacy UUID budget addresses, the original budget's `home` alias, and `?account=<id>` links remain supported. The browser replaces them with the readable address without loading the page again.
 

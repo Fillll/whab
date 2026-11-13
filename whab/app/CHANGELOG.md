@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.73.0 — 2026-11-13
+
+PR: [#192](https://github.com/Fillll/whab/pull/192)
+
+- Add shorter USD Transactions addresses ending at the selected month, including account registers. Keep legacy currency-suffixed bookmarks working, preserve non-USD scope and budget isolation, and expose the shorter canonical address to visual interfaces.
+
 ## 2.72.0 — 2026-11-11
 
 PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)

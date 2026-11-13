@@ -37,8 +37,8 @@ def test_ui_helpers_and_template_execution_stay_inside_renderer(tmp_path):
     value = arguments()
     assert "FICTIONAL_PRIVATE" not in repr(value)
     output = render_page(ui, value).decode()
-    assert output == ('$12.34|/budgets/home/fictional-bank/transactions/current-month/usd|'
-                      '/budgets/demo/transactions/current-month/usd?account=%52aw%49%44|1|fictional,second|'
+    assert output == ('$12.34|/budgets/home/fictional-bank/transactions/current-month|'
+                      '/budgets/demo/transactions/current-month?account=%52aw%49%44|1|fictional,second|'
                       'TrueTrue|<span>$12.34</span>|&lt;script&gt;fictional&lt;/script&gt;|absent')
 
 

@@ -1,5 +1,5 @@
 /* Small register controls. Financial validation and persistence stay on the server. */
-import {api, apiUrl, getContext, notify, pageUrl, updateContext} from './client.js';
+import {api, apiUrl, getContext, notify, pagePath, pageUrl, parsePageRoute, updateContext} from './client.js';
 import {initAccountPicker} from './account-picker.js';
 import {initPeriodPicker} from './period-picker.js';
 import {initTransactionGrid, parseRegisterAmount} from './transaction-grid.js';
@@ -114,9 +114,8 @@ export function transactionControlUrl(base, link) {
     for (const value of updated) if (value) url.searchParams.append('sort', value);
   } else {
     const target = new URL(link.href);
-    const parts = url.pathname.split('/');
-    parts[parts.length - 2] = target.pathname.split('/').at(-2);
-    url.pathname = parts.join('/');
+    const current = parsePageRoute(url), destination = parsePageRoute(target);
+    url.pathname = pagePath(`/budgets/${current.budget}`, current.page, destination.month, current.currency, current.accountSlug);
     for (const key of ['period', 'all_dates', 'start_date', 'end_date']) {
       url.searchParams.delete(key);
       for (const value of target.searchParams.getAll(key)) url.searchParams.append(key, value);

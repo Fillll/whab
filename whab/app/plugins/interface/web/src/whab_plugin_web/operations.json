@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with browser-saved text-column widths, complete-selection compound register sorting, Group > Category labels and calendar-month navigation; financial decisions use shared ledger operations.",
+  "summary": "Visual budgeting interface with USD Transactions addresses ending at the month (legacy /usd links remain supported), browser-saved text-column widths, complete-selection compound register sorting, Group > Category labels and calendar-month navigation; financial decisions use shared ledger operations.",
   "delegates": [
     "core"
   ],

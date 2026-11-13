@@ -163,9 +163,8 @@ initAccountSettings({
   api, readForm: formBody, updateFields: updateAccountFields,
   flush: flushEdits,
   async refresh({currency, changedCurrency}) {
-    const target = new URL(location.href);
+    const target = changedCurrency ? pageUrl({currency}) : new URL(location.href);
     if (changedCurrency) {
-      target.pathname = target.pathname.replace(/\/[a-z]{3}$/, '/' + currency.toLowerCase());
       location.assign(target);
     } else if (!(await accountNavigation.navigate(target, {history: 'replace', refresh: true}))) location.reload();
     bindLogos();

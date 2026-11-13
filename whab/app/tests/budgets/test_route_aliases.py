@@ -61,6 +61,7 @@ def test_aliases_cannot_inject_path_segments(value):
 
 
 def test_account_url_keeps_currency_month_and_legacy_case_sensitive_query_identity():
+    assert page_url("family-budget", "transactions", account_slug="cash-wallet") == "/budgets/family-budget/cash-wallet/transactions/current-month"
     assert page_url("family-budget", "transactions", "current-month", "EUR", account_slug="cash-wallet", all_dates="true") == "/budgets/family-budget/cash-wallet/transactions/current-month/eur?all_dates=true"
     assert page_url("family-budget", "budget", "2026-10", "USD", account_slug="unused") == "/budgets/family-budget/budget/2026-10/usd"
 

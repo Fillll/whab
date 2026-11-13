@@ -40,7 +40,7 @@ def module_imports(asset_prefix):
 
 def local_link(url):
     """Worker request origins are synthetic; browser links retain the live origin."""
-    return url.path + (f"?{url.query}" if url.query else "")
+    return url.path.removesuffix("/usd") + (f"?{url.query}" if url.query else "")
 
 
 def transaction_window(transactions, request, projection=None):
@@ -96,8 +96,8 @@ def transaction_window(transactions, request, projection=None):
 def transaction_month_links(request, month):
     """Calendar navigation keeps the selection and sorting, clearing old date bounds."""
     def link(target):
-        parts = request.url.path.split("/")
-        parts[-2] = target
+        parts = request.url.path.removesuffix("/usd").split("/")
+        parts[-1 if parts[-2] == "transactions" else -2] = target
         query = [(key, value) for key, value in request.query_params.multi_items()
                  if key not in {"period", "all_dates", "start_date", "end_date", "tx_page"}]
         if target == "current-month":

@@ -1,6 +1,6 @@
 # Web interface plugin
 
-Distributed independently as `whab_plugin_web`; this version requires WHAB 2.62+. Bounded register and account metadata reads require WHAB 2.14 or newer. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_web`; this version requires WHAB 2.73+. Bounded register and account metadata reads require WHAB 2.14 or newer. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
 `src/whab_plugin_web/` owns the bundled visual descriptor, view models, icons, Jinja templates and browser assets. Keep rendering and presentation tests alongside them in this folder. The host owns HTTPS routes and access guards through the public UI contract. Every request requires TLS; ordinary visual/private routes remain loopback-only, with only bearer-authorized remote protocol and verified bank-webhook routes exempt from local Host/origin checks.
 
@@ -50,6 +50,16 @@ For rendering or navigation performance changes, compare the same fictional work
 Use `--page accounts` or `--page budget` for the affected view, `--summary` for review summaries, and `--profile-memory` when allocation changes matter. Record the workload, route/filters, environment, response size and measured rendering result. These measurements exclude browser layout/network time; also exercise a disposable Sandbox runtime with comparable fictional history in the browser, retaining any seed fixture with the change. Observe initial display, interaction response, loading/error feedback, scrolling and network/console failures while editing and navigating. Report a regression or improvement against that baseline rather than inventing a numerical latency target. See the [development runbook](../../../../docs/development.md) for disposable runtime setup and running-version verification.
 
 ## Register rendering and navigation
+
+USD register addresses end at the month, for example
+`/budgets/my-budget/transactions/current-month` or
+`/budgets/my-budget/checking/transactions/2026-10`. An omitted currency means USD;
+other currencies keep their explicit suffix, such as `/2026-10/eur`. Legacy
+`/usd` bookmarks still load and the browser replaces them with the shorter
+canonical address. All generated navigation, sorting, date/account filters,
+incremental loading and browser history retain the selected budget and currency.
+Other workspace pages retain their existing currency suffix.
+
 
 Explicit categorizer provenance appears beside the category as **Agent · LABEL**.
 The escaped, bounded label is supplied through the public CLI/API; ordinary CLI

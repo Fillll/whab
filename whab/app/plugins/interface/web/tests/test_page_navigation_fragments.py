@@ -123,7 +123,7 @@ def test_transaction_fragment_keeps_exact_selection_dates_search_and_requested_p
     assert context["reviewFilter"] == "needs-review" and context["transactionSearch"] == "MiXeD & quoted"
     assert context["transactionRequestedPage"] == "999" and context["transactionPage"] == 1
     assert parse_qs(urlsplit(context["canonicalUrl"]).query) == parse_qs(urlsplit(path).query)
-    assert urlsplit(context["canonicalUrl"]).path == "/budgets/my-budget/transactions/2026-10/usd"
+    assert urlsplit(context["canonicalUrl"]).path == "/budgets/my-budget/transactions/2026-10"
     legacy = client.get(path, headers={"X-WHAB-Transactions-Fragment": "1"})
     assert PageMarkup(legacy.text).transaction_context == context
     assert client.get(context["canonicalUrl"], headers=FRAGMENT).status_code == 200
