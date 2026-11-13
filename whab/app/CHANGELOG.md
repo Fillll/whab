@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.75.1 — 2026-11-13
+
+PR: [#196](https://github.com/Fillll/whab/pull/196)
+
+- Bundle Web 1.53.1 so background sidebar count refreshes preserve edited transaction rows and selection, including rejected or failed summary responses.
+
 ## 2.75.0 — 2026-11-13
 
 PR: [#195](https://github.com/Fillll/whab/pull/195)
