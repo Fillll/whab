@@ -98,6 +98,7 @@ function harness(count = 5, options = {}) {
     getContext: () => ({bulkReview: options.bulkReview === true, receiptIndexScoped: options.receiptIndexScoped}),
     encodeURIComponent, location: {href: options.href || 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
+    initTransactionColumns() {return {dispose() {}};},
     updateContext: value => contexts.push(value),
     initAccountPicker(_, onChoose) {
       pickerChoose = onChoose;
