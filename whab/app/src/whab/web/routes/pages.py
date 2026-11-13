@@ -83,7 +83,6 @@ def create_router(
                      category=category, account=account, all_dates=all_dates, accounts=accounts,
                      period=period, start_date=start_date, end_date=end_date, review=review)
 
-
     @router.get("/budgets/{key}/transactions/{month_token}", response_class=HTMLResponse)
     @router.get("/budgets/{key}/{page}/{month_token}/{currency}", response_class=HTMLResponse)
     def index(
@@ -368,6 +367,5 @@ def create_router(
             raise PluginError(
                 "The selected user interface could not render this page.", code="ui_render_failed"
             ) from None
-
 
     return router

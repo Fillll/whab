@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.50.0 — 2026-11-13
+
+PR: [#192](https://github.com/Fillll/whab/pull/192)
+
+- Omit the default USD suffix from Transactions navigation, account links, month arrows, sort links and pagination. Recognize both short and legacy addresses, canonicalize without a reload, and retain currency/account/filter scope through refresh, in-place navigation and Back/Forward. Requires WHAB 2.73 or newer.
+
 ## 1.49.0 — 2026-11-13
 
 PR: [#191](https://github.com/Fillll/whab/pull/191)
