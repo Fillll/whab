@@ -134,7 +134,7 @@ def test_account_alias_and_exact_filters_keep_the_same_context_as_direct_pages(f
     assert context(fragment_client.get(canonical)) == first
     mismatch = fragment_client.get(canonical + f"&account={other}", headers=FRAGMENT)
     assert mismatch.status_code == 400 and "X-WHAB-Page-Fragment" not in mismatch.headers
-    wrong_currency = fragment_client.get(canonical.replace("/usd?", "/eur?"), headers=FRAGMENT)
+    wrong_currency = fragment_client.get(canonical.replace("?", "/eur?", 1), headers=FRAGMENT)
     assert wrong_currency.status_code == 404 and "X-WHAB-Page-Fragment" not in wrong_currency.headers
 
 
