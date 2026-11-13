@@ -4740,3 +4740,5 @@ html[data-sidebar='collapsed'] .app-shell > main { margin-left: 62px; }
   html[data-sidebar='expanded'] .sidebar-account > span > span,
   html[data-sidebar='expanded'] .sidebar-account small { display: inline; }
 }
+.transaction-toolbar:has(> h1.sr-only) > .button-group { max-width: none; }
+.topbar:not(:has(.topbar-right)) .breadcrumb { max-width: 100%; }
