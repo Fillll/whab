@@ -6,6 +6,7 @@ import {initTransactionGrid, parseRegisterAmount} from './transaction-grid.js';
 import {initTransactionStream} from './transaction-stream.js';
 import {initTransactionColumns} from './transaction-columns.js';
 import {bindLogos} from './logo-images.js';
+import {initTransferMatches} from './transfer-matches.js';
 
 export function createTransactionWriter(save, {saved = () => {}, state = () => {}} = {}) {
   let pending = {};
@@ -133,6 +134,10 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   const workspace = root.dataset.workspace;
   const grid = initTransactionGrid(root.querySelector('.transactions-table'));
   const columns = initTransactionColumns(root.querySelector('.transactions-table'));
+  const transfers = initTransferMatches({root, api, context: () => ({...getContext(), workspace}),
+    before: async () => (!draft || draft.hidden) && await flushRows(),
+    saved: async () => {onMutation(); notify('Transfer change saved. Both transactions still need review.'); await go(new URL(location.href), false, true);},
+  });
   const createForm = root.querySelector('[data-transaction-create]');
   const draft = root.querySelector('[data-new-transaction]');
   let creating = false, createRequestId = null;
@@ -681,13 +686,14 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   }
   async function flush() {
     if (draft && !draft.hidden) return false;
+    if (transfers.dirty && !await transfers.flush()) return false;
     return flushRows();
   }
   function beforeUnload(event) {
-    if (creating || draft && !draft.hidden || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
+    if (transfers.dirty || creating || draft && !draft.hidden || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
   }
   stream = initTransactionStream({root, context: {...getContext()},
-    ready: () => !disposed && !filterNavigationPending && !pendingDestination() && !searchTimer &&
+    ready: () => !transfers.dirty && !disposed && !filterNavigationPending && !pendingDestination() && !searchTimer &&
       search.value === displayedSearch && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
       !creating && (!draft || draft.hidden) && !bulkBusy && !receiptBusy && !timers.size &&
       !rows.some(row => row.hasDraft()) && ![...editors.values()].some(writer => writer.dirty),
@@ -711,7 +717,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   else filter();
   return {
     flush,
-    get dirty() { return creating || Boolean(draft && !draft.hidden) || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy; },
+    get dirty() { return transfers.dirty || creating || Boolean(draft && !draft.hidden) || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy; },
     dispose() {
       disposed = true;
       clearTimeout(searchTimer);
@@ -719,6 +725,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       stream?.dispose();
       grid.dispose();
       columns.dispose();
+      transfers.dispose();
       accountPicker.dispose();
       periodPicker.dispose();
       for (const timer of timers.values()) clearTimeout(timer);

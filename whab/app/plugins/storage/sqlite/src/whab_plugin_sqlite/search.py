@@ -71,6 +71,7 @@ def search_transactions(store, workspace, filters):
                 'source': row['source'], 'note': row['note'], 'isTransfer': bool(row['is_transfer']),
                 'inferredTransfer': bool(row['inferred_transfer']), 'currency': account['currency'],
                 **({'categoryAgent': row['category_agent']} if row['category_agent'] is not None else {}),
+                **({'transferPeerId': row['transfer_peer_id']} if row['transfer_peer_id'] is not None else {}),
             })
             transaction['accountName'] = account['name']
             if not uncategorized:

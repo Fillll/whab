@@ -9,6 +9,17 @@ def selection(store, workspace, operation, edits):
     identifiers = [row['transactionId'] for row in selected] if operation == 'edit_transactions' else ()
     # The existing native reader preserves raw annotations and original metadata.
     state = store._read_state(workspace, transaction_ids=identifiers, include_history=False)
+    if operation == 'classify_accounts':
+        from whab.domain.accounts import is_on_budget
+        changed = [row['accountId'] for row in selected if 'onBudget' in row
+                   and row['accountId'] in state['accounts']
+                   and row['onBudget'] != is_on_budget(state['accounts'][row['accountId']])]
+        if changed:
+            matched = [row[0] for row in store.db.execute(
+                'SELECT id FROM transactions WHERE workspace=? AND transfer_peer_id IS NOT NULL AND account_id IN (' + ','.join('?' for _ in changed) + ')',
+                (workspace, *changed))]
+            if matched:
+                state = store._read_state(workspace, transaction_ids=matched, include_history=False)
     return state, selected
 
 

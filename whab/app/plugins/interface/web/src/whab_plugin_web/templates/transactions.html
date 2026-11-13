@@ -18,7 +18,7 @@
   <div>
     <h1 id="transaction-title" tabindex="-1">{{ selected_account.name if selected_account else 'Transactions' }}</h1>
   </div>
-  <div class="button-group">{% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}">{{ icon('settings', 16) }}Account settings</button>{% endif %}<a class="button secondary" href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}" download>{{ icon('download', 16) }}Export</a><button class="button primary" data-add-transaction {% if selected_account and selected_account.closed|default(false) %}disabled title="Reopen this archived account before adding transactions" {% elif not active_transaction_accounts %}disabled title="{{ 'Add or reopen an account in Accounts first' if transaction_accounts else 'Add an account in Accounts first' }}" {% endif %}>{{ icon('plus', 16) }}Add transaction</button></div>
+  <div class="button-group">{% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}">{{ icon('settings', 16) }}Account settings</button>{% endif %}<button class="button secondary" type="button" data-transfer-find>Suggest transfers</button><a class="button secondary" href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}" download>{{ icon('download', 16) }}Export</a><button class="button primary" data-add-transaction {% if selected_account and selected_account.closed|default(false) %}disabled title="Reopen this archived account before adding transactions" {% elif not active_transaction_accounts %}disabled title="{{ 'Add or reopen an account in Accounts first' if transaction_accounts else 'Add an account in Accounts first' }}" {% endif %}>{{ icon('plus', 16) }}Add transaction</button></div>
 </div>
 <div class="transaction-filters">
   <form method="get" action="{{ request.url.path }}" data-transaction-search-form>
@@ -76,6 +76,13 @@
   </div>
   <button class="filter-button transaction-review-filter" id="review-filter" type="button" data-review-state="{{ review_state }}" aria-label="Review status: {{ review_labels[review_state] }}. Click for {{ next_review_labels[review_state] }}."><span class="transaction-review-letter" data-review-letter aria-hidden="true">R</span><span data-review-label>{{ review_labels[review_state] }}</span></button>
 </div>
+<section class="transfer-matches" data-transfer-panel hidden tabindex="-1" aria-labelledby="transfer-matches-title">
+  <div class="page-title-row"><h2 id="transfer-matches-title">Review transfer matches</h2><button class="text-link" type="button" data-transfer-close>Close suggestions</button></div>
+  <p>Possible pairs for this date/account selection. Counterparts may be outside the range. Search and review filters do not hide counterparts. Nothing changes until you confirm a pair. Both transactions still need review afterward.</p>
+  <p data-transfer-message role="status" aria-live="polite"></p>
+  <div data-transfer-list></div>
+  <button class="button secondary" type="button" data-transfer-more hidden>Show more possible pairs</button>
+</section>
 <div class="transaction-selection-bar" data-transaction-selection-bar hidden>
   <span class="transaction-selection-count" data-transaction-selection-count></span>
   <button class="button secondary" type="button" data-bulk-reviewed="true">Mark reviewed</button>
@@ -130,6 +137,7 @@
             {% if client_context.transactionDetails %}<input data-transaction-detail="merchant" value="{{ transaction.merchant }}" maxlength="200" required aria-label="Payee for {{ transaction.merchant }}">{% else %}<strong>{{ transaction.merchant }}</strong>{% endif %}
             {% if transaction.pending %}<span class="transaction-status" title="Pending" aria-label="Pending">{{ icon('clock', 13) }}</span>{% endif %}
             {% if transaction.isTransfer %}<span class="transaction-status" title="Transfer" aria-label="Transfer">{{ icon('arrow-right', 13) }}</span>{% endif %}
+            {% if transaction.transferPeerId|default(none) %}<button class="transaction-grid-action" type="button" data-transfer-unmatch data-transfer-peer="{{ transaction.transferPeerId }}" aria-label="Unmatch transfer for {{ transaction.merchant }}" title="Matched transfer · Review unmatching {{ transaction.transferPeerId }}">{{ icon('link', 13) }}</button>{% endif %}
           </div>
         </td>
         <td class="transaction-category-cell"><div class="transaction-category-editor"><select name="categoryId" data-transaction-field="categoryId" data-category-options-lazy aria-label="Category for {{ transaction.merchant }}" class="{% if not transaction.categoryId and not transaction.isTransfer %}uncategorized{% endif %}">

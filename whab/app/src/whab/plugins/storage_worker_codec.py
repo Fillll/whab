@@ -35,6 +35,9 @@ _RECORDS = {record.__name__: record for record in (
 # (required positional names, optional names/defaults). No arbitrary attribute
 # lookup, kwargs, database handle or implementation-specific state is exposed.
 METHODS = {
+    "supports_transfer_matching": ((), {}),
+    "transfer_candidates": (("workspace", "parameters"), {}),
+    "preview_transfer_match": (("workspace", "transaction_ids", "action"), {}),
     "supports_atomic_bulk_edits": ((), {}),
     "preview_bulk_edits": (("workspace", "operation", "edits"), {}),
     "category_deletion_status": (("workspace", "category_id"), {}),

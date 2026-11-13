@@ -41,6 +41,7 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
             "merchant_logo": "TEXT",
             "original_details": "TEXT",
             "category_agent": "TEXT",
+            "transfer_peer_id": "TEXT",
         },
         "categories": {"currency": "TEXT NOT NULL DEFAULT 'USD'"},
         "meta": {"budget_start_month": "TEXT", "category_groups": "TEXT"},

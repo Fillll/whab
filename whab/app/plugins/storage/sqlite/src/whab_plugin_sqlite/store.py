@@ -224,6 +224,7 @@ class Store(Authority):
                 "amount": row["amount"],
                 "categoryId": row["category_id"],
                 **category_agent_fields(dict(row).get("category_agent")),
+                **({"transferPeerId": row["transfer_peer_id"]} if "transfer_peer_id" in row.keys() and row["transfer_peer_id"] is not None else {}),
                 "pending": bool(row["pending"]),
                 "reviewed": bool(row["reviewed"]),
                 "source": row["source"],
@@ -296,7 +297,7 @@ class Store(Authority):
             ],
         )
         self.db.executemany(
-            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer,merchant_logo,original_details,category_agent) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer,merchant_logo=excluded.merchant_logo,original_details=excluded.original_details,category_agent=excluded.category_agent",
+            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer,merchant_logo,original_details,category_agent,transfer_peer_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer,merchant_logo=excluded.merchant_logo,original_details=excluded.original_details,category_agent=excluded.category_agent,transfer_peer_id=excluded.transfer_peer_id",
             [
                 (
                     t["id"],
@@ -317,6 +318,7 @@ class Store(Authority):
                     t.get("merchantLogo"),
                     json.dumps(t["original"]) if "original" in t else None,
                     t.get("categoryAgent"),
+                    t.get("transferPeerId"),
                 )
                 for t in state["transactions"].values()
             ],
@@ -672,7 +674,7 @@ class Store(Authority):
                 "SELECT t.id,t.account_id AS accountId,t.date,t.merchant,"
                 "t.merchant_logo AS merchantLogo,t.amount,t.category_id AS categoryId,"
                 "t.pending,t.reviewed,t.source,t.note,t.is_transfer AS isTransfer,"
-                "t.inferred_transfer AS inferredTransfer,t.category_agent AS categoryAgent,a.currency "
+                "t.inferred_transfer AS inferredTransfer,t.category_agent AS categoryAgent,t.transfer_peer_id AS transferPeerId,a.currency "
                 "FROM transactions t JOIN accounts a "
                 "ON a.workspace=t.workspace AND a.id=t.account_id WHERE "
                 + " AND ".join(conditions) + " ORDER BY t.date DESC,t.id DESC",
@@ -769,7 +771,7 @@ class Store(Authority):
         return self._mutate(workspace, lambda state: commands.add_account(state, account_id, account))
 
     def update_account(self, workspace: str, account_id: str, changes: dict) -> None:
-        if type(changes) is not dict or changes.keys() & {"currency", "closed"}:
+        if type(changes) is not dict or changes.keys() & {"currency", "closed", "onBudget"}:
             self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
             return
         with self._authority_write(workspace=workspace, transaction_ids=()) as write:
@@ -800,6 +802,24 @@ class Store(Authority):
 
     def add_category_group(self, workspace, name):
         return self._mutate(workspace, lambda state: add_category_group(state, name))
+
+    def supports_transfer_matching(self):
+        return True
+
+    def transfer_candidates(self, workspace, parameters):
+        from whab.domain.transfer_matching import candidates
+        with self._snapshot():
+            state = self._read_state(workspace, include_history=False)
+            return candidates(state['accounts'], state['transactions'].values(), parameters)
+
+    def preview_transfer_match(self, workspace, transaction_ids, action):
+        from whab.domain.transfer_matching import plan
+        with self._snapshot():
+            return plan(self._read_state(workspace, transaction_ids=transaction_ids, include_history=False), transaction_ids, action=action)
+
+    def apply_transfer_match(self, workspace, transaction_ids, action, fingerprint):
+        from whab.domain.transfer_matching import plan
+        return self._mutate(workspace, lambda state: plan(state, transaction_ids, action=action, fingerprint=fingerprint, apply=True))
 
     def supports_atomic_bulk_edits(self):
         return True

@@ -199,8 +199,18 @@ class LedgerService:
         if month is not None:
             _month(month)
         with self._lock:
-            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_bulk_edits"}:
+            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_bulk_edits", "transfer_candidates", "preview_transfer_match"}:
                 raise StoreError("Only feature queries accept parameters.")
+            if operation in {'transfer_candidates', 'preview_transfer_match'}:
+                self._require_transfer_matching()
+                values = parameters or {}
+                if operation == 'transfer_candidates':
+                    data = self._store.transfer_candidates(workspace, values)
+                else:
+                    if type(values) is not dict or values.keys() != {'transactionIds', 'action'}:
+                        raise StoreError('Preview requires transactionIds and action.')
+                    data = self._store.preview_transfer_match(workspace, values['transactionIds'], values['action'])
+                return {'revision': self._revision, 'data': _public(data)}
             if operation == 'preview_bulk_edits':
                 if type(parameters) is not dict or parameters.keys() != {'operation', 'edits'}:
                     raise StoreError('Preview requires operation and edits.')
@@ -302,6 +312,15 @@ class LedgerService:
         if (type(payload) is not dict or not set(schema["required"]) <= payload.keys()
                 or payload.keys() - schema["properties"].keys()):
             raise StoreError("Invalid ledger command fields.")
+        if operation == 'match_transfer':
+            if payload['action'] not in {'match', 'unmatch'}:
+                raise StoreError('Choose match or unmatch.')
+            validate_review_batch(payload['transactionIds'], False)
+            if len(payload['transactionIds']) != 2:
+                raise StoreError('Choose exactly two transaction IDs.')
+            if type(payload['fingerprint']) is not str or len(payload['fingerprint']) != 64:
+                raise StoreError('Use the fingerprint from a transfer preview.')
+            return deepcopy(payload)
         if operation == 'history_apply':
             from whab.domain.history import label
             if payload.get('action') not in {'undo', 'redo', 'restore', 'snapshot'}:
@@ -390,6 +409,13 @@ class LedgerService:
         self._workspace(workspace)
         return deepcopy(self._validate(operation, payload))
 
+    def _require_transfer_matching(self):
+        supported = getattr(self._store, 'supports_transfer_matching', None)
+        if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
+            'transfer_candidates', 'preview_transfer_match', 'apply_transfer_match', 'history_scope', 'budget_history',
+        )):
+            raise StoreError('Update the storage backend/authority for transfer matching with native atomic history. Nothing was changed.')
+
     def _require_atomic_bulk(self):
         supported = getattr(self._store, 'supports_atomic_bulk_edits', None)
         if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
@@ -405,6 +431,8 @@ class LedgerService:
         _identifier(request_id)
         _identifier(expected_revision)
         payload = self._validate(operation, payload)
+        if operation == 'match_transfer':
+            self._require_transfer_matching()
         if operation in {'edit_transactions', 'classify_accounts'}:
             self._require_atomic_bulk()
         if operation in {'delete_category', 'delete_category_group'}:
@@ -479,6 +507,8 @@ class LedgerService:
                         if not callable(remote):
                             raise StoreError("Enable a categorization plugin on the budget host first.")
                         data = remote(workspace, payload)
+                elif operation == 'match_transfer':
+                    data = _public(self._store.apply_transfer_match(workspace, payload['transactionIds'], payload['action'], payload['fingerprint']))
                 elif operation in {"add_account", "add_category", "add_transaction"}:
                     data = getattr(self._store, operation)(workspace, payload)
                 elif operation in {"add_category_group", "move_category"}:

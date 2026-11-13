@@ -107,7 +107,7 @@ def validate_portable_budget(data: object) -> dict:
             account["type"] = "other"
         accounts[index] = normalize_account(account)
     categories = _records(data["categories"], CATEGORY_FIELDS, 10000)
-    transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000, optional=frozenset({"original", "categoryAgent"}))
+    transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000, optional=frozenset({"original", "categoryAgent", "transferPeerId"}))
     assignments = _records(data["assignments"], ASSIGNMENT_FIELDS, 250000)
     future_funding = _records(data.get("futureFunding", []), FUTURE_FUNDING_FIELDS, 250000)
     rollover_modes = _records(data.get("rolloverModes", []), ROLLOVER_MODE_FIELDS, 250000)
@@ -137,6 +137,8 @@ def validate_portable_budget(data: object) -> dict:
         _text(category["group"])
         money(category["target"], category["currency"])
     for transaction in transactions:
+        if "transferPeerId" in transaction:
+            _text(transaction["transferPeerId"])
         _text(transaction["accountId"])
         account = account_map.get(transaction["accountId"])
         if account is None:
@@ -215,6 +217,8 @@ def validate_portable_budget(data: object) -> dict:
         money(funding["assigned"], funding["currency"])
         if funding["assigned"] < 0:
             raise StoreError("Portable next-month funding cannot be negative.")
+    from .transfer_matching import validate_matches
+    validate_matches({'accounts': account_map, 'transactions': {row['id']: row for row in transactions}})
     mode_keys = set()
     for policy in rollover_modes:
         _text(policy["month"], limit=7)

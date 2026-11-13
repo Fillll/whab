@@ -34,7 +34,7 @@ def edit_transaction(
                 row = store.db.execute(
                     "SELECT id,account_id AS accountId,category_id AS categoryId,reviewed,note,"
                     "is_transfer AS isTransfer,inferred_transfer AS inferredTransfer,"
-                    "category_edited AS categoryEdited,deleted, date,merchant,amount,source,original_details,category_agent "
+                    "category_edited AS categoryEdited,deleted, date,merchant,amount,source,original_details,category_agent,transfer_peer_id "
                     "FROM transactions WHERE workspace=? AND id=?", (workspace, transaction_id),
                 ).fetchone()
                 if row is not None:
@@ -44,6 +44,9 @@ def edit_transaction(
                         )},
                     }
                     state["transactions"][row["id"]].pop("category_agent")
+                    peer = state["transactions"][row["id"]].pop("transfer_peer_id")
+                    if peer is not None:
+                        state["transactions"][row["id"]]["transferPeerId"] = peer
             if details is not None:
                 transaction = state["transactions"].get(transaction_id)
                 if transaction is not None:

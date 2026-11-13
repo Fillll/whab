@@ -187,7 +187,7 @@ Choose **Accounts → Add manual account**, select the budget scope, then the ac
 
 Use **Edit classification** beside any existing account to change scope, type or detail. This applies to its whole transaction history and may leave existing allocations unfunded when money moves off budget; check Ready to assign afterward. Classification does not change balances, transactions or categories, and bank refreshes retain the saved classification. Existing cash and credit accounts keep their on-budget scope; legacy loan, investment and unclassified accounts default off budget. YNAB exports omit account types and balances, so imported accounts remain unclassified off budget with unavailable balances until classified; classification alone does not recover an authoritative balance.
 
-Transfers retain the existing inferred-transfer behavior. When funding an off-budget account from a budget account, categorize the on-budget outflow to spend the appropriate envelope; categorization overrides an inferred transfer exclusion. Automatic transfer matching and investment holdings imports remain outside the current model.
+Transfers retain the existing inferred-transfer behavior. When funding an off-budget account from a budget account, categorize the on-budget outflow to spend the appropriate envelope; categorization overrides an inferred transfer exclusion. Transfer-pair suggestions require explicit confirmation; cross-scope pairing and investment holdings imports remain outside the current model.
 
 Amounts are stored as integer currency minor units (USD cents). Choose the budget default currency in **Settings → Budgets**. Accounts lists every account in its own currency, and selecting an account opens its register in that currency. Each manual account declares its currency; new categories use the selected currency. A transaction inherits its account currency and can use only a matching child category. Cash, credit debt, rollover, trends and ready-to-assign totals are calculated separately for each currency, without exchange rates or conversion.
 
@@ -213,7 +213,7 @@ The personal budget starts in its initialization month. Pre-budget imports remai
 
 Core reconstructs monthly opening cash and credit reserves from current account snapshots and dated transactions. Imported history is not added to snapshots again, and pending purchases do not enter category activity. The monthly overview follows the allocation formula above; later category plans do not silently reduce an earlier month's displayed pool. Separate save validation also checks actual eligible cash, positive category commitments and credit reserves, and protects affected monthly budgets. Category overspending, uncategorized outflows or unavailable balances can make the safely assignable amount lower than the displayed monthly pool; the overview explains that situation and rejected saves preserve the ledger. Historical figures are reconstructed rather than frozen records of when budget edits happened. Past edits must fit the applicable monthly and cash headroom.
 
-This is an initial planning model, not the complete YNAB credit-card payment system. Separate payment categories, debt payoff targets, splits, manual/import reconciliation, editable transfer matching, merchant rules, recurring bills, goals editing, and shared family authentication are not implemented yet.
+This is an initial planning model, not the complete YNAB credit-card payment system. Separate payment categories, debt payoff targets, splits, manual/import reconciliation, merchant rules, recurring bills, goals editing, and shared family authentication are not implemented yet.
 
 ## Local access and private files
 
@@ -332,3 +332,43 @@ Keep independent protected backups. After an unknown response, inspect history
 and retain the exact original fingerprint, revision, request ID and labels. There
 is no automatic write replay. The Web UI retains that original request in the
 current browser session and offers an explicit retry of the same request.
+
+## Reviewed transfer matching
+
+WHAB 2.74 introduces optional public `TransferMatching` SDK capability. The financial
+core owns equal nonzero opposite amounts, same currency and budget scope, distinct
+active accounts, posted/nondeleted/uncategorized eligibility and the seven-day date
+window. Deterministic proposals are read-only and preserve every ambiguous alternative;
+merchant names and provider hints never prove a pair. Date/account filters select an
+anchor; its counterpart may lie outside those filters. Pagination returns total/next;
+over 1,000 candidates requires narrower filters. No initial-page background scan runs.
+
+The interface plugins own presentation: Web's Transactions **Suggest transfers** panel
+shows both sides and requires **Review this pair**, then **Confirm transfer match**.
+CLI `trnx transfers`, `match-transfer --dry-run`, `match-transfer` and `unmatch-transfer`
+use the same public operations. Neither matching nor unmatching reviews a transaction:
+both become unreviewed for the normal review workflow. No bank synchronization or
+persistent future rule is created. Refunds may look identical and require judgment.
+Cross-currency, fees/splits and cross-budget-scope transfers need manual handling.
+
+Confirmation uses an observed revision and fingerprint, one native operation, one
+reversible before/after audit entry, one durable receipt and one synchronous checkpoint.
+Exact successful retries keep operation, IDs/order, action, fingerprint, revision,
+request ID and history attribution, including after restart. Unknown outcomes must
+retain that intent; no fresh-intent automatic replay. Unsupported backends/authorities
+fail before mutation. SQLite 1.24 and JSON 1.16 implement the capability through their
+existing native transactions; remote transports delegate to the authority.
+
+Optional `transferPeerId` is a reciprocal stable identity; absence preserves legacy
+records and historical digests. Match changes only this link, `isTransfer=true` and
+`reviewed=false`. Unmatch removes both links, restores each existing `inferredTransfer`
+hint and sets both unreviewed. IDs, amounts, dates, accounts, currencies, merchants
+(including whitespace), notes, category attribution, original metadata and receipts
+are retained. Unmatch before editing a paired amount/date/account/category or changing
+an account's budget scope. Ordinary notes/merchant/review edits preserve the pair.
+Provider corrections/removals that invalidate a pair remove both links and require
+fresh review; this never automatically creates another pair.
+
+The shared contract is necessary because no previous public operation could atomically
+link two transactions with reciprocal identity, validated preview and reversible audit.
+Storage internals stay behind SDK/native operations; interfaces never inspect databases.

@@ -99,6 +99,7 @@ function harness(count = 5, options = {}) {
     encodeURIComponent, location: {href: options.href || 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
     initTransactionColumns() {return {dispose() {}};},
+    initTransferMatches() {return {dirty:false, flush:async () => true, dispose() {}};},
     updateContext: value => contexts.push(value),
     initAccountPicker(_, onChoose) {
       pickerChoose = onChoose;

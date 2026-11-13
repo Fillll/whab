@@ -87,5 +87,7 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
         if not owned_transaction(transaction):
             raise StoreError("Bank transaction does not belong to this connection.")
         transaction["deleted"] = True
+    from .transfer_matching import reconcile_matches
+    reconcile_matches(state)
     item.update(cursor=cursor, lastSynced=synced_at, status="connected", error=None)
     return {kind: len(changes[kind]) for kind in ("added", "modified", "removed")}

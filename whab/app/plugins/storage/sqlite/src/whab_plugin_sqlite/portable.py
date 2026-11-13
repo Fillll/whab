@@ -73,8 +73,8 @@ def _build_image(raw, previous, journal, hints):
                     clean.execute("UPDATE accounts SET name=?,type=?,balance=?,currency=?,on_budget=?,subtype=?,bank_website=?,name_overridden=?,closed=? WHERE workspace=? AND id=?",
                                   (row['name'], row['type'], row['balance'], row['currency'], int(row['onBudget']), row['subtype'], row.get('bankWebsite'), int(row.get('nameOverridden', False)), int(row.get('closed', False)), 'personal', row['id']))
                 else:
-                    clean.execute("UPDATE transactions SET account_id=?,date=?,merchant=?,merchant_logo=?,amount=?,category_id=?,pending=?,reviewed=?,source=?,note=?,is_transfer=?,inferred_transfer=?,category_edited=?,deleted=?,original_details=?,category_agent=? WHERE workspace=? AND id=?",
-                                  (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), 'personal', row['id']))
+                    clean.execute("UPDATE transactions SET account_id=?,date=?,merchant=?,merchant_logo=?,amount=?,category_id=?,pending=?,reviewed=?,source=?,note=?,is_transfer=?,inferred_transfer=?,category_edited=?,deleted=?,original_details=?,category_agent=?,transfer_peer_id=? WHERE workspace=? AND id=?",
+                                  (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), row.get('transferPeerId'), 'personal', row['id']))
         from types import SimpleNamespace
 
         from .history_writes import save_history
@@ -319,6 +319,10 @@ def read_files(files, *, with_receipts=False):
             ])
             for schema in (schema, [
                 (*row[:3], row[3].replace(", category_agent TEXT", "")) if row[1] == "transactions" else row
+                for row in schema
+            ])
+            for schema in (schema, [
+                (*row[:3], row[3].replace(", transfer_peer_id TEXT", "")) if row[1] == "transactions" else row
                 for row in schema
             ])
             for omitted in ((), ("future_funding",), ("rollover_modes",), ("future_funding", "rollover_modes"))

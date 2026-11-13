@@ -295,6 +295,22 @@ class Store(Authority):
     def add_category_group(self, workspace, name):
         return self._mutate(workspace, lambda state: add_category_group(state, name))
 
+    def supports_transfer_matching(self):
+        return True
+
+    def transfer_candidates(self, workspace, parameters):
+        from whab.domain.transfer_matching import candidates
+        state = self._read(workspace)
+        return candidates(state['accounts'], state['transactions'].values(), parameters)
+
+    def preview_transfer_match(self, workspace, transaction_ids, action):
+        from whab.domain.transfer_matching import plan
+        return plan(self._read(workspace), transaction_ids, action=action)
+
+    def apply_transfer_match(self, workspace, transaction_ids, action, fingerprint):
+        from whab.domain.transfer_matching import plan
+        return self._mutate(workspace, lambda state: plan(state, transaction_ids, action=action, fingerprint=fingerprint, apply=True), history_operation='match_transfer')
+
     def supports_atomic_bulk_edits(self):
         return True
 

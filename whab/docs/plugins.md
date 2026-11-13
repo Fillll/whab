@@ -1254,3 +1254,43 @@ revision/result; it is not a new read of current state. Conflicting request reus
 fails. Receipt expiry with stale evidence fails. Uncertain native/checkpoint results
 retain the existing fences; never silently replay with fresh identity or revision.
 `--batch` still only groups history entries across otherwise independent commits.
+
+## Reviewed transfer matching
+
+WHAB 2.74 introduces optional public `TransferMatching` SDK capability. The financial
+core owns equal nonzero opposite amounts, same currency and budget scope, distinct
+active accounts, posted/nondeleted/uncategorized eligibility and the seven-day date
+window. Deterministic proposals are read-only and preserve every ambiguous alternative;
+merchant names and provider hints never prove a pair. Date/account filters select an
+anchor; its counterpart may lie outside those filters. Pagination returns total/next;
+over 1,000 candidates requires narrower filters. No initial-page background scan runs.
+
+The interface plugins own presentation: Web's Transactions **Suggest transfers** panel
+shows both sides and requires **Review this pair**, then **Confirm transfer match**.
+CLI `trnx transfers`, `match-transfer --dry-run`, `match-transfer` and `unmatch-transfer`
+use the same public operations. Neither matching nor unmatching reviews a transaction:
+both become unreviewed for the normal review workflow. No bank synchronization or
+persistent future rule is created. Refunds may look identical and require judgment.
+Cross-currency, fees/splits and cross-budget-scope transfers need manual handling.
+
+Confirmation uses an observed revision and fingerprint, one native operation, one
+reversible before/after audit entry, one durable receipt and one synchronous checkpoint.
+Exact successful retries keep operation, IDs/order, action, fingerprint, revision,
+request ID and history attribution, including after restart. Unknown outcomes must
+retain that intent; no fresh-intent automatic replay. Unsupported backends/authorities
+fail before mutation. SQLite 1.24 and JSON 1.16 implement the capability through their
+existing native transactions; remote transports delegate to the authority.
+
+Optional `transferPeerId` is a reciprocal stable identity; absence preserves legacy
+records and historical digests. Match changes only this link, `isTransfer=true` and
+`reviewed=false`. Unmatch removes both links, restores each existing `inferredTransfer`
+hint and sets both unreviewed. IDs, amounts, dates, accounts, currencies, merchants
+(including whitespace), notes, category attribution, original metadata and receipts
+are retained. Unmatch before editing a paired amount/date/account/category or changing
+an account's budget scope. Ordinary notes/merchant/review edits preserve the pair.
+Provider corrections/removals that invalidate a pair remove both links and require
+fresh review; this never automatically creates another pair.
+
+The shared contract is necessary because no previous public operation could atomically
+link two transactions with reciprocal identity, validated preview and reversible audit.
+Storage internals stay behind SDK/native operations; interfaces never inspect databases.
