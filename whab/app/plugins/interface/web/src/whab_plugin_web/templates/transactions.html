@@ -72,7 +72,6 @@
     </div>
   </div>
     {% if month_links.next %}<a class="icon-button" data-transaction-month href="{{ month_links.next }}" aria-label="Next transaction month" title="Next month">{{ icon('chevron-right', 16) }}</a>{% else %}<button class="icon-button" disabled aria-label="Next transaction month">{{ icon('chevron-right', 16) }}</button>{% endif %}
-    <a class="text-link transaction-current-month" data-transaction-month href="{{ month_links.current }}">This month</a>
   </div>
   <button class="filter-button transaction-review-filter" id="review-filter" type="button" data-review-state="{{ review_state }}" aria-label="Review status: {{ review_labels[review_state] }}. Click for {{ next_review_labels[review_state] }}."><span class="transaction-review-letter" data-review-letter aria-hidden="true">R</span><span data-review-label>{{ review_labels[review_state] }}</span></button>
 </div>
