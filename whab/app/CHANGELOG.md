@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.74.0 — 2026-11-13
+
+PR: [#193](https://github.com/Fillll/whab/pull/193)
+
+- Add read-only transfer proposals, exact reviewed pair confirmation/unmatching, public SDK and guarded atomic audit/retry/portable support. Both transactions remain unreviewed; preserve financial fields and invalidate corrected provider pairs safely.
+
 ## 2.73.0 — 2026-11-13
 
 PR: [#192](https://github.com/Fillll/whab/pull/192)

@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.24.0 — 2026-11-13
+
+PR: [#193](https://github.com/Fillll/whab/pull/193)
+
+- Implement public TransferMatching with native atomic reciprocal links, reversible audit, durable receipts, coherent projections and compatible portable images. Invalidate both links after conflicting provider corrections.
+
 ## 1.23.0 — 2026-11-11
 
 PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)

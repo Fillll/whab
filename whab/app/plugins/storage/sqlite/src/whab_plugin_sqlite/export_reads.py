@@ -26,16 +26,20 @@ def snapshot(store, workspace, *, transaction_ids=None, include_history=True):
         )]
         transactions = []
         original_column = "original_details" in {row["name"] for row in store.db.execute("PRAGMA table_info(transactions)")}
+        peer_column = "transfer_peer_id" in {row["name"] for row in store.db.execute("PRAGMA table_info(transactions)")}
         agent_column = "category_agent" in {row["name"] for row in store.db.execute("PRAGMA table_info(transactions)")}
         for row in store.db.execute(
             "SELECT id,account_id AS accountId,date,merchant,merchant_logo AS merchantLogo,amount,"
             "category_id AS categoryId,pending,reviewed,source,note,is_transfer AS isTransfer,"
             "inferred_transfer AS inferredTransfer,category_edited AS categoryEdited,deleted "
-            + (",original_details " if original_column else "") + (",category_agent " if agent_column else "") +
+            + (",original_details " if original_column else "") + (",category_agent " if agent_column else "") + (",transfer_peer_id " if peer_column else "") +
             "FROM transactions WHERE workspace=? " + ("AND id IN (" + ",".join("?" for _ in transaction_ids) + ") " if transaction_ids is not None else "") + "ORDER BY rowid", (workspace, *(transaction_ids or ())),
         ):
             record = dict(row)
             record.update(category_agent_fields(record.pop("category_agent", None)))
+            peer = record.pop("transfer_peer_id", None)
+            if peer is not None:
+                record["transferPeerId"] = peer
             original = record.pop("original_details", None)
             if original is not None:
                 record["original"] = json.loads(original)

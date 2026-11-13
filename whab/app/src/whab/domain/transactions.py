@@ -42,6 +42,7 @@ def validate_review_batch(transaction_ids, reviewed) -> tuple[str, ...]:
 
 def public_transaction(transaction: dict) -> dict:
     return {
+        **({"transferPeerId": transaction["transferPeerId"]} if transaction.get("transferPeerId") is not None else {}),
         **category_agent_fields(transaction.get("categoryAgent")),
         **{
             key: transaction.get(key)

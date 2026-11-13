@@ -323,6 +323,18 @@ class RemoteStore:
     def move_category(self, workspace, category_id, parent_id):
         return self._command("move_category", workspace, {"categoryId": category_id, "parentId": parent_id})
 
+    def supports_transfer_matching(self):
+        return True
+
+    def transfer_candidates(self, workspace, parameters):
+        return self._query('transfer_candidates', workspace, parameters=parameters)
+
+    def preview_transfer_match(self, workspace, transaction_ids, action):
+        return self._query('preview_transfer_match', workspace, parameters={'transactionIds': transaction_ids, 'action': action})
+
+    def apply_transfer_match(self, workspace, transaction_ids, action, fingerprint):
+        return self._command('match_transfer', workspace, {'transactionIds': transaction_ids, 'action': action, 'fingerprint': fingerprint})
+
     def supports_atomic_bulk_edits(self):
         return True
 

@@ -4668,3 +4668,12 @@ main:has(.budget-planner) > .demo-ribbon,
   .transaction-period-navigation { flex: 1 1 100%; }
   .transaction-period-navigation .transaction-period-filter { flex: 1; width: auto; }
 }
+
+/* Transfer suggestions remain a review surface, separate from the register. */
+.transfer-matches {margin: 0 0 18px; padding: 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface);}
+.transfer-matches h2 {font-size: 16px; margin: 0;}
+.transfer-matches > p, .transfer-match p {font-size: 12px; color: var(--muted);}
+.transfer-match {padding: 14px 0; border-top: 1px solid var(--line);}
+.transfer-match h3 {font-size: 13px; margin: 0 0 8px;}
+.transfer-match-leg {display: grid; gap: 4px; padding: 8px 0; overflow-wrap: anywhere;}
+.transfer-match-leg small {color: var(--muted); font-size: 10px;}

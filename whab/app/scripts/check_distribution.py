@@ -40,7 +40,7 @@ from fastapi.testclient import TestClient
 target = Path(sys.argv[1]).resolve()
 with patch.object(metadata.EntryPoint, "load", side_effect=AssertionError("Documentation must not load hooks")):
     operation_catalog = installed_catalog()
-assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 34
+assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 37
 assert {row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] == "local"} == {
     "bank.connections", "bank.preview", "bank.configure", "bank.sync", "bank.schedule", "bank.background", "bank.investments",
 }

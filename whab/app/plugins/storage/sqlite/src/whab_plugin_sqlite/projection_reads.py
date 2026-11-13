@@ -71,12 +71,13 @@ def snapshot(store, workspace: str, month: str, count: int = 1) -> dict:
         # The exclusive upper bound may be 2300-01 for the final supported month.
         following = shift_month(month, count)
         for row in store.db.execute(
-            "SELECT id,merchant,merchant_logo,reviewed,source,note,inferred_transfer,category_agent "
+            "SELECT id,merchant,merchant_logo,reviewed,source,note,inferred_transfer,category_agent,transfer_peer_id "
             "FROM transactions WHERE workspace=? AND date>=? AND date<?", (workspace, month, following),
         ):
             state["transactions"][row["id"]].update(
                 merchant=row["merchant"], merchantLogo=row["merchant_logo"], reviewed=bool(row["reviewed"]),
                 source=row["source"], note=row["note"], inferredTransfer=bool(row["inferred_transfer"]),
                 **category_agent_fields(row["category_agent"]),
+                **({'transferPeerId': row['transfer_peer_id']} if row['transfer_peer_id'] is not None else {}),
             )
         return state

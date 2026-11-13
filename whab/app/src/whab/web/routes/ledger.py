@@ -2,6 +2,7 @@
 
 import csv
 import io
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, Response
@@ -30,6 +31,34 @@ from whab.web.schemas import (
 
 def create_router(store):
     router = APIRouter()
+
+    class TransferReadBody(BaseModel):
+        model_config = ConfigDict(extra='forbid', strict=True)
+        workspace: Workspace
+        operation: Literal['transfer_candidates', 'preview_transfer_match']
+        parameters: dict
+
+    class TransferApplyBody(BaseModel):
+        model_config = ConfigDict(extra='forbid', strict=True)
+        workspace: Workspace
+        transactionIds: list[str]
+        action: Literal['match', 'unmatch']
+        fingerprint: str
+        revision: str
+        requestId: str
+
+    @router.post('/api/transfers/query')
+    def transfer_query(body: TransferReadBody):
+        return store.query(body.operation, body.workspace, parameters=body.parameters)
+
+    @router.post('/api/transfers/apply')
+    def transfer_apply(body: TransferApplyBody):
+        try:
+            return store.command('match_transfer', body.workspace, {
+                'transactionIds': body.transactionIds, 'action': body.action, 'fingerprint': body.fingerprint,
+            }, request_id=body.requestId, expected_revision=body.revision)
+        except RevisionConflict as error:
+            return JSONResponse({'error': str(error), 'code': 'transfer_revision_conflict'}, status_code=409)
 
     class HistoryPreviewBody(BaseModel):
         model_config = ConfigDict(extra='forbid', strict=True)

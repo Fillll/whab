@@ -75,7 +75,7 @@ def transaction_register_page(
             "SELECT t.id,t.account_id AS accountId,t.date,t.merchant,"
             "t.merchant_logo AS merchantLogo,t.amount,t.category_id AS categoryId,"
             "t.pending,t.reviewed,t.source,t.note,t.is_transfer AS isTransfer,"
-            "t.inferred_transfer AS inferredTransfer,t.category_agent AS categoryAgent,a.currency"
+            "t.inferred_transfer AS inferredTransfer,t.category_agent AS categoryAgent,t.transfer_peer_id AS transferPeerId,a.currency"
             + scope + (" AND " + " AND ".join(matches) if matches else "")
             + " ORDER BY t.date DESC,t.id DESC LIMIT ? OFFSET ?",
             [*arguments, *match_arguments, page_size, offset],

@@ -77,6 +77,11 @@ def update_account(state: dict, account_id: str, changes: dict) -> None:
                 else False
             )
     normalized = normalize_account(candidate)
+    if is_on_budget(normalized) != is_on_budget(account) and any(
+        row['accountId'] == account_id and row.get('transferPeerId')
+        for row in state['transactions'].values()
+    ):
+        raise StoreError('Unmatch confirmed transfers before changing this account budget scope.')
     from .bank_setup import reconcile_account_closed
     reconcile_account_closed(state, account_id, account.get('closed', False), normalized.get('closed', False))
     state["accounts"][account_id] = normalized
@@ -134,6 +139,8 @@ def edit_transaction(
     transaction = state["transactions"].get(transaction_id)
     if not transaction or transaction.get("deleted"):
         raise StoreError("Transaction not found.")
+    if transaction.get('transferPeerId') and category_id is not UNSET:
+        raise StoreError('Unmatch this transfer pair before changing its category.')
     if category_id is not UNSET and category_id is not None:
         child = ensure_child_category(state["categories"], category_id)
         account = state["accounts"][transaction["accountId"]]
@@ -178,6 +185,8 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
     transaction = state["transactions"].get(transaction_id)
     if not transaction or transaction.get("deleted"):
         raise StoreError("Transaction not found.")
+    if transaction.get('transferPeerId') and changes.keys() & {'accountId', 'amount', 'date', 'categoryId'}:
+        raise StoreError('Unmatch this transfer pair before changing its financial fields or category.')
     candidate = {**transaction, **changes}
     validate_date(candidate["date"])
     if not "1900-01-01" <= candidate["date"] <= "2200-12-31":
@@ -197,7 +206,7 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
     # Annotation validation sees the new account/category pair, without exposing
     # a partly corrected record to the caller when any validation fails.
     detached = {**state, "transactions": {transaction_id: candidate}}
-    edit_transaction(detached, transaction_id, candidate.get("categoryId"),
+    edit_transaction(detached, transaction_id, UNSET if transaction.get('transferPeerId') and 'categoryId' not in changes else candidate.get("categoryId"),
                      changes.get("reviewed"), changes.get("note", UNSET),
                      category_agent=changes.get('categoryAgent', UNSET))
     if "categoryId" not in changes:

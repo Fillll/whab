@@ -160,6 +160,9 @@ def annotated_transaction(record: ImportedTransaction, annotations: dict) -> dic
         from .transactions import category_agent_fields
         result.update(category_agent_fields(annotations['categoryAgent']))
 
+    if annotations.get('transferPeerId'):
+        result.update(transferPeerId=annotations['transferPeerId'], isTransfer=True, categoryId=None)
+
     if "original" in annotations:
         result["original"] = {key: result[key] for key in annotations["original"]}
         for key in annotations["original"]:

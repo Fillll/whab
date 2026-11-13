@@ -704,6 +704,10 @@
                   "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
                   "minLength": 1,
                   "maxLength": 80
+                },
+                "transferPeerId": {
+                  "type": "string",
+                  "description": "Optional stable ID of the explicitly confirmed opposite transfer. Absent when unmatched; confirmation does not mark reviewed."
                 }
               },
               "additionalProperties": true
@@ -2155,6 +2159,10 @@
                     "null"
                   ],
                   "description": "Assigned category parent group from the same-budget/same-revision read; null if unavailable."
+                },
+                "transferPeerId": {
+                  "type": "string",
+                  "description": "Optional stable ID of the explicitly confirmed opposite transfer. Absent when unmatched; confirmation does not mark reviewed."
                 }
               },
               "additionalProperties": true
@@ -2392,6 +2400,10 @@
                   "description": "Self-declared agent that explicitly assigned this category, when known. Absent/null for legacy or manual categorization. Independent of the transaction import source; preserved by refresh, review, notes and portable saves.",
                   "minLength": 1,
                   "maxLength": 80
+                },
+                "transferPeerId": {
+                  "type": "string",
+                  "description": "Optional stable ID of the explicitly confirmed opposite transfer. Absent when unmatched; confirmation does not mark reviewed."
                 }
               },
               "additionalProperties": true
@@ -4896,6 +4908,487 @@
       ],
       "retry": "Preserve exact resolved edits, revision, request ID and history. Never automatically replay uncertain writes with fresh intent. Read complete offline command help for recovery flags.",
       "availability": "CLI 2.17+, WHAB 2.72+, native SQLite 1.23+ or JSON 1.15+."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "errors": [
+        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
+        "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
+      ],
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "name": "trnx.transfers",
+      "kind": "local",
+      "summary": "Name-addressed CLI: Read-only possible transfer pairs: equal opposite nonzero amounts, same currency/budget scope, different active accounts, posted/uncategorized/unmatched, within seven days. All alternatives remain proposals; no automatic match or review.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "since": {
+            "type": "string",
+            "description": "Inclusive anchor start YYYY-MM-DD; its opposite leg may be up to seven days outside the range."
+          },
+          "until": {
+            "type": "string",
+            "description": "Inclusive anchor end YYYY-MM-DD."
+          },
+          "currency": {
+            "type": "string",
+            "description": "One uppercase ISO currency; omit for separate candidates in all currencies."
+          },
+          "accountIds": {
+            "type": "array",
+            "description": "Optional anchor accounts. The opposite leg may be any eligible account in this workspace.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Explicit next offset from the previous result; require an unchanged revision across pages."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Page size, default 100."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "description": "Possible pairs with transactionIds, both complete public transactions and accountName, daysApart, bankHint, ambiguous and reason. A match is not proof and never changes records.",
+            "items": {
+              "type": "object",
+              "description": "A possible pair; alternatives may share transaction IDs and require an explicit user choice.",
+              "additionalProperties": true
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Exact count of proposals for this selection."
+          },
+          "next": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Next offset; null means complete."
+          },
+          "requiresConfirmation": {
+            "type": "boolean",
+            "const": true,
+            "description": "Explicit review/confirmation is always required."
+          },
+          "reviewedAutomatically": {
+            "type": "boolean",
+            "const": false,
+            "description": "Never marks transaction review automatically."
+          },
+          "maxDaysApart": {
+            "type": "integer",
+            "const": 7,
+            "description": "Maximum calendar date separation."
+          }
+        },
+        "required": [
+          "candidates",
+          "total",
+          "next",
+          "requiresConfirmation",
+          "reviewedAutomatically",
+          "maxDaysApart"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "since": "2026-11-01",
+            "until": "2026-11-30"
+          },
+          "output": {
+            "candidates": [],
+            "total": 0,
+            "next": null,
+            "requiresConfirmation": true,
+            "reviewedAutomatically": false,
+            "maxDaysApart": 7
+          }
+        }
+      ],
+      "side_effects": "None. This deterministic read performs no bank sync, save, classification, review or reservation."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "errors": [
+        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
+        "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
+      ],
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "name": "trnx.match-transfer.preview",
+      "kind": "local",
+      "summary": "Name-addressed CLI: Inspect the exact proposed pair changes and fingerprint before explicit confirmation. Confirming links both IDs, marks transfer exclusion and leaves both unreviewed. Unmatching removes links and restores provider transfer hints, leaving both unreviewed.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "description": "Exactly two distinct stable transaction IDs in this budget/workspace; proposal order is retained for exact retries.",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "match",
+              "unmatch"
+            ],
+            "description": "Explicit pair confirmation or reversal. Neither automatically marks reviewed."
+          }
+        },
+        "required": [
+          "transactionIds",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "match",
+              "unmatch"
+            ],
+            "description": "Explicit pair confirmation or reversal. Neither automatically marks reviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "SHA-256 of exact observed pair/account state and action.",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "count": {
+            "type": "integer",
+            "const": 2,
+            "description": "Both addressed transactions."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Complete public before/after records for both transactions. Notes and financial fields remain exact.",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "description": "id, before, after.",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "action",
+          "fingerprint",
+          "count",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-out",
+              "fictional-in"
+            ],
+            "action": "match"
+          },
+          "output": {
+            "action": "match",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "count": 2,
+            "changes": [
+              {
+                "id": "fictional-out",
+                "before": {},
+                "after": {}
+              },
+              {
+                "id": "fictional-in",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read-only. No save, revision change or history. A preview does not reserve state."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "errors": [
+        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
+        "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
+      ],
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "name": "trnx.match-transfer",
+      "kind": "local",
+      "summary": "Name-addressed CLI: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "description": "Exactly two distinct stable transaction IDs in this budget/workspace; proposal order is retained for exact retries.",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "match",
+              "unmatch"
+            ],
+            "description": "Explicit pair confirmation or reversal. Neither automatically marks reviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "SHA-256 of exact observed pair/account state and action.",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "transactionIds",
+          "action",
+          "fingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "match",
+              "unmatch"
+            ],
+            "description": "Explicit pair confirmation or reversal. Neither automatically marks reviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "SHA-256 of exact observed pair/account state and action.",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "count": {
+            "type": "integer",
+            "const": 2,
+            "description": "Both addressed transactions."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Complete public before/after records for both transactions. Notes and financial fields remain exact.",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "description": "id, before, after.",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "action",
+          "fingerprint",
+          "count",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-out",
+              "fictional-in"
+            ],
+            "action": "match",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "output": {
+            "action": "match",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "count": 2,
+            "changes": [
+              {
+                "id": "fictional-out",
+                "before": {},
+                "after": {}
+              },
+              {
+                "id": "fictional-in",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "errors": [
+        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
+        "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
+      ],
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "name": "trnx.unmatch-transfer",
+      "kind": "local",
+      "summary": "Name-addressed CLI: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "description": "Exactly two distinct stable transaction IDs in this budget/workspace; proposal order is retained for exact retries.",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "match",
+              "unmatch"
+            ],
+            "description": "Explicit pair confirmation or reversal. Neither automatically marks reviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "SHA-256 of exact observed pair/account state and action.",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "transactionIds",
+          "action",
+          "fingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "match",
+              "unmatch"
+            ],
+            "description": "Explicit pair confirmation or reversal. Neither automatically marks reviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "SHA-256 of exact observed pair/account state and action.",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "count": {
+            "type": "integer",
+            "const": 2,
+            "description": "Both addressed transactions."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Complete public before/after records for both transactions. Notes and financial fields remain exact.",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "description": "id, before, after.",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "action",
+          "fingerprint",
+          "count",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-out",
+              "fictional-in"
+            ],
+            "action": "match",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "output": {
+            "action": "match",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "count": 2,
+            "changes": [
+              {
+                "id": "fictional-out",
+                "before": {},
+                "after": {}
+              },
+              {
+                "id": "fictional-in",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
     }
   ]
 }

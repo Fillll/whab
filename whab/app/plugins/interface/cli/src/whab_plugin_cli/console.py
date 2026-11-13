@@ -47,6 +47,12 @@ lazy from .transaction_search import (
     search_table,
     validate_search,
 )
+lazy from .transfer_commands import (
+    TRANSFER_HELP,
+    add_transfer_parsers,
+    execute_transfer,
+    transfer_table,
+)
 
 PREFIX = "/api/local/v1"
 ROOT_COMMANDS = {"budget", "plugin", "api", "BUDGET"}
@@ -65,7 +71,7 @@ def parser(options, argv=()):
     check_identifiers(catalog)
     root = CommandParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
-        epilog=BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
+        epilog=TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
     budget = groups.add_parser("budget", help="Create and list saved budgets")
@@ -81,6 +87,7 @@ def parser(options, argv=()):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     plugin.add_argument("action", choices=("list",), nargs="?", default="list", help="List installed plugin documentation offline")
     scoped = groups.add_parser("BUDGET", help="Address a saved budget by its name or permanent ID",
+        epilog=TRANSFER_HELP, formatter_class=argparse.RawDescriptionHelpFormatter,
         usage="whab BUDGET {account,category,plugin,bank,history,import,insights,transactions,trnx} ...")
     scoped.add_argument("target", help=argparse.SUPPRESS)
     commands = scoped.add_subparsers(dest="command", required=True)
@@ -119,7 +126,7 @@ def parser(options, argv=()):
         summary.add_argument("--month", help="YYYY-MM; default: current month")
         summary.add_argument("--currency", default="USD", help="ISO currency code (default: USD); currencies are never combined")
     if requested in (None, "transactions", "trnx"):
-        transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit transactions; atomic categorize/edit-many for up to 100 IDs", epilog=BULK_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
+        transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit transactions; review proposed transfers; atomic bulk annotations", epilog=TRANSFER_HELP + "\n\n" + BULK_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
         reads = transactions.add_subparsers(dest="filter", required=True)
         unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
             epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
@@ -129,6 +136,7 @@ def parser(options, argv=()):
         add_category_parsers(reads)
         add_note_parser(reads)
         add_edit_many(reads)
+        add_transfer_parsers(reads)
     groups.add_parser("api", help="Advanced local operations; use whab api --help")
     return root
 
@@ -254,6 +262,8 @@ def execute(args, home, environment, ca):
                 json={"name": args.name, "path": create_path(args.name, args.path)})
         identifier = resolve_budget(connection, args.target)
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
+        if args.command in {"transactions", "trnx"} and args.filter in {"transfers", "match-transfer", "unmatch-transfer"}:
+            return execute_transfer(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter == "list":
             return execute_search(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter in {"uncategorized", "uncategorised"}:
@@ -335,7 +345,7 @@ def main(argv=None):
         else:
             result = execute(args, *configuration(args))
         if getattr(args, "format", None) == "table":
-            print(bulk_table(result) if "dryRun" in result else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
+            print(transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer"} else bulk_table(result) if "dryRun" in result else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
                   else note_table(result) if args.filter == "note" else search_table(result) if args.filter == "list" else transaction_table(result))
         else:
             print(json.dumps(result, allow_nan=False))
