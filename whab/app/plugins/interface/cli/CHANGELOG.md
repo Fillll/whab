@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.18.0 — 2026-11-13
+
+PR: [#193](https://github.com/Fillll/whab/pull/193)
+
+- Add name-addressed transfer proposals, exact preview and guarded match/unmatch commands, complete offline help, audit attribution and original-intent recovery.
+
 ## 2.17.0 — 2026-11-11
 
 PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)

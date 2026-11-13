@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.51.0 — 2026-11-13
+
+PR: [#193](https://github.com/Fillll/whab/pull/193)
+
+- Add on-demand transfer suggestions, explicit review/confirmation, ambiguous alternatives and paired-row unmatch previews. Both records still need ordinary review.
+
 ## 1.50.0 — 2026-11-13
 
 PR: [#192](https://github.com/Fillll/whab/pull/192)

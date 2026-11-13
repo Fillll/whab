@@ -47,3 +47,6 @@ test('row unmatch action previews only and close dismisses without mutations',as
   const h=harness();const button={dataset:{transferPeer:'in'},closest:()=>({dataset:{transactionId:'out'}})};h.root.events.click({target:{closest:()=>button},stopPropagation(){}});await new Promise(resolve=>setImmediate(resolve));assert.equal(h.calls[0].body.parameters.action,'unmatch');assert.equal(h.calls.length,1);
   h.nodes.get('[data-transfer-close]').events.click();assert.equal(h.nodes.get('[data-transfer-panel]').hidden,true);
 });
+test('a revision error after unknown outcome retains original intent and navigation guard',async()=>{
+  const h=harness();await h.find();await h.list().children[0].children.at(-1).onclick();const button=h.list().children.at(-1);h.state.fail='lost';await button.onclick();const original=h.calls.at(-1).body;h.state.fail='transfer_revision_conflict';await button.onclick();assert.deepEqual(h.calls.at(-1).body,original);assert.equal(h.control.dirty,true);assert.equal(await h.control.flush(),false);
+});

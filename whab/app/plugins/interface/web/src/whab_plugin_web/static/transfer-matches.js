@@ -8,7 +8,7 @@ export function initTransferMatches({root, api, context, before, saved}) {
   const more = panel.querySelector('[data-transfer-more]');
   const close = panel.querySelector('[data-transfer-close]');
   const listeners = [];
-  let disposed = false, reading = false, running = null, intent = null, selection = null, next = null, revision = null, sequence = 0;
+  let disposed = false, reading = false, running = null, intent = null, selection = null, next = null, revision = null, sequence = 0, uncertain = false;
   const el = (tag, text, className) => {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -51,18 +51,19 @@ export function initTransferMatches({root, api, context, before, saved}) {
       try {
         const result = await api('/transfers/apply', intent);
         if (!result?.revision || result.data?.count !== 2) throw new Error('Saved transfer response was not confirmed.');
-        intent = null;
+        intent = null; uncertain = false;
         message.textContent = 'Saved. Both transactions still need review.';
         panel.hidden = true;
         lock();
         committed = true;
       } catch (failure) {
-        if (failure.code === 'transfer_revision_conflict') {
+        if (failure.code === 'transfer_revision_conflict' && !uncertain) {
           intent = null;
           message.textContent = 'The budget changed. Nothing was applied by this confirmation. Review the current pair again.';
           button.textContent = 'Review current pair';
           button.onclick = () => preview(selection.ids, selection.action);
         } else {
+          uncertain = true;
           message.textContent = `${failure.message} Save not confirmed; it may have committed. Inspect both transactions/history in another tab, or retry this same confirmation. Neither is automatically reviewed.`;
           button.textContent = 'Retry same confirmation';
         }

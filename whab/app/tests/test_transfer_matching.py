@@ -191,3 +191,53 @@ def test_unsupported_backend_refuses_without_any_mutation():
         supports_transfer_matching = None
     with pytest.raises(StoreError, match='Update the storage'):
         LedgerService(ReadOnly()).query('transfer_candidates', 'personal', parameters={})
+
+
+def test_proposal_cap_is_explicit_and_bank_hint_never_proves_a_match():
+    state = fictional_state()
+    state['transactions']['out']['inferredTransfer'] = True
+    state['transactions'].update({f'credit-{index}': {**state['transactions']['in'], 'id': f'credit-{index}'} for index in range(1000)})
+    with pytest.raises(StoreError, match='1,000'):
+        candidates(state['accounts'], state['transactions'].values(), {})
+    result = candidates(state['accounts'], state['transactions'].values(), {'accountIds': ['c']})
+    assert result['total'] == 0 and result['next'] is None
+
+
+@pytest.fixture
+def bank_store(native_store):
+    _, path, Store = native_store
+    store = Store(path.with_name('fictional-bank' + path.suffix), month='2026-11')
+    yield store
+    store.close()
+
+
+@pytest.mark.parametrize('correction', ['unchanged', 'amount', 'pending', 'removed'])
+def test_native_bank_correction_keeps_or_invalidates_both_reviewed_links(bank_store, correction):
+    store = bank_store
+    state = fictional_state()
+    state['items']['fictional-bank'] = {'id': 'fictional-bank', 'token': 'fictional-encrypted', 'provider': 'plaid', 'institution': 'Fictional', 'cursor': None, 'lastSynced': None, 'status': 'connected', 'error': None}
+    for row in state['accounts'].values():
+        row.update(source='plaid', itemId='fictional-bank', institution='Fictional bank')
+    for row in state['transactions'].values():
+        row['source'] = 'plaid'
+    store.save_item('fictional-bank', 'fictional-encrypted', 'Fictional')
+    records = [{**{key: row[key] for key in ['id', 'accountId', 'date', 'merchant', 'amount', 'pending', 'source', 'inferredTransfer']}, 'suggestedCategoryId': None, 'pendingTransactionId': None} for row in state['transactions'].values()]
+    store.apply_sync('fictional-bank', {'added': records, 'modified': [], 'removed': []}, 'fictional-start', accounts=list(state['accounts'].values()))
+    for row in state['transactions'].values():
+        store.edit_transaction('personal', row['id'], note=row['note'])
+    preview = store.preview_transfer_match('personal', ['out', 'in'], 'match')
+    store.apply_transfer_match('personal', ['out', 'in'], 'match', preview['fingerprint'])
+    store.review_transactions('personal', ['out', 'in'], True)
+    row = state['transactions']['out']
+    imported = {key: row[key] for key in ['id', 'accountId', 'date', 'merchant', 'amount', 'pending', 'source', 'inferredTransfer']}
+    imported.update(suggestedCategoryId=None, pendingTransactionId=None)
+    if correction == 'amount':
+        imported['amount'] += 1
+    if correction == 'pending':
+        imported['pending'] = True
+    changes = {'added': [], 'modified': [] if correction == 'removed' else [imported], 'removed': ['out'] if correction == 'removed' else []}
+    store.apply_sync('fictional-bank', changes, 'fictional-next', accounts=[])
+    rows = {row['id']: row for row in store.export_budget()['transactions']}
+    assert all(bool(row.get('transferPeerId')) == (correction == 'unchanged') for row in rows.values())
+    assert all(row['reviewed'] == (correction == 'unchanged') for row in rows.values())
+    assert rows['out']['note'] == state['transactions']['out']['note']

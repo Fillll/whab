@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.0 — 2026-11-13
+
+PR: [#193](https://github.com/Fillll/whab/pull/193)
+
+- Implement public TransferMatching with native atomic reciprocal links, reversible audit, durable receipts and exact portable restoration.
+
 ## 1.15.0 — 2026-11-11
 
 PR: [#188](https://github.com/Fillll/whab/pull/188)

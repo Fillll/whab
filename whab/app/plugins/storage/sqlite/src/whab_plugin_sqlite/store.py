@@ -1094,6 +1094,8 @@ class Store(Authority):
                 if not owned_transaction(transaction):
                     raise StoreError("Bank transaction does not belong to this connection.")
                 transaction["deleted"] = True
+            from whab.domain.transfer_matching import reconcile_matches
+            reconcile_matches(state)
             item.update(
                 cursor=cursor,
                 lastSynced=datetime.now(timezone.utc).isoformat(),

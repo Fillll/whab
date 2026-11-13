@@ -99,3 +99,11 @@ def test_offline_help_lists_review_criteria_recovery_and_limit(parts, capsys):
     text = capsys.readouterr().out
     assert 'Transfer proposals' in text and 'seven' in text and '1,000' in text
     assert 'reviewed=true' in text and 'uncertain' in text
+
+
+def test_unfiltered_and_ambiguous_table_diagnostics(endpoint):
+    result = run(endpoint)
+    result['data']['candidates'][0]['ambiguous'] = True
+    result['data']['next'] = 1
+    assert 'Ambiguous alternatives' in transfer.transfer_table(result)
+    assert 'next offset: 1' in transfer.transfer_table(result)
