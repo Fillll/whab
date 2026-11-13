@@ -1,12 +1,12 @@
 [project]
 name = "whab_plugin_web"
-version = "1.52.0"
+version = "1.53.0"
 description = "Web interface plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.15,<3.16"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["whab>=2.74,<3", "MarkupSafe>=2,<4"]
+dependencies = ["whab>=2.75,<3", "MarkupSafe>=2,<4"]
 
 [project.entry-points."whab.plugins"]
 web = "whab_plugin_web.plugin:plugin"

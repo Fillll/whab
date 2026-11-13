@@ -1294,3 +1294,35 @@ fresh review; this never automatically creates another pair.
 The shared contract is necessary because no previous public operation could atomically
 link two transactions with reciprocal identity, validated preview and reversible audit.
 Storage internals stay behind SDK/native operations; interfaces never inspect databases.
+
+## Local browser category selections
+
+WHAB 2.75 exposes strict HTTPS browser adapters for the existing `AtomicBulkEdits`
+contract. No new financial command, SDK capability or storage operation is added.
+The Web plugin owns selection, presentation, retained rows and retry intent.
+
+`POST /api/transactions/categories/preview` accepts the following required body:
+
+```json
+{"workspace":"personal","transactionIds":["fictional-a","fictional-b"],"categoryId":"fictional-food"}
+```
+
+It calls `preview_bulk_edits` with `operation=edit_transactions` and one explicit
+`categoryId` edit per ID. The response is the existing revision/data envelope with
+count, changed and exact public before/after records. Preview is read-only.
+
+`POST /api/transactions/categories` accepts the same fields plus required
+`revision` and `requestId`. It invokes guarded `edit_transactions`, not a loop of
+single commands. `categoryId: null` explicitly clears; omission is invalid. Bodies
+are strict, IDs number 1–100, and all existing category/currency/transfer rules apply.
+Invalid items reject the whole operation. Saved output is the exact native result.
+Stale revisions and conflicting request-ID reuse return HTTP 409 with
+`category_revision_conflict` and `category_request_conflict`, respectively. Other
+authored domain errors use the existing safe-error handling. Workspace and budget
+routing retain their existing HTTPS/loopback boundaries; no bank sync is triggered.
+
+Exact successful retries must keep all original fields. They return the original
+durable result without a new commit, checkpoint or audit entry, including after
+restart. An unknown result must retain its intent; never automatically submit a
+fresh request ID. Unsupported storage/authorities fail before mutation. SQLite and
+JSON implement the existing native contract; their versions need no change here.

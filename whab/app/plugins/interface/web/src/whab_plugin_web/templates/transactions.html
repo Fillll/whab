@@ -83,6 +83,7 @@
 </section>
 <div class="transaction-selection-bar" data-transaction-selection-bar hidden>
   <span class="transaction-selection-count" data-transaction-selection-count></span>
+  <span class="transaction-selection-help">Category changes on a selected row apply to the selection (up to 100) in one save.</span>
   <button class="button secondary" type="button" data-bulk-reviewed="true">Mark reviewed</button>
   <button class="button secondary" type="button" data-bulk-reviewed="false">Mark unreviewed</button>
   <button class="text-link" type="button" data-clear-selection>Clear selection</button>
@@ -92,7 +93,7 @@
 <template data-transaction-accounts>{% for choice in transaction_accounts %}<option value="{{ choice.id }}"{% if choice.closed|default(false) %} data-account-closed{% endif %}>{{ choice.name }}{% if choice.closed|default(false) %} · Closed{% endif %}</option>{% endfor %}</template>
 <template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ group.name }} > {{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</template>
 <form id="transaction-create-form" data-transaction-create hidden></form>
-<p class="transaction-grid-help" id="transaction-grid-help">Headings: ascending → descending → none · Drag text column edges to resize · Click a field to edit · ↑ ↓ move between rows · Tab moves between fields · F2 keeps arrows in the editor</p>
+<p class="transaction-grid-help" id="transaction-grid-help">Edits stay until refresh · Headings: ascending → descending → none · Drag text column edges to resize · Click a field to edit · ↑ ↓ move between rows · Tab moves between fields · F2 keeps arrows in the editor</p>
 <span class="sr-only" id="transaction-resize-help">Resize with left and right arrows, Shift for larger steps. Home or double-click resets the column. Escape cancels a drag. Widths are saved in this browser.</span>
 <div class="table-scroll transactions-scroll" role="region" aria-labelledby="transaction-title" tabindex="0">
   <table aria-describedby="transaction-grid-help" class="transactions-table{% if show_account_column %} transactions-table-multi-account{% endif %}">
@@ -124,7 +125,7 @@
       {% set account = accounts_by_id.get(transaction.accountId) %}
       {% set suggestion = none if transaction.transferPeerId|default(none) else (category_suggestions|default({})).get(transaction.id) %}
       {% set selected_category = transaction.categoryId or (suggestion.categoryId if suggestion else none) %}
-      <tr class="transaction-row" data-transaction-id="{{ transaction.id }}"{% if suggestion %} data-suggestion-id="{{ suggestion.id }}" data-suggestion-plugin="{{ suggestion.pluginId }}"{% endif %} data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
+      <tr class="transaction-row" data-transaction-id="{{ transaction.id }}"{% if suggestion %} data-suggestion-id="{{ suggestion.id }}" data-suggestion-plugin="{{ suggestion.pluginId }}"{% endif %} data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-amount="{{ transaction.amount }}" data-inferred-transfer="{{ 'true' if transaction.inferredTransfer else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
         <td class="transaction-select-cell"><input type="checkbox" data-select-transaction aria-label="Select {{ transaction.merchant }} on {{ date_label(transaction.date) }}"></td>
         <td class="date-cell">{% if client_context.transactionDetails %}<input type="date" data-transaction-detail="date"{% if transaction.transferPeerId|default(none) %} disabled title="Unmatch this confirmed transfer before changing financial fields"{% endif %} value="{{ transaction.date }}" min="1900-01-01" max="2200-12-31" required aria-label="Date for {{ transaction.merchant }}">{% else %}{{ date_label(transaction.date) }}{% endif %}</td>
         {% if show_account_column %}<td class="account-cell" title="{{ account.name if account else 'Disconnected account' }}">{% if client_context.transactionDetails %}<select data-transaction-detail="accountId"{% if transaction.transferPeerId|default(none) %} disabled title="Unmatch this confirmed transfer before changing financial fields"{% endif %} data-account-options-lazy aria-label="Account for {{ transaction.merchant }}"><option value="{{ transaction.accountId }}" selected>{{ account.name if account else 'Disconnected account' }}</option></select>{% else %}{{ account.name if account else 'Disconnected account' }}{% endif %}</td>{% endif %}

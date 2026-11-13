@@ -130,11 +130,38 @@ unavailable arrow is disabled. Category editors and their native choices display
 
 Large transaction selections initially render at most 100 editable rows and automatically append further batches as the table scrolls. The table has no page controls; each request remains bounded to 100 rows. Payee and memo search and the review filter apply across the entire selected account/date range before rows are loaded. Loading preserves those filters and mounted editors; pending edits finish before the view changes. The `q` parameter retains search in bookmarks, and earlier `tx_page` bookmarks retain their position; search also works as a normal GET form without JavaScript. Export still contains the complete selected currency. All web module dependencies use the plugin version to load matching scripts after an update. For isolated rendering measurements with fictional data, run `.venv/bin/python scripts/benchmark_register.py --all-accounts` from the application directory; the script also accepts `--page accounts` and `--page budget`. It measures server rendering and markup size, excluding browser layout and network time.
 
-Under All with an empty search, successful review changes request only a small server-rendered summary, keeping the current rows, editors and listeners in place. Search and review-filtered views still refresh their complete visible page. Summary responses validate the addressed budget, currency, account/date filters and requested page before changing the count; canceled or superseded responses cannot replace a newer view. Use `--summary` in the benchmark to compare response size. `--profile-memory` separately measures Python request allocation peaks; it excludes SQLite/native memory and the browser.
+Successful ordinary row edits request only a small server-rendered sidebar summary when needed, keeping the current rows, editors, selection and displayed order in place even under search, review or sort filters. A row that no longer matches stays visible until an explicit refresh or filter/sort/page navigation. The updated R state remains visible and can be toggled again. Summary responses validate the addressed budget, currency, account/date filters and requested page before changing the count; canceled or superseded responses cannot replace a newer view. Use `--summary` in the benchmark to compare response size. `--profile-memory` separately measures Python request allocation peaks; it excludes SQLite/native memory and the browser.
 
 The two account dialogs initially contain only the selected currency option. Opening either dialog fills its choices from one compact server-rendered currency catalogue before showing the controls; loaded account settings apply their currency after hydration. Currency history locks, reset defaults and server-defined minor units remain unchanged. This reduces hidden DOM elements without another request or module.
 
 Ordinary register navigation asks to omit the sidebar account-list template that it leaves in place. Explicit refreshes still request the updated account list, and clients without this optional header receive the complete fragment. Fragment responses remain uncached, and the host's `Vary` header covers both fragment selectors.
+
+### Selected category changes
+
+With WHAB 2.75+ and Web 1.53+, select 2–100 loaded transactions and change the
+category in any selected row to apply that exact category to the whole selection.
+Changing an unselected row still changes only that row. Clearing the category
+clears it for the selected records. Pending records can be categorized, and review
+status stays unchanged. The selection bar explains this behavior before editing.
+
+This uses the existing public `edit_transactions` operation: one observed revision,
+one request ID, one native commit/checkpoint and one reversible audit entry. Every
+target is validated first. Any missing/duplicate/disallowed target, invalid category,
+matched transfer or unsupported backend rejects the entire selection; more than 100
+is refused without splitting or a fallback to separate edits. Notes, merchant
+whitespace, amounts, dates, accounts and transaction identities are preserved.
+Manual categorization clears prior category-agent/provisional suggestion badges.
+
+The browser obtains the exact native preview internally before submitting. A stale
+first request asks for refresh and another explicit choice. An uncertain response
+keeps the same intent and locks category/selection controls; **Retry save** retries
+that original request, never a fresh one. Native durable receipts also preserve
+exact successful retries after host restart. Navigation waits for confirmed saves;
+closing/discarding the page does not automatically replay an unknown mutation.
+
+Sortable heading links fill their complete header backgrounds, including padding.
+Native keyboard and modified-click link behavior remain available. Resize grips
+are independent targets and do not sort the column.
 
 When the host advertises atomic bulk review, pure review changes share requests of at most 100 transactions. Existing row writers retain save/error states and ordering for memo and category drafts. Failed batch tickets keep their original request identity and are confirmed before later edits; a submitted batch never silently switches to individual writes. Providers without this capability retain the existing four-worker path. Pending rows remain excluded from the bulk controls, and navigation waits for outstanding saves.
 
@@ -267,7 +294,7 @@ Click a field to edit it immediately. Up/Down move within a text column; Left/Ri
 
 ### Continuous register loading
 
-The scroll container loads the next batch near its bottom and retains every mounted row, field draft, selection and keyboard position. Newly loaded rows have the same editing, suggestions, review and receipt controls. A failed load offers Retry without discarding existing rows. Account/date/search/review changes cancel old requests; late responses cannot append to the new view. Saved local edits update the loader's revision, and ordering/membership edits restart its scan with ID de-duplication. An unrelated ledger revision refreshes the view instead of combining snapshots. Earlier `tx_page` bookmarks also load preceding batches when scrolled to the top. Back/Forward reloads the necessary batches before restoring the table’s scroll position, without caching financial HTML. The footer reports the total and loaded rows; Export includes the complete selection.
+The scroll container loads the next batch near its bottom and retains every mounted row, field draft, selection and keyboard position. Newly loaded rows have the same editing, suggestions, review and receipt controls. A failed load offers Retry without discarding existing rows. Account/date/search/review changes cancel old requests; late responses cannot append to the new view. Saved local edits update the loader's revision, and ordering/membership edits restart its scan with ID de-duplication. Before local edits, an unrelated ledger revision refreshes the view instead of combining snapshots. After local edits, it pauses further loading and asks for an explicit refresh, preserving held rows and selections. Earlier `tx_page` bookmarks also load preceding batches when scrolled to the top. Back/Forward reloads the necessary batches before restoring the table’s scroll position, without caching financial HTML. The footer reports the total and loaded rows; Export includes the complete selection.
 
 ## Subscriptions and shared AI connections
 

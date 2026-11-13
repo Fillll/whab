@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.75.0 — 2026-11-13
+
+PR: [#195](https://github.com/Fillll/whab/pull/195)
+
+- Add strict guarded browser adapters for atomic selected transaction categories, reusing existing bulk preview/edit operations, native validation, durable receipts and audit history.
+
 ## 2.74.0 — 2026-11-13
 
 PR: [#193](https://github.com/Fillll/whab/pull/193)
