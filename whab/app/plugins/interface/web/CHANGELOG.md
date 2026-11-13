@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.52.0 — 2026-11-13
+
+PR: [#194](https://github.com/Fillll/whab/pull/194)
+
+- Add accessible, browser-saved collapse/expand navigation, responsive defaults and compact overlays; keep navigation icons and Settings available.
+- Remove the repeated visible all-accounts Transactions title and production Live data badge, retaining accessible headings, account titles and Sandbox/Demo notices.
+
 ## 1.51.0 — 2026-11-13
 
 PR: [#193](https://github.com/Fillll/whab/pull/193)
