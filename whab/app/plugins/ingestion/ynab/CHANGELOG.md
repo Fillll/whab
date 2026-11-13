@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.5.0 — 2026-11-13
+
+PR: [#190](https://github.com/Fillll/whab/pull/190)
+
+- Import authoritative Transfer and Inflow: Ready to Assign/To be Budgeted rows with explicit system classifications. Keep clearing/flags in notes; blank categories remain non-reviewed without inferring a human reviewer.
+
 ## 1.4.7 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

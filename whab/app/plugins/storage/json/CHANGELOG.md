@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.0 — 2026-11-13
+
+PR: [#190](https://github.com/Fillll/whab/pull/190)
+
+- Preserve explicit system-category metadata and enforce core review rules across native writes, imports and restore. Implement deferred guarded classification correction, immutable audit preservation and atomic interruption/reopen recovery.
+
 ## 1.15.0 — 2026-11-11
 
 PR: [#188](https://github.com/Fillll/whab/pull/188)

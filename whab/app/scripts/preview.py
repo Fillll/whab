@@ -80,9 +80,9 @@ def seed_fictional_budget(store, month):
         selected = shift_month(month, offset)
         snapshot["assignments"].extend({
             "month": selected, "categoryId": category["id"], "assigned": category["target"],
-        } for category in snapshot["categories"])
+        } for category in snapshot["categories"] if not category.get("systemKind"))
         for index, (identifier, merchant, amount, category, reviewed) in enumerate((
-            ("salary", "Fictional employer", -650000, None, True),
+            ("salary", "Fictional employer", -650000, "whab-system:income:USD", True),
             ("rent", "Fictional landlord", 185000, "rent", True),
             ("groceries", "Fictional market", 8754, "groceries", False),
             ("coffee", "Fictional cafe", 625, "dining", True),

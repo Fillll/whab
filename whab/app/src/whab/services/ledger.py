@@ -243,6 +243,8 @@ class LedgerService:
                 from whab.domain.bulk import validate_edits
                 edits = validate_edits(parameters['operation'], parameters['edits'])
                 self._require_atomic_bulk()
+                if parameters['operation'] == 'edit_transactions' and not getattr(self, '_classifications_supported', False):
+                    raise StoreError('Update the budget host/storage to WHAB 2.73 transaction classification support before previewing edits.')
                 return {'revision': self._revision, 'data': _public(self._store.preview_bulk_edits(workspace, parameters['operation'], edits))}
             if operation == 'category_deletion_status':
                 values = parameters or {}

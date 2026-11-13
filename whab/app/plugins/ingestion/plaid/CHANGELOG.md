@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.10.0 — 2026-11-13
+
+PR: [#190](https://github.com/Fillll/whab/pull/190)
+
+- Map authoritative provider Transfer/Income classifications to protected system identities. Provider categories never manufacture review; core merge retains valid annotations and explicit user choices.
+
 ## 1.9.0 — 2026-11-10
 
 PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)

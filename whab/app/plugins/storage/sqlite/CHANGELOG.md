@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.24.0 — 2026-11-13
+
+PR: [#190](https://github.com/Fillll/whab/pull/190)
+
+- Persist protected system-category kinds through an additive column and all native/portable projections. Implement guarded classification readiness/correction with atomic audit, durable receipts and deferred worker preparation; preserve immutable old events and unrelated financial/provider state.
+
 ## 1.23.0 — 2026-11-11
 
 PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)

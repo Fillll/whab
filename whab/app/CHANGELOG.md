@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.73.0 — 2026-11-13
+
+PR: [#190](https://github.com/Fillll/whab/pull/190)
+
+- Require a valid category for reviewed current transactions; clearing classification clears review, while assignment alone preserves non-reviewed state. Add protected currency-scoped Transfer/Income classifications outside expense envelopes, guarded native compatibility correction after worker activation, exact historical/retry preservation, and remote readiness checks.
+
 ## 2.72.0 — 2026-11-11
 
 PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)

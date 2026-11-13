@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.18.0 — 2026-11-13
+
+PR: [#190](https://github.com/Fillll/whab/pull/190)
+
+- Add simple atomic trnx review/unreview commands with detailed offline help, previews, audit attribution, exact recovery and verified results. Discover protected System / Transfer and System / Income classifications; document category clearing and unsupported-authority checks.
+
 ## 2.17.0 — 2026-11-11
 
 PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)

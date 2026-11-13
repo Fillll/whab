@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.49.0 — 2026-11-13
+
+PR: [#190](https://github.com/Fillll/whab/pull/190)
+
+- Show explicit Transfer/Income system categories in transaction pickers while keeping them out of expense envelopes. Explain uncategorized review refusal; category clearing updates non-reviewed state and unfinished styling immediately.
+
 ## 1.48.2 — 2026-11-12
 
 PR: [#189](https://github.com/Fillll/whab/pull/189)
