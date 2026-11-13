@@ -79,10 +79,10 @@ uses saved **Group > Category**, and ties retain stable date/ID order. Provision
 suggestions do not determine saved-category ordering. Selection and Receipt headings
 remain controls rather than sort columns.
 
-The period picker has previous/next calendar-month arrows and a **This month**
-shortcut. Arrows use the displayed route month and switch to a concrete month,
+The period picker has previous/next calendar-month arrows. Choose **This month**
+inside the picker to return to the current month. Arrows use the displayed route month and switch to a concrete month,
 clearing year/all/custom date bounds and resetting incremental loading while keeping
-account, search, review and sort selections. **This month** resolves against the
+account, search, review and sort selections. The **This month** preset resolves against the
 current household calendar on each load. At the supported calendar limits the
 unavailable arrow is disabled. Category editors and their native choices display
 **Group > Category** to disambiguate duplicate names, including newly created rows.

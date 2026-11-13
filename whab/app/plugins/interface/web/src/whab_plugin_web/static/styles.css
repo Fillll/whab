@@ -4647,7 +4647,6 @@ main:has(.budget-planner) > .demo-ribbon,
 .transaction-sort-indicator small { font-size: 9px; }
 .transaction-period-navigation { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .transaction-period-navigation > .icon-button { flex-shrink: 0; width: 30px; height: 37px; }
-.transaction-current-month { white-space: nowrap; font-size: 11px; margin-left: 4px; }
 @media (max-width: 700px) {
   .transaction-period-navigation { flex: 1 1 100%; }
   .transaction-period-navigation .transaction-period-filter { flex: 1; width: auto; }
