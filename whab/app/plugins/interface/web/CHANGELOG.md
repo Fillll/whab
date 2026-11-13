@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.53.1 — 2026-11-13
+
+PR: [#196](https://github.com/Fillll/whab/pull/196)
+
+- Include the active visual generation in count-only summaries and retain saved rows, selections and focus when a background count refresh fails; never fall back to a full-page reload for an automatic summary.
+
 ## 1.53.0 — 2026-11-13
 
 PR: [#195](https://github.com/Fillll/whab/pull/195)

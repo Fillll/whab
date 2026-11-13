@@ -288,7 +288,9 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
       }
     } catch (failure) {
       if (revision !== request || disposed || failure.name === 'AbortError') return !summary;
-      // The normal server page is the fallback; no financial values are cached.
+      // A background count failure must never replace edited/selected rows.
+      if (summary) {notify('The sidebar count could not be refreshed. Saved rows stay visible; refresh when ready.'); return false;}
+      // Explicit navigation still falls back to the normal server page.
       if (action === 'none') location.replace(target.href);
       else location.assign(target.href);
     } finally {

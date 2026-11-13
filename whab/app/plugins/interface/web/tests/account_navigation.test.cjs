@@ -234,7 +234,7 @@ test('partial review refresh updates, removes and creates the server-rendered na
 });
 
 test('count-only review refresh preserves the register, focus, history and sidebar while updating its badge', async () => {
-  const state = harness({initialContext: {apiPrefix: '/api', budgetId: 'default'}});
+  const state = harness({initialContext: {apiPrefix: '/api', budgetId: 'default', uiGeneration: 'a'.repeat(64)}});
   let current = badge('3');
   const attach = next => {
     current = next;
@@ -277,12 +277,15 @@ test('count summaries validate the same scope and cannot navigate or apply after
     {marker: 'summary', reviewBadge: '1', override: {transactionSearch: 'stale'}},
     {marker: 'summary', reviewBadge: '1', override: {transactionRequestedPage: '8'}},
     {marker: 'summary', reviewBadge: '1', override: {selectedAccountId: 'second'}},
-    {marker: 'summary', reviewBadge: '1', override: {canonicalUrl: second}}]) {
-    const state = harness();
+    {marker: 'summary', reviewBadge: '1', override: {canonicalUrl: second}},
+    {marker: 'summary', reviewBadge: '1', override: {uiGeneration: undefined}},
+    {marker: 'summary', reviewBadge: '1', override: {uiGeneration: 'b'.repeat(64)}}]) {
+    const state = harness({initialContext: {uiGeneration: 'a'.repeat(64)}});
     const pending = state.navigator.navigate(first, {refresh: true, summary: true});
     await tick(); state.respond(0, response); await pending;
     assert.equal(state.replacements.length, 0);
-    assert.deepEqual(state.fallbacks, [['assign', first]]);
+    assert.deepEqual(state.fallbacks, []);
+    assert.equal(state.notices.length, 1);
   }
   const state = harness();
   assert.equal(await state.navigator.navigate(second, {refresh: true, summary: true}), false);
@@ -648,4 +651,19 @@ test('transaction navigation refuses a different visual generation before replac
   assert.equal(state.context.getContext().uiGeneration, 'a'.repeat(64));
   assert.ok(state.fallbacks.length);
   state.navigator.dispose();
+});
+
+
+test('failed background count transport preserves the mounted register and selected editors', async () => {
+  const state = harness({initialContext: {uiGeneration: 'a'.repeat(64)}});
+  const content = state.content();
+  const pending = state.navigator.navigate(first, {refresh: true, summary: true});
+  await tick(); state.requests[0].reject(new Error('Network unavailable'));
+  assert.equal(await pending, false);
+  assert.equal(state.content(), content);
+  assert.equal(state.replacements.length, 0);
+  assert.equal(state.histories.length, 0);
+  assert.equal(state.fallbacks.length, 0);
+  assert.equal(state.navigator.pendingDestination(), null);
+  assert.match(state.notices[0], /Saved rows stay visible/);
 });
