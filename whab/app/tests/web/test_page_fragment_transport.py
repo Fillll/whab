@@ -125,7 +125,7 @@ def test_account_alias_and_exact_filters_keep_the_same_context_as_direct_pages(f
     legacy = f"/budgets/home/transactions/2026-10/usd{query}&account={account}"
     first = context(fragment_client.get(legacy, headers=FRAGMENT))
     canonical = first["canonicalUrl"]
-    assert canonical.startswith("/budgets/my-budget/daily-wallet/transactions/2026-10/usd?")
+    assert canonical.startswith("/budgets/my-budget/daily-wallet/transactions/2026-10?")
     assert first["selectedAccountId"] == account and first["selectedAccountIds"] == [account]
     assert first["transactionPeriod"] == "custom" and first["startDate"] == "2026-09-01" and first["endDate"] == "2026-10-31"
     assert first["reviewFilter"] == "needs-review"
