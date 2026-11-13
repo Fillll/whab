@@ -496,6 +496,8 @@ class LedgerService:
                 replayed = durable_replay(request_id, fingerprint)
                 if replayed is not None:
                     return deepcopy(replayed)
+            if operation in {'rename_category', 'move_category', 'delete_category', 'assign'} and payload['categoryId'].startswith('whab-system:'):
+                raise StoreError('System categories cannot be renamed, moved, deleted, targeted or assigned money.')
             if operation == 'review_transactions' and not callable(getattr(self._store, 'review_transactions', None)):
                 raise StoreError('This storage plugin does not support bulk review.')
             if operation in {'add_transaction', 'edit_transaction', 'edit_transactions', 'review_transactions', 'append_transaction_note', 'history_apply'}:

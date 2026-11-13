@@ -22,6 +22,7 @@ from whab.budgets.storage_replicas import StorageReplicas
 from whab.budgets.storage_runtime import StorageRuntime, open_saved_storage, saved_storage_selection
 from whab.budgets.storage_upgrade import StorageBinding, StorageUpgrade, storage_worker_descriptor
 from whab.config import Settings
+from whab.domain.errors import StoreError
 from whab.plugins import (
     InterfaceContext,
     LedgerService,
