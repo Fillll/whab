@@ -26,7 +26,7 @@ def test_budget_and_account_names_make_readable_urls_while_ids_own_api_scope(tmp
             store.add_transaction("personal", {"accountId": identifier, "date": "2026-09-05", "merchant": merchant, "amount": 100, "categoryId": None})
         old = f"/budgets/home/transactions/current-month/usd?account={account}&all_dates=true"
         data = context(client.get(old))
-        canonical = "/budgets/my-budget/schyot-cafe/transactions/current-month/usd?all_dates=true"
+        canonical = "/budgets/my-budget/schyot-cafe/transactions/current-month?all_dates=true"
         assert data["canonicalUrl"] == canonical
         assert data["budgetUrl"] == "/budgets/my-budget" and data["apiPrefix"] == "/budgets/home/api"
         assert data["budgetId"] == "default" and data["selectedAccountId"] == account
@@ -78,11 +78,11 @@ def test_account_alias_renames_collisions_and_registry_stay_device_local(tmp_pat
         store.db.execute("UPDATE accounts SET name='Daily cash' WHERE workspace='personal' AND id=?", (first,))
         renamed = context(client.get(f"/budgets/my-budget/{old_alias}/transactions/2026-10/usd"))
         assert renamed["selectedAccountId"] == first
-        assert renamed["canonicalUrl"] == "/budgets/my-budget/daily-cash/transactions/2026-10/usd"
+        assert renamed["canonicalUrl"] == "/budgets/my-budget/daily-cash/transactions/2026-10"
         fragment = client.get(f"/budgets/my-budget/{old_alias}/transactions/2026-10/usd", headers={"X-WHAB-Transactions-Fragment": "1"})
         template = re.search(r'<template data-account-list>(.*?)</template>', fragment.text, re.S)[1]
         assert "Daily cash" in template and f'data-account-id="{first}"' in template
-        assert '/daily-cash/transactions/2026-10/usd?all_dates=true' in template
+        assert '/daily-cash/transactions/2026-10?all_dates=true' in template
         assert 'title="Daily cash · USD"' in template
         assert context(client.get(f'/budgets/my-budget/{data["accountSlugs"][second]}/transactions/2026-10/usd'))["selectedAccountId"] == second
         raw = client.get("/budgets/home/api/budget/export").content

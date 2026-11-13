@@ -41,7 +41,7 @@ def test_month_navigation_clears_old_ranges_and_retains_other_filters(month, pre
             assert links[key] is None
             continue
         url = urlsplit(links[key])
-        assert url.path.endswith(f'/transactions/{expected}/usd')
+        assert url.path.endswith(f'/transactions/{expected}')
         query = parse_qs(url.query)
         assert query.get('period') == (['current-month'] if key == 'current' else None)
         assert not {'start_date', 'end_date', 'all_dates', 'tx_page'} & query.keys()
@@ -63,7 +63,7 @@ def test_sorted_rendering_labels_and_canonical_address(client, store):
     assert 'Resize Payee column' in text and 'aria-describedby="transaction-resize-help"' in text
     assert 'sort=date%3Aasc&sort=amount%3Adesc' in text or 'sort=date:asc&sort=amount:desc' in text
     assert re.search(r'href="[^"]*sort=amount%3Adesc[^"]*"', text)
-    assert client.get('/budgets/home/transactions/2026-11/usd?sort=date:sideways').status_code == 400
+    assert client.get('/budgets/home/transactions/2026-11?sort=date:sideways').status_code == 400
 
 
 def test_actual_visual_worker_retains_native_origin_and_paging(store, tmp_path):

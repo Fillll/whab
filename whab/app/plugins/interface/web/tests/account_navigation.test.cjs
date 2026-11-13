@@ -124,6 +124,25 @@ test('ordinary account, search and page navigation omits the unused sidebar frag
   assert.equal(state.fallbacks.length, 0);
 });
 
+test('a legacy USD bookmark shortens in place and short account navigation retains the same budget', async () => {
+  const canonical = '/budgets/home/transactions/2026-10?account=first&all_dates=true';
+  const state = harness({initialContext: {canonicalUrl: canonical}});
+  assert.equal(state.location.href, 'https://localhost:5173' + canonical);
+  assert.deepEqual(state.histories.map(item => item[0]), ['replace']);
+  assert.equal(state.requests.length, 0, 'Canonicalization must not fetch or save');
+  const target = state.location.href.replace('account=first', 'account=second');
+  const pending = state.navigator.navigate(target);
+  await tick();
+  state.respond(0);
+  assert.equal(await pending, true);
+  assert.equal(state.context.getContext().selectedAccountId, 'second');
+  assert.equal(state.fallbacks.length, 0);
+  const otherCurrency = new URL(target);
+  otherCurrency.pathname += '/eur';
+  assert.equal(state.context.isAccountDestination(otherCurrency, new URL(state.location.href)), false);
+  state.navigator.dispose();
+});
+
 test('a validated replacement keeps the original page when its editor cannot be released', async () => {
   let allowed = false, releases = 0;
   const budget = 'https://localhost:5173/budgets/home/budget/2026-10/usd';

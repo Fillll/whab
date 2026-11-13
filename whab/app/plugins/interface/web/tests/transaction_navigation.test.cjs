@@ -24,7 +24,7 @@ function navigation(href, extra = {}) {
 test('account register survives month navigation while switching to the selected month', () => {
   const navigate = navigation('https://localhost:5173/budgets/home/transactions/2026-10/usd?account=MixedCase&all_dates=true');
   const month = navigate({month: '2026-09'});
-  assert.equal(month.pathname, '/budgets/home/transactions/2026-09/usd');
+  assert.equal(month.pathname, '/budgets/home/transactions/2026-09');
   assert.equal(month.searchParams.get('account'), 'MixedCase');
   assert.equal(month.searchParams.has('all_dates'), false);
   const toggle = navigate({allDates: false});
@@ -38,14 +38,14 @@ test('readable budget and account paths preserve stable account IDs while changi
     accountSlugs: {MixedCase: 'daily-checking', 'Other&ID': 'savings'},
   });
   const month = navigate({month: '2026-09'});
-  assert.equal(month.pathname, '/budgets/family-budget/daily-checking/transactions/2026-09/usd');
+  assert.equal(month.pathname, '/budgets/family-budget/daily-checking/transactions/2026-09');
   assert.equal(month.searchParams.has('account'), false);
   assert.equal(month.searchParams.has('all_dates'), false);
-  assert.equal(navigate({allDates: false}).pathname, '/budgets/family-budget/daily-checking/transactions/2026-10/usd');
+  assert.equal(navigate({allDates: false}).pathname, '/budgets/family-budget/daily-checking/transactions/2026-10');
   const account = navigate({account: 'Other&ID'});
-  assert.equal(account.pathname, '/budgets/family-budget/savings/transactions/2026-10/usd');
+  assert.equal(account.pathname, '/budgets/family-budget/savings/transactions/2026-10');
   assert.equal(account.searchParams.get('all_dates'), 'true');
-  assert.equal(navigate({account: 'all'}).pathname, '/budgets/family-budget/transactions/2026-10/usd');
+  assert.equal(navigate({account: 'all'}).pathname, '/budgets/family-budget/transactions/2026-10');
   assert.equal(navigate({currency: 'JPY'}).pathname, '/budgets/family-budget/transactions/2026-10/jpy');
   assert.equal(navigate({page: 'budget'}).pathname, '/budgets/family-budget/budget/2026-10/usd');
 });
@@ -56,7 +56,7 @@ test('legacy account queries become readable paths when the account slug is know
     accountSlugs: {MixedCase: 'daily-checking'},
   });
   const url = navigate({allDates: true});
-  assert.equal(url.pathname, '/budgets/family-budget/daily-checking/transactions/2026-10/usd');
+  assert.equal(url.pathname, '/budgets/family-budget/daily-checking/transactions/2026-10');
   assert.equal(url.searchParams.has('account'), false);
   assert.equal(url.searchParams.get('all_dates'), 'true');
 });
@@ -90,18 +90,18 @@ test('multiple accounts use repeated stable IDs and a single account keeps its r
     accountSlugs: {MixedCase: 'daily-checking', 'Other&ID': 'savings'},
   });
   const multiple = navigate({accounts: ['Other&ID', 'MixedCase', 'Other&ID']});
-  assert.equal(multiple.pathname, '/budgets/family-budget/transactions/2026-10/usd');
+  assert.equal(multiple.pathname, '/budgets/family-budget/transactions/2026-10');
   assert.deepEqual(multiple.searchParams.getAll('accounts'), ['Other&ID', 'MixedCase']);
   assert.equal(multiple.searchParams.has('account'), false);
   for (const [name, value] of [['period', 'custom'], ['start_date', '2026-09-10'], ['end_date', '2026-10-10'], ['review', 'reviewed']]) {
     assert.equal(multiple.searchParams.get(name), value);
   }
   const single = navigate({accounts: ['MixedCase']});
-  assert.equal(single.pathname, '/budgets/family-budget/daily-checking/transactions/2026-10/usd');
+  assert.equal(single.pathname, '/budgets/family-budget/daily-checking/transactions/2026-10');
   assert.equal(single.searchParams.has('accounts'), false);
   assert.equal(single.searchParams.has('account'), false);
   const all = navigate({accounts: []});
-  assert.equal(all.pathname, '/budgets/family-budget/transactions/2026-10/usd');
+  assert.equal(all.pathname, '/budgets/family-budget/transactions/2026-10');
   assert.equal(all.searchParams.has('accounts'), false);
   assert.equal(all.searchParams.has('account'), false);
 });
@@ -110,7 +110,7 @@ test('relative date presets replace legacy all dates and custom bounds while ret
   const navigate = navigation('https://localhost:5173/budgets/home/transactions/2026-10/usd?account=first&all_dates=true&period=custom&start_date=2026-09-10&end_date=2026-10-10&review=needs-review');
   for (const period of ['current-month', 'previous-month', 'current-year', 'previous-year', 'all']) {
     const preset = navigate({period, month: 'current-month'});
-    assert.equal(preset.pathname, '/budgets/home/transactions/current-month/usd');
+    assert.equal(preset.pathname, '/budgets/home/transactions/current-month');
     assert.equal(preset.searchParams.get('period'), period);
     assert.equal(preset.searchParams.get('account'), 'first');
     assert.equal(preset.searchParams.get('review'), 'needs-review');

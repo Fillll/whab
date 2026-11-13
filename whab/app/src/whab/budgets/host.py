@@ -688,10 +688,15 @@ class BudgetDispatch:
                 if tail.endswith("/webhook"):
                     raise ValueError
             else:
-                account_route = len(parts) == 7 and valid_route_key(parts[3]) and parts[4] == "transactions"
-                if not account_route and (len(parts) != 6 or not valid_route_key(parts[3])):
-                    raise ValueError
-                month, currency = parts[-2:]
+                short_transaction = (len(parts) == 5 and parts[3] == "transactions" or
+                                     len(parts) == 6 and valid_route_key(parts[3]) and parts[4] == "transactions")
+                if short_transaction:
+                    month, currency = parts[-1], "usd"
+                else:
+                    account_route = len(parts) == 7 and valid_route_key(parts[3]) and parts[4] == "transactions"
+                    if not account_route and (len(parts) != 6 or not valid_route_key(parts[3])):
+                        raise ValueError
+                    month, currency = parts[-2:]
                 if currency != currency.lower():
                     raise ValueError
                 if month != "current-month":

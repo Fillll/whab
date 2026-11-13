@@ -1,5 +1,5 @@
 /* Keep the app shell in place while fetching server-rendered views. */
-import {getContext, parsePageRoute, updateContext} from './client.js';
+import {getContext, pagePath, parsePageRoute, updateContext} from './client.js';
 
 function sameBudget(source, target, context) {
   if (source === target) return true;
@@ -112,8 +112,7 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
       }
       const accountId = link.dataset?.accountId || url.searchParams.get('account') || Object.keys(accountSlugs).find(id => accountSlugs[id] === source.accountSlug);
       const accountSlug = accountSlugs[accountId] || source.accountSlug;
-      const accountPath = source.page === 'transactions' && accountSlug ? `${accountSlug}/` : '';
-      url.pathname = `${context.budgetUrl || `/budgets/${nextRoute.budget}`}/${accountPath}${source.page}/${nextRoute.month}/${source.currency}`;
+      url.pathname = pagePath(context.budgetUrl || `/budgets/${nextRoute.budget}`, source.page, nextRoute.month, source.currency, accountSlug);
       if (accountSlug) url.searchParams.delete('account');
       link.href = url.href;
       if (link.classList.contains('sidebar-account')) {
@@ -152,7 +151,7 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
       const url = new URL(budgetSwitch.dataset[name], location.href);
       const route = parsePageRoute(url);
       if (!route) continue;
-      url.pathname = `/budgets/${route.budget}/${context.page}/${context.monthToken}/${context.currency.toLowerCase()}`;
+      url.pathname = pagePath(`/budgets/${route.budget}`, context.page, context.monthToken, context.currency);
       url.search = '';
       url.hash = '';
       budgetSwitch.dataset[name] = url.href;

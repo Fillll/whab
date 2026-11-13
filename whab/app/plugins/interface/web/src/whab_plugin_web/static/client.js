@@ -14,9 +14,15 @@ export function getContext() {
 }
 
 export function parsePageRoute(url) {
-  const match = url.pathname.match(/^\/budgets\/([^/]+)\/(?:([^/]+)\/)?(budget|transactions|insights|accounts|subscriptions)\/(current-month|\d{4}-\d{2})\/([a-z]{3})$/);
-  if (!match || match[2] && match[3] !== 'transactions') return null;
-  return {budget: match[1], accountSlug: match[2] || null, page: match[3], month: match[4], currency: match[5]};
+  const match = url.pathname.match(/^\/budgets\/([^/]+)\/(?:([^/]+)\/)?(budget|transactions|insights|accounts|subscriptions)\/(current-month|\d{4}-\d{2})(?:\/([a-z]{3}))?$/);
+  if (!match || (match[2] || !match[5]) && match[3] !== 'transactions') return null;
+  return {budget: match[1], accountSlug: match[2] || null, page: match[3], month: match[4], currency: match[5] || 'usd'};
+}
+
+export function pagePath(budgetUrl, page, month, currency, accountSlug = null) {
+  const accountPath = page === 'transactions' && accountSlug ? `${accountSlug}/` : '';
+  const suffix = page === 'transactions' && currency.toLowerCase() === 'usd' ? '' : `/${currency}`;
+  return `${budgetUrl}/${accountPath}${page}/${month}${suffix}`.toLowerCase();
 }
 
 export function apiUrl(path) {
@@ -39,8 +45,7 @@ export function pageUrl(overrides = {}) {
   if (page !== 'transactions' || 'currency' in overrides) accounts = [];
   const accountId = accounts.length === 1 ? accounts[0] : null;
   const accountSlug = accountId && accountSlugs[accountId];
-  const accountPath = accountSlug ? `${accountSlug}/` : '';
-  url.pathname = `${context.budgetUrl}/${accountPath}${page}/${month}/${currency}`.toLowerCase();
+  url.pathname = pagePath(context.budgetUrl, page, month, currency, accountSlug);
   url.searchParams.delete('account');
   url.searchParams.delete('accounts');
   const clearPeriod = () => ['all_dates', 'period', 'start_date', 'end_date'].forEach(key => url.searchParams.delete(key));
