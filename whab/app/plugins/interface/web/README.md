@@ -136,6 +136,8 @@ The two account dialogs initially contain only the selected currency option. Ope
 
 Ordinary register navigation asks to omit the sidebar account-list template that it leaves in place. Explicit refreshes still request the updated account list, and clients without this optional header receive the complete fragment. Fragment responses remain uncached, and the host's `Vary` header covers both fragment selectors.
 
+Background sidebar count refreshes include the active visual generation. A failed or rejected count refresh leaves saved rows, selections and focus mounted and asks for an explicit refresh; it never falls back to a full page load.
+
 ### Selected category changes
 
 With WHAB 2.75+ and Web 1.53+, select 2–100 loaded transactions and change the

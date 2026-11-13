@@ -188,11 +188,12 @@ def test_summary_carries_the_same_workspace_and_validation_context_as_the_real_r
     register_context = RegisterMarkup(full.text).context
     summary_context = RegisterMarkup(summary.text).context
     fields = {
-        "workspace", "budgetUrl", "budgetAliases", "apiPrefix", "budgetId", "page", "monthToken",
+        "workspace", "budgetUrl", "budgetAliases", "apiPrefix", "budgetId", "uiGeneration", "page", "monthToken",
         "currency", "canonicalUrl", "selectedAccountId", "selectedAccountIds", "transactionPeriod",
         "startDate", "endDate", "reviewFilter", "transactionSearch", "transactionRequestedPage",
     }
     assert summary_context == {name: register_context[name] for name in fields}
+    assert re.fullmatch(r"[a-f0-9]{64}", summary_context["uiGeneration"])
     assert summary_context["workspace"] == workspace
     assert summary_context["transactionSearch"] == "MiXeD & quoted"
     assert summary_context["transactionRequestedPage"] == "02"
