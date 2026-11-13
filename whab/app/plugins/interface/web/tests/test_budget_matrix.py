@@ -511,7 +511,7 @@ def test_budget_labels_are_escaped_and_uncategorized_activity_is_period_specific
     assert category_name not in text and "&lt;script&gt;" in text
     assert "&lt;Living&gt;" in text
     row = re.search(r'<tr class="budget-category-row budget-uncategorized"[^>]*>(.*?)</tr>', text, re.S)[1]
-    assert "-123.45" in row and "/2026-11/usd" in row
+    assert "-123.45" in row and '/transactions/2026-11"' in row
 
 
 @pytest.mark.parametrize("capability", [None, False, 1, "true"])

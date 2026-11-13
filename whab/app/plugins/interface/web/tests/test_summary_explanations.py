@@ -81,7 +81,8 @@ def test_each_month_explains_income_links_matching_assigned_total_and_funding_eq
         )):
             income_body = disclosure(cells["Income"][index][1], "Income", month)
             assert terms(income_body) == [("Received income", money_number(income * factor, currency))]
-            assert f'/budgets/my-budget/transactions/{month}/{currency.lower()}' in income_body
+            suffix = "" if currency == "USD" else f"/{currency.lower()}"
+            assert f'href="/budgets/my-budget/transactions/{month}{suffix}"' in income_body
             assigned_body = disclosure(
                 cells["Assigned this month"][index][1], "Assigned this month", month,
             )
