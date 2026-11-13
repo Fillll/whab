@@ -4677,3 +4677,66 @@ main:has(.budget-planner) > .demo-ribbon,
 .transfer-match h3 {font-size: 13px; margin: 0 0 8px;}
 .transfer-match-leg {display: grid; gap: 4px; padding: 8px 0; overflow-wrap: anywhere;}
 .transfer-match-leg small {color: var(--muted); font-size: 10px;}
+
+/* User-controlled sidebar; the compact state retains named navigation icons. */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+  margin: 0 4px 24px;
+}
+.sidebar-header .brand { flex: 1; min-width: 0; margin: 0; }
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sidebar-toggle[hidden] { display: none; }
+.sidebar-toggle:hover { background: var(--surface); color: var(--ink); }
+.sidebar-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+html[data-sidebar='collapsed'] .sidebar { width: 62px; padding: 20px 7px 0; align-items: center; overflow-x: hidden; }
+html[data-sidebar='collapsed'] .sidebar-header { flex-direction: column; margin: 0 0 18px; gap: 8px; }
+html[data-sidebar='collapsed'] .sidebar-header .brand { flex: none; }
+html[data-sidebar='collapsed'] .sidebar-toggle svg { transform: rotate(180deg); }
+html[data-sidebar='collapsed'] .sidebar .nav-label,
+html[data-sidebar='collapsed'] .sidebar-accounts,
+html[data-sidebar='collapsed'] .nav-item > span,
+html[data-sidebar='collapsed'] .brand > span,
+html[data-sidebar='collapsed'] .local-status-dot,
+html[data-sidebar='collapsed'] .local-status-label { display: none; }
+html[data-sidebar='collapsed'] .nav-item { width: 46px; min-height: 44px; padding: 0; justify-content: center; margin-bottom: 5px; }
+html[data-sidebar='collapsed'] .sidebar nav { width: 46px; }
+html[data-sidebar='collapsed'] .sidebar-bottom { width: 100%; padding-top: 20px; padding-bottom: 12px; }
+html[data-sidebar='collapsed'] .local-status { width: 46px; margin: 0; padding-top: 12px; border-top: 1px solid var(--line); }
+html[data-sidebar='collapsed'] .settings-trigger { width: 46px; min-height: 44px; padding: 0; margin-left: 0; justify-content: center; }
+html[data-sidebar='collapsed'] .app-shell > main { margin-left: 62px; }
+.transaction-toolbar { justify-content: flex-end; margin-bottom: 16px; }
+.transaction-toolbar:has(h1:not(.sr-only)) { justify-content: space-between; }
+@media (max-width: 760px) {
+  .sidebar-header { flex-direction: column; margin: 0 0 18px; gap: 8px; }
+  html[data-sidebar='expanded'] .sidebar { width: 208px; align-items: stretch; padding: 20px 12px 0; box-shadow: 8px 0 24px #0003; }
+  html[data-sidebar='expanded'] .sidebar-header { flex-direction: row; margin: 0 4px 24px; gap: 4px; }
+  html[data-sidebar='expanded'] .brand > span { display: block; }
+  html[data-sidebar='expanded'] .sidebar .nav-label { display: flex; }
+  html[data-sidebar='expanded'] .sidebar-accounts { display: block; }
+  html[data-sidebar='expanded'] .sidebar nav { width: 100%; }
+  html[data-sidebar='expanded'] .nav-item { width: auto; min-height: 39px; padding: 11px 10px; justify-content: flex-start; margin-bottom: 0; }
+  html[data-sidebar='expanded'] .nav-item > span { display: inline; }
+  html[data-sidebar='expanded'] .local-status { width: auto; margin: 0 6px; }
+  html[data-sidebar='expanded'] .local-status-dot,
+  html[data-sidebar='expanded'] .local-status-label { display: inline; }
+  html[data-sidebar='expanded'] .settings-trigger { margin-left: auto; width: 32px; min-height: 32px; }
+  html[data-sidebar='expanded'] .sidebar-account { display: flex; }
+  html[data-sidebar='expanded'] .sidebar-account > span > span,
+  html[data-sidebar='expanded'] .sidebar-account small { display: inline; }
+}

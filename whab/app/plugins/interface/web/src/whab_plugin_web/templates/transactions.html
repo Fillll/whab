@@ -14,10 +14,8 @@
 {% macro resize_handle(field, label) %}<button type="button" class="transaction-column-resize" data-resize-column="{{ field }}" role="separator" aria-orientation="vertical" aria-label="Resize {{ label }} column" aria-valuemin="100" aria-valuemax="1000" aria-describedby="transaction-resize-help" title="Drag to resize {{ label }} · Double-click to reset"></button>{% endmacro %}
 {% set month_links = transaction_month_links(request, month) %}
 <section data-transaction-register data-workspace="{{ workspace }}" data-transaction-paged="true" data-transaction-page="{{ register.page }}" data-transaction-requested-page="{{ register.requested_page }}" data-stream-next="{{ register.next or '' }}" data-stream-previous="{{ register.previous or '' }}" data-stream-revision="{{ register.revision|default('') }}" data-stream-count="{{ register.count }}">
-<div class="page-title-row">
-  <div>
-    <h1 id="transaction-title" tabindex="-1">{{ selected_account.name if selected_account else 'Transactions' }}</h1>
-  </div>
+<div class="page-title-row transaction-toolbar">
+  <h1 id="transaction-title"{% if not selected_account %} class="sr-only"{% endif %} tabindex="-1">{{ selected_account.name if selected_account else 'Transactions' }}</h1>
   <div class="button-group">{% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}">{{ icon('settings', 16) }}Account settings</button>{% endif %}<button class="button secondary" type="button" data-transfer-find>Suggest transfers</button><a class="button secondary" href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}" download>{{ icon('download', 16) }}Export</a><button class="button primary" data-add-transaction {% if selected_account and selected_account.closed|default(false) %}disabled title="Reopen this archived account before adding transactions" {% elif not active_transaction_accounts %}disabled title="{{ 'Add or reopen an account in Accounts first' if transaction_accounts else 'Add an account in Accounts first' }}" {% endif %}>{{ icon('plus', 16) }}Add transaction</button></div>
 </div>
 <div class="transaction-filters">

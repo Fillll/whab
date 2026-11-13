@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with USD Transactions addresses ending at the month (legacy /usd links remain supported), browser-saved text-column widths, complete-selection compound register sorting, Group > Category labels and calendar-month navigation; financial decisions use shared ledger operations.",
+  "summary": "Visual budgeting interface with browser-saved collapsible navigation, accessible transaction page labels, compound register sorting and reviewed transfer proposals; financial decisions use shared ledger operations.",
   "delegates": [
     "core"
   ],
@@ -42,7 +42,7 @@
           "output": null
         }
       ],
-      "side_effects": "The interface delegates explicit reads/mutations to public services; it does not define financial rules. Account, Payee, Category and Memo resize controls save only column keys and pixel widths in browser local storage; resizing never writes financial data or history.",
+      "side_effects": "The interface delegates explicit reads/mutations to public services; it does not define financial rules. Account, Payee, Category and Memo resize controls save only column keys and pixel widths in browser local storage; resizing never writes financial data or history. Sidebar collapse/expand saves only expanded/collapsed under whab.sidebar in browser local storage. It never changes budget data, history or bank synchronization; blocked browser storage keeps the toggle usable for this page.",
       "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [

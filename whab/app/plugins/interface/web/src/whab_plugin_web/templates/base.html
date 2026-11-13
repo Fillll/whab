@@ -19,6 +19,7 @@
     <title>WHAB · We Have A Budget</title>
     <link rel="icon" href="{{ ui_asset_prefix|default(asset_prefix) }}/static/favicon.svg?v={{ web_asset_version }}" type="image/svg+xml">
     <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/theme.js?v={{ web_asset_version }}"></script>
+    <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/sidebar.js?v={{ web_asset_version }}"></script>
     <link rel="stylesheet" href="{{ ui_asset_prefix|default(asset_prefix) }}/static/styles.css?v={{ web_asset_version }}">
     <script id="whab-context" type="application/json">{{ client_context|tojson }}</script>
     <script type="importmap">{{ module_imports(ui_asset_prefix|default(asset_prefix))|tojson }}</script>
@@ -27,12 +28,15 @@
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar">
+      <aside class="sidebar" id="whab-sidebar" aria-label="Workspace sidebar">
+        <div class="sidebar-header">
         <a class="brand" href="{{ url('budget') }}" aria-label="WHAB home"><img class="brand-symbol" src="{{ ui_asset_prefix|default(asset_prefix) }}/static/logo.svg?v={{ web_asset_version }}" alt="" width="40" height="40"><span><strong>WHAB</strong><small>We Have A Budget</small></span></a>
+        <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-controls="whab-sidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar" hidden>{{ icon('chevron-left', 16) }}</button>
+        </div>
         <div class="nav-label">WORKSPACE</div>
         <nav aria-label="Main navigation">
           {% for key,label in nav %}<a class="nav-item {% if page==key %}active {% endif %}"
-   href="{{ url(key) }}"
+   href="{{ url(key) }}" aria-label="{{ label }}" title="{{ label }}"
    {% if page==key %}aria-current="page" {% endif %}>{{ icon(key,19) }}<span>{{ label }}</span>
         {% if key=="transactions" and to_review %}<span class="nav-count">{{ to_review }}</span>
       {% endif %}
@@ -57,8 +61,7 @@
     <div class="breadcrumb">
       {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }} {{ icon('chevron-right', 14) }}<span>{{ page|capitalize }}</span>
     </div>
-    <div class="topbar-right"><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' if status.environment=='sandbox' else 'Live data' }}</span>
-    </div>
+    {% if workspace=='demo' or status.environment=='sandbox' %}<div class="topbar-right"><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' }}</span></div>{% endif %}
   </header>
   {% if workspace=="demo" %}
     <div class="demo-ribbon">

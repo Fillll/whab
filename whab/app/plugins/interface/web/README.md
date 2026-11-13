@@ -49,6 +49,25 @@ For rendering or navigation performance changes, compare the same fictional work
 
 Use `--page accounts` or `--page budget` for the affected view, `--summary` for review summaries, and `--profile-memory` when allocation changes matter. Record the workload, route/filters, environment, response size and measured rendering result. These measurements exclude browser layout/network time; also exercise a disposable Sandbox runtime with comparable fictional history in the browser, retaining any seed fixture with the change. Observe initial display, interaction response, loading/error feedback, scrolling and network/console failures while editing and navigating. Report a regression or improvement against that baseline rather than inventing a numerical latency target. See the [development runbook](../../../../docs/development.md) for disposable runtime setup and running-version verification.
 
+## Collapsible sidebar and page labels
+
+The sidebar's chevron button switches between full navigation and an icon rail.
+Named navigation links and Settings remain keyboard accessible when collapsed;
+expand to reach the account list. The button exposes its expanded state and a
+Collapse/Expand sidebar label and tooltip. The choice is saved only in this browser
+under `whab.sidebar`, before the first paint, and survives reloads and budget/page
+navigation. Without a saved choice, desktop expands and widths up to 760px collapse.
+On compact screens an expanded sidebar overlays the page, keeping the table's width.
+Storage being blocked does not prevent toggling; that choice lasts for the page.
+Other tabs follow stored changes; removing the preference restores responsive defaults.
+No budget data, history or synchronization changes are involved.
+
+The all-accounts transaction register uses its breadcrumb and selected navigation
+item instead of a repeated visible Transactions heading. A screen-reader heading
+and navigation focus target remain; a selected account still has its own visible
+name. Production omits the redundant Live data badge. Sandbox and sample-data
+notices remain explicit.
+
 ## Register rendering and navigation
 
 USD register addresses end at the month, for example
