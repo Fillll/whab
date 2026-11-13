@@ -65,6 +65,18 @@ Compatible model settings expose **Preview low-score guesses**, an explicit acti
 
 The descriptor opts into `transaction_page_size=100` and `lightweight_accounts=True`. The host supplies bounded rows and complete-selection counts, while this plugin builds filter controls, page links and labels. Older storage plugins retain public-read fallbacks. Account and merchant images begin loading near visible fallback marks, with at most two requests at once; closed account pickers wait until opened. Errors, detached rows and a ten-second load deadline release image slots. Explicit account-logo previews remain immediate.
 
+Account, Payee, Category and Memo have resize handles at the right edge of their
+headings. Drag an edge to adjust that column without changing adjacent columns,
+or focus its handle and press Left/Right (10 pixels, Shift for 50). Double-click
+or press Home to restore that column's automatic width; Escape cancels a drag.
+Widths are bounded to 100–1000 pixels and saved as a browser layout preference
+across refreshes, account switches and budgets on the same origin. They contain
+only column keys and widths, and never write to the budget or group undo/history.
+If browser storage is unavailable, resizing still works for the current view.
+Wide layouts scroll horizontally, including on compact screens. Sorting remains
+on the heading text, separate from the resize handle. Date, receipt, selection,
+amount, currency and review columns retain their automatic sizing.
+
 Register data headings (Date, Account, Payee, Category, Memo, Amount, Currency and R)
 cycle **ascending → descending → none**. Clicking another heading adds a secondary
 sort, preserving priority; small arrows carry priority numbers when several columns

@@ -4645,6 +4645,23 @@ main:has(.budget-planner) > .demo-ribbon,
 .transaction-sort:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .transaction-sort-indicator { display: inline-flex; align-items: center; gap: 1px; font-size: 12px; }
 .transaction-sort-indicator small { font-size: 9px; }
+.transactions-table th:has(.transaction-column-resize) { padding-right: 14px; }
+.transaction-column-resize {
+  position: absolute; inset: 0 0 0 auto; width: 10px; min-height: 0;
+  padding: 0; border: 0; border-radius: 0; background: transparent;
+  cursor: col-resize; touch-action: none;
+}
+.transaction-column-resize::after {
+  content: ''; position: absolute; top: 6px; bottom: 6px; right: 2px;
+  width: 2px; background: var(--muted); opacity: .35;
+}
+.transaction-column-resize:hover::after,
+.transaction-column-resize:focus-visible::after { background: var(--focus); opacity: 1; }
+.transaction-column-resize:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.transactions-table[data-column-widths] { min-width: 0; }
+.transactions-table[data-column-widths] th { width: auto; }
+.transactions-table.is-resizing-columns,
+.transactions-table.is-resizing-columns * { cursor: col-resize !important; user-select: none; }
 .transaction-period-navigation { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .transaction-period-navigation > .icon-button { flex-shrink: 0; width: 30px; height: 37px; }
 @media (max-width: 700px) {

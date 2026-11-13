@@ -59,6 +59,8 @@ def test_sorted_rendering_labels_and_canonical_address(client, store):
     assert 'priority 1' in text and 'priority 2' in text
     assert 'transaction-sort-indicator' in text and '<small>1</small>' in text
     assert 'data-transaction-month' in text
+    assert re.findall(r'data-resize-column="([^"]+)"', text) == ['account', 'merchant', 'category', 'note']
+    assert 'Resize Payee column' in text and 'aria-describedby="transaction-resize-help"' in text
     assert 'sort=date%3Aasc&sort=amount%3Adesc' in text or 'sort=date:asc&sort=amount:desc' in text
     assert re.search(r'href="[^"]*sort=amount%3Adesc[^"]*"', text)
     assert client.get('/budgets/home/transactions/2026-11/usd?sort=date:sideways').status_code == 400

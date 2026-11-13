@@ -4,6 +4,7 @@ import {initAccountPicker} from './account-picker.js';
 import {initPeriodPicker} from './period-picker.js';
 import {initTransactionGrid, parseRegisterAmount} from './transaction-grid.js';
 import {initTransactionStream} from './transaction-stream.js';
+import {initTransactionColumns} from './transaction-columns.js';
 import {bindLogos} from './logo-images.js';
 
 export function createTransactionWriter(save, {saved = () => {}, state = () => {}} = {}) {
@@ -132,6 +133,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   let stream = null;
   const workspace = root.dataset.workspace;
   const grid = initTransactionGrid(root.querySelector('.transactions-table'));
+  const columns = initTransactionColumns(root.querySelector('.transactions-table'));
   const createForm = root.querySelector('[data-transaction-create]');
   const draft = root.querySelector('[data-new-transaction]');
   let creating = false, createRequestId = null;
@@ -717,6 +719,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       clearTimeout(refreshTimer);
       stream?.dispose();
       grid.dispose();
+      columns.dispose();
       accountPicker.dispose();
       periodPicker.dispose();
       for (const timer of timers.values()) clearTimeout(timer);
