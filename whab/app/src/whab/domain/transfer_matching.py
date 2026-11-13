@@ -58,7 +58,7 @@ def reconcile_matches(state):
 def plan(state, transaction_ids, *, action='match', fingerprint=None, apply=False):
     if (type(transaction_ids) is not list or len(transaction_ids) != 2
             or any(type(value) is not str or not 1 <= len(value) <= 200 for value in transaction_ids)
-            or len(set(transaction_ids)) != 2 or action not in {'match', 'unmatch'}):
+            or len(set(transaction_ids)) != 2 or type(action) is not str or action not in {'match', 'unmatch'}):
         raise StoreError('Choose exactly two distinct transaction IDs and match or unmatch.')
     rows = [state['transactions'].get(identifier) for identifier in transaction_ids]
     if any(row is None or row.get('deleted') for row in rows):

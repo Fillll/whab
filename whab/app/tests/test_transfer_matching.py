@@ -275,3 +275,21 @@ def test_remote_authority_exposes_same_read_preview_and_explicit_guarded_confirm
             assert all(row.get('transferPeerId') and not row['reviewed'] for row in store.transactions('personal'))
         finally:
             remote.close()
+
+
+@pytest.mark.parametrize('action', [[], {}, None, 1])
+def test_malformed_public_transfer_actions_reject_cleanly_without_mutation(native_store, action):
+    store, _, _ = native_store
+    service = LedgerService(store)
+    before = store.export_budget()
+    with pytest.raises(StoreError):
+        plan(fictional_state(), ['out', 'in'], action=action)
+    with pytest.raises(StoreError):
+        service.query('preview_transfer_match', 'personal', parameters={'transactionIds': ['out', 'in'], 'action': action})
+    with pytest.raises(StoreError):
+        service.command('match_transfer', 'personal', {'transactionIds': ['out', 'in'], 'action': action, 'fingerprint': '0' * 64}, request_id='fictional-invalid', expected_revision=service.revision)
+    with pytest.raises(StoreError):
+        service.query('preview_transfer_match', 'personal', parameters={'transactionIds': ['out'], 'action': 'match'})
+    with pytest.raises(StoreError):
+        service.query('transfer_candidates', 'personal', parameters=[])
+    assert store.export_budget() == before

@@ -203,12 +203,15 @@ class LedgerService:
                 raise StoreError("Only feature queries accept parameters.")
             if operation in {'transfer_candidates', 'preview_transfer_match'}:
                 self._require_transfer_matching()
-                values = parameters or {}
+                values = {} if parameters is None else parameters
                 if operation == 'transfer_candidates':
                     data = self._store.transfer_candidates(workspace, values)
                 else:
                     if type(values) is not dict or values.keys() != {'transactionIds', 'action'}:
                         raise StoreError('Preview requires transactionIds and action.')
+                    validate_review_batch(values['transactionIds'], False)
+                    if len(values['transactionIds']) != 2 or type(values['action']) is not str or values['action'] not in {'match', 'unmatch'}:
+                        raise StoreError('Choose exactly two distinct transaction IDs and match or unmatch.')
                     data = self._store.preview_transfer_match(workspace, values['transactionIds'], values['action'])
                 return {'revision': self._revision, 'data': _public(data)}
             if operation == 'preview_bulk_edits':
@@ -313,12 +316,12 @@ class LedgerService:
                 or payload.keys() - schema["properties"].keys()):
             raise StoreError("Invalid ledger command fields.")
         if operation == 'match_transfer':
-            if payload['action'] not in {'match', 'unmatch'}:
+            if type(payload['action']) is not str or payload['action'] not in {'match', 'unmatch'}:
                 raise StoreError('Choose match or unmatch.')
             validate_review_batch(payload['transactionIds'], False)
             if len(payload['transactionIds']) != 2:
                 raise StoreError('Choose exactly two transaction IDs.')
-            if type(payload['fingerprint']) is not str or len(payload['fingerprint']) != 64:
+            if type(payload['fingerprint']) is not str or len(payload['fingerprint']) != 64 or any(c not in '0123456789abcdef' for c in payload['fingerprint']):
                 raise StoreError('Use the fingerprint from a transfer preview.')
             return deepcopy(payload)
         if operation == 'history_apply':
