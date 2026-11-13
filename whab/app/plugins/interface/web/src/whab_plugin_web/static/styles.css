@@ -4742,3 +4742,18 @@ html[data-sidebar='collapsed'] .app-shell > main { margin-left: 62px; }
 }
 .transaction-toolbar:has(> h1.sr-only) > .button-group { max-width: none; }
 .topbar:not(:has(.topbar-right)) .breadcrumb { max-width: 100%; }
+
+/* The complete sortable header is the link; resize grips remain independent. */
+.transactions-table th:has(> .transaction-sort) { padding: 0; }
+.transactions-table th > .transaction-sort {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+}
+.transactions-table th:has(.transaction-column-resize) > .transaction-sort { padding-right: 14px; }
+.transactions-table th.amount-cell > .transaction-sort { justify-content: flex-end; }
+.transactions-table th > .transaction-sort:focus-visible { outline-offset: -3px; }
+.transaction-selection-help { flex: 1; color: var(--text-secondary); font-size: 10px; }
+.transaction-column-resize { z-index: 2; }

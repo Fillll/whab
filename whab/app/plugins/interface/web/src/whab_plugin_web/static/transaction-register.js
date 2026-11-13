@@ -7,6 +7,7 @@ import {initTransactionStream} from './transaction-stream.js';
 import {initTransactionColumns} from './transaction-columns.js';
 import {bindLogos} from './logo-images.js';
 import {initTransferMatches} from './transfer-matches.js';
+import {createCategoryBatch} from './transaction-category-batch.js';
 
 export function createTransactionWriter(save, {saved = () => {}, state = () => {}} = {}) {
   let pending = {};
@@ -168,6 +169,8 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   let filterNavigationPending = false, filterNavigationRevision = 0;
   let bulkBusy = false;
   let bulkPromise = null;
+  let categoriesLocked = false, retainedEdits = false, streamPaused = false;
+  const categoryLocks = new Map();
   const nativeBulk = getContext().bulkReview === true;
   const saveOne = (transactionId, patch) => api(`/transactions/${encodeURIComponent(transactionId)}`, {workspace, ...patch}, 'PATCH');
   const saveReview = nativeBulk ? createReviewBatcher({workspace, saveOne,
@@ -178,6 +181,38 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   let receiptObjectUrl = null;
   let receiptRequest = 0;
   const receiptIds = new Set();
+  const categoryBatch = createCategoryBatch({workspace, api, before: () => flushRows(), error,
+    restore: targets => targets.forEach(row => row.restoreCategory()),
+    state(locked) {
+      categoriesLocked = locked;
+      for (const row of rows) {
+        const control = row.querySelector('[data-transaction-field="categoryId"]');
+        if (locked) {if (!categoryLocks.has(control)) categoryLocks.set(control, control.disabled); control.disabled = true;}
+        else if (categoryLocks.has(control)) {control.disabled = categoryLocks.get(control); categoryLocks.delete(control);}
+        row.querySelector('[data-select-transaction]').disabled = locked;
+      }
+      selectionBar.querySelector('[data-clear-selection]').disabled = locked;
+      selection();
+      if (!locked) stream?.check();
+    },
+    saved(targets, changes, choice) {
+      for (let i = 0; i < targets.length; i += 1) {
+        targets[i].applyCategory(changes[i].after, choice);
+        targets[i].classList.remove('has-error'); targets[i].classList.add('is-saved');
+      }
+      feedback.hidden = true;
+      live.textContent = `Category saved for ${targets.length} selected transactions in one atomic change. Rows stay until refresh.`;
+      retainedEdits = true; onMutation(); stream?.mutation(needsRescan({categoryId:true})); refreshAfterMutation();
+    },
+  });
+  function needsRescan(patch) {
+    const sorted = new URL(location.href).searchParams.getAll('sort').map(value => value.split(':')[0]);
+    const fields = {categoryId:'category', accountId:'account'};
+    return 'date' in patch || 'accountId' in patch ||
+      Boolean(displayedSearch && ('merchant' in patch || 'note' in patch)) ||
+      displayedReview !== 'all' && 'reviewed' in patch ||
+      Object.keys(patch).some(key => sorted.includes(fields[key] || key));
+  }
   function listen(target, event, callback) {
     target.addEventListener(event, callback);
     listeners.push(() => target.removeEventListener(event, callback));
@@ -189,14 +224,14 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   function selection() {
     const visible = rows.filter(row => !row.hidden);
     const selected = rows.filter(row => row.querySelector('[data-select-transaction]').checked);
-    selectAll.disabled = !visible.length;
+    selectAll.disabled = categoriesLocked || !visible.length;
     selectAll.checked = Boolean(visible.length) && visible.every(row => row.querySelector('[data-select-transaction]').checked);
     selectAll.indeterminate = !selectAll.checked && selected.some(row => !row.hidden);
     selectionBar.hidden = !selected.length;
     selectionBar.querySelector('[data-transaction-selection-count]').textContent = `${selected.length} selected`;
     for (const row of rows) row.classList.toggle('is-selected', row.querySelector('[data-select-transaction]').checked);
     for (const button of selectionBar.querySelectorAll('[data-bulk-reviewed]')) {
-      button.disabled = bulkBusy || !selected.some(row => row.dataset.pending !== 'true');
+      button.disabled = bulkBusy || categoriesLocked || !selected.some(row => row.dataset.pending !== 'true');
     }
     return selected;
   }
@@ -250,7 +285,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
           !document.activeElement?.closest?.('td.grid-current') && (!draft || draft.hidden) &&
           !receiptDialog.open && !receiptBusy && !bulkBusy &&
           ![...editors.values()].some(writer => writer.dirty)) {
-        void go(new URL(location.href), false, true, !search.value && displayedReview === 'all' && !new URL(location.href).searchParams.has('sort'));
+        void go(new URL(location.href), false, true, true);
       }
     }, 0);
   }
@@ -398,22 +433,15 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         }
         if ('merchant' in patch) row.dataset.merchant = patch.merchant;
         if ('accountId' in patch) row.dataset.account = patch.accountId;
+        if ('amount' in patch) row.dataset.amount = String(patch.amount);
+        if ('categoryId' in patch) row.applyCategory({categoryId:patch.categoryId, isTransfer:patch.categoryId === null && row.dataset.inferredTransfer === 'true', amount:Number(row.dataset.amount)}, category.selectedOptions?.[0]);
         const amountField = detailFields.find(control => control.dataset.transactionDetail === 'amount');
         if (amountField) amountField.closest('td').classList.toggle('inflow', Number(amountField.value) > 0);
         row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
         onMutation();
-        if (stream) {
-          const context = getContext();
-          const outsideAccount = 'accountId' in patch && context.selectedAccountIds?.length && !context.selectedAccountIds.includes(patch.accountId);
-          const outsideDates = 'date' in patch && (context.startDate && patch.date < context.startDate || context.endDate && patch.date > context.endDate);
-          if (!row.hidden && (outsideAccount || outsideDates)) {
-            row.hidden = true; row.querySelector('[data-select-transaction]').checked = false; selection();
-            const remaining = Math.max(0, Number(root.dataset.streamCount) - 1); root.dataset.streamCount = String(remaining);
-            count.textContent = count.textContent.replace(/^\d+/, String(remaining));
-          }
-          stream.mutation('date' in patch || 'accountId' in patch || Boolean(search.value && ('merchant' in patch || 'note' in patch)) || displayedReview !== 'all' && 'reviewed' in patch);
-        }
-        if (!paged) filter();
+        retainedEdits = true;
+        stream?.mutation(needsRescan(patch));
+        if (!paged) selection();
         else if (!bulkBusy && (refreshNeeded || search.value && 'note' in patch && document.activeElement !== memo || 'reviewed' in patch || detailFields.some(control => control.dataset.transactionDetail in patch))) {
           refreshAfterMutation();
         }
@@ -429,6 +457,28 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       },
     });
     editors.set(row, writer);
+    row.restoreCategory = () => {
+      category.value = committed.categoryId || '';
+      category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
+    };
+    row.applyCategory = (after, choice) => {
+      const value = after.categoryId || '';
+      if (value && ![...(category.options || [])].some(option => option.value === value) && choice) category.append(choice.cloneNode(true));
+      category.value = value; committed.categoryId = after.categoryId;
+      row.dataset.transfer = String(after.isTransfer);
+      const indicator = row.querySelector('.transaction-status[aria-label="Transfer"]');
+      if (!after.isTransfer) indicator?.remove();
+      else if (!indicator) {
+        const mark = document.createElement('span'); mark.className = 'transaction-status';
+        mark.title = 'Transfer'; mark.setAttribute('aria-label', 'Transfer'); mark.textContent = '→';
+        row.querySelector('.transaction-payee')?.append(mark);
+      }
+      category.classList.toggle('uncategorized', !value && !after.isTransfer);
+      row.querySelector('[data-category-agent]')?.remove();
+      delete row.dataset.suggestionId; delete row.dataset.suggestionPlugin;
+      row.querySelector('.ml-suggestion')?.remove();
+      if (category.options?.[0]) category.options[0].textContent = after.isTransfer ? 'Transfer (excluded)' : after.amount < 0 ? 'Income / uncategorized' : 'Uncategorized';
+    };
     const saveMemo = () => {
       clearTimeout(timers.get(row));
       timers.delete(row);
@@ -456,6 +506,11 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     listen(row.querySelector('[data-select-transaction]'), 'change', selection);
     listen(category, 'change', () => {
       editStarted();
+      const selected = selection();
+      if (selected.length > 1 && selected.includes(row)) {
+        void categoryBatch.apply(selected, category.value || null, category.selectedOptions?.[0]);
+        return;
+      }
       category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
       if (!row.dataset.suggestionId) void writer.push({categoryId: category.value || null});
     });
@@ -495,7 +550,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   }
   for (const row of rows) bindRow(row);
   for (const button of selectionBar.querySelectorAll('[data-bulk-reviewed]')) listen(button, 'click', () => {
-    if (bulkBusy) return;
+    if (bulkBusy || categoriesLocked) return;
     editStarted();
     bulkBusy = true;
     const selected = selection().filter(row => row.dataset.pending !== 'true');
@@ -687,17 +742,21 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   async function flush() {
     if (draft && !draft.hidden) return false;
     if (transfers.dirty && !await transfers.flush()) return false;
+    if (categoryBatch.dirty && !await categoryBatch.flush()) return false;
     return flushRows();
   }
   function beforeUnload(event) {
-    if (transfers.dirty || creating || draft && !draft.hidden || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
+    if (transfers.dirty || categoryBatch.dirty || creating || draft && !draft.hidden || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
   }
   stream = initTransactionStream({root, context: {...getContext()},
-    ready: () => !transfers.dirty && !disposed && !filterNavigationPending && !pendingDestination() && !searchTimer &&
+    ready: () => !transfers.dirty && !categoryBatch.dirty && !streamPaused && !disposed && !filterNavigationPending && !pendingDestination() && !searchTimer &&
       search.value === displayedSearch && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
       !creating && (!draft || draft.hidden) && !bulkBusy && !receiptBusy && !timers.size &&
       !rows.some(row => row.hasDraft()) && ![...editors.values()].some(writer => writer.dirty),
-    changed: () => {notify('Transactions changed. Refreshing this view.'); void go(new URL(location.href), 'heading', true);},
+    changed: () => {
+      if (retainedEdits) {streamPaused = true; notify('Transactions changed. Refresh to load the latest matches; saved rows stay visible.');}
+      else {notify('Transactions changed. Refreshing this view.'); void go(new URL(location.href), 'heading', true);}
+    },
     append(incoming, direction) {
       const known = new Set(rows.map(row => row.dataset.transactionId));
       const added = incoming.filter(row => !known.has(row.dataset.transactionId));
@@ -717,7 +776,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   else filter();
   return {
     flush,
-    get dirty() { return transfers.dirty || creating || Boolean(draft && !draft.hidden) || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy; },
+    get dirty() { return transfers.dirty || categoryBatch.dirty || creating || Boolean(draft && !draft.hidden) || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy; },
     dispose() {
       disposed = true;
       clearTimeout(searchTimer);
@@ -726,6 +785,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       grid.dispose();
       columns.dispose();
       transfers.dispose();
+      categoryBatch.dispose();
       accountPicker.dispose();
       periodPicker.dispose();
       for (const timer of timers.values()) clearTimeout(timer);

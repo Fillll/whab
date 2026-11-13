@@ -3565,7 +3565,7 @@
         "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
       ],
       "retry": "Exact original operation/workspace/resolved edits/revision/request ID/history returns its original durable receipt without changes/history/save, including after restart. Never retry an uncertain mutation with fresh intent. Bounded receipt expiry rejects stale requests. Preview is read-only and does not reserve its revision.",
-      "availability": "WHAB 2.72+, optional AtomicBulkEdits; SQLite 1.23+ and JSON 1.15+; remote authority must support it."
+      "availability": "WHAB 2.72+, optional AtomicBulkEdits; SQLite 1.23+ and JSON 1.15+; remote authority must support it. WHAB 2.75 also maps local browser /api/transactions/categories/preview and /api/transactions/categories to the same guarded operation; no new SDK or native operation is required."
     },
     {
       "name": "classify_accounts",

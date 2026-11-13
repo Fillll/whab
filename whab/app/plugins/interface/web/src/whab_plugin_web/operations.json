@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with browser-saved collapsible navigation, accessible transaction page labels, compound register sorting and reviewed transfer proposals; financial decisions use shared ledger operations.",
+  "summary": "Visual budgeting interface with atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals.",
   "delegates": [
     "core"
   ],
@@ -409,6 +409,99 @@
         }
       ],
       "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
+    },
+    {
+      "name": "transactions.selected-category",
+      "kind": "local",
+      "summary": "Apply or clear one category on 1–100 explicit selected transactions using one guarded atomic edit; retain displayed rows until explicit refresh.",
+      "input": {
+        "type": "object",
+        "description": "Required selected-row category choice. Revision/request ID are obtained internally by the browser.",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "demo"
+            ],
+            "description": "One addressed workspace."
+          },
+          "transactionIds": {
+            "type": "array",
+            "description": "Explicit unique IDs, never split.",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "description": "Stable transaction ID."
+            }
+          },
+          "categoryId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Existing same-currency child ID; null clears. Omission is invalid."
+          }
+        },
+        "required": [
+          "workspace",
+          "transactionIds",
+          "categoryId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Native data containing count, changed, and exact before/after changes after the guarded commit or read-only preview.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "transactionIds": [
+              "fictional-a",
+              "fictional-b"
+            ],
+            "categoryId": "fictional-food"
+          },
+          "output": {
+            "count": 2,
+            "changed": 2,
+            "changes": [
+              {
+                "id": "fictional-a",
+                "before": {
+                  "categoryId": null
+                },
+                "after": {
+                  "categoryId": "fictional-food"
+                }
+              },
+              {
+                "id": "fictional-b",
+                "before": {
+                  "categoryId": null
+                },
+                "after": {
+                  "categoryId": "fictional-food"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read-only internal preview, followed only by an explicit user category change by one native edit_transactions commit/checkpoint and reversible audit entry. Preserve review, note, financial fields and identities; manual category choice clears prior category attribution. All invalid targets reject the whole batch. No synchronization.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "Retain original IDs, category, revision and request ID after an uncertain save. Retry save reuses that exact request. Native durable receipts deduplicate successful requests after restart. Never replay unknown intent with a fresh request ID.",
+      "availability": "WHAB 2.75+ and Web 1.53+, existing optional AtomicBulkEdits backend/authority. Unsupported backends fail before mutation."
     }
   ]
 }

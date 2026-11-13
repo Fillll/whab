@@ -17,7 +17,7 @@ function element(properties = {}) {
   return Object.assign({
     dataset: {}, value: '', hidden: false, checked: false,
     classList: {toggle(name, enabled) {enabled ? classes.add(name) : classes.delete(name);},
-      remove(name) {classes.delete(name);}, contains(name) {return classes.has(name);}},
+      add(name) {classes.add(name);}, remove(name) {classes.delete(name);}, contains(name) {return classes.has(name);}},
     setAttribute(name, value) {attributes[name] = value;},
     getAttribute(name) {return attributes[name];},
     removeAttribute(name) {delete attributes[name]; if (name === 'src') this.src = '';},
@@ -39,12 +39,13 @@ function harness(count = 5, options = {}) {
   const receiptRequests = [], imageRequests = [], objectUrls = [], revokedUrls = [];
   const workspace = options.workspace || 'personal';
   const navigations = [];
-  const contexts = [], history = [];
+  const contexts = [], history = [], mutations = [];
   let pickerChoose, pickerDisposed = false, periodChoose, periodDisposed = false;
   const makeRow = index => {
     const controls = Object.fromEntries(['[data-select-transaction]', '[data-transaction-field="note"]',
       '[data-transaction-field="categoryId"]', '[data-transaction-reviewed]', '[data-transaction-receipt]']
       .map(selector => [selector, element()]));
+    const details = options.details ? [element({dataset:{transactionDetail:'date'},value:'2026-10-01',setCustomValidity(){},checkValidity:()=>true})] : [];
     if (options.agentLabel) controls['[data-category-agent]'] = element({removed: false, remove() {this.removed = true;}});
     controls['[data-select-transaction]'].checked = true;
     controls['[data-transaction-reviewed]'].setAttribute('aria-pressed', 'false');
@@ -52,7 +53,7 @@ function harness(count = 5, options = {}) {
     controls['[data-transaction-receipt]'].title = 'Receipt';
     return element({dataset: {transactionId: options.transactionIds?.[index] || `transaction-${index}`, merchant: `Payee ${index}`,
       payee: `payee ${index}`, reviewed: 'false', pending: 'false', transfer: 'false'},
-    querySelector: selector => controls[selector], controls});
+    querySelector: selector => controls[selector], querySelectorAll: selector => selector === '[data-transaction-detail]' ? details : [], controls, details});
   };
   const rowList = Array.from({length: count}, (_, index) => makeRow(index));
   const body = {querySelector: () => rowList[0], append(row) {rowList.push(row);}, insertBefore(row, anchor) {rowList.splice(rowList.indexOf(anchor), 0, row);}};
@@ -95,7 +96,7 @@ function harness(count = 5, options = {}) {
   }
   const context = {document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, queueMicrotask, URL: ReceiptURL,
     crypto: {randomUUID: () => `review-request-${++requestId}`},
-    getContext: () => ({bulkReview: options.bulkReview === true, receiptIndexScoped: options.receiptIndexScoped}),
+    getContext: () => ({bulkReview: options.bulkReview === true, receiptIndexScoped: options.receiptIndexScoped, ...options.context}),
     encodeURIComponent, location: {href: options.href || 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
     initTransactionColumns() {return {dispose() {}};},
@@ -137,17 +138,18 @@ function harness(count = 5, options = {}) {
   vm.runInNewContext(routeSource.slice(routeSource.indexOf('export function parsePageRoute'), routeSource.indexOf('export function apiUrl')).replaceAll('export function ', 'function '), context);
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/transaction-grid.js'), 'utf8').replaceAll('export function ', 'function '), context);
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/transaction-stream.js'), 'utf8').replaceAll('export function ', 'function '), context);
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/whab_plugin_web/static/transaction-category-batch.js'), 'utf8').replaceAll('export function ', 'function '), context);
   vm.runInNewContext(source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function '), context);
   if (options.stream) {
     context.bindLogos = () => {};
-    context.initTransactionStream = callbacks => {streamCallbacks = callbacks; return {cancel() {}, mutation() {}, check() {}, dispose() {}};};
+    context.initTransactionStream = callbacks => {streamCallbacks = callbacks; return {cancel() {}, mutation(value) {mutations.push(value);}, check() {}, dispose() {}};};
   }
   const register = context.initTransactionRegister({navigate: async (url, details) => {
     navigations.push({url: JSON.parse(JSON.stringify(url)), details: JSON.parse(JSON.stringify(details))});
     return true;
   }, ...options});
   return {register, requests, receiptRequests, makeRow, stream: streamCallbacks, imageRequests, receiptControls, objectUrls, revokedUrls,
-    rows: rowList, controlLinks, bulk, window, feedback, feedbackText, controls, navigations,
+    rows: rowList, mutations, controlLinks, bulk, window, feedback, feedbackText, controls, navigations,
     chooseAccount: value => pickerChoose(value), isPickerDisposed: () => pickerDisposed,
     choosePeriod: value => periodChoose(value), isPeriodDisposed: () => periodDisposed, reviewLabel, contexts, history, searchForm, pageLink, document: context.document, receiptDialog};
 }
@@ -215,7 +217,7 @@ test('a new financial draft cancels a mutation refresh and survives its stale re
   state.requests[0].resolve({ok: true});
   await new Promise(resolve => setTimeout(resolve, 15));
   assert.equal(navigations.length, 1);
-  assert.deepEqual(JSON.parse(JSON.stringify(navigations[0].details)), {focus: false, refresh: true, history: 'replace'});
+  assert.deepEqual(JSON.parse(JSON.stringify(navigations[0].details)), {focus: false, refresh: true, history: 'replace', summary: true});
   const memo = state.rows[0].controls['[data-transaction-field="note"]'];
   memo.value = 'Second draft must survive'; memo.emit('input');
   assert.equal(canceled, 2);
@@ -239,7 +241,7 @@ test('memo search results remain in place during autosave and refresh only after
   state.document.activeElement = null;
   memo.emit('blur');
   await new Promise(resolve => setTimeout(resolve, 15));
-  assert.deepEqual(state.navigations[0].details, {focus: false, refresh: true, history: 'replace'});
+  assert.deepEqual(state.navigations[0].details, {focus: false, refresh: true, history: 'replace', summary: true});
   state.register.dispose();
 });
 
@@ -379,12 +381,13 @@ test('writers already saving memos form a later native cohort after their origin
   state.register.dispose();
 });
 
-test('combined queued category and review patches retain the individual ordered path', async () => {
+test('queued category changes on an unselected row retain the individual ordered path', async () => {
   const state = harness(2, {paged: true, bulkReview: true});
   const memo = state.rows[0].controls['[data-transaction-field="note"]'];
   memo.value = 'Original memo'; memo.emit('input'); memo.emit('change');
   const saving = state.bulk.emit('click').completed;
   const category = state.rows[0].controls['[data-transaction-field="categoryId"]'];
+  state.rows[0].controls['[data-select-transaction]'].checked = false;
   category.value = 'rent'; category.emit('change');
   await tick();
   state.requests[1].resolve({ok: true});
@@ -641,6 +644,7 @@ test('navigation waits for every wave of a bulk review and retains a later failu
 
 test('category edits update the uncategorized indicator immediately while transfers stay neutral', async () => {
   const state = harness(2);
+  state.rows[1].controls['[data-select-transaction]'].checked = false;
   const category = state.rows[0].controls['[data-transaction-field="categoryId"]'];
   category.classList.toggle('uncategorized', true);
   category.value = 'groceries';
@@ -712,16 +716,19 @@ test('review filtering cycles all, needs review and reviewed while preserving se
   state.register.dispose();
 });
 
-test('marking a transaction reviewed immediately removes it from the Needs review view after save', async () => {
+test('a reviewed row remains in Needs review until the user changes the filter', async () => {
   const state = harness(2);
   state.controls['#review-filter'].emit('click');
   state.rows[0].controls['[data-transaction-reviewed]'].emit('click');
   assert.deepEqual(state.requests[0].body, {workspace: 'personal', reviewed: true});
   state.requests[0].resolve({ok: true});
   await tick();
+  assert.equal(state.rows[0].hidden, false);
+  assert.equal(state.rows[1].hidden, false);
+  assert.match(state.controls['#transaction-count'].textContent, /^2 transactions/);
+  for (let i=0;i<3;i+=1) state.controls['#review-filter'].emit('click');
   assert.equal(state.rows[0].hidden, true);
   assert.equal(state.rows[1].hidden, false);
-  assert.match(state.controls['#transaction-count'].textContent, /^1 transaction/);
   state.register.dispose();
 });
 
@@ -878,12 +885,12 @@ test('sort and month links wait for edits and preserve the current search draft'
   }
 });
 
-test('reviewing an explicitly sorted selection refreshes the ordering rather than only its summary', async () => {
+test('reviewing a sorted selection updates only its summary and retains the displayed order', async () => {
   const state = harness(1, {paged: true, href: 'https://localhost:5173/budgets/home/transactions/2026-10/usd?sort=reviewed:asc'});
   state.rows[0].controls['[data-transaction-reviewed]'].emit('click');
   state.requests[0].resolve({ok: true}); await tick(); await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(state.navigations.length, 1);
-  assert.equal(state.navigations[0].details.summary, undefined);
+  assert.equal(state.navigations[0].details.summary, true);
   state.register.dispose();
 });
 
@@ -902,4 +909,38 @@ test('rapid sort choices combine priorities before the earlier navigation finish
   link.emit('click', {button: 0}); await tick();
   assert.deepEqual(navigations[3].searchParams.getAll('sort'), ['amount:asc']);
   pending.resolve(true); await tick(); state.register.dispose();
+});
+
+function categoryResult(state, categoryId, revision='observed') {
+  const selected=state.rows.filter(row=>row.controls['[data-select-transaction]'].checked);
+  return {revision,data:{count:selected.length,changes:selected.map(row=>({id:row.dataset.transactionId,before:{id:row.dataset.transactionId,categoryId:null},after:{id:row.dataset.transactionId,categoryId,isTransfer:false,amount:100,reviewed:false}}))}};
+}
+test('category edits on selected rows save the whole selection once and preserve outside rows and review flags',async()=>{
+  const state=harness(4,{paged:true,stream:true,agentLabel:true,href:'https://localhost:5173/budgets/home/transactions/2026-10?sort=category:asc'});
+  state.rows[3].controls['[data-select-transaction]'].checked=false;
+  state.rows[1].dataset.suggestionId='fictional-suggestion';
+  const control=state.rows[0].controls['[data-transaction-field="categoryId"]'];control.value='rent';control.emit('change');await tick();
+  assert.equal(state.requests.length,1);assert.equal(state.requests[0].path,'/transactions/categories/preview');assert.deepEqual(state.requests[0].body.transactionIds,['transaction-0','transaction-1','transaction-2']);
+  const result=categoryResult(state,'rent');state.requests[0].resolve(result);await tick();
+  assert.equal(state.requests.length,2);assert.equal(state.requests[1].path,'/transactions/categories');assert.equal(state.requests[1].body.revision,'observed');
+  state.requests[1].resolve({...result,revision:'saved'});await tick();await new Promise(resolve=>setTimeout(resolve,5));
+  assert.deepEqual(state.rows.map(row=>row.controls['[data-transaction-field="categoryId"]'].value),['rent','rent','rent','']);
+  assert.equal(state.rows.every(row=>!row.hidden&&row.dataset.reviewed==='false'),true);
+  assert.equal(state.rows[1].dataset.suggestionId,undefined);
+  assert.equal(state.rows[0].controls['[data-category-agent]'].removed,true);assert.equal(state.rows[3].controls['[data-category-agent]'].removed,false);
+  assert.equal(state.register.dirty,false);assert.equal(state.mutations.at(-1),true);assert.equal(state.navigations[0].details.summary,true);
+  state.register.dispose();
+});
+test('an uncertain selected category save blocks navigation and retries the same atomic request',async()=>{
+ const state=harness(2,{paged:true});const control=state.rows[0].controls['[data-transaction-field="categoryId"]'];control.value='rent';control.emit('change');await tick();const result=categoryResult(state,'rent');state.requests[0].resolve(result);await tick();const original=state.requests[1].body;state.requests[1].reject(new Error('Unknown result'));await tick();assert.equal(state.register.dirty,true);assert.equal(control.disabled,true);assert.equal(state.feedback.hidden,false);const flushing=state.register.flush();await tick();assert.deepEqual(state.requests[2].body,original);state.requests[2].resolve({...result,revision:'saved'});assert.equal(await flushing,true);assert.equal(state.register.dirty,false);assert.equal(control.disabled,undefined);state.register.dispose();
+});
+test('selected category failures restore all row values and oversized selections never split',async()=>{
+ for(const count of [2,101]){const state=harness(count,{paged:true});const control=state.rows[0].controls['[data-transaction-field="categoryId"]'];control.value='rent';control.emit('change');await tick();if(count===2){state.requests[0].reject(new Error('Invalid whole batch'));await tick();}assert.equal(state.requests.length,count===2?1:0);assert.equal(state.rows.every(row=>row.controls['[data-transaction-field="categoryId"]'].value===''),true);assert.equal(state.register.dirty,false);assert.equal(state.feedback.hidden,false);state.register.dispose();}
+});
+test('saved rows remain visible under review/search predicates; outside revisions pause instead of replacing them',async()=>{
+ const state=harness(1,{paged:true,stream:true,review:'needs-review',search:'original'});
+ state.rows[0].controls['[data-transaction-reviewed]'].emit('click');state.requests[0].resolve({ok:true});await tick();assert.equal(state.rows[0].hidden,false);assert.equal(state.mutations.at(-1),true);state.stream.changed();assert.equal(state.stream.ready(),false);assert.equal(state.navigations.every(n=>n.details.summary===true),true);state.register.dispose();
+});
+test('date corrections outside the selected period remain visible until explicit refresh',async()=>{
+ const state=harness(1,{paged:true,stream:true,details:true,context:{startDate:'2026-10-01',endDate:'2026-10-31'}});const date=state.rows[0].details[0];date.value='2026-11-01';date.emit('change');await tick();assert.equal(state.requests[0].body.date,'2026-11-01');state.requests[0].resolve({ok:true});await tick();await new Promise(resolve=>setTimeout(resolve,5));assert.equal(state.rows[0].hidden,false);assert.equal(state.mutations.at(-1),true);assert.equal(state.navigations[0].details.summary,true);state.register.dispose();
 });

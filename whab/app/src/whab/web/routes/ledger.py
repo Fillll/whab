@@ -6,13 +6,13 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.domain.money import currency_code
 from whab.domain.transactions import UNSET
-from whab.services.ledger import RevisionConflict
+from whab.services.ledger import RequestConflict, RevisionConflict
 from whab.web.csv import safe_cell
 from whab.web.schemas import (
     AccountBody,
@@ -31,6 +31,35 @@ from whab.web.schemas import (
 
 def create_router(store):
     router = APIRouter()
+
+    class CategorySelectionBody(BaseModel):
+        model_config = ConfigDict(extra='forbid', strict=True)
+        workspace: Workspace
+        transactionIds: list[str] = Field(min_length=1, max_length=100)
+        categoryId: str | None
+
+    class CategorySelectionSaveBody(CategorySelectionBody):
+        revision: str
+        requestId: str
+
+    def category_edits(body):
+        return [{'transactionId': identifier, 'categoryId': body.categoryId} for identifier in body.transactionIds]
+
+    @router.post('/api/transactions/categories/preview')
+    def preview_categories(body: CategorySelectionBody):
+        return store.query('preview_bulk_edits', body.workspace, parameters={
+            'operation': 'edit_transactions', 'edits': category_edits(body),
+        })
+
+    @router.post('/api/transactions/categories')
+    def save_categories(body: CategorySelectionSaveBody):
+        try:
+            return store.command('edit_transactions', body.workspace, {'edits': category_edits(body)},
+                                 request_id=body.requestId, expected_revision=body.revision)
+        except RevisionConflict as error:
+            return JSONResponse({'error': str(error), 'code': 'category_revision_conflict'}, status_code=409)
+        except RequestConflict as error:
+            return JSONResponse({'error': str(error), 'code': 'category_request_conflict'}, status_code=409)
 
     class TransferReadBody(BaseModel):
         model_config = ConfigDict(extra='forbid', strict=True)
