@@ -269,7 +269,12 @@ class RemoteStore:
     def transaction_classification_status(self, workspace):
         # Existing category discovery works on older authorities too; only the
         # explicit canonical kind opts an authority into the new invariant.
+        observed = self._revision
         rows = self.categories(workspace)
+        current = self._revision
+        self._revision = observed
+        if observed is not None and current != observed:
+            raise StoreError("Remote budget changed. Refresh and review before editing; no mutation was submitted.")
         return {"supported": type(rows) is list and any(type(row) is dict and row.get("systemKind") in {"income", "transfer"} for row in rows), "pending": False}
 
     def migrate_transaction_classifications(self, workspace):

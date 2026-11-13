@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.3 — 2026-11-13
+
+PR: [#190](https://github.com/Fillll/whab/pull/190)
+
+- Assign a real expense category before exercising reviewed pending-to-posted bank annotation preservation; retain minimum-host conformance while respecting the current review invariant.
+
 ## 0.11.2 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

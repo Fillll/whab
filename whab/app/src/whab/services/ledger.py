@@ -144,17 +144,20 @@ class LedgerService:
                 raise StoreError("Feature parameters do not match its documented input fields. Read operation help.") from None
         return callback(workspace, payload["action"], deepcopy(payload["parameters"]))
 
-    def _ensure_classifications(self):
+    def _ensure_classifications(self, *, require_support=False):
         # Readiness/code handover must remain read-only. The first admitted public
         # access commits corrections through the same durable intent/checkpoint
         # path as other native writes. Unresolved writes fence this operation.
         backend = getattr(self._store, 'store', self._store)
         if getattr(self, '_classifying', False) or getattr(self, '_classifications_ready_for', None) is backend:
             return
+        if callable(getattr(backend, 'matches_binding', None)) and not require_support:
+            return
         status = getattr(self._store, 'transaction_classification_status', None)
         migrate = getattr(self._store, 'migrate_transaction_classifications', None)
         if not callable(status) or not callable(migrate):
             self._classifications_supported = False
+            self._classifications_ready_for = backend
             return
         self._classifying = True
         try:
@@ -168,6 +171,8 @@ class LedgerService:
                     return
                 if readiness['pending']:
                     migrate(workspace)
+                    if status(workspace) != {'supported': True, 'pending': False}:
+                        raise StoreError('Classification correction was not confirmed. Inspect native recovery/history; do not replay with a new intent.')
                     self._revision = str(uuid4())
                     if self._on_commit is not None:
                         self._on_commit()
@@ -179,7 +184,6 @@ class LedgerService:
     @property
     def revision(self) -> str:
         with self._lock:
-            self._ensure_classifications()
             return self._revision
 
     @property
@@ -492,8 +496,12 @@ class LedgerService:
                 replayed = durable_replay(request_id, fingerprint)
                 if replayed is not None:
                     return deepcopy(replayed)
-            if operation in {'add_transaction', 'edit_transaction', 'edit_transactions', 'review_transactions', 'append_transaction_note', 'history_apply'} and not getattr(self, '_classifications_supported', False):
-                raise StoreError('Update the budget host/storage to WHAB 2.73 transaction classification support before editing transactions or applying history.')
+            if operation == 'review_transactions' and not callable(getattr(self._store, 'review_transactions', None)):
+                raise StoreError('This storage plugin does not support bulk review.')
+            if operation in {'add_transaction', 'edit_transaction', 'edit_transactions', 'review_transactions', 'append_transaction_note', 'history_apply'}:
+                self._ensure_classifications(require_support=True)
+                if not getattr(self, '_classifications_supported', False):
+                    raise StoreError('Update the budget host/storage plugin to WHAB 2.73 transaction classification support before editing transactions or applying history.')
             if expected_revision != self._revision:
                 raise RevisionConflict("Budget changed. Refresh before making this change.")
             response_revision = str(uuid4())

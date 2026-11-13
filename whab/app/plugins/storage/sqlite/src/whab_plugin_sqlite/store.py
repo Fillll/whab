@@ -411,7 +411,7 @@ class Store(Authority):
 
                 from whab.domain.system_categories import migrate_classifications
                 restored = deepcopy(state) if transaction.get("history_restore") else None
-                corrected = migrate_classifications(state)
+                corrected = self._authority_enabled and migrate_classifications(state)
                 if corrected and restored is not None:
                     from whab.domain.history import record_states
                     record_states(restored, state, {"actor": "System", "actorKind": "system", "operation": "migrate_system_categories"})

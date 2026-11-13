@@ -54,7 +54,7 @@ def normalize_transaction(state, transaction, *, classify_transfers=False):
     changed = False
     if transaction.get("deleted"):
         return changed
-    if classify_transfers and transaction.get("categoryId") is None and transaction.get("isTransfer"):
+    if classify_transfers and transaction.get("categoryId") is None and transaction.get("isTransfer") and not transaction.get("categoryAgent"):
         currency = state["accounts"][transaction["accountId"]].get("currency", "USD")
         transaction["categoryId"] = system_category("transfer", currency)["id"]
         changed = True

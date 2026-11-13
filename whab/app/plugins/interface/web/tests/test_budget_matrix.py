@@ -65,7 +65,7 @@ def test_three_month_matrix_keeps_month_controls_and_editable_category_values(cl
         heading = re.search(r'<div class="budget-month-heading">(.*?)</div>', summary_html, re.S)[1]
         assert "<svg" not in heading
         monthly_forms = [form for form in forms if form["month"] == month]
-        assert len(monthly_forms) == len(data["categories"])
+        assert len(monthly_forms) == len(data["budget"])
         for budget in data["budget"]:
             form = next(form for form in monthly_forms if form["api"] == f'/budget/{budget["categoryId"]}')
             assert form["workspace"] == "demo"

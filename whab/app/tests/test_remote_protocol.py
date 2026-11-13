@@ -130,7 +130,7 @@ def test_atomic_bulk_preview_and_commands_through_https_authority(store):
                     "categoryId": None,
                 },
             )
-            edits = [{"transactionId": transaction, "appendNote": "one", "reviewed": True}]
+            edits = [{"transactionId": transaction, "categoryId": "groceries", "appendNote": "one", "reviewed": True}]
             assert client.supports_atomic_bulk_edits()
             plan = client.preview_bulk_edits("personal", "edit_transactions", edits)
             assert client.transactions("personal")[0]["note"] == ""

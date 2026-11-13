@@ -21,6 +21,12 @@ class ReviewBackend:
         self.calls = []
         self.rows = {"one": False, "two": False}
 
+    def transaction_classification_status(self, workspace):
+        return {"supported": True, "pending": False}
+
+    def migrate_transaction_classifications(self, workspace):
+        pytest.fail("Ready synthetic backend must not migrate")
+
     def review_transactions(self, workspace, transaction_ids, reviewed):
         if self.lock is not None:
             assert self.lock._is_owned()

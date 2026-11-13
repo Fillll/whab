@@ -581,6 +581,15 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                 on_create=lambda owner: startup.own(owner, owner.close_sync))
             live.storage = storage_upgrade
         replicas = StorageReplicas(storage_runtime)
+        def prepare_financial_access(name):
+            # Bank continuations observe native evidence before provider work.
+            # Correct the admitted primary first, never during gated code/role
+            # handover or unresolved-write recovery.
+            if runtime.status()['admission'] == 'open':
+                service._ensure_classifications()
+                if name in {'apply_sync', 'import_workspace'} and not getattr(service, '_classifications_supported', False):
+                    raise StoreError('Update the budget storage to transaction classification support before importing financial data.')
+        store.before_access = prepare_financial_access
         from whab.services.bank_jobs import BankJobs
         bank_jobs = BankJobs(worker_home, settings.plaid_env, runtime, leased_banks)
         bank_lifecycle.automatic_sync = bank_jobs.automatic

@@ -251,7 +251,7 @@ def test_multiple_currency_http_views_reject_mixing_and_identify_exports(client)
         "target": 1000, "currency": "EUR",
     }).status_code == 200
     all_data = client.get("/api/workspace?workspace=personal&month=2026-10").json()
-    food = next(c for c in all_data["categories"] if c["currency"] == "EUR")
+    food = next(c for c in all_data["categories"] if c["currency"] == "EUR" and not c.get("systemKind"))
     tx = {"workspace": "personal", "accountId": ids["EUR"], "date": "2026-10-03",
           "merchant": "Fixture market", "amount": 500, "categoryId": food["id"]}
     assert client.post("/api/transactions", json=tx).status_code == 200
@@ -262,7 +262,7 @@ def test_multiple_currency_http_views_reject_mixing_and_identify_exports(client)
     eur = client.get("/api/workspace?workspace=personal&month=2026-10&currency=EUR").json()
     assert eur["currency"] == "EUR" and eur["summary"]["spent"] == 500
     assert {a["currency"] for a in eur["accounts"]} == {"EUR"}
-    assert len(eur["transactions"]) == 1 and eur["categoryGroups"][0]["children"] == [food]
+    assert len(eur["transactions"]) == 1 and next(group for group in eur["categoryGroups"] if group["id"] == food["parentId"])["children"] == [food]
     assert before["summary"]["spent"] == 0
     assert before["summariesByCurrency"]["EUR"]["readyToAssign"] == 30000
     assert before["summariesByCurrency"]["EUR"]["fundingCapacity"] == 29500

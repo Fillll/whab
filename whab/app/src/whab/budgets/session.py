@@ -717,6 +717,7 @@ class TrackedStorage:
         self.session = session
         self.lock = session.lock if session else RLock()
         self.on_mutation = None
+        self.before_access = None
         self.after_ingestion = None
         self.after_commit = None
         self.storage_plugin_id = None
@@ -739,6 +740,8 @@ class TrackedStorage:
 
         def invoke(*args, **kwargs):
             with self.lock:
+                if self.before_access and name not in {'transaction_classification_status', 'migrate_transaction_classifications'}:
+                    self.before_access(args[0].name if name == 'execute_operation' else name)
                 result = getattr(self.store, name)(*args, **kwargs)
                 if name not in self.MUTATIONS or (name == "execute_operation" and result.replayed):
                     return result

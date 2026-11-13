@@ -60,3 +60,21 @@ def test_system_metadata_corruption_is_not_silently_adopted(tmp_path):
         store.db.execute("UPDATE categories SET name='User category collision' WHERE workspace='personal' AND system_kind='income'")
     with pytest.raises(StoreError, match='Reserved system category identity'):
         Store(path, month='2026-11')
+
+
+def test_deferred_legacy_portable_export_is_exact_data_not_a_migration(tmp_path):
+    from whab_plugin_sqlite.portable import read_files
+    path = tmp_path / 'fictional.db'
+    legacy(path)
+    with closing(Store(path, month='2026-11', migrate=False)) as store:
+        snapshot = store.export_budget()
+        evidence = store.commit_evidence()
+        payload = store.export_budget_files()
+        assert read_files(payload) == snapshot
+        assert store.export_budget() == snapshot and store.commit_evidence() == evidence
+        assert store.transaction_classification_status('personal') == {'supported': True, 'pending': True}
+        from whab.plugins import LedgerService
+        service = LedgerService(store)
+        service.query('transactions','personal')
+        assert store.transaction_classification_status('personal') == {'supported': True, 'pending': False}
+        assert store.commit_evidence().generation == evidence.generation + 1

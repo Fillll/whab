@@ -153,3 +153,14 @@ def test_readiness_requires_verified_contract_and_failed_migration_does_not_publ
     status['supported'] = 'true'
     with pytest.raises(StoreError, match='readiness'):
         service.query('categories','personal')
+
+
+def test_legacy_explicit_agent_clear_is_not_attributed_to_a_new_system_choice():
+    from whab.domain.ledger_state import initial_state
+    from whab.domain.system_categories import migrate_classifications
+    state = initial_state('personal','2026-11')
+    state['categories'] = {key: row for key, row in state['categories'].items() if not row.get('systemKind')}
+    state['accounts'] = {'a': {'currency':'USD'}}
+    state['transactions'] = {'t': {'accountId':'a','categoryId':None,'isTransfer':True,'reviewed':True,'categoryAgent':'Codex'}}
+    assert migrate_classifications(state)
+    assert state['transactions']['t'] == {'accountId':'a','categoryId':None,'isTransfer':True,'reviewed':False,'categoryAgent':'Codex'}

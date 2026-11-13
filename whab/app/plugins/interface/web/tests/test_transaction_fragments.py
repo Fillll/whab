@@ -123,7 +123,7 @@ def test_fragment_navigation_badge_tracks_review_edits_and_selected_account_with
     second = store.add_account("personal", {"name": "Second", "type": "depository", "balance": 0})
     transactions = [store.add_transaction("personal", {
         "accountId": account, "date": "2026-10-05", "merchant": f"Purchase {index}",
-        "amount": 100, "categoryId": None,
+        "amount": 100, "categoryId": "groceries",
     }) for index, account in enumerate((first, first, second))]
 
     def count_markup(account):
@@ -149,7 +149,7 @@ def test_summary_returns_only_scoped_server_badge_and_canonical_validation_conte
     for account, date in [(first, "2026-10-05"), (second, "2026-10-05"), (first, "2026-09-05")]:
         store.add_transaction("personal", {
             "accountId": account, "date": date, "merchant": "Private description absent from summary",
-            "amount": 100, "categoryId": None,
+            "amount": 100, "categoryId": "groceries",
         })
     path = f"/budgets/home/transactions/2026-10/usd?accounts={first}&accounts={second}&q=&tx_page=1"
     response = client.get(path, headers=SUMMARY)
@@ -227,7 +227,7 @@ def test_all_period_exposes_full_history_with_account_search_and_review_scope(cl
     assert all(f'data-transaction-id="{identifier}"' in response.text for identifier in identifiers)
     assert f'data-transaction-id="{excluded}"' not in response.text
     assert '3 transactions · All dates' in response.text
-    store.edit_transaction('personal', identifiers[0], reviewed=True)
+    store.edit_transaction('personal', identifiers[0], category_id='groceries', reviewed=True)
     reviewed = client.get(path, headers=headers)
     assert f'data-transaction-id="{identifiers[0]}"' not in reviewed.text
     assert all(f'data-transaction-id="{identifier}"' in reviewed.text for identifier in identifiers[1:])

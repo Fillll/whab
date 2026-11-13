@@ -108,7 +108,7 @@ def test_closed_bank_account_is_frozen_while_peer_syncs_and_reopen_replays_check
     store.apply_sync('item',delta(added=[transaction('old'), transaction('peer-old','peer')]),'cursor-1',records)
     store.configure_bank_sync('item',records,{'cd':{'accountId':'cd','since':'2026-01-01'},'peer':{'accountId':'peer','since':None}})
     store.apply_sync('item',delta(),'cursor-2',records)
-    store.edit_transaction('personal','old',None,True,'Keep my note')
+    store.edit_transaction('personal','old','groceries',True,'Keep my note')
     store.update_account('personal','cd',{'closed':True})
     frozen=next(row for row in store.accounts('personal') if row['id']=='cd')
     old=next(row for row in store.transactions('personal') if row['id']=='old')

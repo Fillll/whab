@@ -546,3 +546,5 @@ Every generated/new plugin packages operations.json beside plugin.json. Edit thi
 Run `whab-plugin docs --directory /absolute/project` to validate the project without loading hooks. The installed candidate check also requires valid packaged documentation before loading its descriptor. Missing metadata, malformed schemas, remote schema references, invalid examples and omitted package resources fail the check. Blank credential examples are structural templates only and are never executed.
 
 `whab-cli --help`, `whab-cli command edit_transaction --help`, and `whab-cli feature-command subscriptions set_label --help` use installed metadata. `whab-cli describe --json` returns full offline schemas without a checkout, URL or credentials. The standalone toolkit validator is generated from the host's canonical validator so genuine older-host conformance does not import new host internals.
+
+Bank runtime conformance explicitly assigns a real expense category before setting review, then verifies annotations survive pending-to-posted refresh and reopening. This remains compatible with the minimum supported host and WHAB 2.73 review invariants.
