@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.48.2 — 2026-11-12
+
+PR: [#189](https://github.com/Fillll/whab/pull/189)
+
+- Remove the standalone This month link beside the transaction period picker and its unused styling. Keep current-month selection inside the picker and retain the previous/next-month controls.
+
 ## 1.48.1 — 2026-11-11
 
 PR: [#186](https://github.com/Fillll/whab/pull/186)
