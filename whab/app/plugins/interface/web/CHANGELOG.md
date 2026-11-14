@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.54.0 — 2026-11-13
+
+PR: [#197](https://github.com/Fillll/whab/pull/197)
+
+- Add Discard local edits & reload to failed transaction saves: explicitly drop local drafts, stop autosave and release beforeunload without undoing saved changes or unmatching transfers. Block discard during active writes and unconfirmed atomic review/category/transfer intents; preserve exact retry identities.
+
 ## 1.53.1 — 2026-11-13
 
 PR: [#196](https://github.com/Fillll/whab/pull/196)

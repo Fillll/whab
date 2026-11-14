@@ -102,3 +102,19 @@ test('a later edit can retry a failure without losing retained fields', async ()
   assert.equal(await retry, true);
   assert.equal(state.writer.dirty, false);
 });
+
+test('explicit discard clears retained local edits only after an active save finishes', async () => {
+  const state = harness();
+  const pending = state.writer.push({categoryId:'fictional-category'});
+  assert.equal(state.writer.saving,true);
+  assert.equal(state.writer.discard(),false);
+  state.saves[0].reject('Unmatch this transfer pair before changing its category.');
+  assert.equal(await pending,false);
+  assert.equal(state.writer.saving,false);
+  assert.equal(state.writer.dirty,true);
+  assert.equal(state.writer.discard(),true);
+  assert.equal(state.writer.dirty,false);
+  assert.equal(await state.writer.flush(),true);
+  assert.equal(state.saves.length,1);
+  assert.equal(state.committed.length,0);
+});

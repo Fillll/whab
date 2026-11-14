@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.75.2 — 2026-11-13
+
+PR: [#197](https://github.com/Fillll/whab/pull/197)
+
+- Bundle Web 1.54 with explicit local-draft recovery after rejected transaction saves, retaining active and unconfirmed-write safeguards.
+
 ## 2.75.1 — 2026-11-13
 
 PR: [#196](https://github.com/Fillll/whab/pull/196)

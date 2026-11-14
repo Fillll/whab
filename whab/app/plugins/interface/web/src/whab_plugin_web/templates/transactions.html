@@ -88,7 +88,7 @@
   <button class="button secondary" type="button" data-bulk-reviewed="false">Mark unreviewed</button>
   <button class="text-link" type="button" data-clear-selection>Clear selection</button>
 </div>
-<div class="transaction-feedback" data-transaction-feedback hidden role="status"><span data-transaction-feedback-text></span><button class="text-link" type="button" data-transaction-retry>Retry save</button></div>
+<div class="transaction-feedback" data-transaction-feedback hidden role="status"><span data-transaction-feedback-text></span><div class="button-group"><button class="text-link" type="button" data-transaction-retry>Retry save</button><button class="text-link" type="button" data-transaction-discard aria-describedby="transaction-discard-help">Discard local edits &amp; reload</button></div><small id="transaction-discard-help">Discards all unsaved edits in this view and reloads saved data. Saved changes are kept. Wait for active saves or resolve unconfirmed bulk/transfer requests first.</small></div>
 <span class="sr-only" data-transaction-save-status aria-live="polite"></span>
 <template data-transaction-accounts>{% for choice in transaction_accounts %}<option value="{{ choice.id }}"{% if choice.closed|default(false) %} data-account-closed{% endif %}>{{ choice.name }}{% if choice.closed|default(false) %} · Closed{% endif %}</option>{% endfor %}</template>
 <template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}">{{ group.name }} > {{ row.category.name }}</option>{% endfor %}</optgroup>{% endfor %}</template>

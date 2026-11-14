@@ -138,6 +138,22 @@ Ordinary register navigation asks to omit the sidebar account-list template that
 
 Background sidebar count refreshes include the active visual generation. A failed or rejected count refresh leaves saved rows, selections and focus mounted and asks for an explicit refresh; it never falls back to a full page load.
 
+### Recovering from a failed edit
+
+The failed-save banner offers **Retry save** and **Discard local edits & reload**.
+Retry attempts the retained edit. For a permanent rejection, such as changing a
+matched transfer's category, discarding releases the browser navigation guard,
+cancels local autosave timers and reloads current saved transactions. It drops
+**all unsaved edits in this view**, including newer drafts; it does not undo any
+saved change or unmatch a transfer. A save whose response was lost may already
+have committed: the reload displays the authoritative result.
+
+Discarding is refused during an active row, receipt or new-transaction save, or
+while a native bulk review, selected-category batch or transfer confirmation has
+an unconfirmed result. Resolve those requests through their original retry first;
+the control never discards their request identities or silently starts a new one.
+The action is local to this tab and sends no financial mutation or bank sync.
+
 ### Selected category changes
 
 With WHAB 2.75+ and Web 1.53+, select 2–100 loaded transactions and change the

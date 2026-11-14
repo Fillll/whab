@@ -88,12 +88,15 @@ test('unknown results retain the exact ticket before merged later fields or an o
 
 test('confirmed tickets remain shared until each writer also saves its later fields', async () => {
   const state = harness();
+  assert.equal(state.save.unconfirmed,false);
   const original = Promise.allSettled(['first', 'second'].map(id => state.save(id, {reviewed: true}, true)));
+  assert.equal(state.save.unconfirmed,true);
   await tick(); state.batches[0].reject(new Error('Unknown result.')); await original;
   const retry = state.save('first', {reviewed: true, note: 'Keep this'});
   const rejected = assert.rejects(retry, /Memo save failed/);
   await tick(); state.batches[1].resolve({ok: true});
   await tick(); state.singles[0].reject(new Error('Memo save failed.')); await rejected;
+  assert.equal(state.save.unconfirmed,false,'Confirmed cohorts do not block discarding remaining local annotation drafts');
   const final = state.save('first', {reviewed: true, note: 'Keep this'});
   await tick();
   assert.equal(state.batches.length, 2);
