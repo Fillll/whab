@@ -1,6 +1,6 @@
 # Budget and plugin model
 
-WHAB combines a plugin host with a hexagonal financial core. The [architecture guide](architecture.md) describes runtime composition and the [SDK guide](plugins.md) defines executable contracts. The [README diagram](../../README.md#architecture) groups plugins by their responsibilities.
+WHAB combines a plugin host with a hexagonal financial core. The [architecture guide](architecture.md) describes runtime composition and the [SDK guide](plugins.md) defines executable contracts. The [architecture overview diagram](../../architecture.md) groups plugins by their responsibilities.
 
 ## Minimal financial core
 
