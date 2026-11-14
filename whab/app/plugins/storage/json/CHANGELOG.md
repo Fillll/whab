@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.17.0 — 2026-11-13
+
+PR: [#198](https://github.com/Fillll/whab/pull/198)
+
+- Persist explicit Income category kind with native guarded classification/preview, exact replay, reversible audit history and portable restore; preserve absent Expense fields and old financial totals.
+
 ## 1.16.0 — 2026-11-13
 
 PR: [#193](https://github.com/Fillll/whab/pull/193)

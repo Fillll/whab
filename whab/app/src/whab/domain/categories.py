@@ -277,10 +277,8 @@ def classify_category(state, category_id, kind):
 
 def preview_category_classification(state, category_id, kind):
     """Show historical financial consequences without migrating any records."""
-    from copy import deepcopy
-
     from .budget import calculate_workspace, select_currency
-    candidate = deepcopy(state)
+    candidate = {**state, "categories": {key: row.copy() for key, row in state["categories"].items()}}
     classify_category(candidate, category_id, kind)
     currency = candidate['categories'][category_id].get('currency', 'USD')
     months = sorted({state['budgetStartMonth'], *state['budget'],
