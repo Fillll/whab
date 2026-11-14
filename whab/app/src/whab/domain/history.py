@@ -319,6 +319,14 @@ def apply_to_state(state, wanted):
         candidate['accounts'][identifier] = {**{k: v for k, v in previous.items() if k not in allowed}, **account}
     if any(identifier not in candidate['transactions'] for identifier in state.get('receipts', {})):
         raise StoreError('This reversal would orphan a receipt attachment.')
+    from .review import review_status
+    for identifier, row in candidate['transactions'].items():
+        previous = state['transactions'].get(identifier, {})
+        if row.get('reviewed') and (not previous.get('reviewed') or
+                review_status(previous, state['categories'])['eligible'] and not review_status(row, candidate['categories'])['eligible']):
+            status = review_status(row, candidate['categories'])
+            if not status['eligible']:
+                raise StoreError(f"{identifier}: This reversal would restore an invalid review. {status['reason']}")
     from .bank_setup import reconcile_account_closed
     state['items'] = deepcopy(state.get('items', {}))
     for identifier, account in candidate['accounts'].items():

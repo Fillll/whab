@@ -1100,7 +1100,7 @@ whab "My budget" category classify --help
 
 Create the Finance parent first if absent (`category group create Finance`). Categories
 accept IDs, unique exact names or `Group / Category`; Unicode is supported and no
-fuzzy match is chosen. JSON is complete by default; tables show Income/Expense.
+fuzzy match is chosen. JSON is complete by default; tables show Expense/Income/Transfer.
 `--type expense` is the default for creation and reverses an explicit classification.
 
 Income is a financial type, independent of names, groups and review status. Income
@@ -1126,8 +1126,8 @@ Changing a referenced category's type affects historical income, spending and RT
 impacts for months represented by transactions, assignments or budget start. It is
 read-only. Normal classification uses one observed revision, unique request ID,
 native atomic commit, durable save and permanent reversible audit entry. `--agent`
-and `--batch` label history. Omitted transaction review remains unchanged, including
-reviewed/unclassified rows. Use explicit `trnx review` separately when wanted.
+and `--batch` label history. Omitted review stays unchanged for valid classified rows. Assigning classification
+to an invalid legacy reviewed row makes it unreviewed unless explicitly reviewed. Use explicit `trnx review` separately when wanted.
 
 `trnx categorize` supports 1–100 IDs and `--dry-run`; `trnx edit-many --file changes.json`
 or `--file -` supports mixed category/review/note edits in one atomic commit/save.
@@ -1139,3 +1139,59 @@ On stale state, read and reconsider. On an uncertain response retain the **entir
 original intent and inspect history; never retry with a new ID/revision. Exact retries
 use `--request-id`, `--revision` and identical type/actor/batch metadata, and cannot
 create another change/history/save. Success verifies the saved category hierarchy.
+
+## Classification before review
+
+WHAB 2.77 supports Expense, Income and Transfer child types (`kind` in public
+records, `--type` in CLI). Missing kind remains Expense. Income and Transfer have
+no expense target or assignment rows. Transfer is explicit account movement,
+excluded from ordinary income/spending without changing account balances. It may
+be classified before pairing; matching still requires equal opposite posted
+amounts, different active accounts, same currency/budget scope and dates within
+seven days. Matching remains separate and never reviews automatically.
+
+A posted, nondeleted transaction needs a valid child of any type, or a previously
+confirmed transfer pair, before explicit review. A bank hint alone is insufficient.
+Assigning classification does not manufacture review. Clearing it makes unreviewed
+in the same native operation. An explicit conflicting clear+review rejects the
+whole operation. Mixed batches validate their final proposed state atomically.
+Pending records cannot be reviewed. Undo/redo cannot restore a newly invalid review.
+
+Old saved reviewed/unclassified flags and historical audit hashes remain readable
+and unchanged on upgrade/read. `trnx review-audit` reports them; cleanup is a
+separate, explicitly authorized public review operation with dry-run and audit.
+New imports do not derive review from an unclassified source clearing flag; YNAB
+clearing/flag information remains in its original memo metadata. Ordinary bank
+updates retain untouched legacy invalid flags for that explicit cleanup, while
+classification/pending transitions enforce the rule. No merchant inference, bank
+synchronization or automatic production cleanup is introduced.
+
+```sh
+whab "My budget" category group create Finance
+whab "My budget" category create Salary --parent Finance --type income --agent Codex
+whab "My budget" category create Transfers --parent Finance --type transfer --agent Codex
+whab "My budget" trnx categorize TX1 --category "Finance / Transfers" --agent Codex
+whab "My budget" trnx review TX1 --reviewed --dry-run --agent Codex
+whab "My budget" trnx review TX1 --reviewed --agent Codex
+whab "My budget" trnx review-audit --format table
+whab "My budget" trnx review TX2 TX3 --needs-review --dry-run --agent Codex
+whab "My budget" trnx review --help
+whab "My budget" trnx review-audit --help
+```
+
+Review supports 1–100 explicit IDs, one observed revision/request ID/native commit
+and durable save; no splitting or silent skipping. One invalid target rejects all.
+`--batch` only groups history. Mixed classification+review uses `trnx edit-many`
+JSON/files/stdin. Omitted review remains unchanged for an already valid classified
+record; assigning a category to a legacy invalid reviewed row makes it unreviewed
+unless review is explicitly requested in the same valid edit. Exact retries retain
+the entire original intent, actor/batch, revision and request ID, returning the
+original receipt without another change/history/save. Stale/uncertain results
+never trigger an automatic fresh intent. JSON is complete; tables are readable.
+
+Audit is read-only with inclusive `--since`/`--until` bounds, complete results or
+an explicit existing 16 MiB size error. Narrow dates rather than truncating.
+Native SQLite/JSON advertise optional `ClassifiedReview`; the public `review_policy`
+query probes the authority. Unsupported storage/remote authorities fail before
+classification/review writes. Financial rules remain in core; adapters retain
+atomic persistence, annotations, original/import records and native receipts.

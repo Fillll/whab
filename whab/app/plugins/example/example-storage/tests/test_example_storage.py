@@ -26,7 +26,12 @@ def operation(storage, identifier="fictional-native-request"):
     )
 
 
-def test_public_conformance_and_cleanup():
+def test_public_conformance_and_cleanup(tmp_path):
+    storage = create_storage(StorageContext(tmp_path, "sandbox", {}))
+    try:
+        assert storage.supports_classified_review() is True
+    finally:
+        storage.close()
     capabilities = frozenset(Capability) - {Capability.NATIVE_REPLICA}
     run_conformance(BackendAdapter(create_storage, capabilities)).assert_success()
 
@@ -463,7 +468,7 @@ def test_provider_pending_posted_receipt_checkpoint_and_private_records_survive_
             expected_cursor=None,
         )
         store.edit_transaction(
-            "personal", "pending", "groceries", reviewed=True, note="Fictional retained note"
+            "personal", "pending", "groceries", reviewed=False, note="Fictional retained note"
         )
         store.save_receipt("personal", "pending", image)
         store.update_account("personal", "fictional-account", {"name": "Fictional edited account"})
@@ -479,7 +484,7 @@ def test_provider_pending_posted_receipt_checkpoint_and_private_records_survive_
         )
         rows = store.transactions("personal", "2026-10")
         assert len(rows) == 1 and rows[0]["id"] == "posted"
-        assert rows[0]["reviewed"] is True and rows[0]["note"] == "Fictional retained note"
+        assert rows[0]["reviewed"] is False and rows[0]["note"] == "Fictional retained note"
         assert rows[0]["categoryId"] == "groceries"
         assert store.accounts("personal")[0]["name"] == "Fictional edited account"
         assert (

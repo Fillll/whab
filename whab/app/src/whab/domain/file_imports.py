@@ -82,7 +82,7 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
         optional=frozenset({"onBudget", "subtype", "closed"}),
     )
     accounts = tuple(normalize_account(account) for account in accounts)
-    categories = _records(data.categories, {"id", "name", "group", "target"}, 10000)
+    categories = _records(data.categories, {"id", "name", "group", "target"}, 10000, optional=frozenset({"kind"}))
     transactions = _records(
         data.transactions,
         {
@@ -131,6 +131,11 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
             ("pending", "reviewed", "isTransfer", "inferredTransfer", "categoryEdited", "deleted"),
         )
         total += abs(cents(transaction["amount"]))
+    from .review import review_status
+    category_map = {row['id']: row for row in categories}
+    for transaction in transactions:
+        if not review_status(transaction, category_map)['eligible']:
+            transaction['reviewed'] = False
     assignment_keys = set()
     for assignment in assignments:
         _text(assignment["month"], limit=7)
@@ -138,6 +143,8 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
         _text(assignment["categoryId"])
         if assignment["categoryId"] not in category_ids:
             raise StoreError("Workspace import category reference not found.")
+        if category_map[assignment["categoryId"]].get("kind", "expense") != "expense":
+            raise StoreError("Income and Transfer categories cannot receive monthly assignments.")
         key = (assignment["month"], assignment["categoryId"])
         if key in assignment_keys:
             raise StoreError("Duplicate workspace import assignment.")

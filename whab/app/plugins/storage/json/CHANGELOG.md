@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.0 — 2026-11-13
+
+PR: [#199](https://github.com/Fillll/whab/pull/199)
+
+- Support classified review and explicit unpaired Transfer categories through core validation, atomic native commits, portable history and exact retries; preserve legacy flags on reads.
+
 ## 1.17.0 — 2026-11-13
 
 PR: [#198](https://github.com/Fillll/whab/pull/198)

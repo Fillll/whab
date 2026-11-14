@@ -26,7 +26,6 @@ def income_ledger(tmp_path, request):
     fees = service.add_category('personal', {'name': 'Fees', 'group': 'Finance', 'target': 0})
     tx = service.add_transaction('personal', {'accountId': cash, 'merchant': 'Fictional employer',
         'date': '2026-11-01', 'amount': -500000, 'categoryId': None, 'note': ' [YNAB: fictional]\nexact  '})
-    service.edit_transaction('personal', tx, reviewed=True)
     yield store, service, factory, path, (cash, tracking, credit, salary, fees, tx)
     store.close()
 
@@ -49,7 +48,7 @@ def test_salary_classification_funds_once_review_independent_and_no_upgrade_rewr
     preview = service.query('preview_category_classification', 'personal', parameters={'categoryId': salary, 'kind': 'income'})
     assert store.export_budget() == before and preview['data']['before']['id'] == salary
     command(service, 'classify_category', {'categoryId': salary, 'kind': 'income'})
-    command(service, 'edit_transactions', {'edits': [{'transactionId': tx, 'categoryId': salary, 'categoryAgent': 'Codex'}]})
+    command(service, 'edit_transactions', {'edits': [{'transactionId': tx, 'categoryId': salary, 'categoryAgent': 'Codex', 'reviewed': True}]})
     after = summary(service)
     assert (after['income'], after['classifiedIncome'], after['unclassifiedIncome'], after['spent'], after['readyToAssign']) == (500000, 500000, 0, 0, 500000)
     saved = next(t for t in store.transactions('personal') if t['id'] == tx)
@@ -57,7 +56,7 @@ def test_salary_classification_funds_once_review_independent_and_no_upgrade_rewr
     assert salary not in {row['categoryId'] for row in store.workspace('personal', '2026-11')['budget']}
     assert {row.get('kind', 'expense') for group in store.category_tree('personal') if group['name'] == 'Finance' for row in group['children']} == {'income', 'expense'}
     command(service, 'edit_transaction', {'transactionId': tx, 'categoryId': None})
-    assert summary(service) == original and store.transactions('personal')[0]['reviewed'] is True
+    assert summary(service) == original and store.transactions('personal')[0]['reviewed'] is False
     snapshot = deepcopy(store.export_budget())
     store.close()
     reopened = factory(path, month='2026-11')

@@ -219,6 +219,8 @@ class LedgerService:
                     raise StoreError('Preview requires operation and edits.')
                 from whab.domain.bulk import validate_edits
                 edits = validate_edits(parameters['operation'], parameters['edits'])
+                if parameters['operation'] == 'edit_transactions' and any({'categoryId', 'reviewed'} & edit.keys() for edit in edits):
+                    self._require_classified_review()
                 self._require_atomic_bulk()
                 return {'revision': self._revision, 'data': _public(self._store.preview_bulk_edits(workspace, parameters['operation'], edits))}
             if operation == 'preview_category_classification':
@@ -297,6 +299,10 @@ class LedgerService:
                 if exporter is None:
                     raise StoreError("This storage plugin does not support portable budgets.")
                 data = validate_portable_budget(exporter(workspace))
+            elif operation == 'review_policy':
+                self._require_classified_review()
+                data = {'version': 1, 'types': ['expense', 'income', 'transfer'],
+                        'classificationRequired': True, 'automaticLegacyCleanup': False}
             elif operation == "category_tree":
                 read = getattr(self._store, "category_tree", None)
                 data = read(workspace) if callable(read) else category_tree(self._store.categories(workspace))
@@ -308,13 +314,18 @@ class LedgerService:
                 raise StoreError("Unknown ledger query.")
             return {"revision": self._revision, "data": _public(data)}
 
+    def _require_classified_review(self):
+        supported = getattr(self._store, 'supports_classified_review', None)
+        if not callable(supported) or supported() is not True:
+            raise StoreError('Update the storage plugin or remote host to enforce Expense/Income/Transfer classification before review.')
+
     def _require_category_classification(self):
         supported = getattr(self._store, 'supports_category_classification', None)
         if not callable(supported) or supported() is not True or not all(
             callable(getattr(self._store, name, None)) for name in
             ('classify_category', 'preview_category_classification', 'history_scope', 'budget_history')
         ):
-            raise StoreError('Update the storage plugin to support audited Income/Expense category classification.')
+            raise StoreError('Update the storage plugin to support audited Expense/Income/Transfer category classification.')
 
     @staticmethod
     def _validate(operation: str, payload: dict) -> dict:
@@ -464,7 +475,12 @@ class LedgerService:
                     or not all(callable(getattr(self._store, name, None)) for name in
                                ('delete_category', 'delete_category_group', 'category_tree', 'budget_history', 'history_scope'))):
                 raise StoreError('Update the storage plugin to support safe category deletion with audit history.')
+        if (operation in {'review_transactions', 'history_apply'} or operation == 'edit_transaction' and {'categoryId', 'reviewed'} & payload.keys()
+                or operation == 'edit_transactions' and any({'categoryId', 'reviewed'} & edit.keys() for edit in payload['edits'])):
+            self._require_classified_review()
         if operation == 'classify_category' or operation == 'add_category' and 'kind' in payload:
+            if payload['kind'] == 'transfer':
+                self._require_classified_review()
             self._require_category_classification()
         if operation in {'rename_category', 'classify_category', 'append_transaction_note'} and not all(
             callable(getattr(self._store, name, None)) for name in ('history_scope', 'budget_history')

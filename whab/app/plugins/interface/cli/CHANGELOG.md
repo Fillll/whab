@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.20.0 — 2026-11-13
+
+PR: [#199](https://github.com/Fillll/whab/pull/199)
+
+- Add explicit atomic trnx review and complete read-only review-audit commands, Transfer category creation/configuration, detailed offline help/examples and exact-intent recovery.
+
 ## 2.19.0 — 2026-11-13
 
 PR: [#198](https://github.com/Fillll/whab/pull/198)

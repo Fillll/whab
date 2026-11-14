@@ -23,7 +23,7 @@ def test_suggestion_shares_category_editor_with_short_label_and_accessible_metad
     row = re.search(r'<tr class="transaction-row" data-transaction-id="' + re.escape(tx) + r'".*?</tr>', page, re.S)[0]
     cell = re.search(r'<td class="transaction-category-cell">(.*?)</td>', row, re.S)[1]
     assert '<div class="transaction-category-editor"><select' in cell
-    assert f'<option value="{category}" selected>Spending &gt; Fictional category</option>' in cell
+    assert f'<option data-category-kind="expense" value="{category}" selected>Spending &gt; Fictional category</option>' in cell
     assert f'<span>{label}</span>' in cell
     assert f'aria-label="{label} suggested category' in cell
     title = unescape(re.search(r'class="ml-suggestion".*?title="([^"]+)"', cell, re.S)[1])

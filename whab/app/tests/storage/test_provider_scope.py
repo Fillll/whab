@@ -79,7 +79,7 @@ def test_namespaced_pending_replacement_preserves_latest_annotations(store):
     alpha.save_item("item", "synthetic-encrypted-token", "Fixture Bank")
     alpha.apply_sync("item", changes(transaction("pending", pending=True)), "one", [account()])
     pending_id = store.transactions("personal")[0]["id"]
-    store.edit_transaction("personal", pending_id, "fun", True)
+    store.edit_transaction("personal", pending_id, "fun", False)
     store.db.execute(
         "UPDATE transactions SET note=? WHERE workspace='personal' AND id=?",
         ("Fixture annotation", pending_id),
@@ -92,7 +92,7 @@ def test_namespaced_pending_replacement_preserves_latest_annotations(store):
     assert rows[0]["id"] != pending_id
     assert (rows[0]["categoryId"], rows[0]["reviewed"], rows[0]["note"]) == (
         "fun",
-        True,
+        False,
         "Fixture annotation",
     )
     assert alpha.get_item("item")["cursor"] == "two"

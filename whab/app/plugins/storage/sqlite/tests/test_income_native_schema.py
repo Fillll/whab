@@ -1,14 +1,16 @@
 """Explicit financial treatment activates a sticky older-reader compatibility fence."""
 
+import pytest
 from whab_plugin_sqlite import Store
 
 
-def test_income_fence_read_only_readiness_and_undo_retains_native_identity(tmp_path):
+@pytest.mark.parametrize("kind", ["income", "transfer"])
+def test_income_fence_read_only_readiness_and_undo_retains_native_identity(tmp_path, kind):
     path = tmp_path / 'fictional.sqlite'
     store = Store(path, month='2026-11')
     before = store.commit_evidence()
     assert store._authority_metadata()['formatVersion'] == 2
-    category = store.add_category('personal', {'name': 'Salary', 'group': 'Income only', 'target': 0, 'kind': 'income'})
+    category = store.add_category('personal', {'name': 'Salary', 'group': 'Income only', 'target': 0, 'kind': kind})
     assert store._authority_metadata()['formatVersion'] == 3
     store.classify_category('personal', category, 'expense')
     # Even removing the last income kind cannot turn an older interpreter back on.

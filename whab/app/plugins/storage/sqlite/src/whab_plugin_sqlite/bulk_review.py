@@ -15,6 +15,7 @@ def review_transactions(store, workspace, transaction_ids, reviewed):
                     row["id"]: {
                         "id": row["id"], "name": row["name"], "group": row["group_name"],
                         "target": row["target"], "currency": row["currency"],
+                        **({"kind": row["kind"]} if row["kind"] is not None else {}),
                     }
                     for row in store.db.execute("SELECT * FROM categories WHERE workspace=?", (workspace,))
                 },
@@ -22,7 +23,7 @@ def review_transactions(store, workspace, transaction_ids, reviewed):
             }
             placeholders = ",".join("?" for _ in selected)
             for row in store.db.execute(
-                "SELECT id,account_id AS accountId,category_id AS categoryId,reviewed,note,"
+                "SELECT id,account_id AS accountId,category_id AS categoryId,reviewed,pending,transfer_peer_id AS transferPeerId,note,"
                 "is_transfer AS isTransfer,inferred_transfer AS inferredTransfer,"
                 "category_edited AS categoryEdited,deleted "
                 "FROM transactions WHERE workspace=? AND id IN (" + placeholders + ")",
@@ -30,7 +31,7 @@ def review_transactions(store, workspace, transaction_ids, reviewed):
             ):
                 state["transactions"][row["id"]] = {
                     **dict(row), **{key: bool(row[key]) for key in (
-                        "reviewed", "isTransfer", "inferredTransfer", "categoryEdited", "deleted",
+                        "reviewed", "pending", "isTransfer", "inferredTransfer", "categoryEdited", "deleted",
                     )},
                 }
             # Validate every target in caller order before any database change.

@@ -21,7 +21,7 @@ def fictional_state():
     state['transactions'] = {identifier: {
         'id': identifier, 'accountId': account, 'date': day,
         'merchant': '  Fictional transfer 商店  ', 'merchantLogo': None, 'amount': amount,
-        'categoryId': None, 'pending': False, 'reviewed': True, 'source': 'manual',
+        'categoryId': None, 'pending': False, 'reviewed': False, 'source': 'manual',
         'note': '[YNAB: uncleared]\nExact existing note  ', 'isTransfer': False,
         'inferredTransfer': False, 'categoryEdited': True, 'deleted': False,
         'categoryAgent': 'Previous agent',

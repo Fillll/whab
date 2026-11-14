@@ -291,8 +291,14 @@ class TransferMatching(Protocol):
     def apply_transfer_match(self, workspace: str, transaction_ids: list[str], action: str, fingerprint: str) -> dict: ...
 
 
+class ClassifiedReview(Protocol):
+    """Optional native enforcement of classification before explicit review."""
+
+    def supports_classified_review(self) -> bool: ...
+
+
 class CategoryClassification(Protocol):
-    """Optional explicit income/expense treatment; core owns financial rules.
+    """Optional explicit Expense/Income/Transfer treatment; core owns financial rules.
 
     Preview is read-only; classify preserves references and commits through the
     existing native history/receipt transaction. Missing kind means expense.

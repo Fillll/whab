@@ -348,12 +348,12 @@ def test_scoped_native_sync_pending_replacement_keeps_latest_review_and_note(set
     monkeypatch.setattr(setup.provider, 'call', lambda command, **_: response('pending', True))
     assert run(setup.coordinator.sync('fictional-item'))['added'] == 1
     pending, = setup.tracked.transactions('personal')
-    setup.tracked.edit_transaction('personal', pending['id'], 'fun', True, note='Fictional reviewed memo')
+    setup.tracked.edit_transaction('personal', pending['id'], 'fun', False, note='Fictional reviewed memo')
     monkeypatch.setattr(setup.provider, 'call', lambda command, **_: response('posted', previous='pending'))
     run(setup.coordinator.sync('fictional-item'))
     posted, = setup.tracked.transactions('personal')
     assert posted['id'] != pending['id']
-    assert (posted['reviewed'], posted['categoryId'], posted['note']) == (True, 'fun', 'Fictional reviewed memo')
+    assert (posted['reviewed'], posted['categoryId'], posted['note']) == (False, 'fun', 'Fictional reviewed memo')
     assert posted['source'] == 'fictional-bank' and posted['pending'] is False
     assert setup.store.get_item('fictional-item')['cursor'] == 'posted'
 

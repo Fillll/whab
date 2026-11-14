@@ -16,13 +16,13 @@ MAX_DAYS = 7
 MAX_CANDIDATES = 1000
 
 
-def _compatible(left, right, accounts):
+def _compatible(left, right, accounts, categories=None):
     a, b = accounts[left['accountId']], accounts[right['accountId']]
     return (left['id'] != right['id'] and a['id'] != b['id']
             and a.get('currency', 'USD') == b.get('currency', 'USD')
             and is_on_budget(a) == is_on_budget(b)
             and left['amount'] != 0 and left['amount'] == -right['amount']
-            and not any(row.get('deleted') or row.get('pending') or row.get('categoryId') is not None for row in (left, right)))
+            and not any(row.get('deleted') or row.get('pending') or row.get('categoryId') is not None and (categories or {}).get(row['categoryId'], {}).get('kind') != 'transfer' for row in (left, right)))
 
 
 def validate_matches(state):
@@ -33,7 +33,7 @@ def validate_matches(state):
         peer_id = row['transferPeerId']
         peer = state['transactions'].get(peer_id) if type(peer_id) is str else None
         if (peer is None or peer.get('transferPeerId') != row['id']
-                or not _compatible(row, peer, state['accounts'])
+                or not _compatible(row, peer, state['accounts'], state.get('categories'))
                 or not row.get('isTransfer') or not peer.get('isTransfer')):
             raise StoreError('Invalid transfer pair. Unmatch it before changing its amount, account, category or budget scope.')
 
@@ -44,14 +44,14 @@ def reconcile_matches(state):
     for row in state['transactions'].values():
         peer = state['transactions'].get(row.get('transferPeerId'))
         if 'transferPeerId' in row and (peer is None or peer.get('transferPeerId') != row['id']
-                                       or not _compatible(row, peer, state['accounts'])):
+                                       or not _compatible(row, peer, state['accounts'], state.get('categories'))):
             invalid.add(row['id'])
             if peer is not None:
                 invalid.add(peer['id'])
     for identifier in invalid:
         row = state['transactions'][identifier]
         row.pop('transferPeerId', None)
-        row['isTransfer'] = row.get('inferredTransfer', False)
+        row['isTransfer'] = row.get('inferredTransfer', False) or state.get('categories', {}).get(row.get('categoryId'), {}).get('kind') == 'transfer'
         row['reviewed'] = False
 
 
@@ -68,8 +68,8 @@ def plan(state, transaction_ids, *, action='match', fingerprint=None, apply=Fals
     if action == 'match':
         if any(row.get('transferPeerId') for row in rows):
             raise StoreError('A transaction is already matched. Inspect or unmatch its existing pair first.')
-        if not _compatible(left, right, accounts):
-            raise StoreError('A transfer needs posted, uncategorized, opposite equal amounts in different accounts of the same currency and budget scope.')
+        if not _compatible(left, right, accounts, state.get('categories')):
+            raise StoreError('A transfer needs posted transactions that are unclassified or explicitly Transfer, with opposite equal amounts in different accounts of the same currency and budget scope.')
         if any(accounts[row['accountId']].get('closed', False) for row in rows):
             raise StoreError('Archived accounts cannot receive new transfer matches.')
         if abs((date.fromisoformat(left['date']) - date.fromisoformat(right['date'])).days) > MAX_DAYS:
@@ -87,7 +87,7 @@ def plan(state, transaction_ids, *, action='match', fingerprint=None, apply=Fals
             after.update(transferPeerId=peer['id'], isTransfer=True)
         else:
             after.pop('transferPeerId', None)
-            after['isTransfer'] = after.get('inferredTransfer', False)
+            after['isTransfer'] = after.get('inferredTransfer', False) or state.get('categories', {}).get(after.get('categoryId'), {}).get('kind') == 'transfer'
         currency = accounts[row['accountId']].get('currency', 'USD')
         changes.append({'id': row['id'], 'before': {**public_transaction({**row, 'currency': currency}), 'accountName': accounts[row['accountId']]['name']},
                         'after': {**public_transaction({**after, 'currency': currency}), 'accountName': accounts[row['accountId']]['name']}})
@@ -96,7 +96,7 @@ def plan(state, transaction_ids, *, action='match', fingerprint=None, apply=Fals
     return {'action': action, 'fingerprint': observed, 'count': 2, 'changes': changes}
 
 
-def candidates(accounts, transactions, parameters):
+def candidates(accounts, transactions, parameters, *, categories=None):
     """Read-only proposals; alternatives stay explicit and never reserve a record."""
     if type(parameters) is not dict or parameters.keys() - {'since', 'until', 'currency', 'accountIds', 'offset', 'limit'}:
         raise StoreError('Invalid transfer proposal filters.')
@@ -123,7 +123,7 @@ def candidates(accounts, transactions, parameters):
     for row in transactions:
         account = accounts.get(row['accountId'])
         if (not account or account.get('closed') or row.get('deleted') or row.get('pending')
-                or row.get('categoryId') is not None or row.get('transferPeerId') or not row['amount']
+                or row.get('categoryId') is not None and (categories or {}).get(row['categoryId'], {}).get('kind') != 'transfer' or row.get('transferPeerId') or not row['amount']
                 or currency is not None and account.get('currency', 'USD') != currency):
             continue
         ordinal = date.fromisoformat(row['date']).toordinal()

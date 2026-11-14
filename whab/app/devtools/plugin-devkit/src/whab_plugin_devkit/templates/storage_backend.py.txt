@@ -621,6 +621,9 @@ class SnapshotStorage:
             ),
         )
 
+    def supports_classified_review(self):
+        return True
+
     def review_transactions(self, workspace, transaction_ids, reviewed):
         identifiers = validate_review_batch(transaction_ids, reviewed)
 

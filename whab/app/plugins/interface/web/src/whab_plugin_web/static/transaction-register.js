@@ -243,7 +243,8 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     selectionBar.querySelector('[data-transaction-selection-count]').textContent = `${selected.length} selected`;
     for (const row of rows) row.classList.toggle('is-selected', row.querySelector('[data-select-transaction]').checked);
     for (const button of selectionBar.querySelectorAll('[data-bulk-reviewed]')) {
-      button.disabled = bulkBusy || categoriesLocked || !selected.some(row => row.dataset.pending !== 'true');
+      button.disabled = bulkBusy || categoriesLocked || !selected.length ||
+        button.dataset.bulkReviewed === 'true' && selected.some(row => row.dataset.reviewClassified === 'false' && !row.dataset.suggestionId);
     }
     return selected;
   }
@@ -437,6 +438,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     }, {
       settled: syncDiscard,
       saved(patch) {
+        if ('categoryId' in patch && !('reviewed' in patch) && (!committed.categoryId && !row.querySelector('[data-transfer-unmatch]') || !patch.categoryId)) patch.reviewed = false;
         Object.assign(committed, patch);
         if ('categoryId' in patch || patch.reviewed === true && row.dataset.suggestionId) row.querySelector('[data-category-agent]')?.remove();
         if ('reviewed' in patch) row.dataset.reviewed = String(patch.reviewed);
@@ -447,9 +449,10 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         if ('merchant' in patch) row.dataset.merchant = patch.merchant;
         if ('accountId' in patch) row.dataset.account = patch.accountId;
         if ('amount' in patch) row.dataset.amount = String(patch.amount);
-        if ('categoryId' in patch) row.applyCategory({categoryId:patch.categoryId, isTransfer:patch.categoryId === null && row.dataset.inferredTransfer === 'true', amount:Number(row.dataset.amount)}, category.selectedOptions?.[0]);
+        if ('categoryId' in patch) row.applyCategory({categoryId:patch.categoryId, isTransfer:patch.categoryId !== null && category.selectedOptions?.[0]?.dataset.categoryKind === 'transfer' || patch.categoryId === null && row.dataset.inferredTransfer === 'true', amount:Number(row.dataset.amount)}, category.selectedOptions?.[0]);
         const amountField = detailFields.find(control => control.dataset.transactionDetail === 'amount');
         if (amountField) amountField.closest('td').classList.toggle('inflow', Number(amountField.value) > 0);
+        syncReview();
         row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
         onMutation();
         retainedEdits = true;
@@ -472,7 +475,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     editors.set(row, writer);
     row.restoreCategory = () => {
       category.value = committed.categoryId || '';
-      category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
+      category.classList.toggle('uncategorized', !category.value && !row.querySelector('[data-transfer-unmatch]'));
     };
     row.resetLocalDraft = () => {
       memo.value = committed.note;
@@ -486,10 +489,19 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       reviewed.title = committed.reviewed ? 'Reviewed' : 'Not reviewed';
       row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
     };
+    function syncReview() {
+      const classified = Boolean(committed.categoryId || row.querySelector('[data-transfer-unmatch]'));
+      row.dataset.reviewClassified = String(classified && row.dataset.pending !== 'true');
+      reviewed.setAttribute('aria-pressed', String(committed.reviewed));
+      reviewed.disabled = row.dataset.pending === 'true' || !committed.reviewed && !classified && !row.dataset.suggestionId;
+      reviewed.title = !classified ? 'Choose an Expense, Income or Transfer category before marking reviewed' : committed.reviewed ? 'Reviewed' : 'Not reviewed';
+      row.dataset.reviewed = String(committed.reviewed);
+    }
     row.applyCategory = (after, choice) => {
       const value = after.categoryId || '';
       if (value && ![...(category.options || [])].some(option => option.value === value) && choice) category.append(choice.cloneNode(true));
       category.value = value; committed.categoryId = after.categoryId;
+      if (typeof after.reviewed === 'boolean') committed.reviewed = after.reviewed;
       row.dataset.transfer = String(after.isTransfer);
       const indicator = row.querySelector('.transaction-status[aria-label="Transfer"]');
       if (!after.isTransfer) indicator?.remove();
@@ -498,11 +510,12 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         mark.title = 'Transfer'; mark.setAttribute('aria-label', 'Transfer'); mark.textContent = '→';
         row.querySelector('.transaction-payee')?.append(mark);
       }
-      category.classList.toggle('uncategorized', !value && !after.isTransfer);
+      category.classList.toggle('uncategorized', !value && !row.querySelector('[data-transfer-unmatch]'));
       row.querySelector('[data-category-agent]')?.remove();
       delete row.dataset.suggestionId; delete row.dataset.suggestionPlugin;
       row.querySelector('.ml-suggestion')?.remove();
-      if (category.options?.[0]) category.options[0].textContent = after.isTransfer ? 'Transfer (excluded)' : 'Uncategorized';
+      if (category.options?.[0]) category.options[0].textContent = after.isTransfer ? 'Transfer hint · choose category' : 'Uncategorized';
+      syncReview(); selection();
     };
     const saveMemo = () => {
       clearTimeout(timers.get(row));
@@ -536,7 +549,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         void categoryBatch.apply(selected, category.value || null, category.selectedOptions?.[0]);
         return;
       }
-      category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
+      category.classList.toggle('uncategorized', !category.value && !row.querySelector('[data-transfer-unmatch]'));
       if (!row.dataset.suggestionId) void writer.push({categoryId: category.value || null});
     });
     if (row.dataset.suggestionId) listen(row.querySelector('[data-dismiss-suggestion]'), 'click', async () => {
@@ -576,10 +589,12 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   for (const row of rows) bindRow(row);
   for (const button of selectionBar.querySelectorAll('[data-bulk-reviewed]')) listen(button, 'click', () => {
     if (bulkBusy || categoriesLocked) return;
+    const selected = selection();
+    if (selected.length > 100) {error('Select at most 100 transactions for one atomic review change. Nothing was submitted.'); return;}
+    const value = button.dataset.bulkReviewed === 'true';
+    if (value && selected.some(row => row.dataset.pending === 'true' || row.dataset.reviewClassified === 'false' && !row.dataset.suggestionId)) {error('Classify every selected transaction as Expense, Income or Transfer before reviewing. Nothing was submitted.'); return;}
     editStarted();
     bulkBusy = true;
-    const selected = selection().filter(row => row.dataset.pending !== 'true');
-    const value = button.dataset.bulkReviewed === 'true';
     const work = [...selected];
     bulkPromise = (async () => {
       let failed = 0;

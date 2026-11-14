@@ -54,6 +54,36 @@ def generate_project(plugin_id, capability, destination, *, ci_ref=None):
             "errors": ["Invalid input or unavailable capability is rejected with a safe authored error."],
             "retry": "Follow the owning SDK lifecycle; remote mutations retain original request IDs and revisions.",
             "availability": "SDK callback only; not directly callable through the CLI."}]}
+    if capability == "storage":
+        documentation["operations"].append(
+            {'name': 'ClassifiedReview.supports_classified_review',
+             'kind': 'sdk',
+             'summary': 'Declare classification-before-review validation for native writes, imports and reversals; no '
+                        'automatic legacy rewrite.',
+             'input': {'type': 'object',
+                       'description': 'Typed in-process SDK arguments. JSON examples are representations, not an '
+                                      'executable remote call.',
+                       'properties': {},
+                       'required': [],
+                       'additionalProperties': False},
+             'output': {'type': 'boolean',
+                        'description': 'True declares native classification-before-review enforcement on annotation '
+                                       'writes, imports and guarded reversals; legacy reads never rewrite flags.'},
+             'examples': [{'input': {}, 'output': True}],
+             'side_effects': 'Read-only capability declaration.',
+             'permissions': 'Host-scoped SDK access; this callback is not remotely callable.',
+             'scope': 'Host-supplied budget/environment context and personal/demo workspace where the method accepts it. '
+                      'Credentials remain machine-local.',
+             'errors': ['Unsupported implementations return false or omit this optional capability; the host refuses '
+                        'classification/review writes before mutation.',
+                        'Remote probes that cannot verify authoritative support fail with an actionable '
+                        'connection/update error.'],
+             'retry': 'Read-only probe. Recheck authoritative support after an update; no financial intent or request '
+                      'receipt is created.',
+             'availability': 'Optional ClassifiedReview SDK, WHAB 2.77+. Native implementations delegate eligibility to '
+                             'the shared public financial helpers; authoritative review_policy exposes the guarantee '
+                             'across supported transports.'}
+        )
     validate_document(documentation, plugin_id)
     (source / "operations.json").write_text(json.dumps(documentation, indent=2) + "\n")
     tests = destination / "tests"

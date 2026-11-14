@@ -63,7 +63,7 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
         if any(not owned_transaction(previous) for previous in (existing, pending) if previous is not None):
             raise StoreError("Bank transaction belongs to another connection.")
         annotations = existing or pending or {}
-        normalized = annotated_transaction(record, annotations)
+        normalized = annotated_transaction(record, annotations, categories=state["categories"])
         category = normalized["categoryId"]
         if category is not None:
             try:
@@ -74,6 +74,7 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
                 if annotations.get("categoryEdited"):
                     raise
                 normalized["categoryId"] = None
+                normalized["reviewed"] = False
         state["transactions"][identifier] = normalized
         if pending is not None and pending["id"] != identifier:
             image = state["receipts"].pop(pending["id"], None)

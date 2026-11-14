@@ -85,7 +85,7 @@ def transaction_register_page(
             "transactions": [
                 public_transaction({**dict(row), **{key: bool(row[key]) for key in (
                     "pending", "reviewed", "isTransfer", "inferredTransfer",
-                )}})
+                )}}, categories={row["id"]: row for row in categories})
                 for row in rows
             ],
             "transactionPage": {

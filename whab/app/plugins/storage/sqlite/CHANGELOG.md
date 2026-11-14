@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.26.0 — 2026-11-13
+
+PR: [#199](https://github.com/Fillll/whab/pull/199)
+
+- Enforce classified review in bounded native writes with pending/pair/type context; preserve Transfer in projections, matching, imports, native receipts, history and durable saves without automatic legacy cleanup.
+
 ## 1.25.0 — 2026-11-13
 
 PR: [#198](https://github.com/Fillll/whab/pull/198)

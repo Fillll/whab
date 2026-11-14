@@ -15,7 +15,7 @@ def annotated_transaction(store):
     account = store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 10000})
     transaction = store.add_transaction("personal", {
         "accountId": account, "date": "2026-10-01", "merchant": "Synthetic purchase",
-        "amount": 100, "categoryId": None, "note": "Original memo",
+        "amount": 100, "categoryId": "groceries", "note": "Original memo",
     })
     store.db.execute(
         "UPDATE transactions SET inferred_transfer=1,is_transfer=1,merchant_logo='synthetic-logo' "
@@ -38,6 +38,14 @@ def test_targeted_edit_matches_core_without_changing_other_records(store, annota
     store.db.execute("INSERT INTO transaction_receipts(workspace,transaction_id,image) VALUES(?,?,?)",
                      ("personal", annotated_transaction, receipt))
     expected = deepcopy(before)
+    if changes.get('reviewed') is True and (pending or changes.get('category_id', 'groceries') is None):
+        snapshot = store.db.serialize()
+        with pytest.raises(StoreError):
+            commands.edit_transaction(expected, annotated_transaction, **changes)
+        with pytest.raises(StoreError):
+            edit_transaction(store, "personal", annotated_transaction, **changes)
+        assert store.db.serialize() == snapshot
+        return
     commands.edit_transaction(expected, annotated_transaction, **changes)
     count = store.db.total_changes
     assert edit_transaction(store, "personal", annotated_transaction, **changes) is None
@@ -85,7 +93,7 @@ def test_currency_validation_and_inferred_transfer_restoration_remain_core_owned
     edit_transaction(store, "personal", annotated_transaction, None)
     restored = store.state("personal")["transactions"][annotated_transaction]
     assert restored["isTransfer"] is True and restored["categoryEdited"] is True
-    assert restored["note"] == "User note" and restored["reviewed"] is True
+    assert restored["note"] == "User note" and restored["reviewed"] is False
 
 
 @pytest.mark.parametrize("transaction_id", ["missing", None, 123, b"123"])

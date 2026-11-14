@@ -62,14 +62,14 @@ def test_public_provider_merge_keeps_pending_annotations_receipts_and_checkpoint
     )
     model.merge_sync(state, "fictional-item", SyncChanges(added=[pending], modified=[], removed=[]),
                      "cursor-one", [account], expected_cursor=None, synced_at="2026-10-03T00:00:00Z")
-    model.commands.edit_transaction(state, "pending", "groceries", reviewed=True, note="Fictional retained note")
+    model.commands.edit_transaction(state, "pending", "groceries", reviewed=False, note="Fictional retained note")
     state["receipts"]["pending"] = b"fictional-native-receipt"
     posted = ImportedTransaction(**{**pending, "id": "posted", "pending": False, "pendingTransactionId": "pending", "suggestedCategoryId": None})
     result = model.merge_sync(state, "fictional-item", SyncChanges(added=[posted], modified=[], removed=["pending"]),
                               "cursor-two", [account], expected_cursor="cursor-one", synced_at="2026-10-04T00:00:00Z")
     assert result == {"added": 1, "modified": 0, "removed": 1}
     assert state["transactions"]["posted"]["note"] == "Fictional retained note"
-    assert state["transactions"]["posted"]["reviewed"] is True
+    assert state["transactions"]["posted"]["reviewed"] is False
     assert state["transactions"]["posted"]["categoryId"] == "groceries"
     assert state["receipts"] == {"posted": b"fictional-native-receipt"}
     assert state["items"]["fictional-item"]["cursor"] == "cursor-two"

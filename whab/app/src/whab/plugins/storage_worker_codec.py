@@ -48,6 +48,7 @@ METHODS = {
     "supports_category_deletion": ((), {}),
     "supports_category_renaming": ((), {}),
     "supports_category_classification": ((), {}),
+    "supports_classified_review": ((), {}),
     "preview_category_classification": (("workspace", "category_id", "kind"), {}),
     "prepare_existing": (("workspace", "files"), {}),
     "category_tree": (("workspace",), {}),

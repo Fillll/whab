@@ -27,7 +27,7 @@ def test_local_facade_and_portable_snapshot(store):
     assert len(saved) == 6 and service.revision != initial
     assert service.accounts("personal")[0]["id"] == account
     assert category in {row["id"] for row in service.categories("personal")}
-    assert service.transactions("personal")[0]["reviewed"] is True
+    assert service.transactions("personal")[0]["reviewed"] is False
     assert service.workspace("personal", "2026-10")["accounts"][0]["id"] == account
     portable = service.query("portable", "personal")["data"]
     assert portable["accounts"][0]["id"] == account
@@ -289,9 +289,9 @@ def test_omitted_memo_preserves_older_backend_call_signature():
     def edit_transaction(workspace, transaction_id, category_id, reviewed):
         calls.append((workspace, transaction_id, category_id, reviewed))
 
-    service = LedgerService(SimpleNamespace(edit_transaction=edit_transaction))
-    service.edit_transaction("personal", "saved", category_id=None, reviewed=True)
-    assert calls == [("personal", "saved", None, True)]
+    service = LedgerService(SimpleNamespace(edit_transaction=edit_transaction, supports_classified_review=lambda: True))
+    service.edit_transaction("personal", "saved", category_id="saved-category", reviewed=True)
+    assert calls == [("personal", "saved", "saved-category", True)]
 
 
 def test_shared_lock_invalidation_does_not_checkpoint(store):

@@ -114,7 +114,7 @@ def test_account_register_skips_envelope_projection_and_reuses_category_choices(
     for row in register_rows(text):
         category = re.search(r'<select name="categoryId"[^>]*>(.*?)</select>', row, re.S)[1]
         assert len(re.findall(r'<option\b', category)) == 2
-        assert '<option value="groceries" selected>Everyday &gt; Groceries</option>' in category
+        assert '<option data-category-kind="expense" value="groceries" selected>Everyday &gt; Groceries</option>' in category
 
 
 def test_large_register_searches_unrendered_transactions_and_preserves_page_filters(client, store):

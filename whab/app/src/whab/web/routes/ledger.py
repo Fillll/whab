@@ -233,7 +233,7 @@ def create_router(store):
     @router.post("/api/categories")
     def category(body: CategoryBody):
         payload = body.model_dump(exclude={"workspace", "kind"})
-        if body.kind == "income":
+        if body.kind != "expense":
             payload["kind"] = body.kind
         store.add_category(body.workspace, payload)
         return {"ok": True}

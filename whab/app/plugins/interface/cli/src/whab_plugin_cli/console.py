@@ -34,6 +34,7 @@ lazy from .bulk_commands import add_edit_many, bulk_table, execute_accounts, exe
 lazy from .category_commands import add_category_parser, category_table, execute_categories
 lazy from .history_commands import add_history_parser, execute_history
 lazy from .record_edits import add_note_parser, execute_note, note_table
+lazy from .review_commands import review_audit_table
 lazy from .transaction_commands import add_category_parsers, execute_category
 lazy from .transaction_reads import (
     add_uncategorized_parser,
@@ -71,7 +72,7 @@ def parser(options, argv=()):
     check_identifiers(catalog)
     root = CommandParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
-        epilog='Income categories: category create --type income; category classify CATEGORY --type income --dry-run. See category classify --help for funding, review and recovery.\n\n' + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
+        epilog='Category types: expense, income, transfer. Use category create/classify --type TYPE. Explicit review: trnx review IDS --reviewed; inspect legacy flags with trnx review-audit. See trnx review --help for classification requirements and atomic recovery.\n\n' + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
     budget = groups.add_parser("budget", help="Create and list saved budgets")
@@ -135,6 +136,8 @@ def parser(options, argv=()):
         add_search_parser(reads, catalog)
         add_category_parsers(reads)
         add_note_parser(reads)
+        from .review_commands import add_review_parsers
+        add_review_parsers(reads)
         add_edit_many(reads)
         add_transfer_parsers(reads)
     groups.add_parser("api", help="Advanced local operations; use whab api --help")
@@ -264,6 +267,9 @@ def execute(args, home, environment, ca):
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
         if args.command in {"transactions", "trnx"} and args.filter in {"transfers", "match-transfer", "unmatch-transfer"}:
             return execute_transfer(connection, identifier, prefix, args, exchange, CommandError)
+        if args.command in {"transactions", "trnx"} and args.filter in {"review", "review-audit"}:
+            from .review_commands import execute_review
+            return execute_review(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter == "list":
             return execute_search(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter in {"uncategorized", "uncategorised"}:
@@ -345,7 +351,7 @@ def main(argv=None):
         else:
             result = execute(args, *configuration(args))
         if getattr(args, "format", None) == "table":
-            print(transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer"} else bulk_table(result) if "dryRun" in result and args.command != "category" else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
+            print(review_audit_table(result) if getattr(args, "filter", None) == "review-audit" else transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer"} else bulk_table(result) if "dryRun" in result and args.command != "category" else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
                   else note_table(result) if args.filter == "note" else search_table(result) if args.filter == "list" else transaction_table(result))
         else:
             print(json.dumps(result, allow_nan=False))

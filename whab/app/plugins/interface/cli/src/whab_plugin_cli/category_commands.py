@@ -82,8 +82,8 @@ def add_category_parser(commands, catalog):
     )
     create.add_argument("--agent", type=validate_category_agent, help="Explicit agent audit label; default: manual User")
     create.add_argument("--batch", help="History grouping label; this creation remains one commit/save")
-    create.add_argument("--type", dest="category_kind", choices=("expense", "income"), default="expense",
-        help="Financial type (default: expense); income has target zero, no assignments, independent review. See category classify --help")
+    create.add_argument("--type", dest="category_kind", choices=("expense", "income", "transfer"), default="expense",
+        help="Financial type (default: expense); income/transfer have target zero, no assignments; review requires explicit classification. See category classify --help")
     create.add_argument(
         "--currency",
         default="USD",
@@ -211,7 +211,7 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
                 "parentId": parent["id"],
                 "target": args.category_target,
                 "currency": args.currency,
-                **({"kind": "income"} if args.category_kind == "income" else {}),
+                **({"kind": args.category_kind} if args.category_kind != "expense" else {}),
             }
         else:
             child = resolve_category(children, args.category, error)
@@ -269,7 +269,7 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
                 "group": parent["name"],
                 "target": args.category_target,
                 "currency": args.currency,
-                **({"kind": "income"} if args.category_kind == "income" else {}),
+                **({"kind": args.category_kind} if args.category_kind != "expense" else {}),
             }
         )
         if any(actual.get(key) != value for key, value in expected.items()):

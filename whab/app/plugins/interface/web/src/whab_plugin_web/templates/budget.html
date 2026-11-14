@@ -250,7 +250,7 @@
       </div>
       <div class="budget-table-footer" data-budget-key="footer"><button class="button secondary" data-dialog="category-dialog">{{ icon('plus', 15) }}Add category</button></div>
     </section>
-  {% if selected and selected.kind|default("expense") != "income" %}
+  {% if selected and selected.kind|default("expense") == "expense" %}
     {% set row = selected_budget %}
     {% set funded = row.assigned+row.carryover %}
     {% set progress = [100,[0,funded/row.target*100 if row.target else 100]|max]|min %}

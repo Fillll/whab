@@ -48,10 +48,10 @@ def test_json_factory_owns_separate_environment_files_and_metadata(tmp_path):
 def test_bulk_review_and_account_changes_are_atomic(json_store):
     account = json_store.add_account("personal", {"name": "Fictional", "type": "depository", "balance": 100000})
     first = json_store.add_transaction("personal", {
-        "accountId": account, "date": "2026-10-01", "merchant": "Fictional", "amount": 100,
+        "accountId": account, "date": "2026-10-01", "merchant": "Fictional", "amount": 100, "categoryId": "groceries",
     })
     second = json_store.add_transaction("personal", {
-        "accountId": account, "date": "2026-10-02", "merchant": "Fictional", "amount": 100,
+        "accountId": account, "date": "2026-10-02", "merchant": "Fictional", "amount": 100, "categoryId": "groceries",
     })
     before = json_store.path.read_bytes()
     with pytest.raises(StoreError):
@@ -70,7 +70,7 @@ def test_provider_receipts_status_annotations_and_reopen(json_store, json_accoun
     json_store.save_item("item", "fictional-ciphertext", "Fictional Bank")
     json_store.apply_sync("item", json_changes(added=[json_transaction()]), "first", [json_account()])
     json_store.save_receipt("personal", "pending", receipt_png())
-    json_store.edit_transaction("personal", "pending", "groceries", True, "")
+    json_store.edit_transaction("personal", "pending", "groceries", False, "")
     json_store.update_account("personal", "bank", {"name": "My fictional account", "bankWebsite": "https://example.test"})
     json_store.apply_sync("item", json_changes(added=[json_transaction(
         "posted", pending=False, pendingTransactionId="pending",
@@ -80,7 +80,7 @@ def test_provider_receipts_status_annotations_and_reopen(json_store, json_accoun
     assert not json_store.receipt_transaction_exists("personal", "pending")
     assert not json_store.receipt_transaction_exists("personal", None)
     assert json_store.accounts("personal")[0]["name"] == "My fictional account"
-    assert json_store.transactions("personal")[0]["reviewed"]
+    assert json_store.transactions("personal")[0]["reviewed"] is False
     assert json_store.transactions("personal")[0]["note"] == ""
     json_store.set_item_status("item", "reconnect", "Reconnect fictional connection.")
     assert json_store.items()[0]["status"] == "reconnect"

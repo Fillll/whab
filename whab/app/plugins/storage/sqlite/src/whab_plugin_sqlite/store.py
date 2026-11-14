@@ -259,7 +259,7 @@ class Store(Authority):
         # Fence old native readers in this same transaction, including complete
         # local transfers. Bounded annotation writes need no additional SQL.
         writing = getattr(self, '_writing', None)
-        if writing is not None and any(row.get('kind') == 'income' for row in state['categories'].values()):
+        if writing is not None and any(row.get('kind') in {'income', 'transfer'} for row in state['categories'].values()):
             writing['metadata']['formatVersion'] = 3
         workspace = state["_id"]
         if "history" in state:
@@ -692,7 +692,7 @@ class Store(Authority):
                 "transactions": [
                     public_transaction({**dict(row), **{key: bool(row[key]) for key in (
                         "pending", "reviewed", "isTransfer", "inferredTransfer",
-                    )}})
+                    )}}, categories={row["id"]: row for row in categories})
                     for row in rows
                 ],
             }
@@ -817,7 +817,7 @@ class Store(Authority):
         from whab.domain.transfer_matching import candidates
         with self._snapshot():
             state = self._read_state(workspace, include_history=False)
-            return candidates(state['accounts'], state['transactions'].values(), parameters)
+            return candidates(state['accounts'], state['transactions'].values(), parameters, categories=state['categories'])
 
     def preview_transfer_match(self, workspace, transaction_ids, action):
         from whab.domain.transfer_matching import plan
@@ -842,6 +842,9 @@ class Store(Authority):
     def classify_accounts(self, workspace, edits):
         from .bulk_edits import apply
         return apply(self, workspace, 'classify_accounts', edits)
+
+    def supports_classified_review(self):
+        return True
 
     def supports_category_classification(self):
         return True
@@ -1079,7 +1082,7 @@ class Store(Authority):
                 ):
                     raise StoreError("Bank transaction belongs to another connection.")
                 annotations = existing or pending or {}
-                normalized_transaction = annotated_transaction(imported, annotations)
+                normalized_transaction = annotated_transaction(imported, annotations, categories=state["categories"])
                 category_id = normalized_transaction["categoryId"]
                 if category_id is not None:
                     try:
@@ -1092,6 +1095,7 @@ class Store(Authority):
                         # A provider suggestion is optional and cannot cross currencies
                         # or introduce a parent/dangling category reference.
                         normalized_transaction["categoryId"] = None
+                        normalized_transaction["reviewed"] = False
                 state["transactions"][transaction_id] = normalized_transaction
                 if pending is not None and pending["id"] != transaction_id:
                     # Keep the user's picture when a provider replaces a pending

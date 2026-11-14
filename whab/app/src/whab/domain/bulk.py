@@ -92,7 +92,7 @@ def bulk_changes(state, operation, edits, *, apply=False):
         after = candidate[collection][identifier]
         def public(row):
             if operation == 'edit_transactions':
-                return public_transaction({**row, 'currency': state['accounts'][row['accountId']].get('currency', 'USD')})
+                return public_transaction({**row, 'currency': state['accounts'][row['accountId']].get('currency', 'USD')}, categories=state['categories'])
             return deepcopy(row)
         changes.append({'id': identifier, 'before': public(previous), 'after': public(after)})
     if apply:

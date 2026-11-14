@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.56.0 — 2026-11-13
+
+PR: [#199](https://github.com/Fillll/whab/pull/199)
+
+- Expose all three category types, explain review eligibility and preserve review/classification transitions during single/selected edits without removing filtered rows.
+
 ## 1.55.0 — 2026-11-13
 
 PR: [#198](https://github.com/Fillll/whab/pull/198)

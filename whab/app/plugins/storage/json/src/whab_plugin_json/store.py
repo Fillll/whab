@@ -301,7 +301,7 @@ class Store(Authority):
     def transfer_candidates(self, workspace, parameters):
         from whab.domain.transfer_matching import candidates
         state = self._read(workspace)
-        return candidates(state['accounts'], state['transactions'].values(), parameters)
+        return candidates(state['accounts'], state['transactions'].values(), parameters, categories=state['categories'])
 
     def preview_transfer_match(self, workspace, transaction_ids, action):
         from whab.domain.transfer_matching import plan
@@ -325,6 +325,9 @@ class Store(Authority):
     def classify_accounts(self, workspace, edits):
         from whab.domain.bulk import bulk_changes
         return self._mutate(workspace, lambda state: bulk_changes(state, 'classify_accounts', edits, apply=True), history_operation='classify_accounts')
+
+    def supports_classified_review(self):
+        return True
 
     def supports_category_classification(self):
         return True

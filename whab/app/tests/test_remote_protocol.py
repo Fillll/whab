@@ -127,7 +127,7 @@ def test_atomic_bulk_preview_and_commands_through_https_authority(store):
                     "date": "2026-11-01",
                     "merchant": "Fictional",
                     "amount": 100,
-                    "categoryId": None,
+                    "categoryId": "groceries",
                 },
             )
             edits = [{"transactionId": transaction, "appendNote": "one", "reviewed": True}]

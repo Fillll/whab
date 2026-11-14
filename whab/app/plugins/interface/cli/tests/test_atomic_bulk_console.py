@@ -185,7 +185,7 @@ def test_bulk_real_console_preservation_restart_and_saved_restore(tmp_path, stor
                 ok=False,
             )["error"]
         )
-        unicode_edits = {'edits': [({'transactionId':key,'reviewed':True} if index < 3 else {'transactionId':key,'note':'🍏'*1000}) for index,key in enumerate(ids)]}
+        unicode_edits = {'edits': [({'transactionId':key,'categoryId':c,'reviewed':True} if index < 3 else {'transactionId':key,'note':'🍏'*1000}) for index,key in enumerate(ids)]}
         large = run('default','trnx','edit-many','--file','-',stdin=json.dumps(unicode_edits))
         assert large['data']['count'] == 100
         after = rows()

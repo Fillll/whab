@@ -65,6 +65,7 @@ lazy from .sdk import (
     CategoryManagement,
     CategoryRenaming,
     CategorySnapshot,
+    ClassifiedReview,
     CommitEvidence,
     ExportCell,
     ExportHook,
@@ -181,6 +182,8 @@ __all__ = [
     "CategoryDeletion",
     "CategoryDeletionInspection",
     "CategoryManagement",
+    "ClassifiedReview",
+    "review_status",
     "CategoryClassification",
     "CategoryRenaming",
     "TransferMatching",
@@ -239,3 +242,5 @@ __all__ = [
     "receipt_media_type",
     "bank_website",
 ]
+
+from whab.domain.review import review_status as review_status
