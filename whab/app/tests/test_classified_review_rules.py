@@ -122,3 +122,23 @@ def test_pending_and_bank_hint_do_not_qualify():
     ledger = LedgerService(SimpleNamespace())
     with pytest.raises(StoreError, match='Update the storage'):
         ledger.query('review_policy','personal')
+
+
+@pytest.mark.parametrize('agent', [None, 'Codex'])
+def test_classifying_legacy_review_never_creates_review_via_either_edit_route(classified, tmp_path, agent):
+    source, _, _, categories, tx, factory = classified
+    snapshot=source.export_budget()
+    snapshot.pop('history',None)
+    snapshot['transactions'][0].update(reviewed=True, merchant='  Fictional source  ')
+    store=factory(tmp_path/'legacy-classification',month='2026-11')
+    try:
+        store.restore_budget('personal',snapshot)
+        payload={'transactionId':tx,'categoryId':categories['transfer']}
+        if agent is not None:
+            payload['categoryAgent']=agent
+        command(LedgerService(store),'edit_transaction',payload)
+        row=store.transactions('personal')[0]
+        assert row['categoryId']==categories['transfer'] and row['reviewed'] is False
+        assert row['merchant']=='  Fictional source  '
+    finally:
+        store.close()

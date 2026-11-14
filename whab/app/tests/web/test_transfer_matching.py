@@ -31,7 +31,7 @@ def test_web_proposal_preview_confirm_unmatch_and_stale_guards(store, tmp_path):
         assert all(row.get('transferPeerId') and not row['reviewed'] for row in store.transactions('personal'))
         page = client.get('/budgets/home/transactions/2026-11').text
         assert 'Suggest transfers' in page and 'data-transfer-panel' in page and 'data-transfer-unmatch' in page
-        assert 'Unmatch this confirmed transfer before changing its category' in page and 'Transfer (excluded)' in page
+        assert 'Unmatch this confirmed transfer before changing its category' in page and 'Transfer (matched)' in page
         unchanged = deepcopy(store.export_budget())
         refused = client.patch(f'/api/transactions/{ids[0]}', json={'workspace':'personal','categoryId':None})
         assert refused.status_code == 400

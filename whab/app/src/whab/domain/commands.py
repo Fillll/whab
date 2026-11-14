@@ -195,7 +195,10 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
         raise StoreError("Transaction not found.")
     if transaction.get('transferPeerId') and changes.keys() & {'accountId', 'amount', 'date', 'categoryId'}:
         raise StoreError('Unmatch this transfer pair before changing its financial fields or category.')
-    candidate = {**transaction, **changes}
+    # Keep the original annotations until their shared validator applies them;
+    # eligibility must compare the saved classification with the proposed one.
+    candidate = {**transaction, **{key: value for key, value in changes.items()
+                                 if key not in {"categoryId", "reviewed", "note", "categoryAgent"}}}
     validate_date(candidate["date"])
     if not "1900-01-01" <= candidate["date"] <= "2200-12-31":
         raise StoreError("Invalid transaction date.")
