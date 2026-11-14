@@ -45,3 +45,19 @@ def test_read_only_legacy_column_requires_explicit_writable_upgrade(tmp_path):
         assert upgraded.export_budget() == before
     finally:
         upgraded.close()
+
+
+def test_income_fence_also_survives_complete_local_storage_transfer(tmp_path):
+    source = Store(tmp_path / 'source.sqlite', month='2026-11')
+    destination = Store(tmp_path / 'destination.sqlite', month='2026-11', initial_role='staged')
+    try:
+        source.add_category('personal', {'name': 'Salary', 'group': 'Finance', 'target': 0, 'kind': 'income'})
+        destination.import_local('fictional-income-transfer', source.export_local())
+        assert destination._authority_metadata()['formatVersion'] == 3
+        before, after = source.export_budget(), destination.export_budget()
+        before['categories'].sort(key=lambda row: row['id'])
+        after['categories'].sort(key=lambda row: row['id'])
+        assert after == before
+    finally:
+        source.close()
+        destination.close()

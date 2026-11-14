@@ -361,11 +361,6 @@ class Authority:
                             self._history_row_positions[name] = (new['transactions'], positions)
                         history_after[name] = new
                     transaction['history_after'] = history_after
-                    # Once explicit category treatment is used, older adapters
-                    # must fail before projecting it as an expense or dropping it.
-                    # The fence survives undo and contains no financial rewrite.
-                    if self.db.execute("SELECT 1 FROM categories WHERE kind IS NOT NULL LIMIT 1").fetchone():
-                        metadata['formatVersion'] = 3
                     metadata.update(generation=metadata["generation"] + 1,
                                     operationId=transaction["operation"].operation_id if transaction["operation"] is not None else str(uuid4()),
                                     empty=False)

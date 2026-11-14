@@ -150,6 +150,14 @@
             "currency": {
               "type": "string",
               "description": "ISO currency; no conversion."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "expense",
+                "income"
+              ],
+              "description": "Financial treatment. Absent means expense; parent is neutral, review is independent."
             }
           },
           "additionalProperties": true

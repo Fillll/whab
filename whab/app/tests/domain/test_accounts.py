@@ -59,7 +59,7 @@ def test_off_budget_activity_and_snapshots_never_fund_or_consume_envelopes(state
     before = deepcopy(state)
     result = calculate_workspace(state, "2026-10")
     assert result["summary"] == {
-        "income": 0, "spent": 0, "assigned": 2000, "available": 3000, "readyToAssign": 7000,
+        "income": 0, "classifiedIncome": 0, "unclassifiedIncome": 0, "spent": 0, "assigned": 2000, "available": 3000, "readyToAssign": 7000,
         "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0,
         "carriedIn": 9000, "carriedInUnassigned": 9000, "carriedInSetAside": 0,
         "fundingCapacity": 7000,

@@ -4406,6 +4406,14 @@
             ],
             "default": "expense",
             "description": "Financial treatment; Income has no target or assignments. Review remains independent."
+          },
+          "agent": {
+            "type": "string",
+            "description": "Explicit self-declared audit actor; default manual User."
+          },
+          "batch": {
+            "type": "string",
+            "description": "Permanent audit grouping; one command remains one commit."
           }
         },
         "required": [

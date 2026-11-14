@@ -37,7 +37,7 @@
     </div>
     <a class="button secondary budget-today" href="{{ url(months=month_count,month='current-month') }}">This month</a>
   </div>
-  <div class="budget-workspace{% if selected %} has-inspector{% endif %}" data-budget-key="workspace">
+  <div class="budget-workspace{% if selected_budget %} has-inspector{% endif %}" data-budget-key="workspace">
     <section class="budget-table-section" aria-label="Monthly category budget" data-budget-key="table-section">
       <div class="budget-editing-key" role="note"><span>{{ icon('pencil', 12) }}Editable assigned amounts</span><span>Read-only summaries</span></div>
       {% if not monthly_funding_flow_available %}<p class="budget-flow-update" role="note">A server update is needed for monthly funding totals and next-month funding edits.</p>{% endif %}

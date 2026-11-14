@@ -25,6 +25,7 @@ Preview FIRST: changing a referenced category's type changes historical income,
 spending and Ready to Assign. --dry-run shows the exact category before/after and
 summary impacts for represented ledger months, without any commit or save.
 Normal execution is noninteractive, one guarded commit/save with undo/redo history.
+Exact retries keep the identical --type, --revision, --request-id and audit metadata.
 
 Examples (fictional):
   whab "My budget" category create Salary --parent Finance --type income

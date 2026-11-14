@@ -45,7 +45,7 @@ def test_income_commands_native_and_restart_replay(tmp_path, storage):
         return run('api', '--budget', 'default', 'query', name)
     with patch.dict(os.environ, env, clear=True), local_connection(home, 'sandbox'):
         before = query('portable')['data']
-        created = run('My budget', 'category', 'create', '給与 🍏', '--parent', 'Finance', '--type', 'income')
+        created = run('My budget', 'category', 'create', '給与 🍏', '--parent', 'Finance', '--type', 'income', '--agent', 'Codex', '--batch', 'income-fixture')
         category = created['data']['id']
         assert created['data']['kind'] == 'income'
         run('default', 'category', 'classify', category, '--type', 'expense')

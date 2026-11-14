@@ -166,3 +166,31 @@ def test_kind_validation_and_unsupported_backends():
     for parameters in [{}, {'categoryId': 'salary', 'kind': 'other'}]:
         with pytest.raises(StoreError):
             service.query('preview_category_classification', 'personal', parameters=parameters)
+
+
+def test_remote_transport_forwards_public_kind_preview_and_guarded_intent():
+    import json
+
+    import httpx
+
+    from whab.plugins.remote_transport import RemoteStore
+
+    requests = []
+    def respond(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        return httpx.Response(200, json={'budgetId': 'fictional', 'revision': 'observed',
+                                        'data': {'categoryId': 'salary'} if body['operation'].startswith('preview') else None})
+    remote = RemoteStore('https://fictional.example', 'fictional-test-token-' + 'x' * 32,
+                         'fictional', transport=httpx.MockTransport(respond))
+    try:
+        assert remote.supports_category_classification() is True
+        assert remote.preview_category_classification('personal', 'salary', 'income') == {'categoryId': 'salary'}
+        remote.classify_category('personal', 'salary', 'income')
+        assert requests[0] == {'operation': 'preview_category_classification', 'workspace': 'personal',
+                               'parameters': {'categoryId': 'salary', 'kind': 'income'}}
+        assert requests[1]['operation'] == 'classify_category'
+        assert requests[1]['payload'] == {'categoryId': 'salary', 'kind': 'income'}
+        assert requests[1]['expected_revision'] == 'observed' and requests[1]['request_id']
+    finally:
+        remote.close()

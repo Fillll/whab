@@ -256,6 +256,11 @@ class Store(Authority):
         return state
 
     def _write_state(self, state: dict) -> None:
+        # Fence old native readers in this same transaction, including complete
+        # local transfers. Bounded annotation writes need no additional SQL.
+        writing = getattr(self, '_writing', None)
+        if writing is not None and any(row.get('kind') == 'income' for row in state['categories'].values()):
+            writing['metadata']['formatVersion'] = 3
         workspace = state["_id"]
         if "history" in state:
             self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (workspace, json.dumps(state["history"])))

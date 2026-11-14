@@ -6,6 +6,7 @@ from uuid import uuid4
 
 lazy import httpx
 
+from whab.plugins import validate_category_agent
 from whab.plugins.documentation import operation
 
 from .transaction_commands import checked
@@ -79,6 +80,8 @@ def add_category_parser(commands, catalog):
         "name",
         help="New child name; duplicate siblings are refused, ignoring case/outer whitespace",
     )
+    create.add_argument("--agent", type=validate_category_agent, help="Explicit agent audit label; default: manual User")
+    create.add_argument("--batch", help="History grouping label; this creation remains one commit/save")
     create.add_argument("--type", dest="category_kind", choices=("expense", "income"), default="expense",
         help="Financial type (default: expense); income has target zero, no assignments, independent review. See category classify --help")
     create.add_argument(
@@ -231,6 +234,12 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
         "expected_revision": observed["revision"],
         "request_id": str(uuid4()),
     }
+    if args.category_action == "create":
+        history = {"actor": args.agent, "actorKind": "agent"} if args.agent is not None else {}
+        if args.batch is not None:
+            history["batchId"] = args.batch
+        if history:
+            intent["history"] = history
     try:
         saved = checked(
             exchange(connection, "POST", prefix + "/commands", json=intent), identifier, error
