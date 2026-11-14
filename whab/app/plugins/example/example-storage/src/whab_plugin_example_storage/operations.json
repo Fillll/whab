@@ -845,6 +845,37 @@
       ],
       "retry": "Read again as needed; reads never authorize a later write using an old revision.",
       "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+    },
+    {
+      "name": "ClassifiedReview.supports_classified_review",
+      "kind": "sdk",
+      "summary": "Declare classification-before-review validation for native writes, imports and reversals; no automatic legacy rewrite.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True declares native classification-before-review enforcement on annotation writes, imports and guarded reversals; legacy reads never rewrite flags."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read-only capability declaration.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Unsupported implementations return false or omit this optional capability; the host refuses classification/review writes before mutation.",
+        "Remote probes that cannot verify authoritative support fail with an actionable connection/update error."
+      ],
+      "retry": "Read-only probe. Recheck authoritative support after an update; no financial intent or request receipt is created.",
+      "availability": "Optional ClassifiedReview SDK, WHAB 2.77+. Native implementations delegate eligibility to the shared public financial helpers; authoritative review_policy exposes the guarantee across supported transports."
     }
   ]
 }

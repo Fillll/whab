@@ -2777,7 +2777,7 @@
       },
       "output": {
         "type": "boolean",
-        "description": "True explicitly opts into CategoryDeletion with atomic history/receipts."
+        "description": "True declares native classification-before-review enforcement on annotation writes, imports and guarded reversals; legacy reads never rewrite flags."
       },
       "examples": [
         {
@@ -2789,11 +2789,11 @@
       "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [
-        "Missing/wrong-kind IDs, any live/deleted transaction reference, any nonzero assignment or a parent with children are refused without mutation; zero-only rows are removed atomically with the child and retained in history.",
-        "Authority/receipt/revision and uncertain-outcome protections apply."
+        "Unsupported implementations return false or omit this optional capability; the host refuses classification/review writes before mutation.",
+        "Remote probes that cannot verify authoritative support fail with an actionable connection/update error."
       ],
-      "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
-      "availability": "Optional CategoryDeletion SDK; WHAB 2.69+ with current SQLite/JSON for zero-only row removal. True support requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
+      "retry": "Read-only probe. Recheck authoritative support after an update; no financial intent or request receipt is created.",
+      "availability": "Optional ClassifiedReview SDK, WHAB 2.77+. Native implementations delegate eligibility to the shared public financial helpers; authoritative review_policy exposes the guarantee across supported transports."
     }
   ]
 }
