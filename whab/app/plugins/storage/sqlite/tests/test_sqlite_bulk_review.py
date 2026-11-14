@@ -70,6 +70,8 @@ def test_batch_matches_core_and_preserves_other_fields_scopes_and_images(review_
     selected = ["bulk-0", "bulk-1", "bulk-2", "bulk-6"] if workspace == "personal" else [
         row["id"] for row in store.transactions("demo")[:3]
     ]
+    if reviewed:
+        selected = [row["id"] for row in store.transactions(workspace) if row.get("categoryId") and not row["pending"]][:3]
     before = store.state(workspace)
     expected = deepcopy(before)
     for key in selected:
@@ -234,8 +236,8 @@ def test_hundred_distinct_ids_are_supported_without_touching_unselected_rows(rev
     account = review_ledger.accounts("personal")[0]["id"]
     selected = [f"boundary-{index}" for index in range(100)]
     review_ledger.db.executemany(
-        "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,source) "
-        "VALUES(?,'personal',?,'2026-10-01','Synthetic boundary',1,'manual')",
+        "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,source,category_id) "
+        "VALUES(?,'personal',?,'2026-10-01','Synthetic boundary',1,'manual','groceries')",
         [(key, account) for key in selected],
     )
     before = review_ledger.state("personal")
@@ -253,7 +255,7 @@ def test_atomic_batch_matches_separate_core_edits_and_exact_portable_payload(rev
         with legacy._snapshot():
             legacy._write_state(review_ledger.state("personal"))
             legacy.db.executemany("INSERT INTO transaction_receipts VALUES(?,?,?)", [tuple(row) for row in review_ledger.db.execute("SELECT * FROM transaction_receipts")])
-        selected = ["bulk-0", "bulk-1", "bulk-2", "bulk-6"]
+        selected = ["bulk-0", "bulk-1", "bulk-3"]
         for key in selected:
             legacy.edit_transaction("personal", key, reviewed=True)
         review_ledger.review_transactions("personal", selected, True)

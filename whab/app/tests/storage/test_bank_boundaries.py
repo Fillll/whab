@@ -93,7 +93,7 @@ def test_namespaces_scope_connections_and_preserve_matched_pending_edits(store):
         row for row in store.accounts("personal") if row["itemId"] == backend.item_identity("first")
     )
     first = next(row for row in pending if row["accountId"] == first_account["id"])
-    store.edit_transaction("personal", first["id"], "fun", True)
+    store.edit_transaction("personal", first["id"], "fun", False)
     backend.apply_sync(
         "first",
         changes([transaction("posted", pendingTransactionId="pending")], removed=["pending"]),
@@ -101,7 +101,7 @@ def test_namespaces_scope_connections_and_preserve_matched_pending_edits(store):
         [account(item_id="first")],
     )
     posted = next(row for row in store.transactions("personal") if not row["pending"])
-    assert (posted["categoryId"], posted["reviewed"]) == ("fun", True)
+    assert (posted["categoryId"], posted["reviewed"]) == ("fun", False)
     assert len(store.transactions("personal")) == 2
 
 

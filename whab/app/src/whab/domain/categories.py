@@ -268,7 +268,7 @@ def classify_category(state, category_id, kind):
     child = ensure_child_category(state['categories'], category_id)
     if kind != 'expense' and (child['target'] != 0 or any(category_id in rows for rows in state['budget'].values())):
         raise StoreError('Income and Transfer categories cannot have expense targets or monthly assignments (including zero rows). '
-                         'Nothing changed. Use a new Income category to preserve the existing envelope and assignments.')
+                         'Nothing changed. Use a new Income or Transfer category to preserve the existing envelope and assignments.')
     if kind != 'transfer' and any(row.get('categoryId') == category_id and row.get('transferPeerId') for row in state['transactions'].values()):
         raise StoreError('Unmatch the linked transfers before changing their category type.')
     if kind != 'expense':

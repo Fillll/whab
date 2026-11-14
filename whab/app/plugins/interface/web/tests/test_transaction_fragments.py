@@ -123,7 +123,7 @@ def test_fragment_navigation_badge_tracks_review_edits_and_selected_account_with
     second = store.add_account("personal", {"name": "Second", "type": "depository", "balance": 0})
     transactions = [store.add_transaction("personal", {
         "accountId": account, "date": "2026-10-05", "merchant": f"Purchase {index}",
-        "amount": 100, "categoryId": None,
+        "amount": 100, "categoryId": "groceries",
     }) for index, account in enumerate((first, first, second))]
 
     def count_markup(account):
@@ -149,7 +149,7 @@ def test_summary_returns_only_scoped_server_badge_and_canonical_validation_conte
     for account, date in [(first, "2026-10-05"), (second, "2026-10-05"), (first, "2026-09-05")]:
         store.add_transaction("personal", {
             "accountId": account, "date": date, "merchant": "Private description absent from summary",
-            "amount": 100, "categoryId": None,
+            "amount": 100, "categoryId": "groceries",
         })
     path = f"/budgets/home/transactions/2026-10/usd?accounts={first}&accounts={second}&q=&tx_page=1"
     response = client.get(path, headers=SUMMARY)
@@ -215,10 +215,10 @@ def test_all_period_exposes_full_history_with_account_search_and_review_scope(cl
     account = store.add_account('personal', {'name': 'Fictional scoped wallet', 'type': 'depository', 'balance': 100000})
     other = store.add_account('personal', {'name': 'Other fictional wallet', 'type': 'depository', 'balance': 100000})
     identifiers = [store.add_transaction('personal', {
-        'accountId': account, 'date': date, 'merchant': 'Matched fictional purchase', 'amount': 100, 'categoryId': None,
+        'accountId': account, 'date': date, 'merchant': 'Matched fictional purchase', 'amount': 100, 'categoryId': 'groceries',
     }) for date in ('2024-01-02', '2026-11-03', '2027-02-04')]
     excluded = store.add_transaction('personal', {
-        'accountId': other, 'date': '2024-01-02', 'merchant': 'Matched other account', 'amount': 100, 'categoryId': None,
+        'accountId': other, 'date': '2024-01-02', 'merchant': 'Matched other account', 'amount': 100, 'categoryId': 'groceries',
     })
     path = f'/budgets/home/transactions/current-month/usd?account={account}&period=all&q=Matched&review=needs-review'
     response = client.get(path, headers=headers)

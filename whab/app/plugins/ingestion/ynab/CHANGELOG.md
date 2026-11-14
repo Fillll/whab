@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.5.0 — 2026-11-13
+
+PR: [#199](https://github.com/Fillll/whab/pull/199)
+
+- Import clearing status as reviewed only when a category is present, retaining original clearing/flag metadata in memos and all financial identities/assignments.
+
 ## 1.4.7 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

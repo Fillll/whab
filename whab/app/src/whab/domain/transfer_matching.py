@@ -69,7 +69,7 @@ def plan(state, transaction_ids, *, action='match', fingerprint=None, apply=Fals
         if any(row.get('transferPeerId') for row in rows):
             raise StoreError('A transaction is already matched. Inspect or unmatch its existing pair first.')
         if not _compatible(left, right, accounts, state.get('categories')):
-            raise StoreError('A transfer needs posted, uncategorized, opposite equal amounts in different accounts of the same currency and budget scope.')
+            raise StoreError('A transfer needs posted transactions that are unclassified or explicitly Transfer, with opposite equal amounts in different accounts of the same currency and budget scope.')
         if any(accounts[row['accountId']].get('closed', False) for row in rows):
             raise StoreError('Archived accounts cannot receive new transfer matches.')
         if abs((date.fromisoformat(left['date']) - date.fromisoformat(right['date'])).days) > MAX_DAYS:

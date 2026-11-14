@@ -83,7 +83,7 @@ def add_category_parser(commands, catalog):
     create.add_argument("--agent", type=validate_category_agent, help="Explicit agent audit label; default: manual User")
     create.add_argument("--batch", help="History grouping label; this creation remains one commit/save")
     create.add_argument("--type", dest="category_kind", choices=("expense", "income", "transfer"), default="expense",
-        help="Financial type (default: expense); income has target zero, no assignments, independent review. See category classify --help")
+        help="Financial type (default: expense); income/transfer have target zero, no assignments; review requires explicit classification. See category classify --help")
     create.add_argument(
         "--currency",
         default="USD",

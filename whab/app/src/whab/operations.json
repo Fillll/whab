@@ -158,7 +158,7 @@
                 "income",
                 "transfer"
               ],
-              "description": "Financial treatment. Absent means expense; parent is neutral, review is independent."
+              "description": "Financial treatment. Absent means expense; parent is neutral. Explicit review requires a valid category or confirmed transfer pair."
             }
           },
           "additionalProperties": true
@@ -316,7 +316,7 @@
     {
       "name": "workspace",
       "kind": "query",
-      "summary": "Read calculated monthly envelopes, summary, accounts and transactions. Income categories fund eligible posted external inflows and have no expense envelopes. summary.classifiedIncome and unclassifiedIncome split the existing total; review is independent.",
+      "summary": "Read calculated monthly envelopes, summary, accounts and transactions. Income categories fund eligible posted external inflows and have no expense envelopes. summary.classifiedIncome and unclassifiedIncome split the existing total; explicit review requires classification or a confirmed transfer pair.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -1250,7 +1250,7 @@
               "income",
               "transfer"
             ],
-            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income requires target zero and no monthly assignment rows."
+            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income and Transfer require target zero and no monthly assignment rows."
           }
         },
         "required": [
@@ -4188,7 +4188,7 @@
               "income",
               "transfer"
             ],
-            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income requires target zero and no monthly assignment rows."
+            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income and Transfer require target zero and no monthly assignment rows."
           }
         },
         "required": [
@@ -4247,7 +4247,7 @@
               "income",
               "transfer"
             ],
-            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income requires target zero and no monthly assignment rows."
+            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income and Transfer require target zero and no monthly assignment rows."
           }
         },
         "required": [

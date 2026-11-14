@@ -33,7 +33,7 @@ def edit_transaction(
             # allowing SQLite's text affinity to match numeric IDs to text keys.
             if isinstance(transaction_id, str):
                 row = store.db.execute(
-                    "SELECT id,account_id AS accountId,category_id AS categoryId,reviewed,note,"
+                    "SELECT id,account_id AS accountId,category_id AS categoryId,reviewed,pending,note,"
                     "is_transfer AS isTransfer,inferred_transfer AS inferredTransfer,"
                     "category_edited AS categoryEdited,deleted, date,merchant,amount,source,original_details,category_agent,transfer_peer_id "
                     "FROM transactions WHERE workspace=? AND id=?", (workspace, transaction_id),
@@ -41,7 +41,7 @@ def edit_transaction(
                 if row is not None:
                     state["transactions"][row["id"]] = {
                         **dict(row), **category_agent_fields(row["category_agent"]), **{key: bool(row[key]) for key in (
-                            "reviewed", "isTransfer", "inferredTransfer", "categoryEdited", "deleted",
+                            "reviewed", "pending", "isTransfer", "inferredTransfer", "categoryEdited", "deleted",
                         )},
                     }
                     state["transactions"][row["id"]].pop("category_agent")

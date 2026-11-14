@@ -16,6 +16,9 @@ from whab.services.ledger import LedgerService, RequestConflict, RevisionConflic
 
 
 class ReviewBackend:
+    def supports_classified_review(self):
+        return True
+
     def __init__(self, lock=None):
         self.lock = lock
         self.calls = []
@@ -71,7 +74,7 @@ def test_review_batch_rejects_invalid_intents_before_any_storage_call(identifier
 
 @pytest.mark.parametrize("capability", ["absent", None, False, "unsupported"])
 def test_optional_bulk_review_never_splits_into_legacy_edits(capability):
-    backend = SimpleNamespace(edit_transaction=lambda *_: pytest.fail("No row fallback after submission"))
+    backend = SimpleNamespace(edit_transaction=lambda *_: pytest.fail("No row fallback after submission"), supports_classified_review=lambda: True)
     if capability != "absent":
         backend.review_transactions = capability
     service = LedgerService(backend)

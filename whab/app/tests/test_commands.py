@@ -56,7 +56,7 @@ def test_transfer_annotations_and_source_defaults_are_independent_of_persistence
     commands.add_account(state, "cash", {"name": "Cash", "type": "depository", "balance": 10000})
     commands.add_transaction(state, "fixture", purchase(categoryId=None), source="demo")
     transaction = state["transactions"]["fixture"]
-    assert transaction["reviewed"] is True
+    assert transaction["reviewed"] is False
     assert transaction["categoryEdited"] is False
     transaction.update(inferredTransfer=True, isTransfer=True)
     commands.edit_transaction(state, "fixture", reviewed=False)

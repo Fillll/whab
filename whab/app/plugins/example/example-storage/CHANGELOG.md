@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4 — 2026-11-13
+
+PR: [#199](https://github.com/Fillll/whab/pull/199)
+
+- Advertise optional classified-review support backed by the public shared financial helpers; keep native persistence contracts and historical host compatibility.
+
 ## 1.0.3 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

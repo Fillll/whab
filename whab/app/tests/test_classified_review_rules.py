@@ -105,7 +105,7 @@ def test_legacy_flags_read_verbatim_and_cleanup_is_explicit_reversible_when_vali
         entry = store.budget_history('personal')['entries'][0]
         with pytest.raises(StoreError, match='invalid review'):
             store.history_preview('personal','undo',target=entry['id'])
-        command(ledger,'edit_transaction',{'transactionId':tx,'categoryId':categories['income']})
+        command(ledger,'edit_transaction',{'transactionId':tx,'categoryId':categories['income'],'categoryAgent':'Codex'})
         assert store.transactions('personal')[0]['reviewed'] is False
         command(ledger,'review_transactions',{'transactionIds':[tx],'reviewed':True})
         assert store.transactions('personal')[0]['merchant'] == '  Fictional source  '

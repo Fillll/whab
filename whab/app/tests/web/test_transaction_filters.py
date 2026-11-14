@@ -50,7 +50,8 @@ def test_register_custom_range_multi_account_urls_preserve_scope_and_canonical_i
             store.add_transaction("personal", {"accountId": account, "date": date,
                 "merchant": f"Purchase {account_index} {date}", "amount": 100, "categoryId": None})
     for transaction in store.transactions("personal"):
-        store.edit_transaction("personal", transaction["id"], reviewed=True)
+        category = store.add_category("personal", {"name": "Review fixture " + transaction["id"], "group": "Fictional", "target": 0, "currency": transaction["currency"]})
+        store.edit_transaction("personal", transaction["id"], category, reviewed=True)
     before = store.transactions("personal")
     with TestClient(create_app(store=store, settings=settings(tmp_path)), base_url=BASE) as client:
         params = [("accounts", identifier) for identifier in identifiers[:2]] + [

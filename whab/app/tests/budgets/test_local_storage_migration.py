@@ -51,7 +51,7 @@ def populate(backend, ciphertext):
                "amount": 200, "suggestedCategoryId": None, "pending": True, "source": "fictional-bank",
                "inferredTransfer": False, "pendingTransactionId": None}
     backend.apply_sync("fictional-item", {"added": [pending], "modified": [], "removed": []}, "cursor-1", [account])
-    backend.edit_transaction("personal", "pending", category_id="food", reviewed=True, note="Pending annotation survives")
+    backend.edit_transaction("personal", "pending", category_id="food", reviewed=False, note="Pending annotation survives")
     backend.save_receipt("personal", "pending", png())
     posted = {**pending, "id": "posted", "pending": False, "pendingTransactionId": "pending"}
     backend.apply_sync("fictional-item", {"added": [posted], "modified": [], "removed": []}, "cursor-2")

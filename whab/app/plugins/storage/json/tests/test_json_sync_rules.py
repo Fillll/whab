@@ -79,7 +79,7 @@ def test_invalid_provider_category_is_optional_but_saved_category_is_preserved(j
     json_store.save_item("item", "fictional-ciphertext", "Fictional")
     json_store.apply_sync("item", json_changes(added=[json_transaction(suggestedCategoryId="missing")]), "one", [json_account()])
     assert json_store.transactions("personal")[0]["categoryId"] is None
-    json_store.edit_transaction("personal", "pending", "groceries", True, "Keep fictional note")
+    json_store.edit_transaction("personal", "pending", "groceries", False, "Keep fictional note")
     json_store.apply_sync("item", json_changes(modified=[json_transaction(suggestedCategoryId="missing")]), "two")
     assert json_store.transactions("personal")[0]["categoryId"] == "groceries"
     assert json_store.transactions("personal")[0]["note"] == "Keep fictional note"

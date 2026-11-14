@@ -282,9 +282,15 @@ test('bulk review coalesces all successful writes into one summary request', asy
   state.register.dispose();
 });
 
-test('native bulk review sends one bounded request, excludes pending rows and keeps the current editors', async () => {
+test('native bulk review rejects mixed pending selection and sends one explicit bounded cohort', async () => {
   const state = harness(100, {paged: true, bulkReview: true});
   state.rows[0].dataset.pending = 'true';
+  await state.bulk.emit('click').completed;
+  assert.equal(state.requests.length, 0);
+  assert.equal(state.register.dirty, false);
+  assert.match(state.feedbackText.textContent, /Nothing was submitted/);
+  state.rows[0].controls['[data-select-transaction]'].checked = false;
+  state.rows[0].controls['[data-select-transaction]'].emit('change');
   const memo = state.rows[1].controls['[data-transaction-field="note"]'];
   memo.matches = () => true;
   state.document.activeElement = memo;
@@ -642,7 +648,7 @@ test('navigation waits for every wave of a bulk review and retains a later failu
   state.register.dispose();
 });
 
-test('category edits update the uncategorized indicator immediately while transfers stay neutral', async () => {
+test('category edits update classification while unmatched transfer hints stay unclassified', async () => {
   const state = harness(2);
   state.rows[1].controls['[data-select-transaction]'].checked = false;
   const category = state.rows[0].controls['[data-transaction-field="categoryId"]'];
@@ -663,7 +669,7 @@ test('category edits update the uncategorized indicator immediately while transf
   const transferCategory = transfer.controls['[data-transaction-field="categoryId"]'];
   transferCategory.value = '';
   transferCategory.emit('change');
-  assert.equal(transferCategory.classList.contains('uncategorized'), false);
+  assert.equal(transferCategory.classList.contains('uncategorized'), true);
   state.requests[2].resolve({ok: true});
   assert.equal(await state.register.flush(), true);
   state.register.dispose();
@@ -1004,5 +1010,41 @@ test('discard cannot abandon an unconfirmed selected category batch',async()=>{
   assert.equal(state.reloads.length,0);
   const retry=state.register.flush();await tick();assert.deepEqual(state.requests[2].body,intent);
   state.requests[2].resolve({...result,revision:'saved'});assert.equal(await retry,true);
+  state.register.dispose();
+});
+
+
+test('classification enables explicit review and clearing it clears review without losing a memo', async () => {
+  const state = harness(1);
+  const row = state.rows[0];
+  const category = row.controls['[data-transaction-field="categoryId"]'];
+  const review = row.controls['[data-transaction-reviewed]'];
+  category.value = 'groceries'; category.emit('change');
+  state.requests[0].resolve({ok:true}); await tick();
+  assert.equal(row.dataset.reviewed, 'false');
+  assert.equal(review.disabled, false);
+  review.emit('click'); state.requests[1].resolve({ok:true}); await tick();
+  assert.equal(row.dataset.reviewed, 'true');
+  category.value = ''; category.emit('change');
+  state.requests[2].resolve({ok:true}); await tick();
+  assert.equal(row.dataset.reviewed, 'false');
+  assert.equal(review.disabled, true);
+  assert.equal(row.dataset.reviewClassified, 'false');
+  assert.match(review.title, /Expense, Income or Transfer/);
+  assert.equal(await state.register.flush(), true);
+  state.register.dispose();
+});
+
+test('bulk review rejects an unclassified selection without locking subsequent actions', async () => {
+  const state = harness(2, {bulkReview:true});
+  state.rows[0].dataset.reviewClassified = 'false';
+  await state.bulk.emit('click').completed;
+  assert.equal(state.requests.length, 0);
+  assert.equal(state.register.dirty, false);
+  state.bulk.dataset.bulkReviewed = 'false';
+  const saving = state.bulk.emit('click').completed; await tick();
+  assert.equal(state.requests.length, 1);
+  assert.deepEqual(state.requests[0].body.transactionIds, ['transaction-0','transaction-1']);
+  state.requests[0].resolve({ok:true}); await saving;
   state.register.dispose();
 });

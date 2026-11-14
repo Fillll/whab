@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.3 — 2026-11-13
+
+PR: [#199](https://github.com/Fillll/whab/pull/199)
+
+- Teach generated native storage to advertise classified-review support and move explicit review after pending-to-posted conversion in provider conformance, preserving annotations without reviewing pending records.
+
 ## 0.11.2 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

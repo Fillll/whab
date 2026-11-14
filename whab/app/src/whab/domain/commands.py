@@ -199,7 +199,8 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
     validate_date(candidate["date"])
     if not "1900-01-01" <= candidate["date"] <= "2200-12-31":
         raise StoreError("Invalid transaction date.")
-    candidate["merchant"] = validate_label(candidate["merchant"])
+    if "merchant" in changes:
+        candidate["merchant"] = validate_label(candidate["merchant"])
     amount = cents(candidate["amount"])
     if not amount:
         raise StoreError("Amount must not be zero.")

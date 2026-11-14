@@ -7,7 +7,7 @@ from whab.plugins import review_status
 from .bulk_commands import bulk_options, execute_bulk
 from .transaction_commands import checked
 from .transaction_reads import terminal_text
-from .transaction_search import execute_search, validate_search
+from .transaction_search import calendar_date, execute_search, validate_search
 
 GUIDE = """A posted transaction needs an Expense, Income or explicitly chosen Transfer
 category (or an already confirmed transfer pair) before review. A bank transfer
@@ -28,7 +28,7 @@ Examples (fictional):
   whab "My budget" trnx review TX3 TX4 --needs-review --dry-run --agent Codex
   whab "My budget" trnx review TX3 TX4 --needs-review --agent Codex
 
-review-audit is read-only. It lists saved reviewed flags that fail the current
+review-audit is a read-only legacy audit. It lists saved reviewed flags that fail the current
 classification/pending rule; upgrades/reads do not automatically change them.
 Inspect each result before explicitly clearing review. Original import notes,
 IDs, financial fields, category attribution and history remain intact. Audit
@@ -48,12 +48,16 @@ def add_review_parsers(actions):
     bulk_options(parser)
     audit = actions.add_parser('review-audit', help='Read saved reviewed records that fail current eligibility; never cleans automatically',
         epilog=GUIDE, formatter_class=argparse.RawDescriptionHelpFormatter)
-    audit.add_argument('--since', help='Inclusive lower date YYYY-MM-DD; default all history')
-    audit.add_argument('--until', help='Inclusive upper date YYYY-MM-DD; default all history')
+    audit.add_argument('--since', type=calendar_date, help='Inclusive lower date YYYY-MM-DD; default all history')
+    audit.add_argument('--until', type=calendar_date, help='Inclusive upper date YYYY-MM-DD; default all history')
     audit.add_argument('--format', choices=('json','table'), default='json', help='Complete JSON (default) or readable IDs/reasons')
 
 
 def execute_review(connection, identifier, prefix, args, exchange, error):
+    if args.filter == 'review':
+        policy = checked(exchange(connection, 'GET', prefix + '/queries/review_policy', params={'workspace':'personal'}), identifier, error)
+        if type(policy['data']) is not dict or policy['data'].get('version') != 1 or policy['data'].get('classificationRequired') is not True:
+            raise error('Update the authoritative WHAB host to enforce classification before review. Nothing was submitted.')
     observed = checked(exchange(connection, 'GET', prefix + '/queries/categories', params={'workspace':'personal'}), identifier, error)
     if args.filter == 'review':
         edits = [{'transactionId': value, 'reviewed': args.reviewed} for value in args.transaction_id]

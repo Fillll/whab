@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.77.0 — 2026-11-13
+
+PR: [#199](https://github.com/Fillll/whab/pull/199)
+
+- Add Expense/Income/Transfer classification and require it before explicit review. Clearing classification unreviews atomically; imports, batches, remote support probes and guarded reversals share core rules. Preserve legacy flags/history for separate explicit cleanup.
+
 ## 2.76.0 — 2026-11-13
 
 PR: [#198](https://github.com/Fillll/whab/pull/198)

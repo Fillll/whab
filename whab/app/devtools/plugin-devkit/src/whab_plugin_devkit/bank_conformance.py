@@ -151,12 +151,12 @@ def exercise_bank_runtime(runtime, scenario, *, variant="standard", disconnect=T
     _check(account["name"] == scenario.account_name and account["currency"] == scenario.currency)
     _check(original["merchant"] == scenario.merchant and original["amount"] == scenario.amount)
     runtime.expect("PATCH", "/api/transactions/" + quote(original["id"], safe=""),
-                   {"workspace": "personal", "reviewed": True, "note": "Fictional retained annotation"})
+                   {"workspace": "personal", "reviewed": False, "note": "Fictional retained annotation"})
     result = runtime.expect("POST", prefix + "/sync", {"itemId": scenario.item_id})
     _check(result == {"ok": True, "added": 1, "modified": 0, "removed": 1})
     data = runtime.expect("GET", workspace_path)
     posted, = [row for row in data["transactions"] if row["source"] == scenario.plugin_id]
-    _check(posted["id"] != original["id"] and not posted["pending"] and posted["reviewed"]
+    _check(posted["id"] != original["id"] and not posted["pending"] and not posted["reviewed"]
            and posted["amount"] == scenario.amount and posted["note"] == "Fictional retained annotation")
     _check(runtime.expect("GET", demo_path) == demo_before)
     runtime.stop()

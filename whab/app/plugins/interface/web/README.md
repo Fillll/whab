@@ -397,8 +397,8 @@ Storage internals stay behind SDK/native operations; interfaces never inspect da
 ## Income categories
 
 New category offers Expense or Income financial treatment. Income requires target
-zero and has no expense assignments/envelope row; a parent may contain both kinds.
-Transaction pickers label Income explicitly and preserve review explicit after classificationly.
+zero and has no expense assignments/envelope row; a parent may contain all three kinds.
+Transaction pickers label Income explicitly and require an explicit review after classification.
 Budget income details show explicit Income and legacy unclassified contributions;
 Insights uses the same core totals. Posted eligible on-budget external Income funds
 Ready to Assign once; pending, transfers, tracking and credit-card inflows do not.

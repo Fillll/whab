@@ -18,7 +18,7 @@ def test_pending_posted_preserves_edits_and_replay_is_unique(
         [imported_account()],
     )
     assert store.workspace("personal", "2026-10")["summary"]["spent"] == 0
-    store.edit_transaction("personal", "pending", "fun", True, note="Family outing")
+    store.edit_transaction("personal", "pending", "fun", False, note="Family outing")
     posted = imported_transaction(
         "posted", amount=1200, pendingTransactionId="pending", merchantLogo="posted-logo",
         note="Provider must not replace the user memo",
@@ -30,7 +30,7 @@ def test_pending_posted_preserves_edits_and_replay_is_unique(
     assert len(rows) == 1
     assert (rows[0]["categoryId"], rows[0]["reviewed"], rows[0]["note"], rows[0]["amount"]) == (
         "fun",
-        True,
+        False,
         "Family outing",
         1200,
     )

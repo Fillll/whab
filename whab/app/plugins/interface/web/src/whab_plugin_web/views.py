@@ -385,6 +385,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "category_names": category_names,
         "category_labels": {row["id"]: (f"{row['group']} > {row['name']}" if row.get("group") else row["name"]) + (" (" + row["kind"].title() + ")" if row.get("kind", "expense") != "expense" else "") for row in categories},
         "category_parents": category_parents,
+        "category_kinds": {row["id"]: row.get("kind", "expense") for row in categories},
         "review_status": {row["id"]: review_status(row, category_map) for row in transactions},
         "expense_groups": [{**group, "rows": [row for row in group["rows"] if row["category"].get("kind", "expense") == "expense"]}
                            for group in groups if any(row["category"].get("kind", "expense") == "expense" for row in group["rows"])],

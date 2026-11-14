@@ -174,7 +174,8 @@ def test_review_only_does_not_override_category_and_transfer_can_restore(
         "payment", amount=2000, inferredTransfer=True, suggestedCategoryId=None
     )
     apply_import("item", sync_changes([purchase]), "one", [imported_account()])
-    store.edit_transaction("personal", "payment", reviewed=True)
+    with pytest.raises(StoreError, match="before marking reviewed"):
+        store.edit_transaction("personal", "payment", reviewed=True)
     assert store.state("personal")["transactions"]["payment"]["categoryEdited"] is False
     store.edit_transaction("personal", "payment", "dining", True)
     apply_import("item", sync_changes(modified=[purchase]), "two", [imported_account()])

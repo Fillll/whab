@@ -382,7 +382,7 @@ an existing unused envelope, preview `whab BUDGET category classify "Finance / S
 --type income --dry-run`, inspect historical totals, then repeat without `--dry-run`.
 Income cannot have a nonzero target or any monthly assignment rows; nothing is
 erased to allow conversion. Income remains available in transaction pickers but not
-expense envelope rows. Classifying a transaction does not change review status.
+expense envelope rows. Classification never automatically marks reviewed; clearing classification makes unreviewed.
 
 Eligible posted Income in on-budget non-credit accounts funds Ready to Assign once.
 Transfers, pending, deleted and off-budget transactions do not fund it. Income
@@ -391,3 +391,59 @@ categories and history are not automatically reclassified on upgrade. Legacy
 uncategorized inflows retain their funding contribution, shown separately from
 explicit Income in budget details and core/CLI summary fields. Inspect uncategorized
 inflows before deciding; they can include refunds and unresolved transfers.
+
+## Classification before review
+
+WHAB 2.77 supports Expense, Income and Transfer child types (`kind` in public
+records, `--type` in CLI). Missing kind remains Expense. Income and Transfer have
+no expense target or assignment rows. Transfer is explicit account movement,
+excluded from ordinary income/spending without changing account balances. It may
+be classified before pairing; matching still requires equal opposite posted
+amounts, different active accounts, same currency/budget scope and dates within
+seven days. Matching remains separate and never reviews automatically.
+
+A posted, nondeleted transaction needs a valid child of any type, or a previously
+confirmed transfer pair, before explicit review. A bank hint alone is insufficient.
+Assigning classification does not manufacture review. Clearing it makes unreviewed
+in the same native operation. An explicit conflicting clear+review rejects the
+whole operation. Mixed batches validate their final proposed state atomically.
+Pending records cannot be reviewed. Undo/redo cannot restore a newly invalid review.
+
+Old saved reviewed/unclassified flags and historical audit hashes remain readable
+and unchanged on upgrade/read. `trnx review-audit` reports them; cleanup is a
+separate, explicitly authorized public review operation with dry-run and audit.
+New imports do not derive review from an unclassified source clearing flag; YNAB
+clearing/flag information remains in its original memo metadata. Ordinary bank
+updates retain untouched legacy invalid flags for that explicit cleanup, while
+classification/pending transitions enforce the rule. No merchant inference, bank
+synchronization or automatic production cleanup is introduced.
+
+```sh
+whab "My budget" category group create Finance
+whab "My budget" category create Salary --parent Finance --type income --agent Codex
+whab "My budget" category create Transfers --parent Finance --type transfer --agent Codex
+whab "My budget" trnx categorize TX1 --category "Finance / Transfers" --agent Codex
+whab "My budget" trnx review TX1 --reviewed --dry-run --agent Codex
+whab "My budget" trnx review TX1 --reviewed --agent Codex
+whab "My budget" trnx review-audit --format table
+whab "My budget" trnx review TX2 TX3 --needs-review --dry-run --agent Codex
+whab "My budget" trnx review --help
+whab "My budget" trnx review-audit --help
+```
+
+Review supports 1–100 explicit IDs, one observed revision/request ID/native commit
+and durable save; no splitting or silent skipping. One invalid target rejects all.
+`--batch` only groups history. Mixed classification+review uses `trnx edit-many`
+JSON/files/stdin. Omitted review remains unchanged for an already valid classified
+record; assigning a category to a legacy invalid reviewed row makes it unreviewed
+unless review is explicitly requested in the same valid edit. Exact retries retain
+the entire original intent, actor/batch, revision and request ID, returning the
+original receipt without another change/history/save. Stale/uncertain results
+never trigger an automatic fresh intent. JSON is complete; tables are readable.
+
+Audit is read-only with inclusive `--since`/`--until` bounds, complete results or
+an explicit existing 16 MiB size error. Narrow dates rather than truncating.
+Native SQLite/JSON advertise optional `ClassifiedReview`; the public `review_policy`
+query probes the authority. Unsupported storage/remote authorities fail before
+classification/review writes. Financial rules remain in core; adapters retain
+atomic persistence, annotations, original/import records and native receipts.

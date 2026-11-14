@@ -325,7 +325,7 @@ class LedgerService:
             callable(getattr(self._store, name, None)) for name in
             ('classify_category', 'preview_category_classification', 'history_scope', 'budget_history')
         ):
-            raise StoreError('Update the storage plugin to support audited Income/Expense category classification.')
+            raise StoreError('Update the storage plugin to support audited Expense/Income/Transfer category classification.')
 
     @staticmethod
     def _validate(operation: str, payload: dict) -> dict:

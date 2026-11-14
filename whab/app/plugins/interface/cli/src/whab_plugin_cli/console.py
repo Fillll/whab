@@ -72,7 +72,7 @@ def parser(options, argv=()):
     check_identifiers(catalog)
     root = CommandParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
-        epilog='Income categories: category create --type income; category classify CATEGORY --type income --dry-run. See category classify --help for funding, review and recovery.\n\n' + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
+        epilog='Category types: expense, income, transfer. Use category create/classify --type TYPE. Explicit review: trnx review IDS --reviewed; inspect legacy flags with trnx review-audit. See trnx review --help for classification requirements and atomic recovery.\n\n' + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
     budget = groups.add_parser("budget", help="Create and list saved budgets")

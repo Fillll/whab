@@ -243,7 +243,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     selectionBar.querySelector('[data-transaction-selection-count]').textContent = `${selected.length} selected`;
     for (const row of rows) row.classList.toggle('is-selected', row.querySelector('[data-select-transaction]').checked);
     for (const button of selectionBar.querySelectorAll('[data-bulk-reviewed]')) {
-      button.disabled = bulkBusy || categoriesLocked || !selected.some(row => row.dataset.pending !== 'true') ||
+      button.disabled = bulkBusy || categoriesLocked || !selected.length ||
         button.dataset.bulkReviewed === 'true' && selected.some(row => row.dataset.reviewClassified === 'false' && !row.dataset.suggestionId);
     }
     return selected;
@@ -475,7 +475,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     editors.set(row, writer);
     row.restoreCategory = () => {
       category.value = committed.categoryId || '';
-      category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
+      category.classList.toggle('uncategorized', !category.value && !row.querySelector('[data-transfer-unmatch]'));
     };
     row.resetLocalDraft = () => {
       memo.value = committed.note;
@@ -510,11 +510,11 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         mark.title = 'Transfer'; mark.setAttribute('aria-label', 'Transfer'); mark.textContent = '→';
         row.querySelector('.transaction-payee')?.append(mark);
       }
-      category.classList.toggle('uncategorized', !value && !after.isTransfer);
+      category.classList.toggle('uncategorized', !value && !row.querySelector('[data-transfer-unmatch]'));
       row.querySelector('[data-category-agent]')?.remove();
       delete row.dataset.suggestionId; delete row.dataset.suggestionPlugin;
       row.querySelector('.ml-suggestion')?.remove();
-      if (category.options?.[0]) category.options[0].textContent = after.isTransfer ? 'Transfer (excluded)' : 'Uncategorized';
+      if (category.options?.[0]) category.options[0].textContent = after.isTransfer ? 'Transfer hint · choose category' : 'Uncategorized';
       syncReview(); selection();
     };
     const saveMemo = () => {
@@ -549,7 +549,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         void categoryBatch.apply(selected, category.value || null, category.selectedOptions?.[0]);
         return;
       }
-      category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
+      category.classList.toggle('uncategorized', !category.value && !row.querySelector('[data-transfer-unmatch]'));
       if (!row.dataset.suggestionId) void writer.push({categoryId: category.value || null});
     });
     if (row.dataset.suggestionId) listen(row.querySelector('[data-dismiss-suggestion]'), 'click', async () => {
@@ -589,11 +589,12 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   for (const row of rows) bindRow(row);
   for (const button of selectionBar.querySelectorAll('[data-bulk-reviewed]')) listen(button, 'click', () => {
     if (bulkBusy || categoriesLocked) return;
+    const selected = selection();
+    if (selected.length > 100) {error('Select at most 100 transactions for one atomic review change. Nothing was submitted.'); return;}
+    const value = button.dataset.bulkReviewed === 'true';
+    if (value && selected.some(row => row.dataset.pending === 'true' || row.dataset.reviewClassified === 'false' && !row.dataset.suggestionId)) {error('Classify every selected transaction as Expense, Income or Transfer before reviewing. Nothing was submitted.'); return;}
     editStarted();
     bulkBusy = true;
-    const selected = selection().filter(row => row.dataset.pending !== 'true');
-    const value = button.dataset.bulkReviewed === 'true';
-    if (value && selected.some(row => row.dataset.reviewClassified === 'false' && !row.dataset.suggestionId)) {error('Classify every selected transaction as Expense, Income or Transfer before reviewing. Nothing was submitted.'); return;}
     const work = [...selected];
     bulkPromise = (async () => {
       let failed = 0;

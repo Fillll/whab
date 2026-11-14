@@ -78,7 +78,7 @@ def test_sqlite_capability_matches_service_legacy_fallback(store, month, options
     for index, date in enumerate(("2026-09-30", "2026-10-01", "2026-10-02")):
         identifier = store.add_transaction("personal", {
             "accountId": account, "date": date, "merchant": "Straße %_" if not index else "Purchase",
-            "amount": 100, "categoryId": None,
+            "amount": 100, "categoryId": "groceries",
         })
         if index == 1:
             store.edit_transaction("personal", identifier, reviewed=True)

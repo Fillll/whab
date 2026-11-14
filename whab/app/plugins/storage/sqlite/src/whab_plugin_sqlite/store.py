@@ -259,7 +259,7 @@ class Store(Authority):
         # Fence old native readers in this same transaction, including complete
         # local transfers. Bounded annotation writes need no additional SQL.
         writing = getattr(self, '_writing', None)
-        if writing is not None and any(row.get('kind') == 'income' for row in state['categories'].values()):
+        if writing is not None and any(row.get('kind') in {'income', 'transfer'} for row in state['categories'].values()):
             writing['metadata']['formatVersion'] = 3
         workspace = state["_id"]
         if "history" in state:

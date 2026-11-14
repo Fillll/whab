@@ -33,7 +33,6 @@ def test_income_commands_native_and_restart_replay(tmp_path, storage):
         account = service.add_account('personal', {'name': 'Fictional cash', 'type': 'depository', 'balance': 0})
         transaction = service.add_transaction('personal', {'accountId': account, 'date': month + '-01',
             'merchant': 'Fictional employer', 'amount': -500000, 'categoryId': None, 'note': ' [YNAB]\nKeep  '})
-        service.edit_transaction('personal', transaction, reviewed=True)
         service.add_category('personal', {'name': 'Fees', 'group': 'Finance', 'target': 0})
     finally:
         native.close()
@@ -59,11 +58,12 @@ def test_income_commands_native_and_restart_replay(tmp_path, storage):
             '--batch', 'income-fixture', '--request-id', saved['requestId'], '--revision', saved['expectedRevision'])
         assert run(*replay_args)['replayed'] is True
         run('default', 'trnx', 'categorize', transaction, '--category', 'Finance / 給与 🍏', '--agent', 'Codex')
+        run('default', 'trnx', 'review', transaction, '--reviewed', '--agent', 'Codex')
         actual = query('workspace')['data']
         assert (actual['summary']['income'], actual['summary']['classifiedIncome'], actual['summary']['readyToAssign']) == (500000, 500000, 500000)
         after = query('portable')['data']
         original = before['transactions'][0]
-        assert after['transactions'] == [{**original, 'categoryId': category, 'categoryEdited': True, 'categoryAgent': 'Codex'}]
+        assert after['transactions'] == [{**original, 'categoryId': category, 'categoryEdited': True, 'categoryAgent': 'Codex', 'reviewed': True}]
         assert after['assignments'] == before['assignments']
         assert run('default', 'category', 'classify', 'missing', '--type', 'income', ok=False)['error']
         run('default', 'category', 'create', 'Invalid', '--parent', 'Finance', '--type', 'income', '--target', '1', ok=False)
