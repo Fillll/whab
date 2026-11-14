@@ -20,8 +20,9 @@ def snapshot(store, workspace, *, transaction_ids=None, include_history=True):
              **{key: record[key] for key in ("bankWebsite", "nameOverridden", "closed") if key in record and (key != "closed" or record[key])}}
             for record in store._read_accounts(workspace)
         ]
-        categories = [dict(row) for row in store.db.execute(
-            'SELECT id,name,group_name AS "group",target,currency FROM categories WHERE workspace=? ORDER BY rowid',
+        kind_column = "kind" in {row["name"] for row in store.db.execute("PRAGMA table_info(categories)")}
+        categories = [{key: value for key, value in dict(row).items() if key != "kind" or value is not None} for row in store.db.execute(
+            'SELECT id,name,group_name AS "group",target,currency' + (',kind' if kind_column else '') + ' FROM categories WHERE workspace=? ORDER BY rowid',
             (workspace,),
         )]
         transactions = []

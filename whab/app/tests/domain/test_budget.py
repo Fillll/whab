@@ -224,17 +224,17 @@ def test_multiple_currencies_keep_cash_debt_income_and_rollover_separate(multicu
     view = calculate_workspace(multicurrency_state, "2026-09")
     assert view["currencies"] == ["EUR", "JPY", "USD"]
     assert view["summariesByCurrency"] == {
-        "USD": {"income": 12000, "spent": -500, "assigned": 10000,
+        "USD": {"income": 12000, "classifiedIncome": 0, "unclassifiedIncome": 12000, "spent": -500, "assigned": 10000,
                 "available": 23500, "readyToAssign": 56500,
                 "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0,
                 "carriedIn": 54500, "carriedInUnassigned": 54500,
                 "carriedInSetAside": 0, "fundingCapacity": 56500},
-        "EUR": {"income": 9000, "spent": 2500, "assigned": 6000,
+        "EUR": {"income": 9000, "classifiedIncome": 0, "unclassifiedIncome": 9000, "spent": 2500, "assigned": 6000,
                 "available": 9500, "readyToAssign": 33500,
                 "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0,
                 "carriedIn": 30500, "carriedInUnassigned": 30500,
                 "carriedInSetAside": 0, "fundingCapacity": 33500},
-        "JPY": {"income": 1000, "spent": 200, "assigned": 300,
+        "JPY": {"income": 1000, "classifiedIncome": 0, "unclassifiedIncome": 1000, "spent": 200, "assigned": 300,
                 "available": 400, "readyToAssign": 2400,
                 "previousOverspending": 0, "balanceCarryover": 0, "assignedNextMonth": 0,
                 "carriedIn": 1700, "carriedInUnassigned": 1700,

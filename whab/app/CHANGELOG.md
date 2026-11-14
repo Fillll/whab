@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.76.0 — 2026-11-13
+
+PR: [#198](https://github.com/Fillll/whab/pull/198)
+
+- Add explicit Income financial category treatment, independent review, guarded classification/preview SDK operations, envelope and assignment safeguards, and compatible classified/unclassified income reporting without automatic historical rewrites.
+
 ## 2.75.2 — 2026-11-13
 
 PR: [#197](https://github.com/Fillll/whab/pull/197)

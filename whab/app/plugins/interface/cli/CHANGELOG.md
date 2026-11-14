@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.19.0 — 2026-11-13
+
+PR: [#198](https://github.com/Fillll/whab/pull/198)
+
+- Add name-addressed Income creation/classification, historical dry-run preview, verified guarded results, audit attribution and exact-intent recovery with complete offline root/group/command help and examples.
+
 ## 2.18.0 — 2026-11-13
 
 PR: [#193](https://github.com/Fillll/whab/pull/193)

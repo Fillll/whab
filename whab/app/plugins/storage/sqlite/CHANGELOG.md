@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.25.0 — 2026-11-13
+
+PR: [#198](https://github.com/Fillll/whab/pull/198)
+
+- Persist explicit Income kind through all native/portable projections, provide guarded audited classification/preview, and fence older native readers without rewriting legacy financial data.
+
 ## 1.24.0 — 2026-11-13
 
 PR: [#193](https://github.com/Fillll/whab/pull/193)

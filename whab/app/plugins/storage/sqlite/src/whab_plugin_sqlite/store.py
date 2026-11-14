@@ -92,7 +92,7 @@ class Store(Authority):
             try:
                 with self._snapshot():
                     metadata = self._authority_metadata()
-                    if metadata["formatVersion"] != 2:
+                    if metadata["formatVersion"] not in {2, 3} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
                         raise StoreError("Read-only readiness requires the current native SQLite schema; upgrade it explicitly first.")
                     if metadata["budgetId"] != budget_id or metadata["environment"] != environment:
                         raise StoreError("SQLite storage identity belongs to another budget or environment.")
@@ -211,6 +211,7 @@ class Store(Authority):
                 "group": row["group_name"],
                 "target": row["target"],
                 "currency": row["currency"],
+                **({"kind": row["kind"]} if row["kind"] is not None else {}),
             }
         for row in self.db.execute(
             "SELECT * FROM transactions WHERE workspace=? " + ("AND id IN (" + ",".join("?" for _ in transaction_ids) + ") " if transaction_ids is not None else "") + "ORDER BY rowid", (workspace, *(transaction_ids or ()))
@@ -255,6 +256,11 @@ class Store(Authority):
         return state
 
     def _write_state(self, state: dict) -> None:
+        # Fence old native readers in this same transaction, including complete
+        # local transfers. Bounded annotation writes need no additional SQL.
+        writing = getattr(self, '_writing', None)
+        if writing is not None and any(row.get('kind') == 'income' for row in state['categories'].values()):
+            writing['metadata']['formatVersion'] = 3
         workspace = state["_id"]
         if "history" in state:
             self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (workspace, json.dumps(state["history"])))
@@ -290,9 +296,9 @@ class Store(Authority):
             ],
         )
         self.db.executemany(
-            "INSERT INTO categories(id,workspace,name,group_name,target,currency) VALUES(?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,group_name=excluded.group_name,target=excluded.target,currency=excluded.currency",
+            "INSERT INTO categories(id,workspace,name,group_name,target,currency,kind) VALUES(?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET name=excluded.name,group_name=excluded.group_name,target=excluded.target,currency=excluded.currency,kind=excluded.kind",
             [
-                (c["id"], workspace, c["name"], c["group"], c["target"], c.get("currency", "USD"))
+                (c["id"], workspace, c["name"], c["group"], c["target"], c.get("currency", "USD"), c.get("kind"))
                 for c in state["categories"].values()
             ],
         )
@@ -630,6 +636,7 @@ class Store(Authority):
                 row["id"]: {
                     "id": row["id"], "name": row["name"], "group": row["group_name"],
                     "target": row["target"], "currency": row["currency"],
+                    **({"kind": row["kind"]} if row["kind"] is not None else {}),
                 }
                 for row in self.db.execute(
                     "SELECT * FROM categories WHERE workspace=? ORDER BY rowid", (workspace,),
@@ -836,6 +843,17 @@ class Store(Authority):
         from .bulk_edits import apply
         return apply(self, workspace, 'classify_accounts', edits)
 
+    def supports_category_classification(self):
+        return True
+
+    def preview_category_classification(self, workspace, category_id, kind):
+        from whab.domain.categories import preview_category_classification
+        return preview_category_classification(self.state(workspace), category_id, kind)
+
+    def classify_category(self, workspace, category_id, kind):
+        from whab.domain.categories import classify_category
+        return self._mutate(workspace, lambda state: classify_category(state, category_id, kind))
+
     def supports_category_renaming(self):
         return True
 
@@ -847,7 +865,7 @@ class Store(Authority):
 
     def add_category(self, workspace: str, category: dict) -> str:
         category_id = str(uuid4())
-        if set(category) - {"name", "group", "target", "parentId", "currency"}:
+        if set(category) - {"name", "group", "target", "parentId", "currency", "kind"}:
             raise StoreError("Categories support exactly two levels.")
 
         def operation(state):
@@ -858,7 +876,7 @@ class Store(Authority):
                 category.get("target", 0),
                 categories=state["categories"], groups=state.get("categoryGroups", ()),
                 parent_id=category.get("parentId"),
-                currency=category.get("currency", "USD"),
+                currency=category.get("currency", "USD"), kind=category.get("kind", "expense"),
             )
             return category_id
 

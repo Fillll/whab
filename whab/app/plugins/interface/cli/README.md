@@ -1085,3 +1085,57 @@ Exact successful retries return the original durable result after restart. Never
 retry an uncertain write with fresh intent; conflicting request reuse is refused.
 Unsupported backends/authorities fail before mutation. Help works offline.
 ```
+
+## Income categories
+
+```sh
+whab "My budget" category create Salary --parent Finance --type income
+whab "My budget" category classify "Finance / Salary" --type income --dry-run
+whab "My budget" category classify "Finance / Salary" --type income --agent Codex
+whab "My budget" category list --parent Finance --format table
+whab "My budget" trnx categorize TX1 TX2 --category "Finance / Salary" --agent Codex --dry-run
+whab "My budget" trnx categorize TX1 TX2 --category "Finance / Salary" --agent Codex
+whab "My budget" category classify --help
+```
+
+Create the Finance parent first if absent (`category group create Finance`). Categories
+accept IDs, unique exact names or `Group / Category`; Unicode is supported and no
+fuzzy match is chosen. JSON is complete by default; tables show Income/Expense.
+`--type expense` is the default for creation and reverses an explicit classification.
+
+Income is a financial type, independent of names, groups and review status. Income
+has target zero and **no monthly assignments**, even zero rows. Conversion refuses
+an existing target or assignments without removing anything. Create a new Income
+category when an old envelope must be retained. A neutral parent can contain both
+Income Salary and Expense Fees.
+
+Posted external Income inflows in eligible on-budget non-credit accounts contribute
+once to income and Ready to Assign; reversals reduce income. Pending, deleted,
+transfer and off-budget records do not fund it. Credit-card inflows remain excluded.
+Expense-category refunds/reimbursements reduce expense activity. Money stays in its
+own currency; no bank sync, merchant inference or automatic review occurs.
+
+Older categories retain Expense treatment and every saved record remains unchanged
+on upgrade. Legacy uncategorized inflows keep their funding behavior for compatibility,
+without being labeled genuine Income. `summary.classifiedIncome` and
+`summary.unclassifiedIncome` split the existing `income` total. Explicitly categorizing
+an eligible legacy inflow into Income preserves its income/RTA contribution.
+
+Changing a referenced category's type affects historical income, spending and RTA.
+**Preview first**: `classify --dry-run` shows exact category before/after plus summary
+impacts for months represented by transactions, assignments or budget start. It is
+read-only. Normal classification uses one observed revision, unique request ID,
+native atomic commit, durable save and permanent reversible audit entry. `--agent`
+and `--batch` label history. Omitted transaction review remains unchanged, including
+reviewed/unclassified rows. Use explicit `trnx review` separately when wanted.
+
+`trnx categorize` supports 1–100 IDs and `--dry-run`; `trnx edit-many --file changes.json`
+or `--file -` supports mixed category/review/note edits in one atomic commit/save.
+`--batch` groups history, not commits. Whole-batch validation and exact retries remain
+unchanged. Kind configuration requires supporting native storage; unsupported
+adapters fail before mutation. No automatic historical reclassification is performed.
+
+On stale state, read and reconsider. On an uncertain response retain the **entire**
+original intent and inspect history; never retry with a new ID/revision. Exact retries
+use `--request-id`, `--revision` and identical type/actor/batch metadata, and cannot
+create another change/history/save. Success verifies the saved category hierarchy.

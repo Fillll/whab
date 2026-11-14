@@ -213,6 +213,7 @@ def budget_month_count(value):
 
 def build_context(data, status, items, *, workspace, page, month, selected=None):
     categories = data["categories"]
+    category_kinds = {row["id"]: row.get("kind", "expense") for row in categories}
     all_accounts = data.get("allAccounts", data["accounts"])
     currency = currency_code(data.get("currency", "USD"))
     budgets = {row["categoryId"]: row for row in data.get("budget", [])}
@@ -251,7 +252,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
             {
                 "category": c, **budgets.get(c["id"], {}),
                 "periods": [
-                    {"month": period["month"], **projection[c["id"]]}
+                    {"month": period["month"], **projection.get(c["id"], {"assigned": 0, "spent": 0, "carryover": 0, "available": 0})}
                     for period, projection in zip(periods, period_budgets, strict=True)
                 ],
             }
@@ -299,6 +300,8 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
             transaction["pending"] or transaction.get("isTransfer")
             or (account is not None and not is_on_budget(account))
         ):
+            continue
+        if category_kinds.get(transaction.get("categoryId")) == "income":
             continue
         if transaction["amount"] > 0:
             purchases += 1
@@ -378,8 +381,10 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "period_months": [period["month"] for period in periods],
         "category_path": lambda identifier: quote(identifier, safe=""),
         "category_names": category_names,
-        "category_labels": {row["id"]: f"{row['group']} > {row['name']}" if row.get("group") else row["name"] for row in categories},
+        "category_labels": {row["id"]: (f"{row['group']} > {row['name']}" if row.get("group") else row["name"]) + (" (Income)" if row.get("kind") == "income" else "") for row in categories},
         "category_parents": category_parents,
+        "expense_groups": [{**group, "rows": [row for row in group["rows"] if row["category"].get("kind") != "income"]}
+                           for group in groups if any(row["category"].get("kind") != "income" for row in group["rows"])],
         "selected": selected,
         "selected_budget": budgets.get(selected["id"]) if selected else None,
         "transactions": transactions,

@@ -125,6 +125,7 @@ class RolloverBody(Body):
 
 
 class CategoryBody(Body):
+    kind: Literal["expense", "income"] = "expense"
     workspace: Workspace
     name: Label
     group: Label | None = None

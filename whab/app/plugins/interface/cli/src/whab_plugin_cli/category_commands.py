@@ -6,6 +6,7 @@ from uuid import uuid4
 
 lazy import httpx
 
+from whab.plugins import validate_category_agent
 from whab.plugins.documentation import operation
 
 from .transaction_commands import checked
@@ -25,6 +26,8 @@ def add_category_parser(commands, catalog):
     actions = group.add_subparsers(dest="category_action", required=True)
     from .record_edits import add_rename_parser
     add_rename_parser(actions)
+    from .category_classification import add_classify_parser
+    add_classify_parser(actions)
     listing = actions.add_parser(
         "list",
         help="Read parent groups and child categories, including empty groups",
@@ -77,6 +80,10 @@ def add_category_parser(commands, catalog):
         "name",
         help="New child name; duplicate siblings are refused, ignoring case/outer whitespace",
     )
+    create.add_argument("--agent", type=validate_category_agent, help="Explicit agent audit label; default: manual User")
+    create.add_argument("--batch", help="History grouping label; this creation remains one commit/save")
+    create.add_argument("--type", dest="category_kind", choices=("expense", "income"), default="expense",
+        help="Financial type (default: expense); income has target zero, no assignments, independent review. See category classify --help")
     create.add_argument(
         "--currency",
         default="USD",
@@ -159,6 +166,10 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
     observed = read()
     groups = observed["data"]
     children = [row for group in groups for row in group["children"]]
+    if args.category_action == "classify":
+        from .category_classification import execute_classification
+        return execute_classification(connection, identifier, prefix, args, exchange, error, observed, read,
+                                      resolve_category(children, args.category, error))
     if args.category_action == "rename":
         from .record_edits import execute_rename
         return execute_rename(connection, identifier, prefix, args, exchange, error, observed, read,
@@ -200,6 +211,7 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
                 "parentId": parent["id"],
                 "target": args.category_target,
                 "currency": args.currency,
+                **({"kind": "income"} if args.category_kind == "income" else {}),
             }
         else:
             child = resolve_category(children, args.category, error)
@@ -222,6 +234,12 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
         "expected_revision": observed["revision"],
         "request_id": str(uuid4()),
     }
+    if args.category_action == "create":
+        history = {"actor": args.agent, "actorKind": "agent"} if args.agent is not None else {}
+        if args.batch is not None:
+            history["batchId"] = args.batch
+        if history:
+            intent["history"] = history
     try:
         saved = checked(
             exchange(connection, "POST", prefix + "/commands", json=intent), identifier, error
@@ -251,6 +269,7 @@ def execute_categories(connection, identifier, prefix, args, exchange, error):
                 "group": parent["name"],
                 "target": args.category_target,
                 "currency": args.currency,
+                **({"kind": "income"} if args.category_kind == "income" else {}),
             }
         )
         if any(actual.get(key) != value for key, value in expected.items()):
@@ -308,6 +327,8 @@ def execute_delete(connection, identifier, prefix, args, exchange, error, observ
 
 def category_table(result):
     data = result["data"]
+    if result.get("dryRun"):
+        return "Read-only category classification preview (no commit/save):\n" + json.dumps(result, ensure_ascii=True, indent=2)
     groups = data if isinstance(data, list) else [data]
     cells = [["Kind", "Name / path", "ID", "Currency", "Target"]]
     for row in groups:
@@ -318,7 +339,7 @@ def category_table(result):
             leaves = [row]
         cells.extend(
             [
-                "child",
+                child.get("kind", "expense"),
                 f"{child['group']} / {child['name']}",
                 child["id"],
                 child["currency"],
@@ -327,7 +348,7 @@ def category_table(result):
             for child in leaves
         )
     cells = [
-        [terminal_text(value, limit) for value, limit in zip(row, (6, 48, 80, 8, 18), strict=True)]
+        [terminal_text(value, limit) for value, limit in zip(row, (8, 48, 80, 8, 18), strict=True)]
         for row in cells
     ]
     widths = [max(len(row[index]) for row in cells) for index in range(5)]

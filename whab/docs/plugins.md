@@ -1326,3 +1326,24 @@ durable result without a new commit, checkpoint or audit entry, including after
 restart. An unknown result must retain its intent; never automatically submit a
 fresh request ID. Unsupported storage/authorities fail before mutation. SQLite and
 JSON implement the existing native contract; their versions need no change here.
+
+### Income/Expense category classification
+
+WHAB 2.76 adds optional `CategoryClassification` because the prior public category
+contract could only create, rename, move and delete expense envelopes. It could not
+configure financial treatment. Core defines optional child `kind=income`; absence
+means Expense, preserving old snapshots/history hashes. A parent has no kind and may
+mix both. `add_category` can create Income with target zero. Public
+`preview_category_classification` returns exact category before/after and monthly
+summary impacts; guarded `classify_category` commits type only with native history,
+receipts and undo/redo. Native SQLite/JSON, storage workers and HTTPS transport
+implement the contract. Unsupported adapters fail before mutation. CLI parsing,
+name resolution and presentation remain in CLI; persistence remains in storage.
+
+Income categories cannot have expense targets or monthly assignment rows. Core
+counts eligible posted on-budget non-credit external Income once, excludes its
+activity from expense envelopes/spending, and keeps review independent. Negative
+expense activity remains a refund, not new income. Legacy unclassified inflows
+retain their old funding behavior, identified by `summary.unclassifiedIncome`;
+`classifiedIncome` identifies explicit Income. Their sum is the compatible `income`
+total. There is no implicit data migration or merchant-based classification.

@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.55.0 — 2026-11-13
+
+PR: [#198](https://github.com/Fillll/whab/pull/198)
+
+- Offer Income creation and explicit transaction labels, keep Income out of expense envelopes, and share classified/legacy income totals with Insights while preserving independent review.
+
 ## 1.54.0 — 2026-11-13
 
 PR: [#197](https://github.com/Fillll/whab/pull/197)

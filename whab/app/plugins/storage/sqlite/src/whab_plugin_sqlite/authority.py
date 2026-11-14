@@ -100,17 +100,17 @@ class Authority:
         if type(row[0]) is not bytes:
             raise StoreError("Invalid SQLite storage authority metadata.")
         metadata = read_storage_json(row[0])
-        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2}:
+        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3}:
             raise StoreError("Invalid SQLite storage authority metadata.")
         if metadata.keys() != {
             "formatVersion", "budgetId", "environment", "instanceId", "authorityEpoch", "generation",
             "operationId", "role", "transitionId", "transfer", "empty",
-        } | ({"replica", "promotionId"} if metadata["formatVersion"] == 2 else set()) or type(metadata["empty"]) is not bool:
+        } | ({"replica", "promotionId"} if metadata["formatVersion"] >= 2 else set()) or type(metadata["empty"]) is not bool:
             raise StoreError("Invalid SQLite storage authority metadata.")
         self._metadata_evidence(metadata, "0" * 64)
         if metadata["transitionId"] is not None:
             storage_identifier(metadata["transitionId"])
-        if metadata["formatVersion"] == 2:
+        if metadata["formatVersion"] >= 2:
             record = metadata["replica"]
             if record is not None:
                 watermark = read_replica_watermark(record)

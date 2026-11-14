@@ -37,7 +37,7 @@
     </div>
     <a class="button secondary budget-today" href="{{ url(months=month_count,month='current-month') }}">This month</a>
   </div>
-  <div class="budget-workspace{% if selected %} has-inspector{% endif %}" data-budget-key="workspace">
+  <div class="budget-workspace{% if selected_budget %} has-inspector{% endif %}" data-budget-key="workspace">
     <section class="budget-table-section" aria-label="Monthly category budget" data-budget-key="table-section">
       <div class="budget-editing-key" role="note"><span>{{ icon('pencil', 12) }}Editable assigned amounts</span><span>Read-only summaries</span></div>
       {% if not monthly_funding_flow_available %}<p class="budget-flow-update" role="note">A server update is needed for monthly funding totals and next-month funding edits.</p>{% endif %}
@@ -91,7 +91,7 @@
                   {% if income_valid %}
                     {% call summary_details(period, 'Income') %}
                       <dl><div><dt>Received income</dt><dd>{{ money_number(period.summary.income) }}</dd></div></dl>
-                      <p>Posted income received in {{ month_label(period.month) }} in on-budget cash accounts, without a spending category. Pending transactions, transfers and credit-card inflows are excluded. Categorized refunds reduce category activity instead.</p>
+                      <p>Posted Income-category inflows received in {{ month_label(period.month) }} in eligible on-budget non-credit accounts. Legacy uncategorized inflows retain their existing funding treatment. Pending transactions, transfers and credit-card inflows are excluded. Expense-category refunds reduce category activity instead. Review is independent. Explicit Income: {{ money(period.summary.classifiedIncome|default(0)) }}; legacy unclassified inflows: {{ money(period.summary.unclassifiedIncome|default(period.summary.income)) }}.</p>
                       {% if period.month<data.budgetStartMonth %}<p>Historical income only: this month is before your budget starts.</p>{% endif %}
                       <p><a class="text-link" href="{{ url('transactions',month=period.month) }}">Review {{ month_label(period.month) }} transactions</a></p>
                     {% endcall %}
@@ -202,7 +202,7 @@
                 <th scope="col"{% if period.month==month %} class="selected-month"{% endif %} data-budget-key="{{ period.month }}:available">Available</th>
               {% endfor %}
             </tr>
-            {% for group in groups %}
+            {% for group in expense_groups %}
               {% set group_index = loop.index %}
               <tr class="budget-group-row" data-budget-key="group:{{ group.name }}">
                 <td data-budget-key="category"><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}<span>{{ group.name }}</span></button></td>
@@ -250,7 +250,7 @@
       </div>
       <div class="budget-table-footer" data-budget-key="footer"><button class="button secondary" data-dialog="category-dialog">{{ icon('plus', 15) }}Add category</button></div>
     </section>
-  {% if selected %}
+  {% if selected and selected.kind|default("expense") != "income" %}
     {% set row = selected_budget %}
     {% set funded = row.assigned+row.carryover %}
     {% set progress = [100,[0,funded/row.target*100 if row.target else 100]|max]|min %}

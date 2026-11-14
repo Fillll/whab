@@ -23,6 +23,7 @@ def edit_transaction(
                     row["id"]: {
                         "id": row["id"], "name": row["name"], "group": row["group_name"],
                         "target": row["target"], "currency": row["currency"],
+                    **({"kind": row["kind"]} if row["kind"] is not None else {}),
                     }
                     for row in store.db.execute("SELECT * FROM categories WHERE workspace=?", (workspace,))
                 },

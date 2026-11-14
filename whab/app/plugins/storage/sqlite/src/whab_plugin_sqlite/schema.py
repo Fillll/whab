@@ -43,7 +43,7 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
             "category_agent": "TEXT",
             "transfer_peer_id": "TEXT",
         },
-        "categories": {"currency": "TEXT NOT NULL DEFAULT 'USD'"},
+        "categories": {"currency": "TEXT NOT NULL DEFAULT 'USD'", "kind": "TEXT"},
         "meta": {"budget_start_month": "TEXT", "category_groups": "TEXT"},
         "items": {"provider": "TEXT NOT NULL DEFAULT 'plaid'", "sync_settings": "TEXT", "closed_account_cursors": "TEXT"},
     }

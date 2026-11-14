@@ -106,7 +106,7 @@ def validate_portable_budget(data: object) -> dict:
         if not {"onBudget", "subtype"} & account.keys() and account["type"] not in ACCOUNT_TYPES:
             account["type"] = "other"
         accounts[index] = normalize_account(account)
-    categories = _records(data["categories"], CATEGORY_FIELDS, 10000)
+    categories = _records(data["categories"], CATEGORY_FIELDS, 10000, optional=frozenset({"kind"}))
     transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000, optional=frozenset({"original", "categoryAgent", "transferPeerId"}))
     assignments = _records(data["assignments"], ASSIGNMENT_FIELDS, 250000)
     future_funding = _records(data.get("futureFunding", []), FUTURE_FUNDING_FIELDS, 250000)
@@ -198,6 +198,8 @@ def validate_portable_budget(data: object) -> dict:
         category = category_map.get(assignment["categoryId"])
         if category is None:
             raise StoreError("Portable budget assignment category not found.")
+        if category.get("kind") == "income":
+            raise StoreError("Income categories cannot receive monthly assignments.")
         key = (assignment["month"], assignment["categoryId"])
         if key in assignment_keys:
             raise StoreError("Duplicate portable budget assignment.")

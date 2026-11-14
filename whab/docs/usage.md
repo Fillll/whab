@@ -372,3 +372,22 @@ fresh review; this never automatically creates another pair.
 The shared contract is necessary because no previous public operation could atomically
 link two transactions with reciprocal identity, validated preview and reversible audit.
 Storage internals stay behind SDK/native operations; interfaces never inspect databases.
+
+## Income versus expense categories
+
+A category can have explicit Income financial treatment, independent of its name
+or parent. For example, Finance can contain Income Salary and Expense Fees. Create
+with `whab BUDGET category create Salary --parent Finance --type income`. To change
+an existing unused envelope, preview `whab BUDGET category classify "Finance / Salary"
+--type income --dry-run`, inspect historical totals, then repeat without `--dry-run`.
+Income cannot have a nonzero target or any monthly assignment rows; nothing is
+erased to allow conversion. Income remains available in transaction pickers but not
+expense envelope rows. Classifying a transaction does not change review status.
+
+Eligible posted Income in on-budget non-credit accounts funds Ready to Assign once.
+Transfers, pending, deleted and off-budget transactions do not fund it. Income
+reversals reduce Income; refunds in Expense categories reduce spending. Existing
+categories and history are not automatically reclassified on upgrade. Legacy
+uncategorized inflows retain their funding contribution, shown separately from
+explicit Income in budget details and core/CLI summary fields. Inspect uncategorized
+inflows before deciding; they can include refunds and unresolved transfers.

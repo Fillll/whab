@@ -199,7 +199,7 @@ class LedgerService:
         if month is not None:
             _month(month)
         with self._lock:
-            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_bulk_edits", "transfer_candidates", "preview_transfer_match"}:
+            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_category_classification", "preview_bulk_edits", "transfer_candidates", "preview_transfer_match"}:
                 raise StoreError("Only feature queries accept parameters.")
             if operation in {'transfer_candidates', 'preview_transfer_match'}:
                 self._require_transfer_matching()
@@ -221,6 +221,15 @@ class LedgerService:
                 edits = validate_edits(parameters['operation'], parameters['edits'])
                 self._require_atomic_bulk()
                 return {'revision': self._revision, 'data': _public(self._store.preview_bulk_edits(workspace, parameters['operation'], edits))}
+            if operation == 'preview_category_classification':
+                if type(parameters) is not dict or parameters.keys() != {'categoryId', 'kind'}:
+                    raise StoreError('Preview requires categoryId and kind.')
+                _identifier(parameters['categoryId'])
+                from whab.domain.categories import validate_category_kind
+                validate_category_kind(parameters['kind'])
+                self._require_category_classification()
+                return {'revision': self._revision, 'data': _public(self._store.preview_category_classification(
+                    workspace, parameters['categoryId'], parameters['kind']))}
             if operation == 'category_deletion_status':
                 values = parameters or {}
                 if type(values) is not dict or values.keys() != {'categoryId'}:
@@ -298,6 +307,14 @@ class LedgerService:
             else:
                 raise StoreError("Unknown ledger query.")
             return {"revision": self._revision, "data": _public(data)}
+
+    def _require_category_classification(self):
+        supported = getattr(self._store, 'supports_category_classification', None)
+        if not callable(supported) or supported() is not True or not all(
+            callable(getattr(self._store, name, None)) for name in
+            ('classify_category', 'preview_category_classification', 'history_scope', 'budget_history')
+        ):
+            raise StoreError('Update the storage plugin to support audited Income/Expense category classification.')
 
     @staticmethod
     def _validate(operation: str, payload: dict) -> dict:
@@ -391,6 +408,9 @@ class LedgerService:
                 raise StoreError("Transaction date must be between 1900-01-01 and 2200-12-31.")
             if "amount" in payload and not payload["amount"]:
                 raise StoreError("Amount must not be zero.")
+        if operation == 'classify_category' or operation == 'add_category' and 'kind' in payload:
+            from whab.domain.categories import validate_category_kind
+            validate_category_kind(payload['kind'])
         if operation == 'append_transaction_note' and (type(payload['text']) is not str or not 1 <= len(payload['text']) <= 1000):
             raise StoreError('Appended text must contain 1–1000 characters; the saved memo must fit 1000 characters.')
         if operation == "edit_transaction":
@@ -444,7 +464,9 @@ class LedgerService:
                     or not all(callable(getattr(self._store, name, None)) for name in
                                ('delete_category', 'delete_category_group', 'category_tree', 'budget_history', 'history_scope'))):
                 raise StoreError('Update the storage plugin to support safe category deletion with audit history.')
-        if operation in {'rename_category', 'append_transaction_note'} and not all(
+        if operation == 'classify_category' or operation == 'add_category' and 'kind' in payload:
+            self._require_category_classification()
+        if operation in {'rename_category', 'classify_category', 'append_transaction_note'} and not all(
             callable(getattr(self._store, name, None)) for name in ('history_scope', 'budget_history')
         ):
             raise StoreError('Update the storage plugin to retain permanent audit history for this edit.')
@@ -523,6 +545,8 @@ class LedgerService:
                         workspace, payload['categoryId'] if operation == 'delete_category' else payload['parentId'])
                 elif operation in {'edit_transactions', 'classify_accounts'}:
                     data = _public(getattr(self._store, operation)(workspace, payload['edits']))
+                elif operation == "classify_category":
+                    data = self._store.classify_category(workspace, payload["categoryId"], payload["kind"])
                 elif operation == "rename_category":
                     data = self._store.rename_category(workspace, payload["categoryId"], payload["name"])
                 elif operation == "append_transaction_note":
