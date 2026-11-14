@@ -28,7 +28,7 @@ Examples (fictional):
   whab "My budget" trnx review TX3 TX4 --needs-review --dry-run --agent Codex
   whab "My budget" trnx review TX3 TX4 --needs-review --agent Codex
 
-review-audit is a read-only legacy audit. It lists saved reviewed flags that fail the current
+review-audit is a read-only legacy audit. It lists saved nondeleted reviewed flags that fail the current
 classification/pending rule; upgrades/reads do not automatically change them.
 Inspect each result before explicitly clearing review. Original import notes,
 IDs, financial fields, category attribution and history remain intact. Audit

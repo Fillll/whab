@@ -11,7 +11,7 @@ from whab_plugin_cli import console
 
 @pytest.fixture
 def endpoint(monkeypatch, tmp_path):
-    state={'revision':'observed','mutations':[], 'mismatch':False, 'policy':{'version':1,'classificationRequired':True},
+    state={'revision':'observed','mutations':[], 'mismatch':False, 'categoryRevision':'observed', 'policy':{'version':1,'classificationRequired':True},
            'rows':[{'id':'legacy','accountId':'cash','date':'2026-11-01','merchant':'Fictional employer','amount':-100,
                     'currency':'USD','pending':False,'reviewed':True,'categoryId':None,'note':' [YNAB]  ','isTransfer':True},
                    {'id':'valid','accountId':'cash','date':'2026-11-01','merchant':'Fictional shop','amount':100,
@@ -25,7 +25,9 @@ def endpoint(monkeypatch, tmp_path):
         if request.url.path.endswith('/queries/review_policy'):
             return httpx.Response(200,json={'budgetId':'budget','revision':'observed','data':state['policy']})
         if request.url.path.endswith('/queries/categories'):
-            return httpx.Response(200,json={'budgetId':'budget','revision':'observed','data':categories})
+            state['categoryReads']=state.get('categoryReads',0)+1
+            revision=state['categoryRevision'] if state['categoryReads']==1 else 'observed'
+            return httpx.Response(200,json={'budgetId':'budget','revision':revision,'data':categories})
         if request.url.path.endswith('/queries/features'):
             return httpx.Response(200,json={'budgetId':'budget','revision':'observed','data':{}})
         if request.url.path.endswith('/queries/accounts'):
@@ -111,4 +113,11 @@ def test_audit_includes_pending_but_ignores_unreviewed(endpoint,capsys):
                              {**endpoint['rows'][0], 'id':'not-reviewed', 'reviewed':False}])
     assert console.main(['Fictional','trnx','review-audit'])==0
     assert {row['id'] for row in json.loads(capsys.readouterr().out)['data']}=={'legacy','pending'}
+    assert not endpoint['mutations']
+
+
+def test_audit_refuses_category_snapshot_different_from_complete_search(endpoint,capsys):
+    endpoint['categoryRevision']='older-category-snapshot'
+    assert console.main(['Fictional','trnx','review-audit'])==1
+    assert 'changed during review audit' in capsys.readouterr().err
     assert not endpoint['mutations']
