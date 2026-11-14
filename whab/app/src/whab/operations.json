@@ -112,7 +112,7 @@
     {
       "name": "categories",
       "kind": "query",
-      "summary": "List assignable budget categories and currency/group metadata.",
+      "summary": "List assignable budget categories and currency/group metadata. Optional kind=income distinguishes Income reporting categories; absent kind means Expense. Parent groups are neutral.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -307,7 +307,7 @@
     {
       "name": "workspace",
       "kind": "query",
-      "summary": "Read calculated monthly envelopes, summary, accounts and transactions.",
+      "summary": "Read calculated monthly envelopes, summary, accounts and transactions. Income categories fund eligible posted external inflows and have no expense envelopes. summary.classifiedIncome and unclassifiedIncome split the existing total; review is independent.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -1233,6 +1233,14 @@
             "description": "ISO currency code; no currency conversion is performed.",
             "pattern": "^[A-Z]{3}$",
             "default": "USD"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ],
+            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income requires target zero and no monthly assignment rows."
           }
         },
         "required": [
@@ -4149,6 +4157,119 @@
         }
       ],
       "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
+    },
+    {
+      "name": "classify_category",
+      "kind": "command",
+      "summary": "Explicitly classify an existing category as Income or Expense without rewriting transactions or reviews.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ],
+            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income requires target zero and no monthly assignment rows."
+          }
+        },
+        "required": [
+          "categoryId",
+          "kind"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit category-management operation parameters."
+      },
+      "output": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Created stable identifier or null for a completed edit."
+      },
+      "examples": [
+        {
+          "input": {
+            "categoryId": "fictional-salary",
+            "kind": "income"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "One guarded native commit and durable save; category kind only plus audit metadata. Preserves IDs, transactions, review status and financial fields. Can change historical income/RTA/spending; inspect preview first. Refuses income with nonzero target or any assignment row; never deletes assignments. Exact retries retain original result.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict.",
+        "Duplicate group names or destination siblings are refused. Missing parents, child-as-parent and deeper hierarchies are invalid.",
+        "Stale state fails; uncertain writes must not be replayed with a new request identity.",
+        "Parent groups cannot be renamed by this child-only operation."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.71+ and CategoryRenaming support (SQLite 1.22+, JSON 1.14+)."
+    },
+    {
+      "name": "preview_category_classification",
+      "kind": "query",
+      "summary": "Read historical monthly before/after totals without saving.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Stable identifier returned by a read; never a display name.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ],
+            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income requires target zero and no monthly assignment rows."
+          }
+        },
+        "required": [
+          "categoryId",
+          "kind"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit category-management operation parameters."
+      },
+      "output": {
+        "type": "object",
+        "description": "Exact category before/after and impacts by month/currency; includes income, classifiedIncome, unclassifiedIncome, spent and readyToAssign. No mutation."
+      },
+      "examples": [
+        {
+          "input": {
+            "categoryId": "fictional-salary",
+            "kind": "income"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "None. Read-only financial preview.",
+      "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict.",
+        "Duplicate group names or destination siblings are refused. Missing parents, child-as-parent and deeper hierarchies are invalid.",
+        "Stale state fails; uncertain writes must not be replayed with a new request identity.",
+        "Parent groups cannot be renamed by this child-only operation."
+      ],
+      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "availability": "WHAB 2.71+ and CategoryRenaming support (SQLite 1.22+, JSON 1.14+)."
     }
   ]
 }

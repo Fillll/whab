@@ -342,3 +342,25 @@ fresh review; this never automatically creates another pair.
 The shared contract is necessary because no previous public operation could atomically
 link two transactions with reciprocal identity, validated preview and reversible audit.
 Storage internals stay behind SDK/native operations; interfaces never inspect databases.
+
+## Explicit Income category treatment
+
+WHAB 2.76 and this adapter implement optional public `CategoryClassification`:
+`supports_category_classification`, read-only `preview_category_classification`,
+and guarded `classify_category`. `add_category` accepts optional `kind=income`;
+missing kind remains Expense. Core owns eligibility, funding, target/assignment
+validation and preview; the adapter only persists the exact records. Kind changes
+commit with one native revision/receipt and reversible audit entry. Transactions,
+review status, balances, provider mappings and monthly assignments remain verbatim.
+No sync or automatic historical classification occurs. Preview shows historical
+summary consequences; income conversion refuses nonzero targets and **any** monthly
+assignment row. Public worker and HTTPS transports carry the same contract.
+
+Portable/history category records retain optional kind. Old records are not expanded
+or relabeled, preserving their history digests and financial totals. Legacy
+uncategorized inflows retain funding compatibility and are reported separately from
+explicit Income. Exact retries/undo/redo and restore use the existing durability
+contracts. Older adapters must not reinterpret explicit Income as an envelope.
+The existing strict native/portable JSON validators retain kind and reject
+unsupported fields in older adapters. No native-format migration or record rewrite
+is needed. Restoring into an empty store preserves Income and all prior audit hashes.

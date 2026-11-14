@@ -97,6 +97,8 @@ def _currency_history(state: dict) -> dict:
     spending = defaultdict(lambda: defaultdict(int))
     income = defaultdict(int)
     spent = defaultdict(int)
+    classified_income = defaultdict(int)
+    unclassified_income = defaultdict(int)
     on_budget = {key for key, account in state["accounts"].items() if is_on_budget(account)}
     for row in state["transactions"].values():
         if row.get("deleted"):
@@ -109,13 +111,20 @@ def _currency_history(state: dict) -> dict:
             continue
         category = row.get("categoryId")
         amount = row["amount"]
+        if state['categories'].get(category, {}).get('kind') == 'income':
+            if state['accounts'][row['accountId']].get('type') != 'credit':
+                income[source] -= amount
+                classified_income[source] -= amount
+            continue
         spending[source][category] += amount
         if amount < 0 and category is None and state["accounts"][row["accountId"]].get("type") != "credit":
             income[source] -= amount
+            unclassified_income[source] -= amount
         if amount > 0 or category is not None:
             spent[source] += amount
     return {"transactions": transactions, "posted": posted, "spending": spending,
-            "income": income, "spent": spent}
+            "income": income, "spent": spent, "classifiedIncome": classified_income,
+            "unclassifiedIncome": unclassified_income}
 
 
 def _calculate_currency(state: dict, month: str, currency: str, history: dict) -> dict:
@@ -151,6 +160,8 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         )
     budget = []
     for category in state["categories"].values():
+        if category.get("kind") == "income":
+            continue
         category_id = category["id"]
         assigned = state["budget"].get(month, {}).get(category_id, 0) if month >= start else 0
         carryover = prior_assignments[category_id] - prior_spending[category_id]
@@ -180,6 +191,8 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         next_month_funding = ready = safe = 0
     summary = {
         "income": income,
+        "classifiedIncome": history["classifiedIncome"].get(month, 0),
+        "unclassifiedIncome": history["unclassifiedIncome"].get(month, 0),
         "carriedIn": carried_in,
         "carriedInUnassigned": carried_in_unassigned,
         "carriedInSetAside": carried_in_set_aside,
@@ -222,6 +235,8 @@ def ensure_assignment_allowed(
     state: dict, category_id: str, month: str, assigned: int, as_of_month: str
 ) -> None:
     category = ensure_child_category(state["categories"], category_id)
+    if category.get("kind") == "income":
+        raise StoreError("Income categories cannot receive monthly assignments.")
     currency = category.get("currency", "USD")
     if month < state["budgetStartMonth"]:
         raise StoreError(
@@ -388,7 +403,8 @@ def _prepare_workspace(state: dict) -> dict:
     )
     for rows in state["budget"].values():
         for category_id in rows:
-            _known_child_category(categories, category_id)
+            if _known_child_category(categories, category_id).get("kind") == "income":
+                raise StoreError("Income categories cannot receive monthly assignments.")
     transactions = defaultdict(dict)
     for key, row in state["transactions"].items():
         account = accounts.get(row["accountId"])
@@ -463,7 +479,7 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
     account_ids = {a["id"] for a in accounts}
     category_ids = {c["id"] for c in categories}
     empty_summary = dict.fromkeys((
-        "income", "carriedIn", "carriedInUnassigned", "carriedInSetAside", "fundingCapacity",
+        "income", "classifiedIncome", "unclassifiedIncome", "carriedIn", "carriedInUnassigned", "carriedInSetAside", "fundingCapacity",
         "previousOverspending", "balanceCarryover", "assignedNextMonth", "spent", "assigned",
         "available", "readyToAssign",
     ), 0)

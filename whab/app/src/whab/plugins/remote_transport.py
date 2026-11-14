@@ -347,6 +347,15 @@ class RemoteStore:
     def classify_accounts(self, workspace, edits):
         return self._command('classify_accounts', workspace, {'edits': edits})
 
+    def supports_category_classification(self):
+        return True
+
+    def preview_category_classification(self, workspace, category_id, kind):
+        return self._query('preview_category_classification', workspace, parameters={'categoryId': category_id, 'kind': kind})
+
+    def classify_category(self, workspace, category_id, kind):
+        return self._command('classify_category', workspace, {'categoryId': category_id, 'kind': kind})
+
     def supports_category_renaming(self):
         return True
 

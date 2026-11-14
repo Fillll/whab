@@ -35,6 +35,7 @@ _MUTATIONS = {
     "add_category": (("workspace", "category"), {}),
     "add_category_group": (("workspace", "name"), {}),
     "move_category": (("workspace", "category_id", "parent_id"), {}),
+    "classify_category": (("workspace", "category_id", "kind"), {}),
     "rename_category": (("workspace", "category_id", "name"), {}),
     "delete_category": (("workspace", "category_id"), {}),
     "delete_category_group": (("workspace", "parent_id"), {}),

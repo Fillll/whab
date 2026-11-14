@@ -343,3 +343,28 @@ fresh review; this never automatically creates another pair.
 The shared contract is necessary because no previous public operation could atomically
 link two transactions with reciprocal identity, validated preview and reversible audit.
 Storage internals stay behind SDK/native operations; interfaces never inspect databases.
+
+## Explicit Income category treatment
+
+WHAB 2.76 and this adapter implement optional public `CategoryClassification`:
+`supports_category_classification`, read-only `preview_category_classification`,
+and guarded `classify_category`. `add_category` accepts optional `kind=income`;
+missing kind remains Expense. Core owns eligibility, funding, target/assignment
+validation and preview; the adapter only persists the exact records. Kind changes
+commit with one native revision/receipt and reversible audit entry. Transactions,
+review status, balances, provider mappings and monthly assignments remain verbatim.
+No sync or automatic historical classification occurs. Preview shows historical
+summary consequences; income conversion refuses nonzero targets and **any** monthly
+assignment row. Public worker and HTTPS transports carry the same contract.
+
+Portable/history category records retain optional kind. Old records are not expanded
+or relabeled, preserving their history digests and financial totals. Legacy
+uncategorized inflows retain funding compatibility and are reported separately from
+explicit Income. Exact retries/undo/redo and restore use the existing durability
+contracts. Older adapters must not reinterpret explicit Income as an envelope.
+SQLite adds a nullable `categories.kind` column without rewriting old records.
+On the first committed Income category, native authority format becomes 3 in the
+same transaction; older SQLite adapters reject it before reads/writes. The fence
+survives undo. Read-only readiness accepts formats 2/3 only with the current column.
+Sanitized portable SQLite schema validation retains historical schema support;
+older readers reject the new payload instead of dropping its financial type.

@@ -39,6 +39,7 @@ def snapshot(store, workspace: str, month: str, count: int = 1) -> dict:
             state["categories"][row["id"]] = {
                 "id": row["id"], "name": row["name"], "group": row["group_name"],
                 "target": row["target"], "currency": row["currency"],
+                    **({"kind": row["kind"]} if row["kind"] is not None else {}),
             }
         for row in store.db.execute(
             "SELECT id,account_id,date,amount,category_id,pending,is_transfer,deleted "

@@ -45,7 +45,7 @@ def validate_child_category(category: dict) -> dict:
     if (
         type(category) is not dict
         or not _CHILD_FIELDS <= category.keys()
-        or category.keys() - _CHILD_FIELDS - {"parentId", "currency"}
+        or category.keys() - _CHILD_FIELDS - {"parentId", "currency", "kind"}
     ):
         raise StoreError("Categories must be children of one parent group.")
     _identifier(category["id"])
@@ -56,6 +56,9 @@ def validate_child_category(category: dict) -> dict:
         raise StoreError("Target cannot be negative.")
     if "parentId" in category and category["parentId"] != category_group_id(category["group"]):
         raise StoreError("Category parent does not match its group.")
+    validate_category_kind(category.get("kind", "expense"))
+    if category.get("kind") == "income" and category["target"] != 0:
+        raise StoreError("Income categories cannot have an expense target.")
     return category.copy()
 
 
@@ -127,8 +130,10 @@ def create_category(
     parent_id: str | None = None,
     currency: str = "USD",
     groups=(),
+    kind="expense",
 ) -> dict:
     """Create an assignable child by parent label or an existing parent ID."""
+    validate_category_kind(kind)
     category_id = _identifier(category_id)
     name = _label(name)
     currency = currency_code(currency)
@@ -146,10 +151,10 @@ def create_category(
         if group is not None and _label(group) != parent_name:
             raise StoreError("Category parent does not match its group.")
         group = parent_name
-    return {
+    return validate_child_category({
         "id": category_id, "name": name, "group": _label(group), "target": target,
-        "currency": currency,
-    }
+        "currency": currency, **({"kind": kind} if kind != "expense" else {}),
+    })
 
 
 def add_category_group(state, name):
@@ -248,3 +253,43 @@ def delete_category_group(state, parent_id):
     if any(category_group_id(row['group']) == parent_id for row in state['categories'].values()):
         raise StoreError('Cannot delete category group: it still has children. Delete or move each child explicitly first.')
     state['categoryGroups'] = [row for row in groups if row['id'] != parent_id]
+
+
+def validate_category_kind(kind):
+    """Financial treatment is explicit and independent of labels and parents."""
+    if type(kind) is not str or kind not in {'expense', 'income'}:
+        raise StoreError('Choose category type expense or income.')
+    return kind
+
+
+def classify_category(state, category_id, kind):
+    """Reclassify a leaf without rewriting transactions, reviews or assignments."""
+    validate_category_kind(kind)
+    child = ensure_child_category(state['categories'], category_id)
+    if kind == 'income' and (child['target'] != 0 or any(category_id in rows for rows in state['budget'].values())):
+        raise StoreError('Income categories cannot have expense targets or monthly assignments (including zero rows). '
+                         'Nothing changed. Use a new Income category to preserve the existing envelope and assignments.')
+    if kind == 'income':
+        state['categories'][category_id]['kind'] = kind
+    else:
+        state['categories'][category_id].pop('kind', None)
+
+
+def preview_category_classification(state, category_id, kind):
+    """Show historical financial consequences without migrating any records."""
+    from copy import deepcopy
+
+    from .budget import calculate_workspace, select_currency
+    candidate = deepcopy(state)
+    classify_category(candidate, category_id, kind)
+    currency = candidate['categories'][category_id].get('currency', 'USD')
+    months = sorted({state['budgetStartMonth'], *state['budget'],
+                     *(row['date'][:7] for row in state['transactions'].values())})
+    impacts = []
+    for month in months:
+        before = select_currency(calculate_workspace(state, month), currency)['summary']
+        after = select_currency(calculate_workspace(candidate, month), currency)['summary']
+        if before != after:
+            impacts.append({'month': month, 'currency': currency, 'before': before, 'after': after})
+    return {'categoryId': category_id, 'before': state['categories'][category_id].copy(),
+            'after': candidate['categories'][category_id].copy(), 'impacts': impacts}

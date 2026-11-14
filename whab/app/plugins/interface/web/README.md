@@ -393,3 +393,16 @@ fresh review; this never automatically creates another pair.
 The shared contract is necessary because no previous public operation could atomically
 link two transactions with reciprocal identity, validated preview and reversible audit.
 Storage internals stay behind SDK/native operations; interfaces never inspect databases.
+
+## Income categories
+
+New category offers Expense or Income financial treatment. Income requires target
+zero and has no expense assignments/envelope row; a parent may contain both kinds.
+Transaction pickers label Income explicitly and preserve review independently.
+Budget income details show explicit Income and legacy unclassified contributions;
+Insights uses the same core totals. Posted eligible on-budget external Income funds
+Ready to Assign once; pending, transfers, tracking and credit-card inflows do not.
+Expense refunds reduce spending. No upgrade reclassifies historical transactions.
+To change an existing category's treatment, use `whab BUDGET category classify
+CATEGORY --type income --dry-run`, inspect the monthly impacts, then issue the guarded
+command. Existing targets or any assignment rows block income conversion.

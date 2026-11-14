@@ -19,7 +19,7 @@
     </span>
   </div>
   <div class="insight-income">
-    <span class="summary-label">INCOME</span><strong>{{ money(data.summary.income) }}</strong><span class="summary-foot">Posted inflows this month</span>
+    <span class="summary-label">INCOME</span><strong>{{ money(data.summary.income) }}</strong><span class="summary-foot">Explicit Income {{ money(data.summary.classifiedIncome|default(0)) }} · legacy unclassified {{ money(data.summary.unclassifiedIncome|default(data.summary.income)) }}</span>
   </div>
   <div class="insight-income">
     <span class="summary-label">TRANSACTIONS</span><strong>{{ purchases }}</strong><span class="summary-foot">Posted purchases</span>

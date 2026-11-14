@@ -502,7 +502,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       row.querySelector('[data-category-agent]')?.remove();
       delete row.dataset.suggestionId; delete row.dataset.suggestionPlugin;
       row.querySelector('.ml-suggestion')?.remove();
-      if (category.options?.[0]) category.options[0].textContent = after.isTransfer ? 'Transfer (excluded)' : after.amount < 0 ? 'Income / uncategorized' : 'Uncategorized';
+      if (category.options?.[0]) category.options[0].textContent = after.isTransfer ? 'Transfer (excluded)' : 'Uncategorized';
     };
     const saveMemo = () => {
       clearTimeout(timers.get(row));

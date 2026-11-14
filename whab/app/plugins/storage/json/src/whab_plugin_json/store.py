@@ -326,6 +326,17 @@ class Store(Authority):
         from whab.domain.bulk import bulk_changes
         return self._mutate(workspace, lambda state: bulk_changes(state, 'classify_accounts', edits, apply=True), history_operation='classify_accounts')
 
+    def supports_category_classification(self):
+        return True
+
+    def preview_category_classification(self, workspace, category_id, kind):
+        from whab.domain.categories import preview_category_classification
+        return preview_category_classification(self._read(workspace), category_id, kind)
+
+    def classify_category(self, workspace, category_id, kind):
+        from whab.domain.categories import classify_category
+        return self._mutate(workspace, lambda state: classify_category(state, category_id, kind))
+
     def supports_category_renaming(self):
         return True
 
@@ -336,14 +347,14 @@ class Store(Authority):
         return self._mutate(workspace, lambda state: move_category(state, category_id, parent_id))
 
     def add_category(self, workspace, category):
-        if type(category) is not dict or category.keys() - {"name", "group", "target", "parentId", "currency"}:
+        if type(category) is not dict or category.keys() - {"name", "group", "target", "parentId", "currency", "kind"}:
             raise StoreError("Categories support exactly two levels.")
         identifier = str(uuid4())
 
         def operation(state):
             state["categories"][identifier] = create_category(
                 identifier, category["name"], category.get("group"), category.get("target", 0),
-                categories=state["categories"], groups=state.get("categoryGroups", ()), parent_id=category.get("parentId"), currency=category.get("currency", "USD"),
+                categories=state["categories"], groups=state.get("categoryGroups", ()), parent_id=category.get("parentId"), currency=category.get("currency", "USD"), kind=category.get("kind", "expense"),
             )
             return identifier
 

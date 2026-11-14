@@ -12,10 +12,11 @@
 {% from "account-fields.html" import account_classification with context %}
 <script id="account-currency-choices" type="application/json">{{ dict(currency_choices)|tojson }}</script>
 <dialog class="modal"
-        id="category-dialog">{{ heading('New category', 'Make space for something you want to budget for.') }}
+        id="category-dialog">{{ heading('New category', 'Choose Expense for envelopes or Income for money received.') }}
   <form class="modal-form" data-api="/categories">
     <input type="hidden" name="workspace" value="{{ workspace }}">
     <input type="hidden" name="currency" value="{{ currency }}">
+    <label>Financial type<select name="kind"><option value="expense">Expense · budget envelope</option><option value="income">Income · no target or assignments</option></select></label>
     <label>
       Child category name<input name="name"
        required
@@ -36,7 +37,7 @@
       </datalist>
     </label>
     <label>
-      Monthly target ({{ currency }})<input name="target" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" value="{{ money_input(0) }}" required>
+      Monthly target ({{ currency }}; Income: keep zero)<input name="target" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" value="{{ money_input(0) }}" required>
     </label>
     <p class="field-error" role="alert" hidden></p>
     <button class="button primary full-width">Create category</button>

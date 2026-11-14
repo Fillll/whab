@@ -2611,6 +2611,156 @@
         }
       ],
       "side_effects": "Read-only capability discovery."
+    },
+    {
+      "name": "CategoryClassification.supports_category_classification",
+      "kind": "sdk",
+      "summary": "Advertise explicit Income/Expense category support before mutation.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True explicitly opts into CategoryDeletion with atomic history/receipts."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read-only capability declaration.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Missing/wrong-kind IDs, any live/deleted transaction reference, any nonzero assignment or a parent with children are refused without mutation; zero-only rows are removed atomically with the child and retained in history.",
+        "Authority/receipt/revision and uncertain-outcome protections apply."
+      ],
+      "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
+      "availability": "Optional CategoryDeletion SDK; WHAB 2.69+ with current SQLite/JSON for zero-only row removal. True support requires category_tree, atomic budget history and both mutation methods. Existing CategoryManagement is unchanged."
+    },
+    {
+      "name": "CategoryClassification.preview_category_classification",
+      "kind": "sdk",
+      "summary": "Read-only exact kind and monthly before/after preview.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "category_id": {
+            "type": "string",
+            "description": "Existing stable child identity."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ],
+            "description": "Explicit financial treatment."
+          }
+        },
+        "required": [
+          "workspace",
+          "category_id",
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Category before/after and impacts by month/currency; read-only."
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "category_id": "fictional-salary",
+            "kind": "income"
+          },
+          "output": {}
+        }
+      ],
+      "side_effects": "Atomically save hierarchy metadata with native evidence, receipt and budget history. No bank sync.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
+      "availability": "Optional CategoryManagement SDK capability, WHAB 2.65+; reached through guarded public category operations, never arbitrary remote storage access."
+    },
+    {
+      "name": "CategoryClassification.classify_category",
+      "kind": "sdk",
+      "summary": "Save explicit category kind with native audit/receipt transaction; never rewrite transaction reviews or assignments.",
+      "input": {
+        "type": "object",
+        "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
+        "properties": {
+          "workspace": {
+            "description": "workspace: str. Typed SDK value supplied by the host; this is not a CLI argument.",
+            "type": "string"
+          },
+          "category_id": {
+            "type": "string",
+            "description": "Existing stable child identity."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ],
+            "description": "Explicit financial treatment."
+          }
+        },
+        "required": [
+          "workspace",
+          "category_id",
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "description": "The operation result in the enclosing response data field.",
+        "type": [
+          "object",
+          "array",
+          "string",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "workspace": "personal",
+            "category_id": "fictional-salary",
+            "kind": "income"
+          },
+          "output": null
+        }
+      ],
+      "side_effects": "Atomically save hierarchy metadata with native evidence, receipt and budget history. No bank sync.",
+      "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
+      "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
+      "errors": [
+        "Invalid or unsupported input is rejected without applying a new decision.",
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+      ],
+      "retry": "The host owns one guarded intent. Reconcile uncertain outcomes using the exact original intent; never automatically create a new intent.",
+      "availability": "Optional CategoryManagement SDK capability, WHAB 2.65+; reached through guarded public category operations, never arbitrary remote storage access."
     }
   ]
 }
