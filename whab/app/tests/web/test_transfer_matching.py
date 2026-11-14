@@ -32,6 +32,19 @@ def test_web_proposal_preview_confirm_unmatch_and_stale_guards(store, tmp_path):
         page = client.get('/budgets/home/transactions/2026-11').text
         assert 'Suggest transfers' in page and 'data-transfer-panel' in page and 'data-transfer-unmatch' in page
         assert 'Unmatch this confirmed transfer before changing its category' in page and 'Transfer (excluded)' in page
+        unchanged = deepcopy(store.export_budget())
+        refused = client.patch(f'/api/transactions/{ids[0]}', json={'workspace':'personal','categoryId':None})
+        assert refused.status_code == 400
+        assert refused.json()['error'] == 'Unmatch this transfer pair before changing its category.'
+        assert store.export_budget() == unchanged
+        assert 'Discard local edits &amp; reload' in page
+        assert 'Saved changes are kept' in page
+        for patch in [{'reviewed':True}, {'note':'[YNAB]  \nFictional memo'}]:
+            assert client.patch(f'/api/transactions/{ids[0]}',json={'workspace':'personal',**patch}).status_code == 200
+        saved_rows = store.transactions('personal')
+        assert all(row.get('transferPeerId') for row in saved_rows)
+        assert next(row for row in saved_rows if row['id']==ids[0])['reviewed'] is True
+        assert next(row for row in saved_rows if row['id']==ids[0])['note'] == '[YNAB]  \nFictional memo'
         for bad in [{**payload, 'extra': True}, {**payload, 'action': 'automatic'}, {**payload, 'workspace': 'foreign'}, {**payload, 'requestId': ''}]:
             assert client.post('/api/transfers/apply', json=bad).status_code == 400
         preview = client.post('/api/transfers/query', json={**body, 'operation': 'preview_transfer_match', 'parameters': {'transactionIds': ids, 'action': 'unmatch'}}).json()

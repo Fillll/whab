@@ -9,7 +9,7 @@ import {bindLogos} from './logo-images.js';
 import {initTransferMatches} from './transfer-matches.js';
 import {createCategoryBatch} from './transaction-category-batch.js';
 
-export function createTransactionWriter(save, {saved = () => {}, state = () => {}} = {}) {
+export function createTransactionWriter(save, {saved = () => {}, state = () => {}, settled = () => {}} = {}) {
   let pending = {};
   let running = null;
   let failure = null;
@@ -34,12 +34,14 @@ export function createTransactionWriter(save, {saved = () => {}, state = () => {
       }
       state('saved');
       return true;
-    })().finally(() => { running = null; });
+    })().finally(() => { running = null; settled(); });
     return running;
   }
   return {
     push(patch) { pending = {...pending, ...patch}; return flush(); },
     flush,
+    discard() {if (running) return false; pending = {}; failure = null; return true;},
+    get saving() {return Boolean(running);},
     get dirty() { return Boolean(running || Object.keys(pending).length); },
   };
 }
@@ -81,7 +83,7 @@ export function createReviewBatcher({workspace, saveBatch, saveOne}) {
     return ticket.running;
   }
 
-  return async (transactionId, patch, batch = false) => {
+  const save = async (transactionId, patch, batch = false) => {
     let ticket = records.get(transactionId);
     if (!ticket && batch && Object.keys(patch).length === 1 && typeof patch.reviewed === 'boolean') {
       ticket = collect(transactionId, patch.reviewed);
@@ -93,6 +95,8 @@ export function createReviewBatcher({workspace, saveBatch, saveOne}) {
     if (Object.keys(remaining).length) await saveOne(transactionId, remaining);
     if (records.get(transactionId) === ticket) records.delete(transactionId);
   };
+  Object.defineProperty(save, 'unconfirmed', {get: () => [...records.values()].some(ticket => !ticket.confirmed)});
+  return save;
 }
 
 export function hydrateTransactionCategories(select, template) {
@@ -149,6 +153,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   const selectAll = root.querySelector('[data-select-all]');
   const selectionBar = root.querySelector('[data-transaction-selection-bar]');
   const feedback = root.querySelector('[data-transaction-feedback]');
+  const discard = root.querySelector('[data-transaction-discard]');
   const live = root.querySelector('[data-transaction-save-status]');
   const paged = root.dataset.transactionPaged === 'true';
   const displayedSearch = search.value;
@@ -193,6 +198,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       }
       selectionBar.querySelector('[data-clear-selection]').disabled = locked;
       selection();
+      syncDiscard();
       if (!locked) stream?.check();
     },
     saved(targets, changes, choice) {
@@ -217,9 +223,15 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     target.addEventListener(event, callback);
     listeners.push(() => target.removeEventListener(event, callback));
   }
+  function canDiscard() {
+    return !disposed && !creating && !receiptBusy && !bulkBusy && !categoryBatch.dirty && !transfers.dirty &&
+      !saveReview?.unconfirmed && [...editors.values()].every(writer => !writer.saving);
+  }
+  function syncDiscard() {discard.disabled = !canDiscard();}
   function error(message) {
     feedback.querySelector('[data-transaction-feedback-text]').textContent = message;
     feedback.hidden = false;
+    syncDiscard();
   }
   function selection() {
     const visible = rows.filter(row => !row.hidden);
@@ -423,6 +435,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       const prepared = prepareReview(patch);
       return saveReview ? saveReview(row.dataset.transactionId, prepared, bulkBusy) : saveOne(row.dataset.transactionId, prepared);
     }, {
+      settled: syncDiscard,
       saved(patch) {
         Object.assign(committed, patch);
         if ('categoryId' in patch || patch.reviewed === true && row.dataset.suggestionId) row.querySelector('[data-category-agent]')?.remove();
@@ -460,6 +473,18 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     row.restoreCategory = () => {
       category.value = committed.categoryId || '';
       category.classList.toggle('uncategorized', !category.value && row.dataset.transfer !== 'true');
+    };
+    row.resetLocalDraft = () => {
+      memo.value = committed.note;
+      row.restoreCategory();
+      for (const control of detailFields) {
+        const field = control.dataset.transactionDetail;
+        control.value = field === 'amount' ? (-committed[field] / 10 ** Number(control.dataset.minorUnits)).toFixed(Number(control.dataset.minorUnits)) : committed[field];
+        control.setCustomValidity('');
+      }
+      reviewed.setAttribute('aria-pressed', String(committed.reviewed));
+      reviewed.title = committed.reviewed ? 'Reviewed' : 'Not reviewed';
+      row.dataset.payee = `${row.dataset.merchant} ${memo.value}`.toLowerCase();
     };
     row.applyCategory = (after, choice) => {
       const value = after.categoryId || '';
@@ -572,11 +597,23 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       bulkBusy = false;
       bulkPromise = null;
       selection();
+      syncDiscard();
       if (paged) refreshAfterMutation();
     });
     return bulkPromise;
   });
   listen(root.querySelector('[data-transaction-retry]'), 'click', async () => { if (await flush()) feedback.hidden = true; });
+  listen(discard, 'click', () => {
+    if (!canDiscard()) {notify('Wait for active saves or resolve the unconfirmed bulk/transfer request with its original retry before discarding local edits.'); return;}
+    editStarted();
+    for (const writer of editors.values()) writer.discard();
+    dispose();
+    for (const row of rows) row.resetLocalDraft();
+    if (createForm) {createForm.reset(); draft.hidden = true;}
+    // Explicitly abandon only browser drafts. A read-only reload shows any
+    // already committed changes; this never sends an undo or unmatch command.
+    location.reload();
+  });
 
   const receiptDialog = root.querySelector('[data-transaction-receipt-dialog]');
   const receiptImage = receiptDialog.querySelector('[data-receipt-preview]');
@@ -588,6 +625,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   function receiptUrl(row) { return apiUrl(`/transactions/${encodeURIComponent(row.dataset.transactionId)}/receipt?workspace=${workspace}`); }
   function receiptState(busy) {
     receiptBusy = busy;
+    syncDiscard();
     for (const control of receiptDialog.querySelectorAll('button,input')) control.disabled = busy;
   }
   function clearImage() {
@@ -727,7 +765,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         onMutation(); notify('Transaction saved. Active filters determine where it appears.');
         await go(new URL(location.href), false, true);
       } catch (failure) {error(failure.message || 'The transaction could not be saved.');}
-      finally {creating = false; for (const control of createForm.elements) control.disabled = false;}
+      finally {creating = false; for (const control of createForm.elements) control.disabled = false; syncDiscard();}
     });
   }
   async function flushRows() {
@@ -740,6 +778,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     return ok;
   }
   async function flush() {
+    if (disposed) return true;
     if (draft && !draft.hidden) return false;
     if (transfers.dirty && !await transfers.flush()) return false;
     if (categoryBatch.dirty && !await categoryBatch.flush()) return false;
@@ -774,23 +813,24 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   listen(window, 'beforeunload', beforeUnload);
   if (paged) selection();
   else filter();
+  function dispose() {
+    disposed = true;
+    clearTimeout(searchTimer);
+    clearTimeout(refreshTimer);
+    stream?.dispose();
+    grid.dispose();
+    columns.dispose();
+    transfers.dispose();
+    categoryBatch.dispose();
+    accountPicker.dispose();
+    periodPicker.dispose();
+    for (const timer of timers.values()) clearTimeout(timer);
+    for (const remove of listeners) remove();
+    clearImage();
+  }
   return {
     flush,
-    get dirty() { return transfers.dirty || categoryBatch.dirty || creating || Boolean(draft && !draft.hidden) || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy; },
-    dispose() {
-      disposed = true;
-      clearTimeout(searchTimer);
-      clearTimeout(refreshTimer);
-      stream?.dispose();
-      grid.dispose();
-      columns.dispose();
-      transfers.dispose();
-      categoryBatch.dispose();
-      accountPicker.dispose();
-      periodPicker.dispose();
-      for (const timer of timers.values()) clearTimeout(timer);
-      for (const remove of listeners) remove();
-      clearImage();
-    },
+    get dirty() { return !disposed && (transfers.dirty || categoryBatch.dirty || creating || Boolean(draft && !draft.hidden) || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size > 0 || receiptBusy); },
+    dispose,
   };
 }

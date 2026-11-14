@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals.",
+  "summary": "Visual budgeting interface with explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals.",
   "delegates": [
     "core"
   ],
@@ -502,6 +502,49 @@
       ],
       "retry": "Retain original IDs, category, revision and request ID after an uncertain save. Retry save reuses that exact request. Native durable receipts deduplicate successful requests after restart. Never replay unknown intent with a fresh request ID.",
       "availability": "WHAB 2.75+ and Web 1.53+, existing optional AtomicBulkEdits backend/authority. Unsupported backends fail before mutation."
+    },
+    {
+      "name": "transactions.discard-local-edits",
+      "kind": "local",
+      "summary": "Discard unsaved transaction-view edits and reload saved data after a failed single-row save. This is an explicit browser action, not a ledger mutation or undo.",
+      "input": {
+        "type": "object",
+        "description": "Click Discard local edits & reload in the failed-save banner. No JSON or terminal input is required.",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "The browser releases its local navigation guard and reloads the authoritative saved view.",
+        "properties": {
+          "reloading": {
+            "type": "boolean",
+            "const": true,
+            "description": "Read-only reload initiated."
+          }
+        },
+        "required": [
+          "reloading"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "reloading": true
+          }
+        }
+      ],
+      "side_effects": "Drops all unsaved local row/form drafts in this view, cancels local autosave timers and releases the beforeunload guard. Sends no mutation, undo, transfer-unmatch or bank-sync operation. Already committed changes are kept; reload reads current saved state, including any earlier response whose outcome was uncertain.",
+      "permissions": "Explicit click in the addressed budget view; no additional ledger permission or write is requested.",
+      "scope": "Current browser tab and mounted transaction view. Other tabs and saved budgets are not changed.",
+      "errors": [
+        "Refused while any row, new transaction or receipt save is active.",
+        "Refused while a native review cohort, selected-category batch or transfer confirmation is unconfirmed. Resolve that exact request through its original retry before discarding local drafts."
+      ],
+      "retry": "Retry save retains the existing save path. Discard local edits & reload instead abandons browser drafts and performs a read-only reload; it never replays a mutation or reverses a saved result.",
+      "availability": "Web 1.54+ browser control only. This operation does not add a public HTTP, CLI or SDK ledger command."
     }
   ]
 }

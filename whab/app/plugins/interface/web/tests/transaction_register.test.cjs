@@ -38,7 +38,7 @@ function harness(count = 5, options = {}) {
   const requests = [];
   const receiptRequests = [], imageRequests = [], objectUrls = [], revokedUrls = [];
   const workspace = options.workspace || 'personal';
-  const navigations = [];
+  const navigations = [], reloads = [];
   const contexts = [], history = [], mutations = [];
   let pickerChoose, pickerDisposed = false, periodChoose, periodDisposed = false;
   const makeRow = index => {
@@ -74,7 +74,7 @@ function harness(count = 5, options = {}) {
       '[data-receipt-save]', '[data-receipt-file]'].map(key => receiptControls[key]) : []});
   const controls = Object.fromEntries(['#transaction-search', '#account-filter', '#review-filter',
     '#transaction-count', '[data-select-all]', '[data-transaction-save-status]', '#all-dates-filter',
-    '[data-navigation="month"]', '[data-transaction-retry]'].map(selector => [selector, element()]));
+    '[data-navigation="month"]', '[data-transaction-retry]', '[data-transaction-discard]'].map(selector => [selector, element()]));
   controls['#transaction-search'].value = options.search || '';
   const controlLinks = ['sort', 'month'].map(kind => element({href: `https://localhost:5173/budgets/home/transactions/2026-10/usd?sort=date:asc`, dataset: {transactionSort: 'date'}, hasAttribute: name => name === 'data-transaction-sort' && kind === 'sort'}));
   const searchForm = element(), pageLink = element({href: 'https://localhost:5173/budgets/home/transactions/2026-10/usd?tx_page=2'});
@@ -97,7 +97,7 @@ function harness(count = 5, options = {}) {
   const context = {document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, queueMicrotask, URL: ReceiptURL,
     crypto: {randomUUID: () => `review-request-${++requestId}`},
     getContext: () => ({bulkReview: options.bulkReview === true, receiptIndexScoped: options.receiptIndexScoped, ...options.context}),
-    encodeURIComponent, location: {href: options.href || 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}},
+    encodeURIComponent, location: {href: options.href || 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}, reload() {reloads.push(true);}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
     initTransactionColumns() {return {dispose() {}};},
     initTransferMatches() {return {dirty:false, flush:async () => true, dispose() {}};},
@@ -149,7 +149,7 @@ function harness(count = 5, options = {}) {
     return true;
   }, ...options});
   return {register, requests, receiptRequests, makeRow, stream: streamCallbacks, imageRequests, receiptControls, objectUrls, revokedUrls,
-    rows: rowList, mutations, controlLinks, bulk, window, feedback, feedbackText, controls, navigations,
+    rows: rowList, mutations, controlLinks, bulk, window, feedback, feedbackText, controls, navigations, reloads,
     chooseAccount: value => pickerChoose(value), isPickerDisposed: () => pickerDisposed,
     choosePeriod: value => periodChoose(value), isPeriodDisposed: () => periodDisposed, reviewLabel, contexts, history, searchForm, pageLink, document: context.document, receiptDialog};
 }
@@ -943,4 +943,66 @@ test('saved rows remain visible under review/search predicates; outside revision
 });
 test('date corrections outside the selected period remain visible until explicit refresh',async()=>{
  const state=harness(1,{paged:true,stream:true,details:true,context:{startDate:'2026-10-01',endDate:'2026-10-31'}});const date=state.rows[0].details[0];date.value='2026-11-01';date.emit('change');await tick();assert.equal(state.requests[0].body.date,'2026-11-01');state.requests[0].resolve({ok:true});await tick();await new Promise(resolve=>setTimeout(resolve,5));assert.equal(state.rows[0].hidden,false);assert.equal(state.mutations.at(-1),true);assert.equal(state.navigations[0].details.summary,true);state.register.dispose();
+});
+
+test('discarding a rejected category edit releases beforeunload and reloads without another write',async()=>{
+  const state=harness(1,{paged:true,details:true});
+  const category=state.rows[0].controls['[data-transaction-field="categoryId"]'];
+  category.value='fictional-category';category.emit('change');
+  state.requests[0].reject(new Error('Unmatch this transfer pair before changing its category.'));
+  await tick();
+  assert.equal(state.register.dirty,true);
+  assert.equal(state.window.emit('beforeunload').event.prevented,true);
+  assert.equal(state.controls['[data-transaction-discard]'].disabled,false);
+  const memo=state.rows[0].controls['[data-transaction-field="note"]'];
+  memo.value='Unsubmitted local draft';memo.emit('input');
+  await state.controls['[data-transaction-discard]'].emit('click').completed;
+  assert.equal(state.reloads.length,1);
+  assert.equal(state.requests.length,1);
+  assert.equal(state.register.dirty,false);
+  assert.equal(await state.register.flush(),true);
+  assert.equal(state.window.emit('beforeunload').event.prevented,false);
+  assert.equal(memo.value,'');
+  assert.equal(category.value,'');
+});
+
+test('discard refuses an active save and becomes available only after it settles',async()=>{
+  const state=harness(1,{paged:true});
+  const category=state.rows[0].controls['[data-transaction-field="categoryId"]'];
+  category.value='fictional-category';category.emit('change');
+  await state.controls['[data-transaction-discard]'].emit('click').completed;
+  assert.equal(state.reloads.length,0);
+  assert.equal(state.register.dirty,true);
+  state.requests[0].reject(new Error('Refused'));await tick();
+  assert.equal(state.controls['[data-transaction-discard]'].disabled,false);
+  await state.controls['[data-transaction-discard]'].emit('click').completed;
+  assert.equal(state.reloads.length,1);
+});
+
+test('discard cannot abandon an unconfirmed native review ticket or change its retry identity',async()=>{
+  const state=harness(2,{paged:true,bulkReview:true});
+  const pending=state.bulk.emit('click').completed;
+  await tick();const intent=state.requests[0].body;
+  state.requests[0].reject(new Error('Unknown review result'));await pending;await tick();
+  assert.equal(state.controls['[data-transaction-discard]'].disabled,true);
+  await state.controls['[data-transaction-discard]'].emit('click').completed;
+  assert.equal(state.reloads.length,0);
+  const retry=state.register.flush();await tick();
+  assert.deepEqual(state.requests[1].body,intent);
+  state.requests[1].resolve({ok:true});assert.equal(await retry,true);
+  state.register.dispose();
+});
+
+test('discard cannot abandon an unconfirmed selected category batch',async()=>{
+  const state=harness(2,{paged:true});
+  const category=state.rows[0].controls['[data-transaction-field="categoryId"]'];
+  category.value='fictional-category';category.emit('change');await tick();
+  const result=categoryResult(state,'fictional-category');state.requests[0].resolve(result);await tick();
+  const intent=state.requests[1].body;state.requests[1].reject(new Error('Unknown category result'));await tick();
+  assert.equal(state.controls['[data-transaction-discard]'].disabled,true);
+  await state.controls['[data-transaction-discard]'].emit('click').completed;
+  assert.equal(state.reloads.length,0);
+  const retry=state.register.flush();await tick();assert.deepEqual(state.requests[2].body,intent);
+  state.requests[2].resolve({...result,revision:'saved'});assert.equal(await retry,true);
+  state.register.dispose();
 });

@@ -4757,3 +4757,4 @@ html[data-sidebar='collapsed'] .app-shell > main { margin-left: 62px; }
 .transactions-table th > .transaction-sort:focus-visible { outline-offset: -3px; }
 .transaction-selection-help { flex: 1; color: var(--text-secondary); font-size: 10px; }
 .transaction-column-resize { z-index: 2; }
+.transaction-feedback > small { flex-basis: 100%; color: var(--text-secondary); }
