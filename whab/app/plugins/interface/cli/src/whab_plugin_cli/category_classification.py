@@ -1,4 +1,4 @@
-"""Explicit Income/Expense category treatment over guarded public operations."""
+"""Explicit Expense/Income/Transfer category treatment over guarded public operations."""
 
 import argparse
 from copy import deepcopy
@@ -6,14 +6,15 @@ from copy import deepcopy
 from .record_edits import RECOVERY, edit_options, intent, saved_edit
 from .transaction_commands import checked
 
-GUIDE = """Income is a financial type, independent of the category/group name and review.
+GUIDE = """Expense, Income and Transfer are financial types independent of display/group names.
+Review is explicit and requires classification. Clearing classification unreviews.
 Posted external inflows in eligible on-budget non-credit accounts fund Ready to
 Assign once. Pending records, transfers, off-budget accounts and credit-card
 inflows do not fund it. Income reversals reduce income; expense-category refunds
 reduce spending. Amounts, balances, merchant whitespace, notes, original/import
 information, categories' IDs/parents/currencies and reviews are preserved.
 
-Income categories have target zero and NO monthly assignments, including zero
+Income and Transfer categories have target zero and NO monthly assignments, including zero
 rows. Conversion refuses existing targets/assignments; create a new Income child
 instead to preserve an old expense envelope. A parent can mix Income and Expense.
 Missing type on older categories remains Expense. No automatic migration, merchant
@@ -33,16 +34,17 @@ Examples (fictional):
   whab "My budget" category classify "Finance / Salary" --type income --agent Codex
   whab "My budget" trnx categorize TX1 TX2 --category "Finance / Salary" --agent Codex
 Categorize supports 1–100 explicit IDs and --dry-run; mixed edits use trnx edit-many.
-Categorization does not change reviewed. Set review explicitly with trnx review.
+Assignment never auto-reviews; clearing classification makes unreviewed.
+Set review explicitly with trnx review; inspect legacy flags with trnx review-audit.
 """
 
 
 def add_classify_parser(actions):
-    parser = actions.add_parser('classify', help='Set Income/Expense treatment without replacing a category',
+    parser = actions.add_parser('classify', help='Set Expense/Income/Transfer treatment without replacing a category',
         description='Explicit financial classification of one existing child. Preview historical totals before applying.',
         epilog=GUIDE + '\n' + RECOVERY, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('category', help='Stable child ID, unique exact name or Group / Category; no fuzzy matching')
-    parser.add_argument('--type', dest='category_kind', required=True, choices=('expense', 'income'), help='Financial treatment; independent of parent/name/review')
+    parser.add_argument('--type', dest='category_kind', required=True, choices=('expense', 'income', 'transfer'), help='Financial treatment; independent of parent/name/review')
     parser.add_argument('--dry-run', action='store_true', help='Read exact proposed kind and monthly totals; never commits or saves')
     edit_options(parser)
 
@@ -59,8 +61,8 @@ def execute_classification(connection, identifier, prefix, args, exchange, error
     for group in expected:
         for row in group['children']:
             if row['id'] == selected['id']:
-                if args.category_kind == 'income':
-                    row['kind'] = 'income'
+                if args.category_kind != 'expense':
+                    row['kind'] = args.category_kind
                 else:
                     row.pop('kind', None)
     original = intent(args, observed, 'classify_category', {'categoryId': selected['id'], 'kind': args.category_kind})

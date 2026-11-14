@@ -26,7 +26,12 @@ def operation(storage, identifier="fictional-native-request"):
     )
 
 
-def test_public_conformance_and_cleanup():
+def test_public_conformance_and_cleanup(tmp_path):
+    storage = create_storage(StorageContext(tmp_path, "sandbox", {}))
+    try:
+        assert storage.supports_classified_review() is True
+    finally:
+        storage.close()
     capabilities = frozenset(Capability) - {Capability.NATIVE_REPLICA}
     run_conformance(BackendAdapter(create_storage, capabilities)).assert_success()
 

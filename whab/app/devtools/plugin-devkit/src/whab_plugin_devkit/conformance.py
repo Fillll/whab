@@ -156,11 +156,12 @@ def _provider_sync(harness, clock):
         store.apply_sync("shared-item", {
             "added": [imported_transaction(clock)], "modified": [], "removed": [],
         }, "cursor-one", [imported_account()], expected_cursor=None)
-    first.edit_transaction("personal", "pending", category, True, "Keep this fictional memo")
+    first.edit_transaction("personal", "pending", category, False, "Keep this fictional memo")
     posted = imported_transaction(clock, "posted", pending=False, pendingTransactionId="pending")
     first.apply_sync("shared-item", {
         "added": [posted], "modified": [], "removed": ["pending"],
     }, "cursor-two", expected_cursor="cursor-one")
+    first.edit_transaction("personal", "posted", reviewed=True)
     rows = {row["id"]: row for row in first.transactions("personal")}
     _check("pending" not in rows, "Pending identity remained active after posting.")
     _check(rows["posted"]["note"] == "Keep this fictional memo", "Posting lost the memo.")

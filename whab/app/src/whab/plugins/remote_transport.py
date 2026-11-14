@@ -347,6 +347,13 @@ class RemoteStore:
     def classify_accounts(self, workspace, edits):
         return self._command('classify_accounts', workspace, {'edits': edits})
 
+    def supports_classified_review(self):
+        try:
+            policy = self._query('review_policy', 'personal')
+        except StoreError:
+            raise StoreError('Unable to verify classified-review support. Check the connection or update the remote authority; no mutation was submitted.') from None
+        return type(policy) is dict and policy.get('version') == 1 and policy.get('classificationRequired') is True
+
     def supports_category_classification(self):
         return True
 

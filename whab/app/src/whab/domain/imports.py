@@ -129,7 +129,7 @@ def imported_account(record: ImportedAccount) -> dict:
     return normalize_account(account)
 
 
-def annotated_transaction(record: ImportedTransaction, annotations: dict) -> dict:
+def annotated_transaction(record: ImportedTransaction, annotations: dict, *, categories=None) -> dict:
     """Apply the latest user edits to a normalized bank record."""
     validate_imported_transaction(record)
     category = (
@@ -161,10 +161,18 @@ def annotated_transaction(record: ImportedTransaction, annotations: dict) -> dic
         result.update(category_agent_fields(annotations['categoryAgent']))
 
     if annotations.get('transferPeerId'):
-        result.update(transferPeerId=annotations['transferPeerId'], isTransfer=True, categoryId=None)
+        result.update(transferPeerId=annotations['transferPeerId'], isTransfer=True)
 
     if "original" in annotations:
         result["original"] = {key: result[key] for key in annotations["original"]}
         for key in annotations["original"]:
             result[key] = annotations[key]
+    if categories is not None:
+        from .review import effective_transfer, review_status
+        result['isTransfer'] = effective_transfer(result, categories)
+        old_eligible = review_status(annotations, categories)['eligible']
+        new_eligible = review_status(result, categories)['eligible']
+        # Untouched legacy invalid flags await explicit cleanup, not upgrade/sync.
+        if (not old_eligible or not new_eligible) and (old_eligible or new_eligible or result['pending'] != annotations.get('pending', False)):
+            result['reviewed'] = False
     return result

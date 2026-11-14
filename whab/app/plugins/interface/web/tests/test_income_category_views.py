@@ -25,7 +25,7 @@ def test_income_categories_are_pickable_but_not_expense_envelopes(client, store)
     assert income_details.status_code == 200 and 'inspector-assignment:' + category not in income_details.text
     insights = client.get('/budgets/home/insights/2026-10/usd').text
     assert 'Explicit Income $5,000.00' in insights
-    # Explicit review stays independent when category is cleared.
+    # Clearing the classification also clears review.
     response = client.patch(f'/api/transactions/{transaction}', json={'workspace': 'personal', 'categoryId': None})
     assert response.status_code == 200
-    assert next(row for row in store.transactions('personal') if row['id'] == transaction)['reviewed'] is True
+    assert next(row for row in store.transactions('personal') if row['id'] == transaction)['reviewed'] is False

@@ -57,8 +57,8 @@ def validate_child_category(category: dict) -> dict:
     if "parentId" in category and category["parentId"] != category_group_id(category["group"]):
         raise StoreError("Category parent does not match its group.")
     validate_category_kind(category.get("kind", "expense"))
-    if category.get("kind") == "income" and category["target"] != 0:
-        raise StoreError("Income categories cannot have an expense target.")
+    if category.get("kind", "expense") != "expense" and category["target"] != 0:
+        raise StoreError("Income and Transfer categories cannot have an expense target.")
     return category.copy()
 
 
@@ -257,8 +257,8 @@ def delete_category_group(state, parent_id):
 
 def validate_category_kind(kind):
     """Financial treatment is explicit and independent of labels and parents."""
-    if type(kind) is not str or kind not in {'expense', 'income'}:
-        raise StoreError('Choose category type expense or income.')
+    if type(kind) is not str or kind not in {'expense', 'income', 'transfer'}:
+        raise StoreError('Choose category type expense, income or transfer.')
     return kind
 
 
@@ -266,10 +266,12 @@ def classify_category(state, category_id, kind):
     """Reclassify a leaf without rewriting transactions, reviews or assignments."""
     validate_category_kind(kind)
     child = ensure_child_category(state['categories'], category_id)
-    if kind == 'income' and (child['target'] != 0 or any(category_id in rows for rows in state['budget'].values())):
-        raise StoreError('Income categories cannot have expense targets or monthly assignments (including zero rows). '
+    if kind != 'expense' and (child['target'] != 0 or any(category_id in rows for rows in state['budget'].values())):
+        raise StoreError('Income and Transfer categories cannot have expense targets or monthly assignments (including zero rows). '
                          'Nothing changed. Use a new Income category to preserve the existing envelope and assignments.')
-    if kind == 'income':
+    if kind != 'transfer' and any(row.get('categoryId') == category_id and row.get('transferPeerId') for row in state['transactions'].values()):
+        raise StoreError('Unmatch the linked transfers before changing their category type.')
+    if kind != 'expense':
         state['categories'][category_id]['kind'] = kind
     else:
         state['categories'][category_id].pop('kind', None)

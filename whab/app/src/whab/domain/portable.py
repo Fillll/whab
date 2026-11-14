@@ -198,8 +198,8 @@ def validate_portable_budget(data: object) -> dict:
         category = category_map.get(assignment["categoryId"])
         if category is None:
             raise StoreError("Portable budget assignment category not found.")
-        if category.get("kind") == "income":
-            raise StoreError("Income categories cannot receive monthly assignments.")
+        if category.get("kind", "expense") != "expense":
+            raise StoreError("Income and Transfer categories cannot receive monthly assignments.")
         key = (assignment["month"], assignment["categoryId"])
         if key in assignment_keys:
             raise StoreError("Duplicate portable budget assignment.")
@@ -220,7 +220,7 @@ def validate_portable_budget(data: object) -> dict:
         if funding["assigned"] < 0:
             raise StoreError("Portable next-month funding cannot be negative.")
     from .transfer_matching import validate_matches
-    validate_matches({'accounts': account_map, 'transactions': {row['id']: row for row in transactions}})
+    validate_matches({'accounts': account_map, 'categories': category_map, 'transactions': {row['id']: row for row in transactions}})
     mode_keys = set()
     for policy in rollover_modes:
         _text(policy["month"], limit=7)

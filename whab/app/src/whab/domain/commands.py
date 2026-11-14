@@ -119,10 +119,10 @@ def add_transaction(
         "amount": amount,
         "categoryId": category,
         "pending": False,
-        "reviewed": source == "demo",
+        "reviewed": source == "demo" and category is not None,
         "source": source,
         "note": note,
-        "isTransfer": False,
+        "isTransfer": state["categories"].get(category, {}).get("kind") == "transfer",
         "inferredTransfer": False,
         "categoryEdited": source == "manual",
         "deleted": False,
@@ -150,6 +150,12 @@ def edit_transaction(
         raise StoreError("Invalid review status.")
     if note is not UNSET and (not isinstance(note, str) or len(note) > 1000):
         raise StoreError("Invalid note.")
+    from .review import review_status
+    previous_eligible = review_status(transaction, state['categories'])['eligible']
+    candidate = {**transaction, **({'categoryId': category_id} if category_id is not UNSET else {})}
+    status = review_status(candidate, state['categories'])
+    if reviewed is True and not status['eligible']:
+        raise StoreError(f"{transaction_id}: {status['reason']}")
     if category_agent is not UNSET:
         from .transactions import validate_category_agent
         validate_category_agent(category_agent)
@@ -163,12 +169,14 @@ def edit_transaction(
         transaction.update(
             categoryId=category_id,
             categoryEdited=True,
-            isTransfer=False
+            isTransfer=state["categories"].get(category_id, {}).get("kind") == "transfer"
             if category_id is not None
             else transaction.get("inferredTransfer", False),
         )
     if reviewed is not None:
         transaction["reviewed"] = reviewed
+    elif category_id is not UNSET and (not previous_eligible or not status["eligible"]):
+        transaction["reviewed"] = False
     if note is not UNSET:
         transaction["note"] = note
 
@@ -206,7 +214,7 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
     # Annotation validation sees the new account/category pair, without exposing
     # a partly corrected record to the caller when any validation fails.
     detached = {**state, "transactions": {transaction_id: candidate}}
-    edit_transaction(detached, transaction_id, UNSET if transaction.get('transferPeerId') and 'categoryId' not in changes else candidate.get("categoryId"),
+    edit_transaction(detached, transaction_id, changes.get('categoryId', UNSET),
                      changes.get("reviewed"), changes.get("note", UNSET),
                      category_agent=changes.get('categoryAgent', UNSET))
     if "categoryId" not in changes:

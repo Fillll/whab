@@ -359,7 +359,7 @@ def test_category_projection_reads_history_independently_of_category_count(state
             return super().__getitem__(key)
 
     public_transaction = budget.public_transaction
-    monkeypatch.setattr(budget, "public_transaction", lambda row: CountedTransaction(public_transaction(row)))
+    monkeypatch.setattr(budget, "public_transaction", lambda row, **kwargs: CountedTransaction(public_transaction(row, **kwargs)))
     state["categories"] = {
         f"category-{index}": {
             "id": f"category-{index}", "name": f"Category {index}", "group": "Everyday", "target": 0,
@@ -454,10 +454,10 @@ def test_only_selected_month_rows_become_public_transactions_in_stable_order(sta
     projected = []
     public_transaction = budget.public_transaction
 
-    def selected_transaction(row):
+    def selected_transaction(row, **kwargs):
         assert row["date"].startswith("2026-09")
         projected.append(row["id"])
-        return public_transaction(row)
+        return public_transaction(row, **kwargs)
 
     monkeypatch.setattr(budget, "public_transaction", selected_transaction)
     state["transactions"] = {

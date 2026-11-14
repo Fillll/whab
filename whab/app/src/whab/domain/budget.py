@@ -111,6 +111,8 @@ def _currency_history(state: dict) -> dict:
             continue
         category = row.get("categoryId")
         amount = row["amount"]
+        if state['categories'].get(category, {}).get('kind') == 'transfer':
+            continue
         if state['categories'].get(category, {}).get('kind') == 'income':
             if state['accounts'][row['accountId']].get('type') != 'credit':
                 income[source] -= amount
@@ -160,7 +162,7 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         )
     budget = []
     for category in state["categories"].values():
-        if category.get("kind") == "income":
+        if category.get("kind", "expense") != "expense":
             continue
         category_id = category["id"]
         assigned = state["budget"].get(month, {}).get(category_id, 0) if month >= start else 0
@@ -221,7 +223,7 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         "accounts": accounts,
         "categories": [category.copy() for category in state["categories"].values()],
         "transactions": sorted(
-            [public_transaction({**row, "currency": currency}) for row in history["transactions"].get(month, ())],
+            [public_transaction({**row, "currency": currency}, categories=state["categories"]) for row in history["transactions"].get(month, ())],
             key=lambda t: (t["date"], t["id"]), reverse=True,
         ),
         "budget": budget,
@@ -235,8 +237,8 @@ def ensure_assignment_allowed(
     state: dict, category_id: str, month: str, assigned: int, as_of_month: str
 ) -> None:
     category = ensure_child_category(state["categories"], category_id)
-    if category.get("kind") == "income":
-        raise StoreError("Income categories cannot receive monthly assignments.")
+    if category.get("kind", "expense") != "expense":
+        raise StoreError("Income and Transfer categories cannot receive monthly assignments.")
     currency = category.get("currency", "USD")
     if month < state["budgetStartMonth"]:
         raise StoreError(
@@ -403,8 +405,8 @@ def _prepare_workspace(state: dict) -> dict:
     )
     for rows in state["budget"].values():
         for category_id in rows:
-            if _known_child_category(categories, category_id).get("kind") == "income":
-                raise StoreError("Income categories cannot receive monthly assignments.")
+            if _known_child_category(categories, category_id).get("kind", "expense") != "expense":
+                raise StoreError("Income and Transfer categories cannot receive monthly assignments.")
     transactions = defaultdict(dict)
     for key, row in state["transactions"].items():
         account = accounts.get(row["accountId"])

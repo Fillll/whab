@@ -1,6 +1,6 @@
 [project]
 name = "whab_plugin_example_storage"
-version = "1.0.3"
+version = "1.0.4"
 description = "Independent POSIX native snapshot-storage teaching plugin for WHAB"
 readme = "README.md"
 requires-python = ">=3.15,<3.16"

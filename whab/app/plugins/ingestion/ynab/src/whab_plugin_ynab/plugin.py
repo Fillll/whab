@@ -33,7 +33,7 @@ def workspace_import(raw: bytes) -> WorkspaceImport:
             "categoryId": row.category_id,
             # YNAB uncleared means unverified, not a bank authorization hold.
             "pending": False,
-            "reviewed": row.cleared in {"cleared", "reconciled"},
+            "reviewed": row.category_id is not None and row.cleared in {"cleared", "reconciled"},
             "source": "ynab",
             "note": note,
             "isTransfer": row.is_transfer,
