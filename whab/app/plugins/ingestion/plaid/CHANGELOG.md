@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.9.3 — 2026-11-15
+
+PR: [#209](https://github.com/Fillll/whab/pull/209)
+
+- Round browser investment totals, activity amounts and unit prices to comma-grouped whole currency units, with halves away from zero. Mask unavailable monetary results too; retain exact provider, CLI/API and stored values, percentages and quantities.
+
 ## 1.9.2 — 2026-11-15
 
 PR: [#208](https://github.com/Fillll/whab/pull/208)

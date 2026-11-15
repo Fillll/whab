@@ -79,15 +79,28 @@
       if (!rect.width || !rect.height) return null;
       const control=[...element.querySelectorAll('input[data-private-amount], button[data-private-mask], [data-money-display]')].find(node=>node.getBoundingClientRect().width);
       const editor=control?.getBoundingClientRect();
-      return {index,x:rect.x,y:rect.y,width:rect.width,height:rect.height,editor:editor?{x:editor.x,y:editor.y,width:editor.width,height:editor.height}:null};
+      // Cell coordinates are relative to their table; editor coordinates are relative to the cell.
+      // Keyboard scrollIntoView must not look like a privacy layout change.
+      const anchor=(element.closest('table') || element.parentElement).getBoundingClientRect();
+      return {index,x:rect.x-anchor.x,y:rect.y-anchor.y,width:rect.width,height:rect.height,right:anchor.right-rect.right,
+        editor:editor?{x:editor.x-rect.x,y:editor.y-rect.y,width:editor.width,height:editor.height,right:rect.right-editor.right}:null};
     }).filter(Boolean);
   }
   function measureGeometry() {
     if (!layoutReady) return;
     const next=visibleGeometry();
     if (geometry && geometry.mode!==document.documentElement.dataset.amounts && geometry.page===byId('fixture-page-title').textContent && geometry.width===innerWidth) {
-      const same=JSON.stringify(geometry.boxes)===JSON.stringify(next);
-      byId('fixture-geometry').textContent=`Privacy layout: ${same?'PASS — identical cell and editor geometry':'CHECK — layout changed'} (${next.length} visible boxes)`;
+      const differences=[];
+      for (const [position,box] of next.entries()) {
+        const before=geometry.boxes[position];
+        if (!before || before.index!==box.index) {differences.push(`box ${box.index}: visibility changed`);continue;}
+        for (const key of ['x','y','width','height','right']) {
+          if (before[key]!==box[key]) differences.push(`box ${box.index} ${key}: ${before[key]} → ${box[key]}`);
+          if (before.editor?.[key]!==box.editor?.[key]) differences.push(`box ${box.index} editor.${key}: ${before.editor?.[key]} → ${box.editor?.[key]}`);
+        }
+      }
+      if (geometry.boxes.length!==next.length) differences.push(`visible boxes: ${geometry.boxes.length} → ${next.length}`);
+      byId('fixture-geometry').textContent=`Privacy layout: ${differences.length?'CHECK — '+differences.slice(0,8).join('; '):'PASS — identical cell and editor geometry'} (${next.length} visible boxes)`;
     } else byId('fixture-geometry').textContent=`Layout baseline recorded (${next.length} visible boxes)`;
     geometry={mode:document.documentElement.dataset.amounts,page:byId('fixture-page-title').textContent,width:innerWidth,boxes:next};
   }
