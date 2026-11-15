@@ -185,7 +185,7 @@ def test_new_budget_preview_is_read_only_and_commit_keeps_source_and_demo_intact
         target = headers["x-import-operation"]
         assert result["id"] == target and result["opened"] and not result["alreadyImported"]
         assert result["counts"] == {"accounts": 1, "categories": 1, "transactions": 1, "assignments": 1}
-        assert result["url"] == "/budgets/imported-budget/accounts/current-month/usd"
+        assert result["url"] == "/budgets/imported-budget/accounts"
         assert "set-cookie" not in imported.headers
         assert store.state("personal") == original and store.state("demo") == demo
         assert client.get("/api/budget").json()["id"] == "default"
@@ -371,7 +371,7 @@ def test_named_import_persists_unicode_name_and_retries_preserve_it(store, tmp_p
         assert set(tmp_path.rglob("*")) == before
         response = client.post(BASE + "new/commit", content=RAW, headers=headers)
         assert response.status_code == 200, response.text
-        assert response.json()["url"] == "/budgets/fictional-cafe/accounts/current-month/usd"
+        assert response.json()["url"] == "/budgets/fictional-cafe/accounts"
         assert client.get(f"/budgets/{target}/api/budget").json()["name"] == name
     with client_for(store, tmp_path) as client:
         retry = client.post(BASE + "new/commit", content=RAW, headers={**headers, "x-import-budget-name": "Another name"})

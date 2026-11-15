@@ -36,3 +36,15 @@ test('month controls retain account, filters and currency for short and old book
     assert.equal(target.searchParams.has('tx_page'), false);
   }
 });
+
+test('Accounts addresses have no period or currency and legacy bookmarks parse to the same view', () => {
+  const base = new URL('https://localhost:5173/budgets/fictional/accounts');
+  const expected = {budget: 'fictional', accountSlug: null, page: 'accounts', month: null, currency: null};
+  for (const suffix of ['', '/current-month/usd', '/2026-10/eur']) {
+    assert.deepEqual(JSON.parse(JSON.stringify(runtime.parsePageRoute(new URL(base.href + suffix)))), expected);
+  }
+  assert.equal(runtime.pagePath('/budgets/fictional', 'accounts', '2026-10', 'EUR', 'wallet'), '/budgets/fictional/accounts');
+  for (const suffix of ['/current-month', '/usd', '/2026-10/eur/extra']) {
+    assert.equal(runtime.parsePageRoute(new URL(base.href + suffix)), null);
+  }
+});

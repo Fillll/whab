@@ -14,12 +14,16 @@ export function getContext() {
 }
 
 export function parsePageRoute(url) {
+  const accounts = url.pathname.match(/^\/budgets\/([^/]+)\/accounts$/);
+  if (accounts) return {budget: accounts[1], accountSlug: null, page: 'accounts', month: null, currency: null};
   const match = url.pathname.match(/^\/budgets\/([^/]+)\/(?:([^/]+)\/)?(budget|transactions|insights|accounts|subscriptions)\/(current-month|\d{4}-\d{2})(?:\/([a-z]{3}))?$/);
   if (!match || (match[2] || !match[5]) && match[3] !== 'transactions') return null;
+  if (match[3] === 'accounts') return {budget: match[1], accountSlug: null, page: 'accounts', month: null, currency: null};
   return {budget: match[1], accountSlug: match[2] || null, page: match[3], month: match[4], currency: match[5] || 'usd'};
 }
 
 export function pagePath(budgetUrl, page, month, currency, accountSlug = null) {
+  if (page === 'accounts') return `${budgetUrl}/accounts`.toLowerCase();
   const accountPath = page === 'transactions' && accountSlug ? `${accountSlug}/` : '';
   const suffix = page === 'transactions' && currency.toLowerCase() === 'usd' ? '' : `/${currency}`;
   return `${budgetUrl}/${accountPath}${page}/${month}${suffix}`.toLowerCase();

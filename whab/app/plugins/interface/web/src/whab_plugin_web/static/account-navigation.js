@@ -12,7 +12,8 @@ export function isAccountDestination(target, current, context = {}) {
   const source = parsePageRoute(current);
   return Boolean(source && destination && target.origin === current.origin &&
     target.protocol === 'https:' && destination.page === 'transactions' &&
-    sameBudget(source.budget, destination.budget, context) && source.currency === destination.currency && !target.hash);
+    sameBudget(source.budget, destination.budget, context) &&
+    (source.currency || context.currency?.toLowerCase()) === destination.currency && !target.hash);
 }
 
 export function isPageDestination(target, current, context = {}) {
@@ -21,7 +22,8 @@ export function isPageDestination(target, current, context = {}) {
   return Boolean(context.pageFragments === true && source && destination &&
     target.origin === current.origin && target.protocol === 'https:' &&
     sameBudget(source.budget, destination.budget, context) &&
-    source.currency === destination.currency && !target.hash && !target.username && !target.password);
+    (destination.page === 'accounts' || (source.currency || context.currency?.toLowerCase()) === destination.currency) &&
+    !target.hash && !target.username && !target.password);
 }
 
 export function preserveTransactionFilters(target, current) {
@@ -69,7 +71,8 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
     const canonicalRoute = parsePageRoute(canonical);
     if (currentRoute && canonicalRoute && canonical.origin === displayed.origin &&
         sameBudget(currentRoute.budget, canonicalRoute.budget, initialContext) &&
-        ['page', 'month', 'currency'].every(key => currentRoute[key] === canonicalRoute[key])) {
+        currentRoute.page === canonicalRoute.page && (currentRoute.page === 'accounts' ||
+          ['month', 'currency'].every(key => currentRoute[key] === canonicalRoute[key]))) {
       canonical.hash = displayed.hash;
       if (canonical.href !== displayed.href) window.history.replaceState(window.history.state, '', canonical.href);
       displayed = canonical;
@@ -105,14 +108,16 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
     for (const link of document.querySelectorAll('.sidebar a[href]')) {
       const url = new URL(link.href, target);
       const source = parsePageRoute(url);
-      if (!source || url.origin !== target.origin || !sameBudget(source.budget, nextRoute.budget, context) || source.currency !== nextRoute.currency) continue;
+      if (!source || url.origin !== target.origin || !sameBudget(source.budget, nextRoute.budget, context) ||
+          source.currency && nextRoute.currency && source.currency !== nextRoute.currency) continue;
       if (summary) {
         if (source.page === 'transactions' && link.classList.contains('nav-item')) syncReviewCount(link, countTemplate);
         continue;
       }
       const accountId = link.dataset?.accountId || url.searchParams.get('account') || Object.keys(accountSlugs).find(id => accountSlugs[id] === source.accountSlug);
       const accountSlug = accountSlugs[accountId] || source.accountSlug;
-      url.pathname = pagePath(context.budgetUrl || `/budgets/${nextRoute.budget}`, source.page, nextRoute.month, source.currency, accountSlug);
+      url.pathname = pagePath(context.budgetUrl || `/budgets/${nextRoute.budget}`, source.page,
+        nextRoute.month || context.monthToken, source.currency || context.currency, accountSlug);
       if (accountSlug) url.searchParams.delete('account');
       link.href = url.href;
       if (link.classList.contains('sidebar-account')) {
@@ -194,14 +199,14 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
     controller = null;
     busy(false);
     try {
-      if (!(await flush())) throw new Error('Save the transaction edit before changing accounts.');
+      if (!(await flush())) throw new Error('Save or resolve the current edit before leaving this page.');
     } catch (failure) {
       if (revision !== request || disposed) return !summary;
       if (action === 'none') window.history.replaceState(window.history.state, '', displayed.href);
       pendingTarget = null;
       pendingCancel?.();
       pendingCancel = null;
-      notify(failure.message || 'Save the transaction edit before continuing.');
+      notify(failure.message || 'Save or resolve the current edit before leaving this page.');
       return !summary;
     }
     if (revision !== request || disposed) return !summary;
@@ -234,9 +239,12 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
           previous.budgetId && context.budgetId !== previous.budgetId ||
           previous.workspace && context.workspace !== previous.workspace ||
           previous.uiGeneration && context.uiGeneration !== previous.uiGeneration ||
-          context.page !== expected.page || actual.page !== expected.page || context.monthToken !== expected.month ||
-          actual.month !== expected.month || context.currency.toLowerCase() !== expected.currency ||
-          actual.currency !== expected.currency || expected.page === 'transactions' && !matchesTransactionFilters(target, context) ||
+          context.currency !== previous.currency ||
+          context.page !== expected.page || actual.page !== expected.page || expected.page !== 'accounts' && (
+            context.monthToken !== expected.month || actual.month !== expected.month ||
+            context.currency.toLowerCase() !== expected.currency || actual.currency !== expected.currency) ||
+          expected.page === 'accounts' && context.monthToken !== 'current-month' ||
+          expected.page === 'transactions' && !matchesTransactionFilters(target, context) ||
           generic && (context.pageFragments !== true || !fresh.dataset.pageAssets ||
             expected.page !== 'transactions' && JSON.stringify([...canonical.searchParams].sort()) !== JSON.stringify([...target.searchParams].sort()) ||
             fresh.dataset.pageAssets !== document.querySelector('main')?.dataset.pageAssets) ||

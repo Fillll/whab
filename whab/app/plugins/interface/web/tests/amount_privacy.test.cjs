@@ -27,6 +27,7 @@ class Element {
     return (!match[1] || this.tag === match[1]) && (!match[2] || this.hasAttribute(match[2]) && (match[3] === undefined || this.getAttribute(match[2]) === match[3]));
   }
   closest(selector) {return this.matches(selector) ? this : this.parentElement?.closest(selector) || null;}
+  querySelector(selector) {return this.querySelectorAll(selector)[0] || null;}
   querySelectorAll(selector) {return this.children.flatMap(child => [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)]);}
   setAttribute(name, value) {this.attributes[name] = String(value);}
   getAttribute(name) {return this.attributes[name] ?? null;}
@@ -52,8 +53,8 @@ function harness({saved, blocked = false, preparse = false} = {}) {
   document.documentElement = root; document.append(root);
   document.createElement = tag => new Element(tag);
   document.createElementNS = (namespace, tag) => {const node = new Element(tag); node.namespaceURI = namespace; return node;};
-  const body = new Element('body'), toggle = new Element('button', {'data-amount-privacy-toggle': '', hidden: ''}), status = new Element('span', {'data-amount-privacy-status': ''});
-  const amount = new Element('span', {'data-private-amount': '$XX', title: '$1,234.56 available'}, '$1,234.56');
+  const body = new Element('body', {'data-private-currency': 'USD'}), toggle = new Element('button', {'data-amount-privacy-toggle': '', hidden: ''}), status = new Element('span', {'data-amount-privacy-status': ''});
+  const amount = new Element('span', {'data-private-amount': '', title: '$1,234.56 available'}, '$1,234.56');
   const input = new Element('input', {'data-private-amount': '', 'aria-label': 'Assign $234.56', title: '$234.56'}); input.value = '234.56';
   const label = new Element('span', {'data-private-amount-attributes': 'title aria-label aria-valuenow', title: 'Available $1,234.56', 'aria-label': 'Balance $1,234.56', 'aria-valuenow': '1234.56'});
   const ordinary = new Element('span', {}, 'November 2026 · 19 transactions · 20%');
@@ -88,8 +89,8 @@ test('prepaint preference precedes body parsing; placeholders keep a fixed lengt
   h.parse();
   assert.equal(h.toggle.hidden, false); assert.equal(h.toggle.getAttribute('aria-label'), 'Show amounts');
   assert.equal(h.toggle.getAttribute('aria-pressed'), 'true');
-  assert.equal(h.amount.textContent, '$1,234.56'); assert.equal(h.amount.nextElementSibling.textContent, '$XX');
-  assert.equal(h.amount.nextElementSibling.hidden, false); assert.equal(h.input.nextElementSibling.textContent, 'XX');
+  assert.equal(h.amount.textContent, '$1,234.56'); assert.equal(h.amount.nextElementSibling.textContent, '$X,XXX');
+  assert.equal(h.amount.nextElementSibling.hidden, false); assert.equal(h.input.nextElementSibling.textContent, '$X,XXX');
   assert.equal(h.ordinary.nextElementSibling, null); assert.equal(h.ordinary.textContent, 'November 2026 · 19 transactions · 20%');
   assert.equal(h.amount.title, 'Amount hidden'); assert.equal(h.input.getAttribute('aria-label'), 'Amount hidden');
   assert.equal(h.label.getAttribute('aria-valuenow'), null); assert.equal(h.label.title, 'Amount hidden');
@@ -118,14 +119,45 @@ test('hiding a focused money draft cannot cause blur/change saves; reveal retain
   assert.equal(h.emit('change', unrelated).immediate, false); assert.equal(saves, 1);
 });
 
+test('currency masks use one fixed four-digit pattern for every size, sign and precision', () => {
+  const h = harness({saved: 'hidden'});
+  for (const value of ['0', '5', '99.99', '1234.56', '-123456789.000', '000123.4500', '']) {
+    h.input.value = value; h.refresh();
+    assert.equal(h.input.nextElementSibling.textContent, '$X,XXX');
+    assert.equal(h.input.value, value);
+  }
+  for (const [currency, expected] of [['JPY', 'JPY X,XXX'], ['KWD', 'KWD X,XXX'], ['EUR', 'EUR X,XXX'], ['', 'X,XXX'], ['bad-currency', 'X,XXX']]) {
+    h.change(h.input, 'data-private-currency', currency);
+    assert.equal(h.input.nextElementSibling.textContent, expected);
+    assert.doesNotMatch(h.input.nextElementSibling.textContent, /\d/);
+  }
+  h.change(h.input, 'data-private-amount', 'Hidden balance');
+  assert.equal(h.input.nextElementSibling.textContent, 'Hidden balance', 'Explicit fixed plugin placeholders retain their contract');
+});
+
+test('monetary masks follow account currency choices without editing or saving the amount', () => {
+  const h = harness({saved: 'hidden'});
+  const form = new Element('form'), currency = new Element('select', {name: 'currency'});
+  const balance = new Element('span', {'data-private-amount':'', 'data-private-currency':'USD'}, '$1,234.56');
+  currency.value = 'EUR'; form.append(currency, h.input, balance); h.body.append(form); h.refresh();
+  assert.equal(h.input.nextElementSibling.textContent, 'EUR X,XXX');
+  assert.equal(balance.nextElementSibling.textContent, '$X,XXX', 'Committed balance keeps its own currency while a different currency is only a draft');
+  currency.value = 'JPY'; h.emit('change', currency);
+  assert.equal(h.input.nextElementSibling.textContent, 'JPY X,XXX');
+  assert.equal(h.input.value, '234.56');
+  assert.equal(h.writes.length, 0);
+  h.change(balance, 'data-private-currency', 'JPY');
+  assert.equal(balance.nextElementSibling.textContent, 'JPY X,XXX', 'A refreshed saved balance adopts its authoritative currency');
+});
+
 test('dynamic rows and genuine metadata updates remain masked and restore the latest exact data', () => {
   const h = harness({saved: 'hidden'});
   h.change(h.label, 'title', 'Available $9,876.00'); assert.equal(h.label.title, 'Amount hidden');
   h.change(h.label, 'aria-valuenow', '9876'); assert.equal(h.label.getAttribute('aria-valuenow'), null);
   h.change(h.input, 'aria-label', null); assert.equal(h.input.getAttribute('aria-label'), null);
-  h.amount.textContent = '-$9,876.00'; h.refresh(); assert.equal(h.amount.nextElementSibling.textContent, '$XX');
+  h.amount.textContent = '-$9,876.00'; h.refresh(); assert.equal(h.amount.nextElementSibling.textContent, '$X,XXX');
   const fresh = new Element('span', {'data-private-amount': ''}, '999999999.99'); h.body.append(fresh); h.refresh();
-  assert.equal(fresh.nextElementSibling.textContent, 'XX'); assert.equal(fresh.nextElementSibling.hidden, false);
+  assert.equal(fresh.nextElementSibling.textContent, '$X,XXX'); assert.equal(fresh.nextElementSibling.hidden, false);
   const oldMask = h.amount.nextElementSibling; h.amount.remove(); h.refresh(); assert.equal(oldMask.isConnected, false);
   assert.equal(h.amount.title, '$1,234.56 available');
   h.body.append(h.amount); h.refresh(); assert.equal(h.amount.title, 'Amount hidden');
@@ -158,7 +190,7 @@ test('opaque sections, hidden controls and SVG text preserve their own visibilit
   h.input.style.display = ''; h.refresh(); assert.equal(h.input.nextElementSibling.hidden, false);
   const svg = h.document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   const text = h.document.createElementNS(svg.namespaceURI, 'text'); text.setAttribute('data-private-amount', ''); text.setAttribute('x', '42'); text.setAttribute('y', '17'); text.textContent = '$75'; svg.append(text); h.body.append(svg); h.refresh();
-  const mask = text.nextElementSibling; assert.equal(mask.namespaceURI, svg.namespaceURI); assert.equal(mask.getAttribute('x'), '42'); assert.equal(mask.getAttribute('y'), '17'); assert.equal(mask.textContent, 'XX');
+  const mask = text.nextElementSibling; assert.equal(mask.namespaceURI, svg.namespaceURI); assert.equal(mask.getAttribute('x'), '42'); assert.equal(mask.getAttribute('y'), '17'); assert.equal(mask.textContent, '$X,XXX');
   h.click(h.toggle); assert.equal(mask.hidden, true); assert.equal(text.textContent, '$75');
 });
 

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "ynab",
-  "summary": "YNAB ZIP importer: local preview/atomic import and a complete ordered CLI migration workflow, including classification, optional shared Plaid setup and six-hour updates.",
+  "summary": "YNAB ZIP importer: local preview/atomic import and a complete ordered CLI migration workflow, including classification, optional shared Plaid setup and six-hour updates. Successful browser imports accept the same-origin /budgets/BUDGET/accounts destination from WHAB 2.80+ as well as legacy month/currency Accounts paths, retaining returned-budget identity checks.",
   "delegates": [],
   "operations": [
     {

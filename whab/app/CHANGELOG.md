@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.80.0 — 2026-11-15
+
+PR: [#208](https://github.com/Fillll/whab/pull/208)
+
+- Add canonical `/budgets/BUDGET/accounts` addresses without date or currency segments. Preserve legacy links, budget aliases, isolated routing and all-currency account management; use saved default currency for outgoing workspace navigation.
+
 ## 2.79.0 — 2026-11-14
 
 PR: [#204](https://github.com/Fillll/whab/pull/204)

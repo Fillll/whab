@@ -260,8 +260,15 @@ import behavior.
 
 ### Amount privacy in Web
 
-With Web 1.61+, the top-right eye also masks investment totals, position values,
+With Web 1.62+, the top-right eye also masks investment totals, position values,
 cost basis, unrealized money returns, unit prices and activity amounts/fees. Plaid
-1.9.1 emits display-only `data-private-amount` spans; account names, dates and
+1.9.2 emits display-only `data-private-amount` spans with their currency; account names, dates and
 nonfinancial controls remain available. No provider request, financial value or
-saved report changes when the eye is toggled. Other interfaces ignore the markers.
+saved report changes when the eye is toggled. Every USD amount uses the same
+`$X,XXX` mask; other currencies use `CODE X,XXX`, without exposing actual digit
+count or decimals. Other interfaces ignore the markers.
+
+Plaid 1.9.2 accepts the canonical `/budgets/BUDGET/accounts` OAuth return path
+from WHAB 2.80+ as well as retained month/currency Accounts paths. Continuation,
+origin and original budget checks stay unchanged; no new bank connection or sync
+is triggered by the address change.

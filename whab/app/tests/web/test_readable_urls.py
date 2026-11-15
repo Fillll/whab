@@ -35,7 +35,7 @@ def test_budget_and_account_names_make_readable_urls_while_ids_own_api_scope(tmp
         response = client.get(canonical)
         assert "Selected fixture" in response.text and "Other fixture" not in response.text
         assert context(response)["selectedAccountId"] == account
-        assert 'href="/budgets/my-budget/accounts/current-month/usd"' in response.text
+        assert 'href="/budgets/my-budget/accounts"' in response.text
         assert "set-cookie" not in response.headers
         assert client.get("/budgets/my-budget/api/workspace?workspace=personal").status_code == 200
         assert client.get("/budgets/my-budget/api/workspace?workspace=demo").status_code == 400

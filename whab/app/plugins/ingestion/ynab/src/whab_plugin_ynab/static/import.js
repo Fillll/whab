@@ -157,7 +157,7 @@ function bindPanel(panel) {
       const result = await request('commit', selected.file, selected.fingerprint, selected.operation, selected.budgetName, selected.parserIdentity);
       const target = new URL(result.url, location.origin);
       if (target.origin !== location.origin || typeof result.id !== 'string' ||
-          !/^[a-f0-9-]{36}$/.test(result.id) || !/^\/budgets\/[a-z0-9]+(?:-[a-z0-9]+)*\/accounts\/current-month\/usd$/.test(target.pathname) ||
+          !/^[a-f0-9-]{36}$/.test(result.id) || !/^\/budgets\/[a-z0-9]+(?:-[a-z0-9]+)*\/accounts(?:\/current-month\/usd)?$/.test(target.pathname) ||
           target.search || target.hash) {
         throw new Error('The imported budget could not be opened. Retry to open the same budget.');
       }

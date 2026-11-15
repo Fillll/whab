@@ -34,7 +34,7 @@ export function initTransferMatches({root, api, context, before, saved}) {
     const amount = new Intl.NumberFormat(undefined, {style:'currency', currency:row.currency}).format(-row.amount / 10 ** digits);
     const block = el('div', undefined, 'transfer-match-leg');
     const heading = el('strong', `${row.accountName} · `), value = el('span', amount);
-    value.dataset.privateAmount = ''; heading.append(value);
+    value.dataset.privateAmount = ''; value.dataset.privateCurrency = row.currency; heading.append(value);
     block.append(heading,
       el('span', `${row.date} · ${row.merchant}`), el('small', row.id));
     return block;

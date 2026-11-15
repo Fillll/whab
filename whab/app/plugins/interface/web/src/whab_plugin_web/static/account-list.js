@@ -11,7 +11,7 @@ export function initAccountList({root = document, api, updateFields, onDraft = (
   const list = root.querySelector('[data-account-management]');
   if (!list) return {dirty: false, flush: async () => true, dispose() {}};
   const context = {...getContext()}, workspace = list.dataset.workspace;
-  const controller = new AbortController(), editors = new Map();
+  const controller = new AbortController(), editors = new Map(), visibilityWrites = new Set();
   let disposed = false, refresh = Promise.resolve();
   const listen = (target, event, callback) => target.addEventListener(event, callback, {signal: controller.signal});
   function feedback(form, message = '', failure = false) {
@@ -58,7 +58,8 @@ export function initAccountList({root = document, api, updateFields, onDraft = (
           const label = freshForm.elements[name]?.getAttribute('aria-label');
           if (label) form.elements[name]?.setAttribute('aria-label', label);
         }
-        form.querySelector('[data-sidebar-visible]').disabled = form.elements.closed.value === 'true';
+        const visibility = form.querySelector('[data-sidebar-visible]');
+        visibility.disabled = form.elements.closed.value === 'true' || visibilityWrites.has(visibility);
         const register = form.querySelector('[data-account-register]');
         register.href = freshForm.querySelector('[data-account-register]').href;
       }
@@ -135,11 +136,12 @@ export function initAccountList({root = document, api, updateFields, onDraft = (
     listen(form, 'submit', event => {event.preventDefault(); void save();});
     listen(form.querySelector('[data-account-cancel]'), 'click', () => {
       if (pending) return;
-      for (const name of ['name', 'onBudget', 'type', 'subtype']) {
+      for (const name of ['name', 'onBudget', 'type', 'subtype', 'closed']) {
         form.elements[name].value = committed[name] === null ? '' : String(committed[name]);
         if (name === 'onBudget' || name === 'type') updateFields(form);
       }
       if (loaded) {currency.value = committed.currency; if (website) website.value = committed.bankWebsite;}
+      visibility.disabled = committed.closed || visibilityWrites.has(visibility);
       logo.reset(); if (loaded) logo.ready();
       feedback(form); draft();
     });
@@ -149,7 +151,8 @@ export function initAccountList({root = document, api, updateFields, onDraft = (
       if (!extra.hidden) void details();
     });
     listen(visibility, 'change', async () => {
-      if (visibility.disabled) return;
+      if (visibility.disabled || visibilityWrites.has(visibility)) return;
+      visibilityWrites.add(visibility);
       onDraft(); const desired = visibility.checked; visibility.disabled = true;
       feedback(form, 'Saving sidebar visibility…');
       try {
@@ -157,13 +160,17 @@ export function initAccountList({root = document, api, updateFields, onDraft = (
         if (disposed) return;
         visible = desired; feedback(form, 'Saved.'); await synchronize(form);
       } catch (error) {if (!disposed) {visibility.checked = visible; feedback(form, error.message, true);}}
-      finally {if (!disposed) visibility.disabled = false;}
+      finally {
+        visibilityWrites.delete(visibility);
+        if (!disposed) visibility.disabled = form.elements.closed.value === 'true';
+      }
     });
   }
-  const dirty = () => [...editors.values()].some(editor => editor.dirty) || !!list.querySelector('[data-sidebar-visible]:disabled');
+  // Archived accounts disable this control permanently; disabled does not mean saving.
+  const dirty = () => [...editors.values()].some(editor => editor.dirty) || visibilityWrites.size > 0;
   listen(window, 'beforeunload', event => {if (dirty()) {event.preventDefault(); event.returnValue = '';}});
   return {get dirty() {return dirty();}, async flush() {
-    if (list.querySelector('[data-sidebar-visible]:disabled')) return false;
+    if (visibilityWrites.size) return false;
     for (const editor of editors.values()) if (!(await editor.save())) return false;
     return true;
   }, dispose() {disposed = true; controller.abort();}};

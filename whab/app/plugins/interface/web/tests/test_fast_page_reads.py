@@ -2,6 +2,8 @@
 
 
 def test_account_management_and_settings_need_no_envelope_or_portable_history(client, store, monkeypatch):
+    monkeypatch.setattr("whab.web.routes.pages.current_month", lambda: "2026-10")
+    monkeypatch.setattr("whab.web.transaction_filters.current_month", lambda: "2026-10")
     account = store.add_account("personal", {"name": "Fast wallet", "type": "depository", "balance": 12345})
     store.add_transaction("personal", {"accountId": account, "date": "2026-10-05",
                                            "merchant": "Review me", "amount": 100, "categoryId": None})
@@ -11,7 +13,7 @@ def test_account_management_and_settings_need_no_envelope_or_portable_history(cl
 
     for name in ("workspace", "state", "export_budget", "transactions"):
         monkeypatch.setattr(store, name, full_history)
-    response = client.get("/budgets/home/accounts/2026-10/usd")
+    response = client.get("/budgets/home/accounts")
     assert response.status_code == 200
     assert "Fast wallet" in response.text and "$122.45" in response.text
     assert '<span class="nav-count">1</span>' in response.text

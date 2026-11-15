@@ -38,7 +38,9 @@ assert not any(name.startswith(("whab_plugin_web", "whab_plugin_plaid")) for nam
     )
 
 
-def test_another_ui_supplies_its_views_templates_assets_and_keeps_host_guards(tmp_path, store):
+def test_another_ui_supplies_its_views_templates_assets_and_keeps_host_guards(tmp_path, store, monkeypatch):
+    monkeypatch.setattr("whab.web.routes.pages.current_month", lambda: "2026-11")
+    monkeypatch.setattr("whab.web.transaction_filters.current_month", lambda: "2026-11")
     templates, static = tmp_path / "templates", tmp_path / "static"
     templates.mkdir()
     static.mkdir()
@@ -59,7 +61,8 @@ def test_another_ui_supplies_its_views_templates_assets_and_keeps_host_guards(tm
         for page in ("budget", "transactions", "insights", "accounts"):
             result = client.get(f"/budgets/demo/{page}/2026-10/usd")
             assert result.status_code == 200
-            assert "Alternative UI &lt;script&gt;fictional&lt;/script&gt; 2026-10" in result.text
+            month = "2026-11" if page == "accounts" else "2026-10"
+            assert f"Alternative UI &lt;script&gt;fictional&lt;/script&gt; {month}" in result.text
             assert seen[-1][1]["workspace"] == "demo"
             assert "periods" not in seen[-1][0]
             assert {"summary", "budget", "trend", "budgetStartMonth"} <= seen[-1][0].keys()

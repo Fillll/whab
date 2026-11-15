@@ -20,7 +20,7 @@
   });
   function observe() {
     observer.observe(root, {subtree: true, childList: true, attributes: true,
-      attributeFilter: [...privateAttributes, 'hidden', 'style', 'data-private-amount', 'data-private-content', 'data-private-amount-attributes', 'data-private-amount-label']});
+      attributeFilter: [...privateAttributes, 'hidden', 'style', 'data-private-amount', 'data-private-content', 'data-private-currency', 'data-private-amount-attributes', 'data-private-amount-label']});
   }
   function writeAttribute(element, name, value) {
     if (value === null) element.removeAttribute(name);
@@ -42,6 +42,16 @@
       ...(element.matches(targets) ? privateAttributes : []),
       ...(element.getAttribute('data-private-amount-attributes') || '').split(/\s+/),
     ]);
+  }
+  function maskText(element) {
+    if (element.hasAttribute('data-private-content')) return element.getAttribute('data-private-content') || 'XX';
+    const explicit = element.getAttribute('data-private-amount');
+    if (explicit) return explicit;
+    // Currency is presentation metadata, never inferred from the amount or its length.
+    // Draft currency choices apply to editors, not a committed balance beside them.
+    const choice = element.matches('input, textarea, select') ? element.closest('form')?.querySelector('[name="currency"]') : null;
+    const currency = choice?.value || element.closest('[data-private-currency]')?.dataset.privateCurrency;
+    return currency === 'USD' ? '$X,XXX' : /^[A-Z]{3}$/.test(currency || '') ? `${currency} X,XXX` : 'X,XXX';
   }
   function createMask(element) {
     const svg = element.namespaceURI === 'http://www.w3.org/2000/svg';
@@ -85,7 +95,7 @@
       if (element.parentElement?.closest(targets)) continue;
       const state = states.get(element) || createMask(element);
       if (state.mask.previousElementSibling !== element) element.after(state.mask);
-      state.mask.textContent = element.getAttribute('data-private-amount') || element.getAttribute('data-private-content') || 'XX';
+      state.mask.textContent = maskText(element);
       writeAttribute(state.mask, 'hidden', !hidden || element.hasAttribute('hidden') || element.style.display === 'none' ? '' : null);
       if (hidden) maskAttributes(element, privateAttributes);
     }
@@ -137,6 +147,9 @@
     }
   }, true);
   document.addEventListener('DOMContentLoaded', synchronize);
+  document.addEventListener('change', event => {
+    if (event.target.matches('[name="currency"]')) synchronize();
+  });
   window.addEventListener('storage', event => {
     if (event.key !== key && event.key !== null) return;
     if (event.newValue !== null && !['shown', 'hidden'].includes(event.newValue)) return;

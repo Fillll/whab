@@ -83,6 +83,10 @@ def create_router(
                      category=category, account=account, all_dates=all_dates, accounts=accounts,
                      period=period, start_date=start_date, end_date=end_date, review=review)
 
+    @router.get("/budgets/{key}/accounts", response_class=HTMLResponse)
+    def accounts_index(request: Request, key: str):
+        return index(request, key, "accounts", accounts=None)
+
     @router.get("/budgets/{key}/transactions/{month_token}", response_class=HTMLResponse)
     @router.get("/budgets/{key}/{page}/{month_token}/{currency}", response_class=HTMLResponse)
     def index(
@@ -110,6 +114,11 @@ def create_router(
         routing = request.scope.get("whab.routing")
         identifier = "demo" if workspace == "demo" else service.budget_id
         key = request.scope.get("whab.budget_key", key)
+        if page == "accounts":
+            # Account management spans all dates/currencies. Legacy path tokens
+            # remain accepted, but never filter this view or its canonical URL.
+            month_token = "current-month"
+            currency = preferences.read(workspace)["defaultCurrency"] if preferences else "USD"
         month = current_month() if month_token == "current-month" else month_token
         currency = currency.upper()
         try:

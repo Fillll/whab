@@ -67,12 +67,14 @@ def test_generic_fragment_is_explicit_and_keeps_authoritative_context(fragment_c
     assert result.headers["content-type"].startswith("text/html")
     data = context(result)
     assert data["page"] == page and data["workspace"] == workspace
-    assert data["month"] == "2026-10" and data["monthToken"] == "current-month" and data["currency"] == "EUR"
+    assert data["month"] == "2026-10" and data["monthToken"] == "current-month"
+    assert data["currency"] == ("USD" if page == "accounts" else "EUR")
     assert data["budgetId"] == ("demo" if key == "demo" else "default")
     assert data["apiPrefix"] == f"/budgets/{key}/api"
     assert data["budgetUrl"] == ("/budgets/demo" if key == "demo" else "/budgets/my-budget")
     assert key in data["budgetAliases"]
-    assert data["canonicalUrl"] == f'{data["budgetUrl"]}/{page}/current-month/eur'
+    suffix = "accounts" if page == "accounts" else f"{page}/current-month/eur"
+    assert data["canonicalUrl"] == f'{data["budgetUrl"]}/{suffix}'
     expected_vary = {"x-whab-page-fragment"}
     if page == "budget":
         expected_vary.add("x-whab-budget-fragment")

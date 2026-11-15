@@ -1,5 +1,11 @@
 # Local YNAB ZIP import plugin changelog
 
+## 1.5.1 — 2026-11-15
+
+PR: [#208](https://github.com/Fillll/whab/pull/208)
+
+- Accept canonical short Accounts destinations after imports while retaining legacy return URLs, same-origin and saved-budget validation.
+
 ## 1.5.0 — 2026-11-13
 
 PR: [#199](https://github.com/Fillll/whab/pull/199)

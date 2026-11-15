@@ -9,7 +9,7 @@ const directory = path.join(__dirname, '../src/whab_plugin_web/static');
 const source = fs.readFileSync(path.join(directory, 'account-navigation.js'), 'utf8');
 const clientSource = fs.readFileSync(path.join(directory, 'client.js'), 'utf8');
 const origin = 'https://localhost:5173';
-const address = (page, month = 'current-month', query = '') => `${origin}/budgets/household/${page}/${month}/usd${query}`;
+const address = (page, month = 'current-month', query = '') => `${origin}/budgets/household/${page}${page === 'accounts' ? '' : `/${month}/usd`}${query}`;
 const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function deferred() {
@@ -169,8 +169,8 @@ function harness({page = 'budget', href = address(page), initial = {}, flush = a
     const generic = request.options.headers['X-WHAB-Page-Fragment'] === '1';
     const summary = request.options.headers['X-WHAB-Transactions-Fragment'] === 'summary';
     const expectedHeader = generic ? 'X-WHAB-Page-Fragment' : 'X-WHAB-Transactions-Fragment';
-    const context = {...runtime.getContext(), page: route.page, monthToken: route.month,
-      currency: route.currency.toUpperCase(), canonicalUrl: target.href,
+    const context = {...runtime.getContext(), page: route.page, monthToken: route.month || 'current-month',
+      currency: (route.currency || 'usd').toUpperCase(), canonicalUrl: target.href,
       selectedAccountId: target.searchParams.get('account'),
       selectedAccountIds: target.searchParams.getAll('accounts'),
       transactionSearch: target.searchParams.get('q') || '',
@@ -200,6 +200,7 @@ function harness({page = 'budget', href = address(page), initial = {}, flush = a
 
 for (const sourcePage of ['budget', 'transactions', 'insights', 'accounts', 'subscriptions']) {
   for (const targetPage of ['budget', 'transactions', 'insights', 'accounts', 'subscriptions']) {
+    if (sourcePage === 'accounts' && targetPage === 'accounts') continue;
     test(`${sourcePage} to ${targetPage} changes only page content and retains the current shell`, async () => {
       const state = harness({page: sourcePage});
       const target = address(targetPage, '2026-11');
@@ -214,7 +215,7 @@ for (const sourcePage of ['budget', 'transactions', 'insights', 'accounts', 'sub
       assert.equal(state.replacements.length, 1);
       assert.equal(state.mounts.length, 1);
       assert.equal(state.runtime.getContext().page, targetPage);
-      assert.equal(state.runtime.getContext().monthToken, '2026-11');
+      assert.equal(state.runtime.getContext().monthToken, targetPage === 'accounts' ? 'current-month' : '2026-11');
       assert.equal(state.breadcrumb.textContent, targetPage[0].toUpperCase() + targetPage.slice(1));
       for (const navigationLink of state.navigationLinks.filter(node => node.classList.contains('nav-item'))) {
         const selected = state.runtime.parsePageRoute(new URL(navigationLink.href)).page === targetPage;
@@ -248,6 +249,33 @@ test('retained budget-switch destinations follow the mounted view and month with
     address('insights', '2026-11', '?category=selected'));
 });
 
+test('Accounts canonicalizes old bookmarks, preserves hashes and avoids fetching the same view', async () => {
+  const state = harness({page: 'accounts', href: `${address('accounts')}/2026-10/eur#bank`,
+    initial: {canonicalUrl: address('accounts')}});
+  assert.equal(state.location.href, `${address('accounts')}#bank`);
+  assert.deepEqual(state.histories.map(([action, href]) => [action, href]), [['replace', `${address('accounts')}#bank`]]);
+  assert.equal(await state.controller.navigate(state.location.href), false);
+  const clean = harness({page: 'accounts'});
+  assert.equal(await clean.controller.navigate(address('accounts')), true);
+  assert.equal(clean.requests.length, 0);
+});
+
+test('Accounts keeps cross-currency navigation browser-owned and refuses mismatched fragment currency', async () => {
+  const state = harness({page: 'accounts'});
+  const euros = address('transactions').replace('/usd', '/eur');
+  assert.equal(state.click(link(euros)).defaultPrevented, false);
+  assert.equal(state.requests.length, 0);
+  assert.equal(state.runtime.isAccountDestination(new URL(euros), new URL(state.location.href), state.runtime.getContext()), false);
+  const budget = harness({href: address('budget').replace('/usd', '/eur'), initial: {currency: 'EUR'}});
+  const pending = budget.controller.navigate(address('accounts'));
+  await tick();
+  budget.respond(0, {override: {currency: 'USD'}});
+  await pending;
+  assert.equal(budget.replacements.length, 0);
+  assert.deepEqual(budget.fallbacks, [['assign', address('accounts')]]);
+  assert.equal(budget.runtime.getContext().currency, 'EUR');
+});
+
 test('ordinary same-scope main/content links are intercepted while browser-owned destinations remain native', async () => {
   const state = harness();
   const target = link(address('insights'));
@@ -259,7 +287,7 @@ test('ordinary same-scope main/content links are intercepted while browser-owned
     [address('accounts'), {}, {ctrlKey: true}], [address('accounts'), {}, {shiftKey: true}],
     [address('accounts'), {}, {altKey: true}], [address('accounts'), {download: ''}, {}],
     [address('accounts'), {target: '_blank'}, {}], [address('accounts') + '#settings', {}, {}],
-    [address('accounts').replace('/usd', '/eur'), {}, {}],
+    [address('budget').replace('/usd', '/eur'), {}, {}],
     [address('accounts').replace('/household/', '/foreign/'), {}, {}],
     [address('accounts').replace(origin, 'https://foreign.invalid'), {}, {}],
     [`${origin}/budgets/household/api/export?workspace=personal`, {}, {}],
@@ -487,7 +515,7 @@ for (const change of [
 ]) test(`invalid generic fragments never dispose or mount a page: ${JSON.stringify(change)}`, async () => {
   let releases = 0;
   const state = harness({beforeReplace: () => {releases += 1; return true;}});
-  const target = address('accounts');
+  const target = address(change.override?.currency ? 'insights' : 'accounts');
   const pending = state.controller.navigate(target);
   await tick(); state.respond(0, change); await pending;
   assert.equal(state.content(), state.original);

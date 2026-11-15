@@ -42,7 +42,8 @@ def budget_key(identifier):
 def page_url(key, page="budget", month="current-month", currency="USD", *, account_slug=None, **filters):
     account_path = f"/{account_slug}" if page == "transactions" and account_slug else ""
     suffix = "" if page == "transactions" and currency.upper() == "USD" else f"/{currency}"
-    path = f"/budgets/{key}{account_path}/{page}/{month}{suffix}".lower()
+    path = (f"/budgets/{key}/accounts" if page == "accounts" else
+            f"/budgets/{key}{account_path}/{page}/{month}{suffix}").lower()
     query = urlencode({name: value for name, value in filters.items() if value is not None}, doseq=True)
     # Encode uppercase identifier characters without changing their meaning.
     query = re.sub(

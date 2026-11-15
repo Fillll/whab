@@ -86,7 +86,8 @@ export function initBudgetHistory({api, getContext, beforeChange, onChanged = ()
         const before = text('span', value(part.before)), after = text('span', value(part.after));
         // Untyped record snapshots may contain nested financial amounts. Keep labels and dates inspectable.
         if (['Amount', 'Balance', 'target', 'assigned'].includes(part.field)) {
-          before.dataset.privateAmount = ''; after.dataset.privateAmount = '';
+          // These raw minor-unit values do not carry a reliable currency projection.
+          before.dataset.privateAmount = 'XX'; after.dataset.privateAmount = 'XX';
         } else if ([part.before, part.after].some(item => item !== null && typeof item === 'object')) {
           before.dataset.privateContent = ''; after.dataset.privateContent = '';
         }

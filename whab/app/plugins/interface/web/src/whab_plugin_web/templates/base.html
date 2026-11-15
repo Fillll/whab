@@ -27,7 +27,7 @@
     <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/app.js?v={{ web_asset_version }}" type="module"></script>
     {% for script in plugin_scripts %}<script src="{{ script }}" type="module"></script>{% endfor %}
   </head>
-  <body>
+  <body data-private-currency="{{ currency }}">
     <div class="app-shell">
       <aside class="sidebar" id="whab-sidebar" aria-label="Workspace sidebar">
         <div class="sidebar-header">

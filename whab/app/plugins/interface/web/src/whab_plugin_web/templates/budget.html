@@ -10,7 +10,7 @@
 {% macro equation_amount(amount, operator) -%}
   <span class="budget-equation-operator">{{ operator }}</span> {% if amount<0 %}(<span data-private-amount>{{ money_number(amount) }}</span>){% else %}<span data-private-amount>{{ money_number(amount) }}</span>{% endif %}
 {%- endmacro %}
-<div class="budget-planner" data-budget-key="budget-planner" data-month="{{ month }}" data-month-count="{{ month_count }}" data-currency="{{ currency }}" data-workspace="{{ workspace }}" data-budget-id="{{ budget_id }}" data-budget-route="{{ client_context.budgetKey }}">
+<div class="budget-planner" data-private-currency="{{ currency }}" data-budget-key="budget-planner" data-month="{{ month }}" data-month-count="{{ month_count }}" data-currency="{{ currency }}" data-workspace="{{ workspace }}" data-budget-id="{{ budget_id }}" data-budget-route="{{ client_context.budgetKey }}">
   <div class="budget-toolbar" data-budget-key="toolbar">
     <div class="month-navigation">
       {% if shift_month(month,-1)!=month %}<a class="icon-button" href="{{ url(months=month_count,month=shift_month(month,-1)) }}" aria-label="Previous month">{{ icon('chevron-left', 17) }}</a>{% endif %}
