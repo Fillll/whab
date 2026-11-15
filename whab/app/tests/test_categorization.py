@@ -400,12 +400,15 @@ def test_categorization_rejects_context_from_another_budget(store, tmp_path):
         CategorizationService(ledger, (plugin,), lambda key: local_context(tmp_path, 'second', key))
 
 
-def test_new_import_and_blank_budget_cannot_use_source_models_or_training_history(store, history, tmp_path):
+def test_new_import_and_blank_budget_cannot_use_source_models_or_training_history(store, history, tmp_path, monkeypatch):
     import hashlib
 
     from tests.web.test_file_import_routes import payload
     from whab.plugins import FileImport
 
+    # This tests budget isolation, not wall-clock expiry while slow coverage
+    # workers create/open independent budgets. Expiry has its own regression.
+    monkeypatch.setattr('whab.services.categorization.monotonic', lambda: 1000)
     configuration = Settings(tmp_path, 5173, 'sandbox', '', '', '', False, '', '', (PLUGIN,), ui='')
     importer = Plugin('dump', 'Synthetic import', file_import=FileImport(lambda _: payload()))
     app = create_app(store=store, settings=configuration, plugins=PluginRegistry((plugin, importer)))
@@ -495,3 +498,20 @@ def test_manual_preview_refreshes_pending_only_after_success(client, store, hist
         fresh = service.suggestions('personal')[pending]
         assert fresh['id'] != old[pending]['id']
         assert fresh['modelId'] == active['id'] and fresh['categoryId'] == two
+
+
+def test_opening_categories_are_not_automatic_suggestions_or_model_choices(client, store, history, monkeypatch):
+    service = client.app.state.ledger_service.categorization
+    category = store.add_category('personal', {'name': 'Opening', 'group': 'Technical', 'kind': 'opening_balance'})
+    assert category not in action(client, 'status')['categoryLabels']
+    engine = service.engines[PLUGIN]
+    monkeypatch.setattr(engine, 'predict', lambda rows: [
+        {'transactionId': row['id'], 'categoryId': category, 'score': 1, 'modelId': 'fictional'} for row in rows])
+    before = store.export_budget()
+    with pytest.raises(StoreError, match='invalid suggestion'):
+        service.predict('personal')
+    row = candidates(store.transactions('personal'), store.accounts('personal'), store.categories('personal'), reviewed=False)[0]
+    service._save(PLUGIN, 'personal', {row['id']: {'id': 'fictional', 'categoryId': category,
+        'fingerprint': fingerprint(row), 'modelId': 'fictional', 'pluginId': PLUGIN, 'createdAt': '2026-11-01'}})
+    assert service.suggestions('personal') == {}
+    assert store.export_budget() == before

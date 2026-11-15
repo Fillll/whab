@@ -91,8 +91,25 @@
                   {% if income_valid %}
                     {% call summary_details(period, 'Income') %}
                       <dl><div><dt>Received income</dt><dd>{{ money_number(period.summary.income) }}</dd></div></dl>
-                      <p>Posted Income-category inflows received in {{ month_label(period.month) }} in eligible on-budget non-credit accounts. Legacy uncategorized inflows retain their existing funding treatment. Pending transactions, transfers and credit-card inflows are excluded. Expense-category refunds reduce category activity instead. Review is independent. Explicit Income: {{ money(period.summary.classifiedIncome|default(0)) }}; legacy unclassified inflows: {{ money(period.summary.unclassifiedIncome|default(period.summary.income)) }}.</p>
+                      <p>Posted Income-category inflows received in {{ month_label(period.month) }} in eligible on-budget non-credit accounts. Legacy uncategorized inflows retain their existing funding treatment. Pending transactions, transfers, opening balances and credit-card inflows are excluded. Expense-category refunds reduce category activity instead. Review is independent. Explicit Income: {{ money(period.summary.classifiedIncome|default(0)) }}; legacy unclassified inflows: {{ money(period.summary.unclassifiedIncome|default(period.summary.income)) }}.</p>
                       {% if period.month<data.budgetStartMonth %}<p>Historical income only: this month is before your budget starts.</p>{% endif %}
+                      <p><a class="text-link" href="{{ url('transactions',month=period.month) }}">Review {{ month_label(period.month) }} transactions</a></p>
+                    {% endcall %}
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+            <tr class="budget-overview-row" data-budget-key="opening-funding">
+              <th scope="row">Opening funding</th>
+              {% for period in periods %}
+                {% set opening_valid = valid_money(period.summary.openingFunding) %}
+                <td colspan="{{ period.column_count }}" class="month-start{% if opening_valid and period.summary.openingFunding<0 %} negative{% endif %}" data-budget-key="{{ period.month }}">
+                  {{ money_number(period.summary.openingFunding) if opening_valid else '—' }}
+                  {% if opening_valid %}
+                    {% call summary_details(period, 'Opening funding') %}
+                      <dl><div><dt>Opening funding</dt><dd>{{ money_number(period.summary.openingFunding) }}</dd></div></dl>
+                      <p>Posted Opening Balance entries in eligible on-budget non-credit cash accounts with verified balances in {{ month_label(period.month) }}. This is existing money, separate from income and spending. Debt and off-budget balances do not become opening funding. Pending entries and stale or unknown account balances do not fund the budget. Classification does not verify an imported balance estimate. Review is independent.</p>
+                      <p>Opening entries before your budget starts are already in Carried in. Later months carry existing balances forward without adding the same opening funding twice.</p>
                       <p><a class="text-link" href="{{ url('transactions',month=period.month) }}">Review {{ month_label(period.month) }} transactions</a></p>
                     {% endcall %}
                   {% endif %}
@@ -169,16 +186,17 @@
                 <td colspan="{{ period.column_count }}" class="month-start{% if ready_valid and period.summary.readyToAssign<0 %} negative{% elif ready_valid and period.summary.readyToAssign>0 %} positive{% endif %}" data-budget-key="{{ period.month }}">
                   {{ money_number(period.summary.readyToAssign) if ready_valid else '—' }}
                   {% if ready_valid %}
-                    {% if valid_money(period.summary.income) and period.carried_in is not none and valid_money(period.summary.assignedNextMonth) and valid_money(period.summary.assigned) %}
+                    {% if valid_money(period.summary.income) and valid_money(period.summary.openingFunding) and period.carried_in is not none and valid_money(period.summary.assignedNextMonth) and valid_money(period.summary.assigned) %}
                       {% call summary_details(period, 'Available to assign') %}
                         <dl>
                           <div><dt>Income</dt><dd>{{ equation_amount(period.summary.income, '+') }}</dd></div>
+                          <div><dt>Opening funding</dt><dd{% if period.summary.openingFunding<0 %} class="negative"{% endif %}>{{ equation_amount(period.summary.openingFunding, '+') }}</dd></div>
                           <div><dt>Carried in</dt><dd{% if period.carried_in<0 %} class="negative"{% endif %}>{{ equation_amount(period.carried_in, '+') }}</dd></div>
                           <div><dt>Assigned for next month</dt><dd>{{ equation_amount(period.summary.assignedNextMonth, '−') }}</dd></div>
                           <div><dt>Assigned this month</dt><dd>{{ equation_amount(period.summary.assigned, '−') }}</dd></div>
                           <div class="budget-summary-total"><dt>Available to assign</dt><dd{% if period.summary.readyToAssign<0 %} class="negative"{% endif %}>{{ equation_amount(period.summary.readyToAssign, '=') }}</dd></div>
                         </dl>
-                        <p>Income + Carried in − Assigned for next month − Assigned this month.</p>
+                        <p>Income + Opening funding + Carried in − Assigned for next month − Assigned this month.</p>
                         <p>{% if period.summary.readyToAssign<0 %}A negative amount means this month's funding pool does not cover its category assignments and next-month set-aside. Review carried-in deficits, income and assignments before assigning more.{% else %}This is the unassigned money remaining in {{ month_label(period.month) }}'s funding pool.{% endif %} By-category carryover stays in its categories and is excluded from this pool.</p>
                         {% if valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<p>Some funds are needed to cover spending or account reserves. Review category overspending, uncategorized spending, and account balances before assigning more money.</p>{% if period.summary.fundingCapacity<0 %}<p class="negative">Available after spending and account reserves: {{ money_number(period.summary.fundingCapacity) }}.</p>{% endif %}{% endif %}
                       {% endcall %}

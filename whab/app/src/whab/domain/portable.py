@@ -199,7 +199,7 @@ def validate_portable_budget(data: object) -> dict:
         if category is None:
             raise StoreError("Portable budget assignment category not found.")
         if category.get("kind", "expense") != "expense":
-            raise StoreError("Income and Transfer categories cannot receive monthly assignments.")
+            raise StoreError("Income, Transfer and Opening Balance categories cannot receive monthly assignments.")
         key = (assignment["month"], assignment["categoryId"])
         if key in assignment_keys:
             raise StoreError("Duplicate portable budget assignment.")

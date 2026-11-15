@@ -74,8 +74,10 @@ class Jobs:
         snapshot = self.context.service.query("portable", workspace)
         data = snapshot["data"]
         accounts = {r["id"]: r for r in data["accounts"]}
+        categories = {r["id"]: r for r in data["categories"]}
         rows = [
-            {**r, "currency": accounts[r["accountId"]]["currency"]}
+            {**r, "currency": accounts[r["accountId"]]["currency"],
+             "categoryKind": categories.get(r.get("categoryId"), {}).get("kind", "expense")}
             for r in data["transactions"]
             if not r.get("deleted")
         ]

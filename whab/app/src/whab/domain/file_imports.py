@@ -144,7 +144,7 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
         if assignment["categoryId"] not in category_ids:
             raise StoreError("Workspace import category reference not found.")
         if category_map[assignment["categoryId"]].get("kind", "expense") != "expense":
-            raise StoreError("Income and Transfer categories cannot receive monthly assignments.")
+            raise StoreError("Income, Transfer and Opening Balance categories cannot receive monthly assignments.")
         key = (assignment["month"], assignment["categoryId"])
         if key in assignment_keys:
             raise StoreError("Duplicate workspace import assignment.")

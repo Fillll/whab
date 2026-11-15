@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
   "plugin_id": "example",
-  "summary": "Fictional teaching implementation of the public example capability; never a production provider.",
+  "summary": "Fictional teaching implementation of the public example capability; never a production provider. Explicit Income contributes signed non-credit income; Transfer and Opening Balance entries are excluded from ordinary income and spending, and all ledger rows remain available in exports.",
   "delegates": [],
   "operations": [
     {
       "name": "insights",
       "kind": "sdk",
-      "summary": "Produce fictional reporting results from an immutable scoped budget snapshot.",
+      "summary": "Produce selected-month totals, excluding explicit Opening Balance entries from income and spending.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
         "properties": {
           "snapshot": {
-            "description": "Host-provided immutable BudgetSnapshot."
+            "description": "Host-provided immutable BudgetSnapshot, including CategorySnapshot.kind (expense, income, transfer, opening_balance). Technical categories have zero envelope values."
           }
         },
         "required": [
@@ -53,7 +53,7 @@
     {
       "name": "export",
       "kind": "sdk",
-      "summary": "Produce fictional reporting results from an immutable scoped budget snapshot.",
+      "summary": "Export all scoped transaction rows, including unchanged Opening Balance entries.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",

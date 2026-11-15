@@ -51,12 +51,19 @@ def _net_account_funds(
                 not row.get("deleted") and not row["pending"]
                 and (row["date"][:7] >= month if opening else row["date"][:7] > month)
             ):
+                if (opening and row["date"][:7] == month
+                        and state["accounts"][row["accountId"]]["type"] == "credit"
+                        and state["categories"].get(row.get("categoryId"), {}).get("kind") == "opening_balance"):
+                    # Opening debt was already owed at this month's boundary;
+                    # it is not new spending to reverse out of the snapshot.
+                    continue
                 later_by_account[row["accountId"]] += row["amount"]
     else:
         for source, totals in history["posted"].items():
             if source >= month if opening else source > month:
                 for account_id, amount in totals.items():
-                    later_by_account[account_id] += amount
+                    opening_debt = history["openingCredit"].get(source, {}).get(account_id, 0) if opening and source == month else 0
+                    later_by_account[account_id] += amount - opening_debt
 
     def balance_at(account):
         return account["balance"] + (-1 if is_liability(account) else 1) * later_by_account[account["id"]]
@@ -99,22 +106,32 @@ def _currency_history(state: dict) -> dict:
     spent = defaultdict(int)
     classified_income = defaultdict(int)
     unclassified_income = defaultdict(int)
+    opening_funding = defaultdict(int)
+    opening_credit = defaultdict(lambda: defaultdict(int))
     on_budget = {key for key, account in state["accounts"].items() if is_on_budget(account)}
     for row in state["transactions"].values():
         if row.get("deleted"):
             continue
         source = row["date"][:7]
+        category = row.get("categoryId")
+        kind = state['categories'].get(category, {}).get('kind', 'expense')
+        account = state['accounts'][row['accountId']]
         transactions[source].append(row)
         if not row["pending"]:
             posted[source][row["accountId"]] += row["amount"]
-        if row.get("pending") or row.get("isTransfer") or row["accountId"] not in on_budget:
+            if kind == 'opening_balance' and account['type'] == 'credit':
+                opening_credit[source][row['accountId']] += row['amount']
+        if row.get("pending") or row["accountId"] not in on_budget:
             continue
-        category = row.get("categoryId")
         amount = row["amount"]
-        if state['categories'].get(category, {}).get('kind') == 'transfer':
+        if kind == 'opening_balance':
+            if account['type'] == 'depository' and not account.get('stale') and not account.get('balanceUnknown'):
+                opening_funding[source] -= amount
             continue
-        if state['categories'].get(category, {}).get('kind') == 'income':
-            if state['accounts'][row['accountId']].get('type') != 'credit':
+        if row.get("isTransfer") or kind == 'transfer':
+            continue
+        if kind == 'income':
+            if account.get('type') != 'credit':
                 income[source] -= amount
                 classified_income[source] -= amount
             continue
@@ -126,7 +143,8 @@ def _currency_history(state: dict) -> dict:
             spent[source] += amount
     return {"transactions": transactions, "posted": posted, "spending": spending,
             "income": income, "spent": spent, "classifiedIncome": classified_income,
-            "unclassifiedIncome": unclassified_income}
+            "unclassifiedIncome": unclassified_income, "openingFunding": opening_funding,
+            "openingCredit": opening_credit}
 
 
 def _calculate_currency(state: dict, month: str, currency: str, history: dict) -> dict:
@@ -179,6 +197,7 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
             }
         )
     income = history["income"].get(month, 0)
+    opening_funding = history["openingFunding"].get(month, 0)
     next_month_funding = effective_month_funding(state, shift_month(month, 1), currency)
     carried_in_set_aside = effective_month_funding(state, month, currency) if month > start else 0
     carried_in = (
@@ -187,7 +206,7 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         if month >= start else 0
     )
     carried_in_unassigned = carried_in - carried_in_set_aside - balance_carryover
-    ready = income + carried_in - next_month_funding - sum(row["assigned"] for row in budget)
+    ready = income + opening_funding + carried_in - next_month_funding - sum(row["assigned"] for row in budget)
     safe = _cash_capacity(state, month, currency, budget, history=history)
     if month < start:
         next_month_funding = ready = safe = 0
@@ -195,6 +214,7 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         "income": income,
         "classifiedIncome": history["classifiedIncome"].get(month, 0),
         "unclassifiedIncome": history["unclassifiedIncome"].get(month, 0),
+        "openingFunding": opening_funding,
         "carriedIn": carried_in,
         "carriedInUnassigned": carried_in_unassigned,
         "carriedInSetAside": carried_in_set_aside,
@@ -212,7 +232,8 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
     trend = []
     for offset in range(-5, 1):
         m = shift_month(month, offset)
-        trend.append({"month": m, "income": history["income"].get(m, 0), "spent": history["spent"].get(m, 0)})
+        trend.append({"month": m, "income": history["income"].get(m, 0), "spent": history["spent"].get(m, 0),
+                      "openingFunding": history["openingFunding"].get(m, 0)})
     return {
         "month": month,
         "budgetStartMonth": start,
@@ -238,7 +259,7 @@ def ensure_assignment_allowed(
 ) -> None:
     category = ensure_child_category(state["categories"], category_id)
     if category.get("kind", "expense") != "expense":
-        raise StoreError("Income and Transfer categories cannot receive monthly assignments.")
+        raise StoreError("Income, Transfer and Opening Balance categories cannot receive monthly assignments.")
     currency = category.get("currency", "USD")
     if month < state["budgetStartMonth"]:
         raise StoreError(
@@ -406,7 +427,7 @@ def _prepare_workspace(state: dict) -> dict:
     for rows in state["budget"].values():
         for category_id in rows:
             if _known_child_category(categories, category_id).get("kind", "expense") != "expense":
-                raise StoreError("Income and Transfer categories cannot receive monthly assignments.")
+                raise StoreError("Income, Transfer and Opening Balance categories cannot receive monthly assignments.")
     transactions = defaultdict(dict)
     for key, row in state["transactions"].items():
         account = accounts.get(row["accountId"])
@@ -481,7 +502,7 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
     account_ids = {a["id"] for a in accounts}
     category_ids = {c["id"] for c in categories}
     empty_summary = dict.fromkeys((
-        "income", "classifiedIncome", "unclassifiedIncome", "carriedIn", "carriedInUnassigned", "carriedInSetAside", "fundingCapacity",
+        "income", "classifiedIncome", "unclassifiedIncome", "openingFunding", "carriedIn", "carriedInUnassigned", "carriedInSetAside", "fundingCapacity",
         "previousOverspending", "balanceCarryover", "assignedNextMonth", "spent", "assigned",
         "available", "readyToAssign",
     ), 0)
@@ -504,6 +525,6 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
             currency, empty_summary
         ),
         "trend": data.get("trendsByCurrency", {"USD": data["trend"]}).get(
-            currency, [{"month": row["month"], "income": 0, "spent": 0} for row in data["trend"]]
+            currency, [{"month": row["month"], "income": 0, "spent": 0, "openingFunding": 0} for row in data["trend"]]
         ),
     }

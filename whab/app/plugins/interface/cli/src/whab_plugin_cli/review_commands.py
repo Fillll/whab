@@ -9,11 +9,13 @@ from .transaction_commands import checked
 from .transaction_reads import terminal_text
 from .transaction_search import calendar_date, execute_search, validate_search
 
-GUIDE = """A posted transaction needs an Expense, Income or explicitly chosen Transfer
-category (or an already confirmed transfer pair) before review. A bank transfer
+GUIDE = """A posted transaction needs an Expense, Income, explicitly chosen Transfer or
+Opening Balance category (or an already confirmed transfer pair) before review. A bank transfer
 hint alone does not qualify. Classification does not automatically review it;
 clearing classification also sets reviewed=false. A combined classification and
-review is allowed in trnx edit-many when the final state is valid.
+review is allowed in trnx edit-many when the final state is valid. Existing zero
+opening entries become reviewable after explicit Opening Balance classification;
+pending entries remain ineligible. Classification never creates an opening entry.
 
 review changes 1–100 explicit IDs atomically: one revision, request ID, native
 commit and durable save. One invalid/missing/duplicate target rejects everything.

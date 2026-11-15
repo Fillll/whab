@@ -32,7 +32,7 @@ def command(ledger, operation, payload, *, revision=None, request=None):
 def test_unclassified_review_rejects_and_classification_never_manufactures_review(classified):
     store, ledger, _, categories, tx, _ = classified
     before = store.export_budget()
-    with pytest.raises(StoreError, match='Choose an Expense, Income or Transfer'):
+    with pytest.raises(StoreError, match='Choose an Expense, Income, Transfer or Opening Balance'):
         command(ledger, 'review_transactions', {'transactionIds':[tx],'reviewed':True})
     assert store.export_budget() == before
     for kind in ['expense','income','transfer']:

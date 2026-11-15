@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals.",
+  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation.",
   "delegates": [
     "core"
   ],
@@ -9,7 +9,7 @@
     {
       "name": "interface",
       "kind": "sdk",
-      "summary": "Provide the declared web interface or remote authority adapter.",
+      "summary": "Provide the declared web interface or remote authority adapter. Opening Balance is available in category creation and transaction pickers; openingFunding is displayed separately from income and included in the documented Ready to Assign equation. Technical categories never appear as expense envelopes.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",

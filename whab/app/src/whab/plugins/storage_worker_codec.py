@@ -55,6 +55,7 @@ METHODS = {
     "supports_category_renaming": ((), {}),
     "supports_category_classification": ((), {}),
     "supports_classified_review": ((), {}),
+    "supports_opening_balances": ((), {}),
     "preview_category_classification": (("workspace", "category_id", "kind"), {}),
     "prepare_existing": (("workspace", "files"), {}),
     "category_tree": (("workspace",), {}),

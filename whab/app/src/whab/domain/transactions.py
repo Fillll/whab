@@ -43,7 +43,7 @@ def validate_review_batch(transaction_ids, reviewed) -> tuple[str, ...]:
 def public_transaction(transaction: dict, *, categories=None) -> dict:
     if categories is not None:
         from .review import effective_transfer
-        if categories.get(transaction.get('categoryId'), {}).get('kind') == 'transfer':
+        if categories.get(transaction.get('categoryId'), {}).get('kind') in {'transfer', 'opening_balance'}:
             transaction = {**transaction, 'isTransfer': effective_transfer(transaction, categories)}
     return {
         **({"transferPeerId": transaction["transferPeerId"]} if transaction.get("transferPeerId") is not None else {}),

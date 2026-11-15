@@ -58,7 +58,7 @@ def validate_child_category(category: dict) -> dict:
         raise StoreError("Category parent does not match its group.")
     validate_category_kind(category.get("kind", "expense"))
     if category.get("kind", "expense") != "expense" and category["target"] != 0:
-        raise StoreError("Income and Transfer categories cannot have an expense target.")
+        raise StoreError("Income, Transfer and Opening Balance categories cannot have an expense target.")
     return category.copy()
 
 
@@ -257,8 +257,8 @@ def delete_category_group(state, parent_id):
 
 def validate_category_kind(kind):
     """Financial treatment is explicit and independent of labels and parents."""
-    if type(kind) is not str or kind not in {'expense', 'income', 'transfer'}:
-        raise StoreError('Choose category type expense, income or transfer.')
+    if type(kind) is not str or kind not in {'expense', 'income', 'transfer', 'opening_balance'}:
+        raise StoreError('Choose category type expense, income, transfer or opening_balance.')
     return kind
 
 
@@ -267,8 +267,8 @@ def classify_category(state, category_id, kind):
     validate_category_kind(kind)
     child = ensure_child_category(state['categories'], category_id)
     if kind != 'expense' and (child['target'] != 0 or any(category_id in rows for rows in state['budget'].values())):
-        raise StoreError('Income and Transfer categories cannot have expense targets or monthly assignments (including zero rows). '
-                         'Nothing changed. Use a new Income or Transfer category to preserve the existing envelope and assignments.')
+        raise StoreError('Income, Transfer and Opening Balance categories cannot have expense targets or monthly assignments (including zero rows). '
+                         'Nothing changed. Use a new Income, Transfer or Opening Balance category to preserve the existing envelope and assignments.')
     if kind != 'transfer' and any(row.get('categoryId') == category_id and row.get('transferPeerId') for row in state['transactions'].values()):
         raise StoreError('Unmatch the linked transfers before changing their category type.')
     if kind != 'expense':
@@ -279,17 +279,30 @@ def classify_category(state, category_id, kind):
 
 def preview_category_classification(state, category_id, kind):
     """Show historical financial consequences without migrating any records."""
-    from .budget import calculate_workspace, select_currency
+    from .budget import _prepare_workspace, _project_workspace, select_currency
+    from .dates import shift_month
+    from .validation import validate_month
     candidate = {**state, "categories": {key: row.copy() for key, row in state["categories"].items()}}
     classify_category(candidate, category_id, kind)
     currency = candidate['categories'][category_id].get('currency', 'USD')
-    months = sorted({state['budgetStartMonth'], *state['budget'],
-                     *(row['date'][:7] for row in state['transactions'].values())})
+    known = {state['budgetStartMonth'], *state['budget'], *state.get('futureFunding', {}),
+             *state.get('rolloverModes', {}), *(row['date'][:7] for row in state['transactions'].values())}
+    for month in known:
+        validate_month(month)
+    first, last = min(known), max(known)
+    # Include empty intervening months and a carry boundary after the final
+    # recorded month, within the domain's finite supported calendar. Index
+    # each ledger once instead of rescanning transaction history per month.
+    if last < '2299-12':
+        last = shift_month(last, 1)
+    previous, proposed = _prepare_workspace(state), _prepare_workspace(candidate)
     impacts = []
-    for month in months:
-        before = select_currency(calculate_workspace(state, month), currency)['summary']
-        after = select_currency(calculate_workspace(candidate, month), currency)['summary']
+    month = first
+    while month <= last:
+        before = select_currency(_project_workspace(previous, month), currency)['summary']
+        after = select_currency(_project_workspace(proposed, month), currency)['summary']
         if before != after:
             impacts.append({'month': month, 'currency': currency, 'before': before, 'after': after})
+        month = shift_month(month, 1)
     return {'categoryId': category_id, 'before': state['categories'][category_id].copy(),
             'after': candidate['categories'][category_id].copy(), 'impacts': impacts}

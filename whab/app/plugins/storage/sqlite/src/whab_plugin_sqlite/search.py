@@ -75,7 +75,8 @@ def search_transactions(store, workspace, filters):
             }, categories=categories)
             transaction['accountName'] = account['name']
             if not uncategorized:
-                transaction.update(categoryName=category.get('name'), categoryGroup=category.get('group'))
+                transaction.update(categoryName=category.get('name'), categoryGroup=category.get('group'),
+                                   categoryKind=category.get('kind', 'expense') if category else None)
             if filters.get('maxBytes') is not None:
                 response_bytes += len(json.dumps(transaction, ensure_ascii=False, separators=(',', ':')).encode()) + 1
                 if response_bytes > filters['maxBytes']:

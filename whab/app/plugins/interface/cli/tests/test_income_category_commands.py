@@ -30,8 +30,8 @@ def endpoint(monkeypatch, tmp_path):
                 raise httpx.ReadError('private detail')
             if state['failure'] == 'refused':
                 return httpx.Response(409, json={'detail': 'Stale fictional state'})
-            if body['payload']['kind'] == 'income':
-                state['groups'][0]['children'][0]['kind'] = 'income'
+            if body['payload']['kind'] != 'expense':
+                state['groups'][0]['children'][0]['kind'] = body['payload']['kind']
             else:
                 state['groups'][0]['children'][0].pop('kind', None)
             state['revision'] = 'saved'
@@ -48,7 +48,7 @@ def endpoint(monkeypatch, tmp_path):
     return state
 
 
-@pytest.mark.parametrize('kind', ['income', 'expense'])
+@pytest.mark.parametrize('kind', ['income', 'expense', 'transfer', 'opening_balance'])
 def test_saved_type_and_table(endpoint, capsys, kind):
     if kind == 'expense':
         endpoint['groups'][0]['children'][0]['kind'] = 'income'
@@ -84,5 +84,5 @@ def test_classification_help_is_offline_and_complete(tmp_path, monkeypatch, caps
         console.main(['Fictional', 'category', 'classify', '--help'])
     assert stopped.value.code == 0
     text = capsys.readouterr().out
-    for expected in ['--type', '--dry-run', 'monthly assignments', 'Review', 'unclassifiedIncome', '--request-id', 'trnx categorize']:
+    for expected in ['--type', 'opening_balance', 'openingFunding', 'zero-amount', '--dry-run', 'monthly assignments', 'Review', 'unclassifiedIncome', '--request-id', 'trnx categorize']:
         assert expected.casefold() in text.casefold()

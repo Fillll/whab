@@ -51,7 +51,8 @@ def search_transport(monkeypatch, tmp_path):
             return httpx.Response(200, content=b" " * (16 * 1024 * 1024 + 1))
         data = {"transactions": state["transactions"], "accounts": [
             {"id": "checking", "name": "Fictional checking"}, {"id": "tracking", "name": "Fictional tracking", "onBudget": False}],
-            "categories": [{"id": "housing", "name": "Fictional home", "group": "Housing"}]}[name]
+            "categories": [{"id": "housing", "name": "Fictional home", "group": "Housing",
+                            **({"kind": state["category_kind"]} if "category_kind" in state else {})}]}[name]
         if "/budget-b/" in request.url.path:
             data = []
         if name == "transactions" and request.url.params.get("month"):
@@ -92,7 +93,9 @@ def test_complete_history_includes_every_state_and_preserves_fields(search_trans
             assert {key: rows[original["id"]][key] for key in original} == original
     assert rows["boundary-reviewed"]["categoryName"] == "Fictional home"
     assert rows["boundary-reviewed"]["categoryGroup"] == "Housing"
+    assert rows["boundary-reviewed"]["categoryKind"] == "expense"
     assert rows["pending"]["categoryName"] is None
+    assert rows["pending"]["categoryKind"] is None
     assert rows["tracking"]["categoryName"] is None
     assert rows["tracking"]["accountName"] == "Fictional tracking"
     assert rows["unicode"]["accountName"] == "unavailable-account"
@@ -236,3 +239,12 @@ def test_optimized_read_never_accepts_partial_counts(counts):
 def test_long_merchant_selection_retains_legacy_complete_read(search_transport, capsys):
     result = read(capsys, '--merchant', 'Fictional' * 3000)
     assert result['complete'] and result['total'] == 0
+
+
+def test_opening_type_is_explicit_in_complete_json_and_readable_table(search_transport, capsys):
+    state, _ = search_transport
+    state['category_kind'] = 'opening_balance'
+    result = read(capsys)
+    assert {row['categoryKind'] for row in result['data'] if row['categoryId'] == 'housing'} == {'opening_balance'}
+    assert console.main(['Fictional 家庭', 'trnx', 'list', '--format', 'table']) == 0
+    assert 'Opening Balance' in capsys.readouterr().out

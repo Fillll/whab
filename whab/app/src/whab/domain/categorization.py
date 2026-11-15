@@ -6,7 +6,8 @@ import json
 
 def candidates(transactions, accounts, categories, *, reviewed):
     accounts = {row["id"]: row for row in accounts}
-    categories = {row["id"]: row for row in categories if row.get("parentId") or row.get("group")}
+    categories = {row["id"]: row for row in categories
+                  if (row.get("parentId") or row.get("group")) and row.get("kind") != "opening_balance"}
     result = []
     for row in transactions:
         account = accounts.get(row["accountId"])

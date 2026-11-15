@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.58.0 — 2026-11-14
+
+PR: [#204](https://github.com/Fillll/whab/pull/204)
+
+- Expose Opening Balance creation and transaction labels, show opening funding separately in budget/Insights and funding reconciliation, and exclude opening entries from purchase/payee spending views while preserving explicit review.
+
 ## 1.57.0 — 2026-11-14
 
 PR: [#201](https://github.com/Fillll/whab/pull/201)

@@ -87,7 +87,7 @@ class Store(Authority):
             self._disk_identity = self._identity() if raw is not None else None
             if raw is not None:
                 self._data = codec.decode(raw)
-                if read_only and self._data["formatVersion"] != 3:
+                if read_only and self._data["formatVersion"] not in {3, 4}:
                     raise StoreError("Read-only readiness requires the current native JSON schema; upgrade it explicitly first.")
                 if self._data["formatVersion"] == 1:
                     preserve_schema_one(self.path, raw)
@@ -172,6 +172,18 @@ class Store(Authority):
         if self._read_only:
             raise StoreError("Read-only storage cannot accept mutations.")
         self._check_current()
+        # Fence older readers even after undo/removal leaves the classification
+        # only in permanent audit history, including restored/local-transfer data.
+        kinds = set()
+        for state in candidate['workspaces'].values():
+            kinds.update(row.get('kind') for row in state['categories'].values())
+            journal = state.get('history') or {}
+            kinds.update(row.get('kind') for row in journal.get('baseline', {}).get('categories', ()))
+            kinds.update(row.get('kind') for entry in journal.get('entries', ())
+                         for change in entry['changes'] if change['path'][0] == 'categories'
+                         for row in (change['before'], change['after']) if row is not None)
+        if 'opening_balance' in kinds:
+            candidate = {**candidate, 'formatVersion': 4}
         raw, candidate = codec.encode(candidate)
         try:
             descriptor, temporary = tempfile.mkstemp(prefix=".whab-json-", dir=self.path.parent)
@@ -339,6 +351,9 @@ class Store(Authority):
         return self._mutate(workspace, lambda state: bulk_changes(state, 'classify_accounts', edits, apply=True), history_operation='classify_accounts')
 
     def supports_classified_review(self):
+        return True
+
+    def supports_opening_balances(self):
         return True
 
     def supports_category_classification(self):

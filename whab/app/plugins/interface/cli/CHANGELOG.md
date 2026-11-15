@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.22.0 — 2026-11-14
+
+PR: [#204](https://github.com/Fillll/whab/pull/204)
+
+- Add explicit Opening Balance category create/classify, complete offline help and examples, native zero-opening review validation and historical openingFunding previews without inferring categories or changing financial fields.
+
 ## 2.21.0 — 2026-11-14
 
 PR: [#202](https://github.com/Fillll/whab/pull/202)

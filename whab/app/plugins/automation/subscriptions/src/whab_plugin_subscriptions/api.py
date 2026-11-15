@@ -61,7 +61,9 @@ class Subscriptions:
         snapshot = self.context.service.query("portable", workspace)
         data = snapshot["data"]
         accounts = {row["id"]: row for row in data["accounts"]}
-        rows = [{**row, "currency": accounts[row["accountId"]]["currency"]}
+        categories = {row["id"]: row for row in data["categories"]}
+        rows = [{**row, "currency": accounts[row["accountId"]]["currency"],
+                 "categoryKind": categories.get(row.get("categoryId"), {}).get("kind", "expense")}
                 for row in data["transactions"] if not row.get("deleted")]
         return snapshot, rows
 

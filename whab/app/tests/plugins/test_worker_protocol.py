@@ -621,3 +621,61 @@ def test_api_parent_rejects_worker_spec_drift_and_retires_process(fixture_proces
         worker.interface()
     assert rejected.value.code == "worker_protocol"
     assert processes[0].poll() is not None
+
+
+def test_technical_category_snapshot_roundtrip_and_legacy_default(worker_snapshot):
+    from whab.plugins import copy_snapshot
+    categories = tuple(CategorySnapshot(kind, kind, 'Technical', 0, 0, 0, kind=kind)
+                       for kind in ('income', 'transfer', 'opening_balance'))
+    snapshot = replace(worker_snapshot, categories=worker_snapshot.categories + categories,
+                       transactions=worker_snapshot.transactions + (
+                           TransactionSnapshot('opening', '2026-10-01', 'Fictional opening', 0, 'wallet', 'opening_balance'),))
+    assert copy_snapshot(snapshot) == snapshot
+    wire = report_worker._snapshot_data(snapshot)
+    assert report_worker._snapshot(wire) == snapshot
+    del wire['categories'][0]['kind']
+    assert report_worker._snapshot(wire).categories[0].kind == 'expense'
+    wire['categories'][0]['kind'] = 'unknown'
+    with pytest.raises(ValueError, match='category type'):
+        report_worker._snapshot(wire)
+
+
+def test_real_worker_reports_technical_categories_without_envelope_rows(store):
+    from whab.web.plugin_snapshot import build_snapshot
+    wallet = store.add_account('personal', {'name': 'Fictional wallet', 'type': 'depository', 'balance': 10000})
+    for kind, amount in [('opening_balance', -10000), ('income', -1000), ('transfer', 500)]:
+        category = store.add_category('personal', {'name': kind, 'group': 'Technical', 'kind': kind})
+        store.add_transaction('personal', {'accountId': wallet, 'merchant': 'Fictional ' + kind,
+                                          'date': '2026-10-01', 'amount': amount, 'categoryId': category})
+    snapshot = build_snapshot('personal', store.workspace('personal', '2026-10'))
+    assert {'opening_balance', 'income', 'transfer'} <= {row.kind for row in snapshot.categories}
+    assert all((row.assigned_cents, row.activity_cents, row.available_cents) == (0, 0, 0)
+               for row in snapshot.categories if row.kind != 'expense')
+    worker = ReportWorker('example', timeout=5)
+    try:
+        assert [row.value for row in worker.insights(snapshot)] == ['$0.00', '$10.00']
+        exported = worker.export(snapshot)
+        assert len(exported.rows) == 3
+        assert sum(row[4] for row in exported.rows) == -10500
+    finally:
+        worker.close()
+
+
+def test_old_report_worker_keeps_ordinary_snapshot_and_refuses_technical_kinds(worker_snapshot, monkeypatch):
+    from dataclasses import replace
+
+    from whab.plugins import CategorySnapshot
+
+    worker = ReportWorker('example', timeout=5)
+    try:
+        worker.info['host'] = '2.78.0'
+        # Expense-only calls omit the additive field; old dataclasses accept them.
+        assert worker.insights(worker_snapshot)
+        technical = replace(worker_snapshot, categories=(CategorySnapshot('opening', 'Opening', 'Technical', 0, 0, 0, 'opening_balance'),), transactions=())
+        monkeypatch.setattr(worker, '_write', lambda *_: pytest.fail('Unsupported snapshot must not be submitted'))
+        with pytest.raises(PluginError, match='Update the report worker to WHAB 2.79'):
+            worker.insights(technical)
+    finally:
+        # Restore the write method so normal worker shutdown can complete.
+        monkeypatch.undo()
+        worker.close()
