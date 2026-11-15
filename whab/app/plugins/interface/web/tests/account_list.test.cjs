@@ -13,9 +13,9 @@ function events(properties = {}) {
     async emit(name, extra = {}) {for (const callback of listeners.get(name) || []) await callback({preventDefault() {}, ...extra});},
   }, properties);
 }
-function harness() {
+function harness({closed = false} = {}) {
   const requests = [], errors = {hidden: true}, status = {hidden: true}, actions = {hidden: true}, submit = {};
-  const elements = Object.fromEntries(Object.entries({name: 'Fictional checking', onBudget: 'true', closed: 'false', type: 'depository', subtype: '', currency: 'USD', bankWebsite: ''})
+  const elements = Object.fromEntries(Object.entries({name: 'Fictional checking', onBudget: 'true', closed: String(closed), type: 'depository', subtype: '', currency: 'USD', bankWebsite: ''})
     .map(([name, value]) => [name, events({name, value, disabled: ['currency', 'bankWebsite'].includes(name)})]));
   const visibility = events({checked: true, disabled: false}), cancel = events(), toggle = events({setAttribute() {}}), extra = {hidden: true};
   let valid = true;
@@ -33,7 +33,7 @@ function harness() {
     fetch: async () => {throw new Error('Saved. Reload to update account totals.');}};
   vm.runInNewContext(source, context);
   const control = context.initAccountList({api(route, body, method) {return new Promise((resolve, reject) => requests.push({route, body: JSON.parse(JSON.stringify(body || null)), method, resolve, reject}));}, updateFields() {}});
-  return {control, requests, form, elements, visibility, cancel, toggle, errors, status, actions, invalid() {valid = false;}};
+  return {control, requests, form, elements, visibility, cancel, toggle, errors, status, actions, window: context.window, invalid() {valid = false;}};
 }
 test('account save retains a newer draft and failed retry stays editable', async () => {
   const h = harness();
@@ -55,6 +55,7 @@ test('sidebar visibility uses only visual preferences and restores its confirmed
   const h = harness(); h.visibility.checked = false;
   const saving = h.visibility.emit('change');
   assert.equal(h.control.dirty, true);
+  assert.equal(await h.control.flush(), false);
   assert.equal(h.requests[0].route, '/ui/preferences/accounts/fictional-one');
   assert.deepEqual(h.requests[0].body, {workspace:'personal', visible:false});
   h.requests[0].reject(new Error('Preference unavailable.')); await saving;
@@ -62,6 +63,41 @@ test('sidebar visibility uses only visual preferences and restores its confirmed
   h.visibility.checked = false; const retry = h.visibility.emit('change');
   h.requests[1].resolve({hiddenAccountIds:['fictional-one']}); await retry;
   assert.equal(h.visibility.checked, false); assert.equal(h.control.dirty, false);
+});
+test('archived accounts do not block navigation or trigger an unsaved-change warning', async () => {
+  const h = harness({closed:true});
+  assert.equal(h.visibility.disabled, true);
+  assert.equal(h.control.dirty, false);
+  assert.equal(await h.control.flush(), true);
+  let blocked = false;
+  await h.window.emit('beforeunload', {preventDefault() {blocked = true;}});
+  assert.equal(blocked, false);
+  assert.equal(h.requests.length, 0);
+});
+test('visibility saving remains guarded if another refresh re-enables the control', async () => {
+  const h = harness(); h.visibility.checked = false;
+  const saving = h.visibility.emit('change');
+  h.visibility.disabled = false;
+  assert.equal(h.control.dirty, true);
+  assert.equal(await h.control.flush(), false);
+  await h.visibility.emit('change');
+  assert.equal(h.requests.length, 1, 'A pending preference write must not be replayed.');
+  h.requests[0].resolve({hiddenAccountIds:['fictional-one']}); await saving;
+  assert.equal(h.control.dirty, false);
+  assert.equal(await h.control.flush(), true);
+});
+test('Cancel restores an unsaved open or closed status without saving', async () => {
+  for (const closed of [false, true]) {
+    const h = harness({closed});
+    h.elements.closed.value = String(!closed); await h.form.emit('change');
+    assert.equal(h.control.dirty, true);
+    await h.cancel.emit('click');
+    assert.equal(h.elements.closed.value, String(closed));
+    assert.equal(h.visibility.disabled, closed);
+    assert.equal(h.control.dirty, false);
+    assert.equal(await h.control.flush(), true);
+    assert.equal(h.requests.length, 0);
+  }
 });
 test('lazy currency and logo reads preserve an account name already being edited', async () => {
   const h = harness(); await h.toggle.emit('click');

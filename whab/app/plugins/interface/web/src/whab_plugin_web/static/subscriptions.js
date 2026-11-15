@@ -38,7 +38,7 @@ export function initSubscriptions() {
   });
   stopButton.addEventListener('click', () => {void perform(() => jobs.stop());});
   const format = value => money(value, getContext().currency);
-  const amount = (tag, text) => {const node = el(tag, text); node.dataset.privateAmount = ''; return node;};
+  const amount = (tag, text) => {const node = el(tag, text); node.dataset.privateAmount = ''; node.dataset.privateCurrency = getContext().currency; return node;};
   async function perform(work) {
     if (busy) return;
     busy = true; error.hidden = true; lock(true);
@@ -169,7 +169,7 @@ export function initSubscriptions() {
       const block = el('div'); block.append(el('small', label), label === 'Active plans' ? el('strong', value) : amount('strong', value)); summary.append(block);
     }
     content.append(summary, el('p', `${data.unclassified} unchecked · ${data.needsReview} uncertain. Monthly estimates include active plans with a known billing interval. No recent charge means a plan may have ended; it does not confirm cancellation.`, 'settings-notice'));
-    const plans = el('section', '', 'subscription-plans'); plans.append(el('h3', 'Your plans'));
+    const plans = el('section', '', 'subscription-plans'); plans.dataset.privateCurrency = getContext().currency; plans.append(el('h3', 'Your plans'));
     renderSubscriptionPlans(plans, data, planState, {format, digits:new Intl.NumberFormat('en', {style:'currency',currency:getContext().currency}).resolvedOptions().maximumFractionDigits});
     content.append(plans);
     const breakdowns = el('div', '', 'subscription-breakdowns');

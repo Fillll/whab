@@ -51,7 +51,7 @@ test('investment action loads the addressed connection and renders text-only val
   assert.equal(h.view.hidden, false); assert.equal(h.connections.hidden, true);
   assert.match(text(h.fields['[data-investment-positions]']), /<img src=x onerror=alert\(1\)>/);
   assert.match(text(h.fields['[data-investment-positions]']), /25.00%/);
-  assert.match(text(h.fields['[data-investment-positions]']), /125\s+USD \/ unit · 2026-11-06/);
+  assert.match(text(h.fields['[data-investment-positions]']), /125\s+USD\s+\/ unit · 2026-11-06/);
   assert.match(text(h.fields['[data-investment-positions]']), /Unavailable/);
   assert.match(text(h.fields['[data-investment-activity]']), /0.82/);
   assert.equal(h.fields['[data-investment-start]'].value, '2024-11-07');
@@ -60,15 +60,16 @@ test('investment action loads the addressed connection and renders text-only val
 test('investment financial fields opt into Web amount masking without masking names or dates', async () => {
   const h = harness(); const loading = h.open.emit('click'); h.requests[0].reply(report()); await loading;
   const privateNodes = node => [
-    ...(node.dataset.privateAmount ? [node] : []), ...node.children.flatMap(privateNodes),
+    ...(Object.hasOwn(node.dataset, 'privateAmount') ? [node] : []), ...node.children.flatMap(privateNodes),
   ];
   assert.equal(privateNodes(h.fields['[data-investment-totals]']).length, 3);
   assert.ok(privateNodes(h.fields['[data-investment-totals]']).every(node => !node.textContent.includes('%')));
   assert.match(text(h.fields['[data-investment-totals]']), /25.00%/);
   const positions = h.fields['[data-investment-positions]'];
-  assert.deepEqual(privateNodes(positions).map(node => node.textContent), ['125', '$1,250.00', '$1,000.00', '$250.00']);
+  assert.deepEqual(privateNodes(positions).map(node => node.textContent), ['125 USD', '$1,250.00', '$1,000.00', '$250.00']);
   assert.deepEqual(privateNodes(h.fields['[data-investment-activity]']).map(node => node.textContent), ['$0.82', '$0.00']);
-  assert.ok(privateNodes(positions).every(node => node.tag === 'span'));
+  assert.ok(privateNodes(positions).every(node => node.tag === 'span' && node.dataset.privateCurrency === 'USD'));
+  assert.ok(privateNodes(h.fields['[data-investment-activity]']).every(node => node.dataset.privateCurrency === 'USD'));
   assert.match(text(positions), /2026-11-06/);
   assert.match(text(positions), /Fictional IRA/);
 });

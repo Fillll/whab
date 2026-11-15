@@ -109,7 +109,7 @@ def test_pages_keep_currency_totals_and_categories_separate(client):
         text = client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text
         assert f'<span data-private-amount>{sidebar_amount}</span></small>' in text
         account_details = client.get(f"/budgets/home/accounts/2026-10/{currency.lower()}").text
-        assert f'<strong><span data-private-amount>{money}</span></strong>' in account_details
+        assert f'<strong><span data-private-amount data-private-currency="{currency}">{money}</span></strong>' in account_details
         assert f'{currency} food' in text and f'{currency} wallet' in text
         assert f'value="{amount_input}"' in text
         assert f'/2026-10/{currency.lower()}' in text

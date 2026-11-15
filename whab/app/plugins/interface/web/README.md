@@ -1,6 +1,6 @@
 # Web interface plugin
 
-Distributed independently as `whab_plugin_web`; this version requires WHAB 2.73+. Bounded register and account metadata reads require WHAB 2.14 or newer. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_web`; this version requires WHAB 2.80+. Bounded register and account metadata reads require WHAB 2.14 or newer. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
 `src/whab_plugin_web/` owns the bundled visual descriptor, view models, icons, Jinja templates and browser assets. Keep rendering and presentation tests alongside them in this folder. The host owns HTTPS routes and access guards through the public UI contract. Every request requires TLS; ordinary visual/private routes remain loopback-only, with only bearer-authorized remote protocol and verified bank-webhook routes exempt from local Host/origin checks.
 
@@ -27,13 +27,27 @@ Settings opens Plugins in one centered preferences window with one backdrop and 
 
 Sections stay mounted so Back preserves the parent’s selections and drafts. Entering or leaving a section starts or stops its existing plugin status/training lifecycle; hidden sections must not block navigation or keep training sessions alive. Opening plugin settings from an account temporarily closes the account dialog and restores it when Settings closes, preserving the account draft. A visual-interface handover closes Settings without restoring another modal so the browser can acknowledge readiness. Existing busy budget operations still block dismissal and section changes. Follow the project’s [clarity and simplicity rules](../../../CONTRIBUTING.md#clarity-and-simplicity).
 
+## Accounts navigation and address
+
+Accounts uses **`/budgets/BUDGET/accounts`**. The page shows all account currencies
+and is not scoped to a month. Existing month/currency-suffixed bookmarks still
+open, then adopt the short canonical address. The saved budget currency and
+current month remain available as context for links to date-scoped views.
+
+Closed accounts are read-only archives and cannot be shown in the sidebar. Their
+disabled controls do not count as unfinished saves or block leaving Accounts.
+Actual in-flight writes and unsaved account edits keep the existing save guards;
+Cancel restores the committed account status along with the other fields.
+
 ## Hide amounts
 
 The eye in the top-right toolbar switches **Hide amounts** / **Show amounts**.
-When closed, fixed `XX` placeholders replace monetary values throughout Web:
+When closed, every USD amount uses the same **`$X,XXX`** placeholder, regardless
+of its real size, sign or decimal precision. Other currencies use their code and
+the same fixed pattern (for example, `JPY X,XXX`). Monetary values are masked throughout Web:
 sidebar balances, Accounts totals, transaction amounts, budget assignments and
 targets, Insights, transfer proposals, subscription reports and Plaid investment
-values (Plaid 1.9.1+). Values in tooltips and accessibility labels are hidden too.
+values (Plaid 1.9.2+ for currency-aware masks). Values in tooltips and accessibility labels are hidden too.
 Charts, receipts and raw history previews are concealed as complete regions when
 they can contain amounts. Dates, names, counts and nonfinancial controls stay usable.
 
@@ -46,7 +60,7 @@ reports, dialogs and saved fragments adopt it automatically.
 
 Hidden monetary editors show a **Show amounts to edit** button. Revealing restores
 the exact original editor value and focus, including an unfinished draft. Toggling
-never substitutes `XX` into data, dispatches a save or changes review status, bank
+never substitutes a placeholder into data, dispatches a save or changes review status, bank
 synchronization or audit history. Existing pending saves retain their normal guards.
 
 This masks displayed financial fields; it is not data redaction. Values remain in
@@ -59,9 +73,14 @@ editing a financial value or inspecting a concealed chart, receipt or history de
 No new core/SDK operation is needed: masking belongs to the Web presentation layer.
 Plugin-owned HTML can opt in without importing Web internals:
 
-- Put `data-private-amount="XX"` on an amount-only span or monetary editor; keep
-  table cells and mixed labels outside that span. A fixed mask such as `$XX` is
-  allowed. Do not encode the original value's length or sign in the mask.
+- Put `data-private-amount` on an amount-only span or monetary editor; keep
+  table cells and mixed labels outside that span. Put `data-private-currency="USD"`
+  on the leaf or its nearest containing region to produce `$X,XXX`; another
+  three-letter currency produces `CODE X,XXX`. Without known currency, the
+  placeholder is `X,XXX`. Account-form currency choices update the mask too.
+  An explicit nonempty marker remains a custom fixed-mask override. Never encode
+  the original value's length, sign or precision in the mask. Opaque content and
+  raw history values without a known currency retain generic `XX` placeholders.
 - Put `data-private-amount-attributes="title aria-label"` on an outer element with
   monetary tooltip/accessibility text. The optional `data-private-amount-label`
   provides a safe fixed label. Numeric ARIA range attributes are removed while

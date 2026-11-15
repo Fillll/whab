@@ -229,13 +229,13 @@ test('chosen Unicode name travels with preview and retries and readable Accounts
   const retry = controls['[data-import-commit]'].emit('click');
   assert.equal(state.requests[2].options.headers['X-Import-Budget-Name'], state.requests[0].options.headers['X-Import-Budget-Name']);
   assert.equal(state.requests[2].options.headers['X-Import-Operation'], state.requests[1].options.headers['X-Import-Operation']);
-  state.requests[2].reply({id: '11111111-1111-4111-8111-111111111111', url: '/budgets/fictional-cafe/accounts/current-month/usd'});
+  state.requests[2].reply({id: '11111111-1111-4111-8111-111111111111', url: '/budgets/fictional-cafe/accounts'});
   await retry;
-  assert.deepEqual(state.redirects, ['https://localhost:5173/budgets/fictional-cafe/accounts/current-month/usd']);
+  assert.deepEqual(state.redirects, ['https://localhost:5173/budgets/fictional-cafe/accounts']);
 });
 
 test('commit rejects unexpected same-origin destinations', async () => {
-  for (const url of ['/settings', '/budgets/home/accounts/current-month/usd?unexpected=1', '/budgets/home/accounts/current-month/usd#unexpected']) {
+  for (const url of ['/settings', '/budgets/home/accounts?unexpected=1', '/budgets/home/accounts#unexpected', '/budgets/home/accounts/current-month/usd?unexpected=1', '/budgets/home/accounts/current-month/usd#unexpected']) {
     const state = harness(1), controls = state.panels[0].controls;
     await checked(state);
     const creating = controls['[data-import-commit]'].emit('click');

@@ -65,7 +65,7 @@ test('history masks financial values and nested records while dates and labels r
   ];
   await h.control.prepare('undo', 'fictional');
   const rows = h.nodes.get('[data-history-changes]').children;
-  for (const row of rows.slice(0,3)) assert.equal(row.children[1].children[1].dataset.privateAmount, '');
+  for (const row of rows.slice(0,3)) assert.equal(row.children[1].children[1].dataset.privateAmount, 'XX');
   assert.equal(rows[0].children[1].children[1].textContent, '1250');
   assert.equal(rows[0].children[2].children[1].textContent, '2026-11-01');
   assert.deepEqual(rows[0].children[2].children[1].dataset, {});

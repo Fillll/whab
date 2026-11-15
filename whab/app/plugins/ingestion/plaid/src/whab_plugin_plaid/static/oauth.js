@@ -15,7 +15,7 @@
       (context.legacy === false && typeof context.flow_id === 'string' && /^[a-f0-9]{32}$/.test(context.flow_id) &&
         Number.isSafeInteger(context.generation) && context.generation > 0 &&
         ['link', 'update'].includes(context.kind) && Number.isSafeInteger(context.deadline_ms) && context.deadline_ms > 0));
-    const route = /^\/budgets\/([a-z0-9]+(?:-[a-z0-9]+)*)\/accounts\/(current-month|[0-9]{4}-(?:0[1-9]|1[0-2]))\/[a-z]{3}$/;
+    const route = /^\/budgets\/([a-z0-9]+(?:-[a-z0-9]+)*)\/accounts(?:\/(current-month|[0-9]{4}-(?:0[1-9]|1[0-2]))\/[a-z]{3})?$/;
     const match = destination?.match(route);
     if (!context || context.formatVersion !== 1 || context.provider !== 'plaid' ||
         !['sandbox', 'production'].includes(context.environment) || typeof context.legacy !== 'boolean' ||

@@ -690,7 +690,9 @@ class BudgetDispatch:
             else:
                 short_transaction = (len(parts) == 5 and parts[3] == "transactions" or
                                      len(parts) == 6 and valid_route_key(parts[3]) and parts[4] == "transactions")
-                if short_transaction:
+                if tail == "/accounts":
+                    month, currency = "current-month", "usd"
+                elif short_transaction:
                     month, currency = parts[-1], "usd"
                 else:
                     account_route = len(parts) == 7 and valid_route_key(parts[3]) and parts[4] == "transactions"

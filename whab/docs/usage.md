@@ -56,22 +56,27 @@ To use an existing certificate, set **both** `WHAB_TLS_CERT_FILE` and `WHAB_TLS_
 
 ## Budget addresses
 
+The Accounts page is `/budgets/BUDGET/accounts`, with no month or currency suffix.
+It lists all account currencies. Older Accounts bookmarks still work and adopt
+the shorter address; transactions and budgets retain their own date/currency scope.
+
 Browser addresses identify the saved budget and selected view:
 
 ```text
 /budgets/<budget-slug>/<page>/<month>/<currency>
 /budgets/<budget-slug>/transactions/<month>
 /budgets/<budget-slug>/<account-slug>/transactions/<month>
+/budgets/<budget-slug>/accounts
 ```
 
-USD Transactions addresses omit the currency suffix; absence means USD. Non-USD registers keep an explicit suffix (for example `/eur`), and other workspace pages retain their currency suffix. Existing `/usd` transaction bookmarks remain supported and the browser replaces them with the shorter address. Every segment is lowercase, including an explicit currency code. Visible budget names and ISO currency labels keep their ordinary capitalization. API payloads and stored currencies continue to use uppercase ISO codes such as `USD`; lowercase is the browser address policy.
+USD Transactions addresses omit the currency suffix; absence means USD. Non-USD registers keep an explicit suffix (for example `/eur`), and dated Budget, Insights and Subscriptions pages retain their currency suffix. Accounts omits both month and currency. Existing `/usd` transaction bookmarks remain supported and the browser replaces them with the shorter address. Every segment is lowercase, including an explicit currency code. Visible budget names and ISO currency labels keep their ordinary capitalization. API payloads and stored currencies continue to use uppercase ISO codes such as `USD`; lowercase is the browser address policy.
 
 | View | Address |
 | --- | --- |
 | Original budget, current month | `/budgets/my-budget/budget/current-month/usd` |
 | Original budget, current register | `/budgets/my-budget/transactions/current-month` |
 | Original budget, fixed month | `/budgets/my-budget/transactions/2026-10/eur` |
-| Fictional sample budget | `/budgets/demo/accounts/current-month/usd` |
+| Fictional sample budget | `/budgets/demo/accounts` |
 | Named budget | `/budgets/family-budget/budget/current-month/usd` |
 | Account register | `/budgets/family-budget/daily-checking/transactions/current-month?all_dates=true` |
 

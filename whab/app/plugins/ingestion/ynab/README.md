@@ -5,6 +5,9 @@ Distributed independently as `whab_plugin_ynab`. Its version and dependency comp
 Display name: **YNAB ZIP importer**. CLI identifier: `ynab-zip-importer` (legacy spelling `ynab` is accepted). Saved-budget/host plugin ID: `ynab`; Python package: `whab_plugin_ynab`. It is installed by WHAB's supported-set installer/extra and is disabled by default. It reads a local YNAB ZIP containing one Budget and one Register table, recognized by their English column headers. Both TSV and CSV, UTF-8 and BOM-marked UTF-16 are supported. No YNAB account, API token or network request is needed.
 
 Import panels bind once per element on startup and `whab:page-ready`. During preview or commit, the module cancels `whab:before-navigate` to keep its file, operation identity and response attached to the active view. Successful creation still opens the newly imported budget with a document navigation.
+YNAB 1.5.1 accepts both the canonical `/budgets/BUDGET/accounts` destination
+from WHAB 2.80+ and legacy month/currency Accounts destinations. The returned
+budget identity and same-origin validation remain required.
 
 Enable **YNAB ZIP importer** through Settings → Plugins, save, and restart. Open the plugin's **Settings** from any page, including Demo, choose the ZIP (at most 10 MiB), enter a budget name (up to 100 characters; an editable suggestion comes from the filename), confirm that its monetary values use USD, and preview. Review the counts and warnings before clicking **Create budget and import**. Each import creates a separate budget with your chosen name in Settings → Budgets and opens its Accounts page for classification. With no saved plugin selection, `WHAB_PLUGINS=ynab` enables it on startup.
 

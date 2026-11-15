@@ -44,12 +44,13 @@ def test_closed_account_dialogs_keep_only_selected_currency_and_one_shared_catal
     store.add_account("personal", {
         "name": f"{currency} cash", "type": "depository", "balance": 0, "currency": currency,
     })
-    response = client.get(f"/budgets/home/accounts/2026-10/{currency.lower()}")
+    assert client.put("/api/ui/preferences", json={"workspace": "personal", "defaultCurrency": currency}).status_code == 200
+    response = client.get("/budgets/home/accounts")
     assert response.status_code == 200
     markup = CurrencyMarkup(response.text)
     assert len(markup.selects) == 4
     assert markup.selects[3]["attrs"]["name"] == "defaultCurrency"
-    assert markup.selects[3]["options"] == [{"value": "USD", "selected": None}]
+    assert markup.selects[3]["options"] == [{"value": currency, "selected": None}]
     for select in markup.selects[:3]:
         assert select["attrs"]["name"] == "currency"
         assert select["options"] == [{

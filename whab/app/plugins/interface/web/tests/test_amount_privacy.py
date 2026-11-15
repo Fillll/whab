@@ -68,6 +68,8 @@ def test_rendered_money_is_protected_without_changing_financial_records(client, 
     markup = MonetaryMarkup(response.text)
     assert markup.protected_text, "The fictional sample must exercise monetary display values."
     assert markup.unprotected == []
+    if fragment:
+        assert 'data-private-currency="USD"' in response.text
     if page in {"budget", "transactions"}:
         assert markup.money_inputs, "Editable amounts must be concealed without replacing their values."
     assert (store.accounts("demo"), store.transactions("demo")) == before
@@ -106,9 +108,11 @@ def test_untyped_extension_report_values_and_details_are_shielded(store, tmp_pat
 @pytest.mark.parametrize("currency,balance,expected", [("USD", 123456, "$1,234.56"), ("JPY", 123456, "JPY 123,456"), ("KWD", 123456, "KWD 123.456")])
 def test_account_privacy_covers_currency_precision_and_keeps_stored_balance(client, store, currency, balance, expected):
     account = store.add_account("personal", {"name": "Fictional 東京 🌱", "type": "depository", "balance": balance, "currency": currency})
-    response = client.get(f"/budgets/home/accounts/2026-10/{currency.lower()}")
+    response = client.get("/budgets/home/accounts/2026-10/usd")
     assert response.status_code == 200
     assert "Fictional 東京 🌱" in response.text
+    # Accounts can mix currencies: totals, row and sidebar carry their own scope.
+    assert response.text.count(f'data-private-currency="{currency}"') >= 3
     markup = MonetaryMarkup(response.text)
     assert markup.unprotected == []
     assert any(expected in value for value in markup.protected_text)

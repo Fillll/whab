@@ -635,14 +635,14 @@ function investmentCell(row, value, className) {
   row.append(cell);
   return cell;
 }
-function investmentAmount(value) {
+function investmentAmount(value, currency) {
   const amount = setupElement('span', value);
-  if (value !== 'Unavailable') amount.dataset.privateAmount = 'XX';
+  if (value !== 'Unavailable') {amount.dataset.privateAmount = ''; amount.dataset.privateCurrency = currency;}
   return amount;
 }
-function investmentAmountCell(row, value, className) {
+function investmentAmountCell(row, value, currency, className) {
   const cell = investmentCell(row, '', className);
-  cell.append(investmentAmount(value));
+  cell.append(investmentAmount(value, currency));
   return cell;
 }
 function renderInvestmentReport(view, report) {
@@ -656,7 +656,7 @@ function renderInvestmentReport(view, report) {
       ['Unrealized gain/loss', total.coveredPositions ? investmentMoney(total.unrealizedGain, total.currency) : 'Unavailable', total.coveredPositions ? ` · ${total.unrealizedReturnPercent}%` : ''],
     ]) {
       const group = setupElement('div'); const amount = setupElement('dd');
-      amount.append(investmentAmount(value));
+      amount.append(investmentAmount(value, total.currency));
       if (detail) amount.append(setupElement('span', detail));
       group.append(setupElement('dt', label), amount); totals.append(group);
     }
@@ -669,13 +669,13 @@ function renderInvestmentReport(view, report) {
     identity.append(setupElement('small', `${position.name} · ${position.quantity} units · ${position.status}`));
     identity.append(setupElement('small', accountNames.get(position.accountId) || ''));
     if (position.price !== null) {
-      const price = setupElement('small'); price.append(investmentAmount(position.price),
-        setupElement('span', ` ${position.currency} / unit · ${position.priceAsOf || 'Price date unavailable'}`)); identity.append(price);
+      const price = setupElement('small'); price.append(investmentAmount(`${position.price} ${position.currency}`, position.currency),
+        setupElement('span', ` / unit · ${position.priceAsOf || 'Price date unavailable'}`)); identity.append(price);
     }
-    investmentAmountCell(row, investmentMoney(position.value, position.currency));
-    investmentAmountCell(row, investmentMoney(position.costBasis, position.currency));
+    investmentAmountCell(row, investmentMoney(position.value, position.currency), position.currency);
+    investmentAmountCell(row, investmentMoney(position.costBasis, position.currency), position.currency);
     const gainClass = position.unrealizedGain < 0 ? 'investment-loss' : 'investment-gain';
-    investmentAmountCell(row, investmentMoney(position.unrealizedGain, position.currency), gainClass);
+    investmentAmountCell(row, investmentMoney(position.unrealizedGain, position.currency), position.currency, gainClass);
     investmentCell(row, position.unrealizedReturnPercent === null ? 'Unavailable' : `${position.unrealizedReturnPercent}%`, gainClass);
     investmentCell(row, position.firstRecordedAddition || 'Unavailable'); positions.append(row);
   }
@@ -685,8 +685,8 @@ function renderInvestmentReport(view, report) {
   for (const event of report.activity.slice(0, activityLimit)) {
     const row = setupElement('tr'); const name = investmentCell(row, event.name);
     name.append(setupElement('small', `${event.type}${event.subtype ? ` · ${event.subtype}` : ''}`));
-    investmentCell(row, event.date); investmentAmountCell(row, investmentMoney(-event.amount, event.currency));
-    investmentAmountCell(row, investmentMoney(event.fees, event.currency)); activity.append(row);
+    investmentCell(row, event.date); investmentAmountCell(row, investmentMoney(-event.amount, event.currency), event.currency);
+    investmentAmountCell(row, investmentMoney(event.fees, event.currency), event.currency); activity.append(row);
   }
   view.querySelector('[data-investment-more-activity]').hidden = report.activity.length <= activityLimit;
   view.querySelector('[data-investment-status]').textContent = report.positions.length

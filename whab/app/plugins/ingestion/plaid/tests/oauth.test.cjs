@@ -19,12 +19,15 @@ function run({session = {}, href = 'https://localhost:5173/?oauth_state_id=ficti
 
 test('OAuth bridge returns only to the original addressed budget with unchanged flow identity', () => {
   for (const budget of ['home', '12345678-1234-1234-1234-123456789abc', 'fictional-household']) {
-    const original = '/budgets/' + budget;
-    const state = run({session: {'whab-link-budget': original, 'whab-link-return-url': original + '/accounts/current-month/eur'}});
-    assert.deepEqual(state.redirects, [original + '/accounts/current-month/eur?oauth_state_id=fictional-private-state']);
-    assert.equal(state.values.get('whab-link-redirect-uri'), 'https://localhost:5173/?oauth_state_id=fictional-private-state');
-    assert.deepEqual(JSON.parse(state.values.get('whab-link-context')), flow);
-    assert.equal(state.paragraph.textContent, '');
+    for (const suffix of ['', '/current-month/eur']) {
+      const original = '/budgets/' + budget;
+      const destination = original + '/accounts' + suffix;
+      const state = run({session: {'whab-link-budget': original, 'whab-link-return-url': destination}});
+      assert.deepEqual(state.redirects, [destination + '?oauth_state_id=fictional-private-state']);
+      assert.equal(state.values.get('whab-link-redirect-uri'), 'https://localhost:5173/?oauth_state_id=fictional-private-state');
+      assert.deepEqual(JSON.parse(state.values.get('whab-link-context')), flow);
+      assert.equal(state.paragraph.textContent, '');
+    }
   }
 });
 
@@ -46,7 +49,7 @@ test('OAuth refuses unscoped, submitted, expired, incompatible and malformed con
 });
 
 test('OAuth cannot redirect outside its local budget, to another view, or with a fragment', () => {
-  for (const destination of ['https://other.example/budgets/home/accounts/2026-10/usd', '//other.example/budgets/home/accounts/2026-10/usd', '/budgets/other/accounts/2026-10/usd', '/budgets/home/transactions/2026-10/usd', '/budgets/home/accounts/2026-13/usd', '/budgets/home/accounts/2026-10/usd?redirect=outside', '/budgets/home/accounts/2026-10/usd#fragment', '/budgets/home/accounts/2026-10/usd\n']) {
+  for (const destination of ['https://other.example/budgets/home/accounts', '//other.example/budgets/home/accounts', '/budgets/other/accounts', '/budgets/home/accounts?redirect=outside', '/budgets/home/accounts#fragment', '/budgets/home/accounts\n', 'https://other.example/budgets/home/accounts/2026-10/usd', '//other.example/budgets/home/accounts/2026-10/usd', '/budgets/other/accounts/2026-10/usd', '/budgets/home/transactions/2026-10/usd', '/budgets/home/accounts/2026-13/usd', '/budgets/home/accounts/2026-10/usd?redirect=outside', '/budgets/home/accounts/2026-10/usd#fragment', '/budgets/home/accounts/2026-10/usd\n']) {
     const state = run({session: {'whab-link-return-url': destination}});
     assert.equal(state.redirects.length, 0);
     assert.equal(state.values.has('whab-link-context'), true);

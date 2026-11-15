@@ -9,7 +9,7 @@
     {
       "name": "interface",
       "kind": "sdk",
-      "summary": "Provide the declared web interface or remote authority adapter. Opening Balance is available in category creation and transaction pickers; openingFunding is displayed separately from income and included in the documented Ready to Assign equation. Technical categories never appear as expense envelopes. Settings opens Plugins with direct Budgets, Appearance, Budget history and About navigation; details stay in place with Back, Close and keyboard focus restoration.",
+      "summary": "Provide the declared web interface or remote authority adapter. Opening Balance is available in category creation and transaction pickers; openingFunding is displayed separately from income and included in the documented Ready to Assign equation. Technical categories never appear as expense envelopes. Settings opens Plugins with direct Budgets, Appearance, Budget history and About navigation; details stay in place with Back, Close and keyboard focus restoration. Accounts has the canonical /budgets/BUDGET/accounts address; legacy month/currency suffixes remain accepted. Archived disabled controls do not block leaving the page; actual unfinished writes retain normal guards.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -581,7 +581,7 @@
     {
       "name": "appearance.amounts",
       "kind": "local",
-      "summary": "Top-right eye: Hide amounts replaces monetary fields with fixed XX placeholders; Show amounts restores exact values. Covers balances, budget and transaction amounts, reports, monetary tooltips/accessibility labels, editor values and opaque chart/receipt/history regions.",
+      "summary": "Top-right eye: Hide amounts replaces monetary fields with the same $X,XXX placeholder for every USD amount (CODE X,XXX for other known currencies), independent of actual magnitude, sign or decimal precision; Show amounts restores exact values. Covers balances, budget and transaction amounts, reports, monetary tooltips/accessibility labels, editor values and opaque chart/receipt/history regions.",
       "input": {
         "type": "object",
         "properties": {
@@ -636,7 +636,7 @@
           }
         }
       ],
-      "side_effects": "Writes only whab.amounts=shown|hidden in browser localStorage. Applies across budgets/workspaces in the same origin, before paint and to dynamic fragments; other tabs follow changes. Does not save or modify financial fields, drafts, history or sync. Hidden monetary editors offer Show amounts to edit and restore the exact draft/focus. CLI, API, exports and stored values are unchanged; arbitrary numeric text in names/memos is not scrubbed.",
+      "side_effects": "Writes only whab.amounts=shown|hidden in browser localStorage. Applies across budgets/workspaces in the same origin, before paint and to dynamic fragments; other tabs follow changes. Does not save or modify financial fields, drafts, history or sync. Hidden monetary editors offer Show amounts to edit and restore the exact draft/focus. CLI, API, exports and stored values are unchanged; arbitrary numeric text in names/memos is not scrubbed. The mask never reads the amount to determine its length. Unknown-currency monetary fields use X,XXX; opaque content and raw history without currency remain generic XX.",
       "permissions": "Local Web browser control; this is not a remotely callable CLI/API command or data-access restriction.",
       "scope": "One browser origin, across its budgets and workspaces. No account/budget data is stored in this preference.",
       "errors": [
@@ -644,7 +644,7 @@
         "Third-party financial HTML must opt into the documented data-private-amount/data-private-content markers; untyped Insight values/details are concealed conservatively."
       ],
       "retry": "Toggle freely; no financial mutation or uncertain-write replay occurs. Revealing is necessary before editing monetary inputs.",
-      "availability": "Web 1.61+; Plaid investment amount markers require Plaid 1.9.1+. Read offline with whab-cli describe --plugin web --json."
+      "availability": "Web 1.62+ with WHAB 2.80+; currency-aware Plaid investment markers require Plaid 1.9.2+. Read offline with whab-cli describe --plugin web --json."
     }
   ]
 }

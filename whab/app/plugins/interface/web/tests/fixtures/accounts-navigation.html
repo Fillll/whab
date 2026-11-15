@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fictional Accounts navigation acceptance</title>
+<link rel="stylesheet" href="../../src/whab_plugin_web/static/styles.css">
+<style>
+  body {display:block;padding:32px;max-width:1040px;margin:auto}
+  h1 {margin:0 0 12px}.fixture-controls {display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:24px 0}
+  .fixture-controls select {width:auto}.fixture-account {border-top:1px solid var(--line);padding:20px 0}
+  .fixture-fields {display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:12px}
+  .fixture-fields label {display:grid;gap:6px}.fixture-account input {width:100%}
+  .fixture-account input[type=checkbox] {width:auto}.fixture-notice {color:var(--muted);font-size:13px;line-height:1.5}
+  #fixture-status {padding:14px;background:var(--surface-alt);border:1px solid var(--line)}
+  @media(max-width:650px) {body{padding:18px}.fixture-fields{grid-template-columns:1fr}}
+</style>
+<h1>Fictional Accounts navigation</h1>
+<p class="fixture-notice">Uses the shipped account editor and its navigation flush guard. The first account is archived, so its sidebar checkbox is intentionally disabled. All records and saves below are mocked in memory; no ledger, bank or production request is made.</p>
+<div class="fixture-controls">
+  <label>Mock save result <select id="save-mode"><option value="success">Succeed</option><option value="failure">Fail</option><option value="hold">Hold pending</option></select></label>
+  <button class="button secondary" id="complete-save" disabled>Complete pending save</button>
+  <button class="button secondary" id="fail-save" disabled>Fail pending save</button>
+  <button class="button primary" id="leave-accounts">Attempt to leave Accounts</button>
+</div>
+<p id="fixture-status" role="status">Starting fictional account controls…</p>
+<section id="accounts-view" data-account-management data-workspace="personal"></section>
+<section id="destination-view" hidden>
+  <h2>Navigation succeeded</h2>
+  <p>Accounts allowed departure. An archived account alone is not an unsaved edit.</p>
+  <button class="button secondary" id="return-accounts">Return to Accounts</button>
+</section>
+<div id="toast" hidden><span></span></div>
+<script id="whab-context" type="application/json">{"budgetId":"fictional-navigation","workspace":"personal","page":"accounts","currency":"USD","apiPrefix":"/fictional-only","uiGeneration":"fixture","accountSlugs":{}}</script>
+<script type="module">
+  import {initAccountList} from '../../src/whab_plugin_web/static/account-list.js';
+  const byId = id => document.getElementById(id), context = JSON.parse(byId('whab-context').textContent);
+  const accounts = byId('accounts-view');
+  accounts.innerHTML = [
+    {id:'archived', name:'Fictional archived savings', closed:true},
+    {id:'open', name:'Fictional everyday checking', closed:false},
+  ].map(account => `<form class="fixture-account" data-inline-account="${account.id}">
+    <h2>${account.closed ? 'Archived account' : 'Open account'}</h2>
+    <div class="fixture-fields"><label>Account name<input name="name" value="${account.name}" aria-label="Name for ${account.id} account" required></label>
+      <label>Account status<select name="closed" aria-label="Status for ${account.id} account"><option value="false"${account.closed?'':' selected'}>Open</option><option value="true"${account.closed?' selected':''}>Closed · archive</option></select></label></div>
+    <input type="hidden" name="onBudget" value="true"><input type="hidden" name="type" value="depository"><input type="hidden" name="subtype" value="savings">
+    <input type="hidden" name="currency" value="USD" disabled>
+    <div data-account-extra hidden></div>
+    <label><input type="checkbox" data-sidebar-visible checked${account.closed?' disabled':''} aria-label="Show ${account.id} account in sidebar"> Show in sidebar${account.closed?' (disabled for archive)':''}</label>
+    <div class="fixture-controls" data-account-actions hidden><button class="button primary" type="submit">Save ${account.id} account</button><button class="button secondary" type="button" data-account-cancel>Cancel ${account.id} edits</button></div>
+    <p data-account-status role="status" hidden></p><p class="field-error" role="alert" hidden></p>
+  </form>`).join('');
+  let calls = 0, saved = 0, pending = null, controller;
+  function status(message = 'Ready') {
+    byId('fixture-status').textContent = `${message} · Mock requests: ${calls} · Mock saves: ${saved} · Unsaved changes: ${controller?.dirty ? 'yes' : 'no'}`;
+    byId('complete-save').disabled = byId('fail-save').disabled = !pending;
+  }
+  // The real editor refreshes after acknowledgment; return only a fictional fragment.
+  window.fetch = async () => ({ok:true, url:location.href, headers:{get:name => name==='X-WHAB-Page-Fragment'?'1':null},
+    text:async () => `<div data-page-fragment data-page-context='${JSON.stringify(context)}'></div>`});
+  controller = initAccountList({root:document, updateFields() {}, onDraft:() => status('Account draft updated'),
+    async api() {
+      calls++;
+      const mode = byId('save-mode').value;
+      if (mode==='failure') throw new Error('Fictional save rejected. Your edit is retained; cancel it or choose Succeed and retry.');
+      if (mode==='hold') await new Promise((resolve,reject) => {pending={resolve,reject}; status('Fictional save pending');});
+      saved++; return {ok:true};
+    },
+  });
+  byId('complete-save').onclick = () => {const value=pending; pending=null; value?.resolve(); status('Fictional save acknowledged');};
+  byId('fail-save').onclick = () => {const value=pending; pending=null; value?.reject(new Error('Fictional save failed.')); status('Fictional save rejected');};
+  byId('leave-accounts').onclick = async () => {
+    status('Checking pending account work');
+    if (await controller.flush()) {accounts.hidden=true;byId('destination-view').hidden=false;status('Navigation succeeded');}
+    else status('Navigation blocked: save or cancel the current edit');
+  };
+  byId('return-accounts').onclick = () => {accounts.hidden=false;byId('destination-view').hidden=true;status('Returned to Accounts');};
+  accounts.addEventListener('click', () => queueMicrotask(() => status('Account controls ready')));
+  status();
+</script>
+</html>
