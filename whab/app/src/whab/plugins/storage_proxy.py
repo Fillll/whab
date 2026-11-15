@@ -26,6 +26,7 @@ from .storage_worker import StorageWorker, storage_error
 from .storage_worker_codec import CONTROL_WRITES, METHODS
 
 _MUTATIONS = {
+    "change_transactions": (("workspace", "edits", "creates"), {"preserve_balances": False}),
     "apply_transfer_match": (("workspace", "transaction_ids", "action", "fingerprint"), {}),
     "edit_transactions": (("workspace", "edits"), {}),
     "classify_accounts": (("workspace", "edits"), {}),
@@ -112,7 +113,7 @@ def operation_payload(name, args, kwargs):
         keys = {"account_id": "accountId", "category_id": "categoryId", "transaction_id": "transactionId",
                 "transaction_ids": "transactionIds", "item_id": "itemId", "encrypted_token": "encryptedToken",
                 "institution_name": "institutionName", "provider_id": "providerId", "historical_complete": "historicalComplete",
-                "expected_cursor": "expectedCursor", "parent_id": "parentId"}
+                "expected_cursor": "expectedCursor", "parent_id": "parentId", "preserve_balances": "preserveBalances"}
         payload = {keys.get(key, key): _plain(value) for key, value in values.items() if value is not UNSET}
     return workspace, canonical_storage_json(payload, limit=operation_limit(name))
 

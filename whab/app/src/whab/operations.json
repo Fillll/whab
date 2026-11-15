@@ -4322,6 +4322,717 @@
       ],
       "retry": "Read again as needed; reads never authorize a later write using an old revision.",
       "availability": "Public ledger API and CLI."
+    },
+    {
+      "name": "change_transactions",
+      "kind": "command",
+      "summary": "Atomically correct and create 1–100 ordinary transactions, including cash-neutral splits.",
+      "input": {
+        "type": "object",
+        "description": "One operation of 1–100 total edits plus creations, validated together before mutation. IDs are already resolved. No silently split or partial saves.",
+        "properties": {
+          "edits": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 100,
+            "description": "Distinct existing active transaction corrections in caller order.",
+            "items": {
+              "type": "object",
+              "description": "Existing transaction correction or annotation changes; omission preserves exact saved fields. At least one change is required.",
+              "properties": {
+                "transactionId": {
+                  "type": "string",
+                  "description": "Stable active transaction ID; never a merchant/name.",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Existing child ID; null clears. Omit to preserve.",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared categorizer label (1–80 printable characters); null clears; requires categoryId.",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "reviewed": {
+                  "type": "boolean",
+                  "description": "Explicit review status; omit to preserve."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Replace exactly; empty string clears; omit to preserve. Cannot accompany appendNote.",
+                  "maxLength": 1000
+                },
+                "appendNote": {
+                  "type": "string",
+                  "description": "Append verbatim with one newline after a nonempty existing note. Final note max 1000. Cannot accompany note.",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "accountId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Existing active same-currency destination account ID; omission preserves."
+                },
+                "date": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                  "description": "Valid ISO date from 1900-01-01 through 2200-12-31."
+                },
+                "merchant": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Explicit payee replacement; omitted saved merchant including whitespace is preserved."
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000,
+                  "description": "Nonzero signed integer minor units: positive outflow, negative inflow."
+                }
+              },
+              "required": [
+                "transactionId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "creates": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 100,
+            "description": "Explicit stable-ID manual creations in caller order after edits.",
+            "items": {
+              "type": "object",
+              "description": "Create one ordinary manual, posted, unreviewed transaction; no imported/provider identity or transfer link can be supplied. Default category null and memo empty.",
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Required existing active destination account ID; currency must match the explicit currency field."
+                },
+                "date": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                  "description": "Valid ISO date from 1900-01-01 through 2200-12-31."
+                },
+                "merchant": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Required payee text, preserved verbatim including outer whitespace; must contain non-whitespace text."
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000,
+                  "description": "Nonzero signed integer minor units: positive outflow, negative inflow."
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional existing child category ID; omission or null creates an uncategorized transaction.",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional self-declared categorizer label (1–80 printable characters); requires explicit categoryId. Omission or null leaves no agent attribution.",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Optional memo preserved verbatim; omission or empty string creates an empty memo. Maximum 1000 characters.",
+                  "maxLength": 1000
+                },
+                "creationId": {
+                  "type": "string",
+                  "minLength": 36,
+                  "maxLength": 36,
+                  "description": "Canonical UUID for this proposed new manual transaction. Reuse exactly for preview, commit and retry; cannot collide with any existing/deleted transaction or another target."
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$",
+                  "description": "Explicit supported ISO currency matching the destination account; never inferred or converted."
+                }
+              },
+              "required": [
+                "creationId",
+                "accountId",
+                "date",
+                "merchant",
+                "amount",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "preserveBalances": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicit split/reallocation guard: require zero net signed transaction amount delta separately in every affected account/currency and preserve all account balance snapshots exactly. Reject nonconserving batches. Otherwise normal manual balance adjustments/imported snapshot-preserving corrections apply."
+          }
+        },
+        "required": [
+          "edits",
+          "creates"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Complete saved or read-only proposed transaction changes in edits-then-creations order; creation before is null. Exact original replay returns its historical result, not a new current read.",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Explicit targets (1–100)."
+          },
+          "changed": {
+            "type": "integer",
+            "description": "Targets whose public records differ."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every target in input order with complete public before/after records. Permanent history separately retains exact internal financial rows.",
+            "items": {
+              "type": "object",
+              "description": "Target id, before and after.",
+              "additionalProperties": true
+            }
+          },
+          "createdIds": {
+            "type": "array",
+            "description": "Stable IDs of ordinary manual created transactions in creates input order.",
+            "items": {
+              "type": "string",
+              "description": "Saved/proposed canonical UUID."
+            }
+          },
+          "balanceChanges": {
+            "type": "array",
+            "description": "Every affected account balance before/after; currency separate. Equal values show preserved balances.",
+            "items": {
+              "type": "object",
+              "description": "Account balance snapshot comparison.",
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "description": "Stable affected account ID."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Account currency."
+                },
+                "before": {
+                  "type": "integer",
+                  "description": "Saved balance in currency minor units."
+                },
+                "after": {
+                  "type": "integer",
+                  "description": "Proposed/saved balance in currency minor units."
+                }
+              },
+              "required": [
+                "accountId",
+                "currency",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "count",
+          "changed",
+          "changes",
+          "createdIds",
+          "balanceChanges"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "edits": [
+              {
+                "transactionId": "fictional-original",
+                "amount": -80000
+              }
+            ],
+            "creates": [
+              {
+                "creationId": "11111111-1111-4111-8111-111111111111",
+                "accountId": "fictional-checking",
+                "date": "2026-10-02",
+                "merchant": "Fictional lender",
+                "amount": -20000,
+                "currency": "USD",
+                "categoryId": "fictional-transfer",
+                "categoryAgent": "Codex",
+                "note": "Fictional split receipt"
+              }
+            ],
+            "preserveBalances": true
+          },
+          "output": {
+            "count": 2,
+            "changed": 2,
+            "changes": [
+              {
+                "id": "fictional-original",
+                "before": {
+                  "amount": -100000,
+                  "reviewed": true
+                },
+                "after": {
+                  "amount": -80000,
+                  "reviewed": false
+                }
+              },
+              {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "before": null,
+                "after": {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "amount": -20000,
+                  "source": "manual",
+                  "reviewed": false
+                }
+              }
+            ],
+            "createdIds": [
+              "11111111-1111-4111-8111-111111111111"
+            ],
+            "balanceChanges": [
+              {
+                "accountId": "fictional-checking",
+                "currency": "USD",
+                "before": 100000,
+                "after": 100000
+              }
+            ]
+          }
+        }
+      ],
+      "permissions": "Scoped public ledger access; remote writes require enabled authenticated authority. No banking credentials or sync.",
+      "scope": "One addressed budget, environment and workspace; accounts/categories must belong to it and have compatible currencies.",
+      "errors": [
+        "Invalid fields, empty/oversized batch, duplicated/colliding IDs, missing/deleted targets, archived destination or incompatible category/currency rejects the entire operation.",
+        "Matched-transfer financial/category protections remain. Financial corrections cannot simultaneously request reviewed=true. Creation is always unreviewed.",
+        "preserveBalances requires exact zero cash delta per account/currency; unsupported authorities refuse before mutation.",
+        "Stale revisions or conflicting request IDs fail. Unknown responses may have committed; inspect history and retain original intent."
+      ],
+      "retry": "Exact operation, workspace, payload (including all creation IDs and preservation mode), history, original revision and request ID return the original durable receipt without duplicate transactions/history/checkpoints, including after native restart. Never replay an uncertain change with new IDs. Expired receipts with stale evidence fail.",
+      "availability": "WHAB 2.78+ optional AtomicTransactionChanges; SQLite 1.27+ and JSON 1.19+, or a compatible remote authority. Existing annotation-only AtomicBulkEdits remains unchanged.",
+      "side_effects": "One native transaction, revision, durable checkpoint/receipt and coherent reversible audit entry. Financial corrections and creations are unreviewed; omitted annotations and imported originals are retained. No bank sync, loan model, counterpart linking or future rule. Normal manual balance arithmetic applies unless explicit validated preserveBalances keeps snapshots unchanged."
+    },
+    {
+      "name": "preview_transaction_changes",
+      "kind": "query",
+      "summary": "Read-only complete before/after preview of atomic transaction edits and manual creations.",
+      "input": {
+        "type": "object",
+        "description": "One operation of 1–100 total edits plus creations, validated together before mutation. IDs are already resolved. No silently split or partial saves.",
+        "properties": {
+          "edits": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 100,
+            "description": "Distinct existing active transaction corrections in caller order.",
+            "items": {
+              "type": "object",
+              "description": "Existing transaction correction or annotation changes; omission preserves exact saved fields. At least one change is required.",
+              "properties": {
+                "transactionId": {
+                  "type": "string",
+                  "description": "Stable active transaction ID; never a merchant/name.",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Existing child ID; null clears. Omit to preserve.",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared categorizer label (1–80 printable characters); null clears; requires categoryId.",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "reviewed": {
+                  "type": "boolean",
+                  "description": "Explicit review status; omit to preserve."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Replace exactly; empty string clears; omit to preserve. Cannot accompany appendNote.",
+                  "maxLength": 1000
+                },
+                "appendNote": {
+                  "type": "string",
+                  "description": "Append verbatim with one newline after a nonempty existing note. Final note max 1000. Cannot accompany note.",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "accountId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Existing active same-currency destination account ID; omission preserves."
+                },
+                "date": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                  "description": "Valid ISO date from 1900-01-01 through 2200-12-31."
+                },
+                "merchant": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Explicit payee replacement; omitted saved merchant including whitespace is preserved."
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000,
+                  "description": "Nonzero signed integer minor units: positive outflow, negative inflow."
+                }
+              },
+              "required": [
+                "transactionId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "creates": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 100,
+            "description": "Explicit stable-ID manual creations in caller order after edits.",
+            "items": {
+              "type": "object",
+              "description": "Create one ordinary manual, posted, unreviewed transaction; no imported/provider identity or transfer link can be supplied. Default category null and memo empty.",
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Required existing active destination account ID; currency must match the explicit currency field."
+                },
+                "date": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                  "description": "Valid ISO date from 1900-01-01 through 2200-12-31."
+                },
+                "merchant": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Required payee text, preserved verbatim including outer whitespace; must contain non-whitespace text."
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": -1000000000000,
+                  "maximum": 1000000000000,
+                  "description": "Nonzero signed integer minor units: positive outflow, negative inflow."
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional existing child category ID; omission or null creates an uncategorized transaction.",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional self-declared categorizer label (1–80 printable characters); requires explicit categoryId. Omission or null leaves no agent attribution.",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Optional memo preserved verbatim; omission or empty string creates an empty memo. Maximum 1000 characters.",
+                  "maxLength": 1000
+                },
+                "creationId": {
+                  "type": "string",
+                  "minLength": 36,
+                  "maxLength": 36,
+                  "description": "Canonical UUID for this proposed new manual transaction. Reuse exactly for preview, commit and retry; cannot collide with any existing/deleted transaction or another target."
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$",
+                  "description": "Explicit supported ISO currency matching the destination account; never inferred or converted."
+                }
+              },
+              "required": [
+                "creationId",
+                "accountId",
+                "date",
+                "merchant",
+                "amount",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "preserveBalances": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicit split/reallocation guard: require zero net signed transaction amount delta separately in every affected account/currency and preserve all account balance snapshots exactly. Reject nonconserving batches. Otherwise normal manual balance adjustments/imported snapshot-preserving corrections apply."
+          }
+        },
+        "required": [
+          "edits",
+          "creates"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Complete saved or read-only proposed transaction changes in edits-then-creations order; creation before is null. Exact original replay returns its historical result, not a new current read.",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Explicit targets (1–100)."
+          },
+          "changed": {
+            "type": "integer",
+            "description": "Targets whose public records differ."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every target in input order with complete public before/after records. Permanent history separately retains exact internal financial rows.",
+            "items": {
+              "type": "object",
+              "description": "Target id, before and after.",
+              "additionalProperties": true
+            }
+          },
+          "createdIds": {
+            "type": "array",
+            "description": "Stable IDs of ordinary manual created transactions in creates input order.",
+            "items": {
+              "type": "string",
+              "description": "Saved/proposed canonical UUID."
+            }
+          },
+          "balanceChanges": {
+            "type": "array",
+            "description": "Every affected account balance before/after; currency separate. Equal values show preserved balances.",
+            "items": {
+              "type": "object",
+              "description": "Account balance snapshot comparison.",
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "description": "Stable affected account ID."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Account currency."
+                },
+                "before": {
+                  "type": "integer",
+                  "description": "Saved balance in currency minor units."
+                },
+                "after": {
+                  "type": "integer",
+                  "description": "Proposed/saved balance in currency minor units."
+                }
+              },
+              "required": [
+                "accountId",
+                "currency",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "count",
+          "changed",
+          "changes",
+          "createdIds",
+          "balanceChanges"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "edits": [
+              {
+                "transactionId": "fictional-original",
+                "amount": -80000
+              }
+            ],
+            "creates": [
+              {
+                "creationId": "11111111-1111-4111-8111-111111111111",
+                "accountId": "fictional-checking",
+                "date": "2026-10-02",
+                "merchant": "Fictional lender",
+                "amount": -20000,
+                "currency": "USD",
+                "categoryId": "fictional-transfer",
+                "categoryAgent": "Codex",
+                "note": "Fictional split receipt"
+              }
+            ],
+            "preserveBalances": true
+          },
+          "output": {
+            "count": 2,
+            "changed": 2,
+            "changes": [
+              {
+                "id": "fictional-original",
+                "before": {
+                  "amount": -100000,
+                  "reviewed": true
+                },
+                "after": {
+                  "amount": -80000,
+                  "reviewed": false
+                }
+              },
+              {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "before": null,
+                "after": {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "amount": -20000,
+                  "source": "manual",
+                  "reviewed": false
+                }
+              }
+            ],
+            "createdIds": [
+              "11111111-1111-4111-8111-111111111111"
+            ],
+            "balanceChanges": [
+              {
+                "accountId": "fictional-checking",
+                "currency": "USD",
+                "before": 100000,
+                "after": 100000
+              }
+            ]
+          }
+        }
+      ],
+      "permissions": "Scoped public ledger access; remote writes require enabled authenticated authority. No banking credentials or sync.",
+      "scope": "One addressed budget, environment and workspace; accounts/categories must belong to it and have compatible currencies.",
+      "errors": [
+        "Invalid fields, empty/oversized batch, duplicated/colliding IDs, missing/deleted targets, archived destination or incompatible category/currency rejects the entire operation.",
+        "Matched-transfer financial/category protections remain. Financial corrections cannot simultaneously request reviewed=true. Creation is always unreviewed.",
+        "preserveBalances requires exact zero cash delta per account/currency; unsupported authorities refuse before mutation.",
+        "Stale revisions or conflicting request IDs fail. Unknown responses may have committed; inspect history and retain original intent."
+      ],
+      "retry": "Exact operation, workspace, payload (including all creation IDs and preservation mode), history, original revision and request ID return the original durable receipt without duplicate transactions/history/checkpoints, including after native restart. Never replay an uncertain change with new IDs. Expired receipts with stale evidence fail.",
+      "availability": "WHAB 2.78+ optional AtomicTransactionChanges; SQLite 1.27+ and JSON 1.19+, or a compatible remote authority. Existing annotation-only AtomicBulkEdits remains unchanged.",
+      "side_effects": "No mutation, commit, history, receipt or revision advancement. Shows exact proposed creations with stable IDs plus all affected account balances; does not reserve state."
+    },
+    {
+      "name": "transaction_change_policy",
+      "kind": "query",
+      "summary": "Verify atomic transaction correction/creation support before sending a new intent.",
+      "input": {
+        "type": "object",
+        "description": "No parameters.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Versioned authority guarantee for atomic edits/creations and guarded cash-neutral splits.",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ],
+            "description": "Contract version."
+          },
+          "maxChanges": {
+            "type": "integer",
+            "enum": [
+              100
+            ],
+            "description": "Maximum combined edits and creations."
+          },
+          "preserveBalances": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Supports explicit per-account cash-conservation guard."
+          }
+        },
+        "required": [
+          "version",
+          "maxChanges",
+          "preserveBalances"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "version": 1,
+            "maxChanges": 100,
+            "preserveBalances": true
+          }
+        }
+      ],
+      "side_effects": "Read-only support probe; no financial mutation or synchronization.",
+      "permissions": "Scoped public ledger access; remote writes require enabled authenticated authority. No banking credentials or sync.",
+      "scope": "One addressed budget, environment and workspace; accounts/categories must belong to it and have compatible currencies.",
+      "errors": [
+        "Unsupported backend/authority returns an actionable upgrade error before mutation."
+      ],
+      "retry": "Read-only and safe to repeat.",
+      "availability": "WHAB 2.78+ optional AtomicTransactionChanges; SQLite 1.27+ and JSON 1.19+, or a compatible remote authority. Existing annotation-only AtomicBulkEdits remains unchanged."
     }
   ]
 }

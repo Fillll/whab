@@ -32,6 +32,7 @@ MAX_BULK_OPERATION_BYTES = 72 * 1024 * 1024
 MAX_OPERATION_RECEIPTS = 4096
 STORAGE_ROLES = frozenset({"primary", "staged", "copy", "fenced", "retired"})
 STORAGE_OPERATIONS = frozenset({
+    "change_transactions",
     "apply_transfer_match",
     "edit_transactions", "classify_accounts",
     "delete_category", "delete_category_group", "rename_category", "classify_category",
@@ -42,6 +43,7 @@ STORAGE_OPERATIONS = frozenset({
 })
 _BULK_OPERATIONS = frozenset({"recorded_command", "restore_budget", "restore_budget_files", "prepare_budget_files", "import_workspace"})
 _OPERATION_FIELDS = {
+    "change_transactions": ({"edits", "creates"}, {"preserveBalances"}),
     "apply_transfer_match": ({"transactionIds", "action", "fingerprint"}, set()),
     "edit_transactions": ({"edits"}, set()),
     "classify_accounts": ({"edits"}, set()),
@@ -117,8 +119,8 @@ def _integer(value):
         _invalid()
 
 
-def _plain(value, depth=0):
-    if depth > 24 or depth == 24 and type(value) in {dict, list}:
+def _plain(value, depth=0, *, max_depth=24):
+    if depth > max_depth or depth == max_depth and type(value) in {dict, list}:
         _invalid()
     if value is None or type(value) is bool:
         return
@@ -134,26 +136,26 @@ def _plain(value, depth=0):
         return
     if type(value) is list:
         for row in value:
-            _plain(row, depth + 1)
+            _plain(row, depth + 1, max_depth=max_depth)
         return
     if type(value) is dict and all(type(key) is str for key in value):
         for key, row in value.items():
-            _plain(key, depth + 1)
-            _plain(row, depth + 1)
+            _plain(key, depth + 1, max_depth=max_depth)
+            _plain(row, depth + 1, max_depth=max_depth)
         return
     _invalid()
 
 
-def canonical_storage_json(value, *, limit=MAX_OPERATION_BYTES):
+def canonical_storage_json(value, *, limit=MAX_OPERATION_BYTES, _max_depth=24):
     """Bounded canonical JSON; rejects custom objects, floats and invalid Unicode."""
-    _plain(value)
+    _plain(value, max_depth=_max_depth)
     raw = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     if len(raw) > limit:
         _invalid()
     return raw
 
 
-def read_storage_json(raw, *, limit=MAX_OPERATION_BYTES):
+def read_storage_json(raw, *, limit=MAX_OPERATION_BYTES, _max_depth=24):
     """Read plain bounded JSON with duplicate-field and nesting rejection."""
     if type(raw) is not bytes or not raw or len(raw) > limit:
         _invalid()
@@ -173,7 +175,7 @@ def read_storage_json(raw, *, limit=MAX_OPERATION_BYTES):
                            parse_float=invalid_number, parse_constant=invalid_number)
     except (ValueError, UnicodeError, RecursionError):
         _invalid()
-    _plain(value)
+    _plain(value, max_depth=_max_depth)
     return value
 
 
@@ -405,6 +407,8 @@ def dispatch_storage_operation(backend, operation):
         fields = {"categoryId": "category_id", "reviewed": "reviewed", "note": "note"}
         return backend.edit_transaction(workspace, identifier,
                                         **{fields[key]: value for key, value in payload.items()})
+    if name == "change_transactions":
+        return backend.change_transactions(workspace, payload["edits"], payload["creates"], preserve_balances=payload.get("preserveBalances", False))
     if name in {"edit_transactions", "classify_accounts"}:
         return getattr(backend, name)(workspace, payload["edits"])
     if name == "review_transactions":

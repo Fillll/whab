@@ -27,6 +27,10 @@ STORAGE_PROTOCOL = 1
 HEADER = struct.Struct("!4sHII")
 MAX_METADATA = 64 * 1024 * 1024
 MAX_BODY = 256 * 1024 * 1024
+MAX_VALUE_DEPTH = 32
+# Each dictionary adds three tagged JSON containers. Keep the existing logical
+# value bound while allowing its framing; ordinary operations retain depth 24.
+MAX_FRAMING_DEPTH = 3 * MAX_VALUE_DEPTH + 3
 _RECORDS = {record.__name__: record for record in (
     CommitEvidence, StorageOperation, OperationReceipt, OperationResult,
     LocalTransferSnapshot, TransferPreview, ReplicaWatermark,
@@ -35,6 +39,8 @@ _RECORDS = {record.__name__: record for record in (
 # (required positional names, optional names/defaults). No arbitrary attribute
 # lookup, kwargs, database handle or implementation-specific state is exposed.
 METHODS = {
+    "supports_atomic_transaction_changes": ((), {}),
+    "preview_transaction_changes": (("workspace", "edits", "creates"), {"preserve_balances": False}),
     "supports_transfer_matching": ((), {}),
     "transfer_candidates": (("workspace", "parameters"), {}),
     "preview_transfer_match": (("workspace", "transaction_ids", "action"), {}),
@@ -106,7 +112,7 @@ def encode(value):
     def pack(item, depth=0):
         nonlocal total, nodes
         nodes += 1
-        if depth > 32 or nodes > 2_000_000:
+        if depth > MAX_VALUE_DEPTH or nodes > 2_000_000:
             raise WireError()
         if item is UNSET:
             return ["unset"]
@@ -129,7 +135,7 @@ def encode(value):
             return ["value", item]
         raise WireError()
 
-    metadata = canonical_storage_json(pack(value), limit=MAX_METADATA)
+    metadata = canonical_storage_json(pack(value), limit=MAX_METADATA, _max_depth=MAX_FRAMING_DEPTH)
     return HEADER.pack(b"WHST", STORAGE_PROTOCOL, len(metadata), total) + metadata + b"".join(bodies)
 
 
@@ -146,13 +152,13 @@ def decode(raw):
     metadata_size, body_size = lengths(raw[:HEADER.size])
     if len(raw) != HEADER.size + metadata_size + body_size:
         raise WireError()
-    value = read_storage_json(raw[HEADER.size:HEADER.size + metadata_size], limit=MAX_METADATA)
+    value = read_storage_json(raw[HEADER.size:HEADER.size + metadata_size], limit=MAX_METADATA, _max_depth=MAX_FRAMING_DEPTH)
     body, ranges, nodes = memoryview(raw)[HEADER.size + metadata_size:], [], 0
 
     def unpack(item, depth=0):
         nonlocal nodes
         nodes += 1
-        if depth > 32 or nodes > 2_000_000 or type(item) is not list or not item:
+        if depth > MAX_VALUE_DEPTH or nodes > 2_000_000 or type(item) is not list or not item:
             raise WireError()
         kind = item[0]
         if item == ["unset"]:

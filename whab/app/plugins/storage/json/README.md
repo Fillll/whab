@@ -420,3 +420,45 @@ Native SQLite/JSON advertise optional `ClassifiedReview`; the public `review_pol
 query probes the authority. Unsupported storage/remote authorities fail before
 classification/review writes. Financial rules remain in core; adapters retain
 atomic persistence, annotations, original/import records and native receipts.
+
+## Atomic transaction edits and creations
+
+WHAB 2.78 adds optional `AtomicTransactionChanges` with read-only
+`preview_transaction_changes(workspace, edits, creates, preserve_balances=False)`
+and native `change_transactions` using the same arguments. This adapter advertises
+`supports_atomic_transaction_changes()`. A combined batch contains 1–100 explicit
+existing edits and new manual records, validated by core before any write. Creation
+uses a preselected canonical UUID; reusing an existing or deleted identity is refused.
+The public ledger supplies the observed revision, request ID and agent/batch audit
+metadata. New records are manual/unreviewed; actual amount/date/account/merchant
+corrections require fresh review. Omitted values, including merchant whitespace,
+notes, classification and provider identity, remain exact. Matched transfer
+financial/category corrections are refused until an explicit unmatch.
+
+The complete preview/receipt includes every before/after record (a creation has
+`before: null`), new stable IDs and every touched account's before/after balance.
+One native transaction stores all records, exact reversible audit history and its
+durable receipt; the host performs one synchronous durable checkpoint. An invalid
+item or persistence failure preserves the whole prior state. Exact retries after
+restart return the same receipt without a second creation or history entry. Guarded
+undo removes all records created by the batch and restores every edited original;
+redo restores the entire same change with the same IDs. Portable exports/restores
+retain all transaction records, correction provenance and permanent history.
+
+For splitting an existing receipt into ordinary transactions, explicitly request
+`preserve_balances=True` (public JSON `preserveBalances: true`). Core requires zero
+signed transaction amount delta for each account before retaining the saved account
+balance snapshots exactly. This is especially necessary for imported records:
+ordinary imported corrections retain a provider/import balance snapshot, while an
+ordinary manual creation changes the account balance. Without this explicit option,
+those established behaviors remain unchanged. A split stores no parent/child or
+synthetic transfer links and creates no extra balancing transaction.
+
+Imported corrections retain the original fields in the existing `original` metadata
+and keep the original transaction ID/source. Later provider refreshes retain the
+user's corrected fields while updating the underlying original provider evidence;
+new manual rows are independent and are never matched or reconciled automatically.
+Provider removal/pending replacement continues the existing import contract, so
+inspect subsequent imported changes before another correction. No bank sync runs
+as part of an edit, creation, preview, retry or audit reversal. Existing annotation
+`edit_transactions` batches and their output shape remain compatible.

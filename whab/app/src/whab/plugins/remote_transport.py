@@ -338,6 +338,21 @@ class RemoteStore:
     def supports_atomic_bulk_edits(self):
         return True
 
+    def supports_atomic_transaction_changes(self):
+        try:
+            policy = self._query('transaction_change_policy', 'personal')
+        except StoreError:
+            raise StoreError('Update or reconnect the remote authority for atomic transaction edits and creation; no mutation was submitted.') from None
+        return type(policy) is dict and policy.get('version') == 1 and policy.get('maxChanges') == 100 and policy.get('preserveBalances') is True
+
+    def preview_transaction_changes(self, workspace, edits, creates, *, preserve_balances=False):
+        return self._query('preview_transaction_changes', workspace, parameters={
+            'edits': edits, 'creates': creates, 'preserveBalances': preserve_balances})
+
+    def change_transactions(self, workspace, edits, creates, *, preserve_balances=False):
+        return self._command('change_transactions', workspace, {
+            'edits': edits, 'creates': creates, 'preserveBalances': preserve_balances})
+
     def preview_bulk_edits(self, workspace, operation, edits):
         return self._query('preview_bulk_edits', workspace, parameters={'operation': operation, 'edits': edits})
 

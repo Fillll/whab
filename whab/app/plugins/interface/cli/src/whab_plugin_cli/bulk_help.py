@@ -9,7 +9,10 @@ BULK_HELP = '''Atomic bulk changes (1–100 explicit, distinct targets; never sp
   whab "My budget" account classify "🍏Example Card" "旅行カード" --type credit --on-budget --dry-run
 
 Use a single edit for one decision, multiple IDs for the same values, or edit-many
-for different annotations. One bulk operation uses ONE revision, request ID,
+for different annotations or financial edits; trnx create adds manual entries.
+For an atomic edit-plus-create split use edit-many with creates and
+preserveBalances:true; see trnx edit-many --help for the complete split example.
+One bulk operation uses ONE revision, request ID,
 atomic native commit, revision advancement and synchronous durable save. --batch
 still groups history entries; it does not combine separate commands into a commit.
 Every item is validated first. Invalid/missing/deleted/duplicate/ambiguous targets
@@ -23,7 +26,8 @@ Complete changes.json example (fictional; replace IDs with observed identities):
   {"transactionId": "TX3", "appendNote": "Exact user wording", "reviewed": true}
 ]}
 
-File/stdin must contain exactly {"edits": [...]} (max 2 MiB). Transaction IDs
+Annotation file/stdin uses {"edits": [...]} (max 2 MiB); general batches may
+also contain creates and preserveBalances (see trnx edit-many --help). Transaction IDs
 are stable IDs only. category accepts an exact ID, unique name or Group / Name;
 categoryId accepts an ID or null to clear. Never supply both. Omitted fields stay
 unchanged. note replaces the memo verbatim; "" clears it; null is invalid.
@@ -36,7 +40,8 @@ Agent labels are self-declared, not authenticated: 1–80 printable characters,
 without outer whitespace. --batch accepts 1–200 printable characters without
 outer whitespace. Stable IDs and recovery revision/request IDs are 1–200 characters;
 copy them exactly. Text must be valid UTF-8 without NUL. Review/note-only edits preserve
-category attribution. Financial-detail changes are outside edit-many.
+category attribution. Financial edits and creations use the newer change_transactions
+contract; annotation-only files retain the existing edit_transactions behavior.
 
 --dry-run performs the same core validation and returns full proposed before/after
 records and the observed revision, without mutation, history or save. A preview
