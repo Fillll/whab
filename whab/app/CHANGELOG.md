@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.81.0 — 2026-11-15
+
+PR: [#210](https://github.com/Fillll/whab/pull/210)
+
+- Enforce reciprocal two-leg transfer classification/review and add native atomic matching of 1–100 explicit disjoint pairs, optionally reviewed in the same operation.
+- Add complete fingerprinted audit/repair, actor/batch history, exact durable retries and public CLI/worker/HTTPS contracts.
+- Permit historical closed/cross-scope pairs without changing accounts; account for dated transfer funding separately from income/spending and reject zero-value pairing.
+
 ## 2.80.0 — 2026-11-15
 
 PR: [#208](https://github.com/Fillll/whab/pull/208)

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.23.0 — 2026-11-15
+
+PR: [#210](https://github.com/Fillll/whab/pull/210)
+
+- Add `trnx match-transfers --file` with 1–100 explicit disjoint pairs, JSON/stdin, optional review in the same native atomic commit/save, exact previews/fingerprints, attribution and verified durable receipts.
+- Add read-only paginated `trnx transfer-audit` and guarded `trnx repair-transfers` for explicitly selected legacy issues; retain imported hints and financial fields without creating counterpart records.
+- Document strict two-leg Transfer eligibility, historical closed/cross-scope pairs, zero-value hints and exact retry recovery throughout offline help and packaged operation examples.
+
 ## 2.22.0 — 2026-11-14
 
 PR: [#204](https://github.com/Fillll/whab/pull/204)

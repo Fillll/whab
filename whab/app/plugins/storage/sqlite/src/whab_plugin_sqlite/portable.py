@@ -11,7 +11,7 @@ from .store import Store
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
 _FORMAT_VERSION = 1
-_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent")
+_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent", "tx_transfer_peer")
 _ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000, "budget_history": 1}
 
 
@@ -58,7 +58,7 @@ def _build_image(raw, previous, journal, hints):
     if len(positions) != 1:
         return None
     changes = entries[positions[0] + 1:]
-    if not changes or any(entry['operation'] not in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts'}
+    if not changes or any(entry['operation'] not in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers'}
                           or any(change['path'][0] not in {'accounts', 'transactions'} or change['before'] is None or change['after'] is None
                                  for change in entry['changes']) for entry in changes):
         return None

@@ -87,7 +87,7 @@ class Store(Authority):
             self._disk_identity = self._identity() if raw is not None else None
             if raw is not None:
                 self._data = codec.decode(raw)
-                if read_only and self._data["formatVersion"] not in {3, 4}:
+                if read_only and self._data["formatVersion"] not in {3, 4, 5}:
                     raise StoreError("Read-only readiness requires the current native JSON schema; upgrade it explicitly first.")
                 if self._data["formatVersion"] == 1:
                     preserve_schema_one(self.path, raw)
@@ -175,6 +175,7 @@ class Store(Authority):
         # Fence older readers even after undo/removal leaves the classification
         # only in permanent audit history, including restored/local-transfer data.
         kinds = set()
+        retained_pairs = False
         for state in candidate['workspaces'].values():
             kinds.update(row.get('kind') for row in state['categories'].values())
             journal = state.get('history') or {}
@@ -182,8 +183,15 @@ class Store(Authority):
             kinds.update(row.get('kind') for entry in journal.get('entries', ())
                          for change in entry['changes'] if change['path'][0] == 'categories'
                          for row in (change['before'], change['after']) if row is not None)
+            retained_pairs = retained_pairs or any(row.get('transferPeerId') for row in state['transactions'].values())
+            retained_pairs = retained_pairs or any(row.get('transferPeerId') for row in journal.get('baseline', {}).get('transactions', ()))
+            retained_pairs = retained_pairs or any(row is not None and row.get('transferPeerId') for entry in journal.get('entries', ())
+                for change in entry['changes'] if change['path'][0] == 'transactions'
+                for row in (change['before'], change['after']))
         if 'opening_balance' in kinds:
-            candidate = {**candidate, 'formatVersion': 4}
+            candidate = {**candidate, 'formatVersion': max(candidate['formatVersion'], 4)}
+        if retained_pairs:
+            candidate = {**candidate, 'formatVersion': max(candidate['formatVersion'], 5)}
         raw, candidate = codec.encode(candidate)
         try:
             descriptor, temporary = tempfile.mkstemp(prefix=".whab-json-", dir=self.path.parent)
@@ -309,6 +317,34 @@ class Store(Authority):
 
     def supports_transfer_matching(self):
         return True
+
+    def supports_bulk_transfer_matching(self):
+        return True
+
+    def supports_transfer_integrity(self):
+        return True
+
+    def preview_transfer_matches(self, workspace, pairs, reviewed=False):
+        from whab.domain.transfer_matching import plan_many
+        return plan_many(self._read(workspace), pairs, reviewed=reviewed)
+
+    def apply_transfer_matches(self, workspace, pairs, reviewed=False, fingerprint=None):
+        from whab.domain.transfer_matching import plan_many
+        return self._mutate(workspace, lambda state: plan_many(
+            state, pairs, reviewed=reviewed, fingerprint=fingerprint, apply=True), history_operation='match_transfers')
+
+    def transfer_audit(self, workspace, parameters):
+        from whab.domain.transfer_matching import audit
+        return audit(self._read(workspace), parameters)
+
+    def preview_transfer_repair(self, workspace, transaction_ids):
+        from whab.domain.transfer_matching import repair_plan
+        return repair_plan(self._read(workspace), transaction_ids)
+
+    def repair_transfers(self, workspace, transaction_ids, fingerprint):
+        from whab.domain.transfer_matching import repair_plan
+        return self._mutate(workspace, lambda state: repair_plan(
+            state, transaction_ids, fingerprint=fingerprint, apply=True), history_operation='repair_transfers')
 
     def transfer_candidates(self, workspace, parameters):
         from whab.domain.transfer_matching import candidates

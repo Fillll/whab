@@ -268,7 +268,7 @@ def execute(args, home, environment, ca):
                 json={"name": args.name, "path": create_path(args.name, args.path)})
         identifier = resolve_budget(connection, args.target)
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
-        if args.command in {"transactions", "trnx"} and args.filter in {"transfers", "match-transfer", "unmatch-transfer"}:
+        if args.command in {"transactions", "trnx"} and args.filter in {"transfers", "match-transfer", "unmatch-transfer", "match-transfers", "transfer-audit", "repair-transfers"}:
             return execute_transfer(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter in {"review", "review-audit"}:
             from .review_commands import execute_review
@@ -356,7 +356,7 @@ def main(argv=None):
         else:
             result = execute(args, *configuration(args))
         if getattr(args, "format", None) == "table":
-            print(review_audit_table(result) if getattr(args, "filter", None) == "review-audit" else transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer"} else bulk_table(result) if "dryRun" in result and args.command != "category" else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
+            print(review_audit_table(result) if getattr(args, "filter", None) == "review-audit" else transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer", "match-transfers", "transfer-audit", "repair-transfers"} else bulk_table(result) if "dryRun" in result and args.command != "category" else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
                   else note_table(result) if args.filter == "note" else search_table(result) if args.filter == "list" else transaction_table(result))
         else:
             print(json.dumps(result, allow_nan=False))

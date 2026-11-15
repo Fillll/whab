@@ -349,7 +349,10 @@ class LedgerService:
                 if opening_supported:
                     data['types'].append('opening_balance')
                 supported = getattr(self._store, 'supports_transfer_integrity', None)
-                data['transferPairRequired'] = callable(supported) and supported() is True
+                try:
+                    data['transferPairRequired'] = callable(supported) and supported() is True
+                except StoreError:
+                    data['transferPairRequired'] = False
             elif operation == 'opening_balance_policy':
                 self._require_opening_balances()
                 data = {'version': 1, 'categoryType': 'opening_balance',
@@ -586,11 +589,15 @@ class LedgerService:
             if payload.get('kind') == 'transfer':
                 self._require_transfer_integrity()
             categories = getattr(self._store, 'categories', None)
-            if callable(categories) and any(row.get('kind') == 'transfer' for row in categories(workspace)):
+            category_rows = categories(workspace) if callable(categories) else []
+            if any(row.get('kind') == 'transfer' for row in category_rows):
                 self._require_transfer_integrity()
             transactions = getattr(self._store, 'transactions', None)
-            if callable(transactions) and any(row.get('transferPeerId') for row in transactions(workspace)):
-                self._require_transfer_integrity()
+            if callable(transactions):
+                from whab.domain.review import effective_transfer
+                category_map = {row['id']: row for row in category_rows}
+                if any(row.get('transferPeerId') or effective_transfer(row, category_map) for row in transactions(workspace)):
+                    self._require_transfer_integrity()
             if history:
                 preview = getattr(self._store, 'history_preview', None)
                 candidate = preview(workspace, payload['action'], target=payload.get('target')) if callable(preview) else None
@@ -598,7 +605,7 @@ class LedgerService:
                     raise StoreError('Update the storage backend to verify transfer history before reversal. Nothing was changed.')
                 def has_transfer(value):
                     if isinstance(value, dict):
-                        return value.get('kind') == 'transfer' or bool(value.get('transferPeerId')) or any(has_transfer(row) for row in value.values())
+                        return value.get('kind') == 'transfer' or bool(value.get('transferPeerId') or value.get('isTransfer')) or any(has_transfer(row) for row in value.values())
                     return isinstance(value, list) and any(has_transfer(row) for row in value)
                 if has_transfer(candidate['changes']):
                     self._require_transfer_integrity()

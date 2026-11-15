@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.64.0 — 2026-11-15
+
+PR: [#210](https://github.com/Fillll/whab/pull/210)
+
+- Show dated Transfer funding separately in budget totals and Available to assign explanations, preserving whole-unit formatting and privacy masking.
+- Use authoritative complete pair verification for transaction review eligibility, including peers outside visible filters.
+
 ## 1.63.0 — 2026-11-15
 
 PR: [#209](https://github.com/Fillll/whab/pull/209)

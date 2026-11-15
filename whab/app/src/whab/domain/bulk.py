@@ -65,7 +65,7 @@ def bulk_changes(state, operation, edits, *, apply=False):
     edits = validate_edits(operation, edits)
     collection = 'transactions' if operation == 'edit_transactions' else 'accounts'
     identity = OPERATIONS[operation]
-    candidate = {**state, collection: {}}
+    candidate = {**state, collection: dict(state[collection])}
     changes = []
     for index, edit in enumerate(edits, 1):
         identifier = edit[identity]
@@ -96,5 +96,5 @@ def bulk_changes(state, operation, edits, *, apply=False):
             return deepcopy(row)
         changes.append({'id': identifier, 'before': public(previous), 'after': public(after)})
     if apply:
-        state[collection].update(candidate[collection])
+        state[collection].update({edit[identity]: candidate[collection][edit[identity]] for edit in edits})
     return {'count': len(changes), 'changed': sum(row['before'] != row['after'] for row in changes), 'changes': changes}

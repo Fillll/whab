@@ -181,7 +181,7 @@ def test_older_remote_review_discovery_remains_usable_without_opening_policy():
     try:
         service = LedgerService(remote)
         assert service.query('review_policy', 'personal')['data']['types'] == ['expense', 'income', 'transfer']
-        assert requested == ['review_policy', 'opening_balance_policy']
+        assert requested == ['review_policy', 'opening_balance_policy', 'transfer_policy']
         with pytest.raises(StoreError, match='no mutation was submitted'):
             service.query('opening_balance_policy', 'personal')
     finally:

@@ -4229,7 +4229,7 @@
     {
       "name": "category.workflow",
       "kind": "local",
-      "summary": "Category workflow (fictional budget; no wizard):\n  whab \"My budget\" category list --format table\n  whab \"My budget\" category group create \"Projects\"\n  whab \"My budget\" category move \"Finance / Example studio\" --parent \"Projects\"\n  whab \"My budget\" category create \"Example venture\" --parent \"Projects\"\n  whab \"My budget\" category list --parent \"Projects\" --format table\n  whab \"My budget\" category delete --help\n  whab \"My budget\" category group delete --help\n  whab \"My budget\" history list\n\nRead the hierarchy, confirm the intended parent and child with the user, apply one\nconfirmed choice, then inspect the verified result before continuing. All commands\naddress the budget by its existing unique name or stable ID. Groups accept an exact\nunique name or stable ID; children also accept \"Group / Name\". Names ignore case\nand outer whitespace; spaces, emoji and non-Latin text work when quoted. No fuzzy\nmatch is selected. Missing/ambiguous names show candidate names and IDs.\n\nGroups are real nonassignable parents and may be empty. Only children can receive\ntransactions, targets or monthly assignments; deeper nesting is refused. Child\ncreation requires an existing --parent, defaults to --currency USD and --target 0,\nand refuses duplicate sibling names. Target is a nonnegative integer in currency\nminor units (USD 1234 = $12.34). No currency conversion is performed. Moves preserve\nchild identity, currency, targets, transaction references, every month's assignments\nand prior history. Unrelated children and the original parent remain intact, even\nwhen the original parent becomes empty. Existing ledger order is preserved on move;\nthere is currently no manual reorder operation or requested-order guarantee.\n\nJSON is the default and retains full IDs/fields; --format table is for readable\ninspection. Successful writes report the addressed budget and verified saved group\nor child. Revisions and unique request IDs are handled internally. Each command is\none atomic change; the sequence is not one transaction. Stale state is refused.\nNo bank synchronization is started. After an uncertain response, inspect category\nlist and history and retain the complete reported original intent (budget, payload,\nrevision and request ID). Never automatically rerun a write with a new intent.\n\nHelp works offline without a profile or running host. The category management\ncommands require WHAB 2.65+; saving empty groups and moving children require native\nSQLite 1.18+, JSON 1.10+ or another adapter implementing CategoryManagement. Older\nstorage can still provide derived nonempty groups for reads; unsupported writes\nfail explicitly. Use whab BUDGET category ACTION --help for each command.\n\nSafe deletion (CLI 2.15+, WHAB 2.69+, SQLite 1.21+/JSON 1.13+):\n  whab \"My budget\" category show \"Fictional maintenance / Example home\" --format table\n  whab \"My budget\" category delete \"Fictional maintenance / Example home\"\n  whab \"My budget\" category list --parent \"Fictional maintenance\"\n  whab \"My budget\" category group delete \"Fictional maintenance\"\n  whab \"My budget\" category list --format table\n  whab \"My budget\" history list\n\nRead category show, confirm the intended child, then issue one guarded delete.\nChildren require NO transaction references, including live, pending, reviewed,\nrefund and deleted records, and NO nonzero monthly assignments in any month.\nZero-only assignment rows do NOT block deletion: the operation removes them and\nthat unused child atomically. Any nonzero row or transaction refuses the ENTIRE\noperation; no zero rows are removed on refusal. All unrelated rows and financial\nfields, monthly monetary results and rollover settings remain unchanged.\nDeleting a child retains its empty parent; groups must have NO children. Delete\nan empty parent with the separate group command. There is no cascade or --force.\n\ncategory show accepts exact names/IDs or child \"Group / Name\", never fuzzy matches.\nJSON is complete; --format table is readable. deletion.deletable is true when only\nzero rows remain and no transactions refer to the child. assignments.count/months\ninclude EVERY row; zeroMonths lists rows deletion will remove; nonzeroCount and\nnonzeroMonths identify blocking rows. No amounts or unrelated transactions are\nexposed. Show is read-only and never changes revision/history, syncs, or authorizes\na later write. A concurrent revision change refuses a mixed inspection result.\n\nEach successful delete commits permanent audit history, category metadata and\nEXACT removed zero rows together, including zero-valued rows in every month.\nUse history list/show to inspect it. Guarded undo/redo previews restore/reapply\ncategory identity, target, parent relationship and every zero row when compatible.\nLater conflicting changes refuse the whole reversal. Prior audit entries/hashes\nare preserved. Success reports deleted=true and a verified same-revision hierarchy\nwith all other groups/children unchanged. Request IDs/revisions are internal.\n\nHTTP 400 domain refusals and HTTP 409 stale/conflicting intents report the actual\nreason; no automatic retry. Timeouts, HTTP 5xx or failed verification remain\nuncertain, not proof of rollback. Inspect category list and history; retain the\nCOMPLETE original budget/payload/revision/request ID. Never rerun deletion with a\nnew request ID to retry. No bank synchronization is started. No nonzero funding,\ntransaction or unrelated assignment is erased. This is not category merge/archive.\nOlder adapters may conservatively refuse zero rows; update to the required versions\nfor this policy. Help and packaged operation documentation work offline.\n\nRename in place: whab \"My budget\" category rename \"House / Rent\" --name \"Main Residence\" --agent Codex --batch housing-cleanup\nPreserves ID, parent, currency, target, references, assignments and history. Rejects ambiguous names and duplicate siblings. Revisions/request IDs are automatic; recovery retains the original intent.\n\nExplicit Income/Expense categories: category create --type income or category classify CATEGORY --type income --dry-run. Preview impacts, then repeat without --dry-run. Income has target zero and no monthly assignment rows. A parent can mix Income Salary and Expense Fees. Review is independent. No legacy transaction is relabeled; classifiedIncome/unclassifiedIncome separate contributions without changing old totals. See category classify --help for full safety/recovery/examples.\n\nFour types: --type expense|income|transfer|opening_balance. Income, Transfer and Opening Balance are technical classifications without expense targets or assignments. Explicit Transfer works before pairing; bank hints alone do not authorize review. Review requires classification; assigning does not auto-review, clearing makes unreviewed. Use trnx review and trnx review-audit --help. Existing invalid reviewed flags require a separate explicit cleanup.\n\nWHAB 2.79 adds `opening_balance`, displayed as **Opening Balance**. The type is\nindependent of a category's name: naming an Expense category “Opening Balance”\ndoes not change its treatment. Create an explicit technical child, or preview\nand classify an existing zero-target child with no monthly assignment rows.\nIncome, Transfer and Opening Balance cannot have expense targets or assignments.\n\nOpening entries represent existing cash or debt and are excluded from ordinary\nincome, spending, purchases and payee analytics. Posted entries in eligible\non-budget non-credit cash accounts contribute signed `openingFunding` in their\ntransaction month. Prior-to-budget entries are already carried in; later months\ncarry existing balances forward without counting the opening amount twice.\nCredit debt and off-budget balances never become opening funding. Stale/unknown\naccount balances remain excluded; classification does not verify imported estimates. The monthly\nidentity is `income + openingFunding + carriedIn - assignedNextMonth - assigned`.\nBudget disclosures and Insights show opening funding separately from income.\n\nExisting imported zero-amount opening entries can be classified and explicitly\nreviewed. Ordinary transaction creation and financial amount edits still require\nnonzero amounts. Pending/deleted records cannot be reviewed. Categorization never\nauto-reviews, changes amounts/account balances or infers a transfer. No upgrade,\nread or bank sync creates a category or reclassifies historical transactions.\nOriginal import notes, merchant whitespace, identities and history are preserved.\n\n```sh\nwhab \"My budget\" category group create Finance\nwhab \"My budget\" category create \"Opening Balance\" --parent Finance --type opening_balance --agent Codex\nwhab \"My budget\" category classify \"Finance / Initial funds\" --type opening_balance --dry-run\nwhab \"My budget\" category classify \"Finance / Initial funds\" --type opening_balance --agent Codex\nwhab \"My budget\" trnx categorize OPENING_TX ZERO_OPENING_TX --category \"Finance / Opening Balance\" --dry-run --agent Codex\nwhab \"My budget\" trnx categorize OPENING_TX ZERO_OPENING_TX --category \"Finance / Opening Balance\" --agent Codex\nwhab \"My budget\" trnx review OPENING_TX ZERO_OPENING_TX --reviewed --dry-run --agent Codex\nwhab \"My budget\" trnx review OPENING_TX ZERO_OPENING_TX --reviewed --agent Codex\nwhab \"My budget\" trnx list --format table\nwhab \"My budget\" trnx review-audit --format table\n```\n\nDry-run shows exact before/after classification and monthly impacts, including\n`openingFunding`, income, spending and Ready to Assign, without mutation/save.\nWrites retain one revision/request ID, audit attribution, guarded undo/redo and\nexact retry recovery. After uncertainty, retain the complete original intent;\nnever resubmit with a new request ID. Unsupported authorities reject opening\nclassification before mutation; the public `opening_balance_policy` query reports\nsupport. JSON retains full classification fields; tables remain readable. Root,\ncategory, create/classify and review `--help` work offline.\n\n",
+      "summary": "Category workflow (fictional budget; no wizard):\n  whab \"My budget\" category list --format table\n  whab \"My budget\" category group create \"Projects\"\n  whab \"My budget\" category move \"Finance / Example studio\" --parent \"Projects\"\n  whab \"My budget\" category create \"Example venture\" --parent \"Projects\"\n  whab \"My budget\" category list --parent \"Projects\" --format table\n  whab \"My budget\" category delete --help\n  whab \"My budget\" category group delete --help\n  whab \"My budget\" history list\n\nRead the hierarchy, confirm the intended parent and child with the user, apply one\nconfirmed choice, then inspect the verified result before continuing. All commands\naddress the budget by its existing unique name or stable ID. Groups accept an exact\nunique name or stable ID; children also accept \"Group / Name\". Names ignore case\nand outer whitespace; spaces, emoji and non-Latin text work when quoted. No fuzzy\nmatch is selected. Missing/ambiguous names show candidate names and IDs.\n\nGroups are real nonassignable parents and may be empty. Only children can receive\ntransactions, targets or monthly assignments; deeper nesting is refused. Child\ncreation requires an existing --parent, defaults to --currency USD and --target 0,\nand refuses duplicate sibling names. Target is a nonnegative integer in currency\nminor units (USD 1234 = $12.34). No currency conversion is performed. Moves preserve\nchild identity, currency, targets, transaction references, every month's assignments\nand prior history. Unrelated children and the original parent remain intact, even\nwhen the original parent becomes empty. Existing ledger order is preserved on move;\nthere is currently no manual reorder operation or requested-order guarantee.\n\nJSON is the default and retains full IDs/fields; --format table is for readable\ninspection. Successful writes report the addressed budget and verified saved group\nor child. Revisions and unique request IDs are handled internally. Each command is\none atomic change; the sequence is not one transaction. Stale state is refused.\nNo bank synchronization is started. After an uncertain response, inspect category\nlist and history and retain the complete reported original intent (budget, payload,\nrevision and request ID). Never automatically rerun a write with a new intent.\n\nHelp works offline without a profile or running host. The category management\ncommands require WHAB 2.65+; saving empty groups and moving children require native\nSQLite 1.18+, JSON 1.10+ or another adapter implementing CategoryManagement. Older\nstorage can still provide derived nonempty groups for reads; unsupported writes\nfail explicitly. Use whab BUDGET category ACTION --help for each command.\n\nSafe deletion (CLI 2.15+, WHAB 2.69+, SQLite 1.21+/JSON 1.13+):\n  whab \"My budget\" category show \"Fictional maintenance / Example home\" --format table\n  whab \"My budget\" category delete \"Fictional maintenance / Example home\"\n  whab \"My budget\" category list --parent \"Fictional maintenance\"\n  whab \"My budget\" category group delete \"Fictional maintenance\"\n  whab \"My budget\" category list --format table\n  whab \"My budget\" history list\n\nRead category show, confirm the intended child, then issue one guarded delete.\nChildren require NO transaction references, including live, pending, reviewed,\nrefund and deleted records, and NO nonzero monthly assignments in any month.\nZero-only assignment rows do NOT block deletion: the operation removes them and\nthat unused child atomically. Any nonzero row or transaction refuses the ENTIRE\noperation; no zero rows are removed on refusal. All unrelated rows and financial\nfields, monthly monetary results and rollover settings remain unchanged.\nDeleting a child retains its empty parent; groups must have NO children. Delete\nan empty parent with the separate group command. There is no cascade or --force.\n\ncategory show accepts exact names/IDs or child \"Group / Name\", never fuzzy matches.\nJSON is complete; --format table is readable. deletion.deletable is true when only\nzero rows remain and no transactions refer to the child. assignments.count/months\ninclude EVERY row; zeroMonths lists rows deletion will remove; nonzeroCount and\nnonzeroMonths identify blocking rows. No amounts or unrelated transactions are\nexposed. Show is read-only and never changes revision/history, syncs, or authorizes\na later write. A concurrent revision change refuses a mixed inspection result.\n\nEach successful delete commits permanent audit history, category metadata and\nEXACT removed zero rows together, including zero-valued rows in every month.\nUse history list/show to inspect it. Guarded undo/redo previews restore/reapply\ncategory identity, target, parent relationship and every zero row when compatible.\nLater conflicting changes refuse the whole reversal. Prior audit entries/hashes\nare preserved. Success reports deleted=true and a verified same-revision hierarchy\nwith all other groups/children unchanged. Request IDs/revisions are internal.\n\nHTTP 400 domain refusals and HTTP 409 stale/conflicting intents report the actual\nreason; no automatic retry. Timeouts, HTTP 5xx or failed verification remain\nuncertain, not proof of rollback. Inspect category list and history; retain the\nCOMPLETE original budget/payload/revision/request ID. Never rerun deletion with a\nnew request ID to retry. No bank synchronization is started. No nonzero funding,\ntransaction or unrelated assignment is erased. This is not category merge/archive.\nOlder adapters may conservatively refuse zero rows; update to the required versions\nfor this policy. Help and packaged operation documentation work offline.\n\nRename in place: whab \"My budget\" category rename \"House / Rent\" --name \"Main Residence\" --agent Codex --batch housing-cleanup\nPreserves ID, parent, currency, target, references, assignments and history. Rejects ambiguous names and duplicate siblings. Revisions/request IDs are automatic; recovery retains the original intent.\n\nExplicit Income/Expense categories: category create --type income or category classify CATEGORY --type income --dry-run. Preview impacts, then repeat without --dry-run. Income has target zero and no monthly assignment rows. A parent can mix Income Salary and Expense Fees. Review is independent. No legacy transaction is relabeled; classifiedIncome/unclassifiedIncome separate contributions without changing old totals. See category classify --help for full safety/recovery/examples.\n\nFour types: --type expense|income|transfer|opening_balance. Income, Transfer and Opening Balance are technical classifications without expense targets or assignments. Transfer classification/review require exactly two valid reciprocal legs; bank hints alone do not authorize review. Review requires classification; assigning does not auto-review, clearing makes unreviewed. Use trnx review and trnx review-audit --help. Existing invalid reviewed flags require a separate explicit cleanup.\n\nWHAB 2.79 adds `opening_balance`, displayed as **Opening Balance**. The type is\nindependent of a category's name: naming an Expense category “Opening Balance”\ndoes not change its treatment. Create an explicit technical child, or preview\nand classify an existing zero-target child with no monthly assignment rows.\nIncome, Transfer and Opening Balance cannot have expense targets or assignments.\n\nOpening entries represent existing cash or debt and are excluded from ordinary\nincome, spending, purchases and payee analytics. Posted entries in eligible\non-budget non-credit cash accounts contribute signed `openingFunding` in their\ntransaction month. Prior-to-budget entries are already carried in; later months\ncarry existing balances forward without counting the opening amount twice.\nCredit debt and off-budget balances never become opening funding. Stale/unknown\naccount balances remain excluded; classification does not verify imported estimates. The monthly\nidentity is `income + openingFunding + transferFunding + carriedIn - assignedNextMonth - assigned`.\nBudget disclosures and Insights show opening funding separately from income.\n\nExisting imported zero-amount opening entries can be classified and explicitly\nreviewed. Ordinary transaction creation and financial amount edits still require\nnonzero amounts. Pending/deleted records cannot be reviewed. Categorization never\nauto-reviews, changes amounts/account balances or infers a transfer. No upgrade,\nread or bank sync creates a category or reclassifies historical transactions.\nOriginal import notes, merchant whitespace, identities and history are preserved.\n\n```sh\nwhab \"My budget\" category group create Finance\nwhab \"My budget\" category create \"Opening Balance\" --parent Finance --type opening_balance --agent Codex\nwhab \"My budget\" category classify \"Finance / Initial funds\" --type opening_balance --dry-run\nwhab \"My budget\" category classify \"Finance / Initial funds\" --type opening_balance --agent Codex\nwhab \"My budget\" trnx categorize OPENING_TX ZERO_OPENING_TX --category \"Finance / Opening Balance\" --dry-run --agent Codex\nwhab \"My budget\" trnx categorize OPENING_TX ZERO_OPENING_TX --category \"Finance / Opening Balance\" --agent Codex\nwhab \"My budget\" trnx review OPENING_TX ZERO_OPENING_TX --reviewed --dry-run --agent Codex\nwhab \"My budget\" trnx review OPENING_TX ZERO_OPENING_TX --reviewed --agent Codex\nwhab \"My budget\" trnx list --format table\nwhab \"My budget\" trnx review-audit --format table\n```\n\nDry-run shows exact before/after classification and monthly impacts, including\n`openingFunding`, income, spending and Ready to Assign, without mutation/save.\nWrites retain one revision/request ID, audit attribution, guarded undo/redo and\nexact retry recovery. After uncertainty, retain the complete original intent;\nnever resubmit with a new request ID. Unsupported authorities reject opening\nclassification before mutation; the public `opening_balance_policy` query reports\nsupport. JSON retains full classification fields; tables remain readable. Root,\ncategory, create/classify and review `--help` work offline.\n\n",
       "input": {
         "type": "object",
         "description": "Simple category-command arguments inside one explicitly addressed budget.",
@@ -4938,17 +4938,17 @@
     },
     {
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
-      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "scope": "One addressed budget/environment/workspace, same currency; valid historical closed accounts and different current on/off-budget scopes are allowed without reopening/reclassifying.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
-      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "availability": "WHAB 2.81+ with transfer integrity; supported SQLite/JSON authorities. Unsupported backends fail before mutation.",
       "name": "trnx.transfers",
       "kind": "local",
-      "summary": "Name-addressed CLI: Read-only possible transfer pairs: equal opposite nonzero amounts, same currency/budget scope, different active accounts, posted/uncategorized/unmatched, within seven days. All alternatives remain proposals; no automatic match or review.",
+      "summary": "Name-addressed CLI: Read-only possible transfer pairs: equal opposite nonzero amounts, same currency, different accounts including closed historical accounts and mixed current scopes, posted/unclassified-or-Transfer/unmatched, within seven days. All alternatives remain proposals; no automatic match or review.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5057,14 +5057,14 @@
     },
     {
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
-      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "scope": "One addressed budget/environment/workspace, same currency; valid historical closed accounts and different current on/off-budget scopes are allowed without reopening/reclassifying.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
-      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "availability": "WHAB 2.81+ with transfer integrity; supported SQLite/JSON authorities. Unsupported backends fail before mutation.",
       "name": "trnx.match-transfer.preview",
       "kind": "local",
       "summary": "Name-addressed CLI: Inspect the exact proposed pair changes and fingerprint before explicit confirmation. Confirming links both IDs, marks transfer exclusion and leaves both unreviewed. Unmatching removes links and restores provider transfer hints, leaving both unreviewed.",
@@ -5173,14 +5173,14 @@
     },
     {
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
-      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "scope": "One addressed budget/environment/workspace, same currency; valid historical closed accounts and different current on/off-budget scopes are allowed without reopening/reclassifying.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
-      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "availability": "WHAB 2.81+ with transfer integrity; supported SQLite/JSON authorities. Unsupported backends fail before mutation.",
       "name": "trnx.match-transfer",
       "kind": "local",
       "summary": "Name-addressed CLI: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
@@ -5292,18 +5292,18 @@
           }
         }
       ],
-      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
+      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes links and any orphan Transfer category/attribution, then restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
     },
     {
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
-      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "scope": "One addressed budget/environment/workspace, same currency; valid historical closed accounts and different current on/off-budget scopes are allowed without reopening/reclassifying.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
-      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "availability": "WHAB 2.81+ with transfer integrity; supported SQLite/JSON authorities. Unsupported backends fail before mutation.",
       "name": "trnx.unmatch-transfer",
       "kind": "local",
       "summary": "Name-addressed CLI: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
@@ -5415,7 +5415,7 @@
           }
         }
       ],
-      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
+      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes links and any orphan Transfer category/attribution, then restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
     },
     {
       "name": "category.classify",
@@ -5868,6 +5868,520 @@
       ],
       "retry": "Reuse identical resolved edits/creates, creationId array order, preserveBalances, original revision/request ID and audit metadata. --dry-run returns these. Exact successful retries after restart return original receipt without duplicate records/history/save. No automatic retry; inspect trnx list/history. Copyable JSON/stdin and recovery examples: whab BUDGET trnx edit-many --help.",
       "availability": "CLI 2.21+, WHAB 2.78+, native SQLite 1.27+ or JSON 1.19+. Unsupported adapters/authorities fail before mutation. Commands and packaged help work noninteractively; help is offline."
+    },
+    {
+      "kind": "local",
+      "permissions": "Existing name-addressed budget access through verified local HTTPS. Reads need no write approval; explicit writes use one revision/request ID internally and optional --agent/--batch history attribution.",
+      "scope": "One addressed budget/environment personal workspace; stable IDs cannot cross budgets. Same-currency legs only. No provider calls or bank synchronization.",
+      "errors": [
+        "Any invalid/missing/deleted/duplicate/shared target, incompatible pair or unsupported authority rejects the entire batch before mutation. No fuzzy match or silent splitting.",
+        "Stale revisions/fingerprints and conflicting request IDs are refused. Timeout/invalid receipts remain uncertain; inspect saved records before exact retry."
+      ],
+      "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
+      "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
+      "name": "trnx.match-transfers.preview",
+      "summary": "Atomic transfer matching (1–100 explicit pairs):\n  whab \"My budget\" trnx match-transfers --file pairs.json --dry-run\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --dry-run --agent Codex\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --agent Codex\n  printf '%s\\n' '[{\"outId\":\"out-1\",\"inId\":\"in-1\"}]' | whab \"My budget\" trnx match-transfers --file - --dry-run\n\nComplete pairs.json example (UTF-8 JSON array, maximum 2 MiB):\n[\n  {\"outId\": \"out-1\", \"inId\": \"in-1\"},\n  {\"outId\": \"out-2\", \"inId\": \"in-2\"}\n]\nUse stable IDs from trnx list/transfers. outId is the positive minor-unit outflow;\ninId is its negative inflow. Each ID may appear exactly once in the whole file.\nNo fuzzy matching or inferred counterpart. Every pair must pass core validation;\none invalid, missing, repeated, already paired or otherwise disallowed leg rejects\nALL pairs. Oversized batches are refused, never split. Empty batches are refused.\nPairing requires equal nonzero opposite amounts in different same-currency\naccounts, posted/nondeleted legs within seven days, and compatible classification.\nClosed historical accounts and different current on/off-budget scopes may pair\nwithout reopening/reclassifying. Dated transferFunding accounts for signed\neligible budget movement; transfers never become income/spending. Same-month\ncash pairs net to zero; cross-month legs affect their posting months. Unknown/\nstale cash creates no funding; credit debt changes cannot invent overpayment cash.\nZero-value imported transfer hints cannot establish directed legs; leave unreviewed\nand inspect the transfer audit. Bank hints and merchant names are not proof.\n\nThis is ONE native atomic commit, revision advancement, durable checkpoint and\ncoherent reversible before/after audit entry for the complete batch, not repeated\nsingle-pair edits. --batch groups history only. --agent labels the audit actor,\nwithout changing existing category-agent attribution. Omitted --reviewed leaves\nboth legs unreviewed; --reviewed explicitly reviews every validated complete pair\ninside that same commit. No financial fields, notes or merchant whitespace are\nchanged; no bank sync or persistent future matching rule is created.\n\n--dry-run is read-only and reports exact before/after, revision and fingerprint.\nInspect every pair, then bind the chosen preview with --revision REV and\n--fingerprint HASH. Omitting them previews current state internally. Execution\nstays noninteractive. A stale revision or changed fingerprint rejects all changes.\nJSON is complete; --format table shows every saved before/after record. Verify\ntrnx list and history list/show. History undo/redo remain separately guarded.\n\nAfter an uncertain response, inspect saved pairs/history and retain the ENTIRE\nreported intent: exact ordered file, --reviewed choice, original --revision,\n--fingerprint, --request-id, --agent and --batch. Repeat that exact command only;\nsuccessful retries return the original durable receipt after restart, without a\nsecond mutation/history/save. Never retry with fresh intent. Conflicting reuse\nis refused. Unsupported authoritative backends fail before mutation. Help works\noffline. Use match-transfer for one pair with its existing result shape, or\nmatch-transfers for a batch and optional review in the same commit.\n",
+      "input": {
+        "type": "object",
+        "description": "Resolved --file/- JSON pairs and --reviewed choice; execution adds fingerprint from the native preview.",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "description": "Ordered UTF-8 JSON file/stdin array. Exactly outId/inId per pair; all IDs disjoint. Positive outflow then negative inflow in integer minor units.",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "outId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Stable ID of the positive outflow leg."
+                },
+                "inId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Stable ID of the negative inflow leg."
+                }
+              },
+              "required": [
+                "outId",
+                "inId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "--reviewed explicitly reviews both legs in every valid pair in this same operation; omitted leaves unreviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact native preview fingerprint; CLI obtains it automatically or accepts --fingerprint for a reviewed plan/exact retry."
+          }
+        },
+        "required": [
+          "pairs"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Exact public before/after receipt for every addressed transaction, ordered by input out/in legs; includes fingerprint, counts, pair metadata and review choice.",
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact native preview fingerprint; CLI obtains it automatically or accepts --fingerprint for a reviewed plan/exact retry."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 200,
+            "description": "Number of transaction legs, twice the pair count."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every id/before/after, preserving unrelated fields verbatim.",
+            "items": {
+              "type": "object",
+              "description": "Exact public transaction states."
+            }
+          }
+        },
+        "required": [
+          "fingerprint",
+          "count",
+          "changes"
+        ],
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in"
+              }
+            ],
+            "reviewed": true
+          },
+          "output": {
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "count": 2,
+            "changes": [
+              {
+                "id": "fictional-out",
+                "before": {},
+                "after": {
+                  "transferPeerId": "fictional-in",
+                  "reviewed": true
+                }
+              },
+              {
+                "id": "fictional-in",
+                "before": {},
+                "after": {
+                  "transferPeerId": "fictional-out",
+                  "reviewed": true
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read-only exact preview; no commit/save."
+    },
+    {
+      "kind": "local",
+      "permissions": "Existing name-addressed budget access through verified local HTTPS. Reads need no write approval; explicit writes use one revision/request ID internally and optional --agent/--batch history attribution.",
+      "scope": "One addressed budget/environment personal workspace; stable IDs cannot cross budgets. Same-currency legs only. No provider calls or bank synchronization.",
+      "errors": [
+        "Any invalid/missing/deleted/duplicate/shared target, incompatible pair or unsupported authority rejects the entire batch before mutation. No fuzzy match or silent splitting.",
+        "Stale revisions/fingerprints and conflicting request IDs are refused. Timeout/invalid receipts remain uncertain; inspect saved records before exact retry."
+      ],
+      "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
+      "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
+      "name": "trnx.match-transfers",
+      "summary": "Atomic transfer matching (1–100 explicit pairs):\n  whab \"My budget\" trnx match-transfers --file pairs.json --dry-run\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --dry-run --agent Codex\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --agent Codex\n  printf '%s\\n' '[{\"outId\":\"out-1\",\"inId\":\"in-1\"}]' | whab \"My budget\" trnx match-transfers --file - --dry-run\n\nComplete pairs.json example (UTF-8 JSON array, maximum 2 MiB):\n[\n  {\"outId\": \"out-1\", \"inId\": \"in-1\"},\n  {\"outId\": \"out-2\", \"inId\": \"in-2\"}\n]\nUse stable IDs from trnx list/transfers. outId is the positive minor-unit outflow;\ninId is its negative inflow. Each ID may appear exactly once in the whole file.\nNo fuzzy matching or inferred counterpart. Every pair must pass core validation;\none invalid, missing, repeated, already paired or otherwise disallowed leg rejects\nALL pairs. Oversized batches are refused, never split. Empty batches are refused.\nPairing requires equal nonzero opposite amounts in different same-currency\naccounts, posted/nondeleted legs within seven days, and compatible classification.\nClosed historical accounts and different current on/off-budget scopes may pair\nwithout reopening/reclassifying. Dated transferFunding accounts for signed\neligible budget movement; transfers never become income/spending. Same-month\ncash pairs net to zero; cross-month legs affect their posting months. Unknown/\nstale cash creates no funding; credit debt changes cannot invent overpayment cash.\nZero-value imported transfer hints cannot establish directed legs; leave unreviewed\nand inspect the transfer audit. Bank hints and merchant names are not proof.\n\nThis is ONE native atomic commit, revision advancement, durable checkpoint and\ncoherent reversible before/after audit entry for the complete batch, not repeated\nsingle-pair edits. --batch groups history only. --agent labels the audit actor,\nwithout changing existing category-agent attribution. Omitted --reviewed leaves\nboth legs unreviewed; --reviewed explicitly reviews every validated complete pair\ninside that same commit. No financial fields, notes or merchant whitespace are\nchanged; no bank sync or persistent future matching rule is created.\n\n--dry-run is read-only and reports exact before/after, revision and fingerprint.\nInspect every pair, then bind the chosen preview with --revision REV and\n--fingerprint HASH. Omitting them previews current state internally. Execution\nstays noninteractive. A stale revision or changed fingerprint rejects all changes.\nJSON is complete; --format table shows every saved before/after record. Verify\ntrnx list and history list/show. History undo/redo remain separately guarded.\n\nAfter an uncertain response, inspect saved pairs/history and retain the ENTIRE\nreported intent: exact ordered file, --reviewed choice, original --revision,\n--fingerprint, --request-id, --agent and --batch. Repeat that exact command only;\nsuccessful retries return the original durable receipt after restart, without a\nsecond mutation/history/save. Never retry with fresh intent. Conflicting reuse\nis refused. Unsupported authoritative backends fail before mutation. Help works\noffline. Use match-transfer for one pair with its existing result shape, or\nmatch-transfers for a batch and optional review in the same commit.\n",
+      "input": {
+        "type": "object",
+        "description": "Resolved --file/- JSON pairs and --reviewed choice; execution adds fingerprint from the native preview.",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "description": "Ordered UTF-8 JSON file/stdin array. Exactly outId/inId per pair; all IDs disjoint. Positive outflow then negative inflow in integer minor units.",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "outId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Stable ID of the positive outflow leg."
+                },
+                "inId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Stable ID of the negative inflow leg."
+                }
+              },
+              "required": [
+                "outId",
+                "inId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "--reviewed explicitly reviews both legs in every valid pair in this same operation; omitted leaves unreviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact native preview fingerprint; CLI obtains it automatically or accepts --fingerprint for a reviewed plan/exact retry."
+          }
+        },
+        "required": [
+          "pairs",
+          "fingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Exact public before/after receipt for every addressed transaction, ordered by input out/in legs; includes fingerprint, counts, pair metadata and review choice.",
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact native preview fingerprint; CLI obtains it automatically or accepts --fingerprint for a reviewed plan/exact retry."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 200,
+            "description": "Number of transaction legs, twice the pair count."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every id/before/after, preserving unrelated fields verbatim.",
+            "items": {
+              "type": "object",
+              "description": "Exact public transaction states."
+            }
+          }
+        },
+        "required": [
+          "fingerprint",
+          "count",
+          "changes"
+        ],
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in"
+              }
+            ],
+            "reviewed": true,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "output": {
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "count": 2,
+            "changes": [
+              {
+                "id": "fictional-out",
+                "before": {},
+                "after": {
+                  "transferPeerId": "fictional-in",
+                  "reviewed": true
+                }
+              },
+              {
+                "id": "fictional-in",
+                "before": {},
+                "after": {
+                  "transferPeerId": "fictional-out",
+                  "reviewed": true
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One native transaction, revision advancement, checkpoint and coherent reversible audit entry for all pairs; optional review is part of the same commit. Preserve identities, financial fields, notes and category attribution; no bank sync or future rule."
+    },
+    {
+      "kind": "local",
+      "permissions": "Existing name-addressed budget access through verified local HTTPS. Reads need no write approval; explicit writes use one revision/request ID internally and optional --agent/--batch history attribution.",
+      "scope": "One addressed budget/environment personal workspace; stable IDs cannot cross budgets. Same-currency legs only. No provider calls or bank synchronization.",
+      "errors": [
+        "Any invalid/missing/deleted/duplicate/shared target, incompatible pair or unsupported authority rejects the entire batch before mutation. No fuzzy match or silent splitting.",
+        "Stale revisions/fingerprints and conflicting request IDs are refused. Timeout/invalid receipts remain uncertain; inspect saved records before exact retry."
+      ],
+      "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
+      "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
+      "name": "trnx.transfer-audit",
+      "summary": "A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,\na merchant name or an isolated Transfer category does not prove a pair. A zero\namount imported hint has no directed outflow/inflow; it cannot be paired and\nmust remain unreviewed until explicitly reclassified on independent evidence.\n\nAudit first (read-only):\n  whab \"My budget\" trnx transfer-audit --format table\n  whab \"My budget\" trnx transfer-audit --since 2026-01-01 --until 2026-12-31\n  whab \"My budget\" trnx transfer-audit --offset NEXT --limit 100\nThe inclusive dates select audited transactions. Inspect total/next and keep the\nsame revision across pages; next=null means complete. Default limit 100; no silent\ntruncation. JSON exposes stable IDs, exact saved records and issue reasons.\n\nRepair only explicitly inspected legacy issues:\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --dry-run --agent Codex\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex\nRepair clears invalid reviewed flags, orphan Transfer classification and invalid\nlinks, as shown by the exact core before/after preview. Include every affected\nmalformed counterpart explicitly. It preserves import hints, identities, amounts,\ndates, merchants (including whitespace), notes, account balances and history.\nIt neither manufactures a missing leg nor guesses a category or counterpart.\nAfter repair, incomplete/zero-value hints stay unreviewed. Inspect trnx list and\nhistory list/show; use match-transfers only for confirmed complete pairs.\nAn already unreviewed hint can appear as unchanged in the exact repair receipt.\n\n1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,\nrevision advancement, durable save and reversible audit entry. One invalid,\nmissing, duplicate or incomplete repair selection rejects the entire operation.\nNo automatic upgrade/read cleanup, bank sync or future matching rule. --batch\ngroups history only; --agent records the audit actor. Normal use is noninteractive.\n\n--dry-run returns exact changes, revision and fingerprint without mutation/save.\nBind a chosen preview with --revision and --fingerprint; otherwise the CLI previews\ncurrent state internally. Stale state or changed fingerprints fail safely. After\nan uncertain result, inspect saved records/history and keep the complete original\nIDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful\nretries return the durable original receipt, including after restart, without\nduplicated changes/history/saves. Never retry with a new intent. Unsupported\nauthorities fail before mutation. JSON is complete; tables show every before/after.\nAll help works offline.\n",
+      "input": {
+        "type": "object",
+        "description": "Read-only transfer issue pagination and inclusive date bounds.",
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date",
+            "description": "Inclusive lower transaction date; omitted means no lower bound."
+          },
+          "until": {
+            "type": "string",
+            "format": "date",
+            "description": "Inclusive upper transaction date; omitted means no upper bound."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Exact next offset from preceding page at the same ledger revision."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 100,
+            "description": "Issue records per page; inspect total/next."
+          }
+        },
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Issue page with stable IDs, codes, messages, original transactions and repairable flags. total/next make completeness explicit; zeroValuePolicy documents imported zero hints.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "limit": 100
+          },
+          "output": {
+            "issues": [],
+            "total": 0,
+            "next": null,
+            "zeroValuePolicy": "Zero amounts have no directed transfer legs; hints remain unreviewed."
+          }
+        }
+      ],
+      "side_effects": "Read-only; never silently repairs old data or changes review/classification."
+    },
+    {
+      "kind": "local",
+      "permissions": "Existing name-addressed budget access through verified local HTTPS. Reads need no write approval; explicit writes use one revision/request ID internally and optional --agent/--batch history attribution.",
+      "scope": "One addressed budget/environment personal workspace; stable IDs cannot cross budgets. Same-currency legs only. No provider calls or bank synchronization.",
+      "errors": [
+        "Any invalid/missing/deleted/duplicate/shared target, incompatible pair or unsupported authority rejects the entire batch before mutation. No fuzzy match or silent splitting.",
+        "Stale revisions/fingerprints and conflicting request IDs are refused. Timeout/invalid receipts remain uncertain; inspect saved records before exact retry."
+      ],
+      "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
+      "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
+      "name": "trnx.repair-transfers.preview",
+      "summary": "A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,\na merchant name or an isolated Transfer category does not prove a pair. A zero\namount imported hint has no directed outflow/inflow; it cannot be paired and\nmust remain unreviewed until explicitly reclassified on independent evidence.\n\nAudit first (read-only):\n  whab \"My budget\" trnx transfer-audit --format table\n  whab \"My budget\" trnx transfer-audit --since 2026-01-01 --until 2026-12-31\n  whab \"My budget\" trnx transfer-audit --offset NEXT --limit 100\nThe inclusive dates select audited transactions. Inspect total/next and keep the\nsame revision across pages; next=null means complete. Default limit 100; no silent\ntruncation. JSON exposes stable IDs, exact saved records and issue reasons.\n\nRepair only explicitly inspected legacy issues:\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --dry-run --agent Codex\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex\nRepair clears invalid reviewed flags, orphan Transfer classification and invalid\nlinks, as shown by the exact core before/after preview. Include every affected\nmalformed counterpart explicitly. It preserves import hints, identities, amounts,\ndates, merchants (including whitespace), notes, account balances and history.\nIt neither manufactures a missing leg nor guesses a category or counterpart.\nAfter repair, incomplete/zero-value hints stay unreviewed. Inspect trnx list and\nhistory list/show; use match-transfers only for confirmed complete pairs.\nAn already unreviewed hint can appear as unchanged in the exact repair receipt.\n\n1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,\nrevision advancement, durable save and reversible audit entry. One invalid,\nmissing, duplicate or incomplete repair selection rejects the entire operation.\nNo automatic upgrade/read cleanup, bank sync or future matching rule. --batch\ngroups history only; --agent records the audit actor. Normal use is noninteractive.\n\n--dry-run returns exact changes, revision and fingerprint without mutation/save.\nBind a chosen preview with --revision and --fingerprint; otherwise the CLI previews\ncurrent state internally. Stale state or changed fingerprints fail safely. After\nan uncertain result, inspect saved records/history and keep the complete original\nIDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful\nretries return the durable original receipt, including after restart, without\nduplicated changes/history/saves. Never retry with a new intent. Unsupported\nauthorities fail before mutation. JSON is complete; tables show every before/after.\nAll help works offline.\n",
+      "input": {
+        "type": "object",
+        "description": "Explicit repair IDs and exact fingerprint from --dry-run or internal preview.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true,
+            "description": "1–200 explicit audited stable IDs including every malformed counterpart; no inferred targets.",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact native preview fingerprint; CLI obtains it automatically or accepts --fingerprint for a reviewed plan/exact retry."
+          }
+        },
+        "required": [
+          "transactionIds"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Exact public before/after receipt for every addressed transaction, ordered by input out/in legs; includes fingerprint, counts, pair metadata and review choice.",
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact native preview fingerprint; CLI obtains it automatically or accepts --fingerprint for a reviewed plan/exact retry."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Number of explicit repair targets."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every id/before/after, preserving unrelated fields verbatim.",
+            "items": {
+              "type": "object",
+              "description": "Exact public transaction states."
+            }
+          }
+        },
+        "required": [
+          "fingerprint",
+          "count",
+          "changes"
+        ],
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-orphan"
+            ]
+          },
+          "output": {
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "count": 1,
+            "changes": [
+              {
+                "id": "fictional-orphan",
+                "before": {
+                  "reviewed": true
+                },
+                "after": {
+                  "reviewed": false
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read-only exact repair preview; no commit/save."
+    },
+    {
+      "kind": "local",
+      "permissions": "Existing name-addressed budget access through verified local HTTPS. Reads need no write approval; explicit writes use one revision/request ID internally and optional --agent/--batch history attribution.",
+      "scope": "One addressed budget/environment personal workspace; stable IDs cannot cross budgets. Same-currency legs only. No provider calls or bank synchronization.",
+      "errors": [
+        "Any invalid/missing/deleted/duplicate/shared target, incompatible pair or unsupported authority rejects the entire batch before mutation. No fuzzy match or silent splitting.",
+        "Stale revisions/fingerprints and conflicting request IDs are refused. Timeout/invalid receipts remain uncertain; inspect saved records before exact retry."
+      ],
+      "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
+      "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
+      "name": "trnx.repair-transfers",
+      "summary": "A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,\na merchant name or an isolated Transfer category does not prove a pair. A zero\namount imported hint has no directed outflow/inflow; it cannot be paired and\nmust remain unreviewed until explicitly reclassified on independent evidence.\n\nAudit first (read-only):\n  whab \"My budget\" trnx transfer-audit --format table\n  whab \"My budget\" trnx transfer-audit --since 2026-01-01 --until 2026-12-31\n  whab \"My budget\" trnx transfer-audit --offset NEXT --limit 100\nThe inclusive dates select audited transactions. Inspect total/next and keep the\nsame revision across pages; next=null means complete. Default limit 100; no silent\ntruncation. JSON exposes stable IDs, exact saved records and issue reasons.\n\nRepair only explicitly inspected legacy issues:\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --dry-run --agent Codex\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex\nRepair clears invalid reviewed flags, orphan Transfer classification and invalid\nlinks, as shown by the exact core before/after preview. Include every affected\nmalformed counterpart explicitly. It preserves import hints, identities, amounts,\ndates, merchants (including whitespace), notes, account balances and history.\nIt neither manufactures a missing leg nor guesses a category or counterpart.\nAfter repair, incomplete/zero-value hints stay unreviewed. Inspect trnx list and\nhistory list/show; use match-transfers only for confirmed complete pairs.\nAn already unreviewed hint can appear as unchanged in the exact repair receipt.\n\n1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,\nrevision advancement, durable save and reversible audit entry. One invalid,\nmissing, duplicate or incomplete repair selection rejects the entire operation.\nNo automatic upgrade/read cleanup, bank sync or future matching rule. --batch\ngroups history only; --agent records the audit actor. Normal use is noninteractive.\n\n--dry-run returns exact changes, revision and fingerprint without mutation/save.\nBind a chosen preview with --revision and --fingerprint; otherwise the CLI previews\ncurrent state internally. Stale state or changed fingerprints fail safely. After\nan uncertain result, inspect saved records/history and keep the complete original\nIDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful\nretries return the durable original receipt, including after restart, without\nduplicated changes/history/saves. Never retry with a new intent. Unsupported\nauthorities fail before mutation. JSON is complete; tables show every before/after.\nAll help works offline.\n",
+      "input": {
+        "type": "object",
+        "description": "Explicit repair IDs and exact fingerprint from --dry-run or internal preview.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true,
+            "description": "1–200 explicit audited stable IDs including every malformed counterpart; no inferred targets.",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact native preview fingerprint; CLI obtains it automatically or accepts --fingerprint for a reviewed plan/exact retry."
+          }
+        },
+        "required": [
+          "transactionIds",
+          "fingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Exact public before/after receipt for every addressed transaction, ordered by input out/in legs; includes fingerprint, counts, pair metadata and review choice.",
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact native preview fingerprint; CLI obtains it automatically or accepts --fingerprint for a reviewed plan/exact retry."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Number of explicit repair targets."
+          },
+          "changes": {
+            "type": "array",
+            "description": "Every id/before/after, preserving unrelated fields verbatim.",
+            "items": {
+              "type": "object",
+              "description": "Exact public transaction states."
+            }
+          }
+        },
+        "required": [
+          "fingerprint",
+          "count",
+          "changes"
+        ],
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-orphan"
+            ],
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "output": {
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "count": 1,
+            "changes": [
+              {
+                "id": "fictional-orphan",
+                "before": {
+                  "reviewed": true
+                },
+                "after": {
+                  "reviewed": false
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Explicit atomic repair clears invalid reviewed state, orphan Transfer category and invalid links shown in the preview. Preserve imported hints and all financial fields/identities/history; never manufacture a pair. One commit/revision/checkpoint/audit entry."
     }
   ]
 }

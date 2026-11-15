@@ -42,7 +42,7 @@ def snapshot(store, workspace: str, month: str, count: int = 1) -> dict:
                     **({"kind": row["kind"]} if row["kind"] is not None else {}),
             }
         for row in store.db.execute(
-            "SELECT id,account_id,date,amount,category_id,pending,is_transfer,deleted "
+            "SELECT id,account_id,date,amount,category_id,pending,is_transfer,deleted,transfer_peer_id "
             "FROM transactions WHERE workspace=? ORDER BY rowid", (workspace,),
         ):
             state["transactions"][row["id"]] = {
@@ -50,6 +50,7 @@ def snapshot(store, workspace: str, month: str, count: int = 1) -> dict:
                 "amount": row["amount"], "categoryId": row["category_id"],
                 "pending": bool(row["pending"]), "isTransfer": bool(row["is_transfer"]),
                 "deleted": bool(row["deleted"]),
+                **({'transferPeerId': row['transfer_peer_id']} if row['transfer_peer_id'] is not None else {}),
             }
         for row in store.db.execute("SELECT * FROM budget WHERE workspace=?", (workspace,)):
             state["budget"].setdefault(row["month"], {})[row["category_id"]] = row["assigned"]

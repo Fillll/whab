@@ -80,14 +80,16 @@ def transaction_register_page(
             + " ORDER BY t.date DESC,t.id DESC LIMIT ? OFFSET ?",
             [*arguments, *match_arguments, page_size, offset],
         )
+        from .transfer_pairs import public_validity
+        transactions = [
+            public_transaction({**dict(row), **{key: bool(row[key]) for key in (
+                "pending", "reviewed", "isTransfer", "inferredTransfer",
+            )}}, categories={row["id"]: row for row in categories})
+            for row in rows
+        ]
         return {
             "accounts": accounts, "categories": categories,
-            "transactions": [
-                public_transaction({**dict(row), **{key: bool(row[key]) for key in (
-                    "pending", "reviewed", "isTransfer", "inferredTransfer",
-                )}}, categories={row["id"]: row for row in categories})
-                for row in rows
-            ],
+            "transactions": public_validity(store, workspace, transactions),
             "transactionPage": {
                 "total": total, "count": count, "page": page, "pages": pages,
                 "start": offset + 1 if count else 0, "end": min(offset + page_size, count),

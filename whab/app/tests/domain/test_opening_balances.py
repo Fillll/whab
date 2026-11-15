@@ -58,7 +58,7 @@ def test_opening_cash_funds_once_without_income_or_spending_or_snapshot_changes(
     assert state == before
     projection = budget.calculate_workspace(state, '2026-11')
     assert not any(row['categoryId'] == 'opening' for row in projection['budget'])
-    assert projection['trend'][-1] == {'month': '2026-11', 'income': 0, 'spent': 0, 'openingFunding': 20000}
+    assert projection['trend'][-1] == {'month': '2026-11', 'income': 0, 'spent': 0, 'openingFunding': 20000, 'transferFunding': 0}
     assert budget.calculate_workspace_periods(state, '2026-10', 3) == [budget.calculate_workspace(state, month) for month in ('2026-10', '2026-11', '2026-12')]
 
 

@@ -45,6 +45,16 @@ def test_classification_required_controls_and_explicit_transfer(client, store):
     response=client.post('/api/categories',json={'workspace':'personal','name':'Move money','group':'Technical','target':0,'kind':'transfer'})
     assert response.status_code==200
     category=next(row['id'] for row in store.categories('personal') if row['name']=='Move money')
+    assert client.patch(f'/api/transactions/{transaction}',json={'workspace':'personal','categoryId':category}).status_code==400
+    counterpart_account = store.add_account('personal', {'name':'Fictional savings','type':'depository','balance':0})
+    counterpart = store.add_transaction('personal', {'accountId':counterpart_account,'date':'2026-10-02',
+        'merchant':'Fictional incoming transfer','amount':-100})
+    pairs = [{'outId': transaction, 'inId': counterpart}]
+    preview = store.preview_transfer_matches('personal', pairs)
+    store.apply_transfer_matches('personal', pairs, fingerprint=preview['fingerprint'])
+    row = markup()
+    assert 'data-transfer-pair-valid="true"' in row
+    assert not re.search(r'data-transaction-field="categoryId"[^>]* disabled', row)
     assert client.patch(f'/api/transactions/{transaction}',json={'workspace':'personal','categoryId':category}).status_code==200
     row=markup()
     assert 'Technical &gt; Move money (Transfer)' in row and 'data-category-kind="transfer"' in row
@@ -53,5 +63,7 @@ def test_classification_required_controls_and_explicit_transfer(client, store):
     assert client.patch(f'/api/transactions/{transaction}',json={'workspace':'personal','reviewed':True}).status_code==200
     assert client.patch(f'/api/transactions/{transaction}',json={'workspace':'personal','categoryId':None}).status_code==200
     saved=next(row for row in store.transactions('personal') if row['id']==transaction)
-    assert saved['reviewed'] is False and saved['merchant']=='Fictional transfer'
-    assert 'data-review-classified="false"' in markup()
+    assert saved['reviewed'] is True and saved['merchant']=='Fictional transfer'
+    assert saved['transferPeerId'] == counterpart and saved['isTransfer'] is True
+    assert 'data-review-classified="true"' in markup()
+    assert client.patch(f'/api/transactions/{transaction}',json={'workspace':'personal','reviewed':False}).status_code==200

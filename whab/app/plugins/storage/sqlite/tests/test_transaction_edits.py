@@ -18,7 +18,7 @@ def annotated_transaction(store):
         "amount": 100, "categoryId": "groceries", "note": "Original memo",
     })
     store.db.execute(
-        "UPDATE transactions SET inferred_transfer=1,is_transfer=1,merchant_logo='synthetic-logo' "
+        "UPDATE transactions SET inferred_transfer=1,is_transfer=0,category_edited=1,merchant_logo='synthetic-logo' "
         "WHERE workspace='personal' AND id=?", (transaction,),
     )
     return transaction

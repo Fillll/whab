@@ -169,6 +169,12 @@ def annotated_transaction(record: ImportedTransaction, annotations: dict, *, cat
             result[key] = annotations[key]
     if categories is not None:
         from .review import effective_transfer, review_status
+        if (categories.get(result.get('categoryId'), {}).get('kind') == 'transfer'
+                and not result.get('transferPeerId')
+                and categories.get(annotations.get('categoryId'), {}).get('kind') != 'transfer'):
+            # New provider/model classifications are evidence, not a second leg.
+            # Existing saved legacy annotations remain available for explicit audit.
+            result.update(categoryId=None, isTransfer=True, inferredTransfer=True, reviewed=False)
         result['isTransfer'] = effective_transfer(result, categories)
         old_eligible = review_status(annotations, categories)['eligible']
         new_eligible = review_status(result, categories)['eligible']

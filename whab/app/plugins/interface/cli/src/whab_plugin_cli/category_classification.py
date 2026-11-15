@@ -9,9 +9,13 @@ from .transaction_commands import checked
 GUIDE = """Expense, Income, Transfer and Opening Balance are financial types independent of
 display/group names. Use --type opening_balance for Opening Balance.
 Review is explicit and requires classification. Clearing classification unreviews.
+Transfer classification/review requires exactly two valid reciprocal legs; a bank
+hint or isolated Transfer category is insufficient. Use trnx match-transfers for
+explicit pairs, and transfer-audit/repair-transfers for guarded legacy cleanup.
 Posted external inflows in eligible on-budget non-credit accounts fund Ready to
 Assign once. Pending records, transfers, off-budget accounts and credit-card
-inflows do not fund it. Income reversals reduce income; expense-category refunds
+inflows do not fund income. Valid transfers have separate signed transferFunding
+for eligible budget movement, including differing scopes/posting months. Income reversals reduce income; expense-category refunds
 reduce spending. Amounts, balances, merchant whitespace, notes, original/import
 information, categories' IDs/parents/currencies and reviews are preserved.
 

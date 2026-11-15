@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.21.0 — 2026-11-15
+
+PR: [#210](https://github.com/Fillll/whab/pull/210)
+
+- Commit 1–100 explicit disjoint transfer pairs with optional review as one native operation, exact preview/fingerprint, before/after audit and restart-safe retry receipt. Reject every invalid batch before mutation; support historical closed accounts and differing current budget scopes without changing accounts or financial fields.
+- Enforce graph-proven two-leg transfer review in native annotation paths and public register projections, including peers outside page filters. Add complete paginated zero-hint/orphan/link audits and guarded explicit legacy repairs.
+- Keep native format 5 sticky while transfer pairs remain in current state or permanent history, including restored/local-transfer records; older native readers refuse unsupported semantics.
+
 ## 1.20.0 — 2026-11-14
 
 PR: [#204](https://github.com/Fillll/whab/pull/204)

@@ -231,7 +231,7 @@ def _pack_ledger(state, *, portable=False, complete_associations=True):
 
 def decode(raw):
     value = parse(raw)
-    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2, 3, 4}:
+    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2, 3, 4, 5}:
         raise StoreError("This JSON storage schema is newer or unsupported; install a compatible plugin.")
     fields = {"formatVersion", "generation", "operationId", "authorityEpoch", "workspaces"}
     _exact(value, fields | ({"authority"} if value["formatVersion"] >= 2 else set()))

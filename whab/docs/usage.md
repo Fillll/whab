@@ -340,43 +340,47 @@ current browser session and offers an explicit retry of the same request.
 
 ## Reviewed transfer matching
 
-WHAB 2.74 introduces optional public `TransferMatching` SDK capability. The financial
-core owns equal nonzero opposite amounts, same currency and budget scope, distinct
-active accounts, posted/nondeleted/uncategorized eligibility and the seven-day date
-window. Deterministic proposals are read-only and preserve every ambiguous alternative;
-merchant names and provider hints never prove a pair. Date/account filters select an
-anchor; its counterpart may lie outside those filters. Pagination returns total/next;
-over 1,000 candidates requires narrower filters. No initial-page background scan runs.
+Use `whab "My budget" trnx transfers` to inspect suggestions. Merchant text and bank
+hints do not prove a transfer. A valid transfer has exactly two reciprocal posted
+legs, equal nonzero opposite amounts in different accounts of one currency, and
+transaction dates no more than seven days apart. Review requires a valid pair.
+Closed historical accounts and different current budget scopes are supported
+without changing the accounts. Income and expenses remain separate classifications.
 
-The interface plugins own presentation: Web's Transactions **Suggest transfers** panel
-shows both sides and requires **Review this pair**, then **Confirm transfer match**.
-CLI `trnx transfers`, `match-transfer --dry-run`, `match-transfer` and `unmatch-transfer`
-use the same public operations. Neither matching nor unmatching reviews a transaction:
-both become unreviewed for the normal review workflow. No bank synchronization or
-persistent future rule is created. Refunds may look identical and require judgment.
-Cross-currency, fees/splits and cross-budget-scope transfers need manual handling.
+For a few pairs, put explicit IDs in `pairs.json`:
 
-Confirmation uses an observed revision and fingerprint, one native operation, one
-reversible before/after audit entry, one durable receipt and one synchronous checkpoint.
-Exact successful retries keep operation, IDs/order, action, fingerprint, revision,
-request ID and history attribution, including after restart. Unknown outcomes must
-retain that intent; no fresh-intent automatic replay. Unsupported backends/authorities
-fail before mutation. SQLite 1.24 and JSON 1.16 implement the capability through their
-existing native transactions; remote transports delegate to the authority.
+```json
+[
+  {"outId": "fictional-out-1", "inId": "fictional-in-1"},
+  {"outId": "fictional-out-2", "inId": "fictional-in-2"}
+]
+```
 
-Optional `transferPeerId` is a reciprocal stable identity; absence preserves legacy
-records and historical digests. Match changes only this link, `isTransfer=true` and
-`reviewed=false`. Unmatch removes both links, restores each existing `inferredTransfer`
-hint and sets both unreviewed. IDs, amounts, dates, accounts, currencies, merchants
-(including whitespace), notes, category attribution, original metadata and receipts
-are retained. Unmatch before editing a paired amount/date/account/category or changing
-an account's budget scope. Ordinary notes/merchant/review edits preserve the pair.
-Provider corrections/removals that invalidate a pair remove both links and require
-fresh review; this never automatically creates another pair.
+```sh
+whab "My budget" trnx match-transfers --file pairs.json --reviewed --agent Codex --dry-run
+whab "My budget" trnx match-transfers --file pairs.json --reviewed --agent Codex
+cat pairs.json | whab "My budget" trnx match-transfers --file - --dry-run
+whab "My budget" trnx transfer-audit --format table
+```
 
-The shared contract is necessary because no previous public operation could atomically
-link two transactions with reciprocal identity, validated preview and reversible audit.
-Storage internals stay behind SDK/native operations; interfaces never inspect databases.
+Each batch supports 1–100 disjoint pairs in one commit/save. An invalid item rejects
+every pair. Omit `--reviewed` to leave both legs unreviewed. For an exact approved
+preview, retain the returned revision and fingerprint with `--revision` and
+`--fingerprint`; retain `--request-id` too when resuming the same intent. Never change
+those values to retry an uncertain save. Read command `--help` for full receipt,
+retry, stdin and explicit repair examples. `--batch` remains history grouping.
+
+The read-only audit includes zero-value imported hints and returns explicit
+pagination. These hints cannot pair and stay unreviewed until deliberately
+reclassified. `trnx repair-transfers ID... --dry-run` shows the exact proposed
+cleanup; execution clears invalid review/Transfer classification and malformed
+links only on the explicit selected records. It never invents a missing leg or
+silently includes a counterpart. No automatic production cleanup runs on upgrade.
+
+Confirmed dated movements can change **Transfer funding** when they cross a month
+or the budget boundary; same-month moves between budget cash accounts cancel.
+This does not count as ordinary income or spending. See the
+[shared transfer and recovery contract](plugins.md#reviewed-transfer-matching).
 
 ## Income versus expense categories
 
@@ -402,13 +406,16 @@ inflows before deciding; they can include refunds and unresolved transfers.
 WHAB 2.77 supports Expense, Income and Transfer child types (`kind` in public
 records, `--type` in CLI). Missing kind remains Expense. Income and Transfer have
 no expense target or assignment rows. Transfer is explicit account movement,
-excluded from ordinary income/spending without changing account balances. It may
-be classified before pairing; matching still requires equal opposite posted
-amounts, different active accounts, same currency/budget scope and dates within
-seven days. Matching remains separate and never reviews automatically.
+excluded from ordinary income/spending without changing account balances. Since
+WHAB 2.81, Transfer classification requires a complete reciprocal pair: equal
+nonzero opposite posted amounts, different same-currency accounts and dates within
+seven days. Closed historical accounts and differing current scopes are supported.
+Single matching leaves both unreviewed; atomic bulk matching can explicitly review
+both legs with --reviewed.
 
-A posted, nondeleted transaction needs a valid child of any type, or a previously
-confirmed transfer pair, before explicit review. A bank hint alone is insufficient.
+A posted, nondeleted transaction needs Expense, Income or Opening Balance
+classification, or a valid complete transfer pair, before explicit review. A bank
+hint or orphan Transfer category is insufficient.
 Assigning classification does not manufacture review. Clearing it makes unreviewed
 in the same native operation. An explicit conflicting clear+review rejects the
 whole operation. Mixed batches validate their final proposed state atomically.

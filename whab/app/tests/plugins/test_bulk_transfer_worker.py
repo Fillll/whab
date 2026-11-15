@@ -82,7 +82,116 @@ def test_hundred_pairs_one_commit_save_exact_restart_receipt_and_restored_budget
         for action in ('undo', 'redo'):
             plan = service.query('history_preview', 'personal', parameters={'action': action, 'target': history['id']})
             service.command('history_apply', 'personal', {key: plan['data'][key] for key in ('action', 'target', 'fingerprint')}, request_id='fixture-' + action, expected_revision=plan['revision'])
-        assert reopened.export_budget('personal')['transactions'] == saved['transactions']
+        assert {row['id']: row for row in reopened.export_budget('personal')['transactions']} == {row['id']: row for row in saved['transactions']}
     finally:
         reopened.close()
         restored.close()
+
+
+@pytest.mark.parametrize('kind', ['sqlite', 'json'])
+def test_https_and_remote_authority_bulk_pairing_and_conflicts(kind, tmp_path):
+    from types import SimpleNamespace
+
+    import httpx
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from whab_plugin_server.plugin import plugin
+
+    from whab.plugins.remote_transport import RemoteStore
+    from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
+    from whab.web.routes.ledger import create_router
+
+    if kind == 'sqlite':
+        from whab_plugin_sqlite import Store
+    else:
+        from whab_plugin_json import Store
+    native = Store(tmp_path / ('fictional.sqlite' if kind == 'sqlite' else 'fictional.json'))
+    native.restore_budget('personal', portable_snapshot(fixture_state(4)))
+    authority = LedgerService(native, budget_id='fictional')
+    app = FastAPI()
+    app.include_router(create_router(authority))
+    token = 'fictional-transfer-token-' + 'a' * 32
+    binding = BoundRemoteInterface(plugin.interface.adapter, SimpleNamespace(service=authority, config={'SERVER_TOKEN': token}, budget_id='fictional'))
+    app.include_router(create_remote_router(lambda: binding))
+    pairs = [{'outId': 'out-0', 'inId': 'in-0'}, {'outId': 'out-1', 'inId': 'in-1'}]
+    try:
+        with TestClient(app, base_url='https://fictional.example') as client:
+            def dispatch(request):
+                response = client.request(request.method, str(request.url), headers=dict(request.headers), content=request.content)
+                return httpx.Response(response.status_code, json=response.json())
+            remote = RemoteStore('https://fictional.example', token, 'fictional', transport=httpx.MockTransport(dispatch))
+            try:
+                assert remote.supports_transfer_integrity() and remote.supports_bulk_transfer_matching()
+                preview = remote.preview_transfer_matches('personal', pairs, True)
+                before = native.export_budget('personal')
+                assert len(remote.transfer_audit('personal', {})['issues']) == 0
+                assert native.export_budget('personal') == before
+                result = remote.apply_transfer_matches('personal', pairs, True, preview['fingerprint'])
+                assert result == preview
+                assert all(row['reviewed'] for row in native.transactions('personal') if row['id'] in {'out-0', 'in-0', 'out-1', 'in-1'})
+            finally:
+                remote.close()
+            # The local HTTPS adapter accepts the same exact atomic envelope.
+            pairs = [{'outId': 'out-2', 'inId': 'in-2'}, {'outId': 'out-3', 'inId': 'in-3'}]
+            body = {'workspace': 'personal', 'operation': 'preview_transfer_matches', 'parameters': {'pairs': pairs}}
+            preview = client.post('/api/transfers/query', json=body).json()
+            apply = {'workspace': 'personal', 'operation': 'match_transfers', 'parameters': {'pairs': pairs, 'fingerprint': preview['data']['fingerprint']}, 'revision': preview['revision'], 'requestId': 'local-bulk', 'history': {'actor': 'Codex', 'actorKind': 'agent'}}
+            first = client.post('/api/transfers/bulk', json=apply)
+            assert first.status_code == 200
+            assert client.post('/api/transfers/bulk', json=apply).json() == first.json()
+            stale = client.post('/api/transfers/bulk', json={**apply, 'requestId': 'stale-bulk'})
+            assert stale.status_code == 409 and stale.json()['code'] == 'transfer_revision_conflict'
+            conflict = client.post('/api/transfers/bulk', json={**apply, 'parameters': {**apply['parameters'], 'reviewed': True}})
+            assert conflict.status_code == 409 and conflict.json()['code'] == 'transfer_request_conflict'
+    finally:
+        native.close()
+
+
+@pytest.mark.parametrize('kind', ['sqlite', 'json'])
+def test_portable_session_pair_and_repair_each_checkpoint_once(kind, tmp_path, monkeypatch):
+    from whab_plugin_json import Store as JSONStore
+    from whab_plugin_sqlite import Store as SQLiteStore
+
+    from whab.budgets.container import decode_container
+    from whab.budgets.session import BudgetSession, TrackedStorage
+
+    factory = SQLiteStore if kind == 'sqlite' else JSONStore
+    session = BudgetSession.create(tmp_path / 'runtime', 'sandbox', 'Fictional transfers', storage=kind, path=tmp_path / 'fictional.whab')
+    native = factory(session.storage_home / ('ledger.sqlite' if kind == 'sqlite' else 'ledger.json'))
+    state = fixture_state(2)
+    state['transactions']['legacy-zero'] = {**state['transactions']['out-0'], 'id': 'legacy-zero', 'amount': 0, 'isTransfer': True, 'inferredTransfer': True, 'reviewed': True}
+    native.restore_budget('personal', portable_snapshot(state))
+    session.bind(native)
+    tracked = TrackedStorage(native, session)
+    ledger = LedgerService(tracked, budget_id=session.id)
+    checkpoints = []
+    original = session.checkpoint
+    def checkpoint():
+        original()
+        checkpoints.append(session.path.read_bytes())
+    monkeypatch.setattr(session, 'checkpoint', checkpoint)
+    try:
+        pairs = [{'outId': 'out-0', 'inId': 'in-0'}, {'outId': 'out-1', 'inId': 'in-1'}]
+        preview = ledger.query('preview_transfer_matches', 'personal', parameters={'pairs': pairs})
+        payload = {'pairs': pairs, 'fingerprint': preview['data']['fingerprint']}
+        args = {'request_id': 'portable-match', 'expected_revision': preview['revision']}
+        result = ledger.command('match_transfers', 'personal', payload, **args)
+        assert len(checkpoints) == 1
+        assert ledger.command('match_transfers', 'personal', payload, **args) == result
+        assert len(checkpoints) == 1
+        repair = ledger.query('preview_transfer_repair', 'personal', parameters={'transactionIds': ['legacy-zero']})
+        ledger.command('repair_transfers', 'personal', {'transactionIds': ['legacy-zero'], 'fingerprint': repair['data']['fingerprint']}, request_id='portable-repair', expected_revision=repair['revision'])
+        assert len(checkpoints) == 2 and checkpoints[0] != checkpoints[1]
+        container = decode_container(checkpoints[-1])
+        files = {name.removeprefix('plugins/'+kind+'/'): data for name, data in container.files.items() if name.startswith('plugins/'+kind+'/')}
+        restored = factory(tmp_path / ('empty.sqlite' if kind == 'sqlite' else 'empty.json'))
+        try:
+            restored.restore_budget_files('personal', files)
+            rows = {row['id']: row for row in restored.export_budget('personal')['transactions']}
+            assert rows['out-0']['transferPeerId'] == 'in-0' and rows['out-1']['transferPeerId'] == 'in-1'
+            assert not rows['legacy-zero']['reviewed'] and rows['legacy-zero']['inferredTransfer']
+            assert rows['legacy-zero']['amount'] == 0
+        finally:
+            restored.close()
+    finally:
+        native.close()

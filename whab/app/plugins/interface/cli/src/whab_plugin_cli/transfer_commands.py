@@ -8,7 +8,9 @@ lazy import httpx
 from whab.plugins import validate_category_agent
 
 from .account_commands import resolve_account
+from .bulk_transfers import BULK_TRANSFER_HELP
 from .transaction_commands import checked
+from .transfer_integrity import TRANSFER_AUDIT_HELP
 
 TRANSFER_HELP = '''Transfer proposals are suggestions, never automatic matches or reviews.
   whab "My budget" trnx transfers --since 2026-11-01 --until 2026-11-30 --format table
@@ -16,14 +18,20 @@ TRANSFER_HELP = '''Transfer proposals are suggestions, never automatic matches o
   whab "My budget" trnx match-transfer OUT_ID IN_ID --agent Codex
   whab "My budget" trnx unmatch-transfer OUT_ID IN_ID --dry-run
 
-Eligibility: two existing posted, nondeleted, uncategorized transactions in
-different active accounts, equal nonzero opposite amounts, same currency AND
-on/off-budget scope, within seven calendar days. A date/account filter selects an
+Eligibility: two existing posted, nondeleted transactions with no category or a
+Transfer category, in different accounts, equal nonzero opposite amounts, same
+currency, within seven calendar days. Historical closed accounts and differing
+current on/off-budget scopes are supported without reopening/reclassifying them.
+A date/account filter selects an
 anchor; the other leg may lie outside that selection by up to seven days. Names
 and bank hints are evidence, not proof. Refunds can look like transfers: inspect
 both merchants/accounts/dates/amounts. All ambiguous alternatives stay explicit.
-Cross-currency, fees/splits and movements between budget scopes need manual
-handling and are not paired. No bank sync or standing future rule is created.
+Cross-currency and unequal fee/split movements cannot be paired. Signed eligible
+budget movement uses explicit dated transferFunding, not income or spending.
+Same-month cash pairs net to zero; cross-month legs affect their posting months.
+Stale/unavailable cash cannot create funding. Credit debt uses its
+actual change without inventing cash for overpayment. No bank sync or standing
+future rule is created. Zero-value imported hints cannot establish directed legs.
 
 List is read-only. JSON includes complete stable IDs, both public transactions,
 account names, evidence, ambiguity, exact total and next offset. Default limit
@@ -38,11 +46,13 @@ these flags the CLI reads the current exact plan and generates revision/request
 machinery internally. Execution is noninteractive, one atomic native commit,
 durable checkpoint and reversible audit entry. --agent labels the audit actor;
 --batch only groups history. Neither command sets reviewed=true: both records
-remain unreviewed for ordinary transaction review. Notes, category attribution,
-amounts, merchants (including whitespace), dates, accounts and identities stay
-unchanged. Match sets reciprocal transferPeerId and isTransfer=true. Unmatch
-removes links and restores isTransfer from the existing provider hint. Unmatch
-before changing paired amounts/dates/accounts/categories or account budget scope.
+remain unreviewed for ordinary transaction review. Notes, amounts, merchants
+(including whitespace), dates, accounts and identities stay unchanged. Match
+preserves category attribution and sets reciprocal transferPeerId/isTransfer=true.
+Unmatch removes links, clears any now-orphan Transfer category and its attribution,
+and restores isTransfer from the existing provider hint. Unmatch
+before changing paired amounts/dates/accounts/categories. Current budget scope or
+closed status does not destroy a valid historical pair.
 Provider corrections/removals that invalidate a pair remove both links and leave
 both unreviewed; provider hints remain distinct from a confirmed match.
 
@@ -53,10 +63,14 @@ retain BOTH original IDs, action, --revision, --fingerprint and --request-id.
 Exact successful retries return the original durable result after restart. Never
 retry an uncertain write with fresh intent; conflicting request reuse is refused.
 Unsupported backends/authorities fail before mutation. Help works offline.
-'''
+''' + '\n\n' + BULK_TRANSFER_HELP + '\n\n' + TRANSFER_AUDIT_HELP
 
 
 def add_transfer_parsers(commands):
+    from .bulk_transfers import add_bulk_transfer_parser
+    from .transfer_integrity import add_integrity_parsers
+    add_bulk_transfer_parser(commands)
+    add_integrity_parsers(commands)
     read = commands.add_parser('transfers', help='Propose possible transfer pairs for explicit review (read-only)',
         epilog=TRANSFER_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     for name in ('since', 'until'):
@@ -80,6 +94,12 @@ def add_transfer_parsers(commands):
 
 
 def execute_transfer(connection, identifier, prefix, args, exchange, error):
+    if args.filter in {'transfer-audit', 'repair-transfers'}:
+        from .transfer_integrity import execute_integrity
+        return execute_integrity(connection, identifier, prefix, args, exchange, error)
+    if args.filter == 'match-transfers':
+        from .bulk_transfers import execute_bulk_transfers
+        return execute_bulk_transfers(connection, identifier, prefix, args, exchange, error)
     def query(operation, parameters):
         return checked(exchange(connection, 'POST', prefix + '/queries', ledger_errors=True, json={
             'operation': operation, 'workspace': 'personal', 'parameters': parameters,
@@ -121,6 +141,12 @@ def execute_transfer(connection, identifier, prefix, args, exchange, error):
 
 
 def transfer_table(result):
+    if result.get('readOnly') or result['data'].get('action') == 'repair':
+        from .transfer_integrity import integrity_table
+        return integrity_table(result)
+    if 'pairs' in result:
+        from .bulk_transfers import bulk_transfer_table
+        return bulk_transfer_table(result)
     data = result['data']
     if 'candidates' not in data:
         rows = [f"{data['action']}: {result.get('budget', result.get('budgetId'))} · both need review"]

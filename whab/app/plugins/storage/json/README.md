@@ -512,3 +512,50 @@ Provider removal/pending replacement continues the existing import contract, so
 inspect subsequent imported changes before another correction. No bank sync runs
 as part of an edit, creation, preview, retry or audit reversal. Existing annotation
 `edit_transactions` batches and their output shape remain compatible.
+
+
+## Atomic transfer pairs and integrity
+
+The optional public `TransferIntegrity` capability adds read-only
+`preview_transfer_matches(workspace, pairs, reviewed=False)` and native
+`apply_transfer_matches(workspace, pairs, reviewed=False, fingerprint=None)`.
+A batch contains 1–100 explicit `{"outId": "fictional-out",
+"inId": "fictional-in"}` pairs: every transaction ID is distinct,
+outflows are positive integer minor units, inflows negative, and paired amounts
+are equal and opposite. Both records must be posted, nondeleted, in different
+accounts of the same currency and at most seven calendar days apart. Existing
+links, any incoming third leg, invalid categories or one invalid pair reject the
+whole batch before the first write. No counterpart is guessed and no oversized
+batch is split.
+
+Every accepted batch uses one native transaction, revision advancement, coherent
+audit entry, durable receipt and synchronous save. Complete before/after records
+retain identities, merchant whitespace, notes, original fields, financial amounts,
+account balances and category attribution. Guarded native request replay returns
+the original receipt after reopening without another save. Explicit `reviewed=True`
+reviews both legs of every validated pair in that same commit; otherwise matching
+leaves them unreviewed. Actor and batch labels describe the single audit entry.
+
+Historical pairs can involve an account that is now closed or accounts with
+different current budget scopes. Pairing does not reopen/reclassify accounts or
+change balances. Core separately accounts for the on-budget leg's signed funding
+flow across a scope boundary; internal paired activity is excluded from income
+and spending. Ordinary Transfer classification and review require a valid
+reciprocal exactly-two-leg pair. Imported flags remain evidence only.
+
+`transfer_audit(workspace, parameters)` is read only, with inclusive `since`/`until`
+and explicit `offset`/`limit` pagination. It reports invalid, missing or shared
+links, orphan Transfer categories and zero-value imported hints. Zero-value hints
+have no directed opposite pair and must stay unreviewed. Nothing is repaired on
+read or open. `preview_transfer_repair(workspace, transaction_ids)` and guarded
+`repair_transfers(workspace, transaction_ids, fingerprint)` repair 1–200 explicit
+invalid rows by clearing invalid links/Transfer classification and leaving them
+unreviewed, preserving original hints and every financial field. Every connected
+invalid counterpart must be selected. History reversal remains guarded and cannot
+reintroduce an invalid reviewed/Transfer classification. No repair invents or
+deletes transactions, reclassifies an account, or triggers bank synchronization.
+
+Native format 5 fences older readers once paired transfers are retained in current
+state or audit history. The floor never decreases after undo/unmatching and is
+retained by saved-file and complete local restoration. Existing older native
+ledgers remain readable for explicit audit; opening them does not repair records.

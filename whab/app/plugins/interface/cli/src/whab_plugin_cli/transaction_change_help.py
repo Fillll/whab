@@ -3,7 +3,7 @@
 CHANGE_HELP = '''General transaction changes (fictional examples):
   whab "My budget" trnx edit TX1 --amount -80000 --agent Codex --dry-run
   whab "My budget" trnx edit TX1 --payee "Fictional employer" --date 2025-04-12 --note "Exact replacement memo" --agent Codex
-  whab "My budget" trnx create --account "Fictional checking" --date 2025-04-12 --amount -20000 --currency USD --payee "Fictional lender" --category "Finance / Transfers" --agent Codex --dry-run
+  whab "My budget" trnx create --account "Fictional checking" --date 2025-04-12 --amount -20000 --currency USD --payee "Fictional lender" --agent Codex --dry-run
   whab "My budget" trnx edit-many --file split.json --agent Codex --dry-run
   cat split.json | whab "My budget" trnx edit-many --file - --agent Codex --revision PREVIEW_REVISION --request-id PREVIEW_REQUEST_ID
 
@@ -19,7 +19,7 @@ account, split into USD 800 and USD 200; substitute observed IDs/names):
  "edits": [{"transactionId": "TX1", "amount": -80000}],
  "creates": [{"account": "Fictional checking", "date": "2025-04-12",
               "merchant": "Fictional lender", "amount": -20000, "currency": "USD",
-              "category": "Finance / Transfers", "note": "Preserved fictional provenance"}]}
+              "note": "Preserved fictional provenance"}]}
 
 This edits the existing record and creates an ordinary manual transaction in ONE
 native commit, revision advancement, durable save and reversible audit entry.
@@ -39,6 +39,8 @@ account balance snapshots stay byte-for-byte unchanged. A nonconserving plan is
 refused; the preview includes balanceChanges even when before and after are equal.
 Future provider refreshes retain corrected fields and original source evidence;
 manual creations are separate records, not duplicate bank imports or transfer peers.
+A new ordinary record cannot have Transfer classification without a valid pair.
+Leave it unclassified, inspect both real legs, then explicitly match their IDs.
 
 create requires account, date, amount, currency and payee; category and note are
 optional. --payee and --merchant are aliases; --note and --memo are aliases.

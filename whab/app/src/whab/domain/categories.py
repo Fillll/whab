@@ -271,6 +271,14 @@ def classify_category(state, category_id, kind):
                          'Nothing changed. Use a new Income, Transfer or Opening Balance category to preserve the existing envelope and assignments.')
     if kind != 'transfer' and any(row.get('categoryId') == category_id and row.get('transferPeerId') for row in state['transactions'].values()):
         raise StoreError('Unmatch the linked transfers before changing their category type.')
+    if kind == 'transfer':
+        from .transfer_matching import incoming_links, valid_pair
+        proposed = {**state['categories'], category_id: {**child, 'kind': kind}}
+        incoming = incoming_links(state['transactions'])
+        if any(row.get('categoryId') == category_id and not row.get('deleted')
+               and not valid_pair(row, state['transactions'], state['accounts'], proposed, incoming=incoming)
+               for row in state['transactions'].values()):
+            raise StoreError('A Transfer category requires exactly two valid reciprocal legs for every transaction. Match or repair its historical records first.')
     if kind != 'expense':
         state['categories'][category_id]['kind'] = kind
     else:
