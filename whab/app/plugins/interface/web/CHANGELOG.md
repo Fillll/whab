@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.61.0 — 2026-11-15
+
+PR: [#207](https://github.com/Fillll/whab/pull/207)
+
+- Add a top-right eye that hides monetary fields, tooltips and accessibility values throughout Web with fixed placeholders, preserving exact drafts and browser-local state across navigation and tabs.
+- Cover budgets, accounts, transactions, subscriptions, transfers and opaque chart/receipt/history details; prevent hidden amount editors from autosaving or accepting blind keyboard edits.
+
 ## 1.60.0 — 2026-11-15
 
 PR: [#206](https://github.com/Fillll/whab/pull/206)
