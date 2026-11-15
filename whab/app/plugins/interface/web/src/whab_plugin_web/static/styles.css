@@ -1232,6 +1232,29 @@ strong {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.transaction-account-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.transaction-account-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+.transaction-account-mark[hidden] { display: none; }
+.transaction-account-value > select,
+.transaction-account-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .transactions-table .transaction-receipt-cell {
   width: 36px;
   padding: 2px 3px;
@@ -4797,3 +4820,38 @@ html[data-sidebar='collapsed'] .app-shell > main { margin-left: 62px; }
   .settings-window .plugin-category-filter select { flex: 1; max-width: 220px; }
   .settings-window .plugin-selection-actions { bottom: -24px; }
 }
+
+/* Sidebar ordering is an optional browser-only layout mode. */
+.sidebar-account-heading-actions { display: inline-flex; align-items: center; gap: 6px; }
+.sidebar-accounts .nav-label [data-account-reorder] { width: 25px; height: 25px; border-radius: 4px; font-size: 19px; line-height: 1; }
+.sidebar-accounts .nav-label [data-account-reorder]:hover,
+.sidebar-accounts .nav-label [data-account-reorder][aria-expanded='true'] { background: var(--surface); color: var(--ink); }
+.sidebar-account-order-tools { padding: 0 9px 10px; }
+.sidebar-account-order-tools p,
+.sidebar-account-order-status { color: var(--muted); font-size: 10px; line-height: 1.5; margin: 0 0 8px; }
+.sidebar-account-order-tools > div { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.sidebar-account-order-tools .text-link { font-size: 10px; }
+.sidebar-account-order-tools .button { min-height: 28px; padding: 4px 10px; font-size: 10px; }
+.sidebar-account-order-status { padding: 0 9px; }
+.sidebar-account-order-status:empty { display: none; }
+.sidebar-account-row { position: relative; }
+.sidebar-account-drag { flex: 0 0 12px; color: var(--muted); font-size: 17px; text-align: center; cursor: grab; }
+.sidebar-account-moves { display: flex; flex: 0 0 auto; gap: 1px; }
+.sidebar-account-moves button { display: inline-flex; justify-content: center; align-items: center; width: 24px; height: 30px; border-radius: 4px; color: var(--text-secondary); }
+.sidebar-account-moves button:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
+.sidebar-account-moves button:disabled { opacity: .25; cursor: default; }
+.sidebar-account-moves [data-account-move='up'] svg { transform: rotate(180deg); }
+.sidebar-account-moves button:focus-visible,
+.sidebar-accounts .nav-label [data-account-reorder]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+[data-reordering='true'] .sidebar-account-row { display: flex; align-items: center; border-radius: 4px; cursor: grab; }
+[data-reordering='true'] .sidebar-account-row:hover { background: var(--surface-subtle, var(--surface)); }
+[data-reordering='true'] .sidebar-account { min-width: 0; flex: 1; padding: 9px 4px; cursor: grab; }
+[data-reordering='true'] .sidebar-account > span { flex-basis: 0; }
+html [data-reordering='true'] .sidebar-account small,
+html[data-sidebar='expanded'] [data-reordering='true'] .sidebar-account small { display: none; }
+[data-reordering='true'] .sidebar-account-row.is-dragging { opacity: .45; }
+.sidebar-account-row[data-drop-position='before']::before,
+.sidebar-account-row[data-drop-position='after']::after { position: absolute; content: ''; left: 0; right: 0; height: 2px; background: var(--brand-red); }
+.sidebar-account-row[data-drop-position='before']::before { top: 0; }
+.sidebar-account-row[data-drop-position='after']::after { bottom: 0; }
+.sidebar-account-order-tools[hidden], .sidebar-account-drag[hidden], .sidebar-account-moves[hidden], [data-account-reorder][hidden] { display: none; }

@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.60.0 — 2026-11-15
+
+PR: [#206](https://github.com/Fillll/whab/pull/206)
+
+- Show optional bank logos beside account names in transaction rows, retaining lazy loading and usable fallbacks when artwork is unavailable.
+- Add browser-saved sidebar account ordering with drag/drop, keyboard-accessible move controls and reset. Keep budget/workspace preferences and On-budget/Off-budget groups separate without changing financial data.
+
 ## 1.59.0 — 2026-11-14
 
 PR: [#205](https://github.com/Fillll/whab/pull/205)

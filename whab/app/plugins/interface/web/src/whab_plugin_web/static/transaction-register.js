@@ -9,6 +9,22 @@ import {bindLogos} from './logo-images.js';
 import {initTransferMatches} from './transfer-matches.js';
 import {createCategoryBatch} from './transaction-category-batch.js';
 
+// Reuse the account picker's local branding, including fallbacks, after an edit.
+export function updateTransactionAccountMark(root, row, accountId) {
+  const current = row.querySelector('[data-transaction-account-mark]');
+  if (!current) return;
+  const option = [...root.querySelectorAll('[data-account-option]')].find(value => value.dataset.value === accountId);
+  const source = option?.querySelector('.sidebar-bank-mark');
+  if (!source) {current.hidden = true; return;}
+  const mark = source.cloneNode(true);
+  mark.classList.remove('account-picker-mark');
+  mark.classList.add('transaction-account-mark');
+  mark.setAttribute('data-transaction-account-mark', '');
+  current.replaceWith(mark);
+  row.querySelector('.account-cell').title = option.querySelector('[data-account-picker-label]').textContent;
+  bindLogos(row);
+}
+
 export function createTransactionWriter(save, {saved = () => {}, state = () => {}, settled = () => {}} = {}) {
   let pending = {};
   let running = null;
@@ -488,6 +504,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         const field = control.dataset.transactionDetail;
         control.value = field === 'amount' ? (-committed[field] / 10 ** Number(control.dataset.minorUnits)).toFixed(Number(control.dataset.minorUnits)) : committed[field];
         control.setCustomValidity('');
+        if (field === 'accountId') updateTransactionAccountMark(root, row, control.value);
       }
       reviewed.setAttribute('aria-pressed', String(committed.reviewed));
       reviewed.title = committed.reviewed ? 'Reviewed' : 'Not reviewed';
@@ -543,7 +560,10 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     };
     for (const control of detailFields) {
       listen(control, 'input', () => {editStarted(); row.classList.remove('is-saved');});
-      listen(control, 'change', () => {editStarted(); void saveMemo();});
+      listen(control, 'change', () => {
+        if (control.dataset.transactionDetail === 'accountId') updateTransactionAccountMark(root, row, control.value);
+        editStarted(); void saveMemo();
+      });
     }
     const checkbox = row.querySelector('[data-select-transaction]');
     listen(checkbox, 'click', event => {
