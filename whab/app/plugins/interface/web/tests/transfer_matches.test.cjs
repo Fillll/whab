@@ -50,3 +50,15 @@ test('row unmatch action previews only and close dismisses without mutations',as
 test('a revision error after unknown outcome retains original intent and navigation guard',async()=>{
   const h=harness();await h.find();await h.list().children[0].children.at(-1).onclick();const button=h.list().children.at(-1);h.state.fail='lost';await button.onclick();const original=h.calls.at(-1).body;h.state.fail='transfer_revision_conflict';await button.onclick();assert.deepEqual(h.calls.at(-1).body,original);assert.equal(h.control.dirty,true);assert.equal(await h.control.flush(),false);
 });
+
+
+test('transfer proposals mark only the amount and preserve account/date/merchant text', async () => {
+  const h = harness(); await h.find();
+  const leg = h.list().children[0].children[1];
+  assert.equal(leg.children[0].textContent, '旅行 🍏 · ');
+  assert.equal(leg.children[0].children[0].dataset.privateAmount, '');
+  assert.match(leg.children[0].children[0].textContent, /1\.00/);
+  assert.match(leg.children[1].textContent, /2026-11-01 · <script> refund/);
+  assert.deepEqual(leg.children[1].dataset, {});
+  assert.equal(h.calls.filter(call => call.url.endsWith('/apply')).length, 0);
+});

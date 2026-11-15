@@ -54,7 +54,7 @@ def test_opening_category_picker_zero_review_and_signed_funding(client, store, c
     following = disclosure(overview_cells(budget, 'Opening funding')[1][1], 'Opening funding', '2026-11')
     assert terms(following) == [('Opening funding', '0.00')]
     insights = client.get('/budgets/home/insights/2026-10/usd').text
-    assert f'Opening funding {format_money(balance, "USD")} · separate from income' in insights
+    assert f'Opening funding <span data-private-amount>{format_money(balance, "USD")}</span> · separate from income' in insights
     assert '<span class="summary-label">TRANSACTIONS</span><strong>0</strong>' in insights
     assert 'Existing cash correction' not in insights
 

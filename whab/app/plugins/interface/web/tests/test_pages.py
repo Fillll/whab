@@ -107,9 +107,9 @@ def test_pages_keep_currency_totals_and_categories_separate(client):
 
     for currency, money, sidebar_amount, amount_input in (("USD", "$734.56", "$735", "0.00"), ("JPY", "JPY 1,745", "JPY 1,745", "0"), ("KWD", "KWD 3.567", "KWD 4", "0.000")):
         text = client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text
-        assert f'>{sidebar_amount}</small>' in text
+        assert f'<span data-private-amount>{sidebar_amount}</span></small>' in text
         account_details = client.get(f"/budgets/home/accounts/2026-10/{currency.lower()}").text
-        assert f'<strong>{money}</strong>' in account_details
+        assert f'<strong><span data-private-amount>{money}</span></strong>' in account_details
         assert f'{currency} food' in text and f'{currency} wallet' in text
         assert f'value="{amount_input}"' in text
         assert f'/2026-10/{currency.lower()}' in text
@@ -132,7 +132,7 @@ def test_empty_selected_currency_remains_selected_when_switching_workspaces(clie
         r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', text, re.S,
     )[1]
     assert [
-        re.sub(r'<details\b[^>]*>.*?</details>', "", value, flags=re.S).strip()
+        re.sub(r'<[^>]*>', '', re.sub(r'<details\b[^>]*>.*?</details>', "", value, flags=re.S)).strip()
         for value in re.findall(r'<td[^>]*>(.*?)</td>', ready, re.S)
     ] == ["0.00"] * 3
     assert '/2026-10/eur' in text
@@ -158,9 +158,9 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
     assert 'aria-label="On-budget accounts"' in text
     assert 'aria-label="Off-budget accounts"' in text
     assert 'aria-label="Account totals in USD"' in text
-    assert '<dt>Assets · USD</dt><dd>$8,500.00</dd>' in text
-    assert '<dt>Liabilities · USD</dt><dd>$1,000.00</dd>' in text
-    assert '<dt>Net worth · USD</dt><dd>$7,500.00</dd>' in text
+    assert '<dt>Assets · USD</dt><dd><span data-private-amount>$8,500.00</span></dd>' in text
+    assert '<dt>Liabilities · USD</dt><dd><span data-private-amount>$1,000.00</span></dd>' in text
+    assert '<dt>Net worth · USD</dt><dd><span data-private-amount>$7,500.00</span></dd>' in text
     assert '401(k)' in text and 'Brokerage' in text and 'Mortgage' in text
     assert 'Certificate of deposit (CD)' in text
     assert 'name="onBudget" data-boolean-value' in text
@@ -175,7 +175,7 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
     text = client.get("/budgets/home/accounts/2026-10/usd").text
     row = text.split('data-inline-account="' + accounts["Everyday cash"] + '"', 1)[1].split('</form>', 1)[0]
     assert 'value="false" selected>Off-budget' in row and 'value="savings" data-account-type="depository" selected>Savings' in row
-    assert '<dt>Net worth · USD</dt><dd>$7,500.00</dd>' in text
+    assert '<dt>Net worth · USD</dt><dd><span data-private-amount>$7,500.00</span></dd>' in text
 
 
 def test_off_budget_transactions_remain_visible_and_marked_excluded(client):

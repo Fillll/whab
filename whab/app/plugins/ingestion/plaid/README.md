@@ -257,3 +257,11 @@ pages. Configuration validates and saves the user's explicit account mappings an
 start dates. Preview obtains local latest dates through the storage aggregate
 when available. Explicit synchronization retains its existing cursor and atomic
 import behavior.
+
+### Amount privacy in Web
+
+With Web 1.61+, the top-right eye also masks investment totals, position values,
+cost basis, unrealized money returns, unit prices and activity amounts/fees. Plaid
+1.9.1 emits display-only `data-private-amount` spans; account names, dates and
+nonfinancial controls remain available. No provider request, financial value or
+saved report changes when the eye is toggled. Other interfaces ignore the markers.

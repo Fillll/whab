@@ -43,7 +43,7 @@ def carried_in_row(text):
 
 
 def total(markup):
-    return re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", markup, flags=re.S).strip()
+    return re.sub(r'<[^>]*>', '', re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", markup, flags=re.S)).strip()
 
 
 @pytest.mark.parametrize("mode", ["category", "balance"])
@@ -207,17 +207,17 @@ def test_actual_monthly_flow_breakdown_keeps_category_money_out_and_receives_exp
     category = client.get("/budgets/home/budget/2026-11/usd").text
     category_cell = re.findall(r'<td[^>]*>(.*?)</td>', carried_in_row(category), re.S)[0]
     assert total(category_cell) == "800.00"
-    assert "Previously unassigned money</dt><dd>676.55</dd>" in category_cell
-    assert "Set aside for this month</dt><dd>123.45</dd>" in category_cell
+    assert "Previously unassigned money</dt><dd><span data-private-amount>676.55</span></dd>" in category_cell
+    assert "Set aside for this month</dt><dd><span data-private-amount>123.45</span></dd>" in category_cell
     assert "Overall category balance" not in category_cell
     assert "<input" not in category_cell
     store.set_rollover_mode("personal", "2026-10", "USD", "balance")
     balance = client.get("/budgets/home/budget/2026-11/usd").text
     balance_cell = re.findall(r'<td[^>]*>(.*?)</td>', carried_in_row(balance), re.S)[0]
     assert total(balance_cell) == "950.00"
-    assert "Previously unassigned money</dt><dd>676.55</dd>" in balance_cell
-    assert "Set aside for this month</dt><dd>123.45</dd>" in balance_cell
-    assert "Overall category balance</dt><dd>150.00</dd>" in balance_cell
+    assert "Previously unassigned money</dt><dd><span data-private-amount>676.55</span></dd>" in balance_cell
+    assert "Set aside for this month</dt><dd><span data-private-amount>123.45</span></dd>" in balance_cell
+    assert "Overall category balance</dt><dd><span data-private-amount>150.00</span></dd>" in balance_cell
     assert "<input" not in balance_cell
 
 

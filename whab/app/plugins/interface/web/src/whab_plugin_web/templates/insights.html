@@ -12,14 +12,14 @@
 
 <div class="insights-summary">
   <div>
-    <span class="summary-label">SPENT IN {{ month_label(month,true)|upper }}</span><strong>{{ money(data.summary.spent) }}</strong><span class="comparison">
+    <span class="summary-label">SPENT IN {{ month_label(month,true)|upper }}</span><strong><span data-private-amount>{{ money(data.summary.spent) }}</span></strong><span class="comparison">
       {% if change is not none %}{{ icon('insights', 14) }}{{ '%.1f'|format(change|abs) }}% {{ 'more' if change>0 else 'less' }} than last month
       {% else %}No prior month to compare yet
       {% endif %}
     </span>
   </div>
   <div class="insight-income">
-    <span class="summary-label">INCOME</span><strong>{{ money(data.summary.income) }}</strong><span class="summary-foot">Explicit Income {{ money(data.summary.classifiedIncome|default(0)) }} · legacy unclassified {{ money(data.summary.unclassifiedIncome|default(data.summary.income)) }}</span><span class="summary-foot">Opening funding {{ money(data.summary.openingFunding) if valid_money(data.summary.openingFunding) else '—' }} · separate from income</span>
+    <span class="summary-label">INCOME</span><strong><span data-private-amount>{{ money(data.summary.income) }}</span></strong><span class="summary-foot">Explicit Income <span data-private-amount>{{ money(data.summary.classifiedIncome|default(0)) }}</span> · legacy unclassified <span data-private-amount>{{ money(data.summary.unclassifiedIncome|default(data.summary.income)) }}</span></span><span class="summary-foot">Opening funding {% if valid_money(data.summary.openingFunding) %}<span data-private-amount>{{ money(data.summary.openingFunding) }}</span>{% else %}—{% endif %} · separate from income</span>
   </div>
   <div class="insight-income">
     <span class="summary-label">TRANSACTIONS</span><strong>{{ purchases }}</strong><span class="summary-foot">Posted purchases</span>
@@ -30,7 +30,7 @@
     <h2>Spending over time</h2>
     <span class="chart-legend"><span></span>Monthly spending · {{ currency }}</span>
   </div>
-  <svg class="spend-chart"
+  <div data-private-content="Chart hidden"><svg class="spend-chart"
        viewBox="0 0 880 230"
        role="img"
        aria-label="Monthly spending over six months">
@@ -43,7 +43,7 @@
       {% for point in points %}<circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" fill="var(--page)" stroke="var(--chart-line)" stroke-width="2"><title>{{ month_label(point.month) }}: {{ money(point.spent) }}</title></circle><text x="{{ point.x }}" y="219" text-anchor="middle">{{ month_label(point.month,true) }}</text>
       {% endfor %}
     {% endif %}
-  </svg>
+  </svg></div>
 </section>
 <div class="insights-columns">
   <section>
@@ -54,7 +54,7 @@
     {% for row in spending %}
       <div class="spending-row">
         <div>
-          <span>{{ category_names[row.category.id] }}</span><strong>{{ money(row.spent) }}</strong>
+          <span>{{ category_names[row.category.id] }}</span><strong><span data-private-amount>{{ money(row.spent) }}</span></strong>
         </div>
         <div class="spend-bar">
           <span style="width:{{ [100,row.spent/data.summary.spent*100 if data.summary.spent>0 else 0]|min }}%"></span>
@@ -65,7 +65,7 @@
     {% if uncategorized %}
       <div class="spending-row">
         <div>
-          <span>Uncategorized</span><strong>{{ money(uncategorized) }}</strong>
+          <span>Uncategorized</span><strong><span data-private-amount>{{ money(uncategorized) }}</span></strong>
         </div>
       </div>
     {% endif %}
@@ -77,7 +77,7 @@
     </div>
     {% for name,amount in payees %}
       <div class="payee-row">
-        <span class="payee-index">{{ '%02d'|format(loop.index) }}</span><strong>{{ name }}</strong><span>{{ money(amount) }}</span>
+        <span class="payee-index">{{ '%02d'|format(loop.index) }}</span><strong>{{ name }}</strong><span><span data-private-amount>{{ money(amount) }}</span></span>
       </div>
     {% else %}<p class="empty-inline">Your top payees will appear after importing transactions.</p>
     {% endfor %}
@@ -97,7 +97,7 @@
         {% if result.error %}<p class="empty-inline" role="status">{{ result.error }}</p>{% endif %}
         <dl class="plugin-metrics">
           {% for insight in result.insights %}
-            <div><dt>{{ insight.title }}</dt><dd>{{ insight.value }}</dd>{% if insight.detail %}<p>{{ insight.detail }}</p>{% endif %}</div>
+            <div><dt>{{ insight.title }}</dt><dd><span data-private-content>{{ insight.value }}</span></dd>{% if insight.detail %}<p><span data-private-content>{{ insight.detail }}</span></p>{% endif %}</div>
           {% endfor %}
         </dl>
       </section>

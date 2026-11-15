@@ -27,6 +27,53 @@ Settings opens Plugins in one centered preferences window with one backdrop and 
 
 Sections stay mounted so Back preserves the parent’s selections and drafts. Entering or leaving a section starts or stops its existing plugin status/training lifecycle; hidden sections must not block navigation or keep training sessions alive. Opening plugin settings from an account temporarily closes the account dialog and restores it when Settings closes, preserving the account draft. A visual-interface handover closes Settings without restoring another modal so the browser can acknowledge readiness. Existing busy budget operations still block dismissal and section changes. Follow the project’s [clarity and simplicity rules](../../../CONTRIBUTING.md#clarity-and-simplicity).
 
+## Hide amounts
+
+The eye in the top-right toolbar switches **Hide amounts** / **Show amounts**.
+When closed, fixed `XX` placeholders replace monetary values throughout Web:
+sidebar balances, Accounts totals, transaction amounts, budget assignments and
+targets, Insights, transfer proposals, subscription reports and Plaid investment
+values (Plaid 1.9.1+). Values in tooltips and accessibility labels are hidden too.
+Charts, receipts and raw history previews are concealed as complete regions when
+they can contain amounts. Dates, names, counts and nonfinancial controls stay usable.
+
+This is a display preference, stored as `shown` or `hidden` under `whab.amounts`
+in this browser origin. It applies across budgets and workspaces, survives reload
+and navigation, and follows changes from other tabs. New browsers show amounts by
+default. With browser storage blocked, the toggle works for the current page.
+Saved hidden mode is applied before the page is painted; dynamically loaded rows,
+reports, dialogs and saved fragments adopt it automatically.
+
+Hidden monetary editors show a **Show amounts to edit** button. Revealing restores
+the exact original editor value and focus, including an unfinished draft. Toggling
+never substitutes `XX` into data, dispatches a save or changes review status, bank
+synchronization or audit history. Existing pending saves retain their normal guards.
+
+This masks displayed financial fields; it is not data redaction. Values remain in
+the browser and downloads, CLI/API output and saved budgets are unchanged. It does
+not scrub arbitrary amounts typed into names or memos. Reveal amounts before
+editing a financial value or inspecting a concealed chart, receipt or history detail.
+
+### Financial content from plugins
+
+No new core/SDK operation is needed: masking belongs to the Web presentation layer.
+Plugin-owned HTML can opt in without importing Web internals:
+
+- Put `data-private-amount="XX"` on an amount-only span or monetary editor; keep
+  table cells and mixed labels outside that span. A fixed mask such as `$XX` is
+  allowed. Do not encode the original value's length or sign in the mask.
+- Put `data-private-amount-attributes="title aria-label"` on an outer element with
+  monetary tooltip/accessibility text. The optional `data-private-amount-label`
+  provides a safe fixed label. Numeric ARIA range attributes are removed while
+  hidden, then restored with their latest authoritative values.
+- Put `data-private-content` on an opaque chart, receipt or raw financial object.
+  Web conceals the region and shows a fixed placeholder.
+
+Web retains underlying values, removes hidden originals from the visible/accessibility
+layout, and observes fragment replacement. Untyped plugin Insight values/details
+are concealed conservatively; titles remain. Third-party financial HTML must use
+these markers to participate. Marker-free HTML renders normally in other interfaces.
+
 ## UI acceptance criteria
 
 The sidebar version and Settings footer keeps the same bottom inset while the account list scrolls, including at its final position. The footer's opaque background extends to the bottom edge, covering account rows beneath it. Long lists retain access to the last account. Compact navigation keeps its Settings control at the same inset too.

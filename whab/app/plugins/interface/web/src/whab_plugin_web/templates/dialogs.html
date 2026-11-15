@@ -37,7 +37,7 @@
       </datalist>
     </label>
     <label>
-      Monthly target ({{ currency }}; non-Expense types: keep zero)<input name="target" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" value="{{ money_input(0) }}" required>
+      Monthly target ({{ currency }}; non-Expense types: keep zero)<input data-private-amount name="target" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" value="{{ money_input(0) }}" required>
     </label>
     <p class="field-error" role="alert" hidden></p>
     <button class="button primary full-width">Create category</button>
@@ -62,7 +62,7 @@
       </select>
     </label>
     <label>
-      <span data-account-balance-label>Current balance</span><input name="balance"
+      <span data-account-balance-label>Current balance</span><input data-private-amount name="balance"
        data-cents data-minor-units="{{ minor_units }}"
        inputmode="decimal"
        value="0"

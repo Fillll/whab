@@ -83,7 +83,14 @@ export function initBudgetHistory({api, getContext, beforeChange, onChanged = ()
       for (const part of changedFields(change)) {
         const line = page.createElement('div'); line.className = 'history-change-values';
         const value = input => input === null ? 'None' : typeof input === 'object' ? JSON.stringify(input) : String(input);
-        line.append(text('span', part.field), text('span', value(part.before)), text('span', '→'), text('span', value(part.after)));
+        const before = text('span', value(part.before)), after = text('span', value(part.after));
+        // Untyped record snapshots may contain nested financial amounts. Keep labels and dates inspectable.
+        if (['Amount', 'Balance', 'target', 'assigned'].includes(part.field)) {
+          before.dataset.privateAmount = ''; after.dataset.privateAmount = '';
+        } else if ([part.before, part.after].some(item => item !== null && typeof item === 'object')) {
+          before.dataset.privateContent = ''; after.dataset.privateContent = '';
+        }
+        line.append(text('span', part.field), before, text('span', '→'), after);
         row.append(line);
       }
       changesBox.append(row);

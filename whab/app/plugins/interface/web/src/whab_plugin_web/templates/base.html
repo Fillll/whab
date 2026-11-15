@@ -20,6 +20,7 @@
     <link rel="icon" href="{{ ui_asset_prefix|default(asset_prefix) }}/static/favicon.svg?v={{ web_asset_version }}" type="image/svg+xml">
     <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/theme.js?v={{ web_asset_version }}"></script>
     <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/sidebar.js?v={{ web_asset_version }}"></script>
+    <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/amount-privacy.js?v={{ web_asset_version }}"></script>
     <link rel="stylesheet" href="{{ ui_asset_prefix|default(asset_prefix) }}/static/styles.css?v={{ web_asset_version }}">
     <script id="whab-context" type="application/json">{{ client_context|tojson }}</script>
     <script type="importmap">{{ module_imports(ui_asset_prefix|default(asset_prefix))|tojson }}</script>
@@ -61,7 +62,11 @@
     <div class="breadcrumb">
       {{ 'Demo budget' if workspace=='demo' else budget_name|default('My budget') }} {{ icon('chevron-right', 14) }}<span>{{ page|capitalize }}</span>
     </div>
-    {% if workspace=='demo' or status.environment=='sandbox' %}<div class="topbar-right"><span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' }}</span></div>{% endif %}
+    <div class="topbar-right">
+      {% if workspace=='demo' or status.environment=='sandbox' %}<span class="mode-badge {% if workspace=='demo' %}demo {% endif %}">{{ 'Sample data' if workspace=='demo' else 'Sandbox mode' }}</span>{% endif %}
+      <button type="button" class="amount-privacy-toggle" data-amount-privacy-toggle aria-pressed="false" aria-label="Hide amounts" title="Hide amounts" hidden><span class="amount-privacy-eye-open">{{ icon('eye', 20) }}</span><span class="amount-privacy-eye-closed">{{ icon('eye-closed', 20) }}</span></button>
+      <span class="sr-only" data-amount-privacy-status role="status" aria-live="polite"></span>
+    </div>
   </header>
   {% if workspace=="demo" %}
     <div class="demo-ribbon">

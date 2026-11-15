@@ -58,3 +58,45 @@ test('one click edits an imported field and Up/Down moves to the next row withou
   assert.equal(active, second, 'Explicit F2 keeps cursor movement within the editor');
   grid.dispose();
 });
+
+test('amount privacy keeps drafts unsaved and makes keyboard editing reveal amounts first', () => {
+  const listeners = {}, row = {cells: [], hidden: false};
+  let hidden = false, revealed = 0, active;
+  const cells = ['amount', 'memo'].map((kind, cellIndex) => {
+    const cell = {parentElement: row, cellIndex, classList: {add() {}, remove() {}},
+      focus() {active = cell;}, scrollIntoView() {}, closest(selector) {return selector === 'td' ? cell : null;},
+      contains(target) {return target === control || target === mask;}};
+    const control = {value: kind === 'amount' ? '-12.34' : 'Fictional memo', dataset: {}, changes: 0, inputs: 0,
+      matches(selector) {return selector.split(',').some(value => value.trim().startsWith('input:not'));},
+      closest(selector) {
+        if (selector === 'td') return cell;
+        if (selector === 'html[data-amounts="hidden"]') return hidden ? {} : null;
+        if (selector === '[data-private-amount], [data-private-content]') return kind === 'amount' ? control : null;
+        return null;
+      },
+      focus() {active = control;}, select() {},
+      dispatchEvent(event) {if (event.type === 'change') this.changes++; if (event.type === 'input') this.inputs++;}};
+    const mask = {matches: selector => selector.split(',').includes('button'),
+      click() {hidden = false; revealed++; active = control;}};
+    cell.querySelector = selector => selector === 'button[data-private-mask]:not([hidden])' ? hidden && kind === 'amount' ? mask : null : control;
+    cell.control = control; row.cells.push(cell); return cell;
+  });
+  const table = {tBodies: [{rows: [row]}], addEventListener(name, callback) {listeners[name] = callback;}};
+  const grid = context.initTransactionGrid(table), amount = cells[0].control, memo = cells[1].control;
+  const key = (cell, name) => listeners.keydown({target: cell, key: name, preventDefault() {}, stopPropagation() {}});
+  grid.focus(amount); amount.value = '-77.01'; hidden = true;
+  listeners.focusout({target: amount, relatedTarget: null});
+  assert.equal(amount.changes, 0, 'Hiding a dirty amount must not save it when grid editing finishes');
+  key(cells[0], '9');
+  assert.equal(amount.value, '-77.01'); assert.equal(amount.inputs, 0);
+  key(cells[0], 'F2');
+  assert.equal(revealed, 1); assert.equal(active, amount); assert.equal(amount.value, '-77.01');
+  hidden = true;
+  listeners.pointerdown({target: cells[0], preventDefault() {}});
+  assert.equal(revealed, 2, 'Clicking the amount cell reveals the real editor instead of editing invisibly');
+  hidden = true;
+  grid.focus(memo); memo.value = 'Updated fictional memo';
+  listeners.focusout({target: memo, relatedTarget: null});
+  assert.equal(memo.changes, 1, 'Nonmonetary editing still works while amounts are hidden');
+  assert.equal(amount.changes, 0); grid.dispose();
+});

@@ -78,7 +78,12 @@ export function renderSubscriptionPlans(parent, data, state, {format, digits}) {
       for (const column of planColumns) {
         const item = value(row,column.key);
         const text = item === null ? '—' : column.type === 'money' ? format(item) + (column.key === 'amount' ? ` ${frequencies[row.cadence]}` : '') : column.type === 'count' ? item.toLocaleString() : item;
-        const cell = el('td',text, ['money','count'].includes(column.type) ? 'subscription-plan-number' : '');
+        const cell = el('td', column.type === 'money' && item !== null ? '' : text, ['money','count'].includes(column.type) ? 'subscription-plan-number' : '');
+        if (column.type === 'money' && item !== null) {
+          const amount = el('span', format(item)); amount.dataset.privateAmount = ''; cell.append(amount);
+          if (column.key === 'amount') cell.append(document.createTextNode(` ${frequencies[row.cadence]}`));
+          cell.dataset.privateAmountAttributes = 'title';
+        }
         cell.title = item === null ? row.cadence === 'unknown' && ['monthly','annual'].includes(column.key) ? 'Billing interval needs review' : 'Available with Subscriptions 1.2 or newer' : String(text);
         if (column.key === 'merchant' && !row.active) {cell.title += ' · No recent charge'; cell.setAttribute('aria-label',cell.title); cell.classList.add('subscription-plan-inactive');}
         tr.append(cell);
@@ -114,6 +119,7 @@ export function renderSubscriptionPlans(parent, data, state, {format, digits}) {
       for (const [key,label] of [['min',column.type === 'date' ? 'From date' : 'At least'],['max',column.type === 'date' ? 'Through date' : 'At most']]) {
         const input = field(controls,`${column.label} · ${label}`,column.type === 'date' ? 'date' : 'number');
         if (column.type !== 'date') {input.min = '0'; input.step = String(column.type === 'count' ? 1 : 10 ** -digits); input.max = String(column.type === 'count' ? Number.MAX_SAFE_INTEGER : 1_000_000_000_000 / 10 ** digits);}
+        if (column.type === 'money') input.dataset.privateAmount = '';
         bind(input,key);
       }
       if (column.key === 'amount') {

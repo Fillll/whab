@@ -38,6 +38,7 @@ export function initSubscriptions() {
   });
   stopButton.addEventListener('click', () => {void perform(() => jobs.stop());});
   const format = value => money(value, getContext().currency);
+  const amount = (tag, text) => {const node = el(tag, text); node.dataset.privateAmount = ''; return node;};
   async function perform(work) {
     if (busy) return;
     busy = true; error.hidden = true; lock(true);
@@ -76,8 +77,8 @@ export function initSubscriptions() {
     const maximum = Math.max(1, ...values.map(row => row.amount));
     for (const row of values.slice(0, 8)) {
       const line = el('div', '', 'subscription-bar-row');
-      const label = el('div'); label.append(el('span', row.name), el('strong', format(row.amount))); line.append(label);
-      const meter = el('meter'); meter.min = 0; meter.max = maximum; meter.value = row.amount;
+      const label = el('div'); label.append(el('span', row.name), amount('strong', format(row.amount))); line.append(label);
+      const meter = el('meter'); meter.dataset.privateContent = ''; meter.min = 0; meter.max = maximum; meter.value = row.amount;
       meter.setAttribute('aria-label', `${row.name}: ${format(row.amount)}`); line.append(meter); section.append(line);
     }
     if (!values.length) section.append(el('p', 'No classified subscriptions yet.', 'settings-notice'));
@@ -115,7 +116,8 @@ export function initSubscriptions() {
             status.textContent = 'Saved for this payment and matching payments in this account.'; await refresh();
           }); actions.append(save);
         }
-        tr.append(merchant, category, el('td', format(row.amount)), label, actions); body.append(tr);
+        const charge = el('td'); charge.append(amount('span', format(row.amount)));
+        tr.append(merchant, category, charge, label, actions); body.append(tr);
       }
       const wrapper = el('div', '', 'subscription-table-scroll'); wrapper.append(table); results.append(wrapper);
       if (!rows.length) results.append(el('p', 'No payments match this view.', 'settings-notice'));
@@ -164,7 +166,7 @@ export function initSubscriptions() {
     const summary = el('div', '', 'subscription-summary');
     const active = data.subscriptions.filter(row => row.active);
     for (const [label, value] of [['Estimated monthly', format(data.estimatedMonthly)], ['Annualized estimate', data.estimatedAnnual == null ? '—' : format(data.estimatedAnnual)], ['Charged this month', format(data.actualMonth)], ['Active plans', String(active.length)]]) {
-      const block = el('div'); block.append(el('small', label), el('strong', value)); summary.append(block);
+      const block = el('div'); block.append(el('small', label), label === 'Active plans' ? el('strong', value) : amount('strong', value)); summary.append(block);
     }
     content.append(summary, el('p', `${data.unclassified} unchecked · ${data.needsReview} uncertain. Monthly estimates include active plans with a known billing interval. No recent charge means a plan may have ended; it does not confirm cancellation.`, 'settings-notice'));
     const plans = el('section', '', 'subscription-plans'); plans.append(el('h3', 'Your plans'));
@@ -176,8 +178,10 @@ export function initSubscriptions() {
     const maximum = Math.max(1, ...data.months.map(row => row.amount));
     for (const row of data.months) {
       const line = el('div', '', 'subscription-month'); line.append(el('span', row.month));
-      const meter = el('meter'); meter.min = 0; meter.max = maximum; meter.value = row.amount; meter.setAttribute('aria-label', `${row.month}: ${format(row.amount)}`);
-      line.append(meter, el('strong', format(row.amount)), el('small', row.change > 0 ? `+${format(row.change)} from prior month` : '')); history.append(line);
+      const meter = el('meter'); meter.dataset.privateContent = ''; meter.min = 0; meter.max = maximum; meter.value = row.amount; meter.setAttribute('aria-label', `${row.month}: ${format(row.amount)}`);
+      const change = el('small');
+      if (row.change > 0) change.append(amount('span', `+${format(row.change)}`), document.createTextNode(' from prior month'));
+      line.append(meter, amount('strong', format(row.amount)), change); history.append(line);
     }
     content.append(history);
     if (mode.value === 'ai') {

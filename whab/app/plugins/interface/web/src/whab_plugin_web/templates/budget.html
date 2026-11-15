@@ -8,7 +8,7 @@
   </details>
 {%- endmacro %}
 {% macro equation_amount(amount, operator) -%}
-  <span class="budget-equation-operator">{{ operator }}</span> {% if amount<0 %}({{ money_number(amount) }}){% else %}{{ money_number(amount) }}{% endif %}
+  <span class="budget-equation-operator">{{ operator }}</span> {% if amount<0 %}(<span data-private-amount>{{ money_number(amount) }}</span>){% else %}<span data-private-amount>{{ money_number(amount) }}</span>{% endif %}
 {%- endmacro %}
 <div class="budget-planner" data-budget-key="budget-planner" data-month="{{ month }}" data-month-count="{{ month_count }}" data-currency="{{ currency }}" data-workspace="{{ workspace }}" data-budget-id="{{ budget_id }}" data-budget-route="{{ client_context.budgetKey }}">
   <div class="budget-toolbar" data-budget-key="toolbar">
@@ -87,11 +87,11 @@
               {% for period in periods %}
                 {% set income_valid = valid_money(period.summary.income) %}
                 <td colspan="{{ period.column_count }}" class="month-start" data-budget-key="{{ period.month }}">
-                  {{ money_number(period.summary.income) if income_valid else '—' }}
+                  {% if income_valid %}<span data-private-amount>{{ money_number(period.summary.income) }}</span>{% else %}—{% endif %}
                   {% if income_valid %}
                     {% call summary_details(period, 'Income') %}
-                      <dl><div><dt>Received income</dt><dd>{{ money_number(period.summary.income) }}</dd></div></dl>
-                      <p>Posted Income-category inflows received in {{ month_label(period.month) }} in eligible on-budget non-credit accounts. Legacy uncategorized inflows retain their existing funding treatment. Pending transactions, transfers, opening balances and credit-card inflows are excluded. Expense-category refunds reduce category activity instead. Review is independent. Explicit Income: {{ money(period.summary.classifiedIncome|default(0)) }}; legacy unclassified inflows: {{ money(period.summary.unclassifiedIncome|default(period.summary.income)) }}.</p>
+                      <dl><div><dt>Received income</dt><dd><span data-private-amount>{{ money_number(period.summary.income) }}</span></dd></div></dl>
+                      <p>Posted Income-category inflows received in {{ month_label(period.month) }} in eligible on-budget non-credit accounts. Legacy uncategorized inflows retain their existing funding treatment. Pending transactions, transfers, opening balances and credit-card inflows are excluded. Expense-category refunds reduce category activity instead. Review is independent. Explicit Income: <span data-private-amount>{{ money(period.summary.classifiedIncome|default(0)) }}</span>; legacy unclassified inflows: <span data-private-amount>{{ money(period.summary.unclassifiedIncome|default(period.summary.income)) }}</span>.</p>
                       {% if period.month<data.budgetStartMonth %}<p>Historical income only: this month is before your budget starts.</p>{% endif %}
                       <p><a class="text-link" href="{{ url('transactions',month=period.month) }}">Review {{ month_label(period.month) }} transactions</a></p>
                     {% endcall %}
@@ -104,10 +104,10 @@
               {% for period in periods %}
                 {% set opening_valid = valid_money(period.summary.openingFunding) %}
                 <td colspan="{{ period.column_count }}" class="month-start{% if opening_valid and period.summary.openingFunding<0 %} negative{% endif %}" data-budget-key="{{ period.month }}">
-                  {{ money_number(period.summary.openingFunding) if opening_valid else '—' }}
+                  {% if opening_valid %}<span data-private-amount>{{ money_number(period.summary.openingFunding) }}</span>{% else %}—{% endif %}
                   {% if opening_valid %}
                     {% call summary_details(period, 'Opening funding') %}
-                      <dl><div><dt>Opening funding</dt><dd>{{ money_number(period.summary.openingFunding) }}</dd></div></dl>
+                      <dl><div><dt>Opening funding</dt><dd><span data-private-amount>{{ money_number(period.summary.openingFunding) }}</span></dd></div></dl>
                       <p>Posted Opening Balance entries in eligible on-budget non-credit cash accounts with verified balances in {{ month_label(period.month) }}. This is existing money, separate from income and spending. Debt and off-budget balances do not become opening funding. Pending entries and stale or unknown account balances do not fund the budget. Classification does not verify an imported balance estimate. Review is independent.</p>
                       <p>Opening entries before your budget starts are already in Carried in. Later months carry existing balances forward without adding the same opening funding twice.</p>
                       <p><a class="text-link" href="{{ url('transactions',month=period.month) }}">Review {{ month_label(period.month) }} transactions</a></p>
@@ -120,11 +120,11 @@
               <th scope="row">Carried in</th>
               {% for period in periods %}
                 <td colspan="{{ period.column_count }}" class="month-start{% if period.carried_in is not none and period.carried_in<0 %} negative{% endif %}" data-budget-key="{{ period.month }}">
-                  {{ money_number(period.carried_in) if period.carried_in is not none else '—' }}
+                  {% if period.carried_in is not none %}<span data-private-amount>{{ money_number(period.carried_in) }}</span>{% else %}—{% endif %}
                   {% if period.carried_in is not none %}
                     {% if period.carried_in_parts %}
                       {% call summary_details(period, 'Carried in', carry_in=true) %}
-                        <dl>{% for label, amount in period.carried_in_parts %}<div><dt>{{ label }}</dt><dd{% if amount<0 %} class="negative"{% endif %}>{{ money_number(amount) }}</dd></div>{% endfor %}</dl>
+                        <dl>{% for label, amount in period.carried_in_parts %}<div><dt>{{ label }}</dt><dd{% if amount<0 %} class="negative"{% endif %}><span data-private-amount>{{ money_number(amount) }}</span></dd></div>{% endfor %}</dl>
                         <p>Balances carried by category stay in their categories.</p>
                       {% endcall %}
                     {% else %}<small class="budget-row-note">Breakdown unavailable</small>{% endif %}
@@ -145,18 +145,18 @@
                       <form class="budget-assignment" data-budget-key="funding:{{ period.month }}" data-api="/budget/funding/next-month" data-method="PUT" data-inline-assignment>
                         <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ period.month }}"><input type="hidden" name="currency" value="{{ currency }}">
                         <span class="budget-assignment-edit" aria-hidden="true">{{ icon('pencil', 11) }}</span>
-                        <input type="text" name="assigned" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" autocomplete="off" spellcheck="false" value="{{ money_input(funding_amount) }}" aria-label="Assigned for {{ month_label(shift_month(period.month,1)) }} from {{ month_label(period.month) }}" required>
+                        <input data-private-amount type="text" name="assigned" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" autocomplete="off" spellcheck="false" value="{{ money_input(funding_amount) }}" aria-label="Assigned for {{ month_label(shift_month(period.month,1)) }} from {{ month_label(period.month) }}" required>
                         <button class="budget-assignment-save" type="submit" aria-label="Save assignment for {{ month_label(shift_month(period.month,1)) }} from {{ month_label(period.month) }}">{{ icon('check', 12) }}</button>
                         <p class="field-error" data-budget-local role="alert" hidden></p>
                         <span class="budget-save-status" data-budget-save-status data-budget-local role="status" aria-live="polite" hidden></span>
                       </form>
                     </div>
                   {% else %}
-                    {{ money_number(funding_amount) if funding_amount_valid and planning_month else '—' }}
+                    {% if funding_amount_valid and planning_month %}<span data-private-amount>{{ money_number(funding_amount) }}</span>{% else %}—{% endif %}
                     {% if planning_month and period.monthlyFundingFlow is sameas true %}<small class="budget-row-note">{% if period.nextMonthFundingEditable is sameas true and funding_amount_valid %}Amount exceeds the editing limit{% else %}Editing requires a server update{% endif %}</small>{% endif %}
                     {% if funding_amount_valid and planning_month %}
                       {% call summary_details(period, 'Assigned for next month') %}
-                        <dl><div><dt>Set aside in {{ month_label(period.month) }}</dt><dd>{{ money_number(funding_amount) }}</dd></div></dl>
+                        <dl><div><dt>Set aside in {{ month_label(period.month) }}</dt><dd><span data-private-amount>{{ money_number(funding_amount) }}</span></dd></div></dl>
                         <p>This amount is removed from {{ month_label(period.month) }}'s available-to-assign pool and included in Carried in for {{ month_label(shift_month(period.month,1)) }}. It is independent of next month's category assignments.</p>
                       {% endcall %}
                     {% endif %}
@@ -169,7 +169,7 @@
               {% for period in periods %}
                 {% set assigned_valid = period.month>=data.budgetStartMonth and valid_money(period.summary.assigned) %}
                 <td id="assigned-summary-{{ period.month }}-{{ currency|lower }}" colspan="{{ period.column_count }}" class="month-start" data-budget-key="{{ period.month }}">
-                  {{ money_number(period.summary.assigned) if assigned_valid else '—' }}
+                  {% if assigned_valid %}<span data-private-amount>{{ money_number(period.summary.assigned) }}</span>{% else %}—{% endif %}
                   {% if assigned_valid %}
                     {% call summary_details(period, 'Assigned this month') %}
                       <p>This is the Assigned total in the spending table for {{ month_label(period.month) }}. It adds up this month's category assignments. Carryover, spending activity and money set aside for next month are excluded.</p>
@@ -184,7 +184,7 @@
               {% for period in periods %}
                 {% set ready_valid = period.monthlyFundingFlow is sameas true and period.month>=data.budgetStartMonth and valid_money(period.summary.readyToAssign) %}
                 <td colspan="{{ period.column_count }}" class="month-start{% if ready_valid and period.summary.readyToAssign<0 %} negative{% elif ready_valid and period.summary.readyToAssign>0 %} positive{% endif %}" data-budget-key="{{ period.month }}">
-                  {{ money_number(period.summary.readyToAssign) if ready_valid else '—' }}
+                  {% if ready_valid %}<span data-private-amount>{{ money_number(period.summary.readyToAssign) }}</span>{% else %}—{% endif %}
                   {% if ready_valid %}
                     {% if valid_money(period.summary.income) and valid_money(period.summary.openingFunding) and period.carried_in is not none and valid_money(period.summary.assignedNextMonth) and valid_money(period.summary.assigned) %}
                       {% call summary_details(period, 'Available to assign') %}
@@ -198,7 +198,7 @@
                         </dl>
                         <p>Income + Opening funding + Carried in − Assigned for next month − Assigned this month.</p>
                         <p>{% if period.summary.readyToAssign<0 %}A negative amount means this month's funding pool does not cover its category assignments and next-month set-aside. Review carried-in deficits, income and assignments before assigning more.{% else %}This is the unassigned money remaining in {{ month_label(period.month) }}'s funding pool.{% endif %} By-category carryover stays in its categories and is excluded from this pool.</p>
-                        {% if valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<p>Some funds are needed to cover spending or account reserves. Review category overspending, uncategorized spending, and account balances before assigning more money.</p>{% if period.summary.fundingCapacity<0 %}<p class="negative">Available after spending and account reserves: {{ money_number(period.summary.fundingCapacity) }}.</p>{% endif %}{% endif %}
+                        {% if valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<p>Some funds are needed to cover spending or account reserves. Review category overspending, uncategorized spending, and account balances before assigning more money.</p>{% if period.summary.fundingCapacity<0 %}<p class="negative">Available after spending and account reserves: <span data-private-amount>{{ money_number(period.summary.fundingCapacity) }}</span>.</p>{% endif %}{% endif %}
                       {% endcall %}
                     {% else %}<small class="budget-row-note">Breakdown unavailable</small>{% endif %}
                   {% endif %}
@@ -226,10 +226,10 @@
                 <td data-budget-key="category"><button class="budget-group-toggle" type="button" data-budget-group="{{ group_index }}" aria-expanded="true">{{ icon('chevron-down', 13) }}<span>{{ group.name }}</span></button></td>
                 {% for total in group.periods[:month_count] %}
                   {% set period = periods[loop.index0] %}
-                  {% if period.show_carryover %}<td class="month-start budget-carryover{% if valid_money(total.carryover) and total.carryover<0 %} negative{% elif total.carryover==0 %} zero{% endif %}" data-budget-key="{{ period.month }}:carryover">{{ money_number(total.carryover) if valid_money(total.carryover) else '—' }}</td>{% endif %}
-                  <td{% if not period.show_carryover %} class="month-start"{% endif %} data-budget-key="{{ period.month }}:assigned">{{ money_number(total.assigned) }}</td>
-                  <td data-budget-key="{{ period.month }}:activity">{{ money_number(-total.spent) }}</td>
-                  <td{% if total.available<0 %} class="negative"{% endif %} data-budget-key="{{ period.month }}:available">{{ money_number(total.available) }}</td>
+                  {% if period.show_carryover %}<td class="month-start budget-carryover{% if valid_money(total.carryover) and total.carryover<0 %} negative{% elif total.carryover==0 %} zero{% endif %}" data-budget-key="{{ period.month }}:carryover">{% if valid_money(total.carryover) %}<span data-private-amount>{{ money_number(total.carryover) }}</span>{% else %}—{% endif %}</td>{% endif %}
+                  <td{% if not period.show_carryover %} class="month-start"{% endif %} data-budget-key="{{ period.month }}:assigned"><span data-private-amount>{{ money_number(total.assigned) }}</span></td>
+                  <td data-budget-key="{{ period.month }}:activity"><span data-private-amount>{{ money_number(-total.spent) }}</span></td>
+                  <td{% if total.available<0 %} class="negative"{% endif %} data-budget-key="{{ period.month }}:available"><span data-private-amount>{{ money_number(total.available) }}</span></td>
                 {% endfor %}
               </tr>
               {% for row in group.rows %}
@@ -237,19 +237,19 @@
                   <td data-budget-key="category"><a class="budget-category-link" href="{{ url(category=row.category.id) }}">{{ row.category.name }}</a></td>
                   {% for cell in row.periods[:month_count] %}
                     {% set period = periods[loop.index0] %}
-                    {% if period.show_carryover %}<td class="month-start budget-carryover{% if cell.month==month %} selected-month{% endif %}{% if valid_money(cell.carryover) and cell.carryover<0 %} negative{% elif cell.carryover==0 %} zero{% endif %}" data-budget-key="{{ cell.month }}:carryover">{{ money_number(cell.carryover) if valid_money(cell.carryover) else '—' }}</td>{% endif %}
+                    {% if period.show_carryover %}<td class="month-start budget-carryover{% if cell.month==month %} selected-month{% endif %}{% if valid_money(cell.carryover) and cell.carryover<0 %} negative{% elif cell.carryover==0 %} zero{% endif %}" data-budget-key="{{ cell.month }}:carryover">{% if valid_money(cell.carryover) %}<span data-private-amount>{{ money_number(cell.carryover) }}</span>{% else %}—{% endif %}</td>{% endif %}
                     <td class="{% if not period.show_carryover %}month-start{% endif %}{% if cell.month==month %} selected-month{% endif %}" data-budget-key="{{ cell.month }}:assigned">
                       <form class="budget-assignment" data-budget-key="category:{{ row.category.id }}:{{ cell.month }}" data-api="/budget/{{ category_path(row.category.id) }}" data-method="PUT" data-inline-assignment>
                         <input type="hidden" name="workspace" value="{{ workspace }}"><input type="hidden" name="month" value="{{ cell.month }}">
                         <span class="budget-assignment-edit" aria-hidden="true">{{ icon('pencil', 11) }}</span>
-                        <input type="text" name="assigned" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" autocomplete="off" spellcheck="false" value="{{ money_input(cell.assigned) }}" aria-label="Assigned to {{ row.category.name }} in {{ month_label(cell.month) }}"{% if cell.month<data.budgetStartMonth %} disabled{% endif %} required>
+                        <input data-private-amount type="text" name="assigned" data-cents data-minor-units="{{ minor_units }}" inputmode="decimal" autocomplete="off" spellcheck="false" value="{{ money_input(cell.assigned) }}" aria-label="Assigned to {{ row.category.name }} in {{ month_label(cell.month) }}"{% if cell.month<data.budgetStartMonth %} disabled{% endif %} required>
                         <button class="budget-assignment-save" type="submit" aria-label="Save assignment to {{ row.category.name }} in {{ month_label(cell.month) }}"{% if cell.month<data.budgetStartMonth %} disabled{% endif %}>{{ icon('check', 12) }}</button>
                         <p class="field-error" data-budget-local role="alert" hidden></p>
                         <span class="budget-save-status" data-budget-save-status data-budget-local role="status" aria-live="polite" hidden></span>
                       </form>
                     </td>
-                    <td class="budget-money{% if cell.month==month %} selected-month{% endif %}{% if not cell.spent %} zero{% endif %}" data-budget-key="{{ cell.month }}:activity">{{ money_number(-cell.spent) }}</td>
-                    <td class="{% if cell.month==month %}selected-month {% endif %}{% if cell.available<0 %}negative{% elif not cell.available %}zero{% endif %}" data-budget-key="{{ cell.month }}:available"><a class="budget-money" href="{{ url(category=row.category.id,month=cell.month) }}" aria-label="Details for {{ row.category.name }} in {{ month_label(cell.month) }}" title="Carried over: {{ money(cell.carryover) if valid_money(cell.carryover) else 'Unavailable' }} · Assigned: {{ money(cell.assigned) }} · Activity: {{ money(-cell.spent) }}">{{ money_number(cell.available) }}</a></td>
+                    <td class="budget-money{% if cell.month==month %} selected-month{% endif %}{% if not cell.spent %} zero{% endif %}" data-budget-key="{{ cell.month }}:activity"><span data-private-amount>{{ money_number(-cell.spent) }}</span></td>
+                    <td class="{% if cell.month==month %}selected-month {% endif %}{% if cell.available<0 %}negative{% elif not cell.available %}zero{% endif %}" data-budget-key="{{ cell.month }}:available"><a data-private-amount-attributes="title" class="budget-money" href="{{ url(category=row.category.id,month=cell.month) }}" aria-label="Details for {{ row.category.name }} in {{ month_label(cell.month) }}" title="Carried over: {{ money(cell.carryover) if valid_money(cell.carryover) else 'Unavailable' }} · Assigned: {{ money(cell.assigned) }} · Activity: {{ money(-cell.spent) }}"><span data-private-amount>{{ money_number(cell.available) }}</span></a></td>
                   {% endfor %}
                 </tr>
               {% endfor %}
@@ -258,12 +258,12 @@
               <tr class="budget-category-row budget-uncategorized" data-budget-key="uncategorized">
                 <td data-budget-key="category"><a class="budget-category-link" href="{{ url('transactions') }}">Uncategorized</a></td>
                 {% for period in periods %}
-                  {% if period.show_carryover %}<td class="month-start budget-carryover" data-budget-key="{{ period.month }}:carryover">—</td>{% endif %}<td{% if not period.show_carryover %} class="month-start"{% endif %} data-budget-key="{{ period.month }}:assigned">—</td><td class="budget-money" data-budget-key="{{ period.month }}:activity">{{ money_number(-period.uncategorized) if period.month>=data.budgetStartMonth else '—' }}</td><td data-budget-key="{{ period.month }}:available"><a class="text-link" href="{{ url('transactions',month=period.month) }}">Review</a></td>
+                  {% if period.show_carryover %}<td class="month-start budget-carryover" data-budget-key="{{ period.month }}:carryover">—</td>{% endif %}<td{% if not period.show_carryover %} class="month-start"{% endif %} data-budget-key="{{ period.month }}:assigned">—</td><td class="budget-money" data-budget-key="{{ period.month }}:activity">{% if period.month>=data.budgetStartMonth %}<span data-private-amount>{{ money_number(-period.uncategorized) }}</span>{% else %}—{% endif %}</td><td data-budget-key="{{ period.month }}:available"><a class="text-link" href="{{ url('transactions',month=period.month) }}">Review</a></td>
                 {% endfor %}
               </tr>
             {% endif %}
           </tbody>
-          <tfoot data-budget-key="totals"><tr class="budget-total-row" data-budget-key="total"><td data-budget-key="category">Total</td>{% for period in periods %}{% if period.show_carryover %}<td class="month-start budget-carryover{% if valid_money(period.carryover) and period.carryover<0 %} negative{% elif period.carryover==0 %} zero{% endif %}" data-budget-key="{{ period.month }}:carryover">{{ money_number(period.carryover) if valid_money(period.carryover) else '—' }}</td>{% endif %}<td id="assigned-total-{{ period.month }}-{{ currency|lower }}" tabindex="-1" aria-label="Total assigned in {{ month_label(period.month) }}: {{ money_number(period.summary.assigned) }} {{ currency }}"{% if not period.show_carryover %} class="month-start"{% endif %} data-budget-key="{{ period.month }}:assigned">{{ money_number(period.summary.assigned) }}</td><td data-budget-key="{{ period.month }}:activity">{{ money_number(-period.summary.spent) }}</td><td data-budget-key="{{ period.month }}:available">{{ money_number(period.summary.available) }}</td>{% endfor %}</tr></tfoot>
+          <tfoot data-budget-key="totals"><tr class="budget-total-row" data-budget-key="total"><td data-budget-key="category">Total</td>{% for period in periods %}{% if period.show_carryover %}<td class="month-start budget-carryover{% if valid_money(period.carryover) and period.carryover<0 %} negative{% elif period.carryover==0 %} zero{% endif %}" data-budget-key="{{ period.month }}:carryover">{% if valid_money(period.carryover) %}<span data-private-amount>{{ money_number(period.carryover) }}</span>{% else %}—{% endif %}</td>{% endif %}<td data-private-amount-attributes="aria-label" data-private-amount-label="Total assigned hidden" id="assigned-total-{{ period.month }}-{{ currency|lower }}" tabindex="-1" aria-label="Total assigned in {{ month_label(period.month) }}: {{ money_number(period.summary.assigned) }} {{ currency }}"{% if not period.show_carryover %} class="month-start"{% endif %} data-budget-key="{{ period.month }}:assigned"><span data-private-amount>{{ money_number(period.summary.assigned) }}</span></td><td data-budget-key="{{ period.month }}:activity"><span data-private-amount>{{ money_number(-period.summary.spent) }}</span></td><td data-budget-key="{{ period.month }}:available"><span data-private-amount>{{ money_number(period.summary.available) }}</span></td>{% endfor %}</tr></tfoot>
         </table>
       </div>
       <div class="budget-table-footer" data-budget-key="footer"><button class="button secondary" data-dialog="category-dialog">{{ icon('plus', 15) }}Add category</button></div>
@@ -281,7 +281,7 @@
           <h2>{{ selected.name }}</h2>
         </div>
       </div>
-      <div class="inspector-available"><span class="summary-label">AVAILABLE THIS MONTH</span><strong class="{% if row.available<0 %}negative {% endif %}">{{ money(row.available) }}</strong>
+      <div class="inspector-available"><span class="summary-label">AVAILABLE THIS MONTH</span><strong class="{% if row.available<0 %}negative {% endif %}"><span data-private-amount>{{ money(row.available) }}</span></strong>
       </div>
       <div class="target-panel">
         <div class="target-top">
@@ -290,11 +290,11 @@
           {% else %}<span>{{ progress|round|int }}%</span>
           {% endif %}
         </div>
-        <strong>{{ money(row.target) }}</strong>
+        <strong><span data-private-amount>{{ money(row.target) }}</span></strong>
         <div class="target-track">
           <span style="width:{{ progress }}%"></span>
         </div>
-        <small>{{ 'No target set' if not row.target else 'Your target is fully funded' if funded>=row.target else money(row.target-funded)+' more to reach your target' }}</small>
+        <small>{% if not row.target %}No target set{% elif funded>=row.target %}Your target is fully funded{% else %}<span data-private-amount>{{ money(row.target-funded) }}</span> more to reach your target{% endif %}</small>
       </div>
       <form class="assign-form"
             data-budget-key="inspector-assignment:{{ selected.id }}:{{ month }}"
@@ -307,7 +307,7 @@
        name="month"
        value="{{ month }}">
         <label for="assigned-amount">Assigned this month</label>
-        <div class="money-input"><span>{{ currency }}</span><input id="assigned-amount"
+        <div class="money-input"><span>{{ currency }}</span><input data-private-amount id="assigned-amount"
        name="assigned"
        data-cents data-minor-units="{{ minor_units }}"
        value="{{ money_input(row.assigned) }}"
@@ -320,16 +320,16 @@
       </form>
       <div class="inspector-breakdown">
         <div>
-          <span>Carried over</span><strong>{{ money(row.carryover) }}</strong>
+          <span>Carried over</span><strong><span data-private-amount>{{ money(row.carryover) }}</span></strong>
         </div>
         <div>
-          <span>Assigned</span><strong>{{ money(row.assigned) }}</strong>
+          <span>Assigned</span><strong><span data-private-amount>{{ money(row.assigned) }}</span></strong>
         </div>
         <div>
-          <span>Activity</span><strong>{{ money(-row.spent) }}</strong>
+          <span>Activity</span><strong><span data-private-amount>{{ money(-row.spent) }}</span></strong>
         </div>
         <div class="breakdown-total">
-          <span>Available</span><strong>{{ money(row.available) }}</strong>
+          <span>Available</span><strong><span data-private-amount>{{ money(row.available) }}</span></strong>
         </div>
       </div>
     </aside>

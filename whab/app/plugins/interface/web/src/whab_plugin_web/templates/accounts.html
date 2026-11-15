@@ -14,9 +14,9 @@
   <div data-account-totals>
   {% for code, totals in account_totals.items() %}
   <dl class="account-summary" aria-label="Account totals in {{ code }}">
-    <div><dt>Assets · {{ code }}</dt><dd>{{ currency_money(totals.assets, code) }}</dd></div>
-    <div><dt>Liabilities · {{ code }}</dt><dd>{{ currency_money(totals.liabilities, code) }}</dd></div>
-    <div><dt>Net worth · {{ code }}</dt><dd>{{ currency_money(totals.netWorth, code) }}</dd></div>
+    <div><dt>Assets · {{ code }}</dt><dd><span data-private-amount>{{ currency_money(totals.assets, code) }}</span></dd></div>
+    <div><dt>Liabilities · {{ code }}</dt><dd><span data-private-amount>{{ currency_money(totals.liabilities, code) }}</span></dd></div>
+    <div><dt>Net worth · {{ code }}</dt><dd><span data-private-amount>{{ currency_money(totals.netWorth, code) }}</span></dd></div>
   </dl>
   {% endfor %}
   <p class="account-summary-note">Current known balances, separated by currency. Stale and unavailable snapshots are excluded from totals.</p>
@@ -56,7 +56,7 @@
           <p class="field-error" role="alert" hidden></p>
         </div>
         <div class="account-row-aside"><span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' and account.source in bank_source_ids else account.source|capitalize }}</span>
-        <div class="account-balance" data-account-balance><strong>{{ 'Unavailable' if account.balanceUnknown else account_money(account) }}</strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small></div></div>
+        <div class="account-balance" data-account-balance><strong>{% if account.balanceUnknown %}Unavailable{% else %}<span data-private-amount>{{ account_money(account) }}</span>{% endif %}</strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small></div></div>
       </form>
     {% endfor %}<p class="empty-inline" data-account-group-empty{% if group.accounts %} hidden{% endif %}>No {{ group.label|lower }} accounts yet.</p>
   </div>
