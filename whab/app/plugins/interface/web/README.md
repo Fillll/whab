@@ -281,16 +281,23 @@ not bypass the category batch limit or split its save.
 With WHAB 2.75+ and Web 1.53+, select 2–100 loaded transactions and change the
 category in any selected row to apply that exact category to the whole selection.
 Changing an unselected row still changes only that row. Clearing the category
-clears it for the selected records. Pending records can be categorized, and review
-status stays unchanged. The selection bar explains this behavior before editing.
+clears it for the selected records. Pending records can be categorized. Review
+stays unchanged only while the saved and proposed classifications are both
+eligible; otherwise it is cleared. The selection bar explains bulk behavior before editing.
 
 This uses the existing public `edit_transactions` operation: one observed revision,
 one request ID, one native commit/checkpoint and one reversible audit entry. Every
-target is validated first. Any missing/duplicate/disallowed target, invalid category,
-matched transfer or unsupported backend rejects the entire selection; more than 100
+target is validated first. Any missing/duplicate/disallowed target, invalid category
+or unsupported backend rejects the entire selection; more than 100
 is refused without splitting or a fallback to separate edits. Notes, merchant
 whitespace, amounts, dates, accounts and transaction identities are preserved.
 Manual categorization clears prior category-agent/provisional suggestion badges.
+
+A verified transfer pair can receive a Transfer category or keep its pair without
+a category. An unmatched transaction cannot receive a Transfer category. A mixed
+selection must satisfy those rules for every row; otherwise the whole save fails.
+Choose **Unmatch** before assigning Expense, Income or Opening Balance to a paired
+transaction. Broken legacy links require an explicit audited repair.
 
 The browser obtains the exact native preview internally before submitting. A stale
 first request asks for refresh and another explicit choice. An uncertain response
@@ -414,6 +421,15 @@ For a fictional preview, serve this plugin folder as described above and open `/
 
 
 The fictional `/tests/fixtures/transaction-row-heights.html` preview uses the shipped register stylesheet to check equal header/cell heights, inline category markers and stable row geometry after dismissal. Cases cover light/dark, single/multiple accounts, desktop/narrow widths, long text, multiline memos and low-score markers; it never opens a budget or contacts a model provider.
+
+For transfer controls and funding explanations, run
+`.venv/bin/python plugins/interface/web/tests/fixtures/build_transfer_preview.py --output /tmp/whab-transfer-ui-static`
+from `whab/app`, then serve that isolated output directory with a loopback static
+server. The four light/dark pages render shipped templates with fictional data;
+category choices and funding disclosures work, while saves and navigation are
+disabled. Check a paired row with its archived counterpart outside the month,
+an unmatched row, disabled unclassified review, and the separate Transfer funding
+row at desktop and compact widths. HTTPS/native tests verify actual saves.
 
 
 ### Currency and month range

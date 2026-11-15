@@ -1,5 +1,6 @@
 """Local HTTPS review endpoints never auto-match or auto-review."""
 
+import re
 from copy import deepcopy
 
 from fastapi.testclient import TestClient
@@ -13,6 +14,8 @@ def test_web_proposal_preview_confirm_unmatch_and_stale_guards(store, tmp_path):
     for name, amount in [('旅行 🍏', 100), ('Сбережения', -100)]:
         account = store.add_account('personal', {'name': name, 'type': 'depository', 'balance': 10000})
         ids.append(store.add_transaction('personal', {'accountId': account, 'date': '2026-11-01', 'merchant': 'Fictional', 'amount': amount, 'categoryId': None}))
+    transfer = store.add_category('personal', {'name': 'Fictional transfer', 'group': 'Technical', 'kind': 'transfer'})
+    expense = store.add_category('personal', {'name': 'Fictional expense', 'group': 'Everyday'})
     settings = Settings(tmp_path, 5173, 'sandbox', '', '', '', False, '', '', (), ui='web')
     app = create_app(store=store, settings=settings)
     with TestClient(app, base_url='https://127.0.0.1:5173') as client:
@@ -31,12 +34,21 @@ def test_web_proposal_preview_confirm_unmatch_and_stale_guards(store, tmp_path):
         assert all(row.get('transferPeerId') and not row['reviewed'] for row in store.transactions('personal'))
         page = client.get('/budgets/home/transactions/2026-11').text
         assert 'Suggest transfers' in page and 'data-transfer-panel' in page and 'data-transfer-unmatch' in page
-        assert 'Unmatch this confirmed transfer before changing its category' in page and 'Transfer (matched)' in page
-        unchanged = deepcopy(store.export_budget())
-        refused = client.patch(f'/api/transactions/{ids[0]}', json={'workspace':'personal','categoryId':None})
-        assert refused.status_code == 400
-        assert refused.json()['error'] == 'Unmatch this transfer pair before changing its category.'
-        assert store.export_budget() == unchanged
+        assert 'Choose a Transfer category, or keep the matched pair without a category' in page
+        assert 'Transfer (matched)' in page and 'data-transfer-pair-valid="true"' in page
+        assert not re.search(r'data-transaction-field="categoryId"[^>]* disabled', page)
+        assert re.search(r'data-transaction-detail="amount"[^>]* disabled', page)
+        assert 'Unmatch this confirmed transfer before changing financial fields' in page
+        for category in [transfer, None]:
+            assert client.patch(f'/api/transactions/{ids[0]}', json={'workspace':'personal','categoryId':category}).status_code == 200
+            row = next(row for row in store.transactions('personal') if row['id'] == ids[0])
+            assert row['categoryId'] == category and row['transferPeerId'] == ids[1] and row['isTransfer']
+        for forbidden in [{'categoryId': expense}, {'amount': 200}]:
+            unchanged = deepcopy(store.export_budget())
+            refused = client.patch(f'/api/transactions/{ids[0]}', json={'workspace':'personal', **forbidden})
+            assert refused.status_code == 400
+            assert 'Unmatch' in refused.json()['error']
+            assert store.export_budget() == unchanged
         assert 'Discard local edits &amp; reload' in page
         assert 'Saved changes are kept' in page
         for patch in [{'reviewed':True}, {'note':'[YNAB]  \nFictional memo'}]:

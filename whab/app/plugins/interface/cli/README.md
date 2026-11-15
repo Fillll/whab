@@ -1248,6 +1248,8 @@ links, as shown by the exact core before/after preview. Include every affected
 malformed counterpart explicitly. It preserves import hints, identities, amounts,
 dates, merchants (including whitespace), notes, account balances and history.
 It neither manufactures a missing leg nor guesses a category or counterpart.
+Explicit non-Transfer categories are retained; imported hint evidence cannot
+override their financial treatment after repair.
 After repair, incomplete/zero-value hints stay unreviewed. Inspect trnx list and
 history list/show; use match-transfers only for confirmed complete pairs.
 An already unreviewed hint can appear as unchanged in the exact repair receipt.
