@@ -190,8 +190,8 @@ export function createVisualSettings({request, beforeChange = async () => true, 
 export function initVisualSettings({page = document, beforeChange, beforeCommit, onOptionalComplete, closeSettings,
   request: suppliedRequest, schedule, cancel} = {}) {
   const dialog = page.getElementById('plugins-dialog');
-  const visualDialog = page.getElementById('plugin-options-web') || dialog;
-  const pane = visualDialog?.querySelector('[data-visual-settings]') || dialog?.querySelector('[data-visual-settings]');
+  const pane = dialog?.querySelector('[data-visual-settings]') || page.getElementById('plugin-options-web')?.querySelector('[data-visual-settings]');
+  const visualDialog = pane?.closest('[data-settings-page]') || dialog;
   if (!pane || pane.dataset.workspace !== 'personal') return null;
   const scope = getContext().apiPrefix;
   const isCurrent = () => getContext().apiPrefix === scope;

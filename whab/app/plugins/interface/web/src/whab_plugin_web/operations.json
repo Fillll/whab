@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation.",
+  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation. Settings uses one responsive preferences window with persistent section navigation, direct browser-local Appearance and reviewed plugin changes.",
   "delegates": [
     "core"
   ],
@@ -9,7 +9,7 @@
     {
       "name": "interface",
       "kind": "sdk",
-      "summary": "Provide the declared web interface or remote authority adapter. Opening Balance is available in category creation and transaction pickers; openingFunding is displayed separately from income and included in the documented Ready to Assign equation. Technical categories never appear as expense envelopes.",
+      "summary": "Provide the declared web interface or remote authority adapter. Opening Balance is available in category creation and transaction pickers; openingFunding is displayed separately from income and included in the documented Ready to Assign equation. Technical categories never appear as expense envelopes. Settings opens Plugins with direct Budgets, Appearance, Budget history and About navigation; details stay in place with Back, Close and keyboard focus restoration.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -42,7 +42,7 @@
           "output": null
         }
       ],
-      "side_effects": "The interface delegates explicit reads/mutations to public services; it does not define financial rules. Account, Payee, Category and Memo resize controls save only column keys and pixel widths in browser local storage; resizing never writes financial data or history. Sidebar collapse/expand saves only expanded/collapsed under whab.sidebar in browser local storage. It never changes budget data, history or bank synchronization; blocked browser storage keeps the toggle usable for this page.",
+      "side_effects": "The interface delegates explicit reads/mutations to public services; it does not define financial rules. Account, Payee, Category and Memo resize controls save only column keys and pixel widths in browser local storage; resizing never writes financial data or history. Sidebar collapse/expand saves only expanded/collapsed under whab.sidebar in browser local storage. It never changes budget data, history or bank synchronization; blocked browser storage keeps the toggle usable for this page. Settings navigation alone does not mutate budgets. Appearance changes only the existing browser-local light/dark preference. Plugin changes retain explicit review, host confirmation and separate restart-save behavior; closing or navigating never retries an uncertain mutation.",
       "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [

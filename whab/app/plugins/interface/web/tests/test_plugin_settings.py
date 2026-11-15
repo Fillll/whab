@@ -48,15 +48,15 @@ def render(client, monkeypatch, *plugins, restart_required=False, error=None):
     return response.text
 
 
-def test_settings_links_to_installed_plugins_with_all_categories_as_default(client, monkeypatch):
+def test_settings_opens_installed_plugins_with_all_categories_and_direct_sections(client, monkeypatch):
     text = render(
         client, monkeypatch,
         plugin("web", active=True, enabled=True, required=True, manageable=False, category="interface"),
         plugin("report", category="insight"),
     )
-    settings = dialog(text, "settings-home")
+    settings = re.search(r'<nav\b[^>]*aria-label="Settings sections".*?</nav>', text, re.S)[0]
     assert 'data-dialog="plugins-dialog"' in settings
-    assert "Installed plugins and their settings" in settings
+    assert 'data-dialog="appearance-settings-page"' in settings
     assert "data-plugin-selection" not in settings
     installed = dialog(text, "plugins-dialog")
     assert 'data-plugin-category-filter aria-label="Plugin category"' in installed
@@ -73,8 +73,9 @@ def test_settings_links_to_installed_plugins_with_all_categories_as_default(clie
     assert 'value="report" name="plugin"' in installed
     assert 'data-dialog="plugin-options-web" data-plugin-options' in installed
     assert 'data-dialog="plugin-options-report" data-plugin-options' in installed
-    assert 'data-plugin-category-empty hidden' in installed
-    assert 'data-settings-back' in installed and '>Settings</button>' in installed
+    empty = next(attrs for _, attrs in Tags(installed).tags if 'data-plugin-category-empty' in attrs)
+    assert 'hidden' in empty and empty.get('role') == 'status'
+    assert 'data-settings-back' not in installed
 
 
 def test_management_tools_and_optional_visuals_use_settings_without_budget_checkboxes(client, monkeypatch):
@@ -84,7 +85,7 @@ def test_management_tools_and_optional_visuals_use_settings_without_budget_check
         plugin("sqlite", category="storage", selection_control="required", required=True, active=True, enabled=True, manageable=False),
     )
     installed = dialog(text, "plugins-dialog")
-    inputs = [attrs for tag, attrs in Tags(installed).tags if tag == "input"]
+    inputs = [attrs for tag, attrs in Tags(installed).tags if tag == "input" and attrs.get("type") == "checkbox"]
     assert [attrs["value"] for attrs in inputs] == ["sqlite"]
     assert "disabled" in inputs[0] and "name" not in inputs[0]
     assert "Installed · management tool" in installed
@@ -101,11 +102,11 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
     )
     assert response.status_code == 200
     text = response.text
-    settings = dialog(text, "settings-home")
+    settings = re.search(r'<nav\b[^>]*aria-label="Settings sections".*?</nav>', text, re.S)[0]
     assert re.findall(r'data-dialog="([^"]+)"', settings) == [
-        "budgets-dialog", "plugins-dialog", "budget-history-page", "about-dialog",
+        "budgets-dialog", "appearance-settings-page", "plugins-dialog", "budget-history-page", "about-dialog",
     ]
-    assert f"Current budget · {label}" in settings
+    assert label in dialog(text, "plugins-dialog")
     budgets = dialog(text, "budgets-dialog")
     switch = re.search(r'<form\b[^>]*\bdata-budget-switch\b.*?</form>', budgets, re.S)[0]
     attributes = next(attrs for tag, attrs in Tags(switch).tags if tag == "form")
@@ -118,7 +119,7 @@ def test_budget_selection_lives_in_settings_and_preserves_page_context(client, w
         switched = client.get(href)
         assert switched.status_code == 200
         next_label = "Demo budget" if destination == "demo" else "My budget"
-        assert f"Current budget · {next_label}" in dialog(switched.text, "settings-home")
+        assert next_label in dialog(switched.text, "plugins-dialog")
     fieldset = re.search(r'<fieldset\b[^>]*\bdata-available-budgets\b.*?</fieldset>', switch, re.S)[0]
     assert 'class="budget-list"' in fieldset
     choices = [attrs for tag, attrs in Tags(fieldset).tags if tag == "input"]
@@ -199,7 +200,8 @@ def test_plugin_categories_and_names_are_sorted_and_examples_are_hidden(client, 
     assert re.findall(r'data-plugin-category="([^"]+)"', installed) == [
         "interface", "ingestion", "insight", "storage", "automation", "extension",
     ]
-    assert re.findall(r'<strong>([^<]+)</strong>', installed) == [
+    labels = re.findall(r'<label class="plugin-toggle">(.*?)</label>', installed, re.S)
+    assert [re.search(r'<strong>([^<]+)</strong>', label)[1] for label in labels] == [
         "Bank logos", "WHAB web", "Import from YNAB ZIP file", "Plaid", "SQLite",
     ]
     assert '<h4 id="plugin-category-interface">Interfaces<span>2</span></h4>' in installed
@@ -235,13 +237,12 @@ def test_each_plugin_has_settings_with_saved_and_running_state(client, monkeypat
         assert '<section class="plugin-settings" aria-label="Plugin settings" data-plugin-settings></section>' in options
     installed = dialog(text, "plugins-dialog")
     assert "Restart WHAB to apply your saved plugin selection" in installed
-    row = re.search(r'<div class="plugin-row">(.*?)</div>', installed, re.S)[1]
+    row = re.search(r'<div class="plugin-row"[^>]*>(.*?)</div>', installed, re.S)[1]
     label = re.search(r'<label class="plugin-toggle">(.*?)</label>', row, re.S)[1]
     assert '<strong>Sample</strong>' in label
     assert "whab-sample" not in label  # Package details do not clutter the checkbox's accessible name.
-    assert row.index('</label>') < row.index('Version 1.0.0') < row.index(
-        f'<span class="plugin-state">{selection}</span>'
-    ) < row.index('aria-label="Settings for Sample"')
+    assert "Version 1.0.0" not in row
+    assert row.index('</label>') < row.index(selection) < row.index('aria-label="Settings for Sample"')
     assert re.findall(r'<button\b[^>]*aria-label="([^"]+)"', row) == ["Settings for Sample"]
     assert "Plugin options" not in text and "Options for" not in text
 
@@ -292,11 +293,18 @@ def test_related_settings_are_sections_in_one_modal_with_one_close_control(clien
     assert sum(tag == 'dialog' for tag, _ in tags) == 1
     pages = [attrs for tag, attrs in tags if tag == 'article' and 'data-settings-page' in attrs]
     by_id = {attrs['id']: attrs for attrs in pages}
-    assert {'settings-home', 'budgets-dialog', 'plugins-dialog', 'about-dialog'} <= by_id.keys()
+    roots = {'budgets-dialog', 'appearance-settings-page', 'plugins-dialog', 'budget-history-page', 'about-dialog'}
+    assert roots <= by_id.keys()
+    assert 'settings-home' not in by_id
     assert 'plugin-options-web' in by_id
-    assert [attrs['id'] for attrs in pages if 'hidden' not in attrs] == ['settings-home']
-    assert by_id['plugins-dialog']['data-settings-parent'] == 'settings-home'
+    assert all('hidden' in attrs for attrs in pages)
+    assert all('data-settings-parent' not in by_id[root] for root in roots)
     assert by_id['plugin-options-web']['data-settings-parent'] == 'plugins-dialog'
+    navigation = re.search(r'<nav\b[^>]*aria-label="Settings sections".*?</nav>', window, re.S)[0]
+    sections = [attrs for tag, attrs in Tags(navigation).tags if tag == 'button']
+    assert {attrs['data-dialog'] for attrs in sections} == roots
+    assert all('data-settings-section' in attrs and attrs['type'] == 'button' for attrs in sections)
+    assert [attrs['data-dialog'] for attrs in sections if attrs.get('aria-current') == 'page'] == ['plugins-dialog']
     close_controls = [attrs for tag, attrs in tags if tag == 'button' and 'data-close-dialog' in attrs]
     assert len(close_controls) == 1
     assert close_controls[0]['aria-label'] == 'Close Settings'
