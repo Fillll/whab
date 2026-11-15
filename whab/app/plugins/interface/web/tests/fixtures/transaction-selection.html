@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fictional transaction range selection</title>
+<link rel="stylesheet" href="../../src/whab_plugin_web/static/styles.css">
+<style>
+  body {display:block; padding:24px; overflow:auto}
+  main {max-width:960px; margin:auto}
+  h1 {font-size:24px}
+  .fixture-controls {display:flex; flex-wrap:wrap; gap:12px; margin:16px 0}
+  .transactions-scroll {height:auto; max-height:none}
+  .transactions-table {min-width:0; width:100%}
+  .transactions-table td:nth-child(2) {width:48px}
+  .fixture-help {max-width:72ch; line-height:1.5}
+</style>
+<main>
+  <h1>Fictional transaction range selection</h1>
+  <p class="fixture-help">Uses the shipped register controller and stylesheet. No runtime home, budget or banking connection is opened. Editing controls are hidden and every API request is intercepted locally.</p>
+  <p class="fixture-help">Click row 2, then Shift-click row 6: rows 2–6 should be selected. Try the reverse direction, unchecking a range, Clear selection, Select all and filtering for <strong>market</strong>. Ordinary Space toggles a focused checkbox. IDs deliberately differ from the displayed order.</p>
+  <div class="fixture-controls"><button id="fixture-theme" type="button">Switch to dark</button><span id="fixture-status" role="status">Loading controller…</span></div>
+  <section data-transaction-register data-workspace="personal">
+    <div class="fixture-controls">
+      <label>Filter fictional merchants <input id="transaction-search" type="search" autocomplete="off"></label>
+      <select id="account-filter" hidden><option value="all">All accounts</option></select>
+      <button id="review-filter" data-review-state="all" type="button" hidden><span data-review-label>All</span></button>
+    </div>
+    <div class="transaction-selection-bar" data-transaction-selection-bar hidden>
+      <strong data-transaction-selection-count>0 selected</strong>
+      <button type="button" class="text-link" data-clear-selection>Clear selection</button>
+    </div>
+    <div data-transaction-feedback hidden role="status"><span data-transaction-feedback-text></span><button data-transaction-retry type="button">Retry</button><button data-transaction-discard type="button">Discard</button></div>
+    <span data-transaction-save-status class="sr-only" aria-live="polite"></span>
+    <div class="table-scroll transactions-scroll">
+      <table class="transactions-table">
+        <thead><tr><th class="transaction-select-cell"><input type="checkbox" data-select-all aria-label="Select loaded fictional transactions"></th><th scope="col">Row</th><th scope="col">Fictional merchant</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p id="transaction-count" data-period="Fictional fixture"></p>
+    <dialog data-transaction-receipt-dialog>
+      <span data-receipt-payee></span><img data-receipt-preview alt="Fictional receipt" hidden><a data-receipt-pdf hidden>PDF</a>
+      <p data-receipt-error hidden></p><p data-receipt-status></p><p data-receipt-empty></p>
+      <form data-receipt-form><input type="file" data-receipt-file disabled><button type="button" data-receipt-remove disabled>Remove</button></form>
+      <button type="button" data-receipt-close>Close</button>
+    </dialog>
+  </section>
+  <p>Unexpected API calls blocked: <output id="fixture-blocked">0</output></p>
+</main>
+<div id="toast" hidden><span></span></div>
+<script id="whab-context" type="application/json">{"apiPrefix":"/fictional-selection-api","receiptIndexScoped":true,"bulkReview":false,"budgetUrl":"/budgets/fictional-selection","page":"transactions","monthToken":"2026-11","currency":"USD"}</script>
+<script type="module">
+  const examples = [
+    ['70', 'Fictional cafe'], ['5', 'Fictional market A'], ['40', 'Fictional books'],
+    ['2', 'Fictional market B'], ['90', 'Fictional café 東京'], ['13', 'Fictional market C'],
+    ['22', 'Fictional bakery'], ['8', 'Fictional market D'],
+  ];
+  const body = document.querySelector('tbody');
+  for (const [index, [id, merchant]] of examples.entries()) {
+    const row = document.createElement('tr');
+    row.className = 'transaction-row';
+    Object.assign(row.dataset, {transactionId:`fictional-${id}`, merchant, payee:merchant.toLowerCase(), reviewed:'false', pending:'false', transfer:'false'});
+    row.innerHTML = `<td class="transaction-select-cell"><input type="checkbox" data-select-transaction aria-label="Select fictional row ${index + 1}"></td><td>${index + 1}</td><td><span></span><div hidden><textarea data-transaction-field="note" readonly></textarea><select data-transaction-field="categoryId" disabled><option value="">Uncategorized</option></select><button data-transaction-reviewed type="button" disabled>R</button><button data-transaction-receipt type="button" disabled>Receipt</button></div></td>`;
+    row.querySelector('span').textContent = merchant;
+    body.append(row);
+  }
+  // No application request leaves this static fixture. Module/style loads remain
+  // normal static resources; the sole expected API call is a mocked receipt read.
+  let blocked = 0;
+  window.fetch = async (url, options) => {
+    if (url === '/fictional-selection-api/receipts/index' && options?.method === 'POST') {
+      return new Response(JSON.stringify({supported:false, transactionIds:[]}), {headers:{'Content-Type':'application/json'}});
+    }
+    document.querySelector('#fixture-blocked').value = String(++blocked);
+    throw new Error('This fictional selection fixture blocks every ledger request.');
+  };
+  document.querySelector('#fixture-theme').addEventListener('click', event => {
+    const dark = document.documentElement.dataset.theme !== 'dark';
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    event.target.textContent = dark ? 'Switch to light' : 'Switch to dark';
+  });
+  try {
+    const {initTransactionRegister} = await import('../../src/whab_plugin_web/static/transaction-register.js');
+    const register = initTransactionRegister({navigate:async () => true});
+    window.addEventListener('pagehide', () => register.dispose(), {once:true});
+    document.querySelector('#fixture-status').textContent = 'Ready · shipped register controller';
+  } catch (error) {
+    document.querySelector('#fixture-status').textContent = `FAIL: ${error.message}`;
+    throw error;
+  }
+</script>
+</html>

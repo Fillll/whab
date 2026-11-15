@@ -175,6 +175,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   let bulkBusy = false;
   let bulkPromise = null;
   let categoriesLocked = false, retainedEdits = false, streamPaused = false;
+  let selectionAnchor = null;
   const categoryLocks = new Map();
   const nativeBulk = getContext().bulkReview === true;
   const saveOne = (transactionId, patch) => api(`/transactions/${encodeURIComponent(transactionId)}`, {workspace, ...patch}, 'PATCH');
@@ -249,6 +250,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     return selected;
   }
   function filter() {
+    selectionAnchor = null;
     let visible = 0;
     for (const row of rows) {
       row.hidden = !row.dataset.payee.includes(search.value.toLowerCase()) ||
@@ -416,10 +418,12 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     }
   });
   listen(selectAll, 'change', () => {
+    selectionAnchor = null;
     for (const row of rows) if (!row.hidden) row.querySelector('[data-select-transaction]').checked = selectAll.checked;
     selection();
   });
   listen(selectionBar.querySelector('[data-clear-selection]'), 'click', () => {
+    selectionAnchor = null;
     for (const row of rows) row.querySelector('[data-select-transaction]').checked = false;
     selection();
   });
@@ -541,7 +545,21 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       listen(control, 'input', () => {editStarted(); row.classList.remove('is-saved');});
       listen(control, 'change', () => {editStarted(); void saveMemo();});
     }
-    listen(row.querySelector('[data-select-transaction]'), 'change', selection);
+    const checkbox = row.querySelector('[data-select-transaction]');
+    listen(checkbox, 'click', event => {
+      if (event.defaultPrevented || categoriesLocked || checkbox.disabled || row.hidden) return;
+      const selectable = rows.filter(candidate => !candidate.hidden && !candidate.querySelector('[data-select-transaction]').disabled);
+      const anchorIndex = selectable.indexOf(selectionAnchor);
+      if (event.shiftKey && anchorIndex !== -1) {
+        const targetIndex = selectable.indexOf(row);
+        // Native checkbox activation has already toggled the endpoint. Apply that
+        // same state to the inclusive range in the displayed (possibly sorted) order.
+        for (const candidate of selectable.slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1)) {
+          candidate.querySelector('[data-select-transaction]').checked = checkbox.checked;
+        }
+      } else selectionAnchor = row;
+    });
+    listen(checkbox, 'change', selection);
     listen(category, 'change', () => {
       editStarted();
       const selected = selection();

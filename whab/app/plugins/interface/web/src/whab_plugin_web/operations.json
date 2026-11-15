@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals.",
+  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals.",
   "delegates": [
     "core"
   ],
@@ -416,7 +416,7 @@
       "summary": "Apply or clear one category on 1–100 explicit selected transactions using one guarded atomic edit; retain displayed rows until explicit refresh.",
       "input": {
         "type": "object",
-        "description": "Required selected-row category choice. Revision/request ID are obtained internally by the browser.",
+        "description": "Required selected-row category choice. Click a checkbox then Shift-click another to select the inclusive loaded visible range in display order; Shift-click a checked endpoint to clear that range. Outside selections stay unchanged. Repeated Shift-clicks retain the last ordinary click as anchor. Clear/select-all/filter/navigation resets the anchor; hidden, disabled and unloaded rows are excluded. Selection alone never writes data, and existing 1–100 edit limits still apply. Revision/request ID are obtained internally by the browser.",
         "properties": {
           "workspace": {
             "type": "string",

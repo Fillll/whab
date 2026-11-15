@@ -154,6 +154,22 @@ an unconfirmed result. Resolve those requests through their original retry first
 the control never discards their request identities or silently starts a new one.
 The action is local to this tab and sends no financial mutation or bank sync.
 
+### Selecting transaction ranges
+
+Click a row checkbox, then hold **Shift** and click another checkbox to select
+both rows and every loaded, visible row between them in the current display order.
+Shift-clicking a checked checkbox clears that range instead. Selections outside
+the range stay unchanged. Repeated Shift-clicks keep the last ordinary click as
+their starting point; without a starting point, Shift-click toggles only that row.
+Hidden and disabled rows are skipped. Clear selection, Select loaded transactions,
+and changing the filters or navigating to another view reset the starting point.
+Rows loaded while scrolling can join the range; unloaded records are never selected
+implicitly. Ordinary keyboard checkbox selection continues to work.
+
+Selection changes only this view, with no financial writes. Bulk category and
+review actions retain their existing limits; selecting more than 100 rows does
+not bypass the category batch limit or split its save.
+
 ### Selected category changes
 
 With WHAB 2.75+ and Web 1.53+, select 2–100 loaded transactions and change the
@@ -262,6 +278,12 @@ Enabled file importers render their upload form in **Settings**, from every page
 Choose **Settings → Plugins → Installed → WHAB web → Settings → Appearance**, then **Light** or **Dark**. The change applies immediately across the web interface. The preference is remembered in this browser for the current origin (hostname and port), independently of financial data and portable budget settings. With no saved choice, the initial appearance follows the browser's system preference. When browser storage is unavailable, switching still works for the current page. The appearance script restores a saved choice before the stylesheet loads; web assets use the web plugin's version so plugin-only updates refresh their styling.
 
 ## Development checks
+
+Serve this plugin folder with the static fixture command below and open
+`/tests/fixtures/transaction-selection.html` to exercise native checkbox range
+selection with the shipped controller. Check forward/reverse Shift-click, range
+clearing, Clear selection, Select all, filtered rows and ordinary Space selection
+in both appearances. The fixture has only fictional rows and blocks ledger requests.
 
 For the footer layout regression, serve this plugin's static source with `python -m http.server 5181 --bind 127.0.0.1 --directory plugins/interface/web` from `whab/app/`, then open `http://127.0.0.1:5181/tests/fixtures/sidebar-footer.html`. This fictional fixture checks the shipped stylesheet in ten desktop/compact, short/tall, light/dark cases. Every row must pass: the gear's bottom inset remains constant at five scroll positions, the opaque footer covers the bottom strip across its width, and the last account remains visible. This static fixture does not start WHAB or open a runtime home.
 
