@@ -86,7 +86,12 @@ def test_offline_flow_variants_preserve_annotation_and_exact_public_flow_identit
     result = bank.exercise_bank_runtime(runtime, scenario, variant=variant, disconnect=disconnect)
     assert result["variant"] == variant and ("disconnect" in result["steps"]) is disconnect
     posted, = runtime.data["transactions"]
-    assert posted["note"] == "Fictional retained annotation" and posted["reviewed"]
+    assert posted["note"] == "Fictional retained annotation"
+    # This scenario preserves a pending, uncategorized annotation through posting;
+    # posting alone must not promote it to reviewed.
+    assert posted["reviewed"] is False
+    annotations = [body for method, _, body in runtime.calls if method == "PATCH"]
+    assert annotations == [{"workspace": "personal", "reviewed": False, "note": "Fictional retained annotation"}]
     exchanges = [body for _, path, body in runtime.calls if path.endswith("/exchange")]
     assert exchanges[-1].keys() == {"flowId"}  # Update completion cannot exchange a new public token.
     assert len(exchanges) == (3 if variant == "completion-replay" else 2)
