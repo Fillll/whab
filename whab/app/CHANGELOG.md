@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.78.0 — 2026-11-14
+
+PR: [#202](https://github.com/Fillll/whab/pull/202)
+
+- Add guarded public transaction editing and manual creation, exact read-only previews, and atomic mixed edit/create batches with durable retry receipts and reversible audit history. An explicit balance-preserving mode validates that each account's transaction amount total is unchanged before saving a split into ordinary records.
+- Preserve imported identities, source evidence and omitted annotations; financial corrections become unreviewed. Expose the contract through native SQLite/JSON storage, isolated workers and authenticated HTTPS clients.
+
 ## 2.77.0 — 2026-11-13
 
 PR: [#199](https://github.com/Fillll/whab/pull/199)

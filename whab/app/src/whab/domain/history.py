@@ -39,7 +39,7 @@ _FIELDS = {
 }
 REVERSIBLE = frozenset({'match_transfer', 'apply_transfer_match',
     'add_account', 'update_account', 'add_category', 'add_category_group', 'move_category', 'delete_category', 'delete_category_group', 'add_transaction',
-    'edit_transactions', 'classify_accounts', 'edit_transaction', 'edit_transaction_details', 'review_transactions', 'classify_category', 'rename_category', 'append_transaction_note',
+    'edit_transactions', 'change_transactions', 'classify_accounts', 'edit_transaction', 'edit_transaction_details', 'review_transactions', 'classify_category', 'rename_category', 'append_transaction_note',
     'assign', 'assign_next_month', 'set_rollover_mode',
 })
 _ENTRY_FIELDS = {'id', 'time', 'actor', 'actorKind', 'batchId', 'operation', 'requestId',

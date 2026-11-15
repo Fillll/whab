@@ -199,8 +199,16 @@ class LedgerService:
         if month is not None:
             _month(month)
         with self._lock:
-            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_category_classification", "preview_bulk_edits", "transfer_candidates", "preview_transfer_match"}:
+            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_category_classification", "preview_bulk_edits", "transfer_candidates", "preview_transfer_match", "preview_transaction_changes"}:
                 raise StoreError("Only feature queries accept parameters.")
+            if operation == 'transaction_change_policy':
+                self._require_transaction_changes()
+                return {'revision': self._revision, 'data': {'version': 1, 'maxChanges': 100, 'preserveBalances': True}}
+            if operation == 'preview_transaction_changes':
+                values = self._validate_transaction_changes(parameters)
+                self._require_transaction_changes()
+                return {'revision': self._revision, 'data': _public(self._store.preview_transaction_changes(
+                    workspace, values['edits'], values['creates'], preserve_balances=values['preserveBalances']))}
             if operation in {'transfer_candidates', 'preview_transfer_match'}:
                 self._require_transfer_matching()
                 values = {} if parameters is None else parameters
@@ -334,6 +342,8 @@ class LedgerService:
         documented = documented_operation(core_document(), "command", operation) if type(operation) is str else None
         if documented is None:
             raise StoreError("Unknown ledger command.")
+        if operation == 'change_transactions':
+            return LedgerService._validate_transaction_changes(payload)
         if operation in {'edit_transactions', 'classify_accounts'}:
             from whab.domain.bulk import validate_edits
             if type(payload) is not dict or payload.keys() != {'edits'}:
@@ -457,6 +467,23 @@ class LedgerService:
         )):
             raise StoreError('Update the storage backend/authority for atomic bulk edits with history and durable receipts. No items were changed.')
 
+    @staticmethod
+    def _validate_transaction_changes(payload):
+        from whab.domain.transaction_changes import validate_transaction_changes
+        if type(payload) is not dict or not {'edits', 'creates'} <= payload.keys() or payload.keys() - {'edits', 'creates', 'preserveBalances'}:
+            raise StoreError('Transaction changes require edits and creates arrays, with optional preserveBalances.')
+        preserve = payload.get('preserveBalances', False)
+        edits, creates = validate_transaction_changes(payload['edits'], payload['creates'], preserve_balances=preserve)
+        return {'edits': edits, 'creates': creates, 'preserveBalances': preserve}
+
+    def _require_transaction_changes(self):
+        supported = getattr(self._store, 'supports_atomic_transaction_changes', None)
+        if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
+            'change_transactions', 'preview_transaction_changes', 'history_scope', 'budget_history',
+        )):
+            raise StoreError('Update the storage backend/authority for atomic transaction edits and creation with history and durable receipts. Nothing was changed.')
+        self._require_classified_review()
+
     def command(
         self, operation: str, workspace: str, payload: dict, *,
         request_id: str, expected_revision: str, history: dict | None = None,
@@ -469,6 +496,8 @@ class LedgerService:
             self._require_transfer_matching()
         if operation in {'edit_transactions', 'classify_accounts'}:
             self._require_atomic_bulk()
+        if operation == 'change_transactions':
+            self._require_transaction_changes()
         if operation in {'delete_category', 'delete_category_group'}:
             supported = getattr(self._store, 'supports_category_deletion', None)
             if (not callable(supported) or supported() is not True
@@ -561,6 +590,8 @@ class LedgerService:
                         workspace, payload['categoryId'] if operation == 'delete_category' else payload['parentId'])
                 elif operation in {'edit_transactions', 'classify_accounts'}:
                     data = _public(getattr(self._store, operation)(workspace, payload['edits']))
+                elif operation == 'change_transactions':
+                    data = _public(self._store.change_transactions(workspace, payload['edits'], payload['creates'], preserve_balances=payload['preserveBalances']))
                 elif operation == "classify_category":
                     data = self._store.classify_category(workspace, payload["categoryId"], payload["kind"])
                 elif operation == "rename_category":

@@ -1255,6 +1255,68 @@ fails. Receipt expiry with stale evidence fails. Uncertain native/checkpoint res
 retain the existing fences; never silently replay with fresh identity or revision.
 `--batch` still only groups history entries across otherwise independent commits.
 
+## AtomicTransactionChanges (optional, WHAB 2.78+)
+
+General transaction corrections and manual creation need a separate optional
+contract: `AtomicBulkEdits` intentionally remains annotation-only, and repeated
+single-record calls cannot make an edit-plus-create split atomic. The CLI owns
+parsing, exact name resolution and presentation; core owns final-state validation
+and cash conservation; native adapters own one transaction, history and save.
+The required `StorageBackend` and earlier annotation operations are unchanged.
+
+```python
+supports_atomic_transaction_changes() -> bool
+preview_transaction_changes(workspace, edits, creates, *, preserve_balances=False) -> dict
+change_transactions(workspace, edits, creates, *, preserve_balances=False) -> dict
+```
+
+Explicit `True` promises one native commit, synchronous durable checkpoint,
+durable exact-retry receipts and one reversible audit entry. SQLite 1.27+ and
+JSON 1.19+ implement this capability. Public `change_transactions` and read-only
+`preview_transaction_changes` accept `{edits, creates, preserveBalances?}` with
+1–100 total records. `transaction_change_policy` probes versioned support, including
+on a remote authority; unsupported adapters refuse without mutation or fallback.
+The packaged core operation schemas define every field and the public SDK
+`validate_transaction_changes` validates/detaches the input structure.
+
+Edits address stable transaction IDs and accept account, date, merchant, signed
+integer-minor-unit amount, category, category attribution, review and memo changes.
+Omitted fields are preserved verbatim. Positive amounts are outflows, negative
+amounts are inflows; zero and currency-changing account moves are rejected. Every
+creation supplies a unique canonical UUID `creationId`, account, currency, date,
+merchant and amount; category and memo are optional. New records are ordinary
+manual, posted, unreviewed transactions. A changed financial field resets review;
+combining such a correction with `reviewed: true` is rejected. Annotation-only
+changes retain existing review/classification rules. Matched-transfer financial
+and category protections remain; no counterpart link is invented or removed.
+
+Imported corrections use the established `original` evidence: source/provider IDs
+stay on the existing record, omitted merchant whitespace and memo remain exact,
+and subsequent provider updates/posting replacements retain corrections. No bank
+sync is triggered. Manual creation does not automatically reconcile with a future
+bank import; the user must inspect overlap through supported operations.
+
+For an existing receipt split, explicitly set `preserveBalances: true`. Core
+requires the sum of transaction-amount deltas to be exactly zero separately in
+every affected account and currency, then preserves each account balance snapshot.
+This avoids counting the newly created manual portion again when the corrected
+original came from an import. A nonconserving batch is rejected entirely. Without
+this option, existing manual balance adjustments and imported snapshot-preserving
+correction semantics apply. The result is ordinary transactions, not a new split
+or loan entity; their shared audit entry records the atomic relationship.
+
+Preview/results contain `count`, `changed`, `changes` in edits-then-creations order,
+`createdIds` and `balanceChanges`. Each change has exact public `before`/`after`
+records including correction evidence; a creation has `before: null`. Account
+balance comparisons include unchanged snapshots. Preview never reserves a revision.
+The CLI generates stable creation UUIDs from the intent request ID and creation
+index before preview; recovery retains the full original intent, IDs, revision,
+history attribution and request ID. Exact native retries return the original
+saved result after restart without another transaction/history/save. Conflicting
+reuse or stale expired receipts fail. Guarded undo/redo reverses the edited record,
+new records and balance changes together; any conflict refuses the whole reversal.
+Worker RPC and supported HTTPS transports carry the same public operations.
+
 ## Reviewed transfer matching
 
 WHAB 2.74 introduces optional public `TransferMatching` SDK capability. The financial

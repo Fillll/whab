@@ -1,5 +1,11 @@
 # SQLite budget storage plugin changelog
 
+## 1.27.0 — 2026-11-14
+
+PR: [#202](https://github.com/Fillll/whab/pull/202)
+
+- Persist core-validated financial edits and manual creations in one native commit with exact preview, optional per-account balance-preserving splits, permanent reversible history and durable retry receipts. Preserve imported correction evidence and unrelated fields; restore the complete change through portable files and restart recovery.
+
 ## 1.26.0 — 2026-11-13
 
 PR: [#199](https://github.com/Fillll/whab/pull/199)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.21.0 — 2026-11-14
+
+PR: [#202](https://github.com/Fillll/whab/pull/202)
+
+- Add name-addressed `trnx edit` and `trnx create`, and financial edits plus creations in `trnx edit-many`, with exact read-only previews, stable creation IDs, guarded retry recovery and verified saved results.
+- Support explicit balance-preserving receipt splits as one native commit/save; retain existing annotation-only commands and document signed minor units, correction provenance, review resets, atomic undo/redo and complete JSON/stdin workflows in offline help.
+
 ## 2.20.0 — 2026-11-13
 
 PR: [#199](https://github.com/Fillll/whab/pull/199)

@@ -314,6 +314,18 @@ class Store(Authority):
     def supports_atomic_bulk_edits(self):
         return True
 
+    def supports_atomic_transaction_changes(self):
+        return True
+
+    def preview_transaction_changes(self, workspace, edits, creates, *, preserve_balances=False):
+        from whab.domain.transaction_changes import transaction_changes
+        return transaction_changes(self._read(workspace), edits, creates, preserve_balances=preserve_balances)
+
+    def change_transactions(self, workspace, edits, creates, *, preserve_balances=False):
+        from whab.domain.transaction_changes import transaction_changes
+        return self._mutate(workspace, lambda state: transaction_changes(
+            state, edits, creates, preserve_balances=preserve_balances, apply=True), history_operation='change_transactions')
+
     def preview_bulk_edits(self, workspace, operation, edits):
         from whab.domain.bulk import bulk_changes
         return bulk_changes(self._read(workspace), operation, edits)

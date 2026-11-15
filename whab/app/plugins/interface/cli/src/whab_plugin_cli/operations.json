@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "cli",
-  "summary": "Name-addressed whab console with an agent workflow, offline operation help and JSON discovery, guarded edits/history, bank/investment reports, local budget creation, imports and plugin management; production is the CLI default.",
+  "summary": "Name-addressed whab console with an agent workflow, offline operation help and JSON discovery, guarded financial edits/manual creation/atomic splits/history, bank/investment reports, local budget creation, imports and plugin management; production is the CLI default.",
   "delegates": [
     "core"
   ],
@@ -5577,6 +5577,279 @@
       ],
       "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
       "availability": "CLI 2.11+, WHAB 2.65+; native category-management adapters for creation/moves. category.workflow is documentation only."
+    },
+    {
+      "name": "transactions.change",
+      "kind": "local",
+      "summary": "Use trnx edit, trnx create or mixed edit-many JSON to correct and create 1–100 ordinary transactions atomically, including balance-preserving splits.",
+      "input": {
+        "type": "object",
+        "description": "Short CLI workflow, not a new HTTP endpoint. Delegates financial validation to core change_transactions/preview_transaction_changes. Arrays are optional but total1–100; aliases resolve names before public intent construction.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Existing name-addressed budget or stable ID."
+          },
+          "edits": {
+            "type": "array",
+            "description": "Existing-record changes; distinct stable transaction IDs.",
+            "items": {
+              "type": "object",
+              "description": "One existing stable transaction and explicit changes; omitted fields preserve saved values. Financial corrections reset review.",
+              "properties": {
+                "transactionId": {
+                  "type": "string",
+                  "description": "Existing nondeleted transaction stable ID."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Unique exact account name or stable ID; mutually exclusive with accountId."
+                },
+                "accountId": {
+                  "type": "string",
+                  "description": "Stable same-currency account ID; mutually exclusive with account."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "YYYY-MM-DD from 1900-01-01 through 2200-12-31."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Explicit payee/merchant, 1–200 raw characters; supplied whitespace and omitted saved fields are preserved verbatim."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Signed minor units: positive outflow, negative inflow; nonzero; no decimal major-unit input."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Stable ID, unique exact category name or Group / Category; mutually exclusive with categoryId."
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Existing same-currency child category ID or null to clear; mutually exclusive with category."
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared category attribution for explicit category change; null clears; --agent is default."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Memo replacement verbatim, at most 1000 characters; empty string clears; omitted edit field preserved."
+                },
+                "reviewed": {
+                  "type": "boolean",
+                  "description": "Explicit review state; true requires eligible classification and cannot accompany an actual financial correction."
+                },
+                "appendNote": {
+                  "type": "string",
+                  "description": "Append one newline if saved note is nonempty and then exact text; mutually exclusive with note; resulting memo max1000."
+                }
+              },
+              "required": [
+                "transactionId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "creates": {
+            "type": "array",
+            "description": "New manual transactions in fixed input order.",
+            "items": {
+              "type": "object",
+              "description": "New ordinary manual unreviewed transaction. Supply exactly one of account/accountId; never transfer counterpart inference.",
+              "properties": {
+                "creationId": {
+                  "type": "string",
+                  "description": "Optional canonical UUID fixing the new ID; otherwise deterministically derived from the request ID and creation index."
+                },
+                "account": {
+                  "type": "string",
+                  "description": "Unique exact account name or stable ID; mutually exclusive with accountId."
+                },
+                "accountId": {
+                  "type": "string",
+                  "description": "Stable same-currency account ID; mutually exclusive with account."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "YYYY-MM-DD from 1900-01-01 through 2200-12-31."
+                },
+                "merchant": {
+                  "type": "string",
+                  "description": "Explicit payee/merchant, 1–200 raw characters; supplied whitespace and omitted saved fields are preserved verbatim."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "Signed minor units: positive outflow, negative inflow; nonzero; no decimal major-unit input."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Stable ID, unique exact category name or Group / Category; mutually exclusive with categoryId."
+                },
+                "categoryId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Existing same-currency child category ID or null to clear; mutually exclusive with category."
+                },
+                "categoryAgent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Self-declared category attribution for explicit category change; null clears; --agent is default."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Memo replacement verbatim, at most 1000 characters; empty string clears; omitted edit field preserved."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Explicit ISO currency code matching account currency; no conversion."
+                }
+              },
+              "required": [
+                "date",
+                "merchant",
+                "amount",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "preserveBalances": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicit split mode: require zero signed amount delta per account/currency across the entire batch, then preserve exact saved account balances; normal manual creates otherwise change balances."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false,
+            "description": "Read-only exact before/after records, new IDs and account balance changes; no save or audit."
+          },
+          "agent": {
+            "type": "string",
+            "description": "Self-declared audit actor; default categoryAgent only on explicit category choices."
+          },
+          "batch": {
+            "type": "string",
+            "description": "History grouping, not commit batching."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Observed preview or original recovery revision; automatic when omitted."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Original intent ID for exact recovery; automatic when omitted. Reuse with revision to commit the exact preview IDs."
+          }
+        },
+        "required": [
+          "budget"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Verified complete public saved records or read-only plan in data.changes (edits then creations, before:null for creations), createdIds, count, changed and balanceChanges, plus budget identity, revision, dryRun, requestId, expectedRevision and complete intent. replayed marks original receipt rather than current ledger state.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "Fictional budget",
+            "preserveBalances": true,
+            "edits": [
+              {
+                "transactionId": "fictional-receipt",
+                "amount": -7000
+              }
+            ],
+            "creates": [
+              {
+                "account": "Fictional savings",
+                "date": "2026-11-02",
+                "merchant": "Fictional lender",
+                "amount": -3000,
+                "currency": "USD",
+                "category": "Fictional finance / Transfers",
+                "note": "Copied source memo"
+              }
+            ],
+            "dryRun": true,
+            "agent": "Codex"
+          },
+          "output": {
+            "budget": "Fictional budget",
+            "budgetId": "fictional-budget",
+            "revision": "observed-fictional-revision",
+            "dryRun": true,
+            "requestId": "fictional-request",
+            "expectedRevision": "observed-fictional-revision",
+            "data": {
+              "count": 2,
+              "changed": 2,
+              "createdIds": [
+                "dd447558-3621-568f-81c2-d2d9f79dbed9"
+              ],
+              "changes": [
+                {
+                  "id": "fictional-receipt",
+                  "before": {
+                    "amount": -10000,
+                    "reviewed": true
+                  },
+                  "after": {
+                    "amount": -7000,
+                    "reviewed": false
+                  }
+                },
+                {
+                  "id": "dd447558-3621-568f-81c2-d2d9f79dbed9",
+                  "before": null,
+                  "after": {
+                    "id": "dd447558-3621-568f-81c2-d2d9f79dbed9",
+                    "accountId": "fictional-savings",
+                    "date": "2026-11-02",
+                    "merchant": "Fictional lender",
+                    "amount": -3000,
+                    "currency": "USD",
+                    "categoryId": "fictional-transfer",
+                    "source": "manual",
+                    "reviewed": false,
+                    "note": "Copied source memo"
+                  }
+                }
+              ],
+              "balanceChanges": [
+                {
+                  "accountId": "fictional-savings",
+                  "currency": "USD",
+                  "before": 25000,
+                  "after": 25000
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "side_effects": "Preview is read-only. Execution validates all items before one native commit/revision/durable checkpoint and one reversible audit entry, including existing record and creation. Financial corrections reset review; creations manual/unreviewed. Omitted fields/import identities/source evidence remain; imported corrections retain original metadata for refreshes. Normal imported corrections preserve provider/import balance snapshots; manual creates alter balances. Explicit preserveBalances rejects nonzero per-account cash changes, then preserves snapshots. No sync, automatic matching, loan components or future rule. Existing annotation-only edit-many, categorize and note remain unchanged.",
+      "permissions": "Existing local verified HTTPS authority access. Agent and batch attribution are self-declared; no extra capability or direct database access.",
+      "scope": "One budget/environment and personal workspace. Exact account/category resolution; no fuzzy match, cross-currency conversion, cross-budget targets or production fixture use.",
+      "errors": [
+        "Invalid/missing/deleted/duplicated/ambiguous targets, malformed or conflicting fields, currency mismatches, matched-transfer protections, unsupported native capability or nonconserving preserveBalances plan reject the complete batch before mutation.",
+        "Stale revisions, conflicting request-ID reuse or unexpected receipts fail with retained exact intent. Uncertain responses may already have committed; never repeat as a new intent."
+      ],
+      "retry": "Reuse identical resolved edits/creates, creationId array order, preserveBalances, original revision/request ID and audit metadata. --dry-run returns these. Exact successful retries after restart return original receipt without duplicate records/history/save. No automatic retry; inspect trnx list/history. Copyable JSON/stdin and recovery examples: whab BUDGET trnx edit-many --help.",
+      "availability": "CLI 2.21+, WHAB 2.78+, native SQLite 1.27+ or JSON 1.19+. Unsupported adapters/authorities fail before mutation. Commands and packaged help work noninteractively; help is offline."
     }
   ]
 }

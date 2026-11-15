@@ -831,6 +831,17 @@ class Store(Authority):
     def supports_atomic_bulk_edits(self):
         return True
 
+    def supports_atomic_transaction_changes(self):
+        return True
+
+    def preview_transaction_changes(self, workspace, edits, creates, *, preserve_balances=False):
+        from .transaction_changes import preview
+        return preview(self, workspace, edits, creates, preserve_balances=preserve_balances)
+
+    def change_transactions(self, workspace, edits, creates, *, preserve_balances=False):
+        from .transaction_changes import apply
+        return apply(self, workspace, edits, creates, preserve_balances=preserve_balances)
+
     def preview_bulk_edits(self, workspace, operation, edits):
         from .bulk_edits import preview
         return preview(self, workspace, operation, edits)

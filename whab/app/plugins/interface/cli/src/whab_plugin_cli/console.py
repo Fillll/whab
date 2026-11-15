@@ -27,6 +27,7 @@ from .help import (
     overview,
 )
 from .identifiers import check_identifiers, host_id, plugin_identifiers
+from .transaction_change_help import CHANGE_HELP
 lazy from . import client
 lazy from .account_commands import account_table, add_account_parser, execute_account
 lazy from .bank_commands import add_bank_parser, bank_error, bank_request
@@ -35,6 +36,7 @@ lazy from .category_commands import add_category_parser, category_table, execute
 lazy from .history_commands import add_history_parser, execute_history
 lazy from .record_edits import add_note_parser, execute_note, note_table
 lazy from .review_commands import review_audit_table
+lazy from .transaction_changes import add_change_parsers, execute_changes
 lazy from .transaction_commands import add_category_parsers, execute_category
 lazy from .transaction_reads import (
     add_uncategorized_parser,
@@ -72,7 +74,7 @@ def parser(options, argv=()):
     check_identifiers(catalog)
     root = CommandParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
-        epilog='Category types: expense, income, transfer. Use category create/classify --type TYPE. Explicit review: trnx review IDS --reviewed; inspect legacy flags with trnx review-audit. See trnx review --help for classification requirements and atomic recovery.\n\n' + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
+        epilog='Transaction corrections: trnx edit TX_ID; manual entry: trnx create; atomic edit-plus-create split: trnx edit-many --file split.json --preserve-balances. See each command --help for complete examples and recovery.\n\nCategory types: expense, income, transfer. Use category create/classify --type TYPE. Explicit review: trnx review IDS --reviewed; inspect legacy flags with trnx review-audit. See trnx review --help for classification requirements and atomic recovery.\n\n' + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
     budget = groups.add_parser("budget", help="Create and list saved budgets")
@@ -127,7 +129,7 @@ def parser(options, argv=()):
         summary.add_argument("--month", help="YYYY-MM; default: current month")
         summary.add_argument("--currency", default="USD", help="ISO currency code (default: USD); currencies are never combined")
     if requested in (None, "transactions", "trnx"):
-        transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit transactions; review proposed transfers; atomic bulk annotations", epilog=TRANSFER_HELP + "\n\n" + BULK_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
+        transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit/create transactions; atomic splits and annotations; review transfers", epilog=TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + CHANGE_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
         reads = transactions.add_subparsers(dest="filter", required=True)
         unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
             epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
@@ -136,6 +138,7 @@ def parser(options, argv=()):
         add_search_parser(reads, catalog)
         add_category_parsers(reads)
         add_note_parser(reads)
+        add_change_parsers(reads)
         from .review_commands import add_review_parsers
         add_review_parsers(reads)
         add_edit_many(reads)
@@ -287,6 +290,8 @@ def execute(args, home, environment, ca):
             return execute_category(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter == "note":
             return execute_note(connection, identifier, prefix, args, exchange, CommandError)
+        if args.command in {"transactions", "trnx"} and args.filter in {"edit", "create"}:
+            return execute_changes(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter == "edit-many":
             return execute_transactions(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "category":

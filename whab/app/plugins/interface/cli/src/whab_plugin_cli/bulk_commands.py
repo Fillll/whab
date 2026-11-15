@@ -29,14 +29,16 @@ def bulk_options(parser, *, attribution=True, formatting=True, recovery=True):
 
 
 def add_edit_many(commands):
-    edit = commands.add_parser('edit-many', help='Atomically edit 1–100 transaction annotations from JSON or stdin',
-        description='Apply different category, agent, review and memo changes in ONE native commit and durable save.',
-        epilog=BULK_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
-    edit.add_argument('--file', required=True, help='UTF-8 JSON file containing {"edits": [...]}; - reads stdin; max 2 MiB')
+    from .transaction_change_help import CHANGE_HELP
+    edit = commands.add_parser('edit-many', help='Atomically edit/create 1–100 transactions from JSON or stdin',
+        description='Apply different financial/annotation edits and manual creations in ONE native commit and durable save.',
+        epilog=BULK_HELP + '\n\n' + CHANGE_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
+    edit.add_argument('--file', required=True, help='UTF-8 JSON {"edits": [...], "creates": [...]}; arrays optional, 1–100 total; - reads stdin; max 2 MiB')
+    edit.add_argument('--preserve-balances', action='store_true', help='Split mode: require zero net signed amount change per account/currency, retaining exact account balance snapshots')
     bulk_options(edit)
 
 
-def read_edits(filename, error):
+def read_edits(filename, error, *, complete=False):
     def unique(pairs):
         result = {}
         for key, value in pairs:
@@ -53,9 +55,14 @@ def read_edits(filename, error):
         if len(raw) > 2 * 1024 * 1024:
             raise ValueError('JSON input exceeds 2 MiB; batches are never split.')
         value = json.loads(raw, object_pairs_hook=unique)
-        if type(value) is not dict or value.keys() != {'edits'} or type(value['edits']) is not list:
-            raise ValueError('Expected exactly {"edits": [...]} with 1–100 items.')
-        return value['edits']
+        if (type(value) is not dict or not value.keys() & {'edits', 'creates'}
+                or value.keys() - {'edits', 'creates', 'preserveBalances'}
+                or any(type(value[key]) is not list for key in ('edits', 'creates') if key in value)
+                or 'preserveBalances' in value and type(value['preserveBalances']) is not bool):
+            raise ValueError('Expected {"edits": [...], "creates": [...], "preserveBalances": false}; arrays are optional, 1–100 total.')
+        if not complete and value.keys() != {'edits'}:
+            raise ValueError('This annotation reader accepts only {"edits": [...]}.')
+        return value if complete else value['edits']
     except (ValueError, OSError) as failure:
         raise error('Cannot read bulk edits: ' + str(failure)) from None
 
@@ -117,7 +124,13 @@ def execute_bulk(connection, identifier, prefix, args, exchange, error, operatio
 
 def execute_transactions(connection, identifier, prefix, args, exchange, error):
     if args.filter == 'edit-many':
-        edits = read_edits(args.file, error)
+        batch = read_edits(args.file, error, complete=True)
+        edits = batch.get('edits', [])
+        if ('creates' in batch or 'preserveBalances' in batch or getattr(args, 'preserve_balances', False)
+                or any(type(row) is dict and row.keys() & {'account', 'accountId', 'date', 'merchant', 'amount', 'currency'} for row in edits)):
+            from .transaction_changes import execute_changes
+            return execute_changes(connection, identifier, prefix, args, exchange, error,
+                edits=edits, creates=batch.get('creates', []), preserve_balances=batch.get('preserveBalances', False) or getattr(args, 'preserve_balances', False))
     else:
         edits = [{'transactionId': value, 'categoryId': None} if args.clear else {'transactionId': value, 'category': args.category} for value in args.transaction_id]
         if args.needs_review:
@@ -145,14 +158,19 @@ def bulk_table(result):
              f"{result['data']['count']} targets; {result['data']['changed']} changed"]
     for row in result['data']['changes']:
         lines.append(json.dumps(row['id'], ensure_ascii=True))
-        keys = sorted(set(row['before']) | set(row['after']))
-        differences = [key for key in keys if row['before'].get(key) != row['after'].get(key)]
+        before, after = row['before'] or {}, row['after']
+        if row['before'] is None:
+            lines.append('  new manual transaction')
+        keys = sorted(set(before) | set(after))
+        differences = [key for key in keys if row['before'] is None or before.get(key) != after.get(key)]
         for key in differences:
-            lines.append('  ' + key + ': ' + json.dumps(row['before'].get(key), ensure_ascii=True) + ' -> ' + json.dumps(row['after'].get(key), ensure_ascii=True))
+            lines.append('  ' + key + ': ' + json.dumps(before.get(key), ensure_ascii=True) + ' -> ' + json.dumps(after.get(key), ensure_ascii=True))
         if not differences:
             lines.append('  unchanged')
+    for balance in result['data'].get('balanceChanges', []):
+        lines.append('Account balance ' + json.dumps(balance['accountId'], ensure_ascii=True) + ' ' + balance['currency'] + ': ' + str(balance['before']) + ' -> ' + str(balance['after']))
     lines.append('Revision: ' + result['revision'])
-    if not result['dryRun']:
+    if not result['dryRun'] or 'requestId' in result:
         lines.append('Request ID: ' + json.dumps(result['requestId'], ensure_ascii=True))
         lines.append('Original expected revision: ' + json.dumps(result['expectedRevision'], ensure_ascii=True))
     return '\n'.join(lines)
