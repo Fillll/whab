@@ -1410,6 +1410,34 @@ retain their old funding behavior, identified by `summary.unclassifiedIncome`;
 `classifiedIncome` identifies explicit Income. Their sum is the compatible `income`
 total. There is no implicit data migration or merchant-based classification.
 
+### Opening Balance classification
+
+WHAB 2.79 adds the explicit child category kind `opening_balance`, independent of
+the category's name. Optional `OpeningBalanceClassification.supports_opening_balances()`
+advertises native financial, review, persistence and audit support; the public
+`opening_balance_policy` query lets remote authorities advertise the same contract.
+Unsupported adapters must reject Opening Balance writes before mutation.
+
+Opening Balance is a technical category with no target or monthly assignment rows.
+Category create/classify and transaction assignment use the existing guarded public
+operations; category-classification previews show exact monthly summary impacts.
+Posted eligible on-budget cash contributes signed `openingFunding`, separate from
+ordinary income and spending. The monthly identity becomes
+`readyToAssign = income + openingFunding + carriedIn - assignedNextMonth - assigned`.
+Account snapshots already include these amounts: core reconstructs boundaries so
+funding appears once, and later months carry the existing balance forward. Opening
+credit debt reserves the existing liability without becoming income, spending or
+opening cash. Tracking assets/debt remain outside budget funding. No name-based
+classification, sign conversion, bank synchronization or data migration occurs.
+
+Classification does not review automatically. Existing zero-valued opening rows
+can be assigned and explicitly reviewed after posting; ordinary transaction
+creation and financial correction still reject zero amounts. Clearing classification
+and pending records retain the classification-before-review rules. Amounts, account
+snapshots, identities, source evidence and omitted fields remain unchanged. Opening
+Balance entries are not transfer-pair candidates. Native history and exact request
+receipts retain guarded undo/redo and restart recovery.
+
 ## Classification before review
 
 WHAB 2.77 supports Expense, Income and Transfer child types (`kind` in public
