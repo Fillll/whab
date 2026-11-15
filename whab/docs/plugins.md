@@ -1553,7 +1553,9 @@ New Merkle entries carry `digestVersion: 2`; `beforeDigest` and `afterDigest` us
 the version-2 financial snapshot root. Entry `hash` and `previousHash` retain
 canonical SHA-256 chaining. At an algorithm transition, validation recomputes the
 preceding financial state under the new algorithm rather than equating different
-hash formats. Independent reopen, history export, undo/redo and guarded restore
+hash formats. The last legacy state root is independently checked before that
+transition. Versions are monotonic: legacy entries form a prefix and version-2
+entries cannot be followed by a downgrade. Independent reopen, history export, undo/redo and guarded restore
 validate the mixed chain. No audit entry is pruned or rewritten to migrate it.
 
 `replay_portable_entries(snapshot, entries)` independently validates bounded

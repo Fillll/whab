@@ -173,10 +173,16 @@ def validate_history(value, *, final_snapshot=None):
         for change in entry['changes']:
             _change(change)
         version = entry.get('digestVersion', 1)
-        if type(version) is not int or version not in {1, 2}:
+        if type(version) is not int or version not in {1, 2} or version < previous_version:
             raise StoreError('Unsupported history integrity version.')
         if version != previous_version:
-            previous_state_digest = state_digest(unflatten(rows), version)
+            # The baseline root was already checked above. At a later boundary,
+            # prove the previous algorithm's final root before adopting the new
+            # root; a rehashed entry chain alone is not financial-state evidence.
+            current = baseline if len(seen) == 1 else unflatten(rows)
+            if len(seen) > 1 and state_digest(current, previous_version) != previous_state_digest:
+                raise StoreError('Budget history state chain is inconsistent.')
+            previous_state_digest = state_digest(current, version)
         if entry['beforeDigest'] != previous_state_digest:
             raise StoreError('Budget history state chain is inconsistent.')
         _apply(rows, entry['changes'], inverse=False)
@@ -205,6 +211,8 @@ def append(journal, before, after, metadata=None, *, trusted=False, before_diges
     if not changes and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
         return journal
     digest_version = digest_version or (2 if journal and journal['formatVersion'] == 2 else 1)
+    if journal and journal['formatVersion'] == 2 and digest_version != 2:
+        raise StoreError('Budget history integrity cannot be downgraded.')
     journal = {**journal, 'entries': list(journal['entries'])} if journal else {'formatVersion': 1, 'baseline': deepcopy(before), 'entries': []}
     if digest_version == 2:
         journal['formatVersion'] = 2

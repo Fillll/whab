@@ -76,12 +76,28 @@ def test_mixed_history_preserves_old_hashes_and_rejects_transition_tampering():
     broken['entries'][1]['hash'] = history.digest({key: value for key, value in broken['entries'][1].items() if key != 'hash'})
     with pytest.raises(StoreError, match='state chain'):
         history.validate_history(broken)
+    # Even a self-consistent entry-hash chain cannot replace the old state root
+    # at the algorithm boundary with an unrelated digest.
+    broken = deepcopy(journal)
+    broken['entries'][0]['afterDigest'] = '0' * 64
+    broken['entries'][0]['hash'] = history.digest({key: value for key, value in broken['entries'][0].items() if key != 'hash'})
+    broken['entries'][1]['previousHash'] = broken['entries'][0]['hash']
+    broken['entries'][1]['hash'] = history.digest({key: value for key, value in broken['entries'][1].items() if key != 'hash'})
+    with pytest.raises(StoreError, match='state chain'):
+        history.validate_history(broken)
     broken = deepcopy(journal)
     broken['entries'][1]['digestVersion'] = 3
     with pytest.raises(StoreError, match='integrity version'):
         history.validate_history(broken)
     with pytest.raises(StoreError):
         history.state_digest(second, 3)
+    with pytest.raises(StoreError, match='downgraded'):
+        history.append(journal, second, first, {'operation': 'edit_transaction'}, digest_version=1)
+    downgraded = history.append(None, second, first, {'operation': 'edit_transaction'})['entries'][0]
+    downgraded['previousHash'] = journal['entries'][-1]['hash']
+    downgraded['hash'] = history.digest({key: value for key, value in downgraded.items() if key != 'hash'})
+    with pytest.raises(StoreError, match='integrity version'):
+        history.validate_history({**journal, 'entries': [*journal['entries'], downgraded]})
 
 
 def test_verified_seed_preserves_source_tree_and_requires_exact_content():
@@ -104,3 +120,17 @@ def test_verified_seed_preserves_source_tree_and_requires_exact_content():
     assert target.digest({'history': {'baseline': baseline}}) == integrity.merkle_digest({'history': {'baseline': baseline}})
     assert not target.seed_immutable(('history', 'baseline'), {'changed': True}, source.last)
     assert not target.seed_immutable(('history', 'baseline'), baseline, None)
+
+
+@pytest.mark.parametrize('value,expected', [
+    (None, 'c58dcb77cee9027d1f4b3207bd876d232e61f79ee9f9dbd4e6d834778da78b16'),
+    ([], 'ad98f6e1464a433660442e646a614897522426aa769e3a0806d2215b4bd92d2d'),
+    ({}, 'c250beb7b611b10b38773cca3b9b9c04023cf071ca1a9dcbafde66772a76f2bd'),
+    ({'a': 1}, 'd2fc7191eb8560816ea113b73a15e6ca08437404d8541c2ab09b07ff8504bb35'),
+    (['a', 2], 'db864657ea2823c25e4f19232e22edc16cf66e6ed51eadc9282ea85c6353b5c1'),
+    ({'id': 'fictional', 'note': '保留'}, 'ca3f9d971dfe3094d6d76d5cae3072f8683fa7a5c6366cc26cd65a70c1094dd8'),
+])
+def test_version_two_wire_vectors_from_independent_sha256_composition(value, expected):
+    # These literal vectors were derived directly from the documented byte tags,
+    # eight-byte counts and hashlib SHA-256, without MerkleHasher/SequenceTree.
+    assert integrity.merkle_digest(value) == expected
