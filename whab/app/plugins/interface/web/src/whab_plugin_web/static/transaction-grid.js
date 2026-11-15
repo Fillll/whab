@@ -30,12 +30,17 @@ export function initTransactionGrid(table) {
   const listen = (event, callback) => table.addEventListener(event, callback, {capture: true, signal: controller.signal});
   const cells = row => [...row.cells].filter(cell => cell.querySelector('input:not([type="hidden"]),select,textarea,button:not(:disabled)'));
   const rows = () => [...table.tBodies[0].rows].filter(row => !row.hidden);
-  const field = cell => cell.querySelector('input:not([type="hidden"]),select,textarea,button:not(:disabled)');
+  const concealed = control => Boolean(control.closest?.('html[data-amounts="hidden"]') && control.closest?.('[data-private-amount], [data-private-content]'));
+  const field = cell => {
+    const control = cell.querySelector('input:not([type="hidden"]),select,textarea,button:not(:disabled)');
+    // Privacy keeps the real input intact; keyboard editing must use its reveal button.
+    return control && concealed(control) ? cell.querySelector('button[data-private-mask]:not([hidden])') : control;
+  };
   function finish() {
     if (!editing) return;
     const control = editing;
     editing = null;
-    control.dispatchEvent(new Event('change', {bubbles: true}));
+    if (!concealed(control)) control.dispatchEvent(new Event('change', {bubbles: true}));
     delete control.dataset.gridEditing;
   }
   function focus(cell) {
@@ -71,6 +76,7 @@ export function initTransactionGrid(table) {
   });
   listen('keydown', event => {
     if (event.isComposing || event.altKey || event.metaKey) return;
+    if (editing && concealed(editing)) finish();
     const cell = event.target.closest('td');
     if (!cell || !field(cell)) return;
     if (event.key === 'Enter' && event.ctrlKey) {

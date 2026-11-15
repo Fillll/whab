@@ -635,17 +635,30 @@ function investmentCell(row, value, className) {
   row.append(cell);
   return cell;
 }
+function investmentAmount(value) {
+  const amount = setupElement('span', value);
+  if (value !== 'Unavailable') amount.dataset.privateAmount = 'XX';
+  return amount;
+}
+function investmentAmountCell(row, value, className) {
+  const cell = investmentCell(row, '', className);
+  cell.append(investmentAmount(value));
+  return cell;
+}
 function renderInvestmentReport(view, report) {
   view.investmentReport = report;
   const accountNames = new Map(report.accounts.map(account => [account.id, account.name]));
   const totals = view.querySelector('[data-investment-totals]'); totals.replaceChildren();
   for (const total of report.totals) {
-    for (const [label, value] of [
+    for (const [label, value, detail] of [
       [`Value · ${total.currency}`, investmentMoney(total.value, total.currency)],
       ['Cost basis available', total.coveredPositions ? investmentMoney(total.costBasis, total.currency) : 'Unavailable'],
-      ['Unrealized gain/loss', total.coveredPositions ? `${investmentMoney(total.unrealizedGain, total.currency)} · ${total.unrealizedReturnPercent}%` : 'Unavailable'],
+      ['Unrealized gain/loss', total.coveredPositions ? investmentMoney(total.unrealizedGain, total.currency) : 'Unavailable', total.coveredPositions ? ` · ${total.unrealizedReturnPercent}%` : ''],
     ]) {
-      const group = setupElement('div'); group.append(setupElement('dt', label), setupElement('dd', value)); totals.append(group);
+      const group = setupElement('div'); const amount = setupElement('dd');
+      amount.append(investmentAmount(value));
+      if (detail) amount.append(setupElement('span', detail));
+      group.append(setupElement('dt', label), amount); totals.append(group);
     }
   }
   const positions = view.querySelector('[data-investment-positions]'); positions.replaceChildren();
@@ -655,11 +668,14 @@ function renderInvestmentReport(view, report) {
     identity.append(setupElement('strong', position.ticker || position.name));
     identity.append(setupElement('small', `${position.name} · ${position.quantity} units · ${position.status}`));
     identity.append(setupElement('small', accountNames.get(position.accountId) || ''));
-    if (position.price !== null) identity.append(setupElement('small', `${position.price} ${position.currency} / unit · ${position.priceAsOf || 'Price date unavailable'}`));
-    investmentCell(row, investmentMoney(position.value, position.currency));
-    investmentCell(row, investmentMoney(position.costBasis, position.currency));
+    if (position.price !== null) {
+      const price = setupElement('small'); price.append(investmentAmount(position.price),
+        setupElement('span', ` ${position.currency} / unit · ${position.priceAsOf || 'Price date unavailable'}`)); identity.append(price);
+    }
+    investmentAmountCell(row, investmentMoney(position.value, position.currency));
+    investmentAmountCell(row, investmentMoney(position.costBasis, position.currency));
     const gainClass = position.unrealizedGain < 0 ? 'investment-loss' : 'investment-gain';
-    investmentCell(row, investmentMoney(position.unrealizedGain, position.currency), gainClass);
+    investmentAmountCell(row, investmentMoney(position.unrealizedGain, position.currency), gainClass);
     investmentCell(row, position.unrealizedReturnPercent === null ? 'Unavailable' : `${position.unrealizedReturnPercent}%`, gainClass);
     investmentCell(row, position.firstRecordedAddition || 'Unavailable'); positions.append(row);
   }
@@ -669,8 +685,8 @@ function renderInvestmentReport(view, report) {
   for (const event of report.activity.slice(0, activityLimit)) {
     const row = setupElement('tr'); const name = investmentCell(row, event.name);
     name.append(setupElement('small', `${event.type}${event.subtype ? ` · ${event.subtype}` : ''}`));
-    investmentCell(row, event.date); investmentCell(row, investmentMoney(-event.amount, event.currency));
-    investmentCell(row, investmentMoney(event.fees, event.currency)); activity.append(row);
+    investmentCell(row, event.date); investmentAmountCell(row, investmentMoney(-event.amount, event.currency));
+    investmentAmountCell(row, investmentMoney(event.fees, event.currency)); activity.append(row);
   }
   view.querySelector('[data-investment-more-activity]').hidden = report.activity.length <= activityLimit;
   view.querySelector('[data-investment-status]').textContent = report.positions.length

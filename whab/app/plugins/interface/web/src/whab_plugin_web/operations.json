@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation. Settings uses one responsive preferences window with persistent section navigation, direct browser-local Appearance and reviewed plugin changes. Account names in multi-account transaction rows show optional bank logos; sidebar accounts support browser-local custom ordering within budget-scope groups.",
+  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation. Settings uses one responsive preferences window with persistent section navigation, direct browser-local Appearance and reviewed plugin changes. Account names in multi-account transaction rows show optional bank logos; sidebar accounts support browser-local custom ordering within budget-scope groups. The top-right eye masks monetary values across Web without changing financial data.",
   "delegates": [
     "core"
   ],
@@ -577,6 +577,74 @@
       ],
       "retry": "Moves can be repeated without financial side effects. Reset order removes this budget/workspace preference and restores the normal displayed order.",
       "availability": "Web 1.60+ browser layout control. Discover this documentation offline with whab-cli describe --plugin web; no new executable CLI, HTTP or SDK ledger operation."
+    },
+    {
+      "name": "appearance.amounts",
+      "kind": "local",
+      "summary": "Top-right eye: Hide amounts replaces monetary fields with fixed XX placeholders; Show amounts restores exact values. Covers balances, budget and transaction amounts, reports, monetary tooltips/accessibility labels, editor values and opaque chart/receipt/history regions.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "shown",
+              "hidden"
+            ],
+            "description": "Browser display preference. New browsers default to shown; the eye toggles the current state."
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "additionalProperties": false,
+        "description": "Browser-local display preference; chosen through the eye control."
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "shown",
+              "hidden"
+            ],
+            "description": "Applied display state for this page."
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "additionalProperties": false,
+        "description": "Display state applied in the current Web page."
+      },
+      "examples": [
+        {
+          "input": {
+            "state": "hidden"
+          },
+          "output": {
+            "state": "hidden"
+          }
+        },
+        {
+          "input": {
+            "state": "shown"
+          },
+          "output": {
+            "state": "shown"
+          }
+        }
+      ],
+      "side_effects": "Writes only whab.amounts=shown|hidden in browser localStorage. Applies across budgets/workspaces in the same origin, before paint and to dynamic fragments; other tabs follow changes. Does not save or modify financial fields, drafts, history or sync. Hidden monetary editors offer Show amounts to edit and restore the exact draft/focus. CLI, API, exports and stored values are unchanged; arbitrary numeric text in names/memos is not scrubbed.",
+      "permissions": "Local Web browser control; this is not a remotely callable CLI/API command or data-access restriction.",
+      "scope": "One browser origin, across its budgets and workspaces. No account/budget data is stored in this preference.",
+      "errors": [
+        "Blocked browser storage keeps this page usable and announces that the preference lasts for this page only.",
+        "Third-party financial HTML must opt into the documented data-private-amount/data-private-content markers; untyped Insight values/details are concealed conservatively."
+      ],
+      "retry": "Toggle freely; no financial mutation or uncertain-write replay occurs. Revealing is necessary before editing monetary inputs.",
+      "availability": "Web 1.61+; Plaid investment amount markers require Plaid 1.9.1+. Read offline with whab-cli describe --plugin web --json."
     }
   ]
 }

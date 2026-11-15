@@ -50,7 +50,7 @@ def test_sidebar_balances_include_import_estimates_without_inventing_unknown_sna
             ("import-debt", "-$235", "Estimated from imported transactions"),
             ("verified-import", "-$400", "Current balance"),
         ):
-            assert f'>{amount}</small>' in rows[identifier]
+            assert re.sub(r'<[^>]*>', '', re.search(r'<small[^>]*>(.*?)</small>', rows[identifier])[1]) == amount
             assert "≈" not in rows[identifier]
             assert f'title="{label}"' in rows[identifier]
             assert f'aria-label="{label}' in rows[identifier]
@@ -67,7 +67,7 @@ def test_sidebar_balances_round_selected_currency_to_whole_units(client, store, 
         "currency": currency,
     })
     rows = sidebar_rows(client.get(f"/budgets/home/budget/2026-10/{currency.lower()}").text)
-    assert f'>{formatted}</small>' in rows[account]
+    assert f'<span data-private-amount>{formatted}</span></small>' in rows[account]
 
 
 @pytest.mark.parametrize('value,currency,expected', (

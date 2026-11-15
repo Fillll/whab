@@ -59,3 +59,41 @@ test('older report fields are unavailable rather than fabricated and sort after 
   state.sortKey='annual';assert.equal(selectPlans([legacy,rows[1]],state).at(-1).id,'legacy');
   state.filters={occurrencesLast12Months:{min:'0'}};assert.deepEqual(selectPlans([legacy],state),[]);
 });
+
+test('plan rendering marks monetary cells and range editors without masking dates or charge counts', async () => {
+  const {renderSubscriptionPlans, createPlanTableState} = await load();
+  const previousDocument = global.document, previousFrame = global.requestAnimationFrame;
+  class Element {
+    constructor(tag) {this.tagName=tag; this.children=[]; this.dataset={}; this.style={}; this.events={}; this.attributes={}; this.classList={add(){},toggle(){}};}
+    append(...nodes) {this.children.push(...nodes);}
+    replaceChildren(...nodes) {this.children=nodes;}
+    setAttribute(name,value) {this.attributes[name]=value;}
+    addEventListener(name,handler) {this.events[name]=handler;}
+    querySelector(selector) {const value = /option\[value="(.*)"\]/.exec(selector)?.[1]; return this.children.find(node=>node.value===value);}
+    set textContent(value) {this.text=String(value); this.children=[];}
+    get textContent() {return (this.text || '') + this.children.map(node=>node.textContent).join('');}
+  }
+  global.document={createElement:tag=>new Element(tag),createTextNode:text=>({textContent:text})};
+  global.requestAnimationFrame=callback=>callback();
+  try {
+    const parent = new Element('section'), state=createPlanTableState();
+    renderSubscriptionPlans(parent,{subscriptions:rows},state,{format:value=>`$${(value/100).toFixed(2)}`,digits:2});
+    const body = parent.children[2].children[0].children[2];
+    const annual = body.children[0];
+    assert.equal(annual.children[3].children[0].dataset.privateAmount,'');
+    assert.equal(annual.children[3].textContent,'$323.00 / year');
+    assert.equal(annual.children[3].dataset.privateAmountAttributes,'title');
+    assert.equal(annual.children[4].children[0].dataset.privateAmount,'');
+    assert.equal(annual.children[5].children[0].dataset.privateAmount,'');
+    assert.equal(annual.children[6].textContent,'3');
+    assert.deepEqual(annual.children[6].dataset,{});
+    assert.equal(annual.children[8].textContent,'2026-10-15');
+    assert.deepEqual(annual.children[8].dataset,{});
+    const choice=parent.children[0].children[0].children[0];
+    choice.value='amount'; choice.events.change();
+    const controls=parent.children[0].children[1];
+    assert.equal(controls.children[0].children[0].dataset.privateAmount,'');
+    assert.equal(controls.children[1].children[0].dataset.privateAmount,'');
+    assert.equal(controls.children[0].children[0].value,'');
+  } finally {global.document=previousDocument; global.requestAnimationFrame=previousFrame;}
+});

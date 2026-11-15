@@ -1,5 +1,11 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.9.1 — 2026-11-15
+
+PR: [#207](https://github.com/Fillll/whab/pull/207)
+
+- Mark investment totals, position values, prices and activity amounts for Web’s display-only eye toggle. Keep provider reads, saved financial values, percentages and dates unchanged.
+
 ## 1.9.0 — 2026-11-10
 
 PRs: [#184](https://github.com/Fillll/whab/pull/184), [#188](https://github.com/Fillll/whab/pull/188)

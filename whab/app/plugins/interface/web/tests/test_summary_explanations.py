@@ -96,12 +96,12 @@ def test_each_month_explains_income_links_matching_assigned_total_and_funding_eq
             assert f'data-budget-source-overview="{source}"' in assigned_body
             assert f'aria-label="Show matching Assigned total for {month_label(month)} in {currency}"' in assigned_body
             assert f'id="{source}"' in cells["Assigned this month"][index][0]
-            footer = re.search(rf'<td id="{target}"([^>]*)>(.*?)</td>', text, re.S)
+            footer = re.search(rf'<td[^>]* id="{target}"([^>]*)>(.*?)</td>', text, re.S)
             assert 'tabindex="-1"' in footer[1]
             total = money_number(sum(assignments) * factor, currency)
-            assert footer[2] == total
+            assert re.sub(r"<[^>]*>", "", footer[2]) == total
             summary_value = re.sub(r'<details\b[^>]*>.*?</details>', '', cells["Assigned this month"][index][1], flags=re.S).strip()
-            assert summary_value == total
+            assert re.sub(r"<[^>]*>", "", summary_value) == total
             ready_body = disclosure(
                 cells["Available to assign"][index][1], "Available to assign", month,
             )

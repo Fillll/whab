@@ -4855,3 +4855,20 @@ html[data-sidebar='expanded'] [data-reordering='true'] .sidebar-account small { 
 .sidebar-account-row[data-drop-position='before']::before { top: 0; }
 .sidebar-account-row[data-drop-position='after']::after { bottom: 0; }
 .sidebar-account-order-tools[hidden], .sidebar-account-drag[hidden], .sidebar-account-moves[hidden], [data-account-reorder][hidden] { display: none; }
+
+
+/* Browser-local amount privacy uses fixed placeholders, never blurred values. */
+.amount-privacy-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: none; border-radius: 6px; color: var(--text-secondary); }
+.amount-privacy-toggle:hover { background: var(--surface); color: var(--ink); }
+.amount-privacy-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.amount-privacy-toggle > span { display: inline-flex; }
+.amount-privacy-toggle .amount-privacy-eye-closed { display: none; }
+html[data-amounts='hidden'] .amount-privacy-eye-open { display: none; }
+html[data-amounts='hidden'] .amount-privacy-eye-closed { display: inline-flex; }
+html[data-amounts='hidden'] [data-private-amount],
+html[data-amounts='hidden'] [data-private-content] { display: none !important; }
+.amount-privacy-mask { white-space: nowrap; }
+.amount-privacy-content-mask { display: block; padding: 12px 0; color: var(--muted); }
+.amount-privacy-reveal { display: inline-block; min-height: 28px; padding: 2px 5px; font: inherit; color: var(--muted); border: 1px solid transparent; border-radius: 4px; cursor: pointer; }
+.amount-privacy-reveal:hover, .amount-privacy-reveal:focus-visible { border-color: var(--line-strong, var(--line)); color: var(--ink); }
+.amount-privacy-toggle[hidden], .amount-privacy-mask[hidden] { display: none !important; }

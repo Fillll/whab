@@ -17,7 +17,7 @@ function harness({present = true, saved = null} = {}) {
   const control = context.initBudgetHistory({document, getContext:()=>({budgetUrl:'/fictional',workspace:'personal'}), beforeChange:async()=>{}, api:async(url,body)=> {
     calls.push({url,body});
     if (body && url.endsWith('/apply')) {if (state.gate) await state.gate; if (state.fail) {const failure = new Error('Unknown outcome'); failure.code = state.code; throw failure;} return {};}
-    if (body) return {revision:'original-revision',data:{fingerprint:'a'.repeat(64),changes:[{path:['transactions','fictional'],before:{categoryId:null,merchant:'<script>'},after:{categoryId:'food',merchant:'<script>'}}]}};
+    if (body) return {revision:'original-revision',data:{fingerprint:'a'.repeat(64),changes:state.changes || [{path:['transactions','fictional'],before:{categoryId:null,merchant:'<script>'},after:{categoryId:'food',merchant:'<script>'}}]}};
     return {data:{entries:[],next:null}};
   }});
   return {control,calls,state,nodes,storage,root,context};
@@ -52,4 +52,24 @@ test('known first revision rejection releases preview but an uncertain retry ret
   await h.control.prepare('undo','batch'); h.state.code = null;
   await h.control.commit(); assert.equal(h.storage.size,1);
   h.state.code = 'history_revision_conflict'; await h.control.commit(true); assert.equal(h.storage.size,1);
+});
+
+
+test('history masks financial values and nested records while dates and labels remain inspectable', async () => {
+  const h = harness();
+  h.state.changes = [
+    {path:['transactions','fictional'], before:{amount:1250,date:'2026-11-01',original:{amount:1250}}, after:{amount:2400,date:'2026-11-02',original:{amount:2400}}},
+    {path:['categories','food'], before:{target:1000}, after:{target:2000}},
+    {path:['assignments','2026-11','food'], before:{assigned:3000}, after:{assigned:4000}},
+    {path:['accounts','cash'], before:null, after:{name:'Fictional cash',balance:5000}},
+  ];
+  await h.control.prepare('undo', 'fictional');
+  const rows = h.nodes.get('[data-history-changes]').children;
+  for (const row of rows.slice(0,3)) assert.equal(row.children[1].children[1].dataset.privateAmount, '');
+  assert.equal(rows[0].children[1].children[1].textContent, '1250');
+  assert.equal(rows[0].children[2].children[1].textContent, '2026-11-01');
+  assert.deepEqual(rows[0].children[2].children[1].dataset, {});
+  assert.equal(rows[0].children[3].children[1].dataset.privateContent, '');
+  assert.equal(rows[3].children[1].children[3].dataset.privateContent, '');
+  assert.equal(h.calls.filter(call => call.url.endsWith('/apply')).length, 0);
 });

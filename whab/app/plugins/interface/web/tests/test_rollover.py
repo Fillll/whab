@@ -183,7 +183,7 @@ def test_rollover_form_saves_source_currency_and_shows_signed_pool_balance(clien
     following = client.get("/budgets/home/budget/2026-11/usd").text
     row = re.search(r'<tr class="budget-overview-row budget-carried-in-row"[^>]*>(.*?)</tr>', following, re.S)[1]
     first_cell = re.search(r'<td([^>]*)>(.*?)</td>', row, re.S)
-    assert re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", first_cell[2], flags=re.S).strip() == money_number(
+    assert re.sub(r'<[^>]*>', '', re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", first_cell[2], flags=re.S)).strip() == money_number(
         usd["summary"]["carriedIn"],
     )
     assert "Overall category balance" in first_cell[2]
@@ -239,5 +239,5 @@ def test_rollover_saves_and_flags_next_month_cash_shortfall_even_with_a_positive
     ready = re.search(r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', text, re.S)[1]
     attributes, cell = re.findall(r'<td([^>]*)>(.*?)</td>', ready, re.S)[1]
     assert "positive" in attributes and "negative" not in attributes
-    assert re.sub(r'<details\b[^>]*>.*?</details>', "", cell, flags=re.S).strip() == "150.00"
-    assert 'class="negative">Available after spending and account reserves: -50.00.</p>' in cell
+    assert re.sub(r'<[^>]*>', '', re.sub(r'<details\b[^>]*>.*?</details>', "", cell, flags=re.S)).strip() == "150.00"
+    assert 'class="negative">Available after spending and account reserves: <span data-private-amount>-50.00</span>.</p>' in cell

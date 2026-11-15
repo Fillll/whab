@@ -600,7 +600,7 @@
     {
       "name": "bank.investments",
       "kind": "local",
-      "summary": "Read current investment positions, value, reported basis, unrealized dollar/percentage return and available investment activity.",
+      "summary": "Read current investment positions, value, reported basis, unrealized dollar/percentage return and available investment activity. In Web 1.61+, the top-right eye masks rendered financial values via display-only markers without altering this operation or its output.",
       "input": {
         "type": "object",
         "description": "POST /budgets/{budget}/api/banks/{provider}/investments. CLI: whab BUDGET bank investments PROVIDER --item ID [--bank-account PROVIDER_ACCOUNT_ID] [--since YYYY-MM-DD] [--until YYYY-MM-DD]; whab-cli PROFILE supports the same command.",

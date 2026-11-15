@@ -34,7 +34,7 @@ def displayed_amount(cell):
     """Extract the monetary value independently of its editing or summary treatment."""
     if match := re.search(r'name="assigned"[^>]+value="([^"]+)"', cell):
         return match[1]
-    return re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", cell, flags=re.S).strip()
+    return re.sub(r'<[^>]*>', '', re.sub(r'<(?:details|small)\b[^>]*>.*?</(?:details|small)>', "", cell, flags=re.S)).strip()
 
 
 def test_three_month_matrix_keeps_month_controls_and_editable_category_values(client):
@@ -590,7 +590,7 @@ def test_conservative_spending_note_stays_inside_closed_breakdown_for_valid_lowe
     assert text.count('class="budget-funding-warning negative" role="note">Funding shortfall</span>') == (
         3 if shortfall else 0
     )
-    assert ("Available after spending and account reserves: -50.00." in row) is shortfall
+    assert ("Available after spending and account reserves: -50.00." in re.sub(r"<[^>]*>", "", row)) is shortfall
     assert "Available after spending and account reserves" not in visible
 
 

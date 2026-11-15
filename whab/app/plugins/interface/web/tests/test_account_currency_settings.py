@@ -1,5 +1,6 @@
 """Account currencies and provider settings have distinct visible homes."""
 
+import re
 from html.parser import HTMLParser
 
 from whab_plugin_plaid.plugin import plugin as plaid
@@ -42,6 +43,6 @@ def test_accounts_show_all_currencies_but_provider_controls_only_in_plugin_setti
         for code in ("USD", "JPY", "KWD"):
             assert f'Account totals in {code}' in content
             assert f'Fictional {code}' in content and f'aria-label="Change currency for Fictional {code}">{code}</button>' in content
-        assert '<strong>$125.00</strong>' in content
-        assert '<strong>JPY 3,456</strong>' in content
-        assert '<strong>KWD 1.234</strong>' in content
+        balances = [re.sub(r'<[^>]*>', '', value) for value in re.findall(r'<strong[^>]*>(.*?)</strong>', content)]
+        for expected in ('$125.00', 'JPY 3,456', 'KWD 1.234'):
+            assert expected in balances
