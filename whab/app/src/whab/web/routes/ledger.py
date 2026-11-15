@@ -64,7 +64,7 @@ def create_router(store):
     class TransferReadBody(BaseModel):
         model_config = ConfigDict(extra='forbid', strict=True)
         workspace: Workspace
-        operation: Literal['transfer_candidates', 'preview_transfer_match']
+        operation: Literal['transfer_candidates', 'preview_transfer_match', 'preview_transfer_matches', 'transfer_audit', 'preview_transfer_repair']
         parameters: dict
 
     class TransferApplyBody(BaseModel):
@@ -88,6 +88,25 @@ def create_router(store):
             }, request_id=body.requestId, expected_revision=body.revision)
         except RevisionConflict as error:
             return JSONResponse({'error': str(error), 'code': 'transfer_revision_conflict'}, status_code=409)
+
+    class TransferBulkBody(BaseModel):
+        model_config = ConfigDict(extra='forbid', strict=True)
+        workspace: Workspace
+        operation: Literal['match_transfers', 'repair_transfers']
+        parameters: dict
+        revision: str
+        requestId: str
+        history: dict | None = None
+
+    @router.post('/api/transfers/bulk')
+    def transfer_bulk(body: TransferBulkBody):
+        try:
+            return store.command(body.operation, body.workspace, body.parameters,
+                                 request_id=body.requestId, expected_revision=body.revision, history=body.history)
+        except RevisionConflict as error:
+            return JSONResponse({'error': str(error), 'code': 'transfer_revision_conflict'}, status_code=409)
+        except RequestConflict as error:
+            return JSONResponse({'error': str(error), 'code': 'transfer_request_conflict'}, status_code=409)
 
     class HistoryPreviewBody(BaseModel):
         model_config = ConfigDict(extra='forbid', strict=True)

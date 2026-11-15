@@ -199,8 +199,32 @@ class LedgerService:
         if month is not None:
             _month(month)
         with self._lock:
-            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_category_classification", "preview_bulk_edits", "transfer_candidates", "preview_transfer_match", "preview_transaction_changes"}:
+            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_category_classification", "preview_bulk_edits", "transfer_candidates", "preview_transfer_match", "preview_transaction_changes", "preview_transfer_matches", "transfer_audit", "preview_transfer_repair"}:
                 raise StoreError("Only feature queries accept parameters.")
+            if operation == 'transfer_policy':
+                self._require_transfer_integrity()
+                self._require_bulk_transfer_matching()
+                return {'revision': self._revision, 'data': {
+                    'version': 1, 'maxPairs': 100, 'maxRepairTransactions': 200,
+                    'twoLegsRequired': True, 'zeroAmountPairing': False,
+                    'historicalClosedAccounts': True, 'crossScopeFunding': True,
+                }}
+            if operation in {'preview_transfer_matches', 'transfer_audit', 'preview_transfer_repair'}:
+                self._require_transfer_integrity()
+                values = {} if parameters is None else parameters
+                if operation == 'preview_transfer_matches':
+                    self._require_bulk_transfer_matching()
+                    values = self._validate_transfer_pairs(values)
+                    data = self._store.preview_transfer_matches(workspace, values['pairs'], values['reviewed'])
+                elif operation == 'transfer_audit':
+                    data = self._store.transfer_audit(workspace, values)
+                else:
+                    if type(values) is not dict or values.keys() != {'transactionIds'}:
+                        raise StoreError('Repair preview requires explicit transactionIds only.')
+                    from whab.domain.transfer_matching import validate_repair_ids
+                    identifiers = validate_repair_ids(values['transactionIds'])
+                    data = self._store.preview_transfer_repair(workspace, identifiers)
+                return {'revision': self._revision, 'data': _public(data)}
             if operation == 'transaction_change_policy':
                 self._require_transaction_changes()
                 return {'revision': self._revision, 'data': {'version': 1, 'maxChanges': 100, 'preserveBalances': True}}
@@ -324,6 +348,8 @@ class LedgerService:
                     opening_supported = False
                 if opening_supported:
                     data['types'].append('opening_balance')
+                supported = getattr(self._store, 'supports_transfer_integrity', None)
+                data['transferPairRequired'] = callable(supported) and supported() is True
             elif operation == 'opening_balance_policy':
                 self._require_opening_balances()
                 data = {'version': 1, 'categoryType': 'opening_balance',
@@ -416,6 +442,14 @@ class LedgerService:
         if (type(payload) is not dict or not set(schema["required"]) <= payload.keys()
                 or payload.keys() - schema["properties"].keys()):
             raise StoreError("Invalid ledger command fields.")
+        if operation in {'match_transfers', 'repair_transfers'}:
+            fingerprint = payload['fingerprint']
+            if type(fingerprint) is not str or len(fingerprint) != 64 or any(c not in '0123456789abcdef' for c in fingerprint):
+                raise StoreError('Use the fingerprint from the exact transfer preview.')
+            if operation == 'match_transfers':
+                return {**LedgerService._validate_transfer_pairs({key: value for key, value in payload.items() if key != 'fingerprint'}), 'fingerprint': fingerprint}
+            from whab.domain.transfer_matching import validate_repair_ids
+            return {'transactionIds': validate_repair_ids(payload['transactionIds']), 'fingerprint': fingerprint}
         if operation == 'match_transfer':
             if type(payload['action']) is not str or payload['action'] not in {'match', 'unmatch'}:
                 raise StoreError('Choose match or unmatch.')
@@ -523,6 +557,59 @@ class LedgerService:
         )):
             raise StoreError('Update the storage backend/authority for transfer matching with native atomic history. Nothing was changed.')
 
+    @staticmethod
+    def _validate_transfer_pairs(payload):
+        from whab.domain.transfer_matching import validate_pairs
+        if type(payload) is not dict or 'pairs' not in payload or payload.keys() - {'pairs', 'reviewed'}:
+            raise StoreError('Supply pairs and an optional reviewed boolean.')
+        reviewed = payload.get('reviewed', False)
+        return {'pairs': validate_pairs(payload['pairs'], reviewed=reviewed), 'reviewed': reviewed}
+
+    def _require_transfer_integrity(self):
+        supported = getattr(self._store, 'supports_transfer_integrity', None)
+        if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
+            'transfer_audit', 'preview_transfer_repair', 'repair_transfers', 'history_scope', 'budget_history',
+        )):
+            raise StoreError('Update the storage backend/authority for strict two-leg transfers and audited repair. Nothing was changed.')
+
+    def _guard_transfer_integrity(self, workspace, payload, *, history=False):
+        """Older adapters may serve ordinary ledgers, never bypass pair rules."""
+        inspection = getattr(self._store, 'inspection_scope', None)
+        with inspection() if callable(inspection) else nullcontext():
+            supported = getattr(self._store, 'supports_transfer_integrity', None)
+            if callable(supported):
+                try:
+                    if supported() is True:
+                        return
+                except StoreError:
+                    pass
+            if payload.get('kind') == 'transfer':
+                self._require_transfer_integrity()
+            categories = getattr(self._store, 'categories', None)
+            if callable(categories) and any(row.get('kind') == 'transfer' for row in categories(workspace)):
+                self._require_transfer_integrity()
+            transactions = getattr(self._store, 'transactions', None)
+            if callable(transactions) and any(row.get('transferPeerId') for row in transactions(workspace)):
+                self._require_transfer_integrity()
+            if history:
+                preview = getattr(self._store, 'history_preview', None)
+                candidate = preview(workspace, payload['action'], target=payload.get('target')) if callable(preview) else None
+                if type(candidate) is not dict or type(candidate.get('changes')) is not list:
+                    raise StoreError('Update the storage backend to verify transfer history before reversal. Nothing was changed.')
+                def has_transfer(value):
+                    if isinstance(value, dict):
+                        return value.get('kind') == 'transfer' or bool(value.get('transferPeerId')) or any(has_transfer(row) for row in value.values())
+                    return isinstance(value, list) and any(has_transfer(row) for row in value)
+                if has_transfer(candidate['changes']):
+                    self._require_transfer_integrity()
+
+    def _require_bulk_transfer_matching(self):
+        supported = getattr(self._store, 'supports_bulk_transfer_matching', None)
+        if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
+            'preview_transfer_matches', 'apply_transfer_matches', 'history_scope', 'budget_history',
+        )):
+            raise StoreError('Update the storage backend/authority for native atomic transfer batches. No pairs were changed.')
+
     def _require_atomic_bulk(self):
         supported = getattr(self._store, 'supports_atomic_bulk_edits', None)
         if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
@@ -557,6 +644,11 @@ class LedgerService:
         payload = self._validate(operation, payload)
         if operation == 'match_transfer':
             self._require_transfer_matching()
+            self._require_transfer_integrity()
+        if operation in {'match_transfers', 'repair_transfers'}:
+            self._require_transfer_integrity()
+        if operation == 'match_transfers':
+            self._require_bulk_transfer_matching()
         if operation in {'edit_transactions', 'classify_accounts'}:
             self._require_atomic_bulk()
         if operation == 'change_transactions':
@@ -618,6 +710,7 @@ class LedgerService:
                 raise RevisionConflict("Budget changed. Refresh before making this change.")
             if operation not in {'feature', 'categorization'}:
                 self._guard_opening_balances(workspace, payload, history=operation == 'history_apply')
+                self._guard_transfer_integrity(workspace, payload, history=operation == 'history_apply')
             response_revision = str(uuid4())
             durable_scope = getattr(self._store, "durable_command_scope", None)
             scope = (durable_scope(request_id, fingerprint, response_revision)
@@ -644,6 +737,10 @@ class LedgerService:
                         data = remote(workspace, payload)
                 elif operation == 'match_transfer':
                     data = _public(self._store.apply_transfer_match(workspace, payload['transactionIds'], payload['action'], payload['fingerprint']))
+                elif operation == 'match_transfers':
+                    data = _public(self._store.apply_transfer_matches(workspace, payload['pairs'], payload['reviewed'], payload['fingerprint']))
+                elif operation == 'repair_transfers':
+                    data = _public(self._store.repair_transfers(workspace, payload['transactionIds'], payload['fingerprint']))
                 elif operation in {"add_account", "add_category", "add_transaction"}:
                     data = getattr(self._store, operation)(workspace, payload)
                 elif operation in {"add_category_group", "move_category"}:

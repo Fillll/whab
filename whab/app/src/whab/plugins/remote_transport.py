@@ -345,6 +345,31 @@ class RemoteStore:
     def supports_transfer_matching(self):
         return True
 
+    def supports_transfer_integrity(self):
+        try:
+            policy = self._policy('transfer_policy')
+        except StoreError:
+            raise StoreError('Update or reconnect the remote authority for strict two-leg transfers; no mutation was submitted.') from None
+        return type(policy) is dict and policy.get('version') == 1 and policy.get('twoLegsRequired') is True
+
+    def supports_bulk_transfer_matching(self):
+        return self.supports_transfer_integrity() and self._policy('transfer_policy').get('maxPairs') == 100
+
+    def preview_transfer_matches(self, workspace, pairs, reviewed=False):
+        return self._query('preview_transfer_matches', workspace, parameters={'pairs': pairs, 'reviewed': reviewed})
+
+    def apply_transfer_matches(self, workspace, pairs, reviewed=False, fingerprint=None):
+        return self._command('match_transfers', workspace, {'pairs': pairs, 'reviewed': reviewed, 'fingerprint': fingerprint})
+
+    def transfer_audit(self, workspace, parameters):
+        return self._query('transfer_audit', workspace, parameters=parameters)
+
+    def preview_transfer_repair(self, workspace, transaction_ids):
+        return self._query('preview_transfer_repair', workspace, parameters={'transactionIds': transaction_ids})
+
+    def repair_transfers(self, workspace, transaction_ids, fingerprint):
+        return self._command('repair_transfers', workspace, {'transactionIds': transaction_ids, 'fingerprint': fingerprint})
+
     def transfer_candidates(self, workspace, parameters):
         return self._query('transfer_candidates', workspace, parameters=parameters)
 
