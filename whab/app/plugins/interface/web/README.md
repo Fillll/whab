@@ -68,6 +68,28 @@ and navigation focus target remain; a selected account still has its own visible
 name. Production omits the redundant Live data badge. Sandbox and sample-data
 notices remain explicit.
 
+## Sidebar account order
+
+Choose **Reorder accounts** beside the sidebar’s Accounts heading. Drag an account
+within its On-budget or Off-budget group, or use its **Move up** / **Move down**
+buttons with a keyboard. Moves take effect immediately; **Done** exits ordering.
+**Reset order** restores the normal account order for this budget.
+
+The preference stores stable account IDs only in this browser, separately for each
+budget and workspace. It survives refreshes and page navigation, but does not travel
+with a saved budget or synchronize to another browser. Hidden and closed accounts
+stay hidden; new accounts retain normal order after accounts already arranged.
+Ordering never changes account scope, balances, transactions, history or bank sync.
+If browser storage is unavailable, ordering works for the current page with an
+explicit unsaved-preference message. No ledger permission or financial save is involved.
+
+Bank logos also appear beside account names in multi-account transaction rows,
+including newly loaded rows. They use the same optional branding provider as the
+sidebar and account picker, with lazy loading and usable account text/fallbacks
+when artwork is unavailable or the plugin is disabled. Editing an account keeps
+its displayed logo consistent with the selected account. No extra provider or
+financial-data access is introduced.
+
 ## Register rendering and navigation
 
 USD register addresses end at the month, for example

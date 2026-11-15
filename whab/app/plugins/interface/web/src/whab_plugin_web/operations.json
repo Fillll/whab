@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation. Settings uses one responsive preferences window with persistent section navigation, direct browser-local Appearance and reviewed plugin changes.",
+  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation. Settings uses one responsive preferences window with persistent section navigation, direct browser-local Appearance and reviewed plugin changes. Account names in multi-account transaction rows show optional bank logos; sidebar accounts support browser-local custom ordering within budget-scope groups.",
   "delegates": [
     "core"
   ],
@@ -545,6 +545,38 @@
       ],
       "retry": "Retry save retains the existing save path. Discard local edits & reload instead abandons browser drafts and performs a read-only reload; it never replays a mutation or reverses a saved result.",
       "availability": "Web 1.54+ browser control only. This operation does not add a public HTTP, CLI or SDK ledger command."
+    },
+    {
+      "name": "sidebar.account-order",
+      "kind": "local",
+      "summary": "Arrange sidebar accounts within On-budget and Off-budget groups using Reorder accounts, drag/drop or Move up/Move down; Done exits and Reset order restores defaults.",
+      "input": {
+        "type": "object",
+        "description": "Browser controls only; this is not an HTTP or CLI mutation. Account IDs identify visible open rows in the addressed budget/workspace.",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Sidebar order updates immediately. The browser reports when local persistence is unavailable.",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {}
+        }
+      ],
+      "side_effects": "Stores only stable account IDs in browser local storage. No ledger writes, revision advancement, audit/history entry, classification change, bank synchronization or portable-budget save. Hidden/closed accounts remain hidden. Newly encountered accounts follow already arranged accounts in normal order.",
+      "permissions": "Explicit browser interaction. Requires no financial write permission and sends no mutation request.",
+      "scope": "Current browser origin, addressed budget and personal/demo workspace. On-budget and Off-budget groups remain separate. The order does not synchronize to other browsers or travel in portable budgets.",
+      "errors": [
+        "Unavailable browser storage keeps the current page usable and reports that the order could not be saved.",
+        "Malformed stored preferences are ignored; moving between budget-scope groups is not permitted."
+      ],
+      "retry": "Moves can be repeated without financial side effects. Reset order removes this budget/workspace preference and restores the normal displayed order.",
+      "availability": "Web 1.60+ browser layout control. Discover this documentation offline with whab-cli describe --plugin web; no new executable CLI, HTTP or SDK ledger operation."
     }
   ]
 }
