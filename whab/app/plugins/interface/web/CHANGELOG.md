@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.62.0 — 2026-11-15
+
+PR: [#208](https://github.com/Fillll/whab/pull/208)
+
+- Fix Accounts navigation being blocked by archived accounts with disabled sidebar controls. Track actual visibility saves, retain real pending/draft guards, and restore committed archive status on Cancel.
+- Use short Accounts links and normalize old bookmarks while preserving safe full navigation across currencies.
+- Show every hidden USD amount as `$X,XXX` and other known currencies as `CODE X,XXX`, independent of magnitude, sign and precision. Carry currency context through dynamic displays and preserve all stored values and drafts.
+
 ## 1.61.0 — 2026-11-15
 
 PR: [#207](https://github.com/Fillll/whab/pull/207)

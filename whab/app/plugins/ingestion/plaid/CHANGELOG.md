@@ -1,5 +1,12 @@
 # Plaid bank ingestion plugin changelog
 
+## 1.9.2 — 2026-11-15
+
+PR: [#208](https://github.com/Fillll/whab/pull/208)
+
+- Accept canonical short Accounts OAuth returns as well as existing bookmarks, retaining origin and flow validation.
+- Supply explicit currency metadata for fixed investment amount masks without changing provider data.
+
 ## 1.9.1 — 2026-11-15
 
 PR: [#207](https://github.com/Fillll/whab/pull/207)
