@@ -8,7 +8,7 @@ from importlib.metadata import version
 import pytest
 
 
-def dialog(text, identifier="plugin-options-web"):
+def dialog(text, identifier="plugins-dialog"):
     return re.search(rf'<article\b[^>]*id="{identifier}".*?</article>', text, re.S)[0]
 
 
@@ -30,10 +30,14 @@ def test_visual_pane_is_accessible_addressed_and_demo_cannot_mutate(client, page
     assert response.status_code == 200
     pane = dialog(response.text)
     installed = dialog(response.text, "plugins-dialog")
-    assert '<h3 id="visual-settings-title">Visual interface</h3>' in pane
     assert f'data-visual-settings data-workspace="{workspace}"' in pane
     tags = Tags(pane).tags
     if workspace == "personal":
+        advanced = re.search(r'<details\b[^>]*class="plugin-interface-details".*?</details>', pane, re.S)[0]
+        assert 'id="visual-settings-title">Advanced interface controls</summary>' in advanced
+        # The common optional-plugin review stays visible without opening Advanced.
+        for attribute in ('data-visual-apply', 'data-visual-review', 'data-visual-message', 'data-visual-error'):
+            assert attribute in pane and attribute not in advanced
         message = next(attrs for _, attrs in tags if "data-visual-message" in attrs)
         assert message["role"] == "status" and message["aria-live"] == "polite"
         error = next(attrs for _, attrs in tags if "data-visual-error" in attrs)
@@ -43,7 +47,7 @@ def test_visual_pane_is_accessible_addressed_and_demo_cannot_mutate(client, page
         assert 'value="headless"' in pane and "Preview interface change" in pane
         assert "Apply reviewed change" in pane and "Review refreshed status" in pane
         assert "Select API interface plugins in the installed list" in pane
-        assert "Review live selection" in installed and "Save selection for restart" in installed
+        assert "Review changes" in installed and "Save selection for restart" in installed
         assert "Saved selections apply when you restart WHAB" not in pane
     else:
         assert "Demo is read-only" in pane

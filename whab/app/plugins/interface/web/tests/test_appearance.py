@@ -41,13 +41,13 @@ def render_plugins(client, monkeypatch, *, web_active=True, web_enabled=True):
     return response.text
 
 
-def test_appearance_is_an_accessible_two_choice_setting_only_in_web_options(client, monkeypatch):
+def test_appearance_is_a_direct_accessible_browser_setting_not_a_plugin_draft(client, monkeypatch):
     text = render_plugins(client, monkeypatch)
-    options = dialog(text, "plugin-options-web")
+    options = dialog(text, "appearance-settings-page")
     fieldsets = re.findall(r"<fieldset\b.*?</fieldset>", options, re.S)
     assert len(fieldsets) == 1
     appearance = fieldsets[0]
-    assert re.findall(r"<legend>(.*?)</legend>", appearance) == ["Appearance"]
+    assert re.findall(r"<legend>(.*?)</legend>", appearance) == ["Color theme"]
 
     inputs = [attrs for tag, attrs in Tags(appearance).tags if tag == "input"]
     assert [attrs.get("type") for attrs in inputs] == ["radio", "radio"]
@@ -63,17 +63,22 @@ def test_appearance_is_an_accessible_two_choice_setting_only_in_web_options(clie
     assert len(statuses) == 1 and statuses[0].get("aria-live") == "polite"
     assert "immediately" in appearance and "this browser" in appearance
 
-    # Appearance survives the separately loaded generic settings section.
-    generic_settings = re.search(r"<section\b[^>]*data-plugin-settings.*?</section>", options, re.S)[0]
-    assert "data-appearance-choice" not in generic_settings
-    assert "data-appearance-choice" not in dialog(text, "settings-home")
+    # One set of native controls is directly reachable from persistent navigation,
+    # independent of plugin enablement drafts or lazily loaded plugin settings.
+    navigation = re.search(r'<nav\b[^>]*aria-label="Settings sections".*?</nav>', text, re.S)[0]
+    assert 'data-dialog="appearance-settings-page"' in navigation
+    assert "data-settings-section" in navigation
+    assert text.count("data-appearance-choice") == 2
+    assert "data-plugin-settings" not in options
+    assert "data-appearance-choice" not in dialog(text, "plugin-options-web")
     assert "data-appearance-choice" not in dialog(text, "plugins-dialog")
     assert "data-appearance-choice" not in dialog(text, "plugin-options-report")
 
 
 @pytest.mark.parametrize("enabled", [True, False])
-def test_inactive_web_does_not_offer_appearance_controls(client, monkeypatch, enabled):
+def test_pending_web_selection_does_not_hide_browser_appearance(client, monkeypatch, enabled):
     text = render_plugins(client, monkeypatch, web_active=False, web_enabled=enabled)
+    assert "data-appearance-choice" in dialog(text, "appearance-settings-page")
     assert "data-appearance-choice" not in dialog(text, "plugin-options-web")
     assert "data-appearance-choice" not in dialog(text, "plugin-options-report")
 
@@ -100,7 +105,6 @@ def test_theme_bootstrap_precedes_styles_and_uses_web_plugin_asset_version(clien
     plugin_version = version("whab_plugin_web")
     for attrs in (script, stylesheet):
         assert parse_qs(urlparse(attrs.get("src", attrs.get("href"))).query) == {"v": [plugin_version]}
-    assert "WHAB · 98.7.6" in response.text
     sidebar = re.search(r'<aside class="sidebar"[^>]*>(.*?)</aside>', response.text, re.S)[1]
     assert '<span class="local-status-label">WHAB v98.7.6</span>' in sidebar
 

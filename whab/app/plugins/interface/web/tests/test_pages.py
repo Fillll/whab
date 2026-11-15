@@ -13,7 +13,7 @@ def test_all_pages_render_and_escape_user_content(client):
         assert "Sample data" in response.text
         assert "/static/app.js" in response.text
         assert "WHAB · We Have A Budget" in response.text
-        assert f"WHAB · {__version__}" in response.text
+        assert f"We Have A Budget · {__version__}" in response.text
         assert 'id="whab-context"' in response.text
     assert client.app.version == __version__
     name = '<script>alert("x")</script>'
@@ -206,13 +206,17 @@ def test_portable_budget_name_labels_personal_pages_and_preserves_demo(client):
     personal = client.get(response.json()["url"]).text
     breadcrumb = re.search(r'<div class="breadcrumb">(.*?)</div>', personal, re.S)[1]
     assert "Household &amp; travel" in breadcrumb
-    assert "Current budget · Household &amp; travel" in personal
+    scope = re.search(r'<p class="settings-budget-scope">(.*?)</p>', personal, re.S)[1]
+    assert '<span>This budget</span>' in scope
+    assert '<strong>Household &amp; travel</strong>' in scope
     assert 'data-budget-copy hidden' in personal
     assert 'aria-label="Saved copies"' in personal
     demo = client.get("/budgets/demo/budget/current-month/usd").text
     breadcrumb = re.search(r'<div class="breadcrumb">(.*?)</div>', demo, re.S)[1]
     assert "Demo budget" in breadcrumb and "Household" not in breadcrumb
-    assert "Current budget · Demo budget" in demo
+    scope = re.search(r'<p class="settings-budget-scope">(.*?)</p>', demo, re.S)[1]
+    assert '<span>This budget</span>' in scope
+    assert '<strong>Demo budget</strong>' in scope and "Household" not in scope
 
 
 def test_receipt_picker_offers_only_jpeg_png_and_pdf_in_that_order(client):

@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.59.0 — 2026-11-14
+
+PR: [#205](https://github.com/Fillll/whab/pull/205)
+
+- Replace the Settings landing menu with one responsive preferences window: persistent section navigation, direct browser-local Appearance, quieter searchable plugin rows and in-place details. Preserve Back/focus, mounted drafts, guarded plugin review, restart saves and recovery feedback.
+
 ## 1.58.0 — 2026-11-14
 
 PR: [#204](https://github.com/Fillll/whab/pull/204)

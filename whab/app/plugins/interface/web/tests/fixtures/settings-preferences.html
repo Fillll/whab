@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings preferences · fictional preview</title>
+  <script src="../../src/whab_plugin_web/static/theme.js"></script>
+  <link rel="stylesheet" href="../../src/whab_plugin_web/static/styles.css">
+  <style>
+    body {margin:0;padding:24px} body > h1 {font-size:22px;margin-bottom:12px}
+    .fixture-copy {font-size:13px;line-height:1.6;margin-bottom:20px;max-width:75ch}
+    .fixture-cases {display:grid;gap:24px;justify-items:start}
+    .fixture-case h2 {font-size:15px;margin:0 0 8px}
+    iframe {border:1px solid var(--line);max-width:100%;display:block}
+    .fixture-workspace {padding:24px;color:var(--text-secondary)}
+    .fixture-status {position:fixed;bottom:0;left:0;right:0;padding:8px 12px;background:var(--page);font-size:11px;z-index:20;white-space:pre-wrap}
+    .fixture-status[data-passed="true"] {color:var(--success)}
+    .fixture-status[data-passed="false"] {color:var(--danger)}
+    .fixture-frame {padding:0}
+  </style>
+</head>
+<body>
+<script type="module">
+const parameters = new URLSearchParams(location.search);
+if (!parameters.has('theme')) {
+  document.body.insertAdjacentHTML('beforeend', '<h1>Settings preferences</h1><p class="fixture-copy">Fictional layout preview using WHAB’s shipped stylesheet, theme controls and Settings navigation. No runtime, budget, bank or provider is opened. Plugin rows and content are representative fixtures; live plugin changes require the separate HTTPS integration checks.</p><div class="fixture-cases"></div>');
+  const cases = document.querySelector('.fixture-cases');
+  for (const [width, height, size] of [[1280,900,'Desktop'],[390,844,'Compact']]) {
+    for (const theme of ['light','dark']) {
+      const block = document.createElement('section'); block.className='fixture-case';
+      block.innerHTML=`<h2>${size} · ${theme}</h2><iframe title="${size} ${theme} Settings" width="${width}" height="${height}" data-src="?theme=${theme}"></iframe><p class="fixture-copy" data-result>Checking…</p>`;
+      cases.append(block);
+    }
+  }
+  const frames=[...document.querySelectorAll('iframe')]; let running=0;
+  function startNext(){const frame=frames[running];if(frame){frame.focus();frame.src=frame.dataset.src;}}
+  window.addEventListener('message', event => {
+    if (event.origin !== location.origin || event.data?.type !== 'settings-layout') return;
+    for (const frame of document.querySelectorAll('iframe')) {
+      if (frame.contentWindow === event.source) {
+        frame.nextElementSibling.textContent=event.data.result;
+        if(frame===frames[running]) {running+=1;startNext();}
+      }
+    }
+  });
+  startNext();
+} else {
+  document.body.className='fixture-frame';
+  const theme = parameters.get('theme') === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme=theme;
+  // This fixture deliberately cannot submit financial or plugin operations.
+  window.fetch=async()=>{throw new Error('Fictional Settings preview blocks runtime requests.');};
+  // Same trusted vectors as the Web icon helper; fixture content only.
+  const iconPaths={"budget": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/>", "image": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"8\" cy=\"8\" r=\"1.5\"/><path d=\"m3 17 6-6 4 4 3-3 5 5\"/>", "settings": "<path d=\"M10 3h4v2.3l1.3.5 1.6-1.6 2.9 2.9-1.6 1.6.5 1.3H21v4h-2.3l-.5 1.3 1.6 1.6-2.9 2.9-1.6-1.6-1.3.5V21h-4v-2.3l-1.3-.5-1.6 1.6-2.9-2.9 1.6-1.6-.5-1.3H3v-4h2.3l.5-1.3-1.6-1.6 2.9-2.9 1.6 1.6 1.3-.5z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>", "clock": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/>", "help": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9 9a3 3 0 1 1 5 2c-2 1-2 2-2 3M12 17h.01\"/>", "search": "<circle cx=\"10\" cy=\"10\" r=\"6\"/><path d=\"m15 15 5 5\"/>", "chevron-right": "<path d=\"m9 6 6 6-6 6\"/>", "chevron-left": "<path d=\"m15 6-6 6 6 6\"/>", "close": "<path d=\"m6 6 12 12M6 18 18 6\"/>"};
+  const icon=(name,size=18)=>`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name]}</svg>`;
+  const heading=(title,copy)=>`<div class="modal-heading"><div><h2>${title}</h2><p>${copy}</p></div></div>`;
+  const section=(id,title,copy,content)=>`<article id="${id}" data-settings-page hidden aria-label="${title}">${heading(title,copy)}${content}</article>`;
+  const sections=[['budgets-dialog','Budgets','budget'],['appearance-settings-page','Appearance','image'],['plugins-dialog','Plugins','settings'],['budget-history-page','Budget history','clock'],['about-dialog','About','help']];
+  const names=[['web','Web interface','Enabled','interface',true],['plaid','Plaid','Enabled','ingestion',true],['ynab','YNAB import','Disabled','ingestion',false],['subscriptions','Subscriptions','Disabled','automation',false],['sqlite','SQLite','Required','storage',true]];
+  const rowMarkup=([id,name,state,category,enabled])=>`<div class="plugin-row" data-fixture-plugin="${id}" data-plugin-name="${name} ${id}"><label class="plugin-toggle">${id==='web'?'':`<input type="checkbox" name="plugin" value="${id}"${enabled?' checked':''}${id==='sqlite'?' disabled':''}>`}<strong>${name}</strong></label><span class="plugin-state" data-plugin-state="${state==='Required'?'required':enabled?'active':'inactive'}">${state}</span><button class="button plugin-settings-button" type="button" data-dialog="plugin-options-${id}" data-plugin-options aria-label="Settings for ${name}"><span class="sr-only">Settings</span>${icon('chevron-right',16)}</button></div>`;
+  const categories=[['interface','Interfaces'],['ingestion','Ingestion'],['insight','Insights'],['storage','Storage'],['automation','Automation'],['extension','Extensions']];
+  const rows=categories.map(([id,label])=>{const members=names.filter(row=>row[3]===id);return `<section class="plugin-category-group" data-plugin-category="${id}"><h4>${label}<span>${members.length}</span></h4>${members.length?members.map(rowMarkup).join(''):'<p class="settings-notice plugin-category-empty">No installed plugins</p>'}</section>`;}).join('');
+  document.body.insertAdjacentHTML('beforeend', `<main class="fixture-workspace"><p>Household demo · Transactions</p><button class="button secondary" data-dialog="settings-dialog" id="fixture-open">Open Settings</button></main>
+  <dialog id="settings-dialog" class="modal settings-modal settings-window" aria-label="Settings">
+    <button class="icon-button settings-close" type="button" data-close-dialog aria-label="Close Settings">${icon('close',20)}</button>
+    <aside class="settings-sidebar"><h2 class="settings-title">Settings</h2><nav class="settings-section-nav" aria-label="Settings sections">${sections.map(([id,name,glyph])=>`<button type="button" data-settings-section data-dialog="${id}">${icon(glyph)}<span>${name}</span></button>`).join('')}</nav><div class="settings-brand"><img src="../../src/whab_plugin_web/static/logo.svg" width="30" height="30" alt=""><strong>WHAB</strong><span>Preview</span></div></aside>
+    <div class="settings-content" data-settings-content>
+      ${section('budgets-dialog','Budgets','Open, create or add a budget.',`<section class="budget-section"><h3>Open budget</h3><fieldset class="budget-list"><legend>Available budgets</legend><div class="budget-choice"><label class="budget-choice-select"><input type="radio" name="budget" checked><span class="budget-choice-copy"><strong>Household demo</strong><small class="budget-current">Current budget</small></span></label></div></fieldset><p class="settings-notice">Fictional preview. No saved budget is opened.</p></section>`)}
+      ${section('appearance-settings-page','Appearance','Choose how WHAB looks in this browser.',`<fieldset class="appearance-settings"><legend>Color theme</legend><div class="appearance-options"><label class="appearance-choice"><input type="radio" name="web-appearance" value="light" data-appearance-choice><span><span class="appearance-preview appearance-preview-light" aria-hidden="true"><i></i><i></i><i></i></span><strong>Light</strong><small>Warm surfaces, red and yellow accents</small></span></label><label class="appearance-choice"><input type="radio" name="web-appearance" value="dark" data-appearance-choice><span><span class="appearance-preview appearance-preview-dark" aria-hidden="true"><i></i><i></i><i></i></span><strong>Dark</strong><small>Charcoal surfaces, red and yellow accents</small></span></label></div><p class="settings-notice" data-appearance-status role="status" aria-live="polite">Changes apply immediately and are remembered for this fixture origin.</p></fieldset>`)}
+      ${section('plugins-dialog','Plugins','Choose the capabilities available to this budget.',`<p class="settings-budget-scope"><span>This budget</span><strong>Household demo</strong></p><button type="button" class="text-link marketplace-link" data-dialog="plugin-marketplace-dialog">Browse plugins ${icon('chevron-right',16)}</button><section class="plugin-manager"><div class="plugin-list-heading"><label class="plugin-search"><span class="sr-only">Find an installed plugin</span>${icon('search',16)}<input type="search" data-plugin-search aria-label="Find an installed plugin" placeholder="Find a plugin" autocomplete="off"></label><h3 class="sr-only">Installed plugins</h3><label class="plugin-category-filter">Category<select data-plugin-category-filter aria-label="Plugin category"><option value="all">All categories</option>${categories.map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label></div><form data-plugin-selection><div class="plugin-list">${rows}<p class="settings-notice" data-plugin-category-empty role="status" hidden>No installed plugins match your search and category.</p></div><p class="settings-notice" role="status" data-fixture-feedback>Selection changes stay in this fictional preview.</p><div class="settings-actions plugin-selection-actions"><button class="button secondary" type="submit">Save selection for restart</button><button class="button primary" type="button" data-fixture-review>Review changes</button></div></form></section>`)}
+      ${section('budget-history-page','Budget history','Inspect financial changes before restoring them.',`<p class="settings-notice">No changes in this fictional preview.</p>`)}
+      ${section('about-dialog','About WHAB','We Have A Budget',`<div class="about-copy"><p>Budgeting with agents, monthly envelopes and extensible plugins.</p><p>This preview uses fictional information.</p></div>`)}
+      <article id="plugin-marketplace-dialog" data-settings-page data-settings-parent="plugins-dialog" hidden aria-label="Browse plugins"><button class="settings-back" type="button" data-settings-back>${icon('chevron-left',14)}Installed plugins</button>${heading('Browse plugins','Install on this device, then enable for each budget.')}<p class="settings-notice">Marketplace requests are blocked in this fixture.</p></article>
+      ${names.map(([id,name,state])=>`<article id="plugin-options-${id}" data-settings-page data-settings-parent="plugins-dialog" hidden aria-label="${name} settings"><button class="settings-back" type="button" data-settings-back>${icon('chevron-left',14)}Installed plugins</button>${heading(name,'Plugin settings')}<details class="plugin-information"><summary>Plugin information</summary><p class="settings-notice">Version 1.0.0 · ${state} · Fictional fixture</p></details><section class="plugin-settings"><p class="settings-notice">No plugin operation is performed by this fixture.</p></section></article>`).join('')}
+    </div>
+  </dialog><p class="fixture-status" id="fixture-status" role="status">Checking layout and navigation…</p>`);
+  for (const choice of document.querySelectorAll('[data-appearance-choice]')) choice.checked=choice.value===theme;
+  const {initSettingsNavigation}=await import('../../src/whab_plugin_web/static/settings-navigation.js');
+  const {initPluginFilter}=await import('../../src/whab_plugin_web/static/plugin-filter.js');
+  initPluginFilter();
+  const navigation=initSettingsNavigation(), modal=document.getElementById('settings-dialog');
+  document.querySelector('[data-close-dialog]').addEventListener('click',()=>navigation.close());
+  modal.addEventListener('click',event=>{if(event.target===modal) navigation.close();});
+  document.querySelector('[data-plugin-selection]').addEventListener('submit',event=>{event.preventDefault();document.querySelector('[data-fixture-feedback]').textContent='Preview only: nothing was saved.';});
+  document.querySelector('[data-fixture-review]').addEventListener('click',()=>{document.querySelector('[data-fixture-feedback]').textContent='Preview only: no plugin change was requested.';});
+  const tick=()=>new Promise(requestAnimationFrame), problems=[];
+  const expect=(condition,label)=>{if(!condition) problems.push(label);};
+  navigation.open('settings-dialog'); await tick();
+  expect(document.querySelectorAll('dialog[open]').length===1,'one native dialog');
+  const content=document.querySelector('[data-settings-content]');
+  const row=document.querySelector('[data-fixture-plugin="plaid"]'), checkbox=row.querySelector('input'), detail=row.querySelector('button');
+  checkbox.checked=false; const before=content.scrollTop;
+  detail.click(); await tick();
+  expect(document.activeElement===document.querySelector('#plugin-options-plaid h2'),'detail heading receives focus');
+  expect(document.querySelector('[data-settings-section][aria-current="page"]')?.dataset.dialog==='plugins-dialog','nested section keeps Plugins selected');
+  document.querySelector('#plugin-options-plaid [data-settings-back]').click(); await tick();
+  expect(!checkbox.checked,'Back retains pending checkbox draft');
+  expect(document.activeElement===detail,'Back restores opening control focus');
+  expect(content.scrollTop===before,'Back restores scroll');
+  checkbox.checked=true;
+  const search=document.querySelector('[data-plugin-search]'); search.value='pla';search.dispatchEvent(new Event('input'));
+  expect(!row.hidden&&document.querySelector('[data-fixture-plugin="ynab"]').hidden,'search narrows installed rows');
+  search.value='no fictional plugin matches';search.dispatchEvent(new Event('input'));
+  expect(!document.querySelector('[data-plugin-category-empty]').hidden,'empty search has visible feedback');
+  search.value='';search.dispatchEvent(new Event('input'));
+  for (const [id] of sections) {
+    document.querySelector(`[data-settings-section][data-dialog="${id}"]`).click(); await tick();
+    const current=document.getElementById(id), rect=modal.getBoundingClientRect();
+    expect(!current.hidden,`${id}: navigates`);
+    expect(document.querySelectorAll('[data-settings-page]:not([hidden])').length===1,`${id}: only one visible section`);
+    expect(rect.left>=-1&&rect.right<=innerWidth+1&&rect.top>=-1&&rect.bottom<=innerHeight+1,`${id}: dialog fits viewport`);
+    expect(content.scrollWidth<=content.clientWidth+1,`${id}: no horizontal content overflow`);
+    for (const control of current.querySelectorAll('button,input,select')) {
+      const r=control.getBoundingClientRect();
+      if(r.width) expect(r.left>=rect.left-1&&r.right<=rect.right+1,`${id}: controls fit`);
+    }
+  }
+  navigation.close();
+  expect(!modal.open,'Close dismisses complete window');
+  navigation.open('settings-dialog'); await tick();
+  expect(!document.getElementById('plugins-dialog').hidden,'reopen starts on Plugins');
+  const result=problems.length?`FAIL: ${problems.join('; ')}`:'PASS: all sections fit; one modal; active navigation; Back restores draft, focus and scroll; Close/reopen work.';
+  const status=document.getElementById('fixture-status');status.textContent=result;status.dataset.passed=String(!problems.length);
+  window.parent.postMessage({type:'settings-layout',result},location.origin);
+}
+</script>
+</body>
+</html>

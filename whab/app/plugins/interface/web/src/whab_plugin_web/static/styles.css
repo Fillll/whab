@@ -2103,22 +2103,79 @@ strong {
   justify-content: flex-end;
   gap: 10px;
 }
-.settings-modal {
-  width: 650px;
-}
+.settings-modal { width: 1000px; }
 .settings-window {
-  height: min(680px, calc(100dvh - 40px));
+  height: min(760px, calc(100dvh - 48px));
+  padding: 0;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--line) 65%, transparent);
+  border-radius: 12px;
 }
-.settings-close {
-  position: absolute;
-  top: 18px;
-  right: 18px;
+.settings-window[open] { display: grid; grid-template-columns: 220px minmax(0, 1fr); }
+.settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 30px 16px 24px;
+  background: var(--sidebar);
+  border-right: 1px solid color-mix(in srgb, var(--line) 45%, transparent);
 }
-.settings-window .modal-heading {
-  padding-right: 32px;
+.settings-title { margin: 0 14px 26px; font-size: 23px; letter-spacing: -.65px; }
+.settings-section-nav { display: grid; gap: 5px; }
+.settings-section-nav > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 7px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: background .15s ease, color .15s ease;
 }
-.settings-window [data-settings-page][hidden] {
-  display: none;
+.settings-section-nav > button > svg { flex: none; }
+.settings-section-nav > button:hover { background: var(--input-hover); color: var(--ink); }
+.settings-section-nav > button[aria-current='page'] { background: var(--accent); color: var(--ink); font-weight: 600; box-shadow: inset 3px 0 var(--brand-yellow); }
+.settings-brand { display: flex; align-items: center; gap: 9px; margin-top: auto; padding: 24px 14px 0; }
+.settings-brand > img { border-radius: 5px; }
+.settings-brand > strong { font-size: 17px; letter-spacing: -.4px; }
+.settings-brand > span { margin-left: auto; color: var(--muted); font-size: 11px; }
+.settings-content { --settings-inset: 32px; min-width: 0; min-height: 0; overflow: auto; scrollbar-gutter: stable; padding: var(--settings-inset); }
+.settings-close { position: absolute; top: 14px; right: 14px; z-index: 5; border-radius: 6px; background: var(--page); }
+.settings-close:hover { background: var(--input-hover); }
+.settings-window .modal-heading { padding-right: 32px; margin-bottom: 24px; }
+.settings-window .modal-heading h2 { font-size: 24px; letter-spacing: -.7px; }
+.settings-window .modal-heading p { font-size: 12px; max-width: 48ch; }
+.settings-window [data-settings-page][hidden], .settings-window [hidden] { display: none; }
+.settings-window .settings-notice, .settings-window .modal-form label, .settings-window .field-error { font-size: 12px; }
+.settings-window .modal-form input, .settings-window .modal-form select { font-size: 13px; }
+.settings-window .button { border-radius: 7px; }
+.settings-budget-scope { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; font-size: 12px; margin-bottom: 18px; }
+.settings-budget-scope > span { color: var(--muted); }
+.settings-budget-scope > strong { overflow-wrap: anywhere; font-weight: 600; }
+.settings-window .marketplace-link { display: flex; align-items: center; gap: 4px; margin: 0 0 20px auto; font-size: 12px; }
+.settings-window .settings-back { font-size: 12px; min-height: 28px; margin-bottom: 12px; }
+.settings-window .plugin-interface-details > summary { cursor: pointer; padding: 12px 0; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.settings-window .plugin-interface-details[open] > summary { margin-bottom: 12px; }
+.settings-window [data-visual-settings] > .settings-actions:has(> button:not([hidden])) { margin-top: 12px; }
+.settings-window [data-visual-settings] > .settings-actions:not(:has(> button:not([hidden]))) { display: none; }
+.settings-window .plugin-change-review { background: var(--accent); padding: 14px 16px; border-left: 3px solid var(--brand-yellow); border-radius: 4px; }
+@media (max-width: 700px) {
+  .settings-window[open] { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings-window { width: calc(100vw - 24px); max-width: none; height: calc(100dvh - 24px); max-height: none; }
+  .settings-sidebar { padding: 18px 16px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .settings-title { margin: 0 36px 14px 4px; font-size: 20px; }
+  .settings-section-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .settings-section-nav > button { font-size: 12px; gap: 7px; padding: 8px; min-height: 40px; }
+  .settings-section-nav > button > svg { width: 16px; height: 16px; }
+  .settings-brand { display: none; }
+  .settings-content { --settings-inset: 24px; padding: var(--settings-inset) 20px; scrollbar-gutter: auto; }
+  .settings-window .modal-heading h2 { font-size: 22px; }
+}
+@media (max-width: 380px) {
+  .settings-section-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-content { --settings-inset: 20px; padding: var(--settings-inset) 16px; }
 }
 .plugin-list-heading > h3 {
   font-size: 14px;
@@ -2135,7 +2192,7 @@ strong {
   margin-top: 24px;
 }
 .plugin-category-group + .plugin-category-group {
-  margin-top: 26px;
+  margin-top: 12px;
 }
 .plugin-category-group > h4 {
   display: flex;
@@ -2157,11 +2214,11 @@ strong {
 }
 .plugin-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(60px, auto) 36px;
   align-items: center;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
 }
 .plugin-toggle {
   display: flex;
@@ -2181,6 +2238,7 @@ strong {
 }
 .plugin-toggle strong {
   min-width: 0;
+  font-size: 14px;
   font-weight: 600;
 }
 .plugin-meta,
@@ -2196,17 +2254,23 @@ strong {
   padding-left: 22px;
 }
 .plugin-state {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.6;
   color: var(--text-secondary);
 }
 .plugin-settings-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px;
+  border: 0;
   font-size: 11px;
 }
+.plugin-state::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: var(--muted); }
+.plugin-state[data-plugin-state='active']::before, .plugin-state[data-plugin-state='required']::before { background: var(--success); }
+.plugin-state[data-plugin-state='pending']::before { background: var(--accent-ink); }
+.plugin-selection-actions { position: sticky; bottom: -32px; z-index: 2; margin-top: 20px; padding: 16px 0; background: var(--page); border-top: 1px solid var(--line); }
 .plugin-restart-notice {
   margin-top: 16px;
   padding: 12px 14px;
@@ -2295,42 +2359,21 @@ strong {
   font-size: 10px;
   line-height: 1.5;
 }
+#appearance-settings-page .appearance-settings { margin-top: 0; border-top: 0; padding-top: 0; }
+#appearance-settings-page .appearance-settings legend { margin-bottom: 18px; }
+#appearance-settings-page .appearance-options { gap: 16px; margin-bottom: 18px; }
+#appearance-settings-page .appearance-choice { padding: 14px; border-radius: 9px; }
+#appearance-settings-page .appearance-choice input { margin-top: 5px; }
+.appearance-preview { display: grid; grid-template-columns: 26px 1fr; grid-template-rows: repeat(3, 15px); gap: 6px; height: 90px; margin: 0 0 14px; padding: 12px; border: 1px solid #bdb5a740; border-radius: 5px; overflow: hidden; }
+.appearance-preview-light { background: #faf8f2; }
+.appearance-preview-dark { background: #211e1b; }
+.appearance-preview > i { grid-column: 2; border-bottom: 1px solid #9a8e7b50; }
+.appearance-preview > i:first-child { background: #ffd338; border: 0; border-radius: 2px; }
+.appearance-preview::before { content: ''; grid-column: 1; grid-row: 1 / 4; background: #c52f36; border-radius: 3px; }
 @media (max-width: 380px) {
   .appearance-options {
     grid-template-columns: 1fr;
   }
-}
-.settings-menu > button {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--line);
-  color: var(--text-secondary);
-  text-align: left;
-  transition: color 0.15s;
-}
-.settings-menu strong {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.settings-menu small {
-  display: block;
-  margin-top: 4px;
-  font-size: 11px;
-}
-.settings-menu > button:hover strong,
-.settings-back:hover {
-  color: var(--action);
-}
-.settings-menu > button > svg {
-  flex-shrink: 0;
-}
-.settings-menu > button > svg:last-child {
-  margin-left: auto;
 }
 .settings-back {
   display: inline-flex;
@@ -2480,6 +2523,11 @@ strong {
   justify-content: space-between;
   gap: 16px;
 }
+.plugin-search { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; padding: 0 11px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: var(--field); }
+.plugin-search > svg { flex: none; }
+.plugin-search > input { width: 100%; min-width: 0; min-height: 40px; padding: 8px 0; border: 0; background: transparent; font-size: 12px; color: var(--ink); }
+.plugin-search:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.plugin-search > input:focus-visible { outline: none; }
 .plugin-category-filter {
   display: flex;
   align-items: center;
@@ -2833,9 +2881,7 @@ strong {
     width: 44px;
     height: 44px;
   }
-  .settings-modal {
-    padding: 22px;
-  }
+  .settings-window { padding: 0; }
   .app-shell > main {
     margin-left: 71px;
   }
@@ -3053,9 +3099,7 @@ strong {
   .local-status {
     width: 40px;
   }
-  .settings-modal {
-    padding: 18px;
-  }
+  .settings-window { padding: 0; }
   .budget-choice {
     gap: 10px;
     padding: 14px 0;
@@ -3071,19 +3115,14 @@ strong {
     grid-column: 1;
     grid-row: 1;
   }
-  .plugin-row .plugin-meta {
+  .plugin-state {
     grid-column: 1;
     grid-row: 2;
     padding-left: 22px;
   }
-  .plugin-state {
-    grid-column: 1;
-    grid-row: 3;
-    padding-left: 22px;
-  }
   .plugin-settings-button {
     grid-column: 2;
-    grid-row: 1 / 4;
+    grid-row: 1 / 3;
   }
   .plugin-category-filter {
     gap: 6px;
@@ -4397,8 +4436,8 @@ main:has(.budget-planner) > .demo-ribbon,
 }
 
 /* Installed plugins and marketplace share the six capability-family sections. */
-.plugin-category-group { padding: 18px 0 14px; border-top: 2px solid var(--line); }
-.plugin-category-group > h4 { margin: 0 0 12px; font-size: 14px; color: var(--text-primary); letter-spacing: 0; text-transform: none; }
+.plugin-category-group { padding: 0; }
+.plugin-category-group > h4 { margin: 0; padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); font-size: 11px; color: var(--muted); letter-spacing: .7px; text-transform: uppercase; }
 .plugin-category-group > h4 > span { margin-left: 8px; font-size: 11px; }
 .plugin-category-empty { margin: 4px 0 8px; }
 .marketplace-link { margin: 0 0 20px; display: inline-flex; gap: 12px; align-items: center; }
@@ -4411,17 +4450,11 @@ main:has(.budget-planner) > .demo-ribbon,
 .plugin-install-review li { font-size: 12px; margin: 8px 0; overflow-wrap: anywhere; }
 @media (max-width: 520px) { .marketplace-row { align-items: flex-start; flex-direction: column; gap: 8px; } }
 
-/* LLM profiles have one editor and a stable heading within the settings window. */
-.settings-window:has(#plugin-options-llm-categorization:not([hidden])) { width: 660px; height: min(880px, calc(100dvh - 40px)); overflow: hidden; }
-#plugin-options-llm-categorization:not([hidden]) { height: 100%; overflow-y: auto; padding-right: 10px; scrollbar-gutter: stable; }
-#plugin-options-llm-categorization > .settings-back { position: sticky; top: 0; z-index: 2; background: var(--page); padding: 4px 0 10px; margin: 0; width: 100%; text-align: left; }
-#plugin-options-llm-categorization > .modal-heading { position: sticky; top: 32px; z-index: 2; background: var(--page); padding-bottom: 14px; margin-bottom: 0; }
-.settings-window:has(#plugin-options-llm-categorization:not([hidden])) > .settings-close { z-index: 3; background: var(--page); }
-.settings-window:has(.bank-settings-page:not([hidden])) {width: min(720px, calc(100vw - 32px)); overflow: hidden;}
-.bank-settings-page:not([hidden]) {height: 100%; display: flex; flex-direction: column;}
-.bank-settings-page > .settings-back {align-self: start; flex: none; margin-bottom: 12px;}
-.bank-settings-content {overflow: auto; min-height: 0; scrollbar-gutter: stable; padding-right: 4px;}
-.bank-settings-content > .plugin-settings:empty {display: none;}
+/* Plugin detail pages share the stable Settings shell and scroll pane. */
+#plugin-options-llm-categorization > .settings-back { position: sticky; top: var(--settings-inset); z-index: 3; background: var(--page); width: 100%; }
+#plugin-options-llm-categorization > .modal-heading { position: sticky; top: calc(var(--settings-inset) + 40px); z-index: 2; background: var(--page); padding-bottom: 14px; }
+.bank-settings-content { min-width: 0; }
+.bank-settings-content > .plugin-settings:empty { display: none; }
 .plugin-information { margin: 0 0 16px; }
 .plugin-information summary, .llm-disclosure summary { cursor: pointer; font-size: 12px; font-weight: 600; padding: 12px 0; }
 .llm-settings { margin-top: 0; padding-top: 0; border-top: 0; }
@@ -4445,7 +4478,6 @@ main:has(.budget-planner) > .demo-ribbon,
 .llm-settings > .llm-disclosure { margin-top: 12px; }
 .llm-settings > .llm-disclosure > button { margin: 8px 10px 0 0; }
 @media(max-width: 540px) {
- .settings-window:has(#plugin-options-llm-categorization:not([hidden])) { padding: 18px; }
  .llm-grid { grid-template-columns: 1fr; gap: 12px; }
  .llm-profile-actions > .button { flex: 1 1 180px; }
 }
@@ -4758,3 +4790,10 @@ html[data-sidebar='collapsed'] .app-shell > main { margin-left: 62px; }
 .transaction-selection-help { flex: 1; color: var(--text-secondary); font-size: 10px; }
 .transaction-column-resize { z-index: 2; }
 .transaction-feedback > small { flex-basis: 100%; color: var(--text-secondary); }
+
+@media (max-width: 700px) {
+  .settings-window .plugin-list-heading { align-items: stretch; flex-direction: column; gap: 10px; }
+  .settings-window .plugin-category-filter { justify-content: space-between; }
+  .settings-window .plugin-category-filter select { flex: 1; max-width: 220px; }
+  .settings-window .plugin-selection-actions { bottom: -24px; }
+}

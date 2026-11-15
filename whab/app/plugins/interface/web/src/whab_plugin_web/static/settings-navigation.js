@@ -6,7 +6,9 @@ export function isSettingsPageOpen(page) {
 export function initSettingsNavigation({document: page = document, beforeOpen = () => {}} = {}) {
   const window = page.getElementById('settings-dialog');
   const pages = [...window.querySelectorAll('[data-settings-page]')];
-  const home = page.getElementById('settings-home');
+  const home = page.getElementById('plugins-dialog');
+  const content = window.querySelector('[data-settings-content]') || window;
+  const sections = [...window.querySelectorAll('[data-settings-section]')];
   const busySelector = '[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy], [data-budget-history][data-busy]';
   let current = home, history = [], origin = null;
   const busy = () => Boolean(window.querySelector(busySelector));
@@ -20,7 +22,12 @@ export function initSettingsNavigation({document: page = document, beforeOpen = 
     for (const item of pages) item.hidden = item !== target;
     window.setAttribute('aria-label', target.getAttribute('aria-label'));
     current.dispatchEvent(new Event('whab:settings-enter'));
-    window.scrollTop = scroll;
+    content.scrollTop = scroll;
+    const root = parents(target)[0]?.target || target;
+    for (const button of sections) {
+      if (button.dataset.dialog === root.id) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    }
     const heading = current.querySelector('h2');
     if (heading) heading.tabIndex = -1;
     (focus || heading)?.focus({preventScroll: true});
@@ -32,12 +39,13 @@ export function initSettingsNavigation({document: page = document, beforeOpen = 
     return path;
   }
   function open(id, opener = null) {
-    const target = id === window.id ? home : page.getElementById(id);
+    const target = id === window.id || id === 'settings-home' ? home : page.getElementById(id);
     if (!pages.includes(target) || busy()) return false;
     if (window.open && current === target) return true;
     beforeOpen();
     if (window.open) {
-      history.push({target: current, focus: opener, scroll: window.scrollTop});
+      if (opener?.dataset.settingsSection !== undefined) history = parents(target);
+      else history.push({target: current, focus: opener, scroll: content.scrollTop});
       leave();
     } else {
       const previous = opener?.closest('dialog');

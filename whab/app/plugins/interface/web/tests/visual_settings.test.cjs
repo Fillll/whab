@@ -129,7 +129,7 @@ test('optional plugins use separate reviewed live route and host terminal operat
 test('Demo initializer never requests metadata or mutates', () => {
   const context = {getContext: () => {throw Error('Demo must not read personal controls');}};
   vm.runInNewContext(navigationSource + source.replace(/^import .*$/gm, '').replaceAll('export function ', 'function ') + '\nthis.init = initVisualSettings;', context);
-  const page = {getElementById: () => ({querySelector: () => ({dataset: {workspace: 'demo'}})})};
+  const page = {getElementById: () => ({querySelector: () => ({dataset: {workspace: 'demo'}, closest: () => null})})};
   assert.equal(context.init({page}), null);
 });
 
@@ -149,7 +149,7 @@ test('explicit cleanup attempts use counts, never resubmit change, and preserve 
   assert.equal(h.controller.canChange(), false); assert.equal(h.mutations().length, 1);
 });
 
-test('visual Apply closes the single Settings window before host submission so browser ACK can proceed', async () => {
+for (const kind of ['visual', 'optional']) test(`${kind} review in Plugins exposes the saved target and preserves its required lifecycle`, async () => {
   class Node {
     constructor() {this.dataset = {}; this.events = {}; this.open = true; this.value = ''; this.hidden = false;}
     addEventListener(type, handler) {(this.events[type] ||= []).push(handler);}
@@ -163,6 +163,7 @@ test('visual Apply closes the single Settings window before host submission so b
   const pane = new Node(); pane.dataset.workspace = 'personal';
   pane.querySelector = selector => fields[selector.match(/data-visual-([^\]]+)/)[1]];
   const dialog = new Node(), settings = new Node(), selection = new Node();
+  pane.closest = () => dialog;
   delete dialog.open; dialog.dataset.settingsPage = ''; dialog.hidden = true;
   dialog.closest = () => settings;
   settings.addEventListener('close', () => {dialog.hidden = true; dialog.fire('close');});
@@ -180,14 +181,20 @@ test('visual Apply closes the single Settings window before host submission so b
       calls.push(url);
       if (body === undefined) return url === '/ui/status' ? visual({operations: committed ? [operation('queued')] : []}) : {runtime: ready, operations: []};
       if (url === '/ui/preview') return {preview_id: P, plugin_id: 'other', selection_revision: G, requires_saved_views: true, code: 'installed'};
-      assert.equal(url, '/ui/commit'); assert.equal(dialog.hidden, true); assert.equal(settings.open, false);
+      assert.equal(url, kind === 'visual' ? '/ui/commit' : '/plugins/management/transition');
+      assert.equal(dialog.hidden, kind === 'visual'); assert.equal(settings.open, kind !== 'visual');
       committed = true; return {id: T, accepted: true};
     }});
-  dialog.hidden = false; const opening = controller.start(); await opening; await controller.preview('other');
+  dialog.hidden = false; dialog.fire('whab:settings-enter');
+  await new Promise(resolve => setImmediate(resolve));
+  if (kind === 'visual') await controller.preview('other');
+  else await controller.reviewOptional(['report']);
   assert.equal(fields.apply.disabled, false); assert.equal(fields.review.focused, true);
+  assert.equal(fields.review.hidden, false);
+  assert.match(fields.review.textContent, kind === 'visual' ? /other will replace/ : /Optional selection: report/);
   await controller.apply();
   assert.equal(fields.apply.hidden, true); assert.match(fields.message.textContent, /queued|Waiting/);
-  assert.equal(calls.filter(url => url === '/ui/commit').length, 1);
+  assert.equal(calls.filter(url => url === (kind === 'visual' ? '/ui/commit' : '/plugins/management/transition')).length, 1);
   const before = calls.length; await controller.refresh(); assert.ok(calls.length > before); // Accepted work still observed after own close.
   controller.stop();
 });

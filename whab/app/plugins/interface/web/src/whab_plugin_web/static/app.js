@@ -1,4 +1,5 @@
 /* WHAB controls. Business rules live in Python; bank UI is loaded by enabled plugins. */
+import {initPluginFilter} from './plugin-filter.js';
 import {api, apiUrl, getContext, notify, pageUrl} from './client.js';
 import {initBudgetHistory} from './budget-history.js';
 import {initBudgetEdits, syncBudgetGroups} from './budget-edits.js';
@@ -242,7 +243,7 @@ if (pluginSelection) {
       submit.disabled = false;
     }
   });
-  const initialSettingsPage = {'#settings': 'settings-home', '#budgets': 'budgets-dialog', '#plugins': 'plugins-dialog', '#history': 'budget-history-page'}[location.hash];
+  const initialSettingsPage = {'#settings': 'plugins-dialog', '#appearance': 'appearance-settings-page', '#budgets': 'budgets-dialog', '#plugins': 'plugins-dialog', '#history': 'budget-history-page'}[location.hash];
   if (initialSettingsPage) settingsNavigation.open(initialSettingsPage);
   const pluginPage = /^#plugin-settings-([a-z][a-z0-9-]*)$/.exec(location.hash);
   if (pluginPage) settingsNavigation.open(`plugin-options-${pluginPage[1]}`);
@@ -517,15 +518,7 @@ budgetForm('[data-budget-open]', async form => {
   return result;
 });
 
-const pluginCategory = document.querySelector('[data-plugin-category-filter]');
-if (pluginCategory) pluginCategory.addEventListener('change', () => {
-  let visible = 0;
-  for (const group of pluginSelection.querySelectorAll('[data-plugin-category]')) {
-    group.hidden = pluginCategory.value !== 'all' && group.dataset.pluginCategory !== pluginCategory.value;
-    if (!group.hidden) visible += 1;
-  }
-  pluginSelection.querySelector('[data-plugin-category-empty]').hidden = visible > 0;
-});
+initPluginFilter();
 
 function settingsText(tag, value, className) {
   const element = document.createElement(tag);

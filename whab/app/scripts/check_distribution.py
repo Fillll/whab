@@ -180,7 +180,7 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     for page in ("budget", "transactions", "insights", "accounts"):
         response = client.get(f"/budgets/demo/{page}/current-month/usd")
         assert response.status_code == 200, page
-        assert f"WHAB · {whab.__version__}" in response.text
+        assert f"We Have A Budget · {whab.__version__}" in response.text
         generation = response.headers.get("X-WHAB-UI-Generation", "")
         assert len(generation) == 64 and all(value in "0123456789abcdef" for value in generation)
         resource = f"/budgets/demo/ui/{generation}/static/app.js"

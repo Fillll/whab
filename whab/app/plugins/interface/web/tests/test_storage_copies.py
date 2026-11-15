@@ -33,7 +33,7 @@ def test_copy_management_is_addressed_accessible_and_demo_read_only(client, page
     key = "home" if workspace == "personal" else "demo"
     response = client.get(f"/budgets/{key}/{page}/2026-10/usd")
     assert response.status_code == 200
-    settings = dialog(response.text, "settings-home")
+    settings = re.search(r'<nav\b[^>]*aria-label="Settings sections".*?</nav>', response.text, re.S)[0]
     assert 'storage-copies-dialog' not in response.text
     assert 'Storage copies' not in settings
     copies = dialog(response.text, "plugin-options-sqlite")
