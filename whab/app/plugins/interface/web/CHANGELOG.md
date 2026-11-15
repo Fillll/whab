@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.57.0 — 2026-11-14
+
+PR: [#201](https://github.com/Fillll/whab/pull/201)
+
+- Select or clear inclusive transaction ranges with Shift-click in displayed order, preserving outside selections and excluding hidden, disabled and unloaded rows. Reset the range anchor on clear, select-all or view changes; selection alone never saves financial data.
+
 ## 1.56.0 — 2026-11-13
 
 PR: [#199](https://github.com/Fillll/whab/pull/199)
