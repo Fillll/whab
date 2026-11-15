@@ -154,6 +154,22 @@ an unconfirmed result. Resolve those requests through their original retry first
 the control never discards their request identities or silently starts a new one.
 The action is local to this tab and sends no financial mutation or bank sync.
 
+### Selecting transaction ranges
+
+Click a row checkbox, then hold **Shift** and click another checkbox to select
+both rows and every loaded, visible row between them in the current display order.
+Shift-clicking a checked checkbox clears that range instead. Selections outside
+the range stay unchanged. Repeated Shift-clicks keep the last ordinary click as
+their starting point; without a starting point, Shift-click toggles only that row.
+Hidden and disabled rows are skipped. Clear selection, Select loaded transactions,
+and changing the filters or navigating to another view reset the starting point.
+Rows loaded while scrolling can join the range; unloaded records are never selected
+implicitly. Ordinary keyboard checkbox selection continues to work.
+
+Selection changes only this view, with no financial writes. Bulk category and
+review actions retain their existing limits; selecting more than 100 rows does
+not bypass the category batch limit or split its save.
+
 ### Selected category changes
 
 With WHAB 2.75+ and Web 1.53+, select 2–100 loaded transactions and change the

@@ -149,10 +149,155 @@ function harness(count = 5, options = {}) {
     return true;
   }, ...options});
   return {register, requests, receiptRequests, makeRow, stream: streamCallbacks, imageRequests, receiptControls, objectUrls, revokedUrls,
-    rows: rowList, mutations, controlLinks, bulk, window, feedback, feedbackText, controls, navigations, reloads,
+    rows: rowList, mutations, controlLinks, bulk, clear, selectionCount, selectionBar, window, feedback, feedbackText, controls, navigations, reloads,
     chooseAccount: value => pickerChoose(value), isPickerDisposed: () => pickerDisposed,
     choosePeriod: value => periodChoose(value), isPeriodDisposed: () => periodDisposed, reviewLabel, contexts, history, searchForm, pageLink, document: context.document, receiptDialog};
 }
+
+function selectRow(state, index, shiftKey = false) {
+  const control = state.rows[index].controls['[data-select-transaction]'];
+  // Native checkboxes toggle before click, then emit change after the click handler.
+  control.checked = !control.checked;
+  control.emit('click', {shiftKey});
+  control.emit('change');
+}
+
+function selectedRows(state) {
+  return state.rows.flatMap((row, index) => row.controls['[data-select-transaction]'].checked ? [index] : []);
+}
+
+test('Shift-click selects the inclusive displayed range and keeps selections outside it without saves', () => {
+  const state = harness(6, {transactionIds: ['z', 'b', 'y', 'a', 'x', 'c']});
+  state.clear.emit('click');
+  selectRow(state, 0);
+  selectRow(state, 2);
+  selectRow(state, 4, true);
+  assert.deepEqual(selectedRows(state), [0, 2, 3, 4]);
+  assert.equal(state.selectionCount.textContent, '4 selected');
+  assert.equal(state.selectionBar.hidden, false);
+  assert.deepEqual(state.rows.map(row => row.classList.contains('is-selected')), [true, false, true, true, true, false]);
+  assert.equal(state.controls['[data-select-all]'].indeterminate, true);
+  assert.equal(state.requests.length, 0);
+  assert.equal(state.register.dirty, false);
+  state.register.dispose();
+});
+
+test('reverse and consecutive Shift-click ranges retain the ordinary-click anchor', () => {
+  const state = harness(6);
+  state.clear.emit('click');
+  selectRow(state, 4);
+  selectRow(state, 1, true);
+  assert.deepEqual(selectedRows(state), [1, 2, 3, 4]);
+  selectRow(state, 5, true);
+  assert.deepEqual(selectedRows(state), [1, 2, 3, 4, 5]);
+  selectRow(state, 2, true);
+  assert.deepEqual(selectedRows(state), [1, 5]);
+  assert.equal(state.requests.length, 0);
+  state.register.dispose();
+});
+
+test('Shift-click without an anchor starts one and ordinary clicks replace it', () => {
+  const state = harness(6);
+  state.clear.emit('click');
+  selectRow(state, 3, true);
+  assert.deepEqual(selectedRows(state), [3]);
+  selectRow(state, 1, true);
+  assert.deepEqual(selectedRows(state), [1, 2, 3]);
+  selectRow(state, 5);
+  selectRow(state, 4, true);
+  assert.deepEqual(selectedRows(state), [1, 2, 3, 4, 5]);
+  assert.equal(state.requests.length, 0);
+  state.register.dispose();
+});
+
+test('clear and select-all actions reset the range anchor', () => {
+  const state = harness(5);
+  state.clear.emit('click');
+  selectRow(state, 0);
+  state.clear.emit('click');
+  selectRow(state, 3, true);
+  assert.deepEqual(selectedRows(state), [3]);
+  const all = state.controls['[data-select-all]'];
+  all.checked = true;
+  all.emit('change');
+  selectRow(state, 1, true);
+  assert.deepEqual(selectedRows(state), [0, 2, 3, 4]);
+  all.checked = false;
+  all.emit('change');
+  selectRow(state, 4, true);
+  assert.deepEqual(selectedRows(state), [4]);
+  assert.equal(state.requests.length, 0);
+  state.register.dispose();
+});
+
+test('filters reset the anchor and ranges skip hidden and disabled rows', () => {
+  const state = harness(6);
+  state.clear.emit('click');
+  selectRow(state, 0);
+  state.rows[0].dataset.reviewed = 'true';
+  state.controls['#review-filter'].emit('click');
+  assert.equal(state.rows[0].hidden, true);
+  selectRow(state, 4, true);
+  assert.deepEqual(selectedRows(state), [4]);
+  state.rows[2].hidden = true;
+  state.rows[3].controls['[data-select-transaction]'].disabled = true;
+  selectRow(state, 1, true);
+  assert.deepEqual(selectedRows(state), [1, 4]);
+  assert.equal(state.requests.length, 0);
+  state.register.dispose();
+});
+
+test('range selection follows prepended and appended stream rows by displayed identity', () => {
+  const state = harness(2, {paged: true, stream: true, receiptIndexScoped: true});
+  state.clear.emit('click');
+  selectRow(state, 1);
+  const before = state.makeRow(99), after = state.makeRow(98);
+  before.controls['[data-select-transaction]'].checked = false;
+  after.controls['[data-select-transaction]'].checked = false;
+  state.stream.append([before], 'previous');
+  state.stream.append([after], 'next');
+  assert.deepEqual(state.rows.map(row => row.dataset.transactionId), ['transaction-99', 'transaction-0', 'transaction-1', 'transaction-98']);
+  selectRow(state, 0, true);
+  assert.deepEqual(selectedRows(state), [0, 1, 2]);
+  selectRow(state, 3, true);
+  assert.deepEqual(selectedRows(state), [0, 1, 2, 3]);
+  assert.equal(state.controls['[data-select-all]'].checked, true);
+  assert.equal(state.requests.length, 0);
+  state.register.dispose();
+});
+
+test('range selection can exceed the write limit without truncation or mutation', () => {
+  const state = harness(101);
+  state.clear.emit('click');
+  selectRow(state, 0);
+  selectRow(state, 100, true);
+  assert.equal(selectedRows(state).length, 101);
+  assert.equal(state.selectionCount.textContent, '101 selected');
+  assert.equal(state.requests.length, 0);
+  assert.equal(state.register.dirty, false);
+  state.register.dispose();
+});
+
+test('category batch locks prevent range selection until the original request settles', async () => {
+  const state = harness(4, {paged: true});
+  state.clear.emit('click');
+  selectRow(state, 0);
+  selectRow(state, 1, true);
+  const category = state.rows[0].controls['[data-transaction-field="categoryId"]'];
+  category.value = 'rent'; category.emit('change');
+  await tick();
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.rows.every(row => row.controls['[data-select-transaction]'].disabled), true);
+  // A disabled native checkbox does not toggle; even a synthetic click must not extend the range.
+  state.rows[3].controls['[data-select-transaction]'].emit('click', {shiftKey: true});
+  assert.deepEqual(selectedRows(state), [0, 1]);
+  state.requests[0].reject(new Error('Fictional rejected category preview'));
+  await tick();
+  selectRow(state, 3, true);
+  assert.deepEqual(selectedRows(state), [0, 1, 2, 3]);
+  assert.equal(state.requests.length, 1);
+  state.register.dispose();
+});
 
 test('paged search debounces full-history navigation and cancels stale work immediately', async () => {
   let canceled = 0;
