@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation. Settings uses one responsive preferences window with persistent section navigation, direct browser-local Appearance and reviewed plugin changes. Account names in multi-account transaction rows show optional bank logos; sidebar accounts support browser-local custom ordering within budget-scope groups. The top-right eye masks monetary values across Web without changing financial data.",
+  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation. Settings uses one responsive preferences window with persistent section navigation, direct browser-local Appearance and reviewed plugin changes. Account names in multi-account transaction rows show optional bank logos; sidebar accounts support browser-local custom ordering within budget-scope groups. The top-right eye masks monetary values across Web without changing financial data. Monetary displays round to comma-grouped whole currency units while editors and all saved/API values retain exact precision.",
   "delegates": [
     "core"
   ],
@@ -581,7 +581,7 @@
     {
       "name": "appearance.amounts",
       "kind": "local",
-      "summary": "Top-right eye: Hide amounts replaces monetary fields with the same $X,XXX placeholder for every USD amount (CODE X,XXX for other known currencies), independent of actual magnitude, sign or decimal precision; Show amounts restores exact values. Covers balances, budget and transaction amounts, reports, monetary tooltips/accessibility labels, editor values and opaque chart/receipt/history regions.",
+      "summary": "Top-right eye: Hide amounts replaces known and unavailable monetary fields with the same $X,XXX placeholder for USD (CODE X,XXX for other known currencies), independent of magnitude, sign, decimal precision or availability. Amount cells retain their sizing and alignment. When shown, monetary displays round to whole units; editing reveals exact currency precision. Covers balances, budgets, transactions, reports, monetary tooltips/accessibility labels and opaque chart/receipt/history regions.",
       "input": {
         "type": "object",
         "properties": {
@@ -636,7 +636,7 @@
           }
         }
       ],
-      "side_effects": "Writes only whab.amounts=shown|hidden in browser localStorage. Applies across budgets/workspaces in the same origin, before paint and to dynamic fragments; other tabs follow changes. Does not save or modify financial fields, drafts, history or sync. Hidden monetary editors offer Show amounts to edit and restore the exact draft/focus. CLI, API, exports and stored values are unchanged; arbitrary numeric text in names/memos is not scrubbed. The mask never reads the amount to determine its length. Unknown-currency monetary fields use X,XXX; opaque content and raw history without currency remain generic XX.",
+      "side_effects": "Writes only whab.amounts=shown|hidden in browser localStorage. Applies across budgets/workspaces in the same origin, before paint and to dynamic fragments; other tabs follow changes. Does not save or modify financial fields, drafts, history or sync. Hidden monetary editors offer Show amounts to edit and restore the exact draft/focus. CLI, API, exports and stored values are unchanged; arbitrary numeric text in names/memos is not scrubbed. The mask never reads the amount to determine its length. Unknown-currency monetary fields use X,XXX; opaque content and raw history without currency remain generic XX. Display rounding uses nearest whole units with halves away from zero; no-op focus/blur never saves rounded data. New-entry and settings amount forms keep exact precision. Counts, percentages, quantities, free text and opaque raw audit/plugin payloads are not reinterpreted. Shown amounts use comma thousands separators (68000.00 displays as 68,000); exact editors remain ungrouped.",
       "permissions": "Local Web browser control; this is not a remotely callable CLI/API command or data-access restriction.",
       "scope": "One browser origin, across its budgets and workspaces. No account/budget data is stored in this preference.",
       "errors": [
@@ -644,7 +644,7 @@
         "Third-party financial HTML must opt into the documented data-private-amount/data-private-content markers; untyped Insight values/details are concealed conservatively."
       ],
       "retry": "Toggle freely; no financial mutation or uncertain-write replay occurs. Revealing is necessary before editing monetary inputs.",
-      "availability": "Web 1.62+ with WHAB 2.80+; currency-aware Plaid investment markers require Plaid 1.9.2+. Read offline with whab-cli describe --plugin web --json."
+      "availability": "Web 1.63+ with WHAB 2.80+; rounded Plaid investment displays and unavailable-value masks require Plaid 1.9.3+. Read offline with whab-cli describe --plugin web --json."
     }
   ]
 }

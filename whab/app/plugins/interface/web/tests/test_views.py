@@ -42,10 +42,10 @@ def test_exact_currency_amount_inputs():
     assert money_input(-1234, "JPY") == "-1234"
     assert money_input(1234, "KWD") == "1.234"
     assert money_input(0, "CLF") == "0.0000"
-    assert money_number(-123456) == "-1,234.56"
+    assert money_number(-123456) == "-1,235"
     assert money_number(1234, "JPY") == "1,234"
-    assert money_number(1234, "KWD") == "1.234"
-    assert money_number(0, "CLF") == "0.0000"
+    assert money_number(1234, "KWD") == "1"
+    assert money_number(0, "CLF") == "0"
     assert month_label("2026-10") == "October 2026"
     assert month_label("2026-10", short=True) == "Oct"
     assert shift_month("2026-12", 1) == "2027-01"
@@ -160,7 +160,7 @@ def test_periods_preserve_core_values_without_recalculating_budget_rules():
         8888, -111, 333,
     ]
     assert all(period["summary"]["readyToAssign"] == 4321 for period in context["periods"])
-    assert context["money_number"](123456) == "1,234.56"
+    assert context["money_number"](123456) == "1,235"
     assert context["category_path"](child["id"]) == "food%2F%20%26%3F%22"
     assert "uncategorized" not in projections[0]
 

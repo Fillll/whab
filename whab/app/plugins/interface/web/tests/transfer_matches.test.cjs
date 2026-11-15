@@ -58,7 +58,7 @@ test('transfer proposals mark only the amount and preserve account/date/merchant
   assert.equal(leg.children[0].textContent, '旅行 🍏 · ');
   assert.equal(leg.children[0].children[0].dataset.privateAmount, '');
   assert.equal(leg.children[0].children[0].dataset.privateCurrency, 'USD');
-  assert.match(leg.children[0].children[0].textContent, /1\.00/);
+  assert.match(leg.children[0].children[0].textContent, /\$1$/);
   assert.match(leg.children[1].textContent, /2026-11-01 · <script> refund/);
   assert.deepEqual(leg.children[1].dataset, {});
   assert.equal(h.calls.filter(call => call.url.endsWith('/apply')).length, 0);

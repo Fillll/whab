@@ -100,3 +100,31 @@ test('amount privacy keeps drafts unsaved and makes keyboard editing reveal amou
   assert.equal(memo.changes, 1, 'Nonmonetary editing still works while amounts are hidden');
   assert.equal(amount.changes, 0); grid.dispose();
 });
+
+test('rounded amount activation joins grid editing so Enter, arrows, Tab and typing retain exact editor behavior', () => {
+  const listeners = {}, rows = []; let active;
+  for (let index = 0; index < 2; index++) {
+    const row = {cells: [], hidden: false};
+    for (let column = 0; column < 2; column++) {
+      const cell = {parentElement: row, cellIndex: column, classList: {add() {},remove() {}},
+        focus() {active=cell;},scrollIntoView(){},closest(){return cell;},contains(target){return target===control;}};
+      const control = {value:column===0?'68000.49':'Memo',dataset:column===0?{moneyRounded:''}:{},changes:0,inputs:0,opened:0,
+        matches(selector){return selector.includes('input:not([type="date"])');},
+        closest(selector){return selector==='td'?cell:null;},focus(){active=control;},
+        select(){this.selectionStart=0;this.selectionEnd=this.value.length;},
+        dispatchEvent(event){if(event.type==='change')this.changes++;if(event.type==='input')this.inputs++;if(event.type==='money-edit')this.opened++;}};
+      cell.querySelector=()=>control;cell.control=control;row.cells.push(cell);
+    }
+    rows.push(row);
+  }
+  const table={tBodies:[{rows}],addEventListener(name,callback){listeners[name]=callback;}};
+  context.initTransactionGrid(table);
+  const first=rows[0].cells[0].control,second=rows[1].cells[0].control;
+  const activate=control=>{let prevented=false;listeners['money-display-activate']({target:control,preventDefault(){prevented=true;}});assert.equal(prevented,true);};
+  const key=(target,key)=>listeners.keydown({target,key,preventDefault(){},stopPropagation(){}});
+  activate(first);assert.equal(active,first);assert.equal(first.value,'68000.49');assert.equal(first.opened,1);
+  key(first,'Enter');assert.equal(active,rows[1].cells[0]);assert.equal(first.changes,1);assert.equal(first.value,'68000.49');
+  activate(second);key(second,'ArrowUp');assert.equal(active,rows[0].cells[0]);assert.equal(second.changes,1);
+  activate(first);key(first,'Tab');assert.equal(active,rows[0].cells[1]);assert.equal(first.value,'68000.49');
+  key(rows[0].cells[1],'ArrowLeft');key(rows[0].cells[0],'7');assert.equal(active,first);assert.equal(first.value,'7');assert.equal(first.inputs,1);
+});

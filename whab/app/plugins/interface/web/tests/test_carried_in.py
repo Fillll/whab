@@ -181,7 +181,7 @@ def test_unsupported_remote_breakdown_never_invents_component_values(client, sto
     assert len(cells) == 3
     assert "<details" not in row
     if field == "carriedIn":
-        assert all(markup.strip() == "—" and "negative" not in attributes for attributes, markup in cells)
+        assert all(markup.strip() == '<span data-private-amount>—</span>' and "negative" not in attributes for attributes, markup in cells)
     else:
         assert row.count("Breakdown unavailable") == 3
 
@@ -206,18 +206,18 @@ def test_actual_monthly_flow_breakdown_keeps_category_money_out_and_receives_exp
     store.assign_next_month("personal", "2026-10", "USD", 12345)
     category = client.get("/budgets/home/budget/2026-11/usd").text
     category_cell = re.findall(r'<td[^>]*>(.*?)</td>', carried_in_row(category), re.S)[0]
-    assert total(category_cell) == "800.00"
-    assert "Previously unassigned money</dt><dd><span data-private-amount>676.55</span></dd>" in category_cell
-    assert "Set aside for this month</dt><dd><span data-private-amount>123.45</span></dd>" in category_cell
+    assert total(category_cell) == "800"
+    assert "Previously unassigned money</dt><dd><span data-private-amount>677</span></dd>" in category_cell
+    assert "Set aside for this month</dt><dd><span data-private-amount>123</span></dd>" in category_cell
     assert "Overall category balance" not in category_cell
     assert "<input" not in category_cell
     store.set_rollover_mode("personal", "2026-10", "USD", "balance")
     balance = client.get("/budgets/home/budget/2026-11/usd").text
     balance_cell = re.findall(r'<td[^>]*>(.*?)</td>', carried_in_row(balance), re.S)[0]
-    assert total(balance_cell) == "950.00"
-    assert "Previously unassigned money</dt><dd><span data-private-amount>676.55</span></dd>" in balance_cell
-    assert "Set aside for this month</dt><dd><span data-private-amount>123.45</span></dd>" in balance_cell
-    assert "Overall category balance</dt><dd><span data-private-amount>150.00</span></dd>" in balance_cell
+    assert total(balance_cell) == "950"
+    assert "Previously unassigned money</dt><dd><span data-private-amount>677</span></dd>" in balance_cell
+    assert "Set aside for this month</dt><dd><span data-private-amount>123</span></dd>" in balance_cell
+    assert "Overall category balance</dt><dd><span data-private-amount>150</span></dd>" in balance_cell
     assert "<input" not in balance_cell
 
 

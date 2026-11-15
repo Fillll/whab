@@ -239,5 +239,5 @@ def test_rollover_saves_and_flags_next_month_cash_shortfall_even_with_a_positive
     ready = re.search(r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', text, re.S)[1]
     attributes, cell = re.findall(r'<td([^>]*)>(.*?)</td>', ready, re.S)[1]
     assert "positive" in attributes and "negative" not in attributes
-    assert re.sub(r'<[^>]*>', '', re.sub(r'<details\b[^>]*>.*?</details>', "", cell, flags=re.S)).strip() == "150.00"
-    assert 'class="negative">Available after spending and account reserves: <span data-private-amount>-50.00</span>.</p>' in cell
+    assert re.sub(r'<[^>]*>', '', re.sub(r'<details\b[^>]*>.*?</details>', "", cell, flags=re.S)).strip() == "150"
+    assert 'class="negative">Available after spending and account reserves: <span data-private-amount>-50</span>.</p>' in cell

@@ -55,7 +55,7 @@ export function initTransactionGrid(table) {
     if (!control) return;
     if (control.matches('button,input[type="checkbox"]')) {control.click(); return;}
     editing = control; nativeArrows = native || control.matches('select,input[type="date"]'); control.dataset.gridEditing = 'true';
-    control.readOnly = false; control.focus();
+    control.readOnly = false; control.dispatchEvent(new Event('money-edit', {bubbles: true})); control.focus();
     if (replacement !== undefined && !control.matches('select')) {
       control.value = replacement; control.dispatchEvent(new Event('input', {bubbles: true}));
     } else if (control.matches('input:not([type="date"]),textarea')) control.select();
@@ -65,6 +65,11 @@ export function initTransactionGrid(table) {
   }
   const first = rows().flatMap(cells)[0];
   if (first) first.tabIndex = 0;
+  listen('money-display-activate', event => {
+    const cell = event.target.closest('td');
+    if (!cell || !cells(cell.parentElement).includes(cell)) return;
+    event.preventDefault(); focus(cell); edit(cell, undefined, false);
+  });
   listen('pointerdown', event => {
     const cell = event.target.closest('td');
     if (!cell || !cells(cell.parentElement).includes(cell) || event.target === editing || event.target.closest('button,input[type="checkbox"]')) return;

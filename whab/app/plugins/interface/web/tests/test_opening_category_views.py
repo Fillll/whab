@@ -4,9 +4,9 @@ import re
 
 import pytest
 from test_summary_explanations import disclosure, equation, overview_cells, terms
-from whab_plugin_web.views import money_number
+from whab_plugin_web.views import display_money, money_number
 
-from whab.plugins import WorkspaceImport, format_money
+from whab.plugins import WorkspaceImport
 
 
 @pytest.mark.parametrize(('cash_amount', 'balance'), [(-5000, 3800), (5000, -6200)])
@@ -49,12 +49,12 @@ def test_opening_category_picker_zero_review_and_signed_funding(client, store, c
     assert 'without adding the same opening funding twice' in opening
     ready = disclosure(overview_cells(budget, 'Available to assign')[0][1], 'Available to assign', '2026-10')
     assert ('Opening funding', equation(balance, '+', 'USD')) in terms(ready)
-    assert ('Income', '+ 0.00') in terms(ready)
+    assert ('Income', '+ 0') in terms(ready)
     assert ('Available to assign', equation(balance, '=', 'USD')) in terms(ready)
     following = disclosure(overview_cells(budget, 'Opening funding')[1][1], 'Opening funding', '2026-11')
-    assert terms(following) == [('Opening funding', '0.00')]
+    assert terms(following) == [('Opening funding', '0')]
     insights = client.get('/budgets/home/insights/2026-10/usd').text
-    assert f'Opening funding <span data-private-amount>{format_money(balance, "USD")}</span> · separate from income' in insights
+    assert f'Opening funding <span data-private-amount>{display_money(balance, "USD")}</span> · separate from income' in insights
     assert '<span class="summary-label">TRANSACTIONS</span><strong>0</strong>' in insights
     assert 'Existing cash correction' not in insights
 
@@ -69,7 +69,7 @@ def test_missing_opening_projection_is_not_invented(client, store, monkeypatch):
     monkeypatch.setattr(store, 'workspace', older_workspace)
     monkeypatch.setattr(store, 'workspace_periods', None)
     page = client.get('/budgets/home/budget/2026-10/usd').text
-    assert all(body.strip() == '—' for _, body in overview_cells(page, 'Opening funding'))
+    assert all(body.strip() == '<span data-private-amount>—</span>' for _, body in overview_cells(page, 'Opening funding'))
     assert 'Breakdown unavailable' in overview_cells(page, 'Available to assign')[0][1]
     insights = client.get('/budgets/home/insights/2026-10/usd').text
-    assert 'Opening funding — · separate from income' in insights
+    assert 'Opening funding <span data-private-amount>—</span> · separate from income' in insights

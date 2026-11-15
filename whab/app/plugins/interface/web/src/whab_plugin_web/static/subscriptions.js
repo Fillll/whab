@@ -6,7 +6,8 @@ import {createPlanTableState, renderSubscriptionPlans} from './subscription-plan
 
 export function money(value, currency) {
   const digits = new Intl.NumberFormat('en', {style: 'currency', currency}).resolvedOptions().maximumFractionDigits;
-  return new Intl.NumberFormat(undefined, {style: 'currency', currency}).format(value / 10 ** digits);
+  const major = value / 10 ** digits;
+  return new Intl.NumberFormat('en-US', {style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0}).format(Math.abs(major) < 0.5 ? 0 : major);
 }
 
 export function initSubscriptions() {

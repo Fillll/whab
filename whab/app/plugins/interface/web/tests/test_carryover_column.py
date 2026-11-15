@@ -80,7 +80,7 @@ def test_incoming_category_column_uses_previous_month_and_keeps_mixed_month_rows
         assert "<input" not in body and "<form" not in body and "<a " not in body
         assert 'name="assigned"' in cells[2][1]
         assert 'name="assigned"' in cells[5][1]
-        assert "budget-carryover" in cells[8][0] and visible_text(cells[8][1]) == "0.00"
+        assert "budget-carryover" in cells[8][0] and visible_text(cells[8][1]) == "0"
         assert 'name="assigned"' in cells[9][1]
 
     home = next(
@@ -91,7 +91,7 @@ def test_incoming_category_column_uses_previous_month_and_keeps_mixed_month_rows
     for row in (home, footer):
         attributes, body = row_cells(row)[1]
         assert "budget-carryover" in attributes and "negative" in attributes
-        assert visible_text(body) == "-25.00"
+        assert visible_text(body) == "-25"
         assert "<input" not in body
     overview = matrix_row(text, "budget-overview-row budget-assigned-row")
     ready = matrix_row(text, "budget-overview-row budget-ready-row")
@@ -134,13 +134,13 @@ def test_carryover_column_policy_and_amounts_are_bound_to_the_selected_currency(
     usd_first = row_cells(category_row(usd, "USD reserve"))[1]
     assert "budget-carryover" not in usd_first[0] and 'name="assigned"' in usd_first[1]
     eur_first = row_cells(category_row(eur, "EUR reserve"))[1]
-    assert "budget-carryover" in eur_first[0] and visible_text(eur_first[1]) == "300.00"
+    assert "budget-carryover" in eur_first[0] and visible_text(eur_first[1]) == "300"
     assert "USD reserve" not in eur and "EUR reserve" not in usd
     usd_in = matrix_row(usd, "budget-overview-row budget-carried-in-row")
     eur_in = matrix_row(eur, "budget-overview-row budget-carried-in-row")
-    assert visible_amount(row_cells(usd_in)[1][1]) == "10,000.00"
+    assert visible_amount(row_cells(usd_in)[1][1]) == "10,000"
     assert "Overall category balance" in row_cells(usd_in)[1][1]
-    assert visible_amount(row_cells(eur_in)[1][1]) == "9,700.00"
+    assert visible_amount(row_cells(eur_in)[1][1]) == "9,700"
     assert "Overall category balance" not in row_cells(eur_in)[1][1]
     response = client.put("/api/budget/settings/rollover", json={
         "workspace": "personal", "month": "2026-10", "currency": "USD", "mode": "category",
@@ -148,7 +148,7 @@ def test_carryover_column_policy_and_amounts_are_bound_to_the_selected_currency(
     assert response.status_code == 200
     restored = client.get("/budgets/home/budget/2026-11/usd").text
     assert column_labels(restored)[1:5] == ["Carryover", "Assigned", "Activity", "Available"]
-    assert visible_text(row_cells(category_row(restored, "USD reserve"))[1][1]) == "100.00"
+    assert visible_text(row_cells(category_row(restored, "USD reserve"))[1][1]) == "100"
 
 
 def test_first_budget_and_historical_months_do_not_have_incoming_columns(client):

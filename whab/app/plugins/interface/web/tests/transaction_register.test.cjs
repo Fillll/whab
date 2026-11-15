@@ -46,6 +46,7 @@ function harness(count = 5, options = {}) {
       '[data-transaction-field="categoryId"]', '[data-transaction-reviewed]', '[data-transaction-receipt]']
       .map(selector => [selector, element()]));
     const details = options.details ? [element({dataset:{transactionDetail:'date'},value:'2026-10-01',setCustomValidity(){},checkValidity:()=>true})] : [];
+    if (options.amountDetails) details.push(element({dataset:{transactionDetail:'amount',minorUnits:'2'},value:'68000.49',setCustomValidity(){},checkValidity:()=>true,closest:()=>element(),dispatchEvent(){}}));
     if (options.accountDetails) details.push(element({dataset:{transactionDetail:'accountId'},value:'first',setCustomValidity(){},checkValidity:()=>true}));
     if (options.agentLabel) controls['[data-category-agent]'] = element({removed: false, remove() {this.removed = true;}});
     controls['[data-select-transaction]'].checked = true;
@@ -95,7 +96,7 @@ function harness(count = 5, options = {}) {
     static createObjectURL(blob) {const url = `blob:fixture-${objectUrls.length + 1}`; objectUrls.push({url, blob}); return url;}
     static revokeObjectURL(url) {revokedUrls.push(url);}
   }
-  const context = {document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, queueMicrotask, URL: ReceiptURL,
+  const context = {Event, document: {...element(), querySelector: () => root}, window, setTimeout, clearTimeout, queueMicrotask, URL: ReceiptURL,
     crypto: {randomUUID: () => `review-request-${++requestId}`},
     getContext: () => ({bulkReview: options.bulkReview === true, receiptIndexScoped: options.receiptIndexScoped, ...options.context}),
     encodeURIComponent, location: {href: options.href || 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}, reload() {reloads.push(true);}},
@@ -1221,4 +1222,11 @@ test('account edit and failed-draft discard keep the bank mark aligned with the 
   assert.equal(row.controls['.account-cell'].title, 'first');
   assert.equal(state.requests.length, 1);
   state.register.dispose();
+});
+
+test('finishing an exact amount without changes is a no-op and a real edit saves every minor unit', async () => {
+  const state=harness(1,{amountDetails:true});const amount=state.rows[0].details[0];
+  amount.emit('change');await tick();assert.equal(state.requests.length,0);assert.equal(amount.value,'68000.49');
+  amount.value='68000.51';amount.emit('change');await tick();assert.equal(state.requests.length,1);assert.equal(state.requests[0].body.amount,-6800051);
+  state.requests[0].resolve({ok:true});await tick();assert.equal(amount.value,'68000.51');assert.equal(state.register.dirty,false);state.register.dispose();
 });

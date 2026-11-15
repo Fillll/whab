@@ -78,10 +78,10 @@ export function renderSubscriptionPlans(parent, data, state, {format, digits}) {
       for (const column of planColumns) {
         const item = value(row,column.key);
         const text = item === null ? '—' : column.type === 'money' ? format(item) + (column.key === 'amount' ? ` ${frequencies[row.cadence]}` : '') : column.type === 'count' ? item.toLocaleString() : item;
-        const cell = el('td', column.type === 'money' && item !== null ? '' : text, ['money','count'].includes(column.type) ? 'subscription-plan-number' : '');
-        if (column.type === 'money' && item !== null) {
-          const amount = el('span', format(item)); amount.dataset.privateAmount = ''; cell.append(amount);
-          if (column.key === 'amount') cell.append(document.createTextNode(` ${frequencies[row.cadence]}`));
+        const cell = el('td', column.type === 'money' ? '' : text, ['money','count'].includes(column.type) ? 'subscription-plan-number' : '');
+        if (column.type === 'money') {
+          const amount = el('span', item === null ? '—' : format(item)); amount.dataset.privateAmount = ''; cell.append(amount);
+          if (column.key === 'amount' && item !== null) cell.append(document.createTextNode(` ${frequencies[row.cadence]}`));
           cell.dataset.privateAmountAttributes = 'title';
         }
         cell.title = item === null ? row.cadence === 'unknown' && ['monthly','annual'].includes(column.key) ? 'Billing interval needs review' : 'Available with Subscriptions 1.2 or newer' : String(text);

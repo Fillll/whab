@@ -178,7 +178,7 @@ def test_older_server_keeps_explainable_income_and_assignments_but_not_new_fundi
         for index, month in enumerate(("2026-10", "2026-11", "2026-12")):
             disclosure(overview_cells(text, label)[index][1], label, month)
     for label in ("Carried in", "Assigned for next month", "Available to assign"):
-        assert all(cell.strip() == "—" for _, cell in overview_cells(text, label))
+        assert all(cell.strip() == '<span data-private-amount>—</span>' for _, cell in overview_cells(text, label))
 
 
 def test_next_month_amount_gets_an_explanation_when_the_server_cannot_edit_it(
@@ -200,7 +200,7 @@ def test_next_month_amount_gets_an_explanation_when_the_server_cannot_edit_it(
     cell = overview_cells(text, "Assigned for next month")[0][1]
     assert "<input" not in cell and "<form" not in cell
     body = disclosure(cell, "Assigned for next month", "2026-10")
-    assert terms(body) == [("Set aside in October 2026", "123.45")]
+    assert terms(body) == [("Set aside in October 2026", "123")]
     assert "Carried in for November 2026" in body
 
 
@@ -214,10 +214,10 @@ def test_historical_income_has_an_explanation_but_no_fabricated_planning_breakdo
     })
     text = client.get("/budgets/home/budget/2026-09/usd").text
     body = disclosure(overview_cells(text, "Income")[0][1], "Income", "2026-09")
-    assert terms(body) == [("Received income", "123.45")]
+    assert terms(body) == [("Received income", "123")]
     for label in ("Carried in", "Assigned for next month", "Assigned this month",
                   "Available to assign"):
-        assert overview_cells(text, label)[0][1].strip() == "—"
+        assert overview_cells(text, label)[0][1].strip() == '<span data-private-amount>—</span>'
 
 
 @pytest.mark.parametrize("field", ["income", "openingFunding", "carriedIn", "assignedNextMonth"])
@@ -242,7 +242,7 @@ def test_ready_breakdown_requires_exact_core_components_without_replacing_the_to
     response = client.get("/budgets/demo/budget/2026-10/usd")
     assert response.status_code == 200
     if field == "income":
-        assert all(cell.strip() == "—" for _, cell in overview_cells(response.text, "Income"))
+        assert all(cell.strip() == '<span data-private-amount>—</span>' for _, cell in overview_cells(response.text, "Income"))
     for _, cell in overview_cells(response.text, "Available to assign"):
         assert "<details" not in cell
         assert "Breakdown unavailable" in cell

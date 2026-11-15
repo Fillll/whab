@@ -504,6 +504,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         const field = control.dataset.transactionDetail;
         control.value = field === 'amount' ? (-committed[field] / 10 ** Number(control.dataset.minorUnits)).toFixed(Number(control.dataset.minorUnits)) : committed[field];
         control.setCustomValidity('');
+        if (field === 'amount') control.dispatchEvent(new Event('money-refresh', {bubbles: true}));
         if (field === 'accountId') updateTransactionAccountMark(root, row, control.value);
       }
       reviewed.setAttribute('aria-pressed', String(committed.reviewed));

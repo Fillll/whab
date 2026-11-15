@@ -21,6 +21,7 @@
     <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/theme.js?v={{ web_asset_version }}"></script>
     <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/sidebar.js?v={{ web_asset_version }}"></script>
     <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/amount-privacy.js?v={{ web_asset_version }}"></script>
+    <script src="{{ ui_asset_prefix|default(asset_prefix) }}/static/money-display.js?v={{ web_asset_version }}" defer></script>
     <link rel="stylesheet" href="{{ ui_asset_prefix|default(asset_prefix) }}/static/styles.css?v={{ web_asset_version }}">
     <script id="whab-context" type="application/json">{{ client_context|tojson }}</script>
     <script type="importmap">{{ module_imports(ui_asset_prefix|default(asset_prefix))|tojson }}</script>
