@@ -40,7 +40,10 @@ from fastapi.testclient import TestClient
 target = Path(sys.argv[1]).resolve()
 with patch.object(metadata.EntryPoint, "load", side_effect=AssertionError("Documentation must not load hooks")):
     operation_catalog = installed_catalog()
-assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 40
+assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 43
+assert {"change_transactions", "preview_transaction_changes", "transaction_change_policy"} <= {
+    row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}
+}
 assert {row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] == "local"} == {
     "bank.connections", "bank.preview", "bank.configure", "bank.sync", "bank.schedule", "bank.background", "bank.investments",
 }
@@ -67,6 +70,9 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
              ["fictional", "trnx", "non-reviewed", "--help"],
              ["fictional", "trnx", "uncategorized", "--help"],
              ["fictional", "trnx", "list", "--help"],
+             ["fictional", "trnx", "edit", "--help"],
+             ["fictional", "trnx", "create", "--help"],
+             ["fictional", "trnx", "edit-many", "--help"],
              ["fictional", "category", "--help"],
              ["fictional", "category", "list", "--help"],
              ["fictional", "category", "group", "--help"],
