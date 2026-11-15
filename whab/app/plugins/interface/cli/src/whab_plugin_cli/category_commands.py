@@ -82,8 +82,8 @@ def add_category_parser(commands, catalog):
     )
     create.add_argument("--agent", type=validate_category_agent, help="Explicit agent audit label; default: manual User")
     create.add_argument("--batch", help="History grouping label; this creation remains one commit/save")
-    create.add_argument("--type", dest="category_kind", choices=("expense", "income", "transfer"), default="expense",
-        help="Financial type (default: expense); income/transfer have target zero, no assignments; review requires explicit classification. See category classify --help")
+    create.add_argument("--type", dest="category_kind", choices=("expense", "income", "transfer", "opening_balance"), default="expense",
+        help="Financial type (default: expense); income/transfer/opening_balance have target zero, no assignments; opening_balance records existing cash/debt separately from income. Review stays explicit. See category classify --help")
     create.add_argument(
         "--currency",
         default="USD",
@@ -348,7 +348,7 @@ def category_table(result):
             for child in leaves
         )
     cells = [
-        [terminal_text(value, limit) for value, limit in zip(row, (8, 48, 80, 8, 18), strict=True)]
+        [terminal_text(value, limit) for value, limit in zip(row, (15, 48, 80, 8, 18), strict=True)]
         for row in cells
     ]
     widths = [max(len(row[index]) for row in cells) for index in range(5)]

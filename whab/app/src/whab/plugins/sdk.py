@@ -133,6 +133,7 @@ class CategorySnapshot:
     assigned_cents: int
     activity_cents: int
     available_cents: int
+    kind: str = "expense"
 
     @property
     def parent_id(self) -> str:
@@ -145,7 +146,7 @@ class CategorySnapshot:
         _integer(self.assigned_cents, "Category assignment")
         _integer(self.activity_cents, "Category activity")
         _integer(self.available_cents, "Category availability")
-        validate_child_category({"id": self.id, "name": self.name, "group": self.group, "target": 0})
+        validate_child_category({"id": self.id, "name": self.name, "group": self.group, "target": 0, "kind": self.kind})
 
 
 @dataclass(frozen=True, slots=True)
@@ -295,6 +296,16 @@ class ClassifiedReview(Protocol):
     """Optional native enforcement of classification before explicit review."""
 
     def supports_classified_review(self) -> bool: ...
+
+
+class OpeningBalanceClassification(Protocol):
+    """Optional explicit opening funding with native history and saved-file fencing.
+
+    Advertise only when the adapter preserves opening_balance categories in all
+    snapshots, receipts and reversals and uses the host financial/review rules.
+    """
+
+    def supports_opening_balances(self) -> bool: ...
 
 
 class CategoryClassification(Protocol):

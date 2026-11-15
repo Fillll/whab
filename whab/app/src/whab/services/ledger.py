@@ -207,10 +207,12 @@ class LedgerService:
             if operation == 'preview_transaction_changes':
                 values = self._validate_transaction_changes(parameters)
                 self._require_transaction_changes()
+                self._guard_opening_balances(workspace, values)
                 return {'revision': self._revision, 'data': _public(self._store.preview_transaction_changes(
                     workspace, values['edits'], values['creates'], preserve_balances=values['preserveBalances']))}
             if operation in {'transfer_candidates', 'preview_transfer_match'}:
                 self._require_transfer_matching()
+                self._guard_opening_balances(workspace, {})
                 values = {} if parameters is None else parameters
                 if operation == 'transfer_candidates':
                     data = self._store.transfer_candidates(workspace, values)
@@ -230,6 +232,7 @@ class LedgerService:
                 if parameters['operation'] == 'edit_transactions' and any({'categoryId', 'reviewed'} & edit.keys() for edit in edits):
                     self._require_classified_review()
                 self._require_atomic_bulk()
+                self._guard_opening_balances(workspace, parameters)
                 return {'revision': self._revision, 'data': _public(self._store.preview_bulk_edits(workspace, parameters['operation'], edits))}
             if operation == 'preview_category_classification':
                 if type(parameters) is not dict or parameters.keys() != {'categoryId', 'kind'}:
@@ -238,6 +241,7 @@ class LedgerService:
                 from whab.domain.categories import validate_category_kind
                 validate_category_kind(parameters['kind'])
                 self._require_category_classification()
+                self._guard_opening_balances(workspace, parameters)
                 return {'revision': self._revision, 'data': _public(self._store.preview_category_classification(
                     workspace, parameters['categoryId'], parameters['kind']))}
             if operation == 'category_deletion_status':
@@ -265,6 +269,8 @@ class LedgerService:
                     raise StoreError('Update the storage plugin to use budget history.')
                 if operation == 'history_preview' and values.get('action') not in {'undo', 'redo', 'restore', 'snapshot'}:
                     raise StoreError('Choose undo, redo, restore or snapshot.')
+                if operation == 'history_preview':
+                    self._guard_opening_balances(workspace, {}, history=True)
                 return {'revision': self._revision, 'data': _public(callback(workspace, **values))}
             if operation == "describe":
                 remote = getattr(self._store, "describe_operations", None)
@@ -311,6 +317,13 @@ class LedgerService:
                 self._require_classified_review()
                 data = {'version': 1, 'types': ['expense', 'income', 'transfer'],
                         'classificationRequired': True, 'automaticLegacyCleanup': False}
+                supported = getattr(self._store, 'supports_opening_balances', None)
+                if callable(supported) and supported() is True:
+                    data['types'].append('opening_balance')
+            elif operation == 'opening_balance_policy':
+                self._require_opening_balances()
+                data = {'version': 1, 'categoryType': 'opening_balance',
+                        'zeroAmountReview': True, 'preservesBalances': True}
             elif operation == "category_tree":
                 read = getattr(self._store, "category_tree", None)
                 data = read(workspace) if callable(read) else category_tree(self._store.categories(workspace))
@@ -334,6 +347,45 @@ class LedgerService:
             ('classify_category', 'preview_category_classification', 'history_scope', 'budget_history')
         ):
             raise StoreError('Update the storage plugin to support audited Expense/Income/Transfer category classification.')
+
+    def _require_opening_balances(self):
+        supported = getattr(self._store, 'supports_opening_balances', None)
+        if not callable(supported) or supported() is not True:
+            raise StoreError('Update the storage plugin or remote host for Opening Balance classification and funding. No mutation was submitted.')
+        self._require_category_classification()
+        self._require_classified_review()
+
+    def _guard_opening_balances(self, workspace, payload, *, history=False):
+        """Old adapters may keep ordinary ledgers but must not alter opening ledgers.
+
+        Supported native adapters take the cheap capability path. Unsupported
+        adapters inspect only category metadata; historical restores also inspect
+        their public portable history so an undone category cannot bypass the gate.
+        """
+        if payload.get('kind') == 'opening_balance':
+            self._require_opening_balances()
+            return
+        supported = getattr(self._store, 'supports_opening_balances', None)
+        if callable(supported):
+            try:
+                if supported() is True:
+                    return
+            except StoreError:
+                # An older remote may not expose the new policy. Its ordinary
+                # Expense/Income/Transfer workflows remain supported.
+                pass
+        categories = getattr(self._store, 'categories', None)
+        if callable(categories) and any(row.get('kind') == 'opening_balance' for row in categories(workspace)):
+            self._require_opening_balances()
+        if history:
+            exporter = getattr(self._store, 'export_budget', None)
+            if callable(exporter):
+                def contains_opening(value):
+                    if isinstance(value, dict):
+                        return value.get('kind') == 'opening_balance' or any(contains_opening(row) for row in value.values())
+                    return isinstance(value, list) and any(contains_opening(row) for row in value)
+                if contains_opening(exporter(workspace)):
+                    self._require_opening_balances()
 
     @staticmethod
     def _validate(operation: str, payload: dict) -> dict:
@@ -553,6 +605,8 @@ class LedgerService:
                     return deepcopy(replayed)
             if expected_revision != self._revision:
                 raise RevisionConflict("Budget changed. Refresh before making this change.")
+            if operation not in {'feature', 'categorization'}:
+                self._guard_opening_balances(workspace, payload, history=operation == 'history_apply')
             response_revision = str(uuid4())
             durable_scope = getattr(self._store, "durable_command_scope", None)
             scope = (durable_scope(request_id, fingerprint, response_revision)

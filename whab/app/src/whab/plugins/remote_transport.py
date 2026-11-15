@@ -372,6 +372,16 @@ class RemoteStore:
     def supports_category_classification(self):
         return True
 
+    def supports_opening_balances(self):
+        try:
+            policy = self._query('opening_balance_policy', 'personal')
+        except StoreError:
+            raise StoreError('Unable to verify Opening Balance support. Check the connection or update the remote authority; no mutation was submitted.') from None
+        return (type(policy) is dict and policy.get('version') == 1
+                and policy.get('categoryType') == 'opening_balance'
+                and policy.get('zeroAmountReview') is True
+                and policy.get('preservesBalances') is True)
+
     def preview_category_classification(self, workspace, category_id, kind):
         return self._query('preview_category_classification', workspace, parameters={'categoryId': category_id, 'kind': kind})
 

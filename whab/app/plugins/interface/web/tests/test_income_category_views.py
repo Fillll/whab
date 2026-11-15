@@ -41,7 +41,7 @@ def test_classification_required_controls_and_explicit_transfer(client, store):
     row=markup()
     assert 'data-review-classified="false"' in row
     assert re.search(r'data-transaction-reviewed[^>]* disabled',row)
-    assert 'Choose an Expense, Income or Transfer category' in row
+    assert 'Choose an Expense, Income, Transfer or Opening Balance category' in row
     response=client.post('/api/categories',json={'workspace':'personal','name':'Move money','group':'Technical','target':0,'kind':'transfer'})
     assert response.status_code==200
     category=next(row['id'] for row in store.categories('personal') if row['name']=='Move money')

@@ -107,6 +107,7 @@ def test_each_month_explains_income_links_matching_assigned_total_and_funding_eq
             )
             assert terms(ready_body) == [
                 ("Income", equation(income * factor, "+", currency)),
+                ("Opening funding", equation(0, "+", currency)),
                 ("Carried in", equation(carry_in * factor, "+", currency)),
                 ("Assigned for next month", equation(set_aside * factor, "−", currency)),
                 ("Assigned this month", equation(sum(assignments) * factor, "−", currency)),
@@ -147,6 +148,7 @@ def test_funding_equation_preserves_signs_zero_and_currency_minor_units(
     body = disclosure(cell, "Available to assign", "2026-10")
     assert terms(body) == [
         ("Income", equation(income, "+", currency)),
+        ("Opening funding", equation(0, "+", currency)),
         ("Carried in", equation(carry_in, "+", currency)),
         ("Assigned for next month", equation(set_aside, "−", currency)),
         ("Assigned this month", equation(assigned, "−", currency)),
@@ -218,7 +220,7 @@ def test_historical_income_has_an_explanation_but_no_fabricated_planning_breakdo
         assert overview_cells(text, label)[0][1].strip() == "—"
 
 
-@pytest.mark.parametrize("field", ["income", "carriedIn", "assignedNextMonth"])
+@pytest.mark.parametrize("field", ["income", "openingFunding", "carriedIn", "assignedNextMonth"])
 @pytest.mark.parametrize("invalid", [None, True, "12345", 1.5, 9_007_199_254_740_992])
 def test_ready_breakdown_requires_exact_core_components_without_replacing_the_total(
     client, store, monkeypatch, field, invalid,

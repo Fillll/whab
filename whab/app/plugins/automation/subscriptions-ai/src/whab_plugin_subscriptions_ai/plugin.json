@@ -3,7 +3,7 @@
   "id": "subscriptions-ai",
   "category": "automation",
   "dependencies": [
-    {"id": "subscriptions", "version": ">=1.3.0,<2"},
+    {"id": "subscriptions", "version": ">=1.4.0,<2"},
     {"id": "ai-credentials", "version": ">=1.0.0,<2"}
   ]
 }

@@ -1175,7 +1175,7 @@ test('classification enables explicit review and clearing it clears review witho
   assert.equal(row.dataset.reviewed, 'false');
   assert.equal(review.disabled, true);
   assert.equal(row.dataset.reviewClassified, 'false');
-  assert.match(review.title, /Expense, Income or Transfer/);
+  assert.match(review.title, /Expense, Income, Transfer or Opening Balance/);
   assert.equal(await state.register.flush(), true);
   state.register.dispose();
 });

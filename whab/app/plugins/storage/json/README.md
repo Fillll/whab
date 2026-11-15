@@ -421,6 +421,56 @@ query probes the authority. Unsupported storage/remote authorities fail before
 classification/review writes. Financial rules remain in core; adapters retain
 atomic persistence, annotations, original/import records and native receipts.
 
+## Explicit Opening Balance classification
+
+WHAB 2.79 adds optional `OpeningBalanceClassification` with read-only
+`supports_opening_balances()`. The public `opening_balance_policy` query probes the
+actual authority; unsupported backends fail before mutation. `kind=opening_balance`
+is a technical category type, independent of its name or parent. Creating or
+converting one requires a zero target and no monthly assignment rows, including
+zero rows. Use the existing read-only category classification preview to inspect
+monthly before/after consequences, then the existing guarded public operation.
+
+Core reports `openingFunding` separately from ordinary income and spending. Only
+posted opening entries on eligible on-budget cash accounts contribute funding;
+credit/loan debt and off-budget accounts never create spendable cash. Existing
+amount signs, currencies, balances, transaction identities, notes, source metadata,
+reviews and provider mappings are preserved. An Opening Balance is never an
+automatic transfer candidate. No bank synchronization or historical inference runs.
+
+Existing zero-valued transactions can be classified and explicitly reviewed when
+posted and otherwise eligible. General financial creation/edit validation still
+rejects zero amounts. Classification never automatically reviews; clearing it
+requires fresh review. Native single/bulk operations retain one guarded revision,
+one durable receipt and exact before/after audit state. Exact retries after restart
+return the original receipt without another change; guarded undo/redo and actual
+saved-file restoration retain the classification and prior history hashes.
+
+JSON advances native format to **4** when Opening Balance appears in current
+records or retained audit history. The fence stays after later writes, undo,
+restore and local transfer, while replica/authority metadata stays unchanged.
+Older readers reject the file before interpreting unsupported financial rules.
+Existing format 3 files retain their format until Opening Balance is saved; no
+existing financial record is rewritten.
+
+```sh
+whab "My budget" category create "Starting Balances" --parent Finance --type opening_balance --agent Codex
+whab "My budget" category classify "Finance / Starting Balances" --type opening_balance --dry-run --agent Codex
+whab "My budget" trnx categorize TX1 --category "Finance / Starting Balances" --agent Codex
+whab "My budget" trnx review TX1 --reviewed --agent Codex
+```
+
+The historical-reader regression uses genuine WHAB 2.78.0 / SQLite 1.27.0 / JSON
+1.19.0 source from pinned commit `ec9d8d9338ed3e239eb093d9b07d97d219f24af6`.
+It creates isolated fictional current-kind and history-only files, verifies old
+writable/read-only readers refuse all eight cases, checks bytes and native evidence
+stay unchanged, then reopens them successfully with current code. Run from
+`whab/app` with full local Git history and the development environment:
+
+```sh
+.venv/bin/python plugins/storage/sqlite/scripts/check_opening_balance_compatibility.py
+```
+
 ## Atomic transaction edits and creations
 
 WHAB 2.78 adds optional `AtomicTransactionChanges` with read-only

@@ -231,7 +231,7 @@ def _pack_ledger(state, *, portable=False, complete_associations=True):
 
 def decode(raw):
     value = parse(raw)
-    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2, 3}:
+    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2, 3, 4}:
         raise StoreError("This JSON storage schema is newer or unsupported; install a compatible plugin.")
     fields = {"formatVersion", "generation", "operationId", "authorityEpoch", "workspaces"}
     _exact(value, fields | ({"authority"} if value["formatVersion"] >= 2 else set()))
@@ -241,7 +241,7 @@ def decode(raw):
     else:
         if value["operationId"] is not None:
             storage_identifier(value["operationId"])
-        value["authority"] = validate_metadata(value["authority"], replica=value["formatVersion"] == 3)
+        value["authority"] = validate_metadata(value["authority"], replica=value["formatVersion"] >= 3)
         if any(read["evidence"]["generation"] > value["generation"] for read in value["authority"]["receipts"]):
             _invalid()
     _uuid(value["authorityEpoch"])
@@ -256,7 +256,7 @@ def decode(raw):
         if any(record["evidence"]["generation"] == value["generation"] and record["evidence"]["state_digest"] != digest
                for record in value["authority"]["receipts"]):
             _invalid()
-        if value["formatVersion"] == 3 and value["authority"]["replica"] is not None:
+        if value["formatVersion"] >= 3 and value["authority"]["replica"] is not None:
             watermark = read_replica_watermark(value["authority"]["replica"])
             if value["authority"]["role"] == "copy" and (
                 value["authorityEpoch"] != watermark.source_authority_epoch

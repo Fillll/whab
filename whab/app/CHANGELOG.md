@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.79.0 — 2026-11-14
+
+PR: [#204](https://github.com/Fillll/whab/pull/204)
+
+- Add explicit Opening Balance category treatment, separate once-only opening cash funding, technical-envelope safeguards and review of existing posted zero entries. Preserve snapshots, signed amounts, identities and annotations; never infer opening entries or rewrite production records.
+- Extend public SDK, worker and HTTPS capability checks, preview/report projections and native saved-file compatibility. Unsupported authorities refuse Opening Balance mutations; exact receipts and guarded audit reversals remain durable.
+
 ## 2.78.0 — 2026-11-14
 
 PR: [#202](https://github.com/Fillll/whab/pull/202)

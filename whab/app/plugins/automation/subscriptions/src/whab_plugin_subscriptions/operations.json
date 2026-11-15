@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "subscriptions",
-  "summary": "Manual subscription labels, deterministic matching and cost reports; no AI credentials required.",
+  "summary": "Manual subscription labels, deterministic matching and cost reports; no AI credentials required. Explicit opening_balance category kinds are excluded from subscription eligibility, inference and cost totals without deleting stored labels.",
   "delegates": [],
   "operations": [
     {
@@ -447,7 +447,7 @@
       ],
       "side_effects": "Read-only; no inference, bank synchronization or changes are started.",
       "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
@@ -535,7 +535,7 @@
       ],
       "side_effects": "Saves the label for matching merchant/amount/currency/account/billing-day payments, including future matching imports. Does not change categories, review flags, balances or bank records.",
       "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
@@ -1064,7 +1064,7 @@
       ],
       "side_effects": "Read-only report; no inference or saved-data mutation.",
       "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
@@ -1640,7 +1640,7 @@
       ],
       "side_effects": "Validate and save explicitly consented classifier configuration; selects AI mode. Requires the companion.",
       "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
@@ -1763,7 +1763,7 @@
       ],
       "side_effects": "Explicitly send eligible payment data to the selected model and save one classification batch. Requires AI mode and the companion.",
       "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
@@ -2302,7 +2302,7 @@
       ],
       "side_effects": "Save an explicit manual label for matching payments in the same account; no inference.",
       "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
@@ -2461,7 +2461,7 @@
       ],
       "side_effects": "Start one explicitly identified background model scan; paid inference may occur. Requires the companion and explicit configuration or saved AI mode.",
       "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
@@ -2618,7 +2618,7 @@
       ],
       "side_effects": "Read current job state; does not start a scan or inference.",
       "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
@@ -2777,7 +2777,7 @@
       ],
       "side_effects": "Request that the identified scan stop after its current batch; an in-flight provider request may finish.",
       "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
@@ -3308,7 +3308,7 @@
       ],
       "side_effects": "Save manual or AI mode. Manual needs no model or credential; AI requires the companion.",
       "permissions": "Local authority access with HTTPS and Host/origin checks. Not exposed by the remote ledger API.",
-      "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
+      "scope": "Explicit budget and personal/demo workspace; currencies are never combined. Opening Balance entries are identified by category kind and excluded from subscription classification and cost totals.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."

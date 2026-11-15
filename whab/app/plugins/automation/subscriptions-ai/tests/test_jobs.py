@@ -493,3 +493,23 @@ def test_demo_and_other_budget_jobs_do_not_share_progress_or_results(
         isolated.close()
     finally:
         jobs.close()
+
+
+def test_opening_balances_never_reach_ai_background_requests(context, config, row, monkeypatch):
+    jobs, ledger = create(context, config, [{**row, 'categoryId': 'opening'}])
+    query = ledger.query
+    def with_opening(operation, workspace):
+        snapshot = query(operation, workspace)
+        snapshot['data']['categories'] = [{'id': 'opening', 'name': 'Arbitrary', 'group': 'Technical', 'kind': 'opening_balance'}]
+        return snapshot
+    monkeypatch.setattr(ledger, 'query', with_opening)
+    monkeypatch.setattr(ai, 'complete', lambda *args, **kwargs: pytest.fail('Opening balances must not reach a provider'))
+    try:
+        _, rows = jobs.snapshot('personal')
+        assert rows[0]['categoryKind'] == 'opening_balance'
+        jobs.start('personal', str(uuid4()))
+        status = finished(jobs)
+        assert status['status'] == 'completed' and status['classified'] == 0
+        assert Engine(context).saved['labels'] == {}
+    finally:
+        jobs.close()

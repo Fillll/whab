@@ -1248,9 +1248,10 @@
             "enum": [
               "expense",
               "income",
-              "transfer"
+              "transfer",
+              "opening_balance"
             ],
-            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income and Transfer require target zero and no monthly assignment rows."
+            "description": "Financial treatment independent of name/parent. Missing kind remains expense. Income, Transfer and Opening Balance require target zero and no monthly assignment rows, including zero rows. Opening Balance is explicit: eligible posted on-budget cash funds once, ordinary income/spending exclude it, debt and tracking never create opening funding."
           }
         },
         "required": [
@@ -1284,7 +1285,7 @@
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
       ],
       "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
-      "availability": "Public ledger API and CLI."
+      "availability": "CategoryClassification support; opening_balance additionally requires WHAB 2.79+ and OpeningBalanceClassification (SQLite 1.28+, JSON 1.20+)."
     },
     {
       "name": "add_transaction",
@@ -4186,9 +4187,10 @@
             "enum": [
               "expense",
               "income",
-              "transfer"
+              "transfer",
+              "opening_balance"
             ],
-            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income and Transfer require target zero and no monthly assignment rows."
+            "description": "Financial treatment independent of name/parent. Missing kind remains expense. Income, Transfer and Opening Balance require target zero and no monthly assignment rows, including zero rows. Opening Balance is explicit: eligible posted on-budget cash funds once, ordinary income/spending exclude it, debt and tracking never create opening funding."
           }
         },
         "required": [
@@ -4225,7 +4227,7 @@
         "Parent groups cannot be renamed by this child-only operation."
       ],
       "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
-      "availability": "WHAB 2.71+ and CategoryRenaming support (SQLite 1.22+, JSON 1.14+)."
+      "availability": "CategoryClassification support; opening_balance additionally requires WHAB 2.79+ and OpeningBalanceClassification (SQLite 1.28+, JSON 1.20+)."
     },
     {
       "name": "preview_category_classification",
@@ -4245,9 +4247,10 @@
             "enum": [
               "expense",
               "income",
-              "transfer"
+              "transfer",
+              "opening_balance"
             ],
-            "description": "Financial treatment independent of name/parent. Missing kind remains expense for compatibility. Income and Transfer require target zero and no monthly assignment rows."
+            "description": "Financial treatment independent of name/parent. Missing kind remains expense. Income, Transfer and Opening Balance require target zero and no monthly assignment rows, including zero rows. Opening Balance is explicit: eligible posted on-budget cash funds once, ordinary income/spending exclude it, debt and tracking never create opening funding."
           }
         },
         "required": [
@@ -4259,13 +4262,20 @@
       },
       "output": {
         "type": "object",
-        "description": "Exact category before/after and impacts by month/currency; includes income, classifiedIncome, unclassifiedIncome, spent and readyToAssign. No mutation."
+        "description": "Exact category before/after and impacts by month/currency; includes openingFunding separately from income, classifiedIncome, unclassifiedIncome, spent and readyToAssign. Read-only; no automatic review or name inference."
       },
       "examples": [
         {
           "input": {
             "categoryId": "fictional-salary",
             "kind": "income"
+          },
+          "output": {}
+        },
+        {
+          "input": {
+            "categoryId": "fictional-opening",
+            "kind": "opening_balance"
           },
           "output": {}
         }
@@ -4281,12 +4291,12 @@
         "Parent groups cannot be renamed by this child-only operation."
       ],
       "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
-      "availability": "WHAB 2.71+ and CategoryRenaming support (SQLite 1.22+, JSON 1.14+)."
+      "availability": "CategoryClassification support; opening_balance additionally requires WHAB 2.79+ and OpeningBalanceClassification (SQLite 1.28+, JSON 1.20+)."
     },
     {
       "name": "review_policy",
       "kind": "query",
-      "summary": "Read authoritative classified-review support. New review requires Expense/Income/Transfer or a confirmed pair; no automatic legacy cleanup.",
+      "summary": "Read authoritative classified-review support. New review requires an explicit supported category or confirmed pair; no automatic legacy cleanup.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -4296,7 +4306,7 @@
       },
       "output": {
         "type": "object",
-        "description": "Policy version, supported types, classificationRequired and automaticLegacyCleanup."
+        "description": "Policy version, supported types, classificationRequired and automaticLegacyCleanup. opening_balance appears only when the authority supports its financial, persistence and review contract; existing posted zero rows may be explicitly reviewed."
       },
       "examples": [
         {
@@ -4306,7 +4316,8 @@
             "types": [
               "expense",
               "income",
-              "transfer"
+              "transfer",
+              "opening_balance"
             ],
             "classificationRequired": true,
             "automaticLegacyCleanup": false
@@ -5033,6 +5044,41 @@
       ],
       "retry": "Read-only and safe to repeat.",
       "availability": "WHAB 2.78+ optional AtomicTransactionChanges; SQLite 1.27+ and JSON 1.19+, or a compatible remote authority. Existing annotation-only AtomicBulkEdits remains unchanged."
+    },
+    {
+      "name": "opening_balance_policy",
+      "kind": "query",
+      "summary": "Read authoritative explicit Opening Balance classification, funding and zero-row review support.",
+      "input": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "description": "No parameters."
+      },
+      "output": {
+        "type": "object",
+        "description": "Version 1, categoryType opening_balance, zeroAmountReview true and preservesBalances true."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "version": 1,
+            "categoryType": "opening_balance",
+            "zeroAmountReview": true,
+            "preservesBalances": true
+          }
+        }
+      ],
+      "side_effects": "None. Never creates categories, migrates records, reviews entries or starts synchronization.",
+      "permissions": "Authenticated server access to the selected budget over verified HTTPS.",
+      "scope": "Explicit budget and personal/demo workspace. Opening funding remains separate per currency.",
+      "errors": [
+        "Unsupported storage or authority fails clearly before an Opening Balance mutation; update the backend/host."
+      ],
+      "retry": "Read again as needed. Later writes still require their observed revision and a unique request ID; exact retries retain the original intent.",
+      "availability": "WHAB 2.79+ and OpeningBalanceClassification; SQLite 1.28+, JSON 1.20+. Existing ordinary category workflows remain compatible."
     }
   ]
 }

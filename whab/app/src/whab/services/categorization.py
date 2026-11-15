@@ -288,7 +288,7 @@ class CategorizationService:
 
     def suggestions(self, workspace, transactions=None):
         rows = {row["id"]: row for row in self.rows(workspace, False, transactions)}
-        categories = {row["id"]: row for row in self.ledger.categories(workspace)}
+        categories = {row["id"]: row for row in self.ledger.categories(workspace) if row.get("kind") != "opening_balance"}
         result = {}
         for plugin_id in self.contexts:
             try:
@@ -320,7 +320,7 @@ class CategorizationService:
                     state = {key: value for key, value in state.items()
                              if key not in current_ids or value.get("dismissed") or value.get("accepted")}
                 rows = [row for row in eligible if row["id"] not in state or state[row["id"]]["fingerprint"] != fingerprint(row)]
-                categories = {row["id"]: row for row in self.ledger.categories(workspace)}
+                categories = {row["id"]: row for row in self.ledger.categories(workspace) if row.get("kind") != "opening_balance"}
                 for batch in range(0, len(rows), 100):
                     chunk = rows[batch:batch + 100]
                     by_id = {row["id"]: row for row in chunk}
@@ -379,7 +379,7 @@ class CategorizationService:
             if action == "status":
                 return {"defaults": engine.defaults, **engine.index(), "eligible": len(self.rows(workspace, True)), "error": self.error,
                         "previewAvailable": callable(getattr(engine, "preview", None)),
-                        "categoryLabels": {row["id"]: row["name"] for row in self.ledger.categories(workspace)}}
+                        "categoryLabels": {row["id"]: row["name"] for row in self.ledger.categories(workspace) if row.get("kind") != "opening_balance"}}
             if action in {"suggest", "preview"}:
                 return self.predict(workspace, preview=action == "preview")
             if action in {"select", "delete", "rename"}:

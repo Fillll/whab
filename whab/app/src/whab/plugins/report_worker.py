@@ -17,6 +17,8 @@ from threading import Lock
 from time import monotonic
 from uuid import uuid4
 
+from packaging.version import Version
+
 from whab import __version__
 
 from .bank_adapter import BankAdapter, ProviderFailure
@@ -64,6 +66,7 @@ _ERRORS = {
     "worker_protocol": "The plugin worker returned an invalid response.",
     "worker_hook_failed": "The plugin worker could not complete this operation.",
     "worker_closed": "The plugin worker has closed. Start a prepared replacement before using it.",
+    "worker_classification_unsupported": "Update the report worker to WHAB 2.79 or later to report Income, Transfer and Opening Balance categories. No report was submitted.",
 }
 
 
@@ -412,6 +415,11 @@ class ReportWorker:
                     request["arguments"] = {} if arguments is None else arguments
                 else:
                     request["snapshot"] = _snapshot_data(snapshot) if snapshot is not None else None
+                    if snapshot is not None and Version(self.info['host']) < Version('2.79'):
+                        if any(row['kind'] != 'expense' for row in request['snapshot']['categories']):
+                            raise _error('worker_classification_unsupported', self.plugin_id)
+                        for row in request['snapshot']['categories']:
+                            row.pop('kind')
                 raw = Frame(request, payload).encode()
                 payload_limit = {"bank.fetch": 128 * 1024, "merchant.fetch": 128 * 1024,
                                  "file.resources": 4 * 1024 * 1024, "file.parse": 50 * 1024 * 1024,

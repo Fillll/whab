@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.20.0 — 2026-11-14
+
+PR: [#204](https://github.com/Fillll/whab/pull/204)
+
+- Persist explicit Opening Balance classifications through native atomic writes, exact retries, reversible audit, restart and saved-file restoration. Preserve zero-valued imported annotations and balances under shared financial rules; advertise the guarded optional capability.
+
+- Fence older JSON readers with sticky native format 4, including cases where Opening Balance exists only in retained audit history.
+
 ## 1.19.0 — 2026-11-14
 
 PR: [#202](https://github.com/Fillll/whab/pull/202)

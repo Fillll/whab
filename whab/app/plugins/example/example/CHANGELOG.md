@@ -1,5 +1,11 @@
 # Example report and export plugin changelog
 
+## 1.5.0 — 2026-11-14
+
+PR: [#204](https://github.com/Fillll/whab/pull/204)
+
+- Use the explicit SDK category kind to exclude signed and zero Opening Balance entries from income and spending insights while retaining their unchanged rows in exports. Treat explicit Income as signed income on non-credit accounts and exclude Transfer categories from ordinary totals. Require WHAB 2.79+ for typed category classifications.
+
 ## 1.4.3 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

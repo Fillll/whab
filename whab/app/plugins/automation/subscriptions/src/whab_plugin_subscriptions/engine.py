@@ -47,6 +47,7 @@ def excluded(row):
         row.get("pending")
         or row.get("isTransfer")
         or row.get("inferredTransfer")
+        or row.get("categoryKind") == "opening_balance"
         or row["amount"] <= 0
     )
 

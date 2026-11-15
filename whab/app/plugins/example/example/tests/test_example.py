@@ -148,3 +148,28 @@ def test_host_snapshot_and_registry_keep_other_workspace_currencies_out_of_the_r
     assert len(table.rows) == 1
     assert table.rows[0][1] == "Euro shop"
     assert table.rows[0][-1] == "EUR"
+
+
+@pytest.mark.parametrize('amount', [-10000, 0, 10000])
+def test_opening_balances_remain_in_exports_without_income_or_spending(amount):
+    from whab.plugins import CategorySnapshot
+    snapshot = BudgetSnapshot('personal', '2026-10',
+                              (AccountSnapshot('cash', 'Fictional cash', 'depository', 'checking', 0),),
+                              (CategorySnapshot('opening', 'Arbitrary label', 'Technical', 0, 0, 0, kind='opening_balance'),),
+                              (TransactionSnapshot('opening', '2026-10-01', 'Fictional import', amount, 'cash', 'opening'),))
+    module = example_module()
+    assert [row.value for row in module.insights(snapshot)] == ['$0.00', '$0.00']
+    assert module.export(snapshot).rows[0][4] == amount
+
+
+@pytest.mark.parametrize('account_type,amount,expected', [('depository', -1000, '$10.00'), ('depository', 1000, '-$10.00'),
+                                                        ('credit', -1000, '$0.00'), ('credit', 1000, '$0.00')])
+def test_explicit_income_and_transfer_kinds_do_not_become_purchases_or_refunds(account_type, amount, expected):
+    from whab.plugins import CategorySnapshot
+    snapshot = BudgetSnapshot('personal', '2026-10',
+                              (AccountSnapshot('account', 'Fictional account', account_type, '', 0),),
+                              (CategorySnapshot('income', 'Pay', 'Technical', 0, 0, 0, kind='income'),
+                               CategorySnapshot('transfer', 'Move', 'Technical', 0, 0, 0, kind='transfer')),
+                              (TransactionSnapshot('income', '2026-10-01', 'Fictional pay', amount, 'account', 'income'),
+                               TransactionSnapshot('transfer', '2026-10-01', 'Fictional move', 9999, 'account', 'transfer')))
+    assert [row.value for row in example_module().insights(snapshot)] == ['$0.00', expected]

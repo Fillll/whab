@@ -303,7 +303,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
             or (account is not None and not is_on_budget(account))
         ):
             continue
-        if category_kinds.get(transaction.get("categoryId")) in {"income", "transfer"}:
+        if category_kinds.get(transaction.get("categoryId")) in {"income", "transfer", "opening_balance"}:
             continue
         if transaction["amount"] > 0:
             purchases += 1
@@ -383,7 +383,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "period_months": [period["month"] for period in periods],
         "category_path": lambda identifier: quote(identifier, safe=""),
         "category_names": category_names,
-        "category_labels": {row["id"]: (f"{row['group']} > {row['name']}" if row.get("group") else row["name"]) + (" (" + row["kind"].title() + ")" if row.get("kind", "expense") != "expense" else "") for row in categories},
+        "category_labels": {row["id"]: (f"{row['group']} > {row['name']}" if row.get("group") else row["name"]) + (" (" + row["kind"].replace("_", " ").title() + ")" if row.get("kind", "expense") != "expense" else "") for row in categories},
         "category_parents": category_parents,
         "category_kinds": {row["id"]: row.get("kind", "expense") for row in categories},
         "review_status": {row["id"]: review_status(row, category_map) for row in transactions},

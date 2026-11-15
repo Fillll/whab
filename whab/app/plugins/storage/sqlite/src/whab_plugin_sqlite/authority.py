@@ -100,7 +100,7 @@ class Authority:
         if type(row[0]) is not bytes:
             raise StoreError("Invalid SQLite storage authority metadata.")
         metadata = read_storage_json(row[0])
-        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3}:
+        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3, 4}:
             raise StoreError("Invalid SQLite storage authority metadata.")
         if metadata.keys() != {
             "formatVersion", "budgetId", "environment", "instanceId", "authorityEpoch", "generation",

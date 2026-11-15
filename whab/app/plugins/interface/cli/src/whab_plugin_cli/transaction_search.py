@@ -71,7 +71,8 @@ def execute_search(connection, identifier, prefix, args, exchange, error):
         account = metadata["accounts"].get(row["accountId"], {})
         category = metadata["categories"].get(row.get("categoryId"), {})
         rows.append({**row, "accountName": account.get("name", row["accountId"]),
-                     "categoryName": category.get("name"), "categoryGroup": category.get("group")})
+                     "categoryName": category.get("name"), "categoryGroup": category.get("group"),
+                     "categoryKind": category.get("kind", "expense") if category else None})
     rows.sort(key=lambda row: (row["date"], row["id"]), reverse=True)
     return {"budgetId": identifier, "revision": transactions["revision"], "complete": True,
             "total": len(rows), "returned": len(rows),
@@ -85,18 +86,19 @@ def search_table(result):
              f"Transactions: {result['total']} matched, {result['returned']} shown (complete)"]
     if not result["data"]:
         return "\n".join([*lines, "No matching transactions."])
-    rows = [["Transaction ID", "Date", "Merchant", "Account", "Amount", "Currency", "Category", "Status", "Review"]]
+    rows = [["Transaction ID", "Date", "Merchant", "Account", "Amount", "Currency", "Category", "Type", "Status", "Review"]]
     for row in result["data"]:
         category = (f"{row['categoryGroup']} / {row['categoryName']}" if row["categoryName"] is not None
                     else row["categoryId"] if row["categoryId"] is not None else "Uncategorized")
         rows.append([row["id"], row["date"], row["merchant"], row["accountName"],
                      format_money(row["amount"], row["currency"]), row["currency"], category,
+                     (row.get("categoryKind") or "—").replace("_", " ").title(),
                      "Pending" if row["pending"] else "Posted", "Reviewed" if row["reviewed"] else "Unreviewed"])
     # IDs are never shortened. JSON retains complete names, notes and annotations.
     rows = [[terminal_text(value, limit)
-             for value, limit in zip(row, (None, 10, 36, 28, 22, 8, 36, 7, 10), strict=True)]
+             for value, limit in zip(row, (None, 10, 36, 28, 22, 8, 36, 15, 7, 10), strict=True)]
             for row in rows]
-    widths = [max(len(row[column]) for row in rows) for column in range(9)]
+    widths = [max(len(row[column]) for row in rows) for column in range(10)]
     lines.append("Positive amounts are outflows; negative amounts are inflows/refunds. Names may be shortened; JSON retains full fields. No currencies are combined.")
     lines += ["  ".join(value.rjust(width) if column == 4 else value.ljust(width)
                         for column, (value, width) in enumerate(zip(row, widths, strict=True))) for row in rows]

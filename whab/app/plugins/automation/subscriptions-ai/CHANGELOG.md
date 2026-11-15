@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3 — 2026-11-14
+
+PR: [#204](https://github.com/Fillll/whab/pull/204)
+
+- Carry explicit category kinds into background scans so Opening Balance entries cannot reach AI requests or reuse subscription labels. Require WHAB 2.79+ and Subscriptions 1.4+.
+
 ## 1.0.2 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

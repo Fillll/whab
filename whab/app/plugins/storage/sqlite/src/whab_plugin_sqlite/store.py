@@ -92,7 +92,7 @@ class Store(Authority):
             try:
                 with self._snapshot():
                     metadata = self._authority_metadata()
-                    if metadata["formatVersion"] not in {2, 3} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
+                    if metadata["formatVersion"] not in {2, 3, 4} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
                         raise StoreError("Read-only readiness requires the current native SQLite schema; upgrade it explicitly first.")
                     if metadata["budgetId"] != budget_id or metadata["environment"] != environment:
                         raise StoreError("SQLite storage identity belongs to another budget or environment.")
@@ -259,8 +259,17 @@ class Store(Authority):
         # Fence old native readers in this same transaction, including complete
         # local transfers. Bounded annotation writes need no additional SQL.
         writing = getattr(self, '_writing', None)
-        if writing is not None and any(row.get('kind') in {'income', 'transfer'} for row in state['categories'].values()):
-            writing['metadata']['formatVersion'] = 3
+        if writing is not None:
+            kinds = {row.get('kind') for row in state['categories'].values()}
+            # Restored audit history may retain a type no longer present in the
+            # current ledger. Older readers must not undo into unknown rules.
+            journal = state.get('history') or {}
+            kinds.update(row.get('kind') for row in journal.get('baseline', {}).get('categories', ()))
+            kinds.update(row.get('kind') for entry in journal.get('entries', ())
+                         for change in entry['changes'] if change['path'][0] == 'categories'
+                         for row in (change['before'], change['after']) if row is not None)
+            required = 4 if 'opening_balance' in kinds else 3 if kinds & {'income', 'transfer'} else 2
+            writing['metadata']['formatVersion'] = max(writing['metadata']['formatVersion'], required)
         workspace = state["_id"]
         if "history" in state:
             self.db.execute("INSERT INTO budget_history(workspace,record) VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET record=excluded.record", (workspace, json.dumps(state["history"])))
@@ -855,6 +864,9 @@ class Store(Authority):
         return apply(self, workspace, 'classify_accounts', edits)
 
     def supports_classified_review(self):
+        return True
+
+    def supports_opening_balances(self):
         return True
 
     def supports_category_classification(self):

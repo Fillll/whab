@@ -120,3 +120,24 @@ def test_mode_and_saved_file_errors_are_authored(app):
     feature.budget("personal").write_file("subscriptions.json", json.dumps({"version": 1, "config": {}, "labels": {}}).encode())
     with pytest.raises(StoreError):
         Engine(feature.budget("personal"))
+
+
+def test_opening_classification_excludes_saved_subscription_labels_without_erasing_them(app, store):
+    identifier = payment(store)
+    feature = app.state.ledger_service.feature_adapter('subscriptions')
+    _, rows = feature.snapshot('personal')
+    from whab_plugin_subscriptions.api import fingerprint
+    feature.command('personal', 'set_label', {'transactionId': identifier, 'fingerprint': fingerprint(rows[0]),
+                                            'isSubscription': True, 'cadence': 'monthly'})
+    saved = feature.budget('personal').read_file('subscriptions.json')
+    category = store.add_category('personal', {'name': 'Not a payment', 'group': 'Technical', 'kind': 'opening_balance'})
+    store.edit_transaction('personal', identifier, category)
+    report = feature.query('personal', 'report', {'month': '2026-10', 'currency': 'USD'})
+    assert report['transactions'][0]['status'] == 'excluded'
+    assert report['estimatedMonthly'] == report['actualMonth'] == report['unclassified'] == 0
+    _, rows = feature.snapshot('personal')
+    assert rows[0]['categoryKind'] == 'opening_balance'
+    with pytest.raises(StoreError, match='posted expense'):
+        feature.command('personal', 'set_label', {'transactionId': identifier, 'fingerprint': fingerprint(rows[0]),
+                                                'isSubscription': True, 'cadence': 'monthly'})
+    assert feature.budget('personal').read_file('subscriptions.json') == saved

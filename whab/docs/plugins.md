@@ -1438,6 +1438,10 @@ snapshots, identities, source evidence and omitted fields remain unchanged. Open
 Balance entries are not transfer-pair candidates. Native history and exact request
 receipts retain guarded undo/redo and restart recovery.
 
+The optional `OpeningBalanceClassification.supports_opening_balances()` contract is advertised by `opening_balance_policy` version 1 (`categoryType: opening_balance`, `zeroAmountReview: true`, `preservesBalances: true`). It requires native category classification, classified-review enforcement, durable receipts and audited reversals. Unsupported adapters can retain ordinary Expense/Income/Transfer workflows; they must refuse Opening Balance changes before mutation, including restoring retained opening history. SQLite and JSON persist a monotonic native format 4 fence once the type appears, even after undo or removal, including retained audit history. Older readers reject these files; the portable kind validator also rejects unknown current types. `review_policy.types` advertises Opening Balance only with that capability.
+
+`CategorySnapshot.kind` is an additive SDK field, defaulting to `expense` for legacy callers and worker payloads. Technical categories retain their identities and kinds in report snapshots and use zero assigned/activity/available envelope values, because they have no expense envelope. Report plugins must use the explicit kind when distinguishing Income, Transfer and Opening Balance. A host talking to a pre-2.79 report worker omits the default Expense field for compatibility; technical-kind snapshots fail clearly before submission until that worker is upgraded.
+
 ## Classification before review
 
 WHAB 2.77 supports Expense, Income and Transfer child types (`kind` in public

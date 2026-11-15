@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0 — 2026-11-14
+
+PR: [#204](https://github.com/Fillll/whab/pull/204)
+
+- Exclude explicitly classified Opening Balance entries from subscription labels, matching-payment reuse and cost reports while preserving saved labels and ledger records. Require WHAB 2.79+.
+
 ## 1.3.2 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

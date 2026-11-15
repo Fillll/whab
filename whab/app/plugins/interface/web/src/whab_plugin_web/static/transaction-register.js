@@ -498,7 +498,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       row.dataset.reviewClassified = String(classified && row.dataset.pending !== 'true');
       reviewed.setAttribute('aria-pressed', String(committed.reviewed));
       reviewed.disabled = row.dataset.pending === 'true' || !committed.reviewed && !classified && !row.dataset.suggestionId;
-      reviewed.title = !classified ? 'Choose an Expense, Income or Transfer category before marking reviewed' : committed.reviewed ? 'Reviewed' : 'Not reviewed';
+      reviewed.title = !classified ? 'Choose an Expense, Income, Transfer or Opening Balance category before marking reviewed' : committed.reviewed ? 'Reviewed' : 'Not reviewed';
       row.dataset.reviewed = String(committed.reviewed);
     }
     row.applyCategory = (after, choice) => {
@@ -610,7 +610,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     const selected = selection();
     if (selected.length > 100) {error('Select at most 100 transactions for one atomic review change. Nothing was submitted.'); return;}
     const value = button.dataset.bulkReviewed === 'true';
-    if (value && selected.some(row => row.dataset.pending === 'true' || row.dataset.reviewClassified === 'false' && !row.dataset.suggestionId)) {error('Classify every selected transaction as Expense, Income or Transfer before reviewing. Nothing was submitted.'); return;}
+    if (value && selected.some(row => row.dataset.pending === 'true' || row.dataset.reviewClassified === 'false' && !row.dataset.suggestionId)) {error('Classify every selected transaction as Expense, Income, Transfer or Opening Balance before reviewing. Nothing was submitted.'); return;}
     editStarted();
     bulkBusy = true;
     const work = [...selected];

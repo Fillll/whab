@@ -431,8 +431,8 @@ command. Existing targets or any assignment rows block income conversion.
 
 ## Classification before review
 
-WHAB 2.77 supports Expense, Income and Transfer child types (`kind` in public
-records, `--type` in CLI). Missing kind remains Expense. Income and Transfer have
+WHAB 2.79 supports Expense, Income, Transfer and Opening Balance child types (`kind` in public
+records, `--type` in CLI). Missing kind remains Expense. Income, Transfer and Opening Balance have
 no expense target or assignment rows. Transfer is explicit account movement,
 excluded from ordinary income/spending without changing account balances. It may
 be classified before pairing; matching still requires equal opposite posted
@@ -484,3 +484,52 @@ Native SQLite/JSON advertise optional `ClassifiedReview`; the public `review_pol
 query probes the authority. Unsupported storage/remote authorities fail before
 classification/review writes. Financial rules remain in core; adapters retain
 atomic persistence, annotations, original/import records and native receipts.
+
+## Opening balances
+
+WHAB 2.79 adds `opening_balance`, displayed as **Opening Balance**. The type is
+independent of a category's name: naming an Expense category “Opening Balance”
+does not change its treatment. Create an explicit technical child, or preview
+and classify an existing zero-target child with no monthly assignment rows.
+Income, Transfer and Opening Balance cannot have expense targets or assignments.
+
+Opening entries represent existing cash or debt and are excluded from ordinary
+income, spending, purchases and payee analytics. Posted entries in eligible
+on-budget non-credit cash accounts contribute signed `openingFunding` in their
+transaction month. Prior-to-budget entries are already carried in; later months
+carry existing balances forward without counting the opening amount twice.
+Credit debt and off-budget balances never become opening funding. Stale/unknown
+account balances remain excluded; classification does not verify imported estimates. The monthly
+identity is `income + openingFunding + carriedIn - assignedNextMonth - assigned`.
+Budget disclosures and Insights show opening funding separately from income.
+
+Existing imported zero-amount opening entries can be classified and explicitly
+reviewed. Ordinary transaction creation and financial amount edits still require
+nonzero amounts. Pending/deleted records cannot be reviewed. Categorization never
+auto-reviews, changes amounts/account balances or infers a transfer. No upgrade,
+read or bank sync creates a category or reclassifies historical transactions.
+Original import notes, merchant whitespace, identities and history are preserved.
+
+```sh
+whab "My budget" category group create Finance
+whab "My budget" category create "Opening Balance" --parent Finance --type opening_balance --agent Codex
+whab "My budget" category classify "Finance / Initial funds" --type opening_balance --dry-run
+whab "My budget" category classify "Finance / Initial funds" --type opening_balance --agent Codex
+whab "My budget" trnx categorize OPENING_TX ZERO_OPENING_TX --category "Finance / Opening Balance" --dry-run --agent Codex
+whab "My budget" trnx categorize OPENING_TX ZERO_OPENING_TX --category "Finance / Opening Balance" --agent Codex
+whab "My budget" trnx review OPENING_TX ZERO_OPENING_TX --reviewed --dry-run --agent Codex
+whab "My budget" trnx review OPENING_TX ZERO_OPENING_TX --reviewed --agent Codex
+whab "My budget" trnx list --format table
+whab "My budget" trnx review-audit --format table
+```
+
+Dry-run shows exact before/after classification and monthly impacts, including
+`openingFunding`, income, spending and Ready to Assign, without mutation/save.
+Writes retain one revision/request ID, audit attribution, guarded undo/redo and
+exact retry recovery. After uncertainty, retain the complete original intent;
+never resubmit with a new request ID. Unsupported authorities reject opening
+classification before mutation; the public `opening_balance_policy` query reports
+support. Transaction-list JSON exposes `categoryKind`; its table shows a readable
+Type column (Opening Balance). Older optimized authorities may omit this field,
+shown as unavailable rather than inferring a type from its name. Root,
+category, create/classify and review `--help` work offline.
