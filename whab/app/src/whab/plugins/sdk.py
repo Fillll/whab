@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path, PurePosixPath
@@ -296,6 +297,18 @@ class ClassifiedReview(Protocol):
     """Optional native enforcement of classification before explicit review."""
 
     def supports_classified_review(self) -> bool: ...
+
+
+class PreflightInspection(Protocol):
+    """Optional read-only inspection that preserves an observed write revision.
+
+    Remote facades serialize inspection with commands and restore the original
+    revision even on failure. Capability checks and host preflight reads must
+    not silently refresh the compare-and-swap revision for a later mutation.
+    Never execute a mutation inside this scope; native stores may omit it.
+    """
+
+    def inspection_scope(self) -> AbstractContextManager[None]: ...
 
 
 class OpeningBalanceClassification(Protocol):

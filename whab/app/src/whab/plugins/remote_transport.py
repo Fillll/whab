@@ -105,6 +105,25 @@ class RemoteStore:
             with self.operation_scope():
                 yield
 
+    @contextmanager
+    def inspection_scope(self):
+        """Inspect support/state without replacing the caller's observed CAS.
+
+        Preflight reads are not an explicit refresh of the user's financial
+        view. Pin admission and serialize the entire inspection with commands;
+        nested scopes and failures restore precisely the revision they entered.
+        """
+        with self._admit(), self._lock:
+            observed = self._revision
+            try:
+                yield
+            finally:
+                self._revision = observed
+
+    def _policy(self, operation):
+        with self.inspection_scope():
+            return self._query(operation, 'personal')
+
     def close(self):
         self._client.close()
 
@@ -340,7 +359,7 @@ class RemoteStore:
 
     def supports_atomic_transaction_changes(self):
         try:
-            policy = self._query('transaction_change_policy', 'personal')
+            policy = self._policy('transaction_change_policy')
         except StoreError:
             raise StoreError('Update or reconnect the remote authority for atomic transaction edits and creation; no mutation was submitted.') from None
         return type(policy) is dict and policy.get('version') == 1 and policy.get('maxChanges') == 100 and policy.get('preserveBalances') is True
@@ -364,7 +383,7 @@ class RemoteStore:
 
     def supports_classified_review(self):
         try:
-            policy = self._query('review_policy', 'personal')
+            policy = self._policy('review_policy')
         except StoreError:
             raise StoreError('Unable to verify classified-review support. Check the connection or update the remote authority; no mutation was submitted.') from None
         return type(policy) is dict and policy.get('version') == 1 and policy.get('classificationRequired') is True
@@ -374,7 +393,7 @@ class RemoteStore:
 
     def supports_opening_balances(self):
         try:
-            policy = self._query('opening_balance_policy', 'personal')
+            policy = self._policy('opening_balance_policy')
         except StoreError:
             raise StoreError('Unable to verify Opening Balance support. Check the connection or update the remote authority; no mutation was submitted.') from None
         return (type(policy) is dict and policy.get('version') == 1

@@ -164,3 +164,52 @@ def test_remote_opening_capability_fails_closed_without_submitting_mutation():
         assert all('/commands' not in str(row.url) for row in requests)
     finally:
         remote.close()
+
+
+def test_older_remote_review_discovery_remains_usable_without_opening_policy():
+    requested = []
+    def older_authority(request):
+        operation = request.url.path.rsplit('/', 1)[-1]
+        requested.append(operation)
+        if operation == 'review_policy':
+            return httpx.Response(200, json={'budgetId': 'fictional', 'revision': 'fictional-old', 'data': {
+                'version': 1, 'types': ['expense', 'income', 'transfer'],
+                'classificationRequired': True, 'automaticLegacyCleanup': False}})
+        return httpx.Response(404, json={'detail': 'Unknown ledger query.'})
+    remote = RemoteStore('https://fictional.example', 'fictional-' + 'x' * 32, 'fictional',
+                         transport=httpx.MockTransport(older_authority))
+    try:
+        service = LedgerService(remote)
+        assert service.query('review_policy', 'personal')['data']['types'] == ['expense', 'income', 'transfer']
+        assert requested == ['review_policy', 'opening_balance_policy']
+        with pytest.raises(StoreError, match='no mutation was submitted'):
+            service.query('opening_balance_policy', 'personal')
+    finally:
+        remote.close()
+
+
+@pytest.mark.parametrize('preview', [None, {}, {'changes': [{'path': ['categories', 'old'], 'before': None,
+    'after': {'id': 'old', 'kind': 'opening_balance'}}]}])
+def test_unsupported_history_without_portable_export_refuses_missing_proof_and_retained_opening(preview):
+    writes = []
+    backend = SimpleNamespace(supports_classified_review=lambda: True, categories=lambda _: [],
+                              history_apply=lambda *args: writes.append(args))
+    if preview is not None:
+        backend.history_preview = lambda *args, **kwargs: deepcopy(preview)
+    service = LedgerService(backend)
+    with pytest.raises(StoreError, match='Update the storage'):
+        service.command('history_apply', 'personal', {'action': 'redo', 'target': 'fictional-entry', 'fingerprint': 'a' * 64},
+                        request_id=str(uuid4()), expected_revision=service.revision)
+    assert writes == []
+
+
+def test_unsupported_old_history_can_restore_proven_ordinary_changes_without_portable_export():
+    writes = []
+    backend = SimpleNamespace(supports_classified_review=lambda: True, categories=lambda _: [],
+        history_preview=lambda *args, **kwargs: {'changes': [{'path': ['categories', 'ordinary'], 'before': None,
+                                                            'after': {'id': 'ordinary', 'kind': 'income'}}]},
+        history_apply=lambda *args: writes.append(args))
+    service = LedgerService(backend)
+    service.command('history_apply', 'personal', {'action': 'redo', 'target': 'fictional-entry', 'fingerprint': 'b' * 64},
+                    request_id=str(uuid4()), expected_revision=service.revision)
+    assert len(writes) == 1

@@ -270,7 +270,7 @@ class LedgerService:
                 if operation == 'history_preview' and values.get('action') not in {'undo', 'redo', 'restore', 'snapshot'}:
                     raise StoreError('Choose undo, redo, restore or snapshot.')
                 if operation == 'history_preview':
-                    self._guard_opening_balances(workspace, {}, history=True)
+                    self._guard_opening_balances(workspace, values, history=True)
                 return {'revision': self._revision, 'data': _public(callback(workspace, **values))}
             if operation == "describe":
                 remote = getattr(self._store, "describe_operations", None)
@@ -318,7 +318,11 @@ class LedgerService:
                 data = {'version': 1, 'types': ['expense', 'income', 'transfer'],
                         'classificationRequired': True, 'automaticLegacyCleanup': False}
                 supported = getattr(self._store, 'supports_opening_balances', None)
-                if callable(supported) and supported() is True:
+                try:
+                    opening_supported = callable(supported) and supported() is True
+                except StoreError:
+                    opening_supported = False
+                if opening_supported:
                     data['types'].append('opening_balance')
             elif operation == 'opening_balance_policy':
                 self._require_opening_balances()
@@ -356,11 +360,16 @@ class LedgerService:
         self._require_classified_review()
 
     def _guard_opening_balances(self, workspace, payload, *, history=False):
+        inspection = getattr(self._store, 'inspection_scope', None)
+        with inspection() if callable(inspection) else nullcontext():
+            self._inspect_opening_balances(workspace, payload, history=history)
+
+    def _inspect_opening_balances(self, workspace, payload, *, history=False):
         """Old adapters may keep ordinary ledgers but must not alter opening ledgers.
 
         Supported native adapters take the cheap capability path. Unsupported
         adapters inspect only category metadata; historical restores also inspect
-        their public portable history so an undone category cannot bypass the gate.
+        their exact public preview so an undone category cannot bypass the gate.
         """
         if payload.get('kind') == 'opening_balance':
             self._require_opening_balances()
@@ -378,14 +387,16 @@ class LedgerService:
         if callable(categories) and any(row.get('kind') == 'opening_balance' for row in categories(workspace)):
             self._require_opening_balances()
         if history:
-            exporter = getattr(self._store, 'export_budget', None)
-            if callable(exporter):
-                def contains_opening(value):
-                    if isinstance(value, dict):
-                        return value.get('kind') == 'opening_balance' or any(contains_opening(row) for row in value.values())
-                    return isinstance(value, list) and any(contains_opening(row) for row in value)
-                if contains_opening(exporter(workspace)):
-                    self._require_opening_balances()
+            preview = getattr(self._store, 'history_preview', None)
+            plan = preview(workspace, payload['action'], target=payload.get('target')) if callable(preview) else None
+            if type(plan) is not dict or type(plan.get('changes')) is not list:
+                raise StoreError('Update the storage plugin to verify complete history changes before restoring classifications. No mutation was submitted.')
+            def contains_opening(value):
+                if isinstance(value, dict):
+                    return value.get('kind') == 'opening_balance' or any(contains_opening(row) for row in value.values())
+                return isinstance(value, list) and any(contains_opening(row) for row in value)
+            if contains_opening(plan['changes']):
+                self._require_opening_balances()
 
     @staticmethod
     def _validate(operation: str, payload: dict) -> dict:
