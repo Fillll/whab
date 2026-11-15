@@ -46,6 +46,7 @@ function harness(count = 5, options = {}) {
       '[data-transaction-field="categoryId"]', '[data-transaction-reviewed]', '[data-transaction-receipt]']
       .map(selector => [selector, element()]));
     const details = options.details ? [element({dataset:{transactionDetail:'date'},value:'2026-10-01',setCustomValidity(){},checkValidity:()=>true})] : [];
+    if (options.accountDetails) details.push(element({dataset:{transactionDetail:'accountId'},value:'first',setCustomValidity(){},checkValidity:()=>true}));
     if (options.agentLabel) controls['[data-category-agent]'] = element({removed: false, remove() {this.removed = true;}});
     controls['[data-select-transaction]'].checked = true;
     controls['[data-transaction-reviewed]'].setAttribute('aria-pressed', 'false');
@@ -148,7 +149,7 @@ function harness(count = 5, options = {}) {
     navigations.push({url: JSON.parse(JSON.stringify(url)), details: JSON.parse(JSON.stringify(details))});
     return true;
   }, ...options});
-  return {register, requests, receiptRequests, makeRow, stream: streamCallbacks, imageRequests, receiptControls, objectUrls, revokedUrls,
+  return {register, root, requests, receiptRequests, makeRow, stream: streamCallbacks, imageRequests, receiptControls, objectUrls, revokedUrls,
     rows: rowList, mutations, controlLinks, bulk, clear, selectionCount, selectionBar, window, feedback, feedbackText, controls, navigations, reloads,
     chooseAccount: value => pickerChoose(value), isPickerDisposed: () => pickerDisposed,
     choosePeriod: value => periodChoose(value), isPeriodDisposed: () => periodDisposed, reviewLabel, contexts, history, searchForm, pageLink, document: context.document, receiptDialog};
@@ -1191,5 +1192,33 @@ test('bulk review rejects an unclassified selection without locking subsequent a
   assert.equal(state.requests.length, 1);
   assert.deepEqual(state.requests[0].body.transactionIds, ['transaction-0','transaction-1']);
   state.requests[0].resolve({ok:true}); await saving;
+  state.register.dispose();
+});
+
+
+test('account edit and failed-draft discard keep the bank mark aligned with the displayed account', async () => {
+  const state = harness(1, {accountDetails: true, stream: true});
+  const row = state.rows[0], account = row.details[0];
+  function mark(name) {
+    return element({name, cloneNode: () => mark(name), replaceWith(next) {row.controls['[data-transaction-account-mark]'] = next;}});
+  }
+  row.controls['[data-transaction-account-mark]'] = mark('first');
+  row.controls['.account-cell'] = element({title: 'first'});
+  const originalQuery = state.root.querySelectorAll;
+  state.root.querySelectorAll = selector => selector === '[data-account-option]' ? ['first', 'second'].map(value => ({
+    dataset: {value}, querySelector: selector => selector === '.sidebar-bank-mark' ? mark(value) : {textContent: value},
+  })) : originalQuery(selector);
+  account.value = 'second';
+  account.emit('change');
+  assert.equal(row.controls['[data-transaction-account-mark]'].name, 'second');
+  assert.equal(row.controls['.account-cell'].title, 'second');
+  assert.equal(state.requests[0].body.accountId, 'second');
+  state.requests[0].reject(new Error('Fictional save failure'));
+  await tick();
+  await state.controls['[data-transaction-discard]'].emit('click').completed;
+  assert.equal(account.value, 'first');
+  assert.equal(row.controls['[data-transaction-account-mark]'].name, 'first');
+  assert.equal(row.controls['.account-cell'].title, 'first');
+  assert.equal(state.requests.length, 1);
   state.register.dispose();
 });

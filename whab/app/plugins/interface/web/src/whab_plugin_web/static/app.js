@@ -9,6 +9,7 @@ import {initAccountNavigation} from './account-navigation.js';
 import {initTransactionRegister} from './transaction-register.js';
 import {hydrateCurrencyChoices, initAccountSettings, initSettingsCurrencyChoices} from './account-settings.js';
 import {initAccountList} from './account-list.js';
+import {initSidebarOrder} from './sidebar-order.js';
 import {bindLogos} from './logo-images.js';
 import {initAiCredentials} from './ai-credentials-settings.js';
 import {initSubscriptions} from './subscriptions.js';
@@ -27,6 +28,7 @@ document.addEventListener('whab:notice', event => {
 });
 
 bindLogos();
+initSidebarOrder();
 
 let currentRegister = null;
 let currentAccounts = null;

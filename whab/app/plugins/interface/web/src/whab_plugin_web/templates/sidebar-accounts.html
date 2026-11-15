@@ -1,22 +1,38 @@
 {% set logos = account_logos|default({}) %}
-<div class="nav-label">ACCOUNTS <a href="{{ url('accounts') }}" aria-label="Add bank account">{{ icon('plus', 15) }}</a></div>
+<div data-sidebar-order data-budget-id="{{ client_context.get('budgetId', budget_id|default('default')) }}" data-workspace="{{ workspace }}" data-environment="{{ status.environment }}" data-default-order="{{ all_accounts|map(attribute='id')|list|tojson|forceescape }}">
+<div class="nav-label">ACCOUNTS <span class="sidebar-account-heading-actions"><button type="button" data-account-reorder aria-label="Reorder accounts" title="Reorder accounts in this browser" aria-expanded="false" hidden><span aria-hidden="true">↕</span></button><a href="{{ url('accounts') }}" aria-label="Add bank account">{{ icon('plus', 15) }}</a></span></div>
+<div class="sidebar-account-order-tools" data-account-order-tools hidden>
+  <p>Drag or use arrows. Saved in this browser.</p>
+  <div><button type="button" class="text-link" data-account-order-reset>Reset order</button><button type="button" class="button secondary" data-account-order-done>Done</button></div>
+</div>
+<p class="sidebar-account-order-status" data-account-order-status role="status" aria-live="polite"></p>
 {% set shown = namespace(count=0) %}
 {% for group in account_groups %}
   {% set visible_accounts = group.accounts|rejectattr("closed")|rejectattr("id", "in", hidden_account_ids|default([]))|list %}
   {% if visible_accounts %}
   {% set shown.count = shown.count + visible_accounts|length %}
   <div class="sidebar-account-scope">{{ group.label }}</div>
+  <div data-account-order-group="{{ 'on-budget' if group.on_budget else 'off-budget' }}">
   {% for account in visible_accounts %}
     {# YNAB exports store a signed transaction total, even after classification as a liability. #}
     {% set estimated = account.balanceUnknown and account.source == 'ynab' %}
     {% set unavailable = account.balanceUnknown and not estimated %}
     {% set balance_label = 'Balance unavailable' if unavailable else 'Estimated from imported transactions' if estimated else 'Last known balance' if account.stale else 'Current balance' %}
     {% set balance = account.balance if estimated or not is_liability(account) else -account.balance %}
+    <div class="sidebar-account-row" data-account-order-row="{{ account.id }}">
+    <span class="sidebar-account-drag" aria-hidden="true" hidden>⠿</span>
     <a class="sidebar-account" href="{{ url('transactions',account=account.id,currency=account.currency,all_dates='true') }}" data-account-id="{{ account.id }}" title="{{ account.name }} · {{ account.currency }}"{% if selected_account and selected_account.id==account.id %} aria-current="page"{% endif %}>
       <span><span class="sidebar-bank-mark" aria-hidden="true"><span>{{ icon('credit' if is_liability(account) else 'accounts',15) }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo data-logo-src="{{ logos[account.id] }}" alt="" width="18" height="18" decoding="async" hidden>{% endif %}</span><span class="sidebar-account-name">{{ account.name }}</span></span>
       <small title="{{ balance_label }}" aria-label="{{ balance_label }}{% if not unavailable %}: {{ account_sidebar_money(balance, account) }}{% endif %}">{% if unavailable %}—{% else %}{{ account_sidebar_money(balance, account) }}{% endif %}</small>
     </a>
+    <span class="sidebar-account-moves" hidden>
+      <button type="button" data-account-move="up" aria-label="Move {{ account.name }} up" title="Move up">{{ icon('chevron-down', 13) }}</button>
+      <button type="button" data-account-move="down" aria-label="Move {{ account.name }} down" title="Move down">{{ icon('chevron-down', 13) }}</button>
+    </span>
+    </div>
   {% endfor %}
+  </div>
 {% endif %}
 {% endfor %}
 {% if not shown.count %}<p class="sidebar-empty">{% if all_accounts %}Choose visible accounts on the Accounts page.{% else %}Connect an account to get started.{% endif %}</p>{% endif %}
+</div>
