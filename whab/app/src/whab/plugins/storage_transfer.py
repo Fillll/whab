@@ -189,6 +189,7 @@ class CommitEvidence:
     operation_id: str | None
     role: str
     state_digest: str
+    digest_version: int = 1
 
     def __post_init__(self):
         storage_identifier(self.budget_id)
@@ -202,16 +203,19 @@ class CommitEvidence:
         if type(self.role) is not str or self.role not in STORAGE_ROLES:
             _invalid()
         _digest(self.state_digest)
+        if type(self.digest_version) is not int or self.digest_version not in {1, 2}:
+            _invalid()
 
 
 def evidence_record(evidence):
     if type(evidence) is not CommitEvidence:
         _invalid()
-    return {name: getattr(evidence, name) for name in CommitEvidence.__slots__}
+    return {name: getattr(evidence, name) for name in CommitEvidence.__slots__
+            if name != "digest_version" or evidence.digest_version != 1}
 
 
 def read_evidence(value):
-    if type(value) is not dict or value.keys() != set(CommitEvidence.__slots__):
+    if type(value) is not dict or value.keys() not in (set(CommitEvidence.__slots__), set(CommitEvidence.__slots__) - {"digest_version"}):
         _invalid()
     return CommitEvidence(**value)
 
@@ -310,7 +314,8 @@ def check_storage_operation(current, operation, previous=None):
                 or previous.evidence.environment != current.environment
                 or previous.evidence.generation > current.generation
                 or (previous.evidence.generation == current.generation
-                    and previous.evidence.state_digest != current.state_digest)):
+                    and (previous.evidence.state_digest != current.state_digest
+                         or previous.evidence.digest_version != current.digest_version))):
             _invalid()
         if previous.fingerprint != operation.fingerprint:
             raise StoreError("Operation identity already belongs to a different storage command.")
@@ -644,30 +649,45 @@ def encode_local_state(states, *, validate=True, encoder=canonical_storage_json)
     return bodies
 
 
-def local_state_digest(financial, protected):
+def local_state_digest(financial, protected, *, version=1):
     """Logical content only, excluding authority/operation-receipt metadata."""
+    if version == 2:
+        from whab.domain.integrity import merkle_digest
+        return merkle_digest([read_storage_json(body, limit=MAX_LOCAL_TRANSFER_BYTES) for body in (financial, protected)])
+    if version != 1:
+        _invalid()
     result = sha256(len(financial).to_bytes(8, "big"))
     result.update(financial)
     result.update(protected)
     return result.hexdigest()
 
 
-def native_state_digest(states, *, chunks):
+def native_state_records(states):
+    """Detached trusted record envelopes; untrusted imports still require validation."""
+    return _local_state_records(states, validate=False)
+
+
+def native_state_digest(states, *, chunks, version=1):
     """Hash trusted native records without copying complete canonical payloads.
 
     Native adapters supply a canonical byte-chunk encoder for immutable records.
     Untrusted transfers continue through encode/decode_local_state validation.
     """
-    return native_records_digest(_local_state_records(states, validate=False), chunks=chunks)
+    return native_records_digest(_local_state_records(states, validate=False), chunks=chunks, version=version)
 
 
-def native_records_digest(records, *, chunks):
+def native_records_digest(records, *, chunks, version=1, hasher=None, selections=None):
     """Hash complete canonical record views retained by a trusted native adapter.
 
     Records use the exact two envelopes supplied to native_state_digest's chunk
     encoder. Adapters must invalidate retained views after untracked writes.
     """
     if type(records) not in {list, tuple} or len(records) != 2:
+        _invalid()
+    if version == 2:
+        from whab.domain.integrity import MerkleHasher
+        return (hasher or MerkleHasher()).digest(records, selections=selections, limit=MAX_LOCAL_TRANSFER_BYTES)
+    if version != 1:
         _invalid()
     bodies = [tuple(chunks(value, limit=MAX_LOCAL_TRANSFER_BYTES)) for value in records]
     if any(type(raw) is not bytes for body in bodies for raw in body):
@@ -695,7 +715,7 @@ class LocalTransferSnapshot:
         canonical = encode_local_state(decode_local_state(self.financial, self.protected))
         object.__setattr__(self, "financial", canonical[0])
         object.__setattr__(self, "protected", canonical[1])
-        if self.source.state_digest != local_state_digest(*canonical):
+        if self.source.state_digest != local_state_digest(*canonical, version=self.source.digest_version):
             raise StoreError("Local storage snapshot does not match its commit evidence.")
         if (type(self.receipts) is not tuple or len(self.receipts) > MAX_OPERATION_RECEIPTS
                 or any(type(row) is not OperationReceipt for row in self.receipts)):
@@ -706,7 +726,8 @@ class LocalTransferSnapshot:
                     or row.evidence.environment != self.source.environment
                     or row.evidence.generation > self.source.generation
                     or (row.evidence.generation == self.source.generation
-                        and row.evidence.state_digest != self.source.state_digest)):
+                        and (row.evidence.state_digest != self.source.state_digest
+                             or row.evidence.digest_version != self.source.digest_version))):
                 _invalid()
             ids.add(row.operation_id)
         if sum(len(row.result) for row in self.receipts) + sum(map(len, canonical)) > MAX_LOCAL_TRANSFER_BYTES:

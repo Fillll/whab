@@ -5,7 +5,7 @@ import json
 from copy import deepcopy
 from uuid import uuid4
 
-import httpx
+lazy import httpx
 
 from whab.plugins import validate_category_agent
 

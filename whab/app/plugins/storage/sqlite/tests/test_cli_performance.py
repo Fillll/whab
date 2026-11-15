@@ -5,6 +5,7 @@ import sqlite3
 import pytest
 from whab_plugin_sqlite import Store, portable
 from whab_plugin_sqlite.evidence import SnapshotEncoder
+from whab_plugin_sqlite.portable_journal import read as read_journal
 
 from whab.domain.history import digest
 from whab.plugins import StoreError
@@ -61,14 +62,14 @@ def test_incremental_evidence_and_portable_images_match_full_rebuild_after_every
         execute(store, 'edit_transaction', {'transactionId': rows[i % 3]['id'], 'note': f'Fictional note {i}'}, f'edit-{i}')
         execute(store, 'update_account', {'accountId': account, 'type': 'credit' if i % 2 else 'depository', 'onBudget': True}, f'account-{i}')
         actual = store.commit_evidence()
-        assert actual.state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+        assert actual.state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False), version=store.commit_evidence().digest_version)
         image = store.export_budget_files()['budget.sqlite']
         loaded, _ = portable.read_files({'budget.sqlite': image}, with_receipts=True)
         assert loaded == store.export_budget('personal')
         assert store.export_budget_files()['budget.sqlite'] == image
     store.db.execute('UPDATE transactions SET note=? WHERE id=?', ('External SQL', rows[0]['id']))
     actual = store.commit_evidence()
-    assert actual.state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+    assert actual.state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False), version=store.commit_evidence().digest_version)
     # Rebuilding after an external write retains its changed row and valid history.
     assert store.export_budget_files()['budget.sqlite']
 
@@ -132,7 +133,7 @@ def test_long_audit_append_grows_reserved_space_and_reopens_ordinary_json(ledger
     record, kind = store.db.execute("SELECT record,typeof(record) FROM budget_history WHERE workspace='personal'").fetchone()
     assert kind == 'text'
     assert len(json.loads(record)['entries']) >= 90
-    assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+    assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False), version=store.commit_evidence().digest_version)
     assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
 
 
@@ -161,7 +162,7 @@ def test_evidence_during_nested_native_scope_keeps_the_existing_journal(ledger):
         with store._authority_write(workspace='personal', transaction_ids=[row['id']]):
             store.db.execute('UPDATE transactions SET note=? WHERE id=?', ('Inside fictional transaction', row['id']))
             transaction.update(dirty=True, workspace='personal')
-            assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+            assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False), version=store.commit_evidence().digest_version)
 
 
 def test_cached_transaction_chunks_handle_growth_scope_and_bounded_replacements():
@@ -253,7 +254,7 @@ def test_cached_native_views_include_details_balances_protected_fields_and_noop(
     row = store.transactions('personal')[0]
     for index, changes in enumerate(({'merchant': 'Fictional 家庭', 'amount': 150}, {'merchant': 'Fictional 家庭', 'amount': 150}, {'date': '2026-09-30'})):
         execute(store, 'edit_transaction_details', {'transactionId': row['id'], 'changes': changes}, f'details-{index}')
-        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False), version=store.commit_evidence().digest_version)
     assert store._native_records[1]['workspaces']['personal']['associations'][0]['mask'] == '9012'
 
 
@@ -267,7 +268,7 @@ def test_unknown_bounded_native_command_rebuilds_protected_evidence(ledger):
         transaction.update(dirty=True, workspace='personal', result=None,
                            operation=StorageOperation('custom-bounded', current.authority_epoch, current.generation,
                                                       'personal', 'edit_transaction', canonical_storage_json({'transactionId': row['id'], 'note': 'Custom native command'})))
-    assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+    assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False), version=store.commit_evidence().digest_version)
 
 
 def test_merchant_index_preserves_literals_and_does_not_change_commit_evidence(ledger):
@@ -374,7 +375,7 @@ def test_unknown_native_identity_changes_fall_back_to_complete_evidence(ledger):
                 store.db.execute("INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,source) VALUES(?,?,?,?,?,?,?)",
                                  ('missing-before', 'personal', row['accountId'], '2026-10-05', 'Fictional insert', 100, 'manual'))
             transaction.update(dirty=True, workspace='personal')
-        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False), version=store.commit_evidence().digest_version)
 
 
 def test_external_commit_between_native_commit_and_cache_publication_invalidates_indexes(ledger):
@@ -398,7 +399,7 @@ def test_external_commit_between_native_commit_and_cache_publication_invalidates
     store.db = ExternalCommit()
     try:
         execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Native edit'}, 'concurrent-publication')
-        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False), version=store.commit_evidence().digest_version)
         assert store.search_transactions('personal', {'merchant': ['Concurrent fictional']})['data'][0]['id'] == row['id']
         assert store._merchant_index is not cached
         assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
@@ -428,7 +429,7 @@ def test_unchanged_legacy_annotation_without_history_keeps_exact_native_evidence
     before = store.commit_evidence()
     execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': ''}, 'legacy-unchanged')
     assert store.commit_evidence().state_digest == before.state_digest
-    assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False))
+    assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states(), validate=False), version=store.commit_evidence().digest_version)
     assert not store.db.execute("SELECT 1 FROM budget_history WHERE workspace='personal'").fetchall()
 
 
@@ -488,7 +489,7 @@ def test_optional_runtime_index_definitions_are_checked_without_schema_combinati
     sql = store.db.execute("SELECT sql FROM sqlite_schema WHERE name='tx_uncategorized_recent'").fetchone()[0]
     clean = sqlite3.connect(':memory:')
     try:
-        clean.deserialize(image)
+        clean.deserialize(read_journal(image)[0])
         clean.execute(sql)
         assert portable.read_files({'budget.sqlite': clean.serialize()}) == store.export_budget('personal')
         clean.execute('DROP INDEX tx_uncategorized_recent')

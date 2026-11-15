@@ -4,8 +4,8 @@ import argparse
 import re
 from datetime import date
 
-from whab.plugins import format_money
 from whab.plugins.documentation import operation
+lazy from whab.plugins import format_money
 
 from .transaction_commands import checked
 from .transaction_reads import optimized_read, terminal_text

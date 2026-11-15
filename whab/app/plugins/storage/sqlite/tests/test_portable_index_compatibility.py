@@ -6,6 +6,7 @@ from itertools import combinations
 import pytest
 from whab_plugin_sqlite import Store
 from whab_plugin_sqlite.portable import read_files
+from whab_plugin_sqlite.portable_journal import read as read_journal
 
 from whab.plugins import StoreError
 
@@ -25,7 +26,7 @@ def portable_payload(store):
     # so this fixture still exercises every historical subset and changed SQL.
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(payload["budget.sqlite"])
+        connection.deserialize(read_journal(payload["budget.sqlite"])[0])
         connection.execute("ALTER TABLE items ADD COLUMN sync_settings TEXT")
         for name in INDEXES:
             sql = store.db.execute("SELECT sql FROM sqlite_schema WHERE name=?", (name,)).fetchone()[0]
@@ -102,7 +103,7 @@ def test_new_portable_exports_keep_bank_setup_metadata_native_only(store):
     files = store.export_budget_files()
     connection = sqlite3.connect(':memory:')
     try:
-        connection.deserialize(files['budget.sqlite'])
+        connection.deserialize(read_journal(files['budget.sqlite'])[0])
         assert 'sync_settings' not in {row[1] for row in connection.execute('PRAGMA table_info(items)')}
         assert connection.execute('SELECT COUNT(*) FROM items').fetchone()[0] == 0
         assert read_files(files) == store.export_budget()

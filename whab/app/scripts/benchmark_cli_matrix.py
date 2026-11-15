@@ -4,6 +4,10 @@ Run from whab/app with .venv/bin/python scripts/benchmark_cli_matrix.py.
 Each size returns the same 300 monthly rows, 13 merchant matches and ten
 uncategorized samples. Full-history output and provider calls are excluded.
 Raw wall times, client CPU times and system load accompany every observation.
+For a before/after comparison, run --prepare-fixtures /tmp/fictional-seeds once
+from the baseline source, then use --fixtures-directory /tmp/fictional-seeds in
+both source versions. Copies preserve identical input bytes and seed provenance;
+activation, first mutations and independent saved-file restoration still run.
 """
 
 import argparse
@@ -15,6 +19,7 @@ import platform
 import random
 import subprocess
 import sys
+from hashlib import sha256
 from importlib.metadata import version
 from pathlib import Path
 from statistics import median
@@ -31,6 +36,56 @@ from whab.domain.history import financial
 from whab.domain.portable import ACCOUNT_FIELDS
 from whab.initialization import initialize_home
 from whab.plugins.local import local_connection
+
+FIXTURE_FORMAT = 'whab-fictional-cli-performance-1'
+
+
+def source_identity():
+    return {'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+            'versions': {name: version(name) for name in ('whab', 'whab_plugin_cli', 'whab_plugin_sqlite')}}
+
+
+def write_fixtures(directory, sizes, accounts):
+    """Prepare immutable fictional input once, before either timed source run."""
+    directory = Path(directory).resolve()
+    directory.mkdir(parents=True, exist_ok=True)
+    index = directory / 'fixtures.json'
+    if index.exists():
+        raise ValueError('Choose a new fixture directory; existing seed provenance is never overwritten.')
+    records = {}
+    for total in sizes:
+        seed_root = directory / f'{total}-{accounts}'
+        seed_root.mkdir()
+        budget = fixture(seed_root, total, accounts)
+        path = Path(budget['path'])
+        records[f'{total}:{accounts}'] = {**budget, 'accounts': accounts, 'categories': 57,
+            'path': str(path.relative_to(directory)), 'sha256': sha256(path.read_bytes()).hexdigest()}
+    index.write_text(json.dumps({'format': FIXTURE_FORMAT, **source_identity(), 'fixtures': records}, indent=2) + '\n')
+    return index
+
+
+def prepared_fixture(root, total, accounts, directory=None):
+    """Copy a hash-verified seed into this isolated run; never mutate the seed."""
+    if directory is None:
+        budget = fixture(root, total, accounts)
+        return {**budget, 'fixture': {**source_identity(), 'seeded': False,
+                'sha256': sha256(Path(budget['path']).read_bytes()).hexdigest()}}
+    directory = Path(directory).resolve()
+    record = json.loads((directory / 'fixtures.json').read_text())
+    if record.get('format') != FIXTURE_FORMAT:
+        raise ValueError('This is not a generated fictional benchmark fixture directory.')
+    seed = record['fixtures'][f'{total}:{accounts}']
+    source = (directory / seed['path']).resolve()
+    if not source.is_relative_to(directory) or seed['transactions'] != total or seed['accounts'] != accounts or seed['categories'] != 57:
+        raise ValueError('Fixture identity or record counts do not match this workload.')
+    raw = source.read_bytes()
+    if sha256(raw).hexdigest() != seed['sha256']:
+        raise ValueError('Fictional fixture bytes changed after preparation.')
+    target = root / f'fictional-{total}.whab'
+    target.write_bytes(raw)
+    return {key: seed[key] for key in ('id', 'name', 'transactions')} | {'path': str(target),
+        'fixture': {'sha256': seed['sha256'], 'seeded': True,
+                    **{key: record[key] for key in ('source_commit', 'versions')}}}
 
 
 class MeasuredProcess(subprocess.Popen):
@@ -80,10 +135,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runs', type=int, default=100)
     parser.add_argument('--sizes', default='1000,14550,100000')
+    fixtures = parser.add_mutually_exclusive_group()
+    fixtures.add_argument('--prepare-fixtures', metavar='DIRECTORY', help='Generate immutable fictional seeds and provenance, then exit without timing')
+    fixtures.add_argument('--fixtures-directory', help='Reuse hash-verified fictional seeds; copy each into the isolated runtime before timing')
     args = parser.parse_args()
     sizes = [int(text) for text in args.sizes.split(',')]
     if not 1 <= args.runs <= 1000 or len(sizes) != len(set(sizes)) or not sizes or min(sizes) < max(300, args.runs) or max(sizes) > 250000:
         parser.error('Use unique sizes between max(300,runs) and 250000, and 1–1000 runs; portable size bounds still apply.')
+    if args.prepare_fixtures:
+        print(write_fixtures(args.prepare_fixtures, sizes, max(100, args.runs)))
+        return
     samples, cold = {}, {}
     executable = str(Path(sys.executable).parent / 'whab')
     with TemporaryDirectory(prefix='whab-cli-matrix-') as directory:
@@ -131,9 +192,9 @@ def main():
 
         with patch.dict(os.environ, env, clear=True):
             initialize_home(home)
-            budgets = [fixture(root, size, max(100, args.runs)) for size in sizes]
+            budgets = [prepared_fixture(root, size, max(100, args.runs), args.fixtures_directory) for size in sizes]
             atomic_write(home / 'budgets/index-sandbox.json', json.dumps([
-                {key: value for key, value in budget.items() if key != 'transactions'} for budget in budgets]).encode())
+                {key: budget[key] for key in ('id', 'name', 'path')} for budget in budgets]).encode())
             gc.collect()
             cli('Missing fictional budget', 'trnx', 'list', '--help', plain=True)
             for _ in range(args.runs):
@@ -143,7 +204,7 @@ def main():
                     target = budget['name']
                     start = perf_counter()
                     cli(target, 'category', 'list')
-                    cold[target] = {'activation_ms': (perf_counter() - start) * 1000}
+                    cold[target] = {'activation_ms': (perf_counter() - start) * 1000, 'fixture': budget['fixture']}
                     start = perf_counter()
                     assert cli(target, 'trnx', 'list', '--merchant', 'Selective fictional merchant')['returned'] == 13
                     cold[target]['merchant_index_ms'] = (perf_counter() - start) * 1000

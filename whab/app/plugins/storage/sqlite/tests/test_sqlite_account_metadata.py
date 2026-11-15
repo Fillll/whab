@@ -5,6 +5,7 @@ import sqlite3
 import pytest
 from whab_plugin_sqlite import Store
 from whab_plugin_sqlite.portable import read_files
+from whab_plugin_sqlite.portable_journal import read as read_journal
 
 from whab.plugins import StoreError
 
@@ -46,7 +47,7 @@ def test_nonboolean_saved_name_override_is_rejected_before_import(store):
     raw = store.export_budget_files()["budget.sqlite"]
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(raw)
+        connection.deserialize(read_journal(raw)[0])
         connection.execute("UPDATE accounts SET name_overridden=2 WHERE id=?", (key,))
         connection.commit()
         raw = connection.serialize()
@@ -60,7 +61,7 @@ def test_pre_metadata_portable_account_schema_stays_readable(store):
     store.add_account("personal", {"name": "Cash", "type": "depository", "balance": 0})
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(store.export_budget_files()["budget.sqlite"])
+        connection.deserialize(read_journal(store.export_budget_files()["budget.sqlite"])[0])
         connection.execute("ALTER TABLE accounts DROP COLUMN name_overridden")
         connection.execute("ALTER TABLE accounts DROP COLUMN bank_website")
         connection.commit()

@@ -10,7 +10,8 @@ def save_history(store, workspace, journal, previous, *, cache_valid):
     hint = hints.get(workspace)
     entries = journal['entries']
     before = previous['entries'] if previous else []
-    append_only = (previous is not None and journal['baseline'] is previous['baseline']
+    append_only = (previous is not None and journal['formatVersion'] == previous['formatVersion']
+                   and journal['baseline'] is previous['baseline']
                    and len(entries) == len(before) + 1 and entries[:-1] == before)
     can_append = (cache_valid and hint is not None and append_only
                   and hint[3] == (before[-1]['hash'] if before else None)

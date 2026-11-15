@@ -92,7 +92,7 @@ class Store(Authority):
             try:
                 with self._snapshot():
                     metadata = self._authority_metadata()
-                    if metadata["formatVersion"] not in {2, 3, 4} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
+                    if metadata["formatVersion"] not in {2, 3, 4, 5} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
                         raise StoreError("Read-only readiness requires the current native SQLite schema; upgrade it explicitly first.")
                     if metadata["budgetId"] != budget_id or metadata["environment"] != environment:
                         raise StoreError("SQLite storage identity belongs to another budget or environment.")

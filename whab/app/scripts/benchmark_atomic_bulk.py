@@ -4,6 +4,8 @@ Run: .venv/bin/python scripts/benchmark_atomic_bulk.py --runs 100 --transactions
 Writes reproducible raw JSON outside the checkout. Each command/size has 100 fresh
 processes; equivalent separate-command workflows run separately. Cold activation,
 first mutation, provider exclusion and instrumentation overhead are reported.
+Use --fixtures-directory with seeds prepared by benchmark_cli_matrix.py to share
+identical original input across source versions, without reusing runtime caches.
 """
 
 import argparse
@@ -13,14 +15,16 @@ import os
 import platform
 import subprocess
 import sys
+from copy import deepcopy
 from importlib.metadata import version
 from pathlib import Path
 from statistics import median
 from tempfile import TemporaryDirectory
 from time import monotonic, perf_counter, sleep
 from unittest.mock import patch
+from uuid import uuid4
 
-from benchmark_cli_matrix import fixture
+from benchmark_cli_matrix import fixture, prepared_fixture
 
 from whab.budgets.container import decode_container
 from whab.initialization import initialize_home
@@ -34,7 +38,8 @@ def host(home, metrics):
     from whab.hosting import run_host
 
     original = BudgetSession.checkpoint
-    counts = {"checkpoints": 0, "generation": 0}
+    counts = {"checkpoints": 0, "generation": None}
+    Path(metrics).write_text(json.dumps(counts))
 
     def checkpoint(session):
         result = original(session)
@@ -54,6 +59,48 @@ def percentile(values, fraction):
 
 def summarize(values):
     return {"p50_ms": median(values), "p95_ms": percentile(values, 0.95)}
+
+
+def verify_retry(connection, identifier, result, counts):
+    """Prove the exact saved intent remains harmless over the public protocol."""
+    prefix = "/budgets/" + identifier + "/api/local/v1"
+
+    def observed():
+        response = connection.get(prefix + "/queries/categories", params={"workspace": "personal"})
+        response.raise_for_status()
+        return response.json()
+
+    before = observed()
+    commits = counts()
+    response = connection.post(prefix + "/commands", json=result["intent"])
+    response.raise_for_status()
+    expected = {key: result[key] for key in ("budgetId", "revision", "data")}
+    assert response.json() == expected, (response.json(), expected)
+    stale = {**result["intent"], "request_id": str(uuid4())}
+    response = connection.post(prefix + "/commands", json=stale)
+    assert response.status_code == 409, "A stale revision must refuse the complete batch"
+    conflicting = {**result["intent"], "history": {"actor": "Other benchmark", "actorKind": "agent"}}
+    response = connection.post(prefix + "/commands", json=conflicting)
+    assert response.status_code in {400, 409}, "A request ID cannot be reused for a different intent"
+    assert observed() == before and counts() == commits, "Retries/refusals must not save or advance state"
+    return {"exact_retry": True, "stale_revision_refused": True, "conflicting_id_refused": True,
+            "no_extra_checkpoint": True}
+
+
+def read_history(connection, identifier):
+    entries, cursor = [], None
+    while True:
+        response = connection.post("/budgets/" + identifier + "/api/local/v1/queries", json={
+            "operation": "history", "workspace": "personal",
+            "parameters": {"limit": 100, **({"before": cursor} if cursor else {})},
+        })
+        response.raise_for_status()
+        page = response.json()["data"]
+        entries.extend(page["entries"])
+        if page["next"] is None:
+            assert len(entries) == page["total"]
+            return entries
+        cursor = page["next"]
 
 
 def verify(path, total, expected, history_count, storage="sqlite"):
@@ -166,7 +213,7 @@ def case_segment(command, size, args):
             assert result.returncode == 0, result.stderr
             return json.loads(result.stdout), elapsed
 
-        def changes(iteration):
+        def changes(iteration, *, start=None):
             if command == "classify":
                 return [
                     {
@@ -187,7 +234,8 @@ def case_segment(command, size, args):
                         else {}
                     ),
                 }
-                for i in range(size)
+                for i in range(iteration * size if start is None else start,
+                               (iteration * size if start is None else start) + size)
             ]
 
         def bulk(edits):
@@ -232,25 +280,33 @@ def case_segment(command, size, args):
             budget = (
                 json_fixture(root, args.transactions)
                 if getattr(args, "storage", "sqlite") == "json"
-                else fixture(root, args.transactions, 100)
+                else prepared_fixture(root, args.transactions, 100, getattr(args, 'fixtures_directory', None))
             )
             target = budget["name"]
             log = (root / "host.log").open("w")
-            process = subprocess.Popen(
-                [sys.executable, str(Path(__file__).resolve()), "--host", str(home), str(metrics)],
-                env=env,
-                stdout=log,
-                stderr=log,
-            )
+            def start_host():
+                child = subprocess.Popen(
+                    [sys.executable, str(Path(__file__).resolve()), "--host", str(home), str(metrics)],
+                    env=env, stdout=log, stderr=log,
+                )
+                try:
+                    deadline = monotonic() + 120
+                    endpoint = home / "run/sandbox/host.json"
+                    while not endpoint.exists() or json.loads(endpoint.read_text())["pid"] != child.pid:
+                        assert child.poll() is None, (
+                            "Instrumented fictional host exited before readiness"
+                        )
+                        assert monotonic() < deadline, "Instrumented host did not become ready"
+                        sleep(0.05)
+                except BaseException:
+                    child.terminate()
+                    child.wait(timeout=60)
+                    raise
+                return child
+
+            started = perf_counter()
+            process = start_host()
             try:
-                started = perf_counter()
-                deadline = monotonic() + 120
-                while not (home / "run/sandbox/host.json").exists():
-                    assert process.poll() is None, (
-                        "Instrumented fictional host exited before readiness"
-                    )
-                    assert monotonic() < deadline, "Instrumented host did not become ready"
-                    sleep(0.05)
                 with local_connection(home, "sandbox", timeout=120) as connection:
                     opened = connection.post(
                         "/api/budget/open",
@@ -267,6 +323,8 @@ def case_segment(command, size, args):
                     # Cold native/portable cache construction is separate, never hidden.
                     result, elapsed = bulk(changes(0))
                     cold["first_mutation_ms"] = elapsed
+                    for row in result["data"]["changes"]:
+                        expected[row["id"]] = deepcopy(row["after"])
                     history_count = 1
                     for i in range(args.runs):
                         edits = changes(i + 1)
@@ -280,13 +338,16 @@ def case_segment(command, size, args):
                         }
                         assert sample["checkpoints"] == sample["native_commits"] == 1
                         assert result["data"]["count"] == size
+                        assert result["data"]["changed"] == size, "Every timed target must actually change"
                         samples.append(sample)
                         for row in result["data"]["changes"]:
-                            expected[row["id"]] = row["after"]
+                            expected[row["id"]] = deepcopy(row["after"])
                         history_count += 1
+                    retry_result = result
+                    retry_before_restart = verify_retry(connection, budget["id"], retry_result, counts)
                     # Identical annotations and target order; separate commits deliberately.
                     for i in range(args.separate_runs):
-                        edits = changes(args.runs + i + 1)
+                        edits = changes(args.runs + i + 1, start=args.runs * size)
                         before = counts()
                         elapsed = 0
                         for edit in edits:
@@ -346,6 +407,8 @@ def case_segment(command, size, args):
                         assert sample["checkpoints"] == sample["native_commits"] == size
                         separate.append(sample)
                         history_count += size
+                    history = read_history(connection, budget["id"])
+                    assert len(history) == history_count
                     restored = verify(
                         path,
                         args.transactions,
@@ -353,6 +416,13 @@ def case_segment(command, size, args):
                         history_count,
                         getattr(args, "storage", "sqlite"),
                     )
+                process.terminate()
+                process.wait(timeout=60)
+                process = start_host()
+                with local_connection(home, "sandbox", timeout=120) as connection:
+                    assert read_history(connection, budget["id"]) == history
+                    retry_after_restart = verify_retry(connection, budget["id"], retry_result, counts)
+                    assert read_history(connection, budget["id"]) == history
             finally:
                 process.terminate()
                 process.wait(timeout=60)
@@ -379,6 +449,10 @@ def case_segment(command, size, args):
             "target_met": summary["p95_ms"] < 250,
             "cold": cold,
             "saved_verification": restored,
+            "fixture": budget.get("fixture"),
+            "retry_verification": {"before_restart": retry_before_restart, "after_restart": retry_after_restart},
+            "distinct_transaction_targets": len(expected) if command != "classify" else None,
+            "account_target_reuse": command == "classify",
             "bulk_samples": samples,
             "separate_samples": separate,
         }
@@ -390,7 +464,7 @@ def case(command, size, args):
     # fresh processes. Separate workflows use the first identical segment.
     from copy import copy
 
-    segment_runs = min(args.runs, max(10, 2000 // size))
+    segment_runs = min(args.runs, max(1, min(2000 // size, args.transactions // size - 1)))
     segments = []
     remaining = args.runs
     while remaining:
@@ -417,6 +491,8 @@ def case(command, size, args):
         "target_met": summary["p95_ms"] < 250,
         "cold": [segment["cold"] for segment in segments],
         "saved_verification": [segment["saved_verification"] for segment in segments],
+        "retry_verification": [segment["retry_verification"] for segment in segments],
+        "distinct_transaction_targets": [segment["distinct_transaction_targets"] for segment in segments],
         "bulk_samples": samples,
         "separate_samples": separate,
         "fresh_fixture_segments": len(segments),
@@ -456,6 +532,7 @@ def main():
     parser.add_argument(
         "--output", required=True, help="Raw JSON evidence path outside source/runtime data"
     )
+    parser.add_argument('--fixtures-directory', help='Reuse immutable SQLite seeds prepared by benchmark_cli_matrix.py; copies remain isolated')
     args = parser.parse_args()
     sizes = [int(value) for value in args.sizes.split(",")]
     commands = args.commands.split(",")
@@ -469,14 +546,18 @@ def main():
         parser.error(
             "Use 1–100 bulk runs, 1–5 separate runs, 1000–100000 rows, sizes 1–100 and supported commands. Full evidence requires >=100 runs."
         )
+    if args.fixtures_directory and args.storage != 'sqlite':
+        parser.error('Prepared fixture directories currently contain SQLite seeds; omit this option for JSON.')
     result = {
+        "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        "source_dirty": bool(subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], text=True).strip()),
         "python": platform.python_version(),
         "platform": platform.platform(),
         "host": version("whab"),
         "cli": version("whab_plugin_cli"),
         "transactions": args.transactions,
         "storage": args.storage,
-        "notes": "End-to-end fresh processes, verified HTTPS and synchronous save. Native evidence query plus a small count-file write after each checkpoint are included instrumentation overhead. Provider latency excluded (no calls). Cold first mutation excluded from warm samples. Fresh fixture per command/size bounds retained history below native/portable limits. Separate p95 uses only the stated number of workflow repetitions.",
+        "notes": "End-to-end fresh processes, verified HTTPS and synchronous save. Native evidence query plus a small count-file write after each checkpoint are included instrumentation overhead. Provider latency excluded (no calls). Cold first mutation excluded from warm samples. Fresh fixture segments bound retained history below native/portable limits. Transaction samples change distinct records within each segment; account samples alternate classifications on the same accounts. Untimed exact retry, conflict, stale revision, restart, complete history and independent saved-file checks accompany every segment. Separate p95 uses only the stated number of workflow repetitions.",
         "cases": [],
     }
     for command in commands:

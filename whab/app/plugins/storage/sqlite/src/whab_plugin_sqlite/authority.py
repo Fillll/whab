@@ -29,6 +29,7 @@ from whab.plugins.storage_transfer import (
     evidence_record,
     native_records_digest,
     native_state_digest,
+    native_state_records,
     operation_limit,
     read_evidence,
     read_operation_receipt,
@@ -100,7 +101,7 @@ class Authority:
         if type(row[0]) is not bytes:
             raise StoreError("Invalid SQLite storage authority metadata.")
         metadata = read_storage_json(row[0])
-        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3, 4}:
+        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3, 4, 5}:
             raise StoreError("Invalid SQLite storage authority metadata.")
         if metadata.keys() != {
             "formatVersion", "budgetId", "environment", "instanceId", "authorityEpoch", "generation",
@@ -119,7 +120,8 @@ class Authority:
                             metadata["authorityEpoch"] != watermark.source_authority_epoch
                             or metadata["generation"] != watermark.source_generation
                             or metadata["operationId"] != watermark.source_operation_id
-                            or self._current_evidence(metadata).state_digest != watermark.state_digest))):
+                            or self._current_evidence(metadata).state_digest != watermark.state_digest
+                            or self._current_evidence(metadata).digest_version != watermark.digest_version))):
                     raise StoreError("Invalid SQLite replica data evidence.")
                 if metadata["role"] == "copy":
                     financial, protected = encode_local_state(self._local_states())
@@ -160,7 +162,7 @@ class Authority:
     def _metadata_evidence(metadata, digest):
         return CommitEvidence(metadata["budgetId"], metadata["environment"], metadata["instanceId"],
                               metadata["authorityEpoch"], metadata["generation"], metadata["operationId"],
-                              metadata["role"], digest)
+                              metadata["role"], digest, 2 if metadata["formatVersion"] >= 5 else 1)
 
     def _local_states(self):
         states = {name: self._read_state(name) for name in ("personal", "demo")}
@@ -195,7 +197,9 @@ class Authority:
 
     def _current_evidence(self, metadata=None):
         stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
-        if getattr(self, '_evidence_stamp', None) != stamp:
+        metadata = metadata or self._authority_metadata()
+        version = 2 if metadata['formatVersion'] >= 5 else 1
+        if getattr(self, '_evidence_stamp', None) != stamp or getattr(self, '_evidence_version', None) != version:
             from .evidence import SnapshotEncoder
             transaction = self._writing
             selected = transaction.get('selected') if transaction is not None else None
@@ -227,8 +231,23 @@ class Authority:
                     records.append(value)
                     return self._snapshot_encoder.chunks(value, limit=limit)
             self._snapshot_encoder.begin(transaction_ids=selected[1] if reusable else None)
-            self._evidence_digest = (native_records_digest(records, chunks=self._snapshot_encoder.chunks) if reusable
-                                     else native_state_digest(self._local_states(), chunks=capture))
+            if version == 2:
+                from whab.domain.integrity import MerkleHasher
+                if not reusable:
+                    records = native_state_records(self._local_states())
+                    self._native_merkle = MerkleHasher()
+                if not hasattr(self, '_native_merkle'):
+                    self._native_merkle = MerkleHasher()
+                selections = None
+                if reusable:
+                    positions = self._history_positions(selected[0], ledger['transactions'])
+                    selections = {(0, 'workspaces', selected[0], 'ledger', 'transactions'): {positions[key] for key in selected[1]}}
+                self._evidence_digest = native_records_digest(records, chunks=self._snapshot_encoder.chunks, version=2,
+                                                              hasher=self._native_merkle, selections=selections)
+            else:
+                self._evidence_digest = (native_records_digest(records, chunks=self._snapshot_encoder.chunks) if reusable
+                                         else native_state_digest(self._local_states(), chunks=capture))
+            self._evidence_version = version
             self._snapshot_encoder.finish()
             self._native_records = records
             self._native_state_stamp = stamp
@@ -281,6 +300,11 @@ class Authority:
                 from .export_reads import snapshot
                 stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
                 transaction['before_stamp'] = stamp
+                if getattr(self, '_history_stamp', None) != stamp:
+                    # An intervening no-op must not turn an untracked external
+                    # write into a trusted cache generation for the next edit.
+                    self._history_merkle = {}
+                    self._history_digest_heads = {}
                 cached = getattr(self, '_history_heads', {}) if getattr(self, '_history_stamp', None) == stamp else {}
                 names = (workspace,) if type(workspace) is str and workspace in {'personal', 'demo'} else ('personal', 'demo')
                 history_before = {name: cached[name] if name in cached else snapshot(self, name) for name in names if self.db.execute("SELECT 1 FROM meta WHERE workspace=?", (name,)).fetchone()} if financial else {}
@@ -293,6 +317,7 @@ class Authority:
                     selected = None
                 yield transaction
                 if transaction["dirty"]:
+                    metadata["formatVersion"] = 5
                     if transaction.get('selected') is not None:
                         workspace, selected = transaction['selected']
                     from whab.domain.history import record_financial
@@ -326,13 +351,12 @@ class Authority:
                             new = snapshot(self, name)
                         if not transaction.get("history_restore"):
                             original_journal = new.get("history") or old.get("history")
-                            from hashlib import sha256
-
                             from .evidence import SnapshotEncoder
                             if not hasattr(self, '_history_encoder') or name not in cached:
                                 self._history_encoder = SnapshotEncoder(ensure_ascii=True)
                             self._history_encoder.begin(transaction_ids=selected if name in cached else None, scope=name)
-                            previous_digest = getattr(self, '_history_digest_heads', {}).get(name) if name in cached else None
+                            previous_digest = (getattr(self, '_history_digest_heads', {}).get(name)
+                                               if name in cached and original_journal and original_journal['formatVersion'] == 2 else None)
                             def digest_snapshot(value):
                                 from whab.plugins.storage_transfer import MAX_LOCAL_TRANSFER_BYTES
                                 if previous_digest is not None and value.keys() == previous_digest[0].keys() and all(
@@ -340,17 +364,19 @@ class Authority:
                                     for key in value
                                 ):
                                     return previous_digest[1]
-                                digest = sha256()
-                                for raw in self._history_encoder.chunks(value, limit=MAX_LOCAL_TRANSFER_BYTES):
-                                    digest.update(raw)
-                                result = digest.hexdigest()
+                                from whab.domain.integrity import MerkleHasher
+                                if not hasattr(self, '_history_merkle') or name not in cached:
+                                    self._history_merkle = {}
+                                hasher = self._history_merkle.setdefault(name, MerkleHasher())
+                                selections = {('transactions',): {positions[key] for key in selected}} if selected is not None else None
+                                result = hasher.digest(value, selections=selections, limit=MAX_LOCAL_TRANSFER_BYTES)
                                 transaction.setdefault('history_digests', {})[name] = (value, result)
                                 return result
                             bounded_changes = None
                             if selected is not None:
                                 from whab.domain.history import difference
                                 bounded_changes = difference({**old, 'transactions': old_rows}, {**new, 'transactions': list(changed.values())})
-                            journal = record_financial(original_journal, old, new, info, digest_snapshot=digest_snapshot, changes=bounded_changes, transactions_sorted=selected is not None)
+                            journal = record_financial(original_journal, old, new, info, digest_snapshot=digest_snapshot, changes=bounded_changes, transactions_sorted=selected is not None, digest_version=2)
                             self._history_encoder.finish()
                             if journal is not None:
                                 new["history"] = journal
@@ -395,13 +421,15 @@ class Authority:
                 promote(self, bounded, stamp, committed_stamp)
                 self._history_heads = history_after
                 self._history_stamp = next_history_stamp
-                if not hasattr(self, '_history_digest_heads'):
-                    self._history_digest_heads = {}
                 self._history_digest_heads.update(transaction.get('history_digests', {}))
             except BaseException as error:
                 self._evidence_stamp = None
                 self._native_state_stamp = None
                 self._history_blob_positions = {}
+                if hasattr(self, '_native_merkle'):
+                    del self._native_merkle
+                if hasattr(self, '_history_merkle'):
+                    del self._history_merkle
                 if hasattr(self, '_history_encoder'):
                     del self._history_encoder
                 if self.db.in_transaction:
@@ -436,7 +464,8 @@ class Authority:
                 or evidence.budget_id != metadata["budgetId"] or evidence.environment != metadata["environment"]
                 or evidence.generation > metadata["generation"]
                 or (evidence.generation == metadata["generation"]
-                    and evidence.state_digest != self._current_evidence(metadata).state_digest)):
+                    and (evidence.state_digest != self._current_evidence(metadata).state_digest
+                         or evidence.digest_version != self._current_evidence(metadata).digest_version))):
             raise StoreError("Invalid SQLite operation receipt evidence.")
         return receipt
 
@@ -543,7 +572,8 @@ class Authority:
             states = self._check_local_target(metadata, snapshot)
             self._replace_local_states(states, snapshot.receipts)
             source = snapshot.source
-            metadata.update(generation=source.generation, operationId=source.operation_id,
+            metadata.update(formatVersion=5 if source.digest_version == 2 else 4,
+                            generation=source.generation, operationId=source.operation_id,
                             authorityEpoch=source.authority_epoch, empty=False, transitionId=transfer_id,
                             transfer={"id": transfer_id, "digest": snapshot.digest, "source": evidence_record(source)})
             result = self._current_evidence(metadata)
@@ -584,7 +614,8 @@ class Authority:
             if replayed:
                 return watermark
             self._replace_local_states(decode_local_state(snapshot.financial, snapshot.protected), snapshot.receipts)
-            metadata.update(generation=snapshot.source.generation, operationId=snapshot.source.operation_id,
+            metadata.update(formatVersion=5 if snapshot.source.digest_version == 2 else 4,
+                            generation=snapshot.source.generation, operationId=snapshot.source.operation_id,
                             authorityEpoch=snapshot.source.authority_epoch, empty=False,
                             replica=replica_record(watermark))
         return watermark

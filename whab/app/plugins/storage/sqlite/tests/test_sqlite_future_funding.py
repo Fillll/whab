@@ -4,6 +4,7 @@ import sqlite3
 
 import pytest
 from whab_plugin_sqlite import Store
+from whab_plugin_sqlite.portable_journal import read as read_journal
 
 from whab.domain.errors import StoreError
 from whab.domain.file_imports import WorkspaceImport
@@ -134,7 +135,7 @@ def test_portable_images_from_before_funding_remain_supported(store, legacy_acco
     snapshot = store.export_budget()
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(store.export_budget_files()["budget.sqlite"])
+        connection.deserialize(read_journal(store.export_budget_files()["budget.sqlite"])[0])
         connection.execute("DROP TABLE future_funding")
         if legacy_accounts:
             connection.execute("ALTER TABLE accounts DROP COLUMN on_budget")
@@ -169,7 +170,7 @@ def test_legacy_snapshot_without_funding_restores_with_empty_canonical_funding(s
 def test_portable_funding_rows_are_revalidated_as_untrusted_data(store, statement):
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(store.export_budget_files()["budget.sqlite"])
+        connection.deserialize(read_journal(store.export_budget_files()["budget.sqlite"])[0])
         connection.execute(statement)
         connection.commit()
         files = {"budget.sqlite": connection.serialize()}
@@ -186,7 +187,7 @@ def test_portable_funding_record_count_is_bounded_before_projection(store, monke
 
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(store.export_budget_files()["budget.sqlite"])
+        connection.deserialize(read_journal(store.export_budget_files()["budget.sqlite"])[0])
         connection.execute("INSERT INTO future_funding VALUES('personal','2026-11','USD',100)")
         connection.execute("INSERT INTO future_funding VALUES('personal','2026-12','USD',100)")
         connection.commit()

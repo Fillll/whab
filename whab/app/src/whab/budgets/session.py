@@ -471,8 +471,17 @@ class BudgetSession:
         cached = self._payload_hashes.get(name)
         if cached is not None and (cached[0] is raw or cached[0] == raw):
             return cached[1]
-        value = digest(raw)
-        self._payload_hashes[name] = (raw, value)
+        from hashlib import sha256
+        # A portable append retains the exact preceding bytes. SHA's copied
+        # state therefore verifies only the new suffix without trusting any
+        # checksum supplied by the storage worker. Changed prefixes rehash.
+        if cached is not None and raw.startswith(cached[0]):
+            state = cached[2].copy()
+            state.update(memoryview(raw)[len(cached[0]):])
+        else:
+            state = sha256(raw)
+        value = state.hexdigest()
+        self._payload_hashes[name] = (raw, value, state)
         return value
 
     def _bundle(self, *, include_credentials=False, password=None, preserve_credentials=False):

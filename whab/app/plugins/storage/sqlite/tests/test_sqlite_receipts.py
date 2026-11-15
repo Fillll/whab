@@ -5,6 +5,7 @@ import sqlite3
 import pytest
 from whab_plugin_sqlite import Store
 from whab_plugin_sqlite.portable import read_files
+from whab_plugin_sqlite.portable_journal import read as read_journal
 
 from tests.receipt_images import png
 from whab.plugins import StoreError
@@ -63,7 +64,7 @@ def test_legacy_portable_schema_without_attachment_table_is_still_readable(store
     files = store.export_budget_files()
     image = sqlite3.connect(":memory:")
     try:
-        image.deserialize(files["budget.sqlite"])
+        image.deserialize(read_journal(files["budget.sqlite"])[0])
         image.execute("DROP TABLE transaction_receipts")
         image.commit()
         legacy = {"budget.sqlite": image.serialize()}
@@ -78,7 +79,7 @@ def test_untrusted_portable_images_validate_attachment_ownership_and_actual_byte
     files = store.export_budget_files()
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(files["budget.sqlite"])
+        connection.deserialize(read_journal(files["budget.sqlite"])[0])
         connection.execute("INSERT INTO transaction_receipts VALUES(?,?,?)", ("personal", key if transaction_key == "fixture" else transaction_key, image))
         connection.commit()
         files = {"budget.sqlite": connection.serialize()}

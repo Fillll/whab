@@ -1034,7 +1034,10 @@ plugin identity, validator implementation and installed JSON Schema library meta
 changed resource is validated again. Read-only cache locations retain validation.
 Parser construction defers unused distribution-version reads; explicit discovery
 still reports installed plugin versions. Python 3.15 lazy imports defer SDK and
-transport modules until they are used.
+transport modules until they are used. A selected transaction action builds only
+its parser family: `trnx list --help` does not import bulk writes, notes, review,
+transfer execution or the HTTP client. Root/group help still lists every command,
+and each action retains the same complete examples, limits and recovery guidance.
 
 Current local hosts expose a coherent filtered transaction read. `trnx list`
 selects complete date/merchant matches in storage and returns names with the same

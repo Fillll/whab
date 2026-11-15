@@ -39,8 +39,11 @@ class ReplicaWatermark:
     transfer_digest: str
     namespace_generation: int
     namespace_digest: str
+    digest_version: int = 1
 
     def __post_init__(self):
+        if type(self.digest_version) is not int or self.digest_version not in {1, 2}:
+            _invalid()
         for value in (self.replica_id, self.source_instance_id, self.source_authority_epoch):
             _uuid(value)
         for value in (self.source_generation, self.namespace_generation):
@@ -55,11 +58,12 @@ class ReplicaWatermark:
 def replica_record(watermark):
     if type(watermark) is not ReplicaWatermark:
         _invalid()
-    return {name: getattr(watermark, name) for name in ReplicaWatermark.__slots__}
+    return {name: getattr(watermark, name) for name in ReplicaWatermark.__slots__
+            if name != "digest_version" or watermark.digest_version != 1}
 
 
 def read_replica_watermark(value):
-    if type(value) is not dict or value.keys() != set(ReplicaWatermark.__slots__):
+    if type(value) is not dict or value.keys() not in (set(ReplicaWatermark.__slots__), set(ReplicaWatermark.__slots__) - {"digest_version"}):
         _invalid()
     return ReplicaWatermark(**value)
 
@@ -83,7 +87,7 @@ def validate_replica_apply(current, previous, replica_id, snapshot, namespace_di
         raise StoreError("This copy cannot accept the requested replica update.")
     target = ReplicaWatermark(replica_id, source.instance_id, source.authority_epoch, source.generation,
                               source.operation_id, source.state_digest, snapshot.digest,
-                              namespace_generation, namespace_digest)
+                              namespace_generation, namespace_digest, source.digest_version)
     if type(empty) is not bool:
         _invalid()
     if previous is None:
@@ -95,6 +99,7 @@ def validate_replica_apply(current, previous, replica_id, snapshot, namespace_di
         if (current.authority_epoch != previous.source_authority_epoch
                 or current.generation != previous.source_generation
                 or current.operation_id != previous.source_operation_id or current.state_digest != previous.state_digest
+                or current.digest_version != previous.digest_version
                 or current.instance_id == previous.source_instance_id):
             raise StoreError("Native copy data does not match its persisted watermark.")
         if (replica_id != previous.replica_id or source.instance_id != previous.source_instance_id

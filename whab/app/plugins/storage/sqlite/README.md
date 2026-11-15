@@ -46,7 +46,7 @@ Preserve integer currency minor units, separate currency totals, workspace/envir
 
 ## Portable files and restoration
 
-Portable plugin budget containers use `export_budget_files()` and `restore_budget_files(workspace, files)`. SQLite owns a single `budget.sqlite` image (payload format 1, at most 50 MiB). Export rebuilds a fresh database from a coherent validated ledger snapshot, validating that snapshot once; it never copies the live database. The image contains personal ledger history, currencies, allocations and annotations, with no demo ledger, bank connections, tokens, cursors or account connection metadata. The source ledger and its active connections remain unchanged. Older portable schemas may omit any of the additive register indexes; present indexes still require exact supported SQL.
+Portable plugin budget containers use `export_budget_files()` and `restore_budget_files(workspace, files)`. SQLite owns a single `budget.sqlite` payload (at most 50 MiB). From SQLite 1.29 / WHAB 2.81, payload format 2 wraps a sanitized SQLite snapshot and checksummed financial change records. Earlier format-1 SQLite images remain readable. New snapshots rebuild a fresh database from a coherent validated ledger; export never copies the live database. The image contains personal ledger history, currencies, allocations and annotations, with no demo ledger, bank connections, tokens, cursors or account connection metadata. The source ledger and its active connections remain unchanged. Older portable schemas may omit any of the additive register indexes; present indexes still require exact supported SQL.
 
 Accounts persist their core `onBudget` scope and optional `subtype`. Existing ledgers and earlier portable images infer on-budget scope for checking/savings (`depository`) and credit cards (`credit`), and off-budget scope for other account types. New account classifications survive reopening, portable roundtrips and provider refreshes. Scope controls envelope budgeting independently of the account's asset or liability type.
 
@@ -241,51 +241,50 @@ changes and triggers require rebuilding it under the next read snapshot. Failed
 index maintenance discards the cache and cannot fail an already-committed edit.
 
 Native evidence is reused only while SQLite total-change and data-version stamps
-agree. Bounded edits replace detached snapshot records and reuse canonical bytes
-of immutable rows and journal baselines. External SQL, triggers and failed writes
-invalidate these optimizations. Native evidence and history hashes retain their
-existing canonical representation and remain independently reproducible.
-Bounded writes retain sorted transaction positions and reuse complete canonical
-native record views, avoiding whole-ledger dictionaries and repeated sorting.
-Immutable prior audit entries also retain their canonical bytes.
-Only changed metadata and records are replaced; complete canonical hashes
-are still computed with the original algorithm. Unknown scopes and identity
-changes retain the full reconstruction path.
+agree. On the first financial write, native metadata advances to format 5 and
+selects version-2 logical Merkle hashes. Known bounded edits update changed record
+leaves and their ancestors; retained history baselines and audit entries are
+immutable. Unknown scopes, outside SQL, triggers and rollbacks discard cached
+state. Older metadata, original entry hashes and old retry receipts remain readable.
+Opening alone does not change financial revisions. Earlier writers refuse the
+new native metadata instead of modifying a state they cannot verify. See the
+[versioned integrity contract](../../../../docs/plugins.md#incremental-integrity).
 
-Classifications that affect account metadata update one row using core rules.
-Currency and lifecycle changes retain their complete-history validation. Portable
-exports reuse a previously sanitized image for supported account/transaction
-edits, apply exact audited changes and update its journal. Unsupported changes or
-unverified source stamps rebuild a fresh validated image. The live database,
-connections and credentials are never copied into a portable image. Checkpoints
-still finish synchronously before the CLI returns. For a verified bounded edit,
-a worker prepares the sanitized image from immutable audit rows while the native
-state is hashed. It never reads or writes the live database from that thread.
-Prepared bytes and patches become reusable only after the native commit succeeds
-and its database generation remains current. Rollbacks and outside writes discard
-the preparation.
+Classifications that affect account metadata update selected rows using core
+rules. Currency and lifecycle changes retain complete-history validation. Atomic
+transaction and account batches share one native transaction, revision, receipt,
+audit entry and checkpoint; `--batch` remains only a history grouping label.
+
+Portable format 2 begins with `WHAB-SQLITE-2`, a bounded SQLite snapshot length and
+SHA-256 checksum, followed by that sanitized snapshot. Each appended frame has
+its own length, SHA-256 checksum and JSON audit entries. Supported edits replace
+existing account or transaction rows. Independent opening validates the snapshot
+schema and every frame, checks exact prior records and the complete audit chain,
+then validates the final ledger and receipt references. Nested envelopes, damaged
+frames, unknown fields and unsupported changes are rejected without executing
+stored SQL. Earlier image-only readers refuse the new header; use SQLite 1.29+
+to open these saved files.
+
+The journal compacts to a fresh sanitized snapshot after 512 frames, 4 MiB of
+changes, a change that cannot be represented by supported replacements, or when
+needed to retain the 50 MiB payload bound. Compaction, the first integrity build,
+full exports and recovery remain size-dependent operations. No receipt or audit
+entry is removed by compaction. Bank credentials and private native records never
+enter either the snapshot or change records.
+
+The host still saves one complete ordinary ZIP `.whab` file atomically and
+synchronously. That file contains every acknowledged edit, including the current
+journal; it needs no sidecar or future compaction to restore. Unchanged compressed
+64 KiB blocks are reused. Append patches retain ordinary SHA-256 checksums: both
+storage and host copy their independently computed SHA state and hash only the
+new suffix after checking the exact previous bytes. A changed prefix requires
+full verification. Native commit failure cannot promote a prepared portable
+image; checksum or encoding failure cannot publish the candidate archive.
 
 Writable native file connections recommend a 64 MiB SQLite page cache, allocated
-on demand, so repeated audit appends can reuse overflow pages. This uses more
-process memory on populated budgets without changing journal or sync guarantees.
-In-memory portable builders and read-only connections retain their prior setting.
-
-Audit records remain compatible JSON TEXT. An adaptive whitespace reserve,
-capped at 1 MiB, lets SQLite append entries transactionally through incremental
-blob writes without repeatedly reallocating a large immutable baseline. Larger
-entries, unverified records and triggers retain full JSON replacement. The
-portable storage capability may return SHA-256-bound file patches so unchanged
-image pages stay in the host. WHAB still publishes a complete `.whab` container.
-For lower checkpoint latency, sessions reuse independently compressed 64 KiB
-blocks for unchanged payload ranges. Files remain ordinary DEFLATE ZIP entries;
-standard ZIP readers and earlier hosts can decompress them. Dictionary resets
-may increase archive size slightly compared with one continuous compression
-stream. The cache is bounded by the current container's expanded size. Checkpoints
-verify the final patched-file SHA while encoding bounded opaque bytes in memory;
-neither the archive nor session state is published until verification finishes.
-They reuse their encoder's validated in-memory container; opening files and checking
-external revisions continue through full container parsing and validation.
-
+on demand, without changing journal or sync guarantees. In-memory portable
+builders and read-only connections retain their prior setting. Audit records
+remain JSON TEXT; a bounded whitespace reserve permits transactional blob appends.
 
 ## Atomic bulk edits
 

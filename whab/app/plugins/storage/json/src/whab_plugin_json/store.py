@@ -87,7 +87,7 @@ class Store(Authority):
             self._disk_identity = self._identity() if raw is not None else None
             if raw is not None:
                 self._data = codec.decode(raw)
-                if read_only and self._data["formatVersion"] not in {3, 4}:
+                if read_only and self._data["formatVersion"] not in {3, 4, 5}:
                     raise StoreError("Read-only readiness requires the current native JSON schema; upgrade it explicitly first.")
                 if self._data["formatVersion"] == 1:
                     preserve_schema_one(self.path, raw)
@@ -183,7 +183,7 @@ class Store(Authority):
                          for change in entry['changes'] if change['path'][0] == 'categories'
                          for row in (change['before'], change['after']) if row is not None)
         if 'opening_balance' in kinds:
-            candidate = {**candidate, 'formatVersion': 4}
+            candidate = {**candidate, 'formatVersion': max(4, candidate['formatVersion'])}
         raw, candidate = codec.encode(candidate)
         try:
             descriptor, temporary = tempfile.mkstemp(prefix=".whab-json-", dir=self.path.parent)

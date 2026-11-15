@@ -6,6 +6,7 @@ from types import MappingProxyType
 
 import pytest
 from whab_plugin_sqlite import Store
+from whab_plugin_sqlite.portable_journal import read as read_journal
 
 from whab.domain.errors import StoreError
 from whab.domain.file_imports import WorkspaceImport
@@ -24,7 +25,7 @@ def payload(store):
 def altered(payload, statements):
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(payload["budget.sqlite"])
+        connection.deserialize(read_journal(payload["budget.sqlite"])[0])
         for sql, parameters in statements:
             connection.execute(sql, parameters)
         connection.commit()
@@ -57,12 +58,12 @@ def test_binary_roundtrip_preserves_currencies_history_annotations_and_demo_with
     assert files == store.export_budget_files()
     assert set(files) == {"budget.sqlite"}
     raw = files["budget.sqlite"]
-    assert raw.startswith(b"SQLite format 3\x00")
+    assert read_journal(raw)[0].startswith(b"SQLite format 3\x00")
     for forbidden in (b"binary-export-must-not-contain-this-token", b"private-final-cursor"):
         assert forbidden not in raw
     image = sqlite3.connect(":memory:")
     try:
-        image.deserialize(raw)
+        image.deserialize(read_journal(raw)[0])
         assert image.execute("SELECT workspace FROM meta").fetchall() == [("personal",)]
         assert image.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0
         assert image.execute("SELECT COUNT(*) FROM workspace_imports").fetchone()[0] == 0
@@ -198,7 +199,7 @@ def test_money_and_references_are_revalidated_after_reading_database_rows(store,
 def test_constraint_damage_is_rejected_by_database_integrity_check(store, payload):
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(payload["budget.sqlite"])
+        connection.deserialize(read_journal(payload["budget.sqlite"])[0])
         original = connection.execute("SELECT sql FROM sqlite_schema WHERE name='accounts'").fetchone()[0]
         version = connection.execute("PRAGMA schema_version").fetchone()[0]
         connection.execute("PRAGMA writable_schema=ON")

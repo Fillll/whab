@@ -5,6 +5,7 @@ import sqlite3
 import pytest
 from whab_plugin_sqlite import Store, portable
 from whab_plugin_sqlite import store as store_module
+from whab_plugin_sqlite.portable_journal import read as read_journal
 
 from tests.receipt_images import png
 from whab.domain.portable import (
@@ -100,7 +101,7 @@ def test_export_matches_public_restore_data_with_one_full_validation(populated_e
     assert portable.read_files(files, with_receipts=True) == portable.read_files(expected, with_receipts=True)
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(files["budget.sqlite"])
+        connection.deserialize(read_journal(files["budget.sqlite"])[0])
         indexes = {row[0] for row in connection.execute("SELECT name FROM sqlite_schema WHERE type='index'")}
         assert not indexes.intersection(portable._ADDITIVE_INDEXES)
         assert "tx_month" in indexes

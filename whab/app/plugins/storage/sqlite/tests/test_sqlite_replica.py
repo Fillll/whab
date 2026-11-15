@@ -172,12 +172,13 @@ def test_authority_one_upgrade_is_additive_preserves_identity_data_and_receipts(
     source, _ = pair
     request, result = save(source)
     source.save_item("fictional-item", "encrypted-fictional-token", "Fictional Bank")
-    evidence = source.commit_evidence()
     metadata = read_storage_json(source.db.execute("SELECT record FROM storage_authority").fetchone()[0])
     metadata.update(formatVersion=1)
     metadata.pop("replica")
     metadata.pop("promotionId")
     source.db.execute("UPDATE storage_authority SET record=?", (canonical_storage_json(metadata),))
+    evidence = source.commit_evidence()
+    assert evidence.digest_version == 1
     path = source.database_path
     close(source)
     reopened = Store(path)

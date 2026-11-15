@@ -1499,3 +1499,66 @@ Native SQLite/JSON advertise optional `ClassifiedReview`; the public `review_pol
 query probes the authority. Unsupported storage/remote authorities fail before
 classification/review writes. Financial rules remain in core; adapters retain
 atomic persistence, annotations, original/import records and native receipts.
+
+
+## Incremental integrity
+
+WHAB 2.81 adds `CommitEvidence.digest_version` and
+`ReplicaWatermark.digest_version`. Omitted fields mean version 1 and retain the
+exact previous wire encoding and canonical SHA-256 calculation. Version 2 uses
+the deterministic Merkle format in
+[`domain/integrity.py`](../app/src/whab/domain/integrity.py). Evidence always binds
+the algorithm as well as its root: same-generation receipts, local transfers and
+copy watermarks must match both. Unknown versions fail before mutation. Older
+receipts remain valid after a later generation adopts version 2.
+
+The version-2 format hashes logical values with SHA-256 and the following binary
+domain separators. Canonical JSON is UTF-8, sorted keys, compact separators and
+literal Unicode (`ensure_ascii=False`); financial/schema validation still precedes
+untrusted hashing. Integers and strings retain their exact values.
+
+- A scalar hashes byte `01` followed by its canonical JSON.
+- An object containing `id` is one record leaf: byte `06`, then its complete
+  canonical JSON. Editing a field replaces that record's leaf.
+- Other objects sort their keys. Each field hashes byte `04`, the canonical
+  JSON key's byte length as an unsigned eight-byte big-endian integer, those key
+  bytes, and the child hash. The object hashes byte `03`, its eight-byte field
+  count and the binary tree root of its ordered field hashes.
+- Arrays hash byte `02`, their eight-byte element count and the binary tree root
+  of their ordered child hashes. Tuple-backed trusted views have the same form.
+- A binary tree pads to the next power of two, with a minimum capacity of one.
+  Its empty leaves are `SHA256(UTF8("whab-merkle-v2:empty"))`; each parent hashes
+  byte `05` followed by its two child hashes. All interior hashes use raw
+  32-byte digests; the public root is lowercase hexadecimal.
+
+Native version-2 evidence is the root of the two financial/protected record
+envelopes, in that order. `local_state_digest(..., version=2)` independently
+validates bounded JSON and computes the same root;
+`native_records_digest(..., version=2, hasher=..., selections=...)` permits a
+trusted adapter to retain immutable trees. Selected record replacements update
+only their ancestor paths. Arrays retain counts and ordering; insertions,
+unknown writes and invalidated native generations rebuild. Cached hashes are
+not persistent authority and never bypass schema validation on reopen.
+
+SQLite adopts native metadata format 5 in the same commit as its next financial
+mutation, without changing identity or advancing the revision merely on open.
+It retains format-1 evidence for an untouched older native generation. JSON
+native format 5 supports version-2 local transfers and copies, preserving the
+source version through promotion and subsequent writes. Older native readers
+reject these new formats; upgrade the stopped host and selected storage plugin
+together. This is not a storage-backend migration.
+
+Financial journal format 2 retains every existing format-1 entry and its hash.
+New Merkle entries carry `digestVersion: 2`; `beforeDigest` and `afterDigest` use
+the version-2 financial snapshot root. Entry `hash` and `previousHash` retain
+canonical SHA-256 chaining. At an algorithm transition, validation recomputes the
+preceding financial state under the new algorithm rather than equating different
+hash formats. Independent reopen, history export, undo/redo and guarded restore
+validate the mixed chain. No audit entry is pruned or rewritten to migrate it.
+
+`replay_portable_entries(snapshot, entries)` independently validates bounded
+replacement-only account/transaction audit additions and their final financial
+state. Storage adapters may pass `trusted_base=True` only for a detached base
+snapshot they have already fully validated. New identities, deletions, malformed
+chains, snapshot entries and mismatched before-values are rejected; unsupported
+operations require the owning storage's complete snapshot path.

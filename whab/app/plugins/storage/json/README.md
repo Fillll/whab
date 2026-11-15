@@ -512,3 +512,16 @@ Provider removal/pending replacement continues the existing import contract, so
 inspect subsequent imported changes before another correction. No bank sync runs
 as part of an edit, creation, preview, retry or audit reversal. Existing annotation
 `edit_transactions` batches and their output shape remain compatible.
+
+
+## Versioned integrity compatibility
+
+JSON 1.21 supports WHAB 2.81's
+[versioned integrity records](../../../../docs/plugins.md#incremental-integrity).
+Existing JSON generations retain their canonical SHA-256 evidence. An explicit
+local transfer or copy from a Merkle source retains that source's algorithm in
+native format 5, including receipts, copy watermarks, reopen and promotion.
+Subsequent writes preserve that version and mixed financial audit history.
+Older JSON readers reject format 5 rather than misinterpret its evidence. Update
+the stopped host and storage plugin together; opening a budget alone does not
+advance its financial generation or silently select another backend.

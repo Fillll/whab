@@ -52,6 +52,15 @@ def digest(value):
                              separators=(',', ':'), allow_nan=False).encode()).hexdigest()
 
 
+def state_digest(value, version=1):
+    if version == 2:
+        from .integrity import merkle_digest
+        return merkle_digest(value)
+    if version != 1:
+        raise StoreError('Unsupported history integrity version.')
+    return digest(value)
+
+
 def label(value, *, nullable=False, limit=100):
     if value is None and nullable:
         return value
@@ -134,8 +143,8 @@ def _change(change):
             raise StoreError('Invalid original history fields.')
 
 
-def validate_history(value):
-    if type(value) is not dict or value.keys() != {'formatVersion', 'baseline', 'entries'} or type(value['formatVersion']) is not int or value['formatVersion'] != 1:
+def validate_history(value, *, final_snapshot=None):
+    if type(value) is not dict or value.keys() != {'formatVersion', 'baseline', 'entries'} or type(value['formatVersion']) is not int or value['formatVersion'] not in {1, 2}:
         raise StoreError('Invalid budget history.')
     if type(value['entries']) is not list:
         raise StoreError('Invalid budget history entries.')
@@ -144,10 +153,11 @@ def validate_history(value):
     baseline = financial(value['baseline'])
     previous = digest(baseline)
     previous_state_digest = previous
+    previous_version = 1
     rows = flatten(baseline)
     seen = set()
     for entry in value['entries']:
-        if type(entry) is not dict or not _ENTRY_FIELDS <= entry.keys() or entry.keys() - _ENTRY_FIELDS - {'snapshot'}:
+        if type(entry) is not dict or not _ENTRY_FIELDS <= entry.keys() or entry.keys() - _ENTRY_FIELDS - ({'snapshot', 'digestVersion'} if value['formatVersion'] == 2 else {'snapshot'}):
             raise StoreError('Invalid history entry fields.')
         label(entry['id'], limit=200)
         if entry['id'] in seen or entry['previousHash'] != previous:
@@ -162,36 +172,49 @@ def validate_history(value):
             raise StoreError('Invalid history entry.')
         for change in entry['changes']:
             _change(change)
+        version = entry.get('digestVersion', 1)
+        if type(version) is not int or version not in {1, 2}:
+            raise StoreError('Unsupported history integrity version.')
+        if version != previous_version:
+            previous_state_digest = state_digest(unflatten(rows), version)
         if entry['beforeDigest'] != previous_state_digest:
             raise StoreError('Budget history state chain is inconsistent.')
         _apply(rows, entry['changes'], inverse=False)
         previous_state_digest = entry['afterDigest']
+        previous_version = version
         if any(type(entry[k]) is not str or len(entry[k]) != 64 or any(c not in '0123456789abcdef' for c in entry[k]) for k in ('beforeDigest', 'afterDigest', 'hash')):
             raise StoreError('Invalid history digest.')
         if 'snapshot' in entry:
-            if type(entry['snapshot']) is not dict or 'history' in entry['snapshot'] or digest(financial(entry['snapshot'])) != entry['afterDigest']:
+            if type(entry['snapshot']) is not dict or 'history' in entry['snapshot'] or state_digest(financial(entry['snapshot']), version) != entry['afterDigest']:
                 raise StoreError('Invalid history snapshot.')
         if digest({k: v for k, v in entry.items() if k != 'hash'}) != entry['hash']:
             raise StoreError('Budget history entry checksum does not match.')
         previous = entry['hash']
-    if digest(unflatten(rows)) != previous_state_digest:
+    if final_snapshot is not None and rows != flatten(final_snapshot):
+        raise StoreError('Budget history does not match the final financial state.')
+    if state_digest(unflatten(rows), previous_version) != previous_state_digest:
         raise StoreError('Budget history final state digest does not match.')
-    return {'formatVersion': 1, 'baseline': baseline, 'entries': deepcopy(value['entries'])}
+    return {'formatVersion': value['formatVersion'], 'baseline': baseline, 'entries': deepcopy(value['entries'])}
 
 
-def append(journal, before, after, metadata=None, *, trusted=False, before_digest=None, after_digest=None, changes=None):
+def append(journal, before, after, metadata=None, *, trusted=False, before_digest=None, after_digest=None, changes=None, digest_version=None):
     if not trusted:
         before, after = financial(before), financial(after)
     changes = difference(before, after) if changes is None else changes
     info = context(metadata)
     if not changes and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
         return journal
+    digest_version = digest_version or (2 if journal and journal['formatVersion'] == 2 else 1)
     journal = {**journal, 'entries': list(journal['entries'])} if journal else {'formatVersion': 1, 'baseline': deepcopy(before), 'entries': []}
-    before_digest = before_digest or digest(before)
+    if digest_version == 2:
+        journal['formatVersion'] = 2
+    before_digest = before_digest or state_digest(before, digest_version)
     entry = {'id': str(uuid4()), 'time': datetime.now(timezone.utc).isoformat(), **info,
-             'changes': changes, 'beforeDigest': before_digest, 'afterDigest': after_digest or digest(after),
+             'changes': changes, 'beforeDigest': before_digest, 'afterDigest': after_digest or state_digest(after, digest_version),
              'reversible': info['operation'] in REVERSIBLE,
-             'previousHash': journal['entries'][-1]['hash'] if journal['entries'] else before_digest}
+             'previousHash': journal['entries'][-1]['hash'] if journal['entries'] else digest(journal['baseline'])}
+    if digest_version != 1:
+        entry['digestVersion'] = digest_version
     if info['action'] == 'snapshot' or (len(journal['entries']) + 1) % 1000 == 0:
         entry['snapshot'] = deepcopy(after)
     entry['hash'] = digest(entry)
@@ -262,7 +285,7 @@ def preview(journal, current, action, target):
     entries = journal['entries']
     if action == 'restore':
         expected = entries[-1]['afterDigest'] if entries else digest(journal['baseline'])
-        if digest(current) != expected:
+        if state_digest(current, entries[-1].get('digestVersion', 1) if entries else 1) != expected:
             raise StoreError('Unrecorded import or external changes prevent restoration. Export the historical snapshot for inspection instead.')
         ids = [e['id'] for e in entries]
         if target != 'baseline' and target not in ids:
@@ -338,9 +361,11 @@ def apply_to_state(state, wanted):
         state['categoryGroups'] = candidate['categoryGroups']
 
 
-def record_financial(journal, before, after, metadata=None, *, digest_snapshot=digest, changes=None, transactions_sorted=False):
+def record_financial(journal, before, after, metadata=None, *, digest_snapshot=None, changes=None, transactions_sorted=False, digest_version=None):
     """Commit adapters supply detached allowlisted snapshots from one native transaction."""
     info = context(metadata)
+    digest_version = digest_version or (2 if journal and journal['formatVersion'] == 2 else 1)
+    digest_snapshot = digest_snapshot or (lambda value: state_digest(value, digest_version))
     old, new = (financial(value, trusted=True, transactions_sorted=transactions_sorted) for value in (before, after))
     unchanged = not changes if changes is not None else old == new
     if unchanged and info['action'] != 'snapshot' and info['operation'] not in {'apply_sync', 'save_receipt', 'delete_receipt', 'import_workspace'}:
@@ -351,11 +376,13 @@ def record_financial(journal, before, after, metadata=None, *, digest_snapshot=d
     if journal:
         last = journal['entries'][-1] if journal['entries'] else None
         expected = last['afterDigest'] if last else digest(journal['baseline'])
+        previous_version = last.get('digestVersion', 1) if last else 1
         old_digest = digest_snapshot(old)
-        if old_digest != expected:
+        comparison = old_digest if previous_version == digest_version else state_digest(old, previous_version)
+        if comparison != expected:
             previous = snapshot_at(journal, last['id'] if last else 'baseline')
-            journal = append(journal, previous, old, {'actor': 'System', 'actorKind': 'system', 'operation': 'import_workspace'})
-    return append(journal, old, new, info, trusted=True, before_digest=old_digest, after_digest=digest_snapshot(new), changes=changes)
+            journal = append(journal, previous, old, {'actor': 'System', 'actorKind': 'system', 'operation': 'import_workspace'}, digest_version=digest_version)
+    return append(journal, old, new, info, trusted=True, before_digest=old_digest, after_digest=digest_snapshot(new), changes=changes, digest_version=digest_version)
 
 
 def record_states(before, after, metadata=None):
@@ -383,3 +410,37 @@ def apply_request(state, action, target, fingerprint, metadata=None):
         raise StoreError('Budget changed since this preview. Preview the history operation again.')
     apply_to_state(state, result['state'])
     return {'action': action, 'target': target, 'changeCount': len(result['changes'])}
+
+
+def replay_portable_entries(snapshot, entries, *, trusted_base=False):
+    """Validate a portable snapshot plus exact replacement-only audit entries.
+
+    Portable storage may append these records to a sanitized base. This pure
+    reader checks the complete chain and final financial state independently;
+    it never runs stored SQL or accepts new/deleted record identities.
+    """
+    snapshot = snapshot if trusted_base else validate_portable_budget(snapshot)
+    if type(entries) is not list:
+        raise StoreError('Portable history additions must be a list.')
+    if not entries:
+        return snapshot
+    baseline = financial({key: list(value) if type(value) is list else value
+                          for key, value in snapshot.items() if key != 'history'}, trusted=True)
+    journal = snapshot.get('history') or {'formatVersion': 1, 'baseline': baseline, 'entries': []}
+    rows = flatten(baseline)
+    for entry in entries:
+        if type(entry) is not dict or type(entry.get('changes')) is not list or 'snapshot' in entry:
+            raise StoreError('Unsupported portable history addition.')
+        for change in entry['changes']:
+            _change(change)
+            if (change['path'][0] not in {'accounts', 'transactions'}
+                    or change['before'] is None or change['after'] is None):
+                raise StoreError('Unsupported portable history replacement.')
+        _apply(rows, entry['changes'], inverse=False)
+    journal = {**journal, 'formatVersion': max(journal['formatVersion'], 2 if any(entry.get('digestVersion') == 2 for entry in entries) else 1),
+               'entries': [*journal['entries'], *deepcopy(entries)]}
+    result = {key: value for key, value in snapshot.items() if key != 'history'}
+    for section in ('accounts', 'transactions'):
+        result[section] = [deepcopy(rows[(section, row['id'])]) for row in snapshot[section]]
+    result = validate_portable_budget(result)
+    return {**result, 'history': validate_history(journal, final_snapshot=result)}

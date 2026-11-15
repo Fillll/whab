@@ -28,6 +28,7 @@ from .help import (
 )
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 from .transaction_change_help import CHANGE_HELP
+from .transfer_help import TRANSFER_HELP
 lazy from . import client
 lazy from .account_commands import account_table, add_account_parser, execute_account
 lazy from .bank_commands import add_bank_parser, bank_error, bank_request
@@ -51,7 +52,6 @@ lazy from .transaction_search import (
     validate_search,
 )
 lazy from .transfer_commands import (
-    TRANSFER_HELP,
     add_transfer_parsers,
     execute_transfer,
     transfer_table,
@@ -131,18 +131,33 @@ def parser(options, argv=()):
     if requested in (None, "transactions", "trnx"):
         transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit/create transactions; atomic splits and annotations; review transfers", epilog=TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + CHANGE_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
         reads = transactions.add_subparsers(dest="filter", required=True)
-        unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
-            epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
-        unreviewed.add_argument("--month", help="Limit to YYYY-MM; default: all history")
-        add_uncategorized_parser(reads)
-        add_search_parser(reads, catalog)
-        add_category_parsers(reads)
-        add_note_parser(reads)
-        add_change_parsers(reads)
-        from .review_commands import add_review_parsers
-        add_review_parsers(reads)
-        add_edit_many(reads)
-        add_transfer_parsers(reads)
+        action = argv[3] if requested in {"transactions", "trnx"} and len(argv) > 3 else None
+        known = {"non-reviewed", "unreviewed", "uncategorized", "uncategorised", "list",
+                 "categories", "categorize", "categorise", "note", "edit", "create",
+                 "review", "review-audit", "edit-many", "transfers", "match-transfer", "unmatch-transfer"}
+        if action not in known:
+            action = None
+        if action in (None, "non-reviewed", "unreviewed"):
+            unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
+                epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
+            unreviewed.add_argument("--month", help="Limit to YYYY-MM; default: all history")
+        if action in (None, "uncategorized", "uncategorised"):
+            add_uncategorized_parser(reads)
+        if action in (None, "list"):
+            add_search_parser(reads, catalog)
+        if action in (None, "categories", "categorize", "categorise"):
+            add_category_parsers(reads)
+        if action in (None, "note"):
+            add_note_parser(reads)
+        if action in (None, "edit", "create"):
+            add_change_parsers(reads)
+        if action in (None, "review", "review-audit"):
+            from .review_commands import add_review_parsers
+            add_review_parsers(reads)
+        if action in (None, "edit-many"):
+            add_edit_many(reads)
+        if action in (None, "transfers", "match-transfer", "unmatch-transfer"):
+            add_transfer_parsers(reads)
     groups.add_parser("api", help="Advanced local operations; use whab api --help")
     return root
 
