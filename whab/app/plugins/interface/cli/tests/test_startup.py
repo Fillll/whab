@@ -71,3 +71,26 @@ def test_unknown_transaction_action_retains_complete_discovery(capsys):
     diagnostic = capsys.readouterr().err
     for action in ('list', 'categorize', 'edit-many', 'note', 'review', 'match-transfer'):
         assert action in diagnostic
+
+
+@pytest.mark.parametrize('arguments,selected', [
+    (['BUDGET', 'bank', 'trnx', 'list', '--merchant', 'plugin'], {'cli'}),
+    (['BUDGET', 'Fictional', 'trnx', 'categorize', 'import', '--category', 'bank'], {'cli'}),
+    (['BUDGET', 'Fictional', 'account', 'show', 'plugin'], {'cli'}),
+    (['budget', 'create', 'bank'], {'cli'}),
+    (['BUDGET', 'Fictional', 'bank', 'connections', 'plaid'], None),
+    (['BUDGET', 'Fictional', 'import', 'ynab', 'preview'], None),
+    (['BUDGET', 'Fictional', 'plugin', 'list'], None),
+    (['plugin', 'list'], None),
+])
+def test_document_discovery_uses_command_positions_not_user_values(monkeypatch, arguments, selected):
+    requested = []
+    installed = console.installed_catalog
+
+    def catalog(**kwargs):
+        requested.append(kwargs['document_plugins'])
+        return installed(**kwargs)
+
+    monkeypatch.setattr(console, 'installed_catalog', catalog)
+    console.parser(console.options_parser(), arguments)
+    assert requested == [selected]

@@ -1924,7 +1924,7 @@
     {
       "name": "Storage.export_budget_file_changes",
       "kind": "sdk",
-      "summary": "Return complete sanitized files or bounded offset patches bound to exact previous and resulting SHA-256 hashes.",
+      "summary": "Return complete sanitized snapshot journals or bounded append/offset patches bound to exact previous and resulting SHA-256 hashes. Portable format 2 includes all acknowledged financial changes and remains readable without a sidecar.",
       "input": {
         "type": "object",
         "description": "Storage-owned SDK arguments for one workspace.",

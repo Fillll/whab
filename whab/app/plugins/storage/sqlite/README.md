@@ -251,7 +251,11 @@ new native metadata instead of modifying a state they cannot verify. See the
 [versioned integrity contract](../../../../docs/plugins.md#incremental-integrity).
 
 Classifications that affect account metadata update selected rows using core
-rules. Currency and lifecycle changes retain complete-history validation. Atomic
+rules. An explicit budget-scope value does not force a full ledger rewrite.
+The transfer guard reads at most one confirmed-transfer witness per addressed
+account through a partial native index; explicit and implicit scope changes still
+require unmatching confirmed transfers first. Currency and lifecycle changes
+retain complete-history validation. Atomic
 transaction and account batches share one native transaction, revision, receipt,
 audit entry and checkpoint; `--batch` remains only a history grouping label.
 

@@ -42,6 +42,7 @@ FIXTURE_FORMAT = 'whab-fictional-cli-performance-1'
 
 def source_identity():
     return {'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+            'source_diff_sha256': sha256(subprocess.check_output(['git', 'diff', '--binary', 'HEAD'])).hexdigest(),
             'versions': {name: version(name) for name in ('whab', 'whab_plugin_cli', 'whab_plugin_sqlite')}}
 
 
@@ -145,6 +146,7 @@ def main():
     if args.prepare_fixtures:
         print(write_fixtures(args.prepare_fixtures, sizes, max(100, args.runs)))
         return
+    initial_source = source_identity()
     samples, cold = {}, {}
     executable = str(Path(sys.executable).parent / 'whab')
     with TemporaryDirectory(prefix='whab-cli-matrix-') as directory:
@@ -263,8 +265,10 @@ def main():
         report[key] = {'n': len(rows), 'median_ms': round(median(times), 2),
                        'p95_ms': round(times[math.ceil(.95 * len(times)) - 1], 2),
                        'max_ms': round(max(times), 2), 'samples': rows}
-    source_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
-    print(json.dumps({'source_commit': source_commit, 'python': platform.python_version(), 'platform': platform.platform(), 'logical_cpus': os.cpu_count(),
+    final_source = source_identity()
+    print(json.dumps({'source_commit': final_source['source_commit'], 'source_before': initial_source,
+                      'source_after': final_source, 'source_changed_during_run': initial_source != final_source,
+                      'python': platform.python_version(), 'platform': platform.platform(), 'logical_cpus': os.cpu_count(),
                       'versions': {name: version(name) for name in ('whab', 'whab_plugin_cli', 'whab_plugin_sqlite')},
                       'transactions': sizes, 'accounts': max(100, args.runs), 'categories': 57, 'runs': args.runs,
                       'seed': 20261110, 'cold': cold, 'saved_results_verified': True, 'commands': report}, indent=2))

@@ -82,3 +82,25 @@ def test_mixed_history_preserves_old_hashes_and_rejects_transition_tampering():
         history.validate_history(broken)
     with pytest.raises(StoreError):
         history.state_digest(second, 3)
+
+
+def test_verified_seed_preserves_source_tree_and_requires_exact_content():
+    rows = [{'id': str(i), 'note': ''} for i in range(100)]
+    source = integrity.MerkleHasher()
+    source_value = {'transactions': rows}
+    source_root = source.digest(source_value)
+    target = integrity.MerkleHasher()
+    copied = deepcopy(rows)
+    assert target.seed_array(('transactions',), copied, source, ('transactions',))
+    changed = copied.copy()
+    changed[50] = {**copied[50], 'note': 'fictional edit'}
+    actual = target.digest({'transactions': changed}, selections={('transactions',): {50}})
+    assert actual == integrity.merkle_digest({'transactions': changed})
+    assert source.digest(source_value) == source_root
+    assert not target.seed_array(('transactions',), changed, source, ('transactions',))
+    assert not target.seed_array(('missing',), rows, source, ('missing',))
+    baseline = deepcopy(source_value)
+    assert target.seed_immutable(('history', 'baseline'), baseline, source.last)
+    assert target.digest({'history': {'baseline': baseline}}) == integrity.merkle_digest({'history': {'baseline': baseline}})
+    assert not target.seed_immutable(('history', 'baseline'), {'changed': True}, source.last)
+    assert not target.seed_immutable(('history', 'baseline'), baseline, None)

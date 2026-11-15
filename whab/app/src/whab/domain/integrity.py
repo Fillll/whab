@@ -66,13 +66,33 @@ class MerkleHasher:
         self.arrays = {}
         self.immutable = {}
         self.selections = {}
+        self.last = None
 
     def digest(self, value, *, selections=None, limit=None):
         self.selections = selections or {}
-        value, size = self._node(value, ())
+        root, size = self._node(value, ())
         if limit is not None and size > limit:
             raise StoreError('Native storage state exceeds the supported bounds.')
-        return value.hex()
+        self.last = (value, (root, size))
+        return root.hex()
+
+    def seed_array(self, path, rows, source, source_path):
+        """Copy a verified tree only after exact immutable-record equality."""
+        cached = source.arrays.get(source_path)
+        if cached is None or rows != cached[0]:
+            return False
+        tree = SequenceTree.__new__(SequenceTree)
+        tree.count, tree.capacity = cached[1].count, cached[1].capacity
+        tree.nodes = cached[1].nodes.copy()
+        self.arrays[path] = (rows, tree, cached[2].copy(), cached[3], cached[4])
+        return True
+
+    def seed_immutable(self, path, value, verified):
+        """Reuse a computed complete node only after exact value equality."""
+        if verified is None or value != verified[0]:
+            return False
+        self.immutable[path] = (value, verified[1])
+        return True
 
     def _node(self, value, path):
         if path and path[-1] == 'baseline':

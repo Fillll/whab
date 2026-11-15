@@ -28,7 +28,6 @@ from whab.plugins.storage_transfer import (
     encode_local_state,
     evidence_record,
     native_records_digest,
-    native_state_digest,
     native_state_records,
     operation_limit,
     read_evidence,
@@ -200,7 +199,6 @@ class Authority:
         metadata = metadata or self._authority_metadata()
         version = 2 if metadata['formatVersion'] >= 5 else 1
         if getattr(self, '_evidence_stamp', None) != stamp or getattr(self, '_evidence_version', None) != version:
-            from .evidence import SnapshotEncoder
             transaction = self._writing
             selected = transaction.get('selected') if transaction is not None else None
             reusable = (selected is not None and selected[0] in transaction.get('history_after', {})
@@ -225,30 +223,32 @@ class Authority:
                 workspaces = financial_records['workspaces']
                 records = ({**financial_records, 'workspaces': {**workspaces, name: {**workspaces[name], 'ledger': ledger}}}, protected)
             else:
-                self._snapshot_encoder = SnapshotEncoder()
-                records = []
-                def capture(value, *, limit):
-                    records.append(value)
-                    return self._snapshot_encoder.chunks(value, limit=limit)
-            self._snapshot_encoder.begin(transaction_ids=selected[1] if reusable else None)
+                records = native_state_records(self._local_states())
             if version == 2:
                 from whab.domain.integrity import MerkleHasher
-                if not reusable:
-                    records = native_state_records(self._local_states())
+                if not reusable or getattr(self, '_evidence_version', None) != 2 or getattr(self, '_native_merkle', None) is None:
                     self._native_merkle = MerkleHasher()
-                if not hasattr(self, '_native_merkle'):
-                    self._native_merkle = MerkleHasher()
+                # A migrated native generation no longer retains a second full
+                # canonical-byte cache alongside its Merkle nodes.
+                self._snapshot_encoder = None
                 selections = None
                 if reusable:
                     positions = self._history_positions(selected[0], ledger['transactions'])
                     selections = {(0, 'workspaces', selected[0], 'ledger', 'transactions'): {positions[key] for key in selected[1]}}
-                self._evidence_digest = native_records_digest(records, chunks=self._snapshot_encoder.chunks, version=2,
+                    baseline = (ledger.get('history') or {}).get('baseline')
+                    verified = transaction.get('history_baselines', {}).get(name)
+                    if baseline is not None and verified is not None:
+                        self._native_merkle.seed_immutable((0, 'workspaces', name, 'ledger', 'history', 'baseline'), baseline, verified)
+                self._evidence_digest = native_records_digest(records, chunks=None, version=2,
                                                               hasher=self._native_merkle, selections=selections)
             else:
-                self._evidence_digest = (native_records_digest(records, chunks=self._snapshot_encoder.chunks) if reusable
-                                         else native_state_digest(self._local_states(), chunks=capture))
+                from .evidence import SnapshotEncoder
+                if not reusable or getattr(self, '_snapshot_encoder', None) is None:
+                    self._snapshot_encoder = SnapshotEncoder()
+                self._snapshot_encoder.begin(transaction_ids=selected[1] if reusable else None)
+                self._evidence_digest = native_records_digest(records, chunks=self._snapshot_encoder.chunks)
+                self._snapshot_encoder.finish()
             self._evidence_version = version
-            self._snapshot_encoder.finish()
             self._native_records = records
             self._native_state_stamp = stamp
             self._evidence_stamp = stamp
@@ -351,10 +351,6 @@ class Authority:
                             new = snapshot(self, name)
                         if not transaction.get("history_restore"):
                             original_journal = new.get("history") or old.get("history")
-                            from .evidence import SnapshotEncoder
-                            if not hasattr(self, '_history_encoder') or name not in cached:
-                                self._history_encoder = SnapshotEncoder(ensure_ascii=True)
-                            self._history_encoder.begin(transaction_ids=selected if name in cached else None, scope=name)
                             previous_digest = (getattr(self, '_history_digest_heads', {}).get(name)
                                                if name in cached and original_journal and original_journal['formatVersion'] == 2 else None)
                             def digest_snapshot(value):
@@ -365,11 +361,18 @@ class Authority:
                                 ):
                                     return previous_digest[1]
                                 from whab.domain.integrity import MerkleHasher
-                                if not hasattr(self, '_history_merkle') or name not in cached:
-                                    self._history_merkle = {}
-                                hasher = self._history_merkle.setdefault(name, MerkleHasher())
+                                hasher = self._history_merkle.get(name)
+                                if hasher is None:
+                                    hasher = self._history_merkle[name] = MerkleHasher()
+                                    native = getattr(self, '_native_merkle', None)
+                                    if (native is not None and getattr(self, '_native_state_stamp', None) == stamp
+                                            and getattr(self, '_evidence_version', None) == 2):
+                                        hasher.seed_array(('transactions',), value['transactions'], native,
+                                                          (0, 'workspaces', name, 'ledger', 'transactions'))
                                 selections = {('transactions',): {positions[key] for key in selected}} if selected is not None else None
                                 result = hasher.digest(value, selections=selections, limit=MAX_LOCAL_TRANSFER_BYTES)
+                                if original_journal is None:
+                                    transaction.setdefault('history_baselines', {}).setdefault(name, hasher.last)
                                 transaction.setdefault('history_digests', {})[name] = (value, result)
                                 return result
                             bounded_changes = None
@@ -377,7 +380,6 @@ class Authority:
                                 from whab.domain.history import difference
                                 bounded_changes = difference({**old, 'transactions': old_rows}, {**new, 'transactions': list(changed.values())})
                             journal = record_financial(original_journal, old, new, info, digest_snapshot=digest_snapshot, changes=bounded_changes, transactions_sorted=selected is not None, digest_version=2)
-                            self._history_encoder.finish()
                             if journal is not None:
                                 new["history"] = journal
                                 if journal is not original_journal:
@@ -428,10 +430,8 @@ class Authority:
                 self._history_blob_positions = {}
                 if hasattr(self, '_native_merkle'):
                     del self._native_merkle
-                if hasattr(self, '_history_merkle'):
-                    del self._history_merkle
-                if hasattr(self, '_history_encoder'):
-                    del self._history_encoder
+                self._history_merkle = {}
+                self._history_digest_heads = {}
                 if self.db.in_transaction:
                     self.db.execute("ROLLBACK")
                 elif attempted and transaction is not None:

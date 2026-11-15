@@ -787,11 +787,24 @@ class Store(Authority):
         return self._mutate(workspace, lambda state: commands.add_account(state, account_id, account))
 
     def update_account(self, workspace: str, account_id: str, changes: dict) -> None:
-        if type(changes) is not dict or changes.keys() & {"currency", "closed", "onBudget"}:
+        if type(changes) is not dict or changes.keys() & {"currency", "closed"}:
             self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
             return
         with self._authority_write(workspace=workspace, transaction_ids=()) as write:
             state = {"accounts": {row["id"]: row for row in self._read_accounts(workspace)}, "transactions": {}}
+            if account_id in state['accounts'] and changes.keys() & {'type', 'onBudget'}:
+                # One real paired row suffices for the core's scope guard, including
+                # implicit scope changes caused by a type change. Other transaction
+                # fields cannot affect this metadata-only operation.
+                paired = self.db.execute(
+                    'SELECT id,account_id,transfer_peer_id FROM transactions '
+                    'WHERE workspace=? AND account_id=? AND transfer_peer_id IS NOT NULL LIMIT 1',
+                    (workspace, account_id),
+                ).fetchone()
+                if paired is not None:
+                    state['transactions'][paired['id']] = {
+                        'accountId': paired['account_id'], 'transferPeerId': paired['transfer_peer_id'],
+                    }
             commands.update_account(state, account_id, changes)
             row = state["accounts"][account_id]
             self.db.execute("UPDATE accounts SET name=?,type=?,on_budget=?,subtype=?,bank_website=?,name_overridden=? WHERE workspace=? AND id=?",

@@ -125,7 +125,8 @@ def encode(value):
             bodies.append(item)
             return ["bytes", offset, len(item), hashlib.sha256(item).hexdigest()]
         if type(item).__name__ in _RECORDS and type(item) is _RECORDS[type(item).__name__]:
-            return ["record", type(item).__name__, {field.name: pack(getattr(item, field.name), depth + 1) for field in fields(item)}]
+            return ["record", type(item).__name__, {field.name: pack(getattr(item, field.name), depth + 1) for field in fields(item)
+                                                    if field.name != "digest_version" or item.digest_version != 1}]
         if type(item) is dict:
             if any(type(key) is not str for key in item):
                 raise WireError()
@@ -187,7 +188,9 @@ def decode(raw):
             return result
         if len(item) == 3 and kind == "record" and type(item[1]) is str and item[1] in _RECORDS and type(item[2]) is dict:
             record = _RECORDS[item[1]]
-            if item[2].keys() != {field.name for field in fields(record)}:
+            names = {field.name for field in fields(record)}
+            allowed = (names, names - {"digest_version"}) if record in {CommitEvidence, ReplicaWatermark} else (names,)
+            if item[2].keys() not in allowed:
                 raise WireError()
             return record(**{key: unpack(row, depth + 1) for key, row in item[2].items()})
         raise WireError()

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.0 — 2026-11-15
+
+PR: [#211](https://github.com/Fillll/whab/pull/211)
+
+- Preserve versioned logical integrity across native local imports and copies from SQLite, retaining legacy evidence and exact durable receipts. Read native format 5 and reject mismatched receipt and copy integrity versions.
+
 ## 1.20.0 — 2026-11-14
 
 PR: [#204](https://github.com/Fillll/whab/pull/204)

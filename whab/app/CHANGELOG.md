@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.81.0 — 2026-11-15
+
+PR: [#211](https://github.com/Fillll/whab/pull/211)
+
+- Add versioned incremental state and audit integrity with compatible old receipts, explicit algorithm evidence, independent transfer/copy verification and first-write migration. Preserve stale-revision refusal and exact replay across restarts.
+- Verify appended portable payloads using independent SHA-256 prefix state and retain synchronous complete-file saves. Extend fictional performance benchmarks with identical input seeds and saved-file, history and retry proofs.
+
 ## 2.80.0 — 2026-11-15
 
 PR: [#208](https://github.com/Fillll/whab/pull/208)

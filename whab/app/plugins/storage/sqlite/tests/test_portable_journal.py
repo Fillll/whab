@@ -66,6 +66,23 @@ def test_edits_append_only_suffixes_and_complete_file_reopens_with_history_and_r
         reopened.close()
 
 
+def test_first_audited_edit_appends_to_validated_legacy_ledger_without_rebuilding(saved, monkeypatch):
+    store, _, ids = saved
+    # An old ledger may have complete financial records but no audit history.
+    store.db.execute("DELETE FROM budget_history WHERE workspace='personal'")
+    original = store.export_budget_files()['budget.sqlite']
+    assert 'history' not in portable.read_files({'budget.sqlite': original})
+    request(store, ids[0], 'First audited note', 'first-legacy-edit')
+    def no_rebuild(*args, **kwargs):
+        raise AssertionError('A verified initial snapshot must not be rebuilt')
+    with monkeypatch.context() as patch:
+        patch.setattr(store, 'export_budget', no_rebuild)
+        saved = store.export_budget_files()['budget.sqlite']
+    assert saved.startswith(original)
+    assert len(journal.read(saved)[1]) == 1
+    assert portable.read_files({'budget.sqlite': saved}) == store.export_budget('personal')
+
+
 def test_reordered_or_repeated_valid_frames_cannot_replay_against_another_history(saved):
     store, _, ids = saved
     original = store.export_budget_files()['budget.sqlite']

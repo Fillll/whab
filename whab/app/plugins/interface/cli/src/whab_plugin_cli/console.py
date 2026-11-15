@@ -69,7 +69,8 @@ def parser(options, argv=()):
     requested = argv[2] if len(argv) > 2 and argv[0] == "BUDGET" else None
     if requested not in {"account", "category", "plugin", "bank", "history", "import", "insights", "transactions", "trnx"}:
         requested = None
-    selected = None if any(token in argv for token in ("bank", "import", "plugin")) else {"cli"}
+    discovery = requested in {"bank", "import", "plugin"} or bool(argv) and argv[0] == "plugin"
+    selected = None if discovery else {"cli"}
     catalog = installed_catalog(document_plugins=selected, include_versions=False)
     check_identifiers(catalog)
     root = CommandParser(prog="whab", parents=[options],

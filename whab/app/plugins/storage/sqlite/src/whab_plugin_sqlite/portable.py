@@ -11,7 +11,7 @@ from .store import Store
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
 _FORMAT_VERSION = 1
-_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent")
+_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent", "tx_confirmed_transfer_account")
 _ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000, "budget_history": 1}
 
 
@@ -55,7 +55,10 @@ def _build_image(raw, previous, journal, hints):
     """Append audited changes to a sanitized snapshot, compacting when bounded."""
     from .portable_journal import append
     entries = journal.get('entries', []) if journal else []
-    positions = [i for i, entry in enumerate(entries) if entry['hash'] == previous]
+    # A verified sanitized base without audit entries is the initial baseline.
+    # Replay creates that same baseline from its validated financial snapshot;
+    # the first financial edit needs only its entry, not a second full image.
+    positions = [-1] if previous is None else [i for i, entry in enumerate(entries) if entry['hash'] == previous]
     if len(positions) != 1:
         return None
     frames = hints.get('frames', 0)

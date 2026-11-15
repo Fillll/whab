@@ -116,3 +116,37 @@ def test_warm_legacy_generation_adopts_merkle_only_with_next_selected_commit(tmp
             store.operation_receipt(command.operation_id)
     finally:
         store.close()
+
+
+def test_first_audit_reuses_only_verified_equivalent_tree_and_keeps_reopen_proof(tmp_path, monkeypatch):
+    from whab.domain.integrity import MerkleHasher
+
+    legacy = Store(':memory:', month='2026-10', _authority=False)
+    account = legacy.add_account('personal', {'name': 'Fictional legacy', 'type': 'depository', 'balance': 0})
+    identifier = legacy.add_transaction('personal', {'accountId': account, 'date': '2026-10-01', 'merchant': 'Fictional shop', 'amount': 100})
+    seed = legacy.export_budget()
+    assert 'history' not in seed
+    legacy.close()
+    store = Store(tmp_path / 'fictional-first-history.sqlite', month='2026-10')
+    try:
+        store.restore_budget('personal', seed)
+        used = []
+        original = MerkleHasher.seed_array
+        def capture(self, *args):
+            result = original(self, *args)
+            used.append(result)
+            return result
+        monkeypatch.setattr(MerkleHasher, 'seed_array', capture)
+        command = request(store, 'fictional-first-audit', 'edit_transaction', {'transactionId': identifier, 'note': 'Retained note'})
+        result = store.execute_operation(command)
+        assert used == [True]
+        assert result.receipt.evidence.state_digest == local_state_digest(*encode_local_state(store._local_states()), version=2)
+        journal = store.export_budget()['history']
+        assert len(journal['entries']) == 1
+        validate_history(journal)
+        store.close()
+        store = Store(tmp_path / 'fictional-first-history.sqlite')
+        assert store.commit_evidence() == result.receipt.evidence
+        assert store.execute_operation(command).replayed
+    finally:
+        store.close()

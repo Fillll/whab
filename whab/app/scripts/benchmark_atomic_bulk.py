@@ -24,7 +24,7 @@ from time import monotonic, perf_counter, sleep
 from unittest.mock import patch
 from uuid import uuid4
 
-from benchmark_cli_matrix import fixture, prepared_fixture
+from benchmark_cli_matrix import fixture, prepared_fixture, source_identity
 
 from whab.budgets.container import decode_container
 from whab.initialization import initialize_home
@@ -549,7 +549,7 @@ def main():
     if args.fixtures_directory and args.storage != 'sqlite':
         parser.error('Prepared fixture directories currently contain SQLite seeds; omit this option for JSON.')
     result = {
-        "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        **source_identity(),
         "source_dirty": bool(subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], text=True).strip()),
         "python": platform.python_version(),
         "platform": platform.platform(),
@@ -563,6 +563,9 @@ def main():
     for command in commands:
         for size in sizes:
             result["cases"].append(case(command, size, args))
+            result['source_after'] = source_identity()
+            result['source_changed_during_run'] = any(result[key] != result['source_after'][key]
+                                                     for key in ('source_commit', 'source_diff_sha256', 'versions'))
             Path(args.output).write_text(json.dumps(result, indent=2) + "\n")
             print(
                 json.dumps(

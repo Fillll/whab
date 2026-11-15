@@ -372,12 +372,11 @@ def record_financial(journal, before, after, metadata=None, *, digest_snapshot=N
         return journal
     # Pristine restores preserve their incoming journal. Reconcile any deliberate
     # provider detachment or external edit when the first new change is made.
-    old_digest = None
+    old_digest = digest_snapshot(old)
     if journal:
         last = journal['entries'][-1] if journal['entries'] else None
         expected = last['afterDigest'] if last else digest(journal['baseline'])
         previous_version = last.get('digestVersion', 1) if last else 1
-        old_digest = digest_snapshot(old)
         comparison = old_digest if previous_version == digest_version else state_digest(old, previous_version)
         if comparison != expected:
             previous = snapshot_at(journal, last['id'] if last else 'baseline')

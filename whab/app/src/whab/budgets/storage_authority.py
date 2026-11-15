@@ -136,6 +136,7 @@ def _journal_record(value, budget_id, environment):
                     or watermark.source_generation != source.generation
                     or watermark.source_operation_id != source.operation_id
                     or watermark.state_digest != source.state_digest
+                    or watermark.digest_version != source.digest_version
                     or watermark.transfer_digest != value["transfer_digest"]):
                 raise ValueError
         elif value["replica"] is not None:
@@ -329,6 +330,7 @@ def _identity(evidence, journal):
 
 def _same_content(snapshot, other):
     return (snapshot.source.state_digest == other.source.state_digest
+            and snapshot.source.digest_version == other.source.digest_version
             and snapshot.financial == other.financial and snapshot.protected == other.protected
             and snapshot.receipt_bytes == other.receipt_bytes)
 
@@ -368,7 +370,8 @@ def _resolve_authority(journal, source, destination, namespace):
     if not committed:
         later_aborted_write = record["stage"] == "aborted" and current_source.generation > original_source.generation
         if ((not later_aborted_write and (current_source.generation != original_source.generation
-                                         or current_source.state_digest != original_source.state_digest))
+                                         or current_source.state_digest != original_source.state_digest
+                                         or current_source.digest_version != original_source.digest_version))
                 or current_source.role not in {"primary", "fenced"}
                 or current_destination.role != ("copy" if promotion else "staged")):
             raise StorageAuthorityError("recovery_required")
@@ -383,11 +386,13 @@ def _resolve_authority(journal, source, destination, namespace):
         return "source"
     if (current_source.role not in {"fenced", "retired"}
             or current_source.generation != original_source.generation
-            or current_source.state_digest != original_source.state_digest):
+            or current_source.state_digest != original_source.state_digest
+            or current_source.digest_version != original_source.digest_version):
         raise StorageAuthorityError("recovery_required")
     if current_destination.role == ("copy" if promotion else "staged"):
         if (current_destination.generation != original_source.generation
                 or current_destination.state_digest != original_source.state_digest
+                or current_destination.digest_version != original_source.digest_version
                 or current_destination.authority_epoch != original_source.authority_epoch):
             raise StorageAuthorityError("recovery_required")
         if promotion and destination.replica_watermark() != read_replica_watermark(record["replica"]):
@@ -397,7 +402,8 @@ def _resolve_authority(journal, source, destination, namespace):
     if (current_destination.role != "primary" or current_destination.authority_epoch != record["target_epoch"]
             or current_destination.generation < original_source.generation
             or (current_destination.generation == original_source.generation
-                and current_destination.state_digest != original_source.state_digest)):
+                and (current_destination.state_digest != original_source.state_digest
+                     or current_destination.digest_version != original_source.digest_version))):
         raise StorageAuthorityError("recovery_required")
     if record["stage"] == "committed":
         journal.write({**record, "stage": "active", "destination": evidence_record(current_destination)})
@@ -541,7 +547,8 @@ class StorageAuthorityCoordinator:
                         or watermark.source_instance_id != snapshot.source.instance_id
                         or watermark.source_authority_epoch != snapshot.source.authority_epoch
                         or watermark.source_generation != snapshot.source.generation
-                        or watermark.state_digest != snapshot.source.state_digest or watermark.transfer_digest != snapshot.digest):
+                        or watermark.state_digest != snapshot.source.state_digest or watermark.transfer_digest != snapshot.digest
+                        or watermark.digest_version != snapshot.source.digest_version):
                     raise StorageAuthorityError("validation_failed")
             else:
                 preview = await asyncio.to_thread(destination.preview_local, snapshot)
