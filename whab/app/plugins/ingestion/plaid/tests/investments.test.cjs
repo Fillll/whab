@@ -39,7 +39,7 @@ function harness() {
     sessionStorage: {getItem: () => null, removeItem() {}},
     fetch(url, options) {return new Promise(resolve => requests.push({url, options, reply: (value, ok = true) => resolve({ok, json: async () => value})}));}};
   vm.runInNewContext(source, context);
-  return {fields, view, provider, connections, select, open, requests, listeners};
+  return {fields, view, provider, connections, select, open, requests, listeners, context};
 }
 const text = element => [element.textContent, ...element.children.map(text)].join(' ');
 
@@ -51,9 +51,9 @@ test('investment action loads the addressed connection and renders text-only val
   assert.equal(h.view.hidden, false); assert.equal(h.connections.hidden, true);
   assert.match(text(h.fields['[data-investment-positions]']), /<img src=x onerror=alert\(1\)>/);
   assert.match(text(h.fields['[data-investment-positions]']), /25.00%/);
-  assert.match(text(h.fields['[data-investment-positions]']), /125\s+USD\s+\/ unit · 2026-11-06/);
+  assert.match(text(h.fields['[data-investment-positions]']), /\$125\s+\/ unit · 2026-11-06/);
   assert.match(text(h.fields['[data-investment-positions]']), /Unavailable/);
-  assert.match(text(h.fields['[data-investment-activity]']), /0.82/);
+  assert.match(text(h.fields['[data-investment-activity]']), /\$1/);
   assert.equal(h.fields['[data-investment-start]'].value, '2024-11-07');
 });
 
@@ -66,8 +66,8 @@ test('investment financial fields opt into Web amount masking without masking na
   assert.ok(privateNodes(h.fields['[data-investment-totals]']).every(node => !node.textContent.includes('%')));
   assert.match(text(h.fields['[data-investment-totals]']), /25.00%/);
   const positions = h.fields['[data-investment-positions]'];
-  assert.deepEqual(privateNodes(positions).map(node => node.textContent), ['125 USD', '$1,250.00', '$1,000.00', '$250.00']);
-  assert.deepEqual(privateNodes(h.fields['[data-investment-activity]']).map(node => node.textContent), ['$0.82', '$0.00']);
+  assert.deepEqual(privateNodes(positions).map(node => node.textContent), ['$125', '$1,250', '$1,000', '$250']);
+  assert.deepEqual(privateNodes(h.fields['[data-investment-activity]']).map(node => node.textContent), ['$1', '$0']);
   assert.ok(privateNodes(positions).every(node => node.tag === 'span' && node.dataset.privateCurrency === 'USD'));
   assert.ok(privateNodes(h.fields['[data-investment-activity]']).every(node => node.dataset.privateCurrency === 'USD'));
   assert.match(text(positions), /2026-11-06/);
@@ -116,4 +116,14 @@ test('large reports expose every position through progressive rows and handle un
   await h.fields['[data-investment-more]'].emit('click');
   assert.equal(h.fields['[data-investment-positions]'].children.length, 501);
   assert.equal(h.fields['[data-investment-more]'].hidden, true);
+});
+
+test('investment monetary display rounds minor-unit totals and decimal major-unit prices independently', () => {
+  const h=harness();
+  for(const [minor,currency,expected] of [[150,'USD','$2'],[-150,'USD','-$2'],[-49,'USD','$0'],[1234,'JPY','¥1,234'],[1234500,'KWD','KWD 1,235'],[-499,'KWD','KWD 0']]){
+    assert.equal(h.context.investmentMoney(minor,currency),expected);
+  }
+  for(const [major,expected] of [['125.49','$125'],['125.50','$126'],['-0.49','$0'],['-0.50','-$1'],['68000.00','$68,000']]) assert.equal(h.context.investmentMajorMoney(major,'USD'),expected);
+  const unavailable=h.context.investmentAmount(h.context.investmentMoney(null,'USD'),'USD');
+  assert.equal(unavailable.textContent,'Unavailable');assert.equal(unavailable.dataset.privateAmount,'');assert.equal(unavailable.dataset.privateCurrency,'USD');
 });

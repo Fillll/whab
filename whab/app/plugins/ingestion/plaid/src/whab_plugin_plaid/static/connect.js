@@ -626,8 +626,12 @@ if (previousNotice) {
 }
 function investmentMoney(value, currency) {
   if (value === null) return 'Unavailable';
-  const formatter = new Intl.NumberFormat(undefined, {style: 'currency', currency});
-  return formatter.format(value / 10 ** formatter.resolvedOptions().maximumFractionDigits);
+  const digits = new Intl.NumberFormat('en', {style: 'currency', currency}).resolvedOptions().maximumFractionDigits;
+  return investmentMajorMoney(value / 10 ** digits, currency);
+}
+function investmentMajorMoney(value, currency) {
+  // Unit prices are decimal major-unit strings; totals use integer minor units.
+  return new Intl.NumberFormat('en-US', {style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0}).format(Math.abs(Number(value)) < 0.5 ? 0 : value);
 }
 function investmentCell(row, value, className) {
   const cell = setupElement('td', value);
@@ -637,7 +641,7 @@ function investmentCell(row, value, className) {
 }
 function investmentAmount(value, currency) {
   const amount = setupElement('span', value);
-  if (value !== 'Unavailable') {amount.dataset.privateAmount = ''; amount.dataset.privateCurrency = currency;}
+  amount.dataset.privateAmount = ''; amount.dataset.privateCurrency = currency;
   return amount;
 }
 function investmentAmountCell(row, value, currency, className) {
@@ -669,7 +673,7 @@ function renderInvestmentReport(view, report) {
     identity.append(setupElement('small', `${position.name} · ${position.quantity} units · ${position.status}`));
     identity.append(setupElement('small', accountNames.get(position.accountId) || ''));
     if (position.price !== null) {
-      const price = setupElement('small'); price.append(investmentAmount(`${position.price} ${position.currency}`, position.currency),
+      const price = setupElement('small'); price.append(investmentAmount(investmentMajorMoney(position.price, position.currency), position.currency),
         setupElement('span', ` / unit · ${position.priceAsOf || 'Price date unavailable'}`)); identity.append(price);
     }
     investmentAmountCell(row, investmentMoney(position.value, position.currency), position.currency);

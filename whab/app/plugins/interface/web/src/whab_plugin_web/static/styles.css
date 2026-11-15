@@ -152,7 +152,9 @@ button {
   background: none;
 }
 input,
-select {
+select,
+.amount-privacy-reveal,
+.amount-display {
   border: 1px solid var(--control-border);
   border-radius: 7px;
   background: var(--field);
@@ -742,7 +744,9 @@ strong {
   color: var(--muted);
   font-size: 12px;
 }
-.money-input input {
+.money-input input,
+.money-input .amount-privacy-reveal,
+.money-input .amount-display {
   border: 0;
   min-height: 34px;
   padding: 9px;
@@ -2081,7 +2085,9 @@ strong {
   margin-bottom: 16px;
 }
 .modal-form label > input,
-.modal-form label > select {
+.modal-form label > select,
+.modal-form label > .amount-privacy-reveal,
+.modal-form label > .amount-display {
   font-size: 12px;
   width: 100%;
   background-color: var(--field);
@@ -2172,7 +2178,7 @@ strong {
 .settings-window .modal-heading p { font-size: 12px; max-width: 48ch; }
 .settings-window [data-settings-page][hidden], .settings-window [hidden] { display: none; }
 .settings-window .settings-notice, .settings-window .modal-form label, .settings-window .field-error { font-size: 12px; }
-.settings-window .modal-form input, .settings-window .modal-form select { font-size: 13px; }
+.settings-window .modal-form input, .settings-window .modal-form select, .settings-window .modal-form .amount-privacy-reveal, .settings-window .modal-form .amount-display { font-size: 13px; }
 .settings-window .button { border-radius: 7px; }
 .settings-budget-scope { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; font-size: 12px; margin-bottom: 18px; }
 .settings-budget-scope > span { color: var(--muted); }
@@ -3992,10 +3998,13 @@ main:has(.budget-planner) > .demo-ribbon,
 .budget-assignment:has(> .budget-save-status:not([hidden])) .budget-assignment-edit {
   visibility: hidden;
 }
-.budget-assignment[data-save-state='saved'] input[data-cents] {
+.budget-assignment[data-save-state='saved'] input[data-cents],
+.budget-assignment[data-save-state='saved'] .amount-display {
   border-color: var(--success);
 }
-.budget-assignment input[data-cents] {
+.budget-assignment input[data-cents],
+.budget-assignment .amount-privacy-reveal,
+.budget-assignment .amount-display {
   width: 100%;
   min-width: 0;
   min-height: 29px;
@@ -4018,7 +4027,9 @@ main:has(.budget-planner) > .demo-ribbon,
   color: var(--muted);
   pointer-events: none;
 }
-.budget-assignment input[data-cents]:disabled {
+.budget-assignment input[data-cents]:disabled,
+.budget-assignment input[data-cents]:disabled ~ .amount-privacy-reveal,
+.budget-assignment input[data-cents]:disabled ~ .amount-display {
   border-color: transparent;
   background: transparent;
   color: var(--muted);
@@ -4026,18 +4037,22 @@ main:has(.budget-planner) > .demo-ribbon,
 .budget-assignment:has(input:disabled) .budget-assignment-edit {
   display: none;
 }
-.budget-assignment input[data-cents]:hover {
+.budget-assignment input[data-cents]:hover,
+.budget-assignment .amount-display:hover {
   border-color: var(--input-hover-border);
   background: var(--input-hover);
 }
-.budget-assignment input[data-cents]:focus {
+.budget-assignment input[data-cents]:focus,
+.budget-assignment .amount-display:focus-visible {
   border-color: var(--action);
   background: var(--field);
 }
-.budget-assignment input[aria-invalid='true'] {
+.budget-assignment input[aria-invalid='true'],
+.budget-assignment input[aria-invalid='true'] ~ .amount-display {
   border-color: var(--danger);
 }
-.budget-assignment[aria-busy='true'] input[data-cents] {
+.budget-assignment[aria-busy='true'] input[data-cents],
+.budget-assignment[aria-busy='true'] .amount-display {
   border-color: var(--action);
 }
 .budget-assignment .field-error {
@@ -4141,7 +4156,9 @@ main:has(.budget-planner) > .demo-ribbon,
   }
   .budget-category-link,
   .budget-group-toggle,
-  .budget-assignment input[data-cents] {
+  .budget-assignment input[data-cents],
+  .budget-assignment .amount-privacy-reveal,
+  .budget-assignment .amount-display {
     font-size: 12px;
   }
   .budget-category-row td {
@@ -4373,7 +4390,9 @@ main:has(.budget-planner) > .demo-ribbon,
   .budget-category-row td {
     height: 44px;
   }
-  .budget-assignment input[data-cents] {
+  .budget-assignment input[data-cents],
+  .budget-assignment .amount-privacy-reveal,
+  .budget-assignment .amount-display {
     min-height: 40px;
     font-size: 16px;
   }
@@ -4553,14 +4572,18 @@ main:has(.budget-planner) > .demo-ribbon,
 /* Spreadsheet cells retain the register's fixed row height. */
 .transactions-table td input:not([type='checkbox']):not([type='hidden']),
 .transactions-table td select,
-.transactions-table td textarea {
+.transactions-table td textarea,
+.transactions-table td .amount-privacy-reveal,
+.transactions-table td .amount-display {
   width: 100%; min-width: 0; max-width: 100%; height: 26px; min-height: 26px;
   margin: 0; padding: 3px 4px; border: 1px solid transparent; border-radius: 3px;
   font: inherit; color: inherit; background: transparent; box-shadow: none;
 }
 .transactions-table td input[data-transaction-detail='merchant'] {font-weight: 600;}
 .transactions-table .transaction-payee input {flex: 1;}
-.transactions-table td.amount-cell input {text-align: right; font-variant-numeric: tabular-nums;}
+.transactions-table td.amount-cell input,
+.transactions-table td.amount-cell .amount-privacy-reveal,
+.transactions-table td.amount-cell .amount-display {text-align: right; font-variant-numeric: tabular-nums;}
 .transactions-table td.grid-current {background: var(--current);}
 .transactions-table td [data-grid-editing='true'] {border-color: var(--focus); background: var(--field);}
 .transactions-table .transaction-draft-row td {background: var(--accent);}
@@ -4581,7 +4604,7 @@ main:has(.budget-planner) > .demo-ribbon,
 .account-logo-toggle:hover, .account-logo-toggle:focus-visible {border-color:var(--brand-red);}
 .account-inline-fields {display:grid; grid-template-columns:minmax(180px,1.5fr) repeat(4,minmax(110px,1fr)); gap:12px;}
 .account-inline-fields label, .account-inline-extra label {display:grid; gap:5px; font-size:10px; color:var(--muted);}
-.account-inline-fields input, .account-inline-fields select, .account-inline-extra input, .account-inline-extra select {min-width:0; width:100%; height:36px; font-size:12px; padding:6px 9px; border:1px solid var(--line); border-radius:5px; background:var(--surface); color:var(--ink);}
+.account-inline-fields input, .account-inline-fields select, .account-inline-extra input, .account-inline-extra select, .account-inline-fields .amount-privacy-reveal, .account-inline-extra .amount-privacy-reveal {min-width:0; width:100%; height:36px; font-size:12px; padding:6px 9px; border:1px solid var(--line); border-radius:5px; background:var(--surface); color:var(--ink);}
 .account-inline-fields .account-name-field input {font-weight:600;}
 .account-inline-meta {display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin-top:10px; color:var(--muted); font-size:10px;}
 .account-inline-meta .text-link {font-size:10px;}
@@ -4869,6 +4892,9 @@ html[data-amounts='hidden'] [data-private-amount],
 html[data-amounts='hidden'] [data-private-content] { display: none !important; }
 .amount-privacy-mask { white-space: nowrap; }
 .amount-privacy-content-mask { display: block; padding: 12px 0; color: var(--muted); }
-.amount-privacy-reveal { display: inline-block; min-height: 28px; padding: 2px 5px; font: inherit; color: var(--muted); border: 1px solid transparent; border-radius: 4px; cursor: pointer; }
+/* Display and privacy buttons share the editor sizing rules above. Never size a mask from a value. */
+.amount-privacy-reveal, .amount-display { display: inline-block; cursor: pointer; }
+input[data-money-idle], [data-money-display][hidden],
+html[data-amounts='hidden'] [data-money-display] { display: none !important; }
 .amount-privacy-reveal:hover, .amount-privacy-reveal:focus-visible { border-color: var(--line-strong, var(--line)); color: var(--ink); }
 .amount-privacy-toggle[hidden], .amount-privacy-mask[hidden] { display: none !important; }

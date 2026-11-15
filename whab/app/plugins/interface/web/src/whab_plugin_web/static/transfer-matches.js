@@ -31,7 +31,8 @@ export function initTransferMatches({root, api, context, before, saved}) {
   }
   function leg(row) {
     const digits = new Intl.NumberFormat('en', {style:'currency', currency:row.currency}).resolvedOptions().maximumFractionDigits;
-    const amount = new Intl.NumberFormat(undefined, {style:'currency', currency:row.currency}).format(-row.amount / 10 ** digits);
+    const major = -row.amount / 10 ** digits;
+    const amount = new Intl.NumberFormat('en-US', {style:'currency', currency:row.currency, minimumFractionDigits:0, maximumFractionDigits:0}).format(Math.abs(major) < 0.5 ? 0 : major);
     const block = el('div', undefined, 'transfer-match-leg');
     const heading = el('strong', `${row.accountName} · `), value = el('span', amount);
     value.dataset.privateAmount = ''; value.dataset.privateCurrency = row.currency; heading.append(value);

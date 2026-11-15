@@ -16,7 +16,6 @@ from whab.plugins import (
     currency_code,
     currency_minor_units,
     format_date,
-    format_money,
     is_liability,
     is_on_budget,
 )
@@ -159,20 +158,23 @@ def money_input(value, currency="USD"):
 
 
 def money_number(value, currency="USD"):
-    """Display exact, grouped minor units beneath a shared currency heading."""
-    digits = currency_minor_units(currency)
-    whole, fraction = divmod(abs(value), 10**digits)
-    sign = "-" if value < 0 else ""
-    return f"{sign}{whole:,}.{fraction:0{digits}d}" if digits else f"{sign}{whole:,}"
-
-
-def sidebar_money(value, currency="USD"):
-    """Round sidebar balances to whole major units, half away from zero."""
+    """Round displayed money to whole major units, half away from zero."""
     unit = 10**currency_minor_units(currency)
     whole = (abs(value) + unit // 2) // unit
     sign = "-" if value < 0 and whole else ""
+    return f"{sign}{whole:,}"
+
+
+def display_money(value, currency="USD"):
+    """Add a currency label to rounded display money without touching input values."""
+    number = money_number(value, currency)
     prefix = "$" if currency == "USD" else f"{currency} "
-    return f"{sign}{prefix}{whole:,}"
+    return f"-{prefix}{number[1:]}" if number.startswith("-") else f"{prefix}{number}"
+
+
+def sidebar_money(value, currency="USD"):
+    """Keep sidebar balances on the same whole-unit display contract."""
+    return display_money(value, currency)
 
 
 def month_label(month, short=False):
@@ -361,11 +363,11 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "hidden_account_ids": data.get("viewPreferences", {}).get("hiddenAccountIds", []),
         "account_totals": data.get("accountSummariesByCurrency", {}),
         "all_accounts": all_accounts,
-        "currency_money": format_money,
-        "account_money": lambda account: format_money(account["balance"], account.get("currency", "USD")),
+        "currency_money": display_money,
+        "account_money": lambda account: display_money(account["balance"], account.get("currency", "USD")),
         "account_sidebar_money": lambda value, account: sidebar_money(value, account.get("currency", "USD")),
         "budget_month_count": budget_month_count,
-        "money": lambda value: format_money(value, currency),
+        "money": lambda value: display_money(value, currency),
         "sidebar_money": lambda value: sidebar_money(value, currency),
         "money_input": lambda value: money_input(value, currency),
         "money_number": lambda value: money_number(value, currency),

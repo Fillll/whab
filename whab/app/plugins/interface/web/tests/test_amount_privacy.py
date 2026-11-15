@@ -105,7 +105,7 @@ def test_untyped_extension_report_values_and_details_are_shielded(store, tmp_pat
     assert any("EUR 3,456.78" in text for text in markup.protected_text)
 
 
-@pytest.mark.parametrize("currency,balance,expected", [("USD", 123456, "$1,234.56"), ("JPY", 123456, "JPY 123,456"), ("KWD", 123456, "KWD 123.456")])
+@pytest.mark.parametrize("currency,balance,expected", [("USD", 123456, "$1,235"), ("JPY", 123456, "JPY 123,456"), ("KWD", 123456, "KWD 123")])
 def test_account_privacy_covers_currency_precision_and_keeps_stored_balance(client, store, currency, balance, expected):
     account = store.add_account("personal", {"name": "Fictional 東京 🌱", "type": "depository", "balance": balance, "currency": currency})
     response = client.get("/budgets/home/accounts/2026-10/usd")

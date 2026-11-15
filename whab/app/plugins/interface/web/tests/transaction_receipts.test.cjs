@@ -6,7 +6,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const helpers = fs.readFileSync(path.join(__dirname, 'transaction_register.test.cjs'), 'utf8').split('\ntest(')[0];
-const runtime = {require, __dirname, URL, setImmediate, setTimeout, clearTimeout, queueMicrotask};
+const runtime = {require, __dirname, URL, Event, setImmediate, setTimeout, clearTimeout, queueMicrotask};
 vm.runInNewContext(helpers, runtime);
 const {harness, deferred} = runtime;
 const tick = () => new Promise(resolve => setImmediate(resolve));

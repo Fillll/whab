@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.63.0 — 2026-11-15
+
+PR: [#209](https://github.com/Fillll/whab/pull/209)
+
+- Display typed monetary values as comma-grouped whole units with halves rounded away from zero. Inline editors reveal the original exact decimal draft; unchanged focus/blur never saves a rounded value. Keep calculations, sorting, stored values and exports precise.
+- Mask unavailable balances and missing monetary results with the same fixed currency placeholders as known values. Preserve transaction/budget cell sizing and alignment across privacy toggles.
+- Retain keyboard grid navigation, save/error feedback, validation focus and drafts while preventing privacy/display observer feedback loops.
+
 ## 1.62.0 — 2026-11-15
 
 PR: [#208](https://github.com/Fillll/whab/pull/208)

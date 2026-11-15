@@ -39,6 +39,23 @@ disabled controls do not count as unfinished saves or block leaving Accounts.
 Actual in-flight writes and unsaved account edits keep the existing save guards;
 Cancel restores the committed account status along with the other fields.
 
+## Displayed amounts and exact editing
+
+Web 1.63 displays money in whole currency units across account balances, budget
+figures, transaction rows, Insights, subscription reports and transfer proposals.
+Display numbers use commas for thousands, so `68000.00` appears as `68,000`.
+It rounds to the nearest whole unit, with exact halves away from zero: `$12.49`
+shows `$12`, `$12.50` shows `$13`, and `-$12.50` shows `-$13`. A rounded zero has
+no minus sign. Zero-decimal currencies keep their existing unit precision.
+
+Click or focus an editable amount to see its exact currency precision, including
+cents. Leaving an unchanged editor does not save a rounded value. New-entry and
+financial settings forms remain exact editors. Sorting, totals, filters, saves,
+CLI/API responses, exports and stored records retain their original precise values.
+Counts, percentages, quantities, free text and opaque raw audit/plugin payloads
+are not reinterpreted as money. Plaid 1.9.3 applies the same display rule to its
+investment totals, activity amounts and unit prices.
+
 ## Hide amounts
 
 The eye in the top-right toolbar switches **Hide amounts** / **Show amounts**.
@@ -47,7 +64,7 @@ of its real size, sign or decimal precision. Other currencies use their code and
 the same fixed pattern (for example, `JPY X,XXX`). Monetary values are masked throughout Web:
 sidebar balances, Accounts totals, transaction amounts, budget assignments and
 targets, Insights, transfer proposals, subscription reports and Plaid investment
-values (Plaid 1.9.2+ for currency-aware masks). Values in tooltips and accessibility labels are hidden too.
+values (Plaid 1.9.3+ also masks unavailable monetary results). Unavailable balances and missing monetary values use the same currency mask as known values. Values in tooltips and accessibility labels are hidden too.
 Charts, receipts and raw history previews are concealed as complete regions when
 they can contain amounts. Dates, names, counts and nonfinancial controls stay usable.
 
@@ -58,8 +75,9 @@ default. With browser storage blocked, the toggle works for the current page.
 Saved hidden mode is applied before the page is painted; dynamically loaded rows,
 reports, dialogs and saved fragments adopt it automatically.
 
-Hidden monetary editors show a **Show amounts to edit** button. Revealing restores
-the exact original editor value and focus, including an unfinished draft. Toggling
+Privacy toggles preserve amount-cell sizing and alignment, including inline transaction and budget editors. Hidden monetary editors show a **Show amounts to edit** button. Revealing restores
+the exact original editor value and focus, including an unfinished draft. Idle
+amount displays remain rounded until editing starts. Toggling
 never substitutes a placeholder into data, dispatches a save or changes review status, bank
 synchronization or audit history. Existing pending saves retain their normal guards.
 

@@ -197,12 +197,12 @@ def test_historical_income_remains_visible_while_overview_planning_is_unavailabl
     text = client.get("/budgets/home/budget/2026-09/usd").text
     overview = re.findall(r'<tr class="budget-overview-row[^"]*"[^>]*>(.*?)</tr>', text, re.S)
     cells = [re.findall(r'<td[^>]*>(.*?)</td>', row, re.S) for row in overview]
-    assert displayed_amount(cells[0][0]) == "123.45"
-    assert displayed_amount(cells[1][0]) == "0.00"
-    assert cells[2][0].strip() == "—"
+    assert displayed_amount(cells[0][0]) == "123"
+    assert displayed_amount(cells[1][0]) == "0"
+    assert displayed_amount(cells[2][0]) == "—"
     assert displayed_amount(cells[3][0]) == "—"
-    assert cells[4][0].strip() == cells[5][0].strip() == "—"
-    assert displayed_amount(cells[4][1]) == "10.00"
+    assert displayed_amount(cells[4][0]) == displayed_amount(cells[5][0]) == "—"
+    assert displayed_amount(cells[4][1]) == "10"
     current = client.get("/api/workspace?workspace=personal&month=2026-10").json()
     assert displayed_amount(cells[2][1]) == money_number(current["summary"]["carriedIn"])
     assert displayed_amount(cells[5][1]) == money_number(current["summary"]["readyToAssign"])
@@ -329,7 +329,7 @@ def test_next_month_editor_requires_explicit_capability_and_valid_minor_units(
     assert not [form for form in assignment_forms(text) if form["api"] == "/budget/funding/next-month"]
     row = re.search(r'<th scope="row">Assigned for next month</th>(.*?)</tr>', text, re.S)[1]
     assert row.count("Editing requires a server update") == 3
-    expected = "123.45" if type(amount) is int and amount == 12345 else "—"
+    expected = "123" if type(amount) is int and amount == 12345 else "—"
     assert [displayed_amount(cell) for cell in re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)] == [
         expected,
     ] * 3
@@ -512,7 +512,7 @@ def test_budget_labels_are_escaped_and_uncategorized_activity_is_period_specific
     assert category_name not in text and "&lt;script&gt;" in text
     assert "&lt;Living&gt;" in text
     row = re.search(r'<tr class="budget-category-row budget-uncategorized"[^>]*>(.*?)</tr>', text, re.S)[1]
-    assert "-123.45" in row and '/transactions/2026-11"' in row
+    assert '<span data-private-amount>-123</span>' in row and '/transactions/2026-11"' in row
 
 
 @pytest.mark.parametrize("capability", [None, False, 1, "true"])
@@ -575,7 +575,7 @@ def test_conservative_spending_note_stays_inside_closed_breakdown_for_valid_lowe
     text = response.text
     row = re.search(r'<tr class="budget-overview-row budget-ready-row"[^>]*>(.*?)</tr>', text, re.S)[1]
     assert [displayed_amount(markup) for markup in re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)] == [
-        "100.00",
+        "100",
     ] * 3
     assert ("Some funds are needed to cover spending or account reserves." in row) is (
         type(capacity) is int and capacity < 10000
@@ -590,7 +590,7 @@ def test_conservative_spending_note_stays_inside_closed_breakdown_for_valid_lowe
     assert text.count('class="budget-funding-warning negative" role="note">Funding shortfall</span>') == (
         3 if shortfall else 0
     )
-    assert ("Available after spending and account reserves: -50.00." in re.sub(r"<[^>]*>", "", row)) is shortfall
+    assert ("Available after spending and account reserves: -50." in re.sub(r"<[^>]*>", "", row)) is shortfall
     assert "Available after spending and account reserves" not in visible
 
 

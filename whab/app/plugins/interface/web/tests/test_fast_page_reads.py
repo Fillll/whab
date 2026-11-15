@@ -15,7 +15,7 @@ def test_account_management_and_settings_need_no_envelope_or_portable_history(cl
         monkeypatch.setattr(store, name, full_history)
     response = client.get("/budgets/home/accounts")
     assert response.status_code == 200
-    assert "Fast wallet" in response.text and "$122.45" in response.text
+    assert "Fast wallet" in response.text and "$122" in response.text
     assert '<span class="nav-count">1</span>' in response.text
     result = client.get(f"/api/accounts/{account}/settings?workspace=personal")
     assert result.status_code == 200

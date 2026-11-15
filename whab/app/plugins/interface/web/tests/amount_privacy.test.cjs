@@ -41,6 +41,7 @@ class Element {
   get title() {return this.getAttribute('title') || '';}
   set title(value) {this.setAttribute('title', value);}
   addEventListener(type, callback) {this.events.set(type, [...this.events.get(type) || [], callback]);}
+  dispatchEvent(event) {let root = this; while (root.parentElement) root = root.parentElement; return !root.emit(event.type, this, event).prevented;}
   focus() {
     let root = this; while (root.parentElement) root = root.parentElement;
     if (root.activeElement === this) return;
@@ -66,7 +67,7 @@ function harness({saved, blocked = false, preparse = false} = {}) {
     setItem(key, value) {if (blocked) throw Error('blocked'); storage.set(key, value); writes.push([key, value]);},
   };
   let observer;
-  const context = {document, window, MutationObserver: class {constructor(callback) {observer = this; this.callback = callback;} observe() {} disconnect() {}}};
+  const context = {document, window, Event: class {constructor(type, options) {this.type = type; Object.assign(this, options);}}, MutationObserver: class {constructor(callback) {observer = this; this.callback = callback;} observe() {} disconnect() {}}};
   const emit = document.emit = (type, target, extra = {}) => {
     const event = {target, prevented: false, stopped: false, immediate: false, ...extra,
       preventDefault() {this.prevented = true;}, stopPropagation() {this.stopped = true;}, stopImmediatePropagation() {this.immediate = true; this.stopped = true;}};
@@ -133,6 +134,44 @@ test('currency masks use one fixed four-digit pattern for every size, sign and p
   }
   h.change(h.input, 'data-private-amount', 'Hidden balance');
   assert.equal(h.input.nextElementSibling.textContent, 'Hidden balance', 'Explicit fixed plugin placeholders retain their contract');
+});
+
+test('unavailable balances use the same mask and restore their unavailable meaning', () => {
+  const h = harness({saved: 'hidden'});
+  const balance = new Element('strong', {'data-private-amount': '', 'data-private-currency':'USD', title:'Balance unavailable'}, 'Unavailable');
+  h.body.append(balance); h.refresh();
+  assert.equal(balance.nextElementSibling.textContent, '$X,XXX');
+  assert.equal(balance.title, 'Amount hidden');
+  h.click(h.toggle);
+  assert.equal(balance.textContent, 'Unavailable');
+  assert.equal(balance.title, 'Balance unavailable');
+  assert.equal(balance.nextElementSibling.hidden, true);
+});
+
+test('revealing a rounded amount opens its exact editor without changing cents', () => {
+  const h = harness({saved: 'hidden'});
+  h.input.setAttribute('data-money-rounded', ''); h.input.setAttribute('data-money-idle', '');
+  h.input.value = '000123.4500'; let edits = 0;
+  h.document.addEventListener('money-edit', event => {edits++; event.target.removeAttribute('data-money-idle');});
+  h.click(h.input.nextElementSibling);
+  assert.equal(edits, 1); assert.equal(h.input.hasAttribute('data-money-idle'), false);
+  assert.equal(h.input.value, '000123.4500'); assert.equal(h.document.activeElement, h.input);
+  assert.equal(h.root.dataset.amounts, 'shown');
+});
+
+test('privacy reveal lets the grid register editing before exact input receives typing', () => {
+  const h = harness({saved: 'hidden'}); let activations = 0, fallbackEdits = 0;
+  h.input.setAttribute('data-money-rounded', ''); h.input.setAttribute('data-money-idle', '');
+  h.document.addEventListener('money-display-activate', event => {
+    activations++; event.preventDefault();
+    event.target.setAttribute('data-grid-editing', 'true'); event.target.removeAttribute('data-money-idle');
+    event.target.focus();
+  });
+  h.document.addEventListener('money-edit', () => fallbackEdits++);
+  h.click(h.input.nextElementSibling);
+  assert.equal(activations, 1); assert.equal(fallbackEdits, 0);
+  assert.equal(h.input.dataset.gridEditing, 'true'); assert.equal(h.document.activeElement, h.input);
+  assert.equal(h.input.value, '234.56');
 });
 
 test('monetary masks follow account currency choices without editing or saving the amount', () => {

@@ -56,7 +56,7 @@
           <p class="field-error" role="alert" hidden></p>
         </div>
         <div class="account-row-aside"><span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' and account.source in bank_source_ids else account.source|capitalize }}</span>
-        <div class="account-balance" data-account-balance><strong>{% if account.balanceUnknown %}Unavailable{% else %}<span data-private-amount data-private-currency="{{ account.currency }}">{{ account_money(account) }}</span>{% endif %}</strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small></div></div>
+        <div class="account-balance" data-account-balance><strong><span data-private-amount data-private-currency="{{ account.currency }}">{% if account.balanceUnknown %}Unavailable{% else %}{{ account_money(account) }}{% endif %}</span></strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small></div></div>
       </form>
     {% endfor %}<p class="empty-inline" data-account-group-empty{% if group.accounts %} hidden{% endif %}>No {{ group.label|lower }} accounts yet.</p>
   </div>

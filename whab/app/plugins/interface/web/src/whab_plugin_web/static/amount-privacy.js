@@ -8,7 +8,7 @@
   const states = new Map(), attributes = new Map();
   let hidden = false;
   try {hidden = window.localStorage.getItem(key) === 'hidden';} catch { /* Keep a usable page without storage. */ }
-  root.dataset.amounts = hidden ? 'hidden' : 'shown';
+  writeAttribute(root, 'data-amounts', hidden ? 'hidden' : 'shown');
   const observer = new MutationObserver(changes => {
     // Remember genuine UI updates while masked; our own writes are not observed.
     for (const change of changes) {
@@ -23,6 +23,7 @@
       attributeFilter: [...privateAttributes, 'hidden', 'style', 'data-private-amount', 'data-private-content', 'data-private-currency', 'data-private-amount-attributes', 'data-private-amount-label']});
   }
   function writeAttribute(element, name, value) {
+    if (element.getAttribute(name) === value) return;
     if (value === null) element.removeAttribute(name);
     else element.setAttribute(name, value);
   }
@@ -95,7 +96,8 @@
       if (element.parentElement?.closest(targets)) continue;
       const state = states.get(element) || createMask(element);
       if (state.mask.previousElementSibling !== element) element.after(state.mask);
-      state.mask.textContent = maskText(element);
+      const text = maskText(element);
+      if (state.mask.textContent !== text) state.mask.textContent = text;
       writeAttribute(state.mask, 'hidden', !hidden || element.hasAttribute('hidden') || element.style.display === 'none' ? '' : null);
       if (hidden) maskAttributes(element, privateAttributes);
     }
@@ -105,16 +107,16 @@
       }
     }
     for (const button of document.querySelectorAll('[data-amount-privacy-toggle]')) {
-      button.hidden = false;
-      button.setAttribute('aria-pressed', String(hidden));
-      button.setAttribute('aria-label', hidden ? 'Show amounts' : 'Hide amounts');
-      button.title = hidden ? 'Show amounts' : 'Hide amounts';
+      writeAttribute(button, 'hidden', null);
+      writeAttribute(button, 'aria-pressed', String(hidden));
+      writeAttribute(button, 'aria-label', hidden ? 'Show amounts' : 'Hide amounts');
+      writeAttribute(button, 'title', hidden ? 'Show amounts' : 'Hide amounts');
     }
     observe();
   }
   function apply(value, persist = false) {
     hidden = value;
-    root.dataset.amounts = hidden ? 'hidden' : 'shown';
+    writeAttribute(root, 'data-amounts', hidden ? 'hidden' : 'shown');
     synchronize();
     let stored = true;
     if (persist) {
@@ -143,6 +145,10 @@
       const state = [...states.values()].find(value => value.mask === mask);
       if (!state) return;
       apply(false, true);
+      if (state.element.hasAttribute('data-money-rounded')) {
+        const activation = new Event('money-display-activate', {bubbles: true, cancelable: true});
+        if (state.element.dispatchEvent(activation)) state.element.dispatchEvent(new Event('money-edit', {bubbles: true}));
+      }
       state.element.focus({preventScroll: true});
     }
   }, true);
