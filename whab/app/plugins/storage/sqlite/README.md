@@ -54,6 +54,8 @@ Opening an image checks its exact supported schema and bounded rows in memory, r
 
 The container lifecycle calls `prepare_budget_files(workspace, files, existing=False)` on first open. A retry with the same normalized ledger is harmless; different nonempty data is preserved and rejected. With `existing=True`, an established local ledger remains authoritative and retains its private bank connections; a pristine replacement cache is restored from the image. Every path validates the input image before using the cache.
 
+Cold restoration reuses the image reader's fully validated detached snapshot inside the atomic import, avoiding a second ledger/history validation. An existing cache with a personal account is recognized by an indexed presence query without loading its transaction history. Independent file verification, public JSON restore validation and all empty-workspace guards remain in place.
+
 ## Planning, accounts and receipts
 
 WHAB 2.7 and SQLite plugin 1.2 add the optional `future_funding` table with one saved amount per target month and currency. From core 2.9 those records represent explicit set-asides from the previous source month, independently of target category assignments. Core includes the incoming amount in the new monthly carry-in breakdown and validates the source pool and actual cash. The schema and public command remain compatible. Reads, writes, reopening, neutral exports and SQLite portable images preserve the records atomically; earlier ledgers without the table remain readable. Funding counts as saved user data, so a workspace containing it cannot receive a replacement import.

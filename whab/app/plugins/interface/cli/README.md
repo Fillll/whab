@@ -1033,7 +1033,11 @@ resources offline. Validation results are cached privately by document content,
 plugin identity, validator implementation and installed JSON Schema library metadata. A
 changed resource is validated again. Read-only cache locations retain validation.
 Parser construction defers unused distribution-version reads; explicit discovery
-still reports installed plugin versions. Python 3.15 lazy imports defer SDK and
+still reports installed plugin versions. Root help builds only its visible
+top-level choices, and command help copies only its needed, fully validated core
+schemas. Unused plugin documents stay unloaded; external plugin identities and
+reserved-name conflicts remain discoverable. Validator identity reads are shared
+within each catalog and refreshed for the next call. Python 3.15 lazy imports defer SDK and
 transport modules until they are used. A selected transaction action builds only
 its parser family: `trnx list --help` does not import bulk writes, notes, review,
 transfer execution or the HTTP client. Root/group help still lists every command,

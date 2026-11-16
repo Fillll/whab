@@ -393,6 +393,11 @@ def prepare_files(store, files, *, existing):
     snapshot, images = read_files(files, with_receipts=True)
     if existing:
         with store._snapshot():
+            # Any personal account proves this is not a pristine replacement
+            # cache. The input image was independently validated above; avoid
+            # materializing unrelated transactions just to preserve this cache.
+            if store.db.execute("SELECT 1 FROM accounts WHERE workspace='personal' LIMIT 1").fetchone():
+                return
             state = store._read_state("personal")
             try:
                 receipt = store._workspace_import_receipt(state, "portable-budget-files", "restore")
@@ -405,4 +410,5 @@ def prepare_files(store, files, *, existing):
         for transaction_id in store.receipt_ids("personal")
     ]:
         return
-    store.restore_budget("personal", snapshot, _receipts=images)
+    # read_files already validated this detached snapshot and its full history.
+    store._mutate("personal", lambda state: store._restore_validated_snapshot(state, snapshot, images))

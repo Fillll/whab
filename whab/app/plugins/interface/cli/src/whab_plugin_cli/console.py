@@ -7,7 +7,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from urllib.parse import quote
+lazy from urllib.parse import quote
 
 lazy import httpx
 
@@ -59,6 +59,17 @@ lazy from .transfer_commands import (
 
 PREFIX = "/api/local/v1"
 ROOT_COMMANDS = {"budget", "plugin", "api", "BUDGET"}
+_ROOT_HELP = {
+    "budget": "Create and list saved budgets",
+    "plugin": "Discover installed plugins; enable them under a budget name",
+    "BUDGET": "Address a saved budget by its name or permanent ID",
+    "api": "Advanced local operations; use whab api --help",
+}
+_TRANSACTION_ACTIONS = {
+    "non-reviewed", "unreviewed", "uncategorized", "uncategorised", "list",
+    "categories", "categorize", "categorise", "note", "edit", "create",
+    "review", "review-audit", "edit-many", "transfers", "match-transfer", "unmatch-transfer",
+}
 
 
 class CommandError(ValueError):
@@ -66,19 +77,32 @@ class CommandError(ValueError):
 
 
 def parser(options, argv=()):
+    root_help = len(argv) == 1 and argv[0] in {"-h", "--help"}
     requested = argv[2] if len(argv) > 2 and argv[0] == "BUDGET" else None
     if requested not in {"account", "category", "plugin", "bank", "history", "import", "insights", "transactions", "trnx"}:
         requested = None
     discovery = requested in {"bank", "import", "plugin"} or bool(argv) and argv[0] == "plugin"
-    selected = None if discovery else {"cli"}
-    catalog = installed_catalog(document_plugins=selected, include_versions=False)
+    action = argv[3] if requested in {"transactions", "trnx"} and len(argv) > 3 else None
+    if action not in _TRANSACTION_ACTIONS:
+        action = None
+    needs_cli = not root_help and (requested in {None, "category"}
+                                   or requested in {"transactions", "trnx"} and action in {None, "list"})
+    selected = None if discovery else {"cli"} if needs_cli else set()
+    core_operations = ({("query", "accounts"), ("command", "update_account")}
+                       if root_help or requested is not None and not discovery else None)
+    catalog = installed_catalog(document_plugins=selected, include_versions=False,
+                                core_operations=core_operations)
     check_identifiers(catalog)
     root = CommandParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
         epilog='Transaction corrections: trnx edit TX_ID; manual entry: trnx create; atomic edit-plus-create split: trnx edit-many --file split.json --preserve-balances. See each command --help for complete examples and recovery.\n\nCategory types: expense, income, transfer, opening_balance. Opening Balance records existing cash/debt separately from income; it never auto-reviews. Use category create/classify --type TYPE. Explicit review: trnx review IDS --reviewed; inspect legacy flags with trnx review-audit. See trnx review --help for classification requirements and atomic recovery.\n\n' + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
-    budget = groups.add_parser("budget", help="Create and list saved budgets")
+    if root_help:
+        for name, description in _ROOT_HELP.items():
+            groups.add_parser(name, help=description)
+        return root
+    budget = groups.add_parser("budget", help=_ROOT_HELP["budget"])
     actions = budget.add_subparsers(dest="action", required=True)
     actions.add_parser("list", help="List budgets available in this environment")
     create = actions.add_parser("create", help="Create an empty SQLite budget with no optional plugins",
@@ -86,11 +110,11 @@ def parser(options, argv=()):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     create.add_argument("name", help="Unique budget name (1–100 characters)")
     create.add_argument("--path", help="Directory or .whab file; expands ~ even when quoted. Default: runtime-managed location")
-    plugin = groups.add_parser("plugin", help="Discover installed plugins; enable them under a budget name",
+    plugin = groups.add_parser("plugin", help=_ROOT_HELP["plugin"],
         epilog="Enable for a budget: whab BUDGET plugin enable PLUGIN\n\n" + overview(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     plugin.add_argument("action", choices=("list",), nargs="?", default="list", help="List installed plugin documentation offline")
-    scoped = groups.add_parser("BUDGET", help="Address a saved budget by its name or permanent ID",
+    scoped = groups.add_parser("BUDGET", help=_ROOT_HELP["BUDGET"],
         epilog=TRANSFER_HELP, formatter_class=argparse.RawDescriptionHelpFormatter,
         usage="whab BUDGET {account,category,plugin,bank,history,import,insights,transactions,trnx} ...")
     scoped.add_argument("target", help=argparse.SUPPRESS)
@@ -132,12 +156,6 @@ def parser(options, argv=()):
     if requested in (None, "transactions", "trnx"):
         transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit/create transactions; atomic splits and annotations; review transfers", epilog=TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + CHANGE_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
         reads = transactions.add_subparsers(dest="filter", required=True)
-        action = argv[3] if requested in {"transactions", "trnx"} and len(argv) > 3 else None
-        known = {"non-reviewed", "unreviewed", "uncategorized", "uncategorised", "list",
-                 "categories", "categorize", "categorise", "note", "edit", "create",
-                 "review", "review-audit", "edit-many", "transfers", "match-transfer", "unmatch-transfer"}
-        if action not in known:
-            action = None
         if action in (None, "non-reviewed", "unreviewed"):
             unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
                 epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
@@ -159,7 +177,7 @@ def parser(options, argv=()):
             add_edit_many(reads)
         if action in (None, "transfers", "match-transfer", "unmatch-transfer"):
             add_transfer_parsers(reads)
-    groups.add_parser("api", help="Advanced local operations; use whab api --help")
+    groups.add_parser("api", help=_ROOT_HELP["api"])
     return root
 
 

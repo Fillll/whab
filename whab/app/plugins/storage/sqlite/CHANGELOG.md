@@ -6,6 +6,7 @@ PR: [#211](https://github.com/Fillll/whab/pull/211)
 
 - Update changed record hashes and their tree paths for bounded native edits, with cache invalidation after external writes, triggers and rollback. Preserve old metadata on open and fence earlier writers after the first format-5 financial commit.
 - Keep single-account scope edits and bulk classifications on indexed metadata reads while preserving confirmed-transfer guards, including implicit scope changes.
+- Reuse fully validated portable records during atomic cold restoration, and recognize populated local caches without loading their full transaction history. Every incoming file still receives independent validation before reuse.
 - Store a sanitized SQLite snapshot plus bounded checksummed audit additions in portable format 2. Compact without dropping history or receipts, validate independent restores, and keep every acknowledged edit inside the synchronously saved `.whab` file. Earlier raw SQLite payloads remain readable; new payloads require SQLite 1.29 or newer.
 
 ## 1.28.0 — 2026-11-14

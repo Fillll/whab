@@ -613,7 +613,8 @@ class Store(Authority):
         if workspace != "personal":
             raise StoreError("Portable budgets require the personal workspace.")
         snapshot, images = read_files(files, with_receipts=True)
-        self.restore_budget(workspace, snapshot, _receipts=images)
+        # The owned image reader already validated the detached ledger/history.
+        self._mutate(workspace, lambda state: self._restore_validated_snapshot(state, snapshot, images))
 
     def prepare_budget_files(
         self, workspace: str, files: Mapping[str, bytes], *, existing: bool = False,

@@ -745,6 +745,13 @@ Resources ship in wheels and are read without importing inactive plugin code. Cr
 
 The [CLI](../app/plugins/interface/cli/README.md) builds `--help` and operation-specific help from these resources. `whab-cli describe --json` works offline without a URL or token and includes schemas, examples and installed-plugin availability. `describe --plugin ID --kind KIND --operation NAME` filters the catalog. Supplying authenticated `--url` and `--budget` reads the authority's catalog through the public `describe` query, including enabled/disabled status; `--offline` deliberately uses local installed resources. This is read-only discovery and never starts inference or banking work. The shared ledger command validator derives accepted/required fields from the same core definitions while retaining domain validation and normalization. Feature inputs are checked against their action's documented schema before dispatch.
 
+Parser callers may request `installed_catalog(core_operations={(kind, name), ...})`
+to copy only selected core operations after complete document validation. The
+default catalog remains complete, and every returned document is detached from
+cached data. Plugin identities still include external registrations. Validation
+markers bind document bytes, validator code and JSON Schema library identity;
+identity reads are shared within one catalog, then refreshed on the next call.
+
 The [contribution requirement](../app/CONTRIBUTING.md#required-operation-documentation), repository checker, wheel smoke checks and [developer toolkit](../app/devtools/plugin-devkit/README.md) enforce these rules. A plugin change that adds or changes a public operation must update its resource, README and examples in the same change.
 
 Authenticated online discovery also includes `http.openapi`, the running application's complete OpenAPI contract with HTTP paths, methods, parameter/body schemas and response schemas. Human-readable `describe` lists methods and paths; `describe --json` includes their full definitions. Its `http.access` explains the existing HTTPS, local Host/origin, bearer authorization and signed-webhook boundaries. Documentation never grants route access. Offline documentation covers installed operation resources; it cannot claim the runtime's exact HTTP route selection or enablement.
