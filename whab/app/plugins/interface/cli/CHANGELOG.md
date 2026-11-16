@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.24.0 — 2026-11-15
+
+PR: [#215](https://github.com/Fillll/whab/pull/215)
+
+- Add ordinary atomic `trnx void` and `trnx unvoid` for 1–100 explicit IDs, exact read-only records/balance previews, guarded revisions/fingerprints, actor/batch attribution and durable exact retry recovery.
+- Verify complete saved receipts, preserve imported balance snapshots and source evidence, require both transfer legs explicitly, and document manual balance changes, tombstone retention and unreviewed restoration throughout offline help and operation examples.
+
 ## 2.23.0 — 2026-11-15
 
 PR: [#210](https://github.com/Fillll/whab/pull/210)

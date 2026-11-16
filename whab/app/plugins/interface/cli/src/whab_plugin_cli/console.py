@@ -28,6 +28,7 @@ from .help import (
 )
 from .identifiers import check_identifiers, host_id, plugin_identifiers
 from .transaction_change_help import CHANGE_HELP
+from .transaction_voids import VOID_HELP
 lazy from . import client
 lazy from .account_commands import account_table, add_account_parser, execute_account
 lazy from .bank_commands import add_bank_parser, bank_error, bank_request
@@ -50,6 +51,7 @@ lazy from .transaction_search import (
     search_table,
     validate_search,
 )
+lazy from .transaction_voids import add_void_parsers, execute_void, void_table
 lazy from .transfer_commands import (
     TRANSFER_HELP,
     add_transfer_parsers,
@@ -74,7 +76,7 @@ def parser(options, argv=()):
     check_identifiers(catalog)
     root = CommandParser(prog="whab", parents=[options],
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
-        epilog='Transaction corrections: trnx edit TX_ID; manual entry: trnx create; atomic edit-plus-create split: trnx edit-many --file split.json --preserve-balances. See each command --help for complete examples and recovery.\n\nCategory types: expense, income, transfer, opening_balance. Opening Balance records existing cash/debt separately from income; it never auto-reviews. Use category create/classify --type TYPE. Explicit review: trnx review IDS --reviewed; inspect legacy flags with trnx review-audit. See trnx review --help for classification requirements and atomic recovery.\n\n' + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
+        epilog='Transaction corrections: trnx edit TX_ID; manual entry: trnx create; atomic edit-plus-create split: trnx edit-many --file split.json --preserve-balances. Reversible exclusion: trnx void IDS / trnx unvoid IDS. See each command --help for complete examples and recovery.\n\nCategory types: expense, income, transfer, opening_balance. Opening Balance records existing cash/debt separately from income; it never auto-reviews. Use category create/classify --type TYPE. Explicit review: trnx review IDS --reviewed; inspect legacy flags with trnx review-audit. See trnx review --help for classification requirements and atomic recovery.\n\n' + VOID_HELP + "\n\n" + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
     budget = groups.add_parser("budget", help="Create and list saved budgets")
@@ -90,7 +92,7 @@ def parser(options, argv=()):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     plugin.add_argument("action", choices=("list",), nargs="?", default="list", help="List installed plugin documentation offline")
     scoped = groups.add_parser("BUDGET", help="Address a saved budget by its name or permanent ID",
-        epilog=TRANSFER_HELP, formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=VOID_HELP + "\n\n" + TRANSFER_HELP, formatter_class=argparse.RawDescriptionHelpFormatter,
         usage="whab BUDGET {account,category,plugin,bank,history,import,insights,transactions,trnx} ...")
     scoped.add_argument("target", help=argparse.SUPPRESS)
     commands = scoped.add_subparsers(dest="command", required=True)
@@ -129,7 +131,7 @@ def parser(options, argv=()):
         summary.add_argument("--month", help="YYYY-MM; default: current month")
         summary.add_argument("--currency", default="USD", help="ISO currency code (default: USD); currencies are never combined")
     if requested in (None, "transactions", "trnx"):
-        transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit/create transactions; atomic splits and annotations; review transfers", epilog=TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + CHANGE_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
+        transactions = commands.add_parser("transactions", aliases=["trnx"], help="Read/edit/create/void transactions; atomic splits and annotations; review transfers", epilog=VOID_HELP + "\n\n" + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + CHANGE_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
         reads = transactions.add_subparsers(dest="filter", required=True)
         unreviewed = reads.add_parser("non-reviewed", aliases=["unreviewed"], help="List unreviewed, non-deleted transactions",
             epilog="Example: whab empty-budget trnx non-reviewed --month 2026-11\nWithout --month, reads all available history. Never marks transactions reviewed.")
@@ -139,6 +141,7 @@ def parser(options, argv=()):
         add_category_parsers(reads)
         add_note_parser(reads)
         add_change_parsers(reads)
+        add_void_parsers(reads)
         from .review_commands import add_review_parsers
         add_review_parsers(reads)
         add_edit_many(reads)
@@ -268,6 +271,8 @@ def execute(args, home, environment, ca):
                 json={"name": args.name, "path": create_path(args.name, args.path)})
         identifier = resolve_budget(connection, args.target)
         prefix = "/budgets/" + quote(identifier, safe="") + PREFIX
+        if args.command in {"transactions", "trnx"} and args.filter in {"void", "unvoid"}:
+            return execute_void(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter in {"transfers", "match-transfer", "unmatch-transfer", "match-transfers", "transfer-audit", "repair-transfers"}:
             return execute_transfer(connection, identifier, prefix, args, exchange, CommandError)
         if args.command in {"transactions", "trnx"} and args.filter in {"review", "review-audit"}:
@@ -356,7 +361,7 @@ def main(argv=None):
         else:
             result = execute(args, *configuration(args))
         if getattr(args, "format", None) == "table":
-            print(review_audit_table(result) if getattr(args, "filter", None) == "review-audit" else transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer", "match-transfers", "transfer-audit", "repair-transfers"} else bulk_table(result) if "dryRun" in result and args.command != "category" else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
+            print(void_table(result) if getattr(args, "filter", None) in {"void", "unvoid"} else review_audit_table(result) if getattr(args, "filter", None) == "review-audit" else transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer", "match-transfers", "transfer-audit", "repair-transfers"} else bulk_table(result) if "dryRun" in result and args.command != "category" else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
                   else note_table(result) if args.filter == "note" else search_table(result) if args.filter == "list" else transaction_table(result))
         else:
             print(json.dumps(result, allow_nan=False))

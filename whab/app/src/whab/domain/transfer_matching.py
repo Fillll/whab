@@ -1,7 +1,7 @@
 """Deterministic transfer proposals and explicitly confirmed, reversible pairs."""
 
 from bisect import bisect_left, bisect_right
-from collections import defaultdict
+from collections import ChainMap, defaultdict
 from copy import deepcopy
 from datetime import date
 from hashlib import sha256
@@ -38,6 +38,16 @@ def valid_pair(row, transactions, accounts, categories=None, *, incoming=None):
     return incoming.get(row['id'], set()) == {peer['id']} and incoming.get(peer['id'], set()) == {row['id']}
 
 
+def archived_pair(row, transactions, accounts, categories=None, *, incoming=None):
+    """Prove a retained pair whose two explicitly voided legs are excluded."""
+    peer = transactions.get(row.get('transferPeerId'))
+    if peer is None or any(record.get('voided') is not True or record.get('deleted') is not True
+                           or record.get('reviewed') for record in (row, peer)):
+        return False
+    restored = ChainMap({record['id']: {**record, 'deleted': False} for record in (row, peer)}, transactions)
+    return valid_pair(restored[row['id']], restored, accounts, categories, incoming=incoming)
+
+
 def _identifier(value):
     if type(value) is not str or not 1 <= len(value) <= 200 or '\x00' in value:
         raise StoreError('Transaction IDs must be nonempty text of at most 200 characters.')
@@ -69,7 +79,7 @@ def _public(state, row):
     account = state['accounts'][row['accountId']]
     return {**public_transaction({**row, 'currency': account.get('currency', 'USD')}),
             'accountName': account['name'],
-            **{key: deepcopy(row[key]) for key in ('original', 'categoryEdited', 'deleted') if key in row}}
+            **{key: deepcopy(row[key]) for key in ('original', 'categoryEdited', 'deleted', 'voided', 'providerDeleted') if key in row}}
 
 
 def _fingerprint(state, action, ids, changes, extras=None):
@@ -121,7 +131,8 @@ def _audit_issue(state, row, incoming=None):
         return None
     if not ('transferPeerId' in row or row.get('isTransfer') or row.get('inferredTransfer') or category.get('kind') == 'transfer'):
         return None
-    if valid_pair(row, state['transactions'], state['accounts'], state['categories'], incoming=incoming):
+    if (valid_pair(row, state['transactions'], state['accounts'], state['categories'], incoming=incoming)
+            or archived_pair(row, state['transactions'], state['accounts'], state['categories'], incoming=incoming)):
         return None
     if row['amount'] == 0:
         code, message = 'zero_amount', 'A zero-value hint needs an explicitly confirmed pair of existing posted zero entries in different same-currency accounts; no direction or counterpart is inferred.'
@@ -216,7 +227,8 @@ def validate_matches(state):
     for row in state['transactions'].values():
         if 'transferPeerId' not in row:
             continue
-        if not valid_pair(row, state['transactions'], state['accounts'], state.get('categories'), incoming=incoming):
+        if not (valid_pair(row, state['transactions'], state['accounts'], state.get('categories'), incoming=incoming)
+                or archived_pair(row, state['transactions'], state['accounts'], state.get('categories'), incoming=incoming)):
             raise StoreError('Invalid transfer pair. Unmatch it before changing its amount, account, category or budget scope.')
 
 
@@ -226,7 +238,9 @@ def reconcile_matches(state):
     incoming = incoming_links(state['transactions'])
     for row in state['transactions'].values():
         peer = state['transactions'].get(row.get('transferPeerId'))
-        if 'transferPeerId' in row and not valid_pair(row, state['transactions'], state['accounts'], state.get('categories'), incoming=incoming):
+        if ('transferPeerId' in row
+                and not valid_pair(row, state['transactions'], state['accounts'], state.get('categories'), incoming=incoming)
+                and not archived_pair(row, state['transactions'], state['accounts'], state.get('categories'), incoming=incoming)):
             invalid.add(row['id'])
             if peer is not None:
                 invalid.add(peer['id'])

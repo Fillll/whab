@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.82.0 — 2026-11-15
+
+PR: [#215](https://github.com/Fillll/whab/pull/215)
+
+- Add reversible, guarded transaction void/unvoid for 1–100 explicit IDs, with exact record/balance previews, native atomic history, one save and restart-safe exact retries.
+- Keep user tombstones across bank refresh/import and portable restoration, distinguish later provider deletion, preserve imported balance snapshots, and require both matched-transfer legs.
+- Expose the same capability through public SDK, worker and HTTPS contracts; preserve manual-entry balance rules, source evidence, attachments and guarded audit reversals.
+
 ## 2.81.0 — 2026-11-15
 
 PR: [#210](https://github.com/Fillll/whab/pull/210)

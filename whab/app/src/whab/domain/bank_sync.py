@@ -11,6 +11,8 @@ from .imports import (
     annotated_transaction,
     bank_identifier,
     imported_account,
+    mark_provider_removed,
+    sync_annotations,
     validate_imported_transaction,
 )
 from .transactions import UNSET
@@ -62,7 +64,7 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
         pending = state["transactions"].get(record.get("pendingTransactionId"))
         if any(not owned_transaction(previous) for previous in (existing, pending) if previous is not None):
             raise StoreError("Bank transaction belongs to another connection.")
-        annotations = existing or pending or {}
+        annotations = sync_annotations(existing, pending)
         normalized = annotated_transaction(record, annotations, categories=state["categories"])
         category = normalized["categoryId"]
         if category is not None:
@@ -77,7 +79,10 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
                 normalized["reviewed"] = False
         state["transactions"][identifier] = normalized
         if pending is not None and pending["id"] != identifier:
-            image = state["receipts"].pop(pending["id"], None)
+            if pending.get('voided'):
+                mark_provider_removed(pending)
+            image = (state['receipts'].get(pending['id']) if pending.get('voided')
+                     else state["receipts"].pop(pending["id"], None))
             if image is not None:
                 state["receipts"].setdefault(identifier, image)
     for identifier in changes["removed"]:
@@ -87,7 +92,7 @@ def merge_sync(state, item_id, changes, cursor, accounts, *, expected_cursor=UNS
             continue
         if not owned_transaction(transaction):
             raise StoreError("Bank transaction does not belong to this connection.")
-        transaction["deleted"] = True
+        mark_provider_removed(transaction)
     from .transfer_matching import reconcile_matches
     reconcile_matches(state)
     item.update(cursor=cursor, lastSynced=synced_at, status="connected", error=None)

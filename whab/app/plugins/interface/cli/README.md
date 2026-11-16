@@ -119,6 +119,73 @@ Requires CLI 2.16 / WHAB 2.71; native rename support is SQLite 1.22 or JSON 1.14
 Existing public note-only edits supply memo persistence; no new note storage API
 or migration is introduced. Unsupported storage reports an update requirement.
 
+## Void and restore erroneous transactions
+
+```sh
+whab "My budget" trnx void TX1 TX2 --dry-run --format table
+whab "My budget" trnx void TX1 TX2 --revision REV --fingerprint HASH --agent Codex
+whab "My budget" trnx unvoid TX1 TX2 --dry-run
+whab "My budget" trnx unvoid TX1 TX2 --agent Codex --batch correction
+whab "My budget" trnx void --help
+whab "My budget" trnx unvoid --help
+```
+
+Use `void` for user-confirmed erroneous records, including imported placeholders.
+It excludes records from ordinary transaction reads and financial activity while
+retaining their identity, source evidence and reversible tombstone. It does not
+change an amount to zero, delete the record physically or fabricate a reversal.
+`unvoid` restores explicitly voided records; provider-only deletions and later
+`providerDeleted` evidence cannot be overridden. Both operations leave affected
+transactions unreviewed. Unvoid retains `voided: false` as an explicit restoration
+decision, preventing a later posted refresh from inheriting an old pending
+tombstone. Existing category, category-agent label, notes, exact
+merchant whitespace, account/date/amount and reciprocal transfer links remain
+unchanged. Refresh/reimport must not silently resurrect an explicit void.
+
+Each command accepts **1–100 distinct stable transaction IDs**, from `trnx list`
+or a previous exact receipt/history entry. Names/payees are not transaction
+identities. Include both reciprocal transfer legs explicitly when voiding or
+restoring a pair. No counterpart or link is inferred. Empty, oversized, missing,
+duplicate, already-in-the-requested-state or unsafe selections reject the entire
+batch. A batch is never split. One public operation uses one revision, request
+ID, native atomic commit, revision advancement, synchronous durable save and
+permanent before/after audit entry. `--batch` still groups history only.
+
+`--dry-run` is read-only and shows every exact before/after transaction and
+`balanceChanges`, with each account's ID, currency, type, and before/after integer
+minor-unit balance. Imported corrections preserve imported/provider balance
+snapshots. Manual/demo entries reverse their original balance effect when voided
+and reapply it when restored: assets reverse an outflow by adding its amount;
+liabilities reverse the amount owed. Unknown/null snapshots remain unknown when
+no balance adjustment is required; a nonzero manual adjustment requires a known
+balance and otherwise rejects the entire batch. Monthly assignments remain unchanged even
+when excluding false income reveals a funding deficit. No envelope reallocation,
+bank synchronization or future rule is created. Zero-value entries are supported.
+
+Inspect both records and balances, then bind the preview with `--revision` and
+`--fingerprint`; omitting them previews current state internally. Execution remains
+noninteractive. JSON is complete; `--format table` shows all before/after records
+and balance changes. The result includes the addressed budget, saved revision,
+original request/revision/fingerprint and complete intent. Verify it with
+`history list`/`history show`. Voided rows are absent from ordinary `trnx list`;
+retain their IDs and use `trnx unvoid IDS --dry-run` to inspect them. Guarded
+history undo/redo and explicit unvoid must satisfy current financial/transfer rules.
+
+Stale revisions, changed fingerprints and conflicting request-ID reuse fail safely.
+After uncertainty retain the **complete original intent**: ordered IDs, action,
+revision, fingerprint, request ID, agent and batch. An exact retry uses all those
+same values and returns the original durable receipt, including after restart,
+without duplicated changes, history or saves. Never automatically replay with a
+fresh revision/request ID. An HTTP error after submission, including 400 or 409,
+does not prove that nothing was saved; inspect state using the original intent.
+`--agent` records audit attribution without changing
+existing category attribution. Unsupported backends fail before mutation.
+
+Requires CLI 2.24 / WHAB 2.82 and native SQLite 1.30 or JSON 1.22. Root, budget,
+transaction group, both command help pages and packaged operation documentation
+are available offline. Public financial rules and persistence stay in the shared
+ledger contracts; the CLI owns parsing, guarded intent handling and presentation.
+
 ## Atomic bulk edits
 
 CLI 2.17 with WHAB 2.72 adds true atomic native bulk operations.

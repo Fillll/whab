@@ -37,6 +37,8 @@ from whab.domain.imports import (
     annotated_transaction,
     bank_identifier,
     imported_account,
+    mark_provider_removed,
+    sync_annotations,
     validate_imported_transaction,
 )
 from whab.domain.portable import validate_portable_budget
@@ -92,7 +94,7 @@ class Store(Authority):
             try:
                 with self._snapshot():
                     metadata = self._authority_metadata()
-                    if metadata["formatVersion"] not in {2, 3, 4, 5} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
+                    if metadata["formatVersion"] not in {2, 3, 4, 5, 6} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
                         raise StoreError("Read-only readiness requires the current native SQLite schema; upgrade it explicitly first.")
                     if metadata["budgetId"] != budget_id or metadata["environment"] != environment:
                         raise StoreError("SQLite storage identity belongs to another budget or environment.")
@@ -234,6 +236,8 @@ class Store(Authority):
                 "inferredTransfer": bool(row["inferred_transfer"]),
                 "categoryEdited": bool(row["category_edited"]),
                 "deleted": bool(row["deleted"]),
+                **({"voided": bool(row["voided"])} if "voided" in row.keys() and row["voided"] is not None else {}),
+                **({"providerDeleted": True} if "provider_deleted" in row.keys() and row["provider_deleted"] else {}),
                 **({"original": json.loads(row["original_details"])} if "original_details" in row.keys() and row["original_details"] is not None else {}),
             }
         for row in self.db.execute("SELECT * FROM budget WHERE workspace=?", (workspace,)):
@@ -272,6 +276,9 @@ class Store(Authority):
             from .transfer_pairs import retains_pairs
             if retains_pairs(state):
                 required = 5
+            from .transaction_voids import retains_voids
+            if retains_voids(state):
+                required = 6
             writing['metadata']['formatVersion'] = max(writing['metadata']['formatVersion'], required)
         workspace = state["_id"]
         if "history" in state:
@@ -315,7 +322,7 @@ class Store(Authority):
             ],
         )
         self.db.executemany(
-            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer,merchant_logo,original_details,category_agent,transfer_peer_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer,merchant_logo=excluded.merchant_logo,original_details=excluded.original_details,category_agent=excluded.category_agent,transfer_peer_id=excluded.transfer_peer_id",
+            "INSERT INTO transactions(id,workspace,account_id,date,merchant,amount,category_id,pending,reviewed,source,note,is_transfer,category_edited,deleted,inferred_transfer,merchant_logo,original_details,category_agent,transfer_peer_id,voided,provider_deleted) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET account_id=excluded.account_id,date=excluded.date,merchant=excluded.merchant,amount=excluded.amount,category_id=excluded.category_id,pending=excluded.pending,reviewed=excluded.reviewed,source=excluded.source,note=excluded.note,is_transfer=excluded.is_transfer,category_edited=excluded.category_edited,deleted=excluded.deleted,inferred_transfer=excluded.inferred_transfer,merchant_logo=excluded.merchant_logo,original_details=excluded.original_details,category_agent=excluded.category_agent,transfer_peer_id=excluded.transfer_peer_id,voided=excluded.voided,provider_deleted=excluded.provider_deleted",
             [
                 (
                     t["id"],
@@ -337,6 +344,8 @@ class Store(Authority):
                     json.dumps(t["original"]) if "original" in t else None,
                     t.get("categoryAgent"),
                     t.get("transferPeerId"),
+                    int(t["voided"]) if "voided" in t else None,
+                    int(t.get("providerDeleted", False)),
                 )
                 for t in state["transactions"].values()
             ],
@@ -830,6 +839,17 @@ class Store(Authority):
     def supports_bulk_transfer_matching(self):
         return True
 
+    def supports_transaction_voiding(self):
+        return True
+
+    def preview_transaction_void(self, workspace, transaction_ids, action):
+        from .transaction_voids import preview
+        return preview(self, workspace, transaction_ids, action)
+
+    def apply_transaction_void(self, workspace, transaction_ids, action, fingerprint):
+        from .transaction_voids import apply
+        return apply(self, workspace, transaction_ids, action, fingerprint)
+
     def supports_transfer_integrity(self):
         return True
 
@@ -1137,7 +1157,7 @@ class Store(Authority):
                     if previous is not None
                 ):
                     raise StoreError("Bank transaction belongs to another connection.")
-                annotations = existing or pending or {}
+                annotations = sync_annotations(existing, pending)
                 normalized_transaction = annotated_transaction(imported, annotations, categories=state["categories"])
                 category_id = normalized_transaction["categoryId"]
                 if category_id is not None:
@@ -1154,16 +1174,19 @@ class Store(Authority):
                         normalized_transaction["reviewed"] = False
                 state["transactions"][transaction_id] = normalized_transaction
                 if pending is not None and pending["id"] != transaction_id:
+                    if pending.get("voided"):
+                        mark_provider_removed(pending)
                     # Keep the user's picture when a provider replaces a pending
                     # transaction ID with its posted ID, within the same sync.
                     self.db.execute(
                         "INSERT OR IGNORE INTO transaction_receipts(workspace,transaction_id,image) SELECT workspace,?,image FROM transaction_receipts WHERE workspace=? AND transaction_id=?",
                         (transaction_id, "personal", pending["id"]),
                     )
-                    self.db.execute(
-                        "DELETE FROM transaction_receipts WHERE workspace=? AND transaction_id=?",
-                        ("personal", pending["id"]),
-                    )
+                    if not pending.get("voided"):
+                        self.db.execute(
+                            "DELETE FROM transaction_receipts WHERE workspace=? AND transaction_id=?",
+                            ("personal", pending["id"]),
+                        )
             for removed_id in sync_changes.get("removed", []):
                 bank_identifier(removed_id)
                 transaction = state["transactions"].get(removed_id)
@@ -1171,7 +1194,7 @@ class Store(Authority):
                     continue  # Already absent tombstones remain harmless and replayable.
                 if not owned_transaction(transaction):
                     raise StoreError("Bank transaction does not belong to this connection.")
-                transaction["deleted"] = True
+                mark_provider_removed(transaction)
             from whab.domain.transfer_matching import reconcile_matches
             reconcile_matches(state)
             item.update(

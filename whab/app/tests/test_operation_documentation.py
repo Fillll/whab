@@ -35,10 +35,12 @@ def test_all_installed_plugins_have_complete_nonexecuting_documents(monkeypatch)
     catalog = docs.installed_catalog()
     assert not calls and len(catalog["plugins"]) == 23
     assert all(row["documented"] and row["enabled"] is None for row in catalog["plugins"])
-    assert len([row for row in catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 50
+    assert len([row for row in catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 55
     assert {"change_transactions", "preview_transaction_changes", "transaction_change_policy",
             "transfer_policy", "preview_transfer_matches", "match_transfers",
-            "transfer_audit", "preview_transfer_repair", "repair_transfers"} <= {
+            "transfer_audit", "preview_transfer_repair", "repair_transfers",
+            "transaction_void_policy", "preview_void_transactions", "preview_unvoid_transactions",
+            "void_transactions", "unvoid_transactions"} <= {
         row["name"] for row in catalog["core"]["operations"] if row["kind"] in {"query", "command"}
     }
     assert {row["name"] for row in catalog["core"]["operations"] if row["kind"] == "local"} == {

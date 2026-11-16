@@ -342,6 +342,24 @@ class RemoteStore:
     def move_category(self, workspace, category_id, parent_id):
         return self._command("move_category", workspace, {"categoryId": category_id, "parentId": parent_id})
 
+    def supports_transaction_voiding(self):
+        try:
+            policy = self._policy('transaction_void_policy')
+        except StoreError:
+            raise StoreError('Update or reconnect the remote authority for reversible atomic transaction voiding; no mutation was submitted.') from None
+        return (type(policy) is dict and policy.get('version') == 1
+                and policy.get('maxTransactions') == 100 and policy.get('durableTombstones') is True)
+
+    def preview_transaction_void(self, workspace, transaction_ids, action):
+        if type(action) is not str or action not in {'void', 'unvoid'}:
+            raise StoreError('Choose void or unvoid.')
+        return self._query('preview_' + action + '_transactions', workspace, parameters={'transactionIds': transaction_ids})
+
+    def apply_transaction_void(self, workspace, transaction_ids, action, fingerprint):
+        if type(action) is not str or action not in {'void', 'unvoid'}:
+            raise StoreError('Choose void or unvoid.')
+        return self._command(action + '_transactions', workspace, {'transactionIds': transaction_ids, 'fingerprint': fingerprint})
+
     def supports_transfer_matching(self):
         return True
 
